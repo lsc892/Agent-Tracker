@@ -1,8 +1,8 @@
-# Claude & Codex Usage Tracker 설계 명세
+# Agent Tracker 설계 명세
 
 > 상태: 구현 전 검증 완료 초안
 > 검증일: 2026-10-02
-> 의사결정 이력: [Claude & Codex Usage Tracker 일지](./ClaudeCodexUsageTracker-일지.md)
+> 의사결정 이력: [Agent Tracker 일지](./AgentTracker-일지.md)
 
 ## 1. 목표
 
@@ -156,19 +156,19 @@ manual refresh
 
 ```ts
 const claudeItem = vscode.window.createStatusBarItem(
-  'claudeCodexUsage.claudeQuota', vscode.StatusBarAlignment.Right, 100,
+  'agentTracker.claudeQuota', vscode.StatusBarAlignment.Right, 100,
 );
 const codexItem = vscode.window.createStatusBarItem(
-  'claudeCodexUsage.codexQuota', vscode.StatusBarAlignment.Right, 99,
+  'agentTracker.codexQuota', vscode.StatusBarAlignment.Right, 99,
 );
 claudeItem.text = 'Claude 5h:32% 7d:18%';
 codexItem.text = 'Codex 5h:42% 7d:11%';
 claudeItem.command = {
-  title: 'Claude 사용량 보기', command: 'claudeCodexUsage.openDashboard',
+  title: 'Claude 사용량 보기', command: 'agentTracker.openDashboard',
   arguments: [{ tab: 'quota', provider: 'claude' }],
 };
 codexItem.command = {
-  title: 'Codex 사용량 보기', command: 'claudeCodexUsage.openDashboard',
+  title: 'Codex 사용량 보기', command: 'agentTracker.openDashboard',
   arguments: [{ tab: 'quota', provider: 'codex' }],
 };
 claudeItem.tooltip = '클릭하여 Claude 사용량 보기';
@@ -855,27 +855,7 @@ S 파일 중 하나 파싱 실패:
 
 중복 winner 파일이 삭제되었어도 남은 원본에서 후보를 다시 비교한다. 따라서 파일별 기여량을 단순 차감하지 않고 session 전체를 재집계한다.
 
-## 12. 원안과 비교한 수정 사항
-
-| 원안 | 검증 결과와 수정 |
-|---|---|
-| 5시간/7일 token 사용량 | 실제로는 quota 사용률이다. token 절대량으로 표현하지 않는다. |
-| Claude usage API | 동작 사례는 있지만 공개 안정 API가 아니다. 교체 가능한 adapter와 실패 UI가 필요하다. |
-| Codex `account/rateLimits/read` | 짧은 App Server 조회 후 종료한다. `rateLimitsByLimitId`, 조회 중 notification, 인증 유형을 처리한다. |
-| `MarkdownString`을 클릭해 표시 | hover는 안내만 제공하고 두 StatusBarItem의 click은 공통 Quota Webview의 해당 제공자 카드로 이동한다. |
-| progress bar의 임의 CSS | sanitizer가 `font-size`를 제거할 수 있다. 허용된 span color만 사용한다. |
-| 공통 `message.id + requestId` dedup | Claude 전용이다. Codex current는 `response_id`, legacy는 snapshot/high-water를 사용한다. |
-| user message 단위 grouping | Claude는 `promptId`, Codex는 `root_turn_id`를 우선한다. |
-| `turn_id = 세션 내 순서` | 식별자와 `turn_index`를 분리한다. |
-| agent별 영속 row | parser 내부에서 main/subagent 귀속을 구분하고 사용자 요청 summary 하나로 합산한다. |
-| subagent 시간 미합산 | 타당하다. token만 root에 합산하고 duration은 main/root만 사용한다. |
-| cache bucket을 모두 total에 더함 | Claude와 Codex 의미가 다르므로 먼저 정규화한다. |
-| model별·비용 분석 | 현재 기능 범위에서 제외하고 token 총량·turn 평균·시간만 조회한다. |
-| 과거 누계 갱신 | quota와 분리하고 dashboard open/manual refresh 때만 lazy 갱신한다. |
-| manifest 전체 적재와 refresh 전체 transaction | 발견·비교는 최대 n개씩, summary 교체는 영향 session 단위로 수행한다. |
-| project/session/agent/turn/candidate 정규화 table | 영속 table은 manifest와 turn_summary 두 개로 줄이고 변경 session의 원본을 다시 집계한다. |
-
-## 13. 실패와 품질 표시
+## 12. 실패와 품질 표시
 
 데이터가 애매할 때 임의로 정확한 값처럼 만들지 않는다.
 
@@ -902,79 +882,9 @@ summaries with source error / stale values
 last successful session update
 ```
 
-## 14. 테스트 계획
+## 13. 구현 순서
 
-### manifest와 session 재집계
-
-- 변경 없는 session은 body read 0 bytes; 같은 session의 다른 파일 변경 시 함께 재집계
-- append/truncate/replace 후 session 전체 재집계가 full rebuild 결과와 일치
-- newline 없는 마지막 row 보류
-- winner 파일 삭제 후 남은 원본을 재파싱하여 duplicate runner-up 복구
-- move는 신뢰 가능한 inode에서만 최적화
-- 파일 session 귀속 변경 시 이전·새 session의 summary와 manifest를 함께 교체
-- n개보다 많은 파일과 큰 session도 metadata·parser buffer·대기열 한도 유지
-- 묶음 경계의 duplicate와 main/subagent 기록도 사용자 요청당 summary 한 행
-- session 교체 실패 시 summary·정상 metadata·삭제가 함께 rollback
-- 파일 하나의 parse 실패 시 이전 summary 유지, 상태·처리 위치·기록 시각·오류만 기록
-- 오류·중단 후 자동 재시도 없이 종료; 다음 화면 진입·수동 새로 고침에서 새로 조사
-- 전체 순회 완료 전 부재 판정 금지; 접근 실패·취소 시 summary 교체와 삭제 금지
-- NULL 방문 표시를 포함한 미방문 파일을 keyset pagination으로 이번 실행의 임시 목록에 기록
-- 부재 flag 없이 session 교체와 manifest 삭제를 함께 commit; 실패 시 둘 다 보존
-- 다음 사용자 요청에서 새 scan으로 재조사; 다시 나타난 파일은 삭제 대상으로 판정하지 않음
-- 대상에서 제외된 루트는 이번 scan의 삭제 판정에서 제외
-- 여러 창의 refresh 직렬 실행; 일부 session 반영을 전체 최신 통계로 표시하지 않음
-- 영속 schema에는 manifest와 turn_summary 두 table만 존재
-
-### Claude parser
-
-- partial/final usage 중 큰 vector 선택
-- requestId 없는 단일 후보 결합
-- requestId 후보가 여러 개면 분리
-- tool-result user row가 새 root turn을 만들지 않음
-- main/subagent transcript가 같은 root prompt에 귀속
-
-### Codex parser
-
-- current `token_usage_record.usage` 합과 turn 누계 일치
-- cumulative turn/thread snapshot을 반복 합산하지 않음
-- legacy `last_token_usage` 우선
-- legacy high-water regression clamp
-- fork의 검증된 inherited prefix만 제외
-
-### duration
-
-- explicit duration 우선
-- lifecycle 차이 fallback
-- timestamp fallback
-- 병렬 subagent duration 미합산
-- background subagent가 root 종료 뒤 끝나는 경우 정책 확인
-
-### UI와 quota
-
-- 클릭 Quota 화면은 light/dark theme에서 읽히고 hover는 안내만 표시
-- 75%/90% threshold 색상
-- dynamic label HTML escape
-- 두 status item click이 해당 Quota 카드로 이동하고 설정 버튼은 클릭으로 동작
-- 실패 시 마지막 성공 값·시각·오래된 값 안내를 유지하고 성공 이력이 없거나 유지 기한이 지나면 `조회 불가` 표시
-- 기본 15분 polling, 비활성 중 생략, 복귀 5분 debounce, 실패 backoff, 수동 강제 조회와 중복 병합
-- 제공자별 갱신 간격·표시/숨김 및 공통 사용률/남은 비율·간략/상세 설정
-- 기존 CLI 로그인, 미로그인, API key, 다른 data home 및 외부 계정 변경 처리
-- App Server 성공·오류·timeout·취소 뒤 process 종료, 진행 중 중복 refresh의 단일 실행, 조회 사이 상주 process 없음
-- HTTP 요청 수와 로컬 protocol 메시지 수 구분; token 갱신·재시도 때문에 HTTP 1회 고정이라고 가정하지 않음
-- reset timestamp timezone과 DST 처리
-
-### 총량·평균·디버깅 조회
-
-- 일·월·프로젝트·세션 총량이 사용자 요청 summary 합계와 일치
-- 진행 중 요청은 확인한 token 총량에 포함하고 완료 turn 평균에서 제외
-- duration NULL은 평균의 분모에서 제외하고 유효 표본 수 표시
-- 서로 다른 경로의 같은 project 이름은 project_key로 구분
-- configured timezone의 일·월 경계, DST, 시각 미상 요청의 별도 표시
-- main/subagent가 많은 요청도 turn 평균 분모에는 사용자 요청 한 개로 반영
-- manifest의 진단 네 column으로 최근 상태·처리 위치·기록 시각·오류 표시
-- summary의 문제 파일·byte 위치·원인을 표시하고 이전 정상 수치를 보존
-
-## 15. 구현 순서
+각 기능을 구현할 때 fixture 기반 테스트를 함께 작성한다. 상세 검증 항목과 자동 실행·패키징 정책은 [CI/CD 계획](./CI-CD.md)에서 관리한다.
 
 1. VS Code extension scaffold와 StatusBar/Webview command
 2. `QuotaService`와 provider adapter interface
@@ -986,9 +896,9 @@ last successful session update
 8. Codex current parser와 legacy fallback
 9. 임시 staging에서 사용자 요청 합산, session 단위 turn_summary 교체
 10. 일·월·프로젝트·세션 총량 및 turn 평균 Webview, 파일·summary 디버깅
-11. fixture 기반 regression test와 대용량 benchmark
+11. GitHub Actions CI 연결과 릴리스 VSIX 패키징; 대용량 benchmark는 정기·수동 workflow로 실행
 
-## 16. 완료 조건
+## 14. 완료 조건
 
 - extension 활성화만으로 JSONL 전체 scan이 발생하지 않는다.
 - 조회 중 provider notification은 수신 즉시 반영하고 활성 창의 정기 조회는 제공자별 기본 15분 간격으로 수행한다. 조회 사이 Codex App Server는 상주하지 않는다.
@@ -1004,16 +914,3 @@ last successful session update
 - 일·월·프로젝트·세션 총량과 완료 turn 평균 token·시간을 summary query로 계산하고 누락 시간은 0으로 채우지 않는다.
 - schema drift와 부분 coverage가 조용히 숨겨지지 않고 Diagnostics에 표시된다.
 - 현재 quota를 로컬 token 합계로 역산하지 않는다. quota 갱신은 과거 JSONL 통계 스캔을 유발하지 않는다.
-
-## 17. 최종 판단
-
-프로젝트 방향은 타당하다. 특히 **quota만 실시간**, **과거 누계는 manifest와 turn_summary 두 table로 지연 갱신**, **subagent는 token만 합산하고 시간은 root turn만 사용**하는 구분은 메모리와 정확도 사이의 균형이 좋다.
-
-원안에서 구현 전에 반드시 고쳐야 하는 부분은 네 가지다.
-
-1. quota percentage를 실제 token 개수로 표현하지 않는다.
-2. Claude와 Codex에 같은 dedup 알고리즘을 적용하지 않는다.
-3. cache/reasoning token을 단순 덧셈해 이중 집계하지 않는다.
-4. Claude의 비공개 usage endpoint와 provider JSONL을 안정된 공개 API처럼 취급하지 않는다.
-
-이 네 조건과 품질 flag를 지키면 구현 가능한 설계다.
