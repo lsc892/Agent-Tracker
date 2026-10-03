@@ -1,0 +1,195 @@
+(() => {
+  'use strict';
+  const vscode = acquireVsCodeApi();
+  const $ = id => document.getElementById(id);
+  const send = message => vscode.postMessage(message);
+  const number = value => value === null || value === undefined ? '—' : new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 1 }).format(value);
+  const duration = value => value === null || value === undefined ? '—' : value < 1000 ? `${number(value)} ms` : `${number(value / 1000)}초`;
+  let timezone;
+  const date = value => value === null || value === undefined ? '알 수 없음' : new Intl.DateTimeFormat('ko-KR', { dateStyle: 'short', timeStyle: 'medium', timeZone: timezone }).format(new Date(value));
+  let quotaStates = [];
+  let percentage = 'used';
+  let currentTab = 'quota';
+  let offset = 0;
+  let diagnosticOffset = 0;
+  let latestUsage;
+  let countdowns = [];
+  const saved = vscode.getState();
+  if (saved && ['day', 'month', 'project', 'session', 'turn', 'all'].includes(saved.group)) $('group').value = saved.group;
+
+  function element(tag, text, className) {
+    const node = document.createElement(tag);
+    if (text !== undefined) node.textContent = String(text);
+    if (className) node.className = className;
+    return node;
+  }
+  function button(label, handler) {
+    const node = element('button', label);
+    node.type = 'button';
+    node.addEventListener('click', handler);
+    return node;
+  }
+  function tab(name, notify = true) {
+    currentTab = name;
+    if (name === 'diagnostics') diagnosticOffset = 0;
+    if (name === 'quota') renderCountdowns();
+    for (const item of ['quota', 'usage', 'diagnostics']) $(item).hidden = item !== name;
+    document.querySelectorAll('[data-tab]').forEach(node => {
+      if (node.dataset.tab === name) node.setAttribute('aria-current', 'page');
+      else node.removeAttribute('aria-current');
+    });
+    if (notify) { if (name === 'usage') query(); send({ type: 'tab', tab: name }); }
+  }
+  function query() {
+    const request = { groupBy: $('group').value, offset };
+    if ($('provider').value) request.provider = $('provider').value;
+    if ($('project-key').value.trim()) request.projectKey = $('project-key').value.trim();
+    if ($('session-id').value.trim()) request.sessionId = $('session-id').value.trim();
+    if ($('from-day').value) request.fromDay = $('from-day').value;
+    if ($('to-day').value) request.toDay = $('to-day').value;
+    send({ type: 'queryUsage', query: request });
+    vscode.setState({ group: request.groupBy });
+  }
+  function remaining(timestamp) {
+    if (timestamp === null) return '초기화 시각 알 수 없음';
+    const seconds = Math.ceil((timestamp - Date.now()) / 1000);
+    if (seconds <= 0) return '초기화 시각 지남 · 다음 조회 대기';
+    if (seconds < 60) return `초기화까지 ${seconds}초`;
+    if (seconds < 3600) return `초기화까지 ${Math.ceil(seconds / 60)}분`;
+    if (seconds < 86400) return `초기화까지 ${Math.floor(seconds / 3600)}시간 ${Math.ceil(seconds % 3600 / 60)}분`;
+    return `초기화까지 ${Math.floor(seconds / 86400)}일 ${Math.floor(seconds % 86400 / 3600)}시간`;
+  }
+  function renderQuota() {
+    const cards = $('quota-cards');
+    const focusedCard = document.activeElement?.closest('.card');
+    const focusedAction = document.activeElement?.dataset.action;
+    countdowns = [];
+    cards.replaceChildren();
+    $('quota-diagnostics').replaceChildren();
+    for (const state of quotaStates) {
+      const name = state.provider === 'claude' ? 'Claude' : 'Codex';
+      const card = element('article', undefined, 'card');
+      card.id = `card-${state.provider}`;
+      card.tabIndex = -1;
+      const heading = element('div', undefined, 'card-heading');
+      heading.append(element('h2', `${name} 사용량`));
+      const actions = element('div', undefined, 'actions');
+      const refresh = button(state.refreshing ? '조회 중…' : '↻', () => send({ type: 'refreshQuota', provider: state.provider }));
+      refresh.setAttribute('aria-label', `${name} 사용률 새로 고침`);
+      refresh.setAttribute('aria-busy', String(state.refreshing));
+      refresh.dataset.action = 'refresh';
+      const settings = button('⚙', () => send({ type: 'settings', provider: state.provider }));
+      settings.setAttribute('aria-label', `${name} 설정`);
+      settings.dataset.action = 'settings';
+      actions.append(refresh, settings);
+      heading.append(actions);
+      card.append(heading);
+      if (!state.snapshot || !state.snapshot.windows.length) card.append(element('p', state.refreshing ? '사용량을 확인하고 있습니다…' : '조회 불가', 'muted'));
+      for (const window of state.snapshot?.windows ?? []) {
+        const row = element('div', undefined, 'window');
+        const title = element('div', undefined, 'window-heading');
+        const shown = percentage === 'remaining' ? Math.max(0, 100 - window.usedPercent) : window.usedPercent;
+        title.append(element('span', window.label), element('strong', `${percentage === 'remaining' ? '남음' : '사용'} ${number(shown)}%`));
+        const progress = element('progress');
+        progress.max = 100;
+        progress.value = Math.max(0, Math.min(100, shown));
+        progress.setAttribute('aria-label', `${window.label} ${number(shown)}%`);
+        progress.className = window.usedPercent >= 90 ? 'danger' : window.usedPercent >= 75 ? 'warning' : '';
+        const countdown = element('p', undefined, 'reset countdown');
+        countdowns.push({ node: countdown, window });
+        row.append(title, progress, countdown, element('p', `초기화: ${date(window.resetsAt)}`, 'reset'));
+        card.append(row);
+      }
+      if (state.status === 'stale') card.append(element('p', '오래된 값 · 최근 갱신에 실패하여 마지막 성공 값을 표시합니다.', 'stale'));
+      if (state.error) card.append(element('p', state.error.message, 'error'));
+      card.append(element('p', `마지막 성공 갱신: ${date(state.lastSuccessAt)}`, 'muted'));
+      cards.append(card);
+      $('quota-diagnostics').append(element('p', `${name}: ${state.error ? state.error.message : state.refreshing ? '조회 중' : state.snapshot ? '정상' : '아직 조회하지 않음'} · 마지막 성공 ${date(state.lastSuccessAt)}`));
+    }
+    renderCountdowns();
+    if (focusedCard) {
+      const card = $(focusedCard.id);
+      const target = focusedAction ? card?.querySelector(`[data-action="${focusedAction}"]`) : card;
+      target?.focus({ preventScroll: true });
+    }
+  }
+  function renderCountdowns() {
+    for (const { node, window } of countdowns) node.textContent = `현재 ${number(window.current)} / 최대 ${number(window.maximum)} · ${remaining(window.resetsAt)}`;
+  }
+  function table(target, headers, rows) {
+    target.replaceChildren();
+    if (!rows.length) { target.append(element('p', '표시할 기록이 없습니다.', 'empty')); return; }
+    const node = element('table');
+    const head = element('thead');
+    const tr = element('tr');
+    for (const header of headers) tr.append(element('th', header));
+    head.append(tr);
+    node.append(head);
+    const body = element('tbody');
+    for (const values of rows) {
+      const row = element('tr');
+      for (const value of values) row.append(element('td', value ?? '—'));
+      body.append(row);
+    }
+    node.append(body);
+    target.append(node);
+  }
+  function renderUsage(result) {
+    latestUsage = result;
+    const turn = result.groupBy === 'turn';
+    const rows = result.rows;
+    if (turn) {
+      table($('usage-table'), ['제공자 / 프로젝트', '요청 / 세션', '시작 시각', '입력', '출력', '총 토큰', '소요 시간', '상태 / 품질'], rows.map(row => [
+        `${row.provider} / ${row.project_name}`, `${row.root_turn_id} / ${row.session_id}`, date(row.started_at_ms), number(row.input_tokens), number(row.output_tokens), number(row.total_tokens), duration(row.duration_ms), `${row.status === 'completed' ? '완료' : '진행 중'} · ${row.duration_quality}${row.quality_flags ? ` · ${row.quality_flags}` : ''}${row.last_error ? ` · 이전 값: ${row.last_error}` : ''}`,
+      ]));
+    } else {
+      table($('usage-table'), ['제공자', '기간 / 프로젝트 / 세션', '입력', '출력', '총 토큰', '완료 / 전체 요청', '평균 토큰', '평균 시간 / 표본'], rows.map(row => [
+        row.provider, row.period ?? row.session_id ?? (row.project_name ? `${row.project_name} (${row.project_key})` : ['day', 'month'].includes(result.groupBy) ? '시각 미상' : '전체'), number(row.input_tokens), number(row.output_tokens), number(row.total_tokens), `${number(row.completed_turns)} / ${number(row.turn_count)}`, number(row.avg_tokens_per_turn), `${duration(row.avg_duration_ms)} / ${number(row.turns_with_duration)}개`,
+      ]));
+    }
+    $('previous').disabled = offset === 0;
+    $('next').disabled = offset + rows.length >= result.total;
+    $('page-label').textContent = result.total ? `${number(offset + 1)}–${number(offset + rows.length)} / ${number(result.total)}` : '0개';
+    const coverage = result.coverage;
+    const durationCoverage = turn ? '' : ` · 시간 품질(현재 페이지) 정확 ${number(rows.reduce((n, r) => n + (r.exact_duration_turns ?? 0), 0))} / 계산 ${number(rows.reduce((n, r) => n + (r.derived_duration_turns ?? 0), 0))} / 근사 ${number(rows.reduce((n, r) => n + (r.approximate_duration_turns ?? 0), 0))} / 미상 ${number(rows.reduce((n, r) => n + (r.missing_duration_turns ?? 0), 0))}`;
+    $('coverage').textContent = `파일 ${number(coverage.files)} · 정상 ${number(coverage.done)} · 오류 ${number(coverage.error)} · 중단 ${number(coverage.interrupted)} · 이전 수치 유지 요청 ${number(coverage.stale_summaries)}${durationCoverage}`;
+  }
+  function renderDiagnostics(result) {
+    const counts = result.counts;
+    $('diagnostic-counts').textContent = `파일 ${number(counts.files)} · 처리 중 ${number(counts.processing)} · 완료 ${number(counts.done)} · 오류 ${number(counts.error)} · 중단 ${number(counts.interrupted)} · 이전 수치 유지 ${number(counts.stale_summaries)}${result.lastRefresh?.error ? ` · 최근 스캔: ${result.lastRefresh.error}` : ''}`;
+    table($('diagnostic-files'), ['제공자 / 파일', '세션', '상태 / 위치', '기록 시각', '원인'], result.files.map(row => [`${row.provider} · ${row.path}`, row.session_id, `${row.processing_status} · ${row.processing_position ?? '—'}`, date(row.recorded_at), row.last_error]));
+    table($('diagnostic-summaries'), ['프로젝트 / 요청 / 세션', '마지막 정상 갱신', '품질', '원본 / byte', '원인'], result.summaries.map(row => [`${row.project_name} · ${row.root_turn_id} · ${row.session_id}`, date(row.updated_at), row.quality_flags, `${row.diagnostic_file_id ?? '—'} / ${row.diagnostic_offset ?? '—'}`, row.last_error]));
+    $('diagnostic-previous').disabled = diagnosticOffset === 0;
+    $('diagnostic-next').disabled = !result.nextFileId && !result.nextSummaryId;
+    $('diagnostic-page').textContent = `${number(diagnosticOffset + 1)}번째부터`;
+  }
+  document.querySelectorAll('[data-tab]').forEach(node => node.addEventListener('click', () => tab(node.dataset.tab)));
+  $('open-usage').addEventListener('click', () => tab('usage'));
+  $('settings').addEventListener('click', () => send({ type: 'settings' }));
+  $('refresh-usage').addEventListener('click', () => send({ type: 'refreshUsage' }));
+  $('cancel-usage').addEventListener('click', () => send({ type: 'cancelUsage' }));
+  $('usage-filters').addEventListener('submit', event => { event.preventDefault(); offset = 0; query(); });
+  $('previous').addEventListener('click', () => { offset = Math.max(0, offset - 100); query(); });
+  $('next').addEventListener('click', () => { offset += 100; query(); });
+  const diagnostics = () => send({ type: 'diagnostics', offset: diagnosticOffset });
+  $('refresh-diagnostics').addEventListener('click', diagnostics);
+  $('diagnostic-previous').addEventListener('click', () => { diagnosticOffset = Math.max(0, diagnosticOffset - 100); diagnostics(); });
+  $('diagnostic-next').addEventListener('click', () => { diagnosticOffset += 100; diagnostics(); });
+  window.addEventListener('message', event => {
+    const message = event.data;
+    if (!message || typeof message !== 'object') return;
+    switch (message.type) {
+      case 'state': quotaStates = message.quota; percentage = message.percentage; timezone = message.timezone; $('timezone').textContent = `집계 시간대: ${timezone}`; $('configuration-warning').textContent = message.timezoneWarning ?? ''; $('configuration-warning').hidden = !message.timezoneWarning; renderQuota(); if (latestUsage) renderUsage(latestUsage); break;
+      case 'navigate': tab(message.tab, false); if (message.tab === 'quota' && message.provider) { const card = $(`card-${message.provider}`); card?.scrollIntoView({ block: 'nearest' }); card?.focus(); } if (message.tab === 'usage') query(); break;
+      case 'usage': $('error').hidden = true; renderUsage(message.result); break;
+      case 'diagnostics': diagnosticOffset = message.offset; renderDiagnostics(message.result); break;
+      case 'busy': $('cancel-usage').hidden = !message.busy; $('refresh-usage').disabled = message.busy; if (message.busy) $('usage-progress').textContent = '로컬 기록을 확인하고 있습니다…'; break;
+      case 'progress': { const p = message.progress; $('usage-progress').textContent = `${({ scanning: '파일 확인', parsing: '요청 집계', committing: '통계 저장', complete: '완료' })[p.phase] ?? p.phase} · 발견 ${number(p.discovered)} · 읽음 ${number(p.parsed)} · 실패 ${number(p.failed)}`; break; }
+      case 'refreshResult': { const r = message.result; $('usage-progress').textContent = `${r.interrupted ? '중단됨' : r.failed ? '일부 실패 · 이전 정상 통계를 유지했습니다' : '갱신 완료'} · 발견 ${number(r.discovered)} · 읽음 ${number(r.parsed)} · 재사용 ${number(r.reused)} · 실패 ${number(r.failed)} · 읽은 데이터 ${number(r.bodyBytes)} bytes${r.error ? ` · 원인: ${r.error}` : ''}`; break; }
+      case 'error': $('error').textContent = message.message; $('error').hidden = false; break;
+    }
+  });
+  // Only the display changes here. Countdown updates never request quota or scan logs.
+  setInterval(() => { if (currentTab === 'quota' && !document.hidden) renderCountdowns(); }, 30_000);
+  send({ type: 'ready' });
+})();

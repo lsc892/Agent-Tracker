@@ -1,0 +1,51 @@
+import { homedir } from 'node:os';
+import { join, resolve } from 'node:path';
+import type { SourceRoot } from './summary/types';
+
+export interface SettingsReader { get<T>(key: string, fallback: T): T }
+export interface TrackerConfiguration {
+  percentage: 'used' | 'remaining';
+  detail: 'compact' | 'detailed';
+  claude: { dataHome: string; showStatusBar: boolean; pollingSeconds: number };
+  codex: { dataHome: string; executable: string; showStatusBar: boolean; pollingSeconds: number };
+  roots: SourceRoot[];
+  timezone: string;
+  timezoneWarning?: string;
+}
+
+export function expandPath(value: string): string {
+  return resolve(value === '~' ? homedir() : /^~[/\\]/.test(value) ? join(homedir(), value.slice(2)) : value);
+}
+
+export function readConfiguration(settings: SettingsReader): TrackerConfiguration {
+  const claudeHome = expandPath(settings.get('claude.dataHome', '') || process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude'));
+  const codexHome = expandPath(settings.get('codex.dataHome', '') || process.env.CODEX_HOME || join(homedir(), '.codex'));
+  const claudeRoots = settings.get<string[]>('usage.claudeRoots', []);
+  const codexRoots = settings.get<string[]>('usage.codexRoots', []);
+  let timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  let timezoneWarning: string | undefined;
+  const configuredTimezone = settings.get<unknown>('usage.timezone', '');
+  if (configuredTimezone !== '' && configuredTimezone !== undefined) {
+    try {
+      if (typeof configuredTimezone !== 'string') throw new TypeError('Invalid timezone');
+      const selected = configuredTimezone.trim();
+      if (selected) {
+        new Intl.DateTimeFormat('en', { timeZone: selected }).format(0);
+        timezone = selected;
+      }
+    } catch {
+      timezoneWarning = `시간대 설정을 해석할 수 없어 시스템 시간대(${timezone})를 사용합니다. agentTracker.usage.timezone 설정을 확인해 주세요.`;
+    }
+  }
+  return {
+    percentage: settings.get('display.percentage', 'used'),
+    detail: settings.get('display.detail', 'detailed'),
+    claude: { dataHome: claudeHome, showStatusBar: settings.get('claude.showStatusBar', true), pollingSeconds: settings.get('claude.pollingIntervalSeconds', 900) },
+    codex: { dataHome: codexHome, executable: settings.get('codex.executable', 'codex'), showStatusBar: settings.get('codex.showStatusBar', true), pollingSeconds: settings.get('codex.pollingIntervalSeconds', 900) },
+    roots: [
+      ...(claudeRoots.length ? claudeRoots : [join(claudeHome, 'projects')]).map(path => ({ provider: 'claude' as const, path: expandPath(path) })),
+      ...(codexRoots.length ? codexRoots : [join(codexHome, 'sessions'), join(codexHome, 'archived_sessions')]).map(path => ({ provider: 'codex' as const, path: expandPath(path) })),
+    ],
+    timezone, timezoneWarning,
+  };
+}
