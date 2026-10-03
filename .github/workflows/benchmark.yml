@@ -1,0 +1,28 @@
+name: Resource benchmarks
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 19 * * 0'
+permissions:
+  contents: read
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run benchmark
+        env:
+          BENCHMARK_FILES: '2000'
+          BENCHMARK_TURNS: '20000'
+      - run: npm run benchmark:quota
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: benchmark-results
+          path: benchmark-results/
