@@ -1,6 +1,6 @@
 # Agent Tracker CI/CD 계획
 
-> 상태: 구현 전 계획. 현재 저장소에는 실행할 extension 코드와 테스트 명령이 없어 실제 workflow는 아직 구성하지 않았다.
+> 상태: extension 코드·로컬 검증 명령과 CI/benchmark/VSIX artifact workflow 구현. 실제 계정·화면·원격 환경 검증은 릴리스 전 수행한다.
 > 기준 문서: [Agent Tracker 설계 명세](./AgentTracker.md)
 
 상세 테스트 목록은 이 문서에서 관리하고, 각 기능 구현과 함께 테스트 코드를 작성한다. CI는 작성된 테스트를 자동 실행하며, CD는 검증을 통과한 버전의 패키징과 배포를 담당한다.
@@ -9,7 +9,7 @@
 
 | 실행 시점 | 검증·산출물 |
 |---|---|
-| PR 및 기본 브랜치 push | 타입 검사·lint·빌드, parser fixture 회귀 테스트, manifest·SQLite 통합 테스트, quota 갱신·process 종료 테스트 |
+| PR 및 기본 브랜치 push | 타입 검사·lint·빌드, parser fixture 회귀 테스트, manifest·SQLite 통합 테스트, quota 갱신·process 종료, 최소 지원·stable VS Code의 실제 light/dark Webview 테스트 |
 | 정기 실행 및 수동 실행 | 대량 파일·큰 session benchmark, 메모리·buffer·대기열 한도와 처리 시간 측정 |
 | 릴리스 버전 tag | 해당 commit의 CI 통과 확인 후 VSIX 패키징과 artifact 보관. 외부 배포는 배포 대상 결정 후 연결 |
 | 릴리스 전 수동 확인 | 실제 CLI 로그인·실시간 quota 조회, 실행 환경별 인증·data home, light/dark 화면의 가독성 |
@@ -21,6 +21,7 @@
 - timer와 시각은 제어 가능한 clock으로 검증한다. App Server는 대체 process로 응답·오류·timeout·취소와 종료 처리를 검증한다.
 - parser·SQLite·Extension Host 통합 테스트는 지원 운영체제에 맞춰 실행한다. Windows 경로·파일 identity와 Linux/macOS 동작, SQLite native module의 로딩·패키징을 검증한다.
 - 상태바 command와 Webview 이벤트 연결은 자동 검증하고, 화면 가독성과 실제 로그인·원격 quota 연동은 수동 확인한다.
+- `npm run test:vscode`는 별도 프로필에서 실제 확장을 활성화하고 합성 로그로 탭·필터·빈 상태·테마 적용을 검증한다. Linux CI는 Xvfb를 사용하며 결과 JSON과 확장 호스트 로그를 artifact로 보관한다.
 - 빠른 CI 실패는 릴리스 패키징을 막는다. benchmark는 별도 workflow에서 측정하고 기준 초과를 보고한다. 절대 시간 기준은 실행 환경별 측정 후 정한다.
 - 테스트 결과, benchmark 측정값과 릴리스 VSIX는 workflow artifact로 보관한다. 외부 배포를 연결할 때도 동일 commit의 검증 통과를 조건으로 한다.
 

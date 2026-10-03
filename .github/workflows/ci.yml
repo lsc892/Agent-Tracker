@@ -1,0 +1,61 @@
+name: CI
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  vscode:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ['1.101.0', stable]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: xvfb-run -a npm run test:vscode
+        env:
+          VSCODE_TEST_VERSION: ${{ matrix.version }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: vscode-${{ matrix.version }}
+          include-hidden-files: true
+          path: |
+            test-results/
+            .vscode-test/profile-*/user-data/logs/
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node: [22, 24]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tests-${{ matrix.os }}-node${{ matrix.node }}
+          path: test-results/
+      - run: npm run package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vsix-${{ matrix.os }}-node${{ matrix.node }}
+          path: '*.vsix'

@@ -1,6 +1,6 @@
 # Agent Tracker 설계 명세
 
-> 상태: 구현 전 검증 완료 초안
+> 상태: 설계 기준 문서 · 첫 구현 진행 및 검증 현황은 [구현 기록](./Implementation.md) 참고
 > 검증일: 2026-10-02
 > 의사결정 이력: [Agent Tracker 일지](./AgentTracker-일지.md)
 
