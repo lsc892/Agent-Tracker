@@ -24,7 +24,7 @@ export function quotaHtml(assets: { script: string; style: string; claude: strin
 <title>사용량</title><link rel="stylesheet" href="${style}"></head>
 <body><main class="quota-panel" aria-label="에이전트 사용량">
 <header><h1>사용량</h1><button id="refresh" class="icon-button" aria-label="현재 사용량 새로고침" title="현재 사용량 새로고침"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6.1 7a7 7 0 0 1 11.6-1L20 9M4 15l2.3 3A7 7 0 0 0 18 17"/></svg></button></header>
-<div class="display-options" role="group" aria-label="표시 방식"><button data-detail="detailed" aria-pressed="true">상세</button><button data-detail="compact" aria-pressed="false">압축</button></div>
+<div class="display-options" role="group" aria-label="상태 표시줄 표시 방식"><span class="display-options-label">상태 표시줄</span><button data-detail="detailed" aria-pressed="true" title="상태 표시줄에 7일·5시간 사용량 표시">상세</button><button data-detail="compact" aria-pressed="false" title="상태 표시줄에 5시간 사용량만 표시">압축</button></div>
 <div class="providers">
 ${(['codex', 'claude'] as const).map(provider => `<section class="provider" id="provider-${provider}" aria-label="${provider === 'codex' ? 'Codex' : 'Claude'}">
 <img class="provider-icon ${provider}-icon" src="${provider === 'codex' ? codex : claude}" alt="" width="22" height="22">

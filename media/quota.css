@@ -12,7 +12,8 @@ button:disabled { cursor: default; opacity: .6; }
 svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .icon-button { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 5px; border-radius: 5px; color: var(--vscode-descriptionForeground); }
 button:hover { background: var(--vscode-toolbar-hoverBackground); }
-.display-options { display: flex; margin: 0 16px 12px; padding: 2px; border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border)); border-radius: 9px; }
+.display-options { display: flex; align-items: center; margin: 0 16px 12px; padding: 2px; border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border)); border-radius: 9px; }
+.display-options-label { padding: 0 8px; color: var(--vscode-descriptionForeground); font-size: 12px; }
 .display-options button { flex: 1; padding: 4px; border-radius: 7px; color: var(--vscode-descriptionForeground); }
 .display-options button[aria-pressed="true"] { background: var(--vscode-list-hoverBackground); color: var(--vscode-foreground); font-weight: 600; }
 .providers { border-top: 1px solid var(--vscode-widget-border, var(--vscode-panel-border)); }

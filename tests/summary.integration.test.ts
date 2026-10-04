@@ -119,6 +119,76 @@ const codexMeta = (id:string,parent?:string,fork?:string) => ({type:'session_met
 const codexStart = (turn:string,root=turn) => ({type:'event_msg',timestamp:'2026-10-01T00:00:00Z',payload:{type:'task_started',turn_id:turn,root_turn_id:root}});
 const currentUsage = (thread:string,turn:string,root:string,input:number) => ({type:'token_usage_record',payload:{thread_id:thread,turn_id:turn,root_turn_id:root,response_id:`r-${thread}`,usage:{input_tokens:input,output_tokens:0}}});
 const legacyUsage = (input:number) => ({type:'event_msg',payload:{type:'token_count',info:{total_token_usage:{input_tokens:input,output_tokens:0},last_token_usage:{input_tokens:input,output_tokens:0}}}});
+const rootlessStart = (turn:string) => ({type:'event_msg',timestamp:'2026-10-01T00:00:00Z',payload:{type:'task_started',turn_id:turn}});
+
+test('rootless legacy subagents become separate sessions without counting verified inherited usage twice',async () => fixture(async (database,options,root) => {
+  const codexOptions={...options,roots:[{provider:'codex' as const,path:root}]};
+  const main=join(root,'main.jsonl');const child=join(root,'child.jsonl');
+  await writeFile(main,jsonl([codexMeta('main'),rootlessStart('inherited'),legacyUsage(100),
+    {type:'event_msg',payload:{type:'task_complete',turn_id:'inherited',duration_ms:500}}]));
+  await writeFile(child,jsonl([{type:'session_meta',payload:{id:'child',session_id:'main',parent_thread_id:'main'}},
+    rootlessStart('inherited'),legacyUsage(100),rootlessStart('child-turn'),
+    {type:'event_msg',payload:{type:'token_count',info:{total_token_usage:{input_tokens:140,output_tokens:0},last_token_usage:{input_tokens:40,output_tokens:0}}}},
+    {type:'event_msg',payload:{type:'task_complete',turn_id:'child-turn',duration_ms:700}}]));
+  const result=await refreshSummary(database,codexOptions);
+  assert.equal(result.failed,0);
+  const turns=database.queryTurns();assert.equal(turns.length,2);
+  const parentTurn=turns.find(row=>row.session_id==='main')!;const childTurn=turns.find(row=>row.session_id==='child')!;
+  assert.equal(parentTurn.total_tokens,100);assert.equal(parentTurn.duration_ms,500);
+  assert.equal(childTurn.root_turn_id,'child-turn');assert.equal(childTurn.total_tokens,40);assert.equal(childTurn.duration_ms,700);
+  assert.match(childTurn.quality_flags!,/standalone-subagent/);assert.equal(childTurn.last_error,null);
+  assert.equal(database.findManifest('codex',child)!.session_id,'child');
+  const unchanged=await refreshSummary(database,codexOptions);
+  assert.equal(unchanged.failed,0);assert.equal(unchanged.reused,2);assert.equal(unchanged.bodyBytes,0);
+  await appendFile(child,jsonl([rootlessStart('next-child-turn'),
+    {type:'event_msg',payload:{type:'token_count',info:{total_token_usage:{input_tokens:160,output_tokens:0},last_token_usage:{input_tokens:20,output_tokens:0}}}}]));
+  assert.equal((await refreshSummary(database,codexOptions)).failed,0);
+  assert.equal(database.queryTurns().reduce((sum,row)=>sum+row.total_tokens,0),160);
+  await appendFile(child,'{bad}\n');
+  assert.equal((await refreshSummary(database,codexOptions)).failed,1);
+  assert.equal(database.queryTurns().find(row=>row.session_id==='main')!.last_error,null);
+  assert.equal(database.queryTurns().find(row=>row.session_id==='child')!.last_error,'parse-error');
+  await unlink(child);assert.equal((await refreshSummary(database,codexOptions)).failed,0);
+  assert.equal(database.queryTurns().length,1);assert.equal(database.queryTurns()[0].total_tokens,100);
+}));
+
+test('rootless usage-only subagents work without the parent source and keep sibling sessions distinct',async () => fixture(async (database,options,root) => {
+  const codexOptions={...options,roots:[{provider:'codex' as const,path:root}]};
+  for (const [id,input] of [['child-one',25],['child-two',40]] as const) {
+    await writeFile(join(root,`${id}.jsonl`),jsonl([codexMeta(id,'missing-parent'),legacyUsage(input)]));
+  }
+  assert.equal((await refreshSummary(database,codexOptions)).failed,0);
+  const turns=database.queryTurns();assert.equal(turns.length,2);
+  assert.deepEqual(turns.map(row=>row.session_id).sort(),['child-one','child-two']);
+  assert.equal(turns.reduce((sum,row)=>sum+row.total_tokens,0),65);
+  assert.ok(turns.every(row=>row.quality_flags!.includes('standalone-subagent') && row.last_error===null));
+}));
+
+test('rooted current subagents stay attached after a rootless inherited legacy prefix',async () => fixture(async (database,options,root) => {
+  const codexOptions={...options,roots:[{provider:'codex' as const,path:root}]};
+  await writeFile(join(root,'main.jsonl'),jsonl([codexMeta('main'),codexStart('root'),currentUsage('main','root','root',100),
+    {type:'event_msg',payload:{type:'task_complete',turn_id:'root',duration_ms:500}}]));
+  await writeFile(join(root,'child.jsonl'),jsonl([codexMeta('child','main','main'),rootlessStart('root'),legacyUsage(100),
+    codexStart('c','root'),currentUsage('child','c','root',40),
+    {type:'event_msg',payload:{type:'task_complete',turn_id:'c',root_turn_id:'root',duration_ms:700}}]));
+  assert.equal((await refreshSummary(database,codexOptions)).failed,0);
+  const turns=database.queryTurns();assert.equal(turns.length,1);
+  assert.equal(turns[0].session_id,'main');assert.equal(turns[0].total_tokens,140);assert.equal(turns[0].duration_ms,500);
+  assert.ok(!turns[0].quality_flags?.includes('standalone-subagent'));
+}));
+
+test('subagent fallback reassigns an accepted parent session without leaving old totals behind',async () => fixture(async (database,options,root) => {
+  const codexOptions={...options,roots:[{provider:'codex' as const,path:root}]};
+  const child=join(root,'child.jsonl');
+  await writeFile(join(root,'main.jsonl'),jsonl([codexMeta('main'),codexStart('root'),currentUsage('main','root','root',100)]));
+  await writeFile(child,jsonl([codexMeta('child','main'),codexStart('c','root'),currentUsage('child','c','root',40)]));
+  assert.equal((await refreshSummary(database,codexOptions)).failed,0);assert.equal(database.queryTurns()[0].total_tokens,140);
+  await writeFile(child,jsonl([codexMeta('child','main'),rootlessStart('c'),legacyUsage(40)]));
+  assert.equal((await refreshSummary(database,codexOptions)).failed,0);
+  const turns=database.queryTurns();assert.equal(turns.length,2);
+  assert.equal(turns.find(row=>row.session_id==='main')!.total_tokens,100);
+  assert.equal(turns.find(row=>row.session_id==='child')!.total_tokens,40);
+}));
 
 test('nested Codex descendants resolve to the root and current records supersede legacy snapshots',async () => fixture(async (database,options,root) => {
   const codexOptions = {...options,roots:[{provider:'codex' as const,path:root}]};

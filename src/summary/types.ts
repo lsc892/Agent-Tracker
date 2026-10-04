@@ -67,6 +67,7 @@ export interface ParsedIdentity {
   projectName: string;
   isMain: boolean;
   forkedFromId?: string | null;
+  standaloneSubagent?: boolean;
 }
 export interface TurnEvent {
   kind: 'turn';

@@ -89,17 +89,19 @@ export async function run(): Promise<void> {
               try {
                 const windows = [
                   {id:'five-hour',label:'5h',usedPercent:42,current:42,maximum:100,resetsAt:now+90000,windowDurationMins:300},
-                  {id:'weekly',label:'wk',usedPercent:75,current:75,maximum:100,resetsAt:now+3600000,windowDurationMins:10080}
+                  {id:'weekly',label:'7d',usedPercent:75,current:75,maximum:100,resetsAt:now+3600000,windowDurationMins:10080}
                 ];
                 const state = {...message,percentage:'used',detail:'detailed',states:[
                   {provider:'codex',status:'ready',snapshot:{provider:'codex',fetchedAt:now,windows},refreshing:false,error:null,lastSuccessAt:now},
-                  {provider:'claude',status:'unavailable',snapshot:null,refreshing:false,error:null,lastSuccessAt:null}
+                  {provider:'claude',status:'ready',snapshot:{provider:'claude',fetchedAt:now,windows},refreshing:false,error:null,lastSuccessAt:now}
                 ]};
                 emit(state);
                 const manage = document.querySelector('#provider-codex .manage');
                 manage.focus(); emit(state);
                 check(document.activeElement === manage,'quota updates preserve focused management action');
                 check(document.querySelectorAll('#provider-codex progress').length === 2,'detailed quota shows both windows');
+                check(document.querySelectorAll('#provider-claude progress').length === 2,'Claude quota shows both windows');
+                check(document.querySelector('.display-options-label').textContent === '상태 표시줄','detail controls identify the status bar as their target');
                 check(document.querySelector('#provider-codex progress').value === 58,'quota slider displays remaining percentage');
                 const countdown = document.querySelector('#provider-codex .availability');
                 const before = countdown.textContent;
@@ -110,10 +112,13 @@ export async function run(): Promise<void> {
                 check(countdown.textContent.includes('시각 지남'),'expired countdown waits for the next quota read');
                 check(document.querySelector('#provider-codex progress').value === 58,'countdown never invents a reset quota');
                 document.querySelector('[data-detail="compact"]').click();
-                check(document.querySelectorAll('#provider-codex progress').length === 1 && document.querySelector('#provider-codex progress').value === 25,'compact mode shows the most-used window');
+                check(document.querySelectorAll('#provider-codex progress').length === 2 && document.querySelectorAll('#provider-claude progress').length === 2,'status compact mode keeps both windows in both quota cards');
+                check(document.querySelector('#provider-codex progress').value === 58,'status toggle preserves the displayed quota values');
                 check(document.querySelector('[data-detail="compact"]').getAttribute('aria-pressed') === 'true','compact selection is accessible');
+                emit({...state,detail:'compact'});
+                check(document.querySelectorAll('#provider-codex progress').length === 2 && document.querySelectorAll('#provider-claude progress').length === 2,'host updates in compact mode also render all quota windows');
                 document.querySelector('[data-detail="detailed"]').click();
-                check(document.querySelectorAll('#provider-codex progress').length === 2,'detailed mode restores both windows');
+                check(document.querySelectorAll('#provider-codex progress').length === 2 && document.querySelectorAll('#provider-claude progress').length === 2,'status detailed mode leaves the quota cards detailed');
                 emit({...state,percentage:'remaining'});
                 check(document.querySelector('#provider-codex .quota-window').textContent.includes('58% 남음'),'remaining text agrees with slider');
                 emit({...state,states:state.states.map(value => value.provider === 'codex' ? {...value,status:'stale'} : value)});

@@ -53,3 +53,31 @@ test('invalid token schemas do not silently become zero usage', () => {
   assert.throws(() => codexTokens({input_tokens:'100',output_tokens:20}), /unsupported-token-schema/);
   assert.throws(() => claudeTokens({unknown_token_field:30}), /unsupported-token-schema/);
 });
+
+test('rootless Codex subagents retain their local turns and become independent sessions', () => {
+  const events: ParseEvent[] = [];let identity: ParsedIdentity | undefined;
+  const parser = new CodexCurrentParserAdapter({provider:'codex',path:'/sessions/child.jsonl',sourceRoot:'/sessions',fileId:1},
+    {identity:value=>{identity=value;},event:event=>events.push(event)});
+  parser.row({type:'session_meta',payload:{id:'child',session_id:'parent',parent_thread_id:'parent'}},0);
+  for (const [turn,input] of [['child-turn-one',10],['child-turn-two',20]] as const) {
+    parser.row({type:'event_msg',payload:{type:'task_started',turn_id:turn}},1);
+    parser.row({type:'event_msg',payload:{type:'token_count',info:{last_token_usage:{input_tokens:input,output_tokens:2}}}},2);
+  }
+  parser.finish();
+  assert.deepEqual(events.filter(event=>event.kind==='usage').map(event=>event.rootId),['child-turn-one','child-turn-two']);
+  assert.equal(identity!.sessionId,'child');assert.equal(identity!.isMain,true);assert.equal(identity!.parentThreadId,null);
+  assert.equal(identity!.forkedFromId,'parent');assert.equal(identity!.standaloneSubagent,true);
+});
+
+test('a later explicit root keeps a Codex subagent attached despite rootless inherited history', () => {
+  let identity: ParsedIdentity | undefined;
+  const parser = new CodexCurrentParserAdapter({provider:'codex',path:'/sessions/child.jsonl',sourceRoot:'/sessions',fileId:1},
+    {identity:value=>{identity=value;},event:()=>undefined});
+  parser.row({type:'session_meta',payload:{id:'child',parent_thread_id:'parent'}},0);
+  parser.row({type:'turn_context',payload:{turn_id:'inherited'}},1);
+  parser.row({type:'event_msg',payload:{type:'token_count',info:{last_token_usage:{input_tokens:10,output_tokens:2}}}},2);
+  parser.row({type:'event_msg',payload:{type:'task_started',turn_id:'child-turn',root_turn_id:'parent-turn'}},3);
+  parser.finish();
+  assert.equal(identity!.sessionId,'parent');assert.equal(identity!.isMain,false);assert.equal(identity!.parentThreadId,'parent');
+  assert.equal(identity!.standaloneSubagent,undefined);
+});

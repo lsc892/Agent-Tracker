@@ -10,7 +10,7 @@ import { ClaudeParserAdapter, CodexCurrentParserAdapter } from './parsers';
 import { acquireRefreshLock } from './lock';
 import type { SourceRoot, SummaryOptions, SummaryProgress, RefreshResult } from './types';
 
-export const PARSER_VERSION = 1;
+export const PARSER_VERSION = 2;
 const componentPredicate = `EXISTS(SELECT 1 FROM component c WHERE c.provider=scan_files.provider
   AND (c.session_id=scan_files.session_id OR c.session_id=scan_files.old_session))`;
 
@@ -219,7 +219,7 @@ export async function refreshSummary(
       if (!staging.componentFailed()) {
         staging.prepareSummaries();
         check();
-        // Unresolvable subagent-only roots are diagnostics, never invented user requests.
+        // Rootless subagents already have independent sessions; unresolved explicit roots remain diagnostics.
         const orphan = database.connection.prepare('SELECT file_id,byte_offset FROM prepared_turns WHERE has_main=0 LIMIT 1').get() as {file_id:number;byte_offset:number}|undefined;
         if (orphan) {
           const file = database.connection.prepare('SELECT * FROM scan_files WHERE id=?').get(orphan.file_id) as unknown as StagedFile;

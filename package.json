@@ -90,7 +90,7 @@
             "detailed"
           ],
           "default": "detailed",
-          "description": "간략 모드는 사용률이 가장 높은 window 하나를 표시합니다."
+          "description": "상태 표시줄의 표시 방식입니다. 상세는 7일·5시간, 압축은 5시간 사용량만 표시합니다. 사용량 패널은 항상 모든 정보를 표시합니다."
         },
         "agentTracker.claude.showStatusBar": {
           "type": "boolean",

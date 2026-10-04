@@ -3,6 +3,7 @@
   const vscode = acquireVsCodeApi();
   let current = { states: [], percentage: 'used', detail: 'detailed' };
   const refresh = document.getElementById('refresh');
+  const renderDisplayOptions = () => document.querySelectorAll('[data-detail]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.detail === current.detail)));
   const percent = value => Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 0;
   const resetText = windows => {
     const resets = windows.map(window => window.resetsAt).filter(value => typeof value === 'number' && Number.isFinite(value));
@@ -27,14 +28,13 @@
     const busy = current.states.some(state => state.refreshing);
     refresh.disabled = busy;
     refresh.setAttribute('aria-busy', String(busy));
-    document.querySelectorAll('[data-detail]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.detail === current.detail)));
+    renderDisplayOptions();
     for (const provider of ['codex', 'claude']) {
       const state = current.states.find(value => value.provider === provider);
       const windows = state?.snapshot?.windows || [];
-      const selected = current.detail === 'compact' && windows.length ? [windows.reduce((a, b) => a.usedPercent >= b.usedPercent ? a : b)] : windows;
       const section = document.getElementById(`provider-${provider}`);
       const container = section.querySelector('.windows');
-      container.replaceChildren(...selected.map(window => {
+      container.replaceChildren(...windows.map(window => {
         const item = document.createElement('div'); item.className = 'quota-window';
         const label = document.createElement('span'); label.className = 'window-label'; label.textContent = window.label;
         const used = percent(window.usedPercent);
@@ -56,7 +56,7 @@
   document.getElementById('open-usage').addEventListener('click', () => vscode.postMessage({ type: 'openUsage' }));
   document.querySelectorAll('.manage').forEach(button => button.addEventListener('click', () => vscode.postMessage({ type: 'manage', provider: button.dataset.provider })));
   document.querySelectorAll('[data-detail]').forEach(button => button.addEventListener('click', () => {
-    current.detail = button.dataset.detail; render(); vscode.postMessage({ type: 'detail', detail: current.detail });
+    current.detail = button.dataset.detail; renderDisplayOptions(); vscode.postMessage({ type: 'detail', detail: current.detail });
   }));
   window.addEventListener('message', event => { if (event.data && event.data.type === 'quota') { current = event.data; render(); } });
   setInterval(renderCountdowns, 30000);

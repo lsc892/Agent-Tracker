@@ -73,6 +73,10 @@ export class SummaryStaging {
     const previous = this.connection.prepare('SELECT * FROM scan_files WHERE id=?').get(fileId) as unknown as StagedFile;
     this.connection.prepare(`UPDATE scan_files SET session_id=?,project_key=?,project_name=?,thread_id=?,parent_thread_id=?,forked_from_id=?,is_main=?,parsed=1 WHERE id=?`)
       .run(identity.sessionId,identity.projectKey,identity.projectName,identity.threadId,identity.parentThreadId,identity.forkedFromId ?? null,Number(identity.isMain),fileId);
+    if (identity.standaloneSubagent) {
+      this.connection.prepare("UPDATE events SET is_main=1 WHERE file_id=? AND kind='turn'").run(fileId);
+      this.flag(fileId,'*','standalone-subagent');
+    }
     this.affect(previous.provider,identity.sessionId);
     if (previous.old_session && previous.old_session !== identity.sessionId) {
       this.connection.prepare('INSERT OR IGNORE INTO links VALUES (?,?,?)').run(previous.provider,previous.old_session,identity.sessionId);

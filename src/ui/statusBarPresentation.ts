@@ -29,17 +29,25 @@ export function statusBarPresentation(
     const message = state.refreshing ? '조회 중…' : '조회 불가.';
     return { text: `${icon} ${message}`, accessibleText: `${name}: ${message}` };
   }
+  const codexWindows = state.provider === 'codex' ? windows.filter(window => window.limitId === 'codex') : [];
+  const mainWindows = codexWindows.length ? codexWindows : windows;
+  const fiveHour = mainWindows.find(window => window.id === 'five_hour')
+    ?? mainWindows.find(window => window.windowDurationMins === 300);
+  const sevenDay = mainWindows.find(window => window.id === 'seven_day')
+    ?? mainWindows.find(window => window.windowDurationMins === 10080);
   const selected = detail === 'compact'
-    ? [windows.reduce((a, b) => a.usedPercent >= b.usedPercent ? a : b)]
-    : windows.slice(0, 2);
+    ? fiveHour ? [fiveHour] : []
+    : fiveHour || sevenDay ? [sevenDay, fiveHour].filter((window): window is QuotaWindow => window !== undefined) : mainWindows.slice(0, 2);
+  if (!selected.length) return { text: `${icon} 5시간 정보 없음`, accessibleText: `${name}: 5시간 정보 없음` };
   const values = selected.map(window => {
     const used = Math.max(0, Math.min(100, window.usedPercent));
     const percent = Math.round(percentage === 'remaining' ? 100 - used : used);
     const label = percentage === 'remaining' ? '남음' : '사용';
     const resets = resetTime(window, now);
+    const period = window.windowDurationMins === 300 ? '5시간' : window.windowDurationMins === 10080 ? '7일' : window.label;
     return {
-      text: `${remainingBar(used)} ${percent}% ${label}${resets ? ` ${resets}` : ''}`,
-      accessibleText: `${window.label}: ${percent}% ${label}${resets ? `, 재설정 ${resets}` : ''}`,
+      text: `${period} ${remainingBar(used)} ${percent}% ${label}${resets ? ` ${resets}` : ''}`,
+      accessibleText: `${period}: ${percent}% ${label}${resets ? `, 재설정 ${resets}` : ''}`,
     };
   });
   const stale = state.status === 'stale';

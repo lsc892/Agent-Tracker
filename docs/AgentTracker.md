@@ -212,7 +212,7 @@ Codex 사용량                           [↻] [⚙]
 | Claude | 자동 갱신 간격 | 900초 |
 | Codex | 자동 갱신 간격 | 900초 |
 
-간략 모드는 사용률이 가장 높은 window 하나, 상세 모드는 주요 단기·장기 window를 표시한다. 상태바 숨김은 provider 비활성화와 구분하며 Quota 화면에서는 숨긴 제공자도 볼 수 있다. 표시 설정 변경은 기존 snapshot에 즉시 반영한다.
+상태바 압축 모드는 5시간 window만, 상세 모드는 7일·5시간 window를 표시한다. 5시간 window가 없으면 압축 상태바에 정보 없음으로 표시하고 장기 window로 대체하지 않는다. Quota 화면은 상태바 모드와 관계없이 모든 window를 표시한다. 상태바 숨김은 provider 비활성화와 구분하며 Quota 화면에서는 숨긴 제공자도 볼 수 있다. 표시 설정 변경은 기존 snapshot에 즉시 반영한다.
 
 ### 3.6 Codex App Server 사용
 
@@ -481,6 +481,8 @@ agent_role = parent_thread_id가 없으면 main, 있으면 subagent
 `thread.sessionId`는 live session tree의 root를 식별하고 fork/child thread는 별도 thread id를 가진다. parent/ancestor thread filter도 별도로 제공된다.
 
 현재 JSONL의 `session_meta.parent_thread_id`, `forked_from_id`, `thread_source`와 turn의 `root_turn_id`를 우선 사용한다. 단순히 “내 turn id와 parent id가 다르다”는 조건으로 subagent를 판정하지 않는다.
+
+예외로, 파일 전체에 `root_turn_id`가 없는 구형 subagent는 `thread_id`를 독립 `session_id`로 사용하고 자체 `turn_id`로 요청을 구분한다. 요청 식별자가 없는 usage-only 기록은 thread에 하나의 안정적인 요청 id를 부여한다. 해당 thread의 token·시간을 자체 대화에 집계하고 `standalone-subagent` 품질 flag를 남긴다. 원래 부모·fork 정보는 복제 이력의 중복 검증에 사용하며, 명시적인 `root_turn_id`가 있는 subagent는 부모 요청 합산을 유지한다.
 
 forked child가 부모의 token prefix를 복제한 구형 로그는 verified lineage prefix만 제외한다. 부모를 찾을 수 없으면 임의로 차감하지 않고 `missing-parent`를 표시한다.
 

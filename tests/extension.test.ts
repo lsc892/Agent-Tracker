@@ -136,7 +136,10 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
   class FakeQuota {
     start() {} setFocused() {} setPollingInterval() {} subscribe() { return disposable; }
     async dispose() { quotaDisposals++; }
-    getState(provider: string) { return { provider, snapshot: null, refreshing: false, status: 'unavailable', error: null, lastSuccessAt: null, nextAllowedAt: 0 }; }
+    getState(provider: string) { return { provider, snapshot: {provider,fetchedAt:0,windows:[
+      {id:'five-hour',label:'5h',usedPercent:23,current:23,maximum:100,resetsAt:null,windowDurationMins:300},
+      {id:'weekly',label:'7d',usedPercent:92,current:92,maximum:100,resetsAt:null,windowDurationMins:10080},
+    ]}, refreshing: false, status: 'ready', error: null, lastSuccessAt: 0, nextAllowedAt: 0 }; }
     getStates() { return ['claude', 'codex'].map(provider => this.getState(provider)); }
     async refresh(provider: string, force: boolean) { refreshes.push({ provider, force }); }
   }
@@ -170,6 +173,8 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     assert.deepEqual(items.map(item => item.id), ['agentTracker.quota', 'agentTracker.refreshQuota']);
     assert.ok(items[0].priority > items[1].priority, 'the refresh button is right of the combined quota button');
     assert.match(items[0].text!, /\$\(agent-tracker-claude\).*\$\(agent-tracker-codex\)/);
+    assert.equal(items[0].text!.match(/7일/g)?.length,2);
+    assert.equal(items[0].text!.match(/5시간/g)?.length,2);
     assert.equal(items[0].color, '#ffffff');
     activeColorTheme.kind = 1; themes.fire(activeColorTheme);
     assert.equal(items[0].color, '#000000');
@@ -200,6 +205,10 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     quotaView.webview.receive({ type: 'detail', detail: 'compact' }); await tick();
     assert.deepEqual(configUpdates, [{ key: 'display.detail', value: 'compact', target: 1 }]);
     assert.equal(quotaView.webview.messages.at(-1)?.detail, 'compact');
+    assert.doesNotMatch(items[0].text!,/7일|92%/);
+    assert.equal(items[0].text!.match(/5시간/g)?.length,2);
+    const quotaStates=quotaView.webview.messages.at(-1)!.states as import('../src/quota/types').QuotaState[];
+    assert.ok(quotaStates.every(state=>state.snapshot!.windows.length===2),'status compact mode still sends both windows to the quota panel');
     const commandCount = externalCommands.length;
     for (const message of [
       { type: 'executeCommand', command: 'unsafe' }, { type: 'manage', provider: '../../credential' },

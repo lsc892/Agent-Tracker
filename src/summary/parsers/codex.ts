@@ -13,6 +13,7 @@ export class CodexCurrentParserAdapter {
   private currentClosed = false;
   private hasUserInTurn = false;
   private pendingLifecycle = false;
+  private hasExplicitRoot = false;
 
   constructor(private readonly context: FileContext, private readonly sink: ParseSink) {}
 
@@ -37,16 +38,21 @@ export class CodexCurrentParserAdapter {
       if (row.type === 'token_usage_record') throw new SummaryError('missing-session-id', offset);
       return;
     }
+    const suppliedRoot = string(payload.root_turn_id);
+    if (suppliedRoot && ['turn_context', 'token_usage_record', 'event_msg'].includes(String(row.type))) this.hasExplicitRoot = true;
+    // Rootless subagents use their own turn ids; finish() gives the thread a separate session.
+    const ownTurns = this.identityValue.isMain || !this.hasExplicitRoot;
     if (row.type === 'turn_context') {
       if (string(payload.turn_id) && payload.turn_id !== this.turn) { this.hasUserInTurn = false; this.currentClosed = false; }
       this.turn = string(payload.turn_id) ?? this.turn;
-      this.root = string(payload.root_turn_id) ?? (this.identityValue.isMain ? this.turn : this.root);
+      this.root = suppliedRoot ?? (ownTurns ? this.turn : this.root);
       return;
     }
     if (row.type === 'token_usage_record') {
       this.sawCurrent = true;
       // Mixed generations can coexist. Disk staging discards legacy usage if any current usage exists in this file.
-      const rootId = string(payload.root_turn_id) ?? this.root ?? (this.identityValue.isMain ? string(payload.turn_id) : undefined);
+      const rootId = suppliedRoot ?? (!this.identityValue.isMain && !this.hasExplicitRoot
+        ? string(payload.turn_id) ?? this.turn ?? this.root : this.root ?? string(payload.turn_id));
       const turnId = string(payload.turn_id) ?? this.turn;
       const responseId = string(payload.response_id);
       if (!rootId || !turnId) throw new SummaryError('missing-root-turn', offset);
@@ -66,14 +72,14 @@ export class CodexCurrentParserAdapter {
       const event = string(payload.type);
       const suppliedTurn = string(payload.turn_id);
       if (suppliedTurn) this.turn = suppliedTurn;
-      if (string(payload.root_turn_id)) this.root = String(payload.root_turn_id);
-      else if (this.identityValue.isMain && suppliedTurn) this.root = suppliedTurn;
+      if (suppliedRoot) this.root = suppliedRoot;
+      else if (ownTurns && suppliedTurn) this.root = suppliedTurn;
       if (event === 'task_started') {
         this.currentClosed = false; this.hasUserInTurn = false; this.pendingLifecycle = true;
         if (this.root) this.sink.event({ kind: 'turn', rootId: this.root, isMain: this.identityValue.isMain,
           startedAt: timestamp(payload.started_at) ?? time, offset });
       } else if (event === 'user_message') {
-        if (this.identityValue.isMain && (!this.root || this.currentClosed || this.hasUserInTurn && !this.pendingLifecycle)) {
+        if (ownTurns && (!this.root || this.currentClosed || this.hasUserInTurn && !this.pendingLifecycle)) {
           this.root = string(payload.id) ?? (time === null ? undefined : `legacy-${time}`);
           this.turn = this.root;
         }
@@ -97,6 +103,9 @@ export class CodexCurrentParserAdapter {
   private legacy(payload: Record<string, unknown>, offset: number): void {
     const info = object(payload.info);
     if (!info.total_token_usage && !info.last_token_usage) return;
+    if (this.identityValue && !this.identityValue.isMain && !this.hasExplicitRoot && (!this.root || !this.turn)) {
+      this.root = this.turn = this.turn ?? `legacy-${this.identityValue.threadId}`;
+    }
     if (!this.root || !this.turn || !this.identityValue) throw new SummaryError('missing-root-turn', offset);
     this.sawLegacy = true;
     const total = info.total_token_usage ? codexTokens(object(info.total_token_usage)) : {...this.highWater};
@@ -117,12 +126,18 @@ export class CodexCurrentParserAdapter {
   }
 
   finish(): void {
-    if (!this.identityValue) throw new SummaryError('unsupported-schema');
-    this.sink.identity(this.identityValue);
+    const identity = this.getIdentity();
+    if (!identity) throw new SummaryError('unsupported-schema');
+    this.sink.identity(identity);
   }
 
   /** session_meta can establish reassignment before a later malformed row. */
-  getIdentity(): ParsedIdentity | undefined { return this.identityValue; }
+  getIdentity(): ParsedIdentity | undefined {
+    const identity = this.identityValue;
+    if (!identity || identity.isMain || this.hasExplicitRoot) return identity;
+    return { ...identity, sessionId: identity.threadId, parentThreadId: null, isMain: true,
+      forkedFromId: identity.forkedFromId ?? identity.parentThreadId, standaloneSubagent: true };
+  }
 }
 
 export class CodexLegacyParserAdapter extends CodexCurrentParserAdapter {}
