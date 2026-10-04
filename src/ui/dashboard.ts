@@ -1,7 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import * as vscode from 'vscode';
 import type { TrackerConfiguration } from '../configuration';
-import type { QuotaProviderId, QuotaState } from '../quota/types';
 import type { SummaryClient } from '../summary/client';
 import type { UsageQuery } from '../summary/types';
 import { dashboardHtml } from './html';
@@ -12,15 +11,12 @@ export interface DashboardDependencies {
   extensionUri: vscode.Uri;
   summary: SummaryClient;
   settings(): TrackerConfiguration;
-  quota(): QuotaState[];
-  refreshQuota(provider: QuotaProviderId): Promise<void>;
 }
 
 export class Dashboard implements vscode.Disposable {
   private panel: vscode.WebviewPanel | undefined;
   private ready = false;
-  private tab: DashboardTab = 'quota';
-  private provider: QuotaProviderId | undefined;
+  private tab: DashboardTab = 'usage';
   private query: UsageQuery = { groupBy: 'day', limit: 100, offset: 0 };
   private queryVersion = 0;
   private diagnosticsVersion = 0;
@@ -33,9 +29,8 @@ export class Dashboard implements vscode.Disposable {
     this.unsubscribe = dependencies.summary.subscribe(progress => this.post({ type: 'progress', progress }));
   }
 
-  open(tab: DashboardTab = 'quota', provider?: QuotaProviderId): void {
+  open(tab: DashboardTab = 'usage'): void {
     this.tab = tab;
-    this.provider = provider;
     if (this.panel) {
       this.panel.reveal(vscode.ViewColumn.Active);
       this.navigate();
@@ -58,7 +53,7 @@ export class Dashboard implements vscode.Disposable {
 
   update(): void {
     const settings = this.dependencies.settings();
-    this.post({ type: 'state', quota: this.dependencies.quota(), percentage: settings.percentage, timezone: settings.timezone, timezoneWarning: settings.timezoneWarning });
+    this.post({ type: 'state', timezone: settings.timezone, timezoneWarning: settings.timezoneWarning });
   }
 
   configurationChanged(): void {
@@ -70,27 +65,26 @@ export class Dashboard implements vscode.Disposable {
 
   private async handle(message: NonNullable<ReturnType<typeof parseDashboardMessage>>): Promise<void> {
     switch (message.type) {
-      case 'ready': this.ready = true; this.update(); this.navigate(); break;
-      case 'tab': this.tab = message.tab; if (this.tab === 'usage') await this.refreshUsage(); else if (this.tab === 'diagnostics') await this.loadDiagnostics(0); break;
-      case 'refreshQuota': await this.dependencies.refreshQuota(message.provider); break;
-      case 'settings': await vscode.commands.executeCommand('workbench.action.openSettings', message.provider ? `@ext:agent-tracker.agent-tracker agentTracker.${message.provider}` : 'agentTracker.display'); break;
-      case 'refreshUsage': await this.refreshUsage(); break;
+      case 'ready': if (!this.ready) { this.ready = true; this.navigate(); } break;
+      case 'tab': this.tab = message.tab; if (this.tab === 'usage') await this.loadUsage(); else if (this.tab === 'diagnostics') await this.loadDiagnostics(0); break;
+      case 'settings': await vscode.commands.executeCommand('workbench.action.openSettings', '@ext:agent-tracker.agent-tracker agentTracker.usage'); break;
       case 'cancelUsage': this.dependencies.summary.cancel(); break;
-      case 'queryUsage': this.query = message.query; this.fromDay = message.fromDay; this.toDay = message.toDay; await this.loadUsage(); break;
+      case 'queryUsage': this.query = message.query; this.fromDay = message.fromDay; this.toDay = message.toDay; if (this.ready) await this.loadUsage(); break;
       case 'diagnostics': await this.loadDiagnostics(message.offset); break;
     }
   }
 
   private navigate(): void {
+    if (!this.ready) return;
     this.update();
-    this.post({ type: 'navigate', tab: this.tab, provider: this.provider });
+    this.post({ type: 'navigate', tab: this.tab });
     if (this.tab === 'usage') void this.refreshUsage().catch(error => this.error(error));
     if (this.tab === 'diagnostics') void this.loadDiagnostics(0).catch(error => this.error(error));
   }
 
   private async refreshUsage(): Promise<void> {
-    if (this.refreshPromise) return this.refreshPromise;
     this.post({ type: 'busy', busy: true });
+    if (this.refreshPromise) return this.refreshPromise;
     this.refreshPromise = (async () => {
       const settings = this.dependencies.settings();
       // The cached page remains visible during this operation.

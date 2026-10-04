@@ -3,10 +3,10 @@ import { join } from 'node:path';
 import { mkdir } from 'node:fs/promises';
 import { readConfiguration, type TrackerConfiguration } from './configuration';
 import { ClaudeQuotaProvider, CodexQuotaProvider, QuotaService } from './quota';
-import type { QuotaProviderId } from './quota/types';
 import { SummaryClient } from './summary/client';
 import { Dashboard } from './ui/dashboard';
-import { statusPresentation, type DashboardTab } from './ui/presentation';
+import { QuotaStatusBar } from './ui/statusBar';
+import { QuotaView } from './ui/quotaView';
 
 let shutdown: (() => Promise<void>) | undefined;
 
@@ -21,36 +21,27 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   let quota = createQuota(settings);
   await mkdir(context.globalStorageUri.fsPath, { recursive: true });
   const summary = new SummaryClient({ dbPath: join(context.globalStorageUri.fsPath, 'agent-tracker.sqlite'), roots: settings.roots, timezone: settings.timezone });
-  const dashboard = new Dashboard({ extensionUri: context.extensionUri, summary, settings: () => settings,
-    quota: () => quota.getStates(), refreshQuota: provider => quota.refresh(provider, true) });
-  const claude = vscode.window.createStatusBarItem('agentTracker.claudeQuota', vscode.StatusBarAlignment.Right, 100);
-  const codex = vscode.window.createStatusBarItem('agentTracker.codexQuota', vscode.StatusBarAlignment.Right, 99);
-  const statusItems = { claude, codex };
-  for (const provider of ['claude', 'codex'] as const) {
-    const name = provider === 'claude' ? 'Claude' : 'Codex';
-    const item = statusItems[provider];
-    item.name = `Agent Tracker: ${name}`;
-    item.tooltip = `클릭하여 ${name} 사용량 보기`;
-    item.command = { command: 'agentTracker.openDashboard', title: `${name} 사용량 보기`, arguments: [{ tab: 'quota', provider }] };
-  }
+  const dashboard = new Dashboard({ extensionUri: context.extensionUri, summary, settings: () => settings });
+  const refreshQuota = async (): Promise<void> => {
+    await Promise.all([quota.refresh('claude', true), quota.refresh('codex', true)]);
+  };
+  const quotaView = new QuotaView({ extensionUri: context.extensionUri, settings: () => settings,
+    quota: () => quota.getStates(), refresh: refreshQuota, openUsage: () => dashboard.open('usage') });
+  const statusBar = new QuotaStatusBar();
   const render = (): void => {
-    for (const provider of ['claude', 'codex'] as const) {
-      const item = statusItems[provider];
-      const view = statusPresentation(quota.getState(provider), settings.percentage, settings.detail);
-      item.text = view.text;
-      item.backgroundColor = view.warning ? new vscode.ThemeColor('statusBarItem.errorBackground') : undefined;
-      if (settings[provider].showStatusBar) item.show(); else item.hide();
-    }
-    dashboard.update();
+    statusBar.update(quota.getStates(), settings);
+    quotaView.update();
   };
   let subscription = quota.subscribe(render);
-  const open = (argument?: unknown): void => {
+  const open = (argument?: unknown): void | Promise<void> => {
     const value = argument && typeof argument === 'object' ? argument as Record<string, unknown> : {};
-    const tab: DashboardTab = value.tab === 'usage' || value.tab === 'diagnostics' ? value.tab : 'quota';
-    const provider: QuotaProviderId | undefined = value.provider === 'claude' || value.provider === 'codex' ? value.provider : undefined;
-    dashboard.open(tab, provider);
+    if (value.tab === 'quota') return quotaView.toggle();
+    dashboard.open(value.tab === 'diagnostics' ? 'diagnostics' : 'usage');
   };
-  context.subscriptions.push(claude, codex, dashboard,
+  context.subscriptions.push(statusBar, quotaView, dashboard,
+    vscode.window.registerWebviewViewProvider('agentTracker.quotaView', quotaView, { webviewOptions: { retainContextWhenHidden: true } }),
+    vscode.commands.registerCommand('agentTracker.toggleQuota', () => quotaView.toggle()),
+    vscode.commands.registerCommand('agentTracker.refreshQuota', refreshQuota),
     vscode.commands.registerCommand('agentTracker.openDashboard', open),
     vscode.commands.registerCommand('agentTracker.openUsage', () => dashboard.open('usage')),
     vscode.commands.registerCommand('agentTracker.refreshClaude', () => quota.refresh('claude', true)),
@@ -83,6 +74,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     if (disposed) return;
     disposed = true;
     subscription.dispose();
+    statusBar.dispose();
+    quotaView.dispose();
     dashboard.dispose();
     await Promise.allSettled([quota.dispose(), summary.dispose(), configurationQueue]);
   };

@@ -5,11 +5,10 @@ export function dashboardHtml(scriptUri: string, styleUri: string, cspSource: st
 <html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${escapeHtml(cspSource)}; script-src 'nonce-${escapeHtml(nonce)}';">
 <title>Agent Tracker</title><link rel="stylesheet" href="${escapeHtml(styleUri)}"></head>
-<body><header><div><p class="eyebrow">AGENT TRACKER</p><h1>작업의 흐름을 한눈에</h1><p class="muted">Claude · Codex 구독 사용률과 요청별 사용 통계</p></div><button id="settings">표시 설정</button></header>
-<nav aria-label="대시보드"><button data-tab="quota" aria-current="page">Quota</button><button data-tab="usage">Usage</button><button data-tab="diagnostics">Diagnostics</button></nav>
+<body><header><div><p class="eyebrow">AGENT TRACKER</p><h1>작업의 흐름을 한눈에</h1><p class="muted">Claude · Codex 요청별 사용 통계</p></div><button id="settings">통계 설정</button></header>
+<nav aria-label="대시보드"><button data-tab="usage" aria-current="page">사용량 통계</button><button data-tab="diagnostics">진단</button></nav>
 <main><p id="configuration-warning" class="stale" role="status" hidden></p><p id="error" class="error" role="alert" hidden></p>
-<section id="quota" aria-label="구독 사용률"><div id="quota-cards" class="cards"></div><button id="open-usage" class="primary">기간별 · 프로젝트별 상세 통계 →</button><p class="muted note">활성 창에서 자동 갱신합니다. 초기화 시각이 지나도 다음 조회 전까지 마지막 관측값을 표시합니다.</p></section>
-<section id="usage" aria-label="사용 통계" hidden><div class="section-title"><div><h2>사용 통계</h2><p class="muted">이 화면에 들어오거나 새로 고침할 때 로컬 기록을 확인합니다.</p></div><div class="actions"><button id="refresh-usage">새로 고침</button><button id="cancel-usage" hidden>취소</button></div></div>
+<section id="usage" aria-label="사용량 통계"><div class="section-title"><div><h2>사용량 통계</h2><p class="muted">사용량 통계 버튼으로 이 화면을 열 때 기록을 갱신합니다.</p></div><div class="actions"><button id="cancel-usage" hidden>취소</button></div></div>
 <p id="usage-progress" role="status" aria-live="polite"></p><form id="usage-filters" class="filters">
 <label>조회 단위<select id="group"><option value="day">일별</option><option value="month">월별</option><option value="project">프로젝트별</option><option value="session">세션별</option><option value="turn">사용자 요청별</option><option value="all">전체</option></select></label>
 <label>제공자<select id="provider"><option value="">전체</option><option value="claude">Claude</option><option value="codex">Codex</option></select></label>
@@ -17,6 +16,6 @@ export function dashboardHtml(scriptUri: string, styleUri: string, cspSource: st
 <label>프로젝트 ID<input id="project-key" type="text" placeholder="전체 프로젝트"></label><label>세션 ID<input id="session-id" type="text" placeholder="전체 세션"></label><button type="submit">조회</button></form>
 <p id="timezone" class="muted"></p><div id="usage-table" class="table-wrap"></div><div class="pagination"><button id="previous">이전</button><span id="page-label"></span><button id="next">다음</button></div><p id="coverage" class="muted"></p>
 <p class="muted note">총 토큰에는 진행 중 요청이 포함됩니다. 평균은 완료한 요청만 계산하며, 소요 시간을 알 수 없는 요청은 시간 평균에서 제외합니다. 요청의 시작일을 기준으로 집계합니다.</p></section>
-<section id="diagnostics" aria-label="진단" hidden><div class="section-title"><div><h2>진단</h2><p class="muted">최근 파일 처리 상태와 이전 통계를 유지한 이유를 확인합니다.</p></div><button id="refresh-diagnostics">다시 조회</button></div><div id="quota-diagnostics"></div><p id="diagnostic-counts"></p><div id="diagnostic-files" class="table-wrap"></div><div class="pagination"><button id="diagnostic-previous">이전</button><span id="diagnostic-page"></span><button id="diagnostic-next">다음</button></div><h3>확인이 필요한 요청</h3><div id="diagnostic-summaries" class="table-wrap"></div></section>
+<section id="diagnostics" aria-label="진단" hidden><div class="section-title"><div><h2>진단</h2><p class="muted">최근 파일 처리 상태와 이전 통계를 유지한 이유를 확인합니다.</p></div><button id="refresh-diagnostics">다시 조회</button></div><p id="diagnostic-counts"></p><div id="diagnostic-files" class="table-wrap"></div><div class="pagination"><button id="diagnostic-previous">이전</button><span id="diagnostic-page"></span><button id="diagnostic-next">다음</button></div><h3>확인이 필요한 요청</h3><div id="diagnostic-summaries" class="table-wrap"></div></section>
 </main><script nonce="${escapeHtml(nonce)}" src="${escapeHtml(scriptUri)}"></script></body></html>`;
 }

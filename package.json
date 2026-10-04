@@ -38,6 +38,12 @@
     "benchmark:quota": "npm run build && node scripts/quota/benchmark.cjs"
   },
   "contributes": {
+    "viewsContainers": {
+      "panel": [{ "id": "agentTracker", "title": "Agent Tracker", "icon": "resource/icon/codex.svg" }]
+    },
+    "views": {
+      "agentTracker": [{ "type": "webview", "id": "agentTracker.quotaView", "name": "사용량" }]
+    },
     "commands": [
       {
         "command": "agentTracker.openDashboard",
@@ -54,6 +60,15 @@
       {
         "command": "agentTracker.refreshCodex",
         "title": "Agent Tracker: Codex 사용률 새로 고침"
+      },
+      {
+        "command": "agentTracker.toggleQuota",
+        "title": "Agent Tracker: 현재 사용량 열기 / 닫기"
+      },
+      {
+        "command": "agentTracker.refreshQuota",
+        "title": "Agent Tracker: 현재 사용량 새로고침",
+        "icon": "$(refresh)"
       }
     ],
     "configuration": {
@@ -139,6 +154,99 @@
           "type": "string",
           "default": "",
           "description": "일·월 통계의 IANA 시간대. 비우면 시스템 시간대를 사용합니다."
+        }
+      }
+    },
+    "icons": {
+      "agent-tracker-codex": {
+        "description": "Codex logo",
+        "default": {
+          "fontPath": "./resource/icon/agent-tracker.woff",
+          "fontCharacter": "\\e001"
+        }
+      },
+      "agent-tracker-claude": {
+        "description": "Claude logo",
+        "default": {
+          "fontPath": "./resource/icon/agent-tracker.woff",
+          "fontCharacter": "\\e002"
+        }
+      },
+      "agent-tracker-quota-0": {
+        "description": "0% remaining quota",
+        "default": {
+          "fontPath": "./resource/icon/agent-tracker.woff",
+          "fontCharacter": "\\e010"
+        }
+      },
+      "agent-tracker-quota-1": {
+        "description": "10% remaining quota",
+        "default": {
+          "fontPath": "./resource/icon/agent-tracker.woff",
+          "fontCharacter": "\\e011"
+        }
+      },
+      "agent-tracker-quota-2": {
+        "description": "20% remaining quota",
+        "default": {
+          "fontPath": "./resource/icon/agent-tracker.woff",
+          "fontCharacter": "\\e012"
+        }
+      },
+      "agent-tracker-quota-3": {
+        "description": "30% remaining quota",
+        "default": {
+          "fontPath": "./resource/icon/agent-tracker.woff",
+          "fontCharacter": "\\e013"
+        }
+      },
+      "agent-tracker-quota-4": {
+        "description": "40% remaining quota",
+        "default": {
+          "fontPath": "./resource/icon/agent-tracker.woff",
+          "fontCharacter": "\\e014"
+        }
+      },
+      "agent-tracker-quota-5": {
+        "description": "50% remaining quota",
+        "default": {
+          "fontPath": "./resource/icon/agent-tracker.woff",
+          "fontCharacter": "\\e015"
+        }
+      },
+      "agent-tracker-quota-6": {
+        "description": "60% remaining quota",
+        "default": {
+          "fontPath": "./resource/icon/agent-tracker.woff",
+          "fontCharacter": "\\e016"
+        }
+      },
+      "agent-tracker-quota-7": {
+        "description": "70% remaining quota",
+        "default": {
+          "fontPath": "./resource/icon/agent-tracker.woff",
+          "fontCharacter": "\\e017"
+        }
+      },
+      "agent-tracker-quota-8": {
+        "description": "80% remaining quota",
+        "default": {
+          "fontPath": "./resource/icon/agent-tracker.woff",
+          "fontCharacter": "\\e018"
+        }
+      },
+      "agent-tracker-quota-9": {
+        "description": "90% remaining quota",
+        "default": {
+          "fontPath": "./resource/icon/agent-tracker.woff",
+          "fontCharacter": "\\e019"
+        }
+      },
+      "agent-tracker-quota-10": {
+        "description": "100% remaining quota",
+        "default": {
+          "fontPath": "./resource/icon/agent-tracker.woff",
+          "fontCharacter": "\\e01a"
         }
       }
     }

@@ -2,7 +2,7 @@
 
 Claude와 Codex의 구독 사용률, 로컬 대화 기록의 요청별 토큰 사용량을 보여 주는 VS Code 확장입니다.
 
-- **Quota**: 상태 표시줄의 Claude·Codex 사용률, 초기화 시각, 제공자별 새로 고침과 설정
+- **Quota**: 하나의 상태 표시줄에 Claude·Codex 로고, 남은 잔량 막대, 사용률과 초기화 시각 표시
 - **Usage**: 일·월·프로젝트·세션·사용자 요청별 합계와 완료 요청의 평균 토큰·소요 시간
 - **Diagnostics**: 파일 처리 상태, 오류 위치, 이전 정상 통계를 유지한 요청
 
@@ -15,7 +15,9 @@ npm ci
 npm run build
 ```
 
-명령 팔레트에서 `Agent Tracker: 대시보드 열기` 또는 `Agent Tracker: 사용 통계 열기`를 실행할 수 있습니다. 상태 표시줄을 클릭하면 선택한 제공자의 quota 카드가 열립니다.
+상태 표시줄의 Claude·Codex 통합 버튼을 누르면 하단 사용량 패널을 열고 닫습니다. `상세`/`압축`으로 표시량을 바꾸고, 각 제공자 오른쪽 화살표로 해당 확장 관리 화면을 엽니다. 패널의 `사용량 통계`를 누르면 통계 Webview가 열립니다. 명령 팔레트의 `Agent Tracker: 대시보드 열기` 또는 `Agent Tracker: 사용 통계 열기`로도 통계에 진입할 수 있습니다.
+
+오른쪽 새로고침 버튼과 사용량 패널의 새로고침 버튼은 Claude·Codex의 현재 quota만 조회합니다. 계정 관리 메뉴는 제공하지 않습니다. 로고 SVG와 상태줄용 아이콘 폰트는 `resource/icon`에 포함됩니다.
 
 VSIX를 만들려면 다음 명령을 사용합니다. 생성된 `agent-tracker-0.1.0.vsix`를 VS Code의 **Extensions: Install from VSIX...**로 설치합니다.
 
@@ -44,7 +46,7 @@ Windows의 npm Codex 설치는 `.cmd` 옆 패키지에서 네이티브 실행 �
 
 ## 데이터 처리
 
-활성화 시 SQLite schema만 준비하고 quota를 조회합니다. JSONL 스캔은 Usage 화면 진입 또는 수동 새로 고침에서 시작합니다. 날짜·시간대·그룹·페이지 변경은 저장된 결과만 조회합니다. 비활성 창에서는 quota 자동 조회를 생략합니다.
+활성화 시 SQLite schema만 준비하고 quota를 조회합니다. JSONL 스캔은 사용량 통계에 진입할 때만 시작합니다. quota 열기·닫기와 새로고침, 통계 내부 탭·날짜·시간대·그룹·페이지 변경은 스캔을 시작하지 않습니다. 비활성 창에서는 quota 자동 조회를 생략합니다.
 
 SQLite는 확장 `globalStorageUri`의 `agent-tracker.sqlite`에 저장됩니다. 영속 테이블은 `manifest`, `turn_summary` 두 개입니다. 변경된 세션은 원본 전체를 다시 읽어 중복 응답을 제거하고 교체하며, 변화가 없는 세션은 본문을 읽지 않습니다. 하위 에이전트의 토큰은 부모 요청에 더하고 시간은 부모 요청 값만 사용합니다.
 
@@ -71,6 +73,7 @@ PR CI는 Windows·Linux·macOS, Node 22·24의 단위·통합 테스트와 Linux
 
 ## 현재 제약
 
+- VS Code 공개 API는 상태 표시줄에 붙는 클릭형 Webview 팝업을 제공하지 않아, 같은 내용을 하단 패널의 토글 UI로 표시합니다. 상태줄은 SVG 원본에서 만든 폰트 아이콘을 쓰며 단일 항목 전체에 밝은 테마는 검정, 어두운 테마는 흰색을 적용합니다. 사용량 패널의 Claude SVG는 원래 주황색입니다. 막대는 남은 잔량을 표시하며, 숫자는 `display.percentage` 설정을 따릅니다.
 - Claude OAuth usage는 비공개 endpoint입니다. 401이면 CLI가 보관한 credential을 한 번 다시 읽고, 계속 실패하면 CLI 재로그인을 안내합니다. refresh token을 직접 교체하지 않습니다.
 - 로컬 JSONL은 제공자의 안정된 API 계약이 아닙니다. 확인할 수 없는 부모 관계나 요청은 임의로 합산하지 않고 Diagnostics에 표시합니다. fork 이력은 부모와 일치하는 순차 legacy prefix만 제외합니다.
 - 로컬 Codex 실제 quota 조회와 조회 후 프로세스 종료를 확인했습니다. Claude 실제 조회는 인증 오류여서 Claude Code 재로그인 후 확인이 필요합니다. 실제 VS Code light/dark 테마의 탭·필터·표시 동작은 자동 검증하며, 화면 가독성과 원격 환경은 수동 검증 대상입니다. 자동 테스트는 합성 fixture와 대체 App Server 프로세스를 사용합니다.

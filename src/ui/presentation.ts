@@ -1,26 +1,15 @@
-import type { QuotaProviderId, QuotaState } from '../quota/types';
+import type { QuotaProviderId } from '../quota/types';
 import type { UsageQuery } from '../summary/types';
 
 export const providerName = (id: QuotaProviderId): string => id === 'claude' ? 'Claude' : 'Codex';
 export function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]!);
 }
-export function statusPresentation(state: QuotaState, percentage: 'used' | 'remaining', detail: 'compact' | 'detailed'): { text: string; warning: boolean } {
-  const name = providerName(state.provider);
-  const windows = state.snapshot?.windows ?? [];
-  if (!windows.length) return { text: `${name} ${state.refreshing ? '$(sync~spin)' : '조회 불가'}`, warning: false };
-  const selected = detail === 'compact' ? [windows.reduce((a, b) => a.usedPercent >= b.usedPercent ? a : b)] : windows.slice(0, 2);
-  const value = selected.map(window => `${window.label.replace(/\$\(/g, '(').replace(/[\r\n]/g, ' ')}:${Math.round(percentage === 'remaining' ? Math.max(0, 100 - window.usedPercent) : window.usedPercent)}%`).join(' ');
-  return { text: `${name} ${percentage === 'remaining' ? '남음 ' : ''}${value}${state.status === 'stale' ? ' $(history)' : ''}${state.refreshing ? ' $(sync~spin)' : ''}`, warning: windows.some(window => window.usedPercent >= 90) };
-}
-
-export type DashboardTab = 'quota' | 'usage' | 'diagnostics';
+export type DashboardTab = 'usage' | 'diagnostics';
 export type DashboardMessage =
   | { type: 'ready' }
   | { type: 'tab'; tab: DashboardTab }
-  | { type: 'refreshQuota'; provider: QuotaProviderId }
-  | { type: 'settings'; provider?: QuotaProviderId }
-  | { type: 'refreshUsage' }
+  | { type: 'settings' }
   | { type: 'cancelUsage' }
   | { type: 'queryUsage'; query: UsageQuery; fromDay?: string; toDay?: string }
   | { type: 'diagnostics'; offset: number };
@@ -29,12 +18,10 @@ export type DashboardMessage =
 export function parseDashboardMessage(input: unknown): DashboardMessage | null {
   if (!input || typeof input !== 'object') return null;
   const value = input as Record<string, unknown>;
-  const provider = value.provider === 'claude' || value.provider === 'codex' ? value.provider : undefined;
   switch (value.type) {
-    case 'ready': case 'refreshUsage': case 'cancelUsage': return { type: value.type };
-    case 'tab': return ['quota', 'usage', 'diagnostics'].includes(String(value.tab)) ? { type: 'tab', tab: value.tab as DashboardTab } : null;
-    case 'refreshQuota': return provider ? { type: 'refreshQuota', provider } : null;
-    case 'settings': return value.provider === undefined || provider ? { type: 'settings', provider } : null;
+    case 'ready': case 'cancelUsage': return { type: value.type };
+    case 'tab': return ['usage', 'diagnostics'].includes(String(value.tab)) ? { type: 'tab', tab: value.tab as DashboardTab } : null;
+    case 'settings': return value.provider === undefined ? { type: 'settings' } : null;
     case 'diagnostics': return { type: 'diagnostics', offset: boundedOffset(value.offset) };
     case 'queryUsage': {
       if (!value.query || typeof value.query !== 'object') return null;
