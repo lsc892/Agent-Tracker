@@ -20,14 +20,13 @@ function resetTime(window: QuotaWindow, now: number): string {
 export function quotaHoverSummary(states: readonly QuotaState[], now = Date.now()): string {
   const lines = (['claude', 'codex'] as const).map(provider => {
     const state = states.find(value => value.provider === provider);
-    const name = provider === 'claude' ? 'Claude' : 'Codex';
-    if (!state) return `${name}: 조회 불가`;
+    if (!state) return undefined;
     const view = statusBarPresentation(state, 'remaining', 'compact', now);
     return view.accessibleText
       .replace(/조회 불가\.$/, '조회 불가')
       .replace('5시간:', '5시간 -')
       .replace(', 재설정 ', ', 재설정까지 ');
-  });
+  }).filter((line): line is string => line !== undefined);
   return [...lines, '클릭하여 열기/닫기'].join('\n');
 }
 

@@ -16,6 +16,7 @@ export interface UsageQuery {
   fromMs?: number;
   toMs?: number;
   provider?: Provider;
+  providers?: Provider[];
   projectKey?: string;
   sessionId?: string;
   limit?: number;

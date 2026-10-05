@@ -100,7 +100,17 @@
     const message = event.data;
     if (!message || typeof message !== 'object') return;
     switch (message.type) {
-      case 'state': timezone = message.timezone; $('timezone').textContent = `집계 시간대: ${timezone}`; $('configuration-warning').textContent = message.timezoneWarning ?? ''; $('configuration-warning').hidden = !message.timezoneWarning; if (latestUsage) renderUsage(latestUsage); break;
+      case 'state':
+        timezone = message.timezone;
+        $('timezone').textContent = `집계 시간대: ${timezone}`;
+        $('configuration-warning').textContent = message.timezoneWarning ?? '';
+        $('configuration-warning').hidden = !message.timezoneWarning;
+        if (Array.isArray(message.providers)) {
+          for (const option of $('provider').options) option.disabled = Boolean(option.value) && !message.providers.includes(option.value);
+          if ($('provider').selectedOptions[0]?.disabled) { $('provider').value = ''; offset = 0; query(); }
+        }
+        if (latestUsage) renderUsage(latestUsage);
+        break;
       case 'navigate': tab(message.tab, false); break;
       case 'usage': $('error').hidden = true; renderUsage(message.result); break;
       case 'diagnostics': diagnosticOffset = message.offset; renderDiagnostics(message.result); break;

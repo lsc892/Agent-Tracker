@@ -33,14 +33,15 @@ export class QuotaStatusBar implements vscode.Disposable {
 
   update(states: readonly QuotaState[], settings: StatusSettings): void {
     this.latest = { states, settings };
-    const visible = ['claude', 'codex'].flatMap(provider => states.filter(state => state.provider === provider && settings[state.provider].showStatusBar));
+    const tracked = states.filter(state => settings[state.provider].enabled);
+    const visible = ['claude', 'codex'].flatMap(provider => tracked.filter(state => state.provider === provider && (state.provider === 'claude' || settings.codex.showStatusBar)));
     const views = visible.map(state => statusBarPresentation(state, settings.percentage, settings.detail));
     this.quota.text = views.map(view => view.text).join('   ');
-    this.quota.tooltip = createQuotaTooltip(states, settings);
+    this.quota.tooltip = createQuotaTooltip(tracked, settings);
     // The renderer uses this plain-text preview for automatic hover; the Markdown
     // tooltip remains the full quota UI opened by the native click toggle.
-    this.quota.accessibilityInformation = { label: quotaHoverSummary(states), role: 'button' };
-    this.refresh.text = states.some(state => state.refreshing) ? '$(sync~spin)' : '$(refresh)';
+    this.quota.accessibilityInformation = { label: quotaHoverSummary(tracked), role: 'button' };
+    this.refresh.text = tracked.some(state => state.refreshing) ? '$(sync~spin)' : '$(refresh)';
     if (visible.length) {
       this.quota.show();
       this.refresh.show();

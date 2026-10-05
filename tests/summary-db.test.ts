@@ -38,6 +38,34 @@ function seed(db: SummaryDatabase, rows: TurnSummaryInput[] = [turn()]): number 
   return manifest.id;
 }
 
+test('tracking selection filters usage, pagination counts and diagnostics without discarding cached data', t => {
+  const db = database(t);
+  seed(db);
+  const meta = {...metadata(), provider: 'codex' as const};
+  const file = db.observeFile(meta, 'scan-codex');
+  db.replaceSessions({sessions: [{provider: 'codex', session_id: 'session-a'}], files: [{...meta, id: file.id}], summaries: [turn('codex-turn', {provider: 'codex', quality_flags: '["derived"]'})]});
+  for (const provider of ['claude', 'codex'] as const) {
+    const filter = {providers: [provider]};
+    assert.deepEqual(db.queryTurns(filter).map(row => row.provider), [provider]);
+    assert.equal(db.queryTurnsCount(filter), 1);
+    assert.deepEqual(db.queryUsage(filter).map(row => row.provider), [provider]);
+    assert.equal(db.queryUsageCount(filter), 1);
+    assert.equal(db.diagnostics(filter).counts.files, 1);
+    assert.ok(db.diagnostics(filter).files.every(row => row.provider === provider));
+    assert.ok(db.diagnostics(filter).summaries.every(row => row.provider === provider));
+  }
+  assert.deepEqual(db.queryTurns({providers: ['codex'], provider: 'claude'}), []);
+  assert.deepEqual(db.queryUsage({providers: []}), []);
+  assert.equal(db.queryUsageCount({providers: []}), 0);
+  assert.equal(db.diagnostics({providers: []}).counts.files, 0);
+  assert.equal(db.queryTurnsCount(), 2);
+  db.clearData();
+  assert.equal(db.queryTurnsCount(), 0);
+  assert.equal(db.diagnostics().counts.files, 0);
+  seed(db);
+  assert.equal(db.queryTurnsCount(), 1, 'clear preserves a usable schema');
+});
+
 test('schema persists only manifest and turn_summary and uses bounded disk staging cache', t => {
   const parent = realpathSync(tmpdir());
   const directory = mkdtempSync(join(parent, 'agent-tracker-db-test-'));

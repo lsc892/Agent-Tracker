@@ -6,6 +6,16 @@ function settings(values: Record<string, unknown>): SettingsReader {
   return { get<T>(key: string, fallback: T): T { return (key in values ? values[key] : fallback) as T; } };
 }
 
+test('tracking switches exclude source roots independently of status visibility', () => {
+  for (const provider of ['claude', 'codex'] as const) {
+    const config = readConfiguration(settings({ [`${provider}.enabled`]: false }));
+    assert.equal(config[provider].enabled, false);
+    assert.ok(config.roots.length > 0 && config.roots.every(root => root.provider !== provider));
+  }
+  assert.equal(readConfiguration(settings({'codex.showStatusBar': false})).codex.enabled, true);
+  assert.deepEqual(readConfiguration(settings({'claude.enabled': false, 'codex.enabled': false})).roots, []);
+});
+
 test('configured timezone is trimmed and keeps quota and summary on the same valid timezone', () => {
   const config = readConfiguration(settings({ 'usage.timezone': ' Asia/Seoul ' }));
   assert.equal(config.timezone, 'Asia/Seoul');

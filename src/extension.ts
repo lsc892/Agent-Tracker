@@ -15,15 +15,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   let configurationQueue = Promise.resolve();
   let clearingData: Promise<void> | undefined;
   const createQuota = (config: TrackerConfiguration): QuotaService => new QuotaService([
-    new ClaudeQuotaProvider({ dataHome: config.claude.dataHome }),
-    new CodexQuotaProvider({ dataHome: config.codex.dataHome, executable: config.codex.executable }),
+    ...(config.claude.enabled ? [new ClaudeQuotaProvider({ dataHome: config.claude.dataHome })] : []),
+    ...(config.codex.enabled ? [new CodexQuotaProvider({ dataHome: config.codex.dataHome, executable: config.codex.executable })] : []),
   ], { pollingSeconds: { claude: config.claude.pollingSeconds, codex: config.codex.pollingSeconds } });
   let quota = createQuota(settings);
   await mkdir(context.globalStorageUri.fsPath, { recursive: true });
   const summary = new SummaryClient({ dbPath: join(context.globalStorageUri.fsPath, 'agent-tracker.sqlite'), roots: settings.roots, timezone: settings.timezone });
   const dashboard = new Dashboard({ extensionUri: context.extensionUri, summary, settings: () => settings });
   const refreshQuota = async (): Promise<void> => {
-    await Promise.all([quota.refresh('claude', true), quota.refresh('codex', true)]);
+    await configurationQueue;
+    if (!disposed) await Promise.all(quota.getStates().map(state => quota.refresh(state.provider, true)));
   };
   const statusBar = new QuotaStatusBar();
   const render = (): void => statusBar.update(quota.getStates(), settings);
@@ -75,7 +76,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         if (disposed) return;
         const previous = settings;
         settings = readConfiguration(vscode.workspace.getConfiguration('agentTracker'));
-        const changedProvider = previous.claude.dataHome !== settings.claude.dataHome || previous.codex.dataHome !== settings.codex.dataHome || previous.codex.executable !== settings.codex.executable;
+        const changedTracking = previous.claude.enabled !== settings.claude.enabled || previous.codex.enabled !== settings.codex.enabled;
+        if (JSON.stringify(previous.roots) !== JSON.stringify(settings.roots)) {
+          dashboard.close();
+          await summary.cancelRefresh();
+          if (disposed) return;
+        }
+        const changedProvider = changedTracking || previous.claude.dataHome !== settings.claude.dataHome || previous.codex.dataHome !== settings.codex.dataHome || previous.codex.executable !== settings.codex.executable;
         if (changedProvider) {
           subscription.dispose();
           await quota.dispose();

@@ -34,8 +34,8 @@ port.on('message',(message: {id?:number;method:string;payload?:unknown}) => {
           : database.queryUsage(query,query.groupBy === 'all' || !query.groupBy ? 'total' : query.groupBy,query.timezone ?? options.timezone ?? 'UTC',query);
         const total = query.groupBy === 'turn' ? database.queryTurnsCount(query)
           : database.queryUsageCount(query,query.groupBy === 'all' || !query.groupBy ? 'total' : query.groupBy,query.timezone ?? options.timezone ?? 'UTC');
-        result = {rows,total,coverage:database.diagnostics({limit:1}).counts};
-      } else if (message.method === 'diagnostics') result = {...database.diagnostics((message.payload ?? {}) as {limit?:number;offset?:number;afterId?:number}),lastRefresh};
+        result = {rows,total,coverage:database.diagnostics({limit:1,providers:query.providers}).counts};
+      } else if (message.method === 'diagnostics') result = {...database.diagnostics((message.payload ?? {}) as {limit?:number;offset?:number;afterId?:number;providers?:SourceRoot['provider'][]}),lastRefresh};
       else if (message.method === 'clearData') {
         // Use the same cross-window lock as scanning; never unlink a live DB or lock file.
         const release = await acquireRefreshLock(options.dbPath, AbortSignal.timeout(30_000));

@@ -20,7 +20,7 @@ test('hover preview shows both providers, five-hour remaining quota, reset count
   const claude = { ...state, provider: 'claude' as const, snapshot: null };
   assert.equal(quotaHoverSummary([codex, claude], 0), 'Claude: 조회 불가\nCodex: 5시간 - 83% 남음, 재설정까지 3h 10m\n클릭하여 열기/닫기');
   assert.match(quotaHoverSummary([codex], 60_000), /3h 9m/);
-  assert.match(quotaHoverSummary([{ ...claude, refreshing: true }], 0), /Claude: 조회 중…\nCodex: 조회 불가/);
+  assert.equal(quotaHoverSummary([{ ...claude, refreshing: true }], 0), 'Claude: 조회 중…\n클릭하여 열기/닫기');
   assert.match(quotaHoverSummary([{ ...codex, status: 'stale' }], 0), /이전 조회 값/);
   assert.doesNotMatch(quotaHoverSummary([codex], 0), /7일|92%|\$\(/);
 });

@@ -47,6 +47,10 @@ function turnValues(row: TurnSummaryInput, now: string): SQLInputValue[] {
 function whereClause(filter: SummaryFilter): { sql: string; values: SQLInputValue[] } {
   const clauses: string[] = [];
   const values: SQLInputValue[] = [];
+  if (filter.providers) {
+    clauses.push(filter.providers.length ? `provider IN (${filter.providers.map(() => '?').join(',')})` : '0 = 1');
+    values.push(...filter.providers);
+  }
   for (const [name, column] of [['provider', 'provider'], ['projectKey', 'project_key'], ['sessionId', 'session_id']] as const) {
     if (filter[name] !== undefined) {
       clauses.push(`${column} = ?`);
@@ -333,22 +337,23 @@ export class SummaryDatabase {
       .all(...prefix, ...where.values, pageLimit(page.limit), nonnegative(page.offset ?? 0, 'offset')) as unknown as UsageRow[];
   }
 
-  diagnostics(page: KeysetPage & { afterSummaryId?: number; offset?: number } = {}): DiagnosticsPage {
+  diagnostics(page: KeysetPage & { afterSummaryId?: number; offset?: number; providers?: Provider[] } = {}): DiagnosticsPage {
     const limit = pageLimit(page.limit);
     const offset = nonnegative(page.offset ?? 0, 'offset');
-    const files = this.connection.prepare('SELECT * FROM manifest WHERE id > ? ORDER BY id LIMIT ? OFFSET ?')
-      .all(nonnegative(page.afterId ?? 0, 'afterId'), limit, offset) as unknown as ManifestRow[];
-    const summaries = this.connection.prepare(`SELECT * FROM turn_summary WHERE id > ? AND
+    const where = whereClause({ providers: page.providers });
+    const files = this.connection.prepare(`SELECT * FROM manifest WHERE ${where.sql} AND id > ? ORDER BY id LIMIT ? OFFSET ?`)
+      .all(...where.values, nonnegative(page.afterId ?? 0, 'afterId'), limit, offset) as unknown as ManifestRow[];
+    const summaries = this.connection.prepare(`SELECT * FROM turn_summary WHERE ${where.sql} AND id > ? AND
       (last_error IS NOT NULL OR (quality_flags IS NOT NULL AND quality_flags <> '[]' AND quality_flags <> ''))
       ORDER BY id LIMIT ? OFFSET ?`)
-      .all(nonnegative(page.afterSummaryId ?? 0, 'afterSummaryId'), limit, offset) as unknown as TurnSummaryRow[];
+      .all(...where.values, nonnegative(page.afterSummaryId ?? 0, 'afterSummaryId'), limit, offset) as unknown as TurnSummaryRow[];
     const counts = this.connection.prepare(`SELECT COUNT(*) AS files,
       COALESCE(SUM(processing_status = 'processing'), 0) AS processing,
       COALESCE(SUM(processing_status = 'done'), 0) AS done,
       COALESCE(SUM(processing_status = 'error'), 0) AS error,
       COALESCE(SUM(processing_status = 'interrupted'), 0) AS interrupted,
-      (SELECT COUNT(*) FROM turn_summary WHERE last_error IS NOT NULL) AS stale_summaries
-      FROM manifest`).get() as unknown as DiagnosticsPage['counts'];
+      (SELECT COUNT(*) FROM turn_summary WHERE ${where.sql} AND last_error IS NOT NULL) AS stale_summaries
+      FROM manifest WHERE ${where.sql}`).get(...where.values, ...where.values) as unknown as DiagnosticsPage['counts'];
     return {
       files, summaries, counts,
       nextFileId: files.length === limit ? files[files.length - 1].id : null,

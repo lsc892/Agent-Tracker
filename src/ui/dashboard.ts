@@ -45,6 +45,7 @@ export class Dashboard implements vscode.Disposable {
       webview.asWebviewUri(vscode.Uri.joinPath(media, 'dashboard.css')).toString(), webview.cspSource, randomBytes(18).toString('base64'));
     this.panel.onDidDispose(() => { this.panel = undefined; this.ready = false; this.queryVersion++; this.diagnosticsVersion++; });
     webview.onDidReceiveMessage((raw: unknown) => {
+      if (this.panel?.webview !== webview) return;
       const message = parseDashboardMessage(raw);
       if (!message) return;
       void this.handle(message).catch(error => this.error(error));
@@ -53,7 +54,7 @@ export class Dashboard implements vscode.Disposable {
 
   update(): void {
     const settings = this.dependencies.settings();
-    this.post({ type: 'state', timezone: settings.timezone, timezoneWarning: settings.timezoneWarning });
+    this.post({ type: 'state', timezone: settings.timezone, timezoneWarning: settings.timezoneWarning, providers: this.providers() });
   }
 
   configurationChanged(): void {
@@ -102,7 +103,7 @@ export class Dashboard implements vscode.Disposable {
   private async loadUsage(): Promise<void> {
     const version = ++this.queryVersion;
     const timezone = this.dependencies.settings().timezone;
-    const query = { ...this.query, timezone };
+    const query = { ...this.query, timezone, providers: this.providers() };
     if (this.fromDay) query.fromMs = periodBounds(this.fromDay, timezone).fromMs;
     if (this.toDay) query.toMs = periodBounds(this.toDay, timezone).toMs;
     if (query.fromMs !== undefined && query.toMs !== undefined && query.fromMs >= query.toMs) throw new Error('조회 시작일은 종료일보다 늦을 수 없습니다.');
@@ -113,12 +114,16 @@ export class Dashboard implements vscode.Disposable {
   private async loadDiagnostics(offset: number): Promise<void> {
     const version = ++this.diagnosticsVersion;
     this.update();
-    const result = await this.dependencies.summary.diagnostics({ limit: 100, offset });
+    const result = await this.dependencies.summary.diagnostics({ limit: 100, offset, providers: this.providers() });
     if (version === this.diagnosticsVersion) this.post({ type: 'diagnostics', result, offset });
   }
 
   private post(message: unknown): void {
     if (this.ready && this.panel) void this.panel.webview.postMessage(message);
+  }
+  private providers(): ('claude' | 'codex')[] {
+    const settings = this.dependencies.settings();
+    return (['claude', 'codex'] as const).filter(provider => settings[provider].enabled);
   }
   private error(error: unknown): void {
     const message = error instanceof Error ? error.message : '작업에 실패했습니다. Diagnostics에서 처리 상태를 확인해 주세요.';

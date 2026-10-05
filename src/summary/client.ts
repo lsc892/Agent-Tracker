@@ -28,7 +28,7 @@ export class SummaryClient {
     return this.refreshPending;
   }
   async query(query: UsageQuery = {}): Promise<UsageResult> { await this.clearPending; return this.request('query',query); }
-  async diagnostics(page: {limit?:number;offset?:number;afterId?:number} = {}): Promise<DiagnosticsResult> { await this.clearPending; return this.request('diagnostics',page); }
+  async diagnostics(page: {limit?:number;offset?:number;afterId?:number;providers?:SourceRoot['provider'][]} = {}): Promise<DiagnosticsResult> { await this.clearPending; return this.request('diagnostics',page); }
   async cancelRefresh(): Promise<void> {
     this.cancel();
     await this.refreshPending?.catch(() => undefined);

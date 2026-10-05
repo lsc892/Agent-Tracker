@@ -63,6 +63,7 @@ export interface SessionReplacement {
 
 export interface SummaryFilter {
   provider?: Provider;
+  providers?: Provider[];
   projectKey?: string;
   sessionId?: string;
   fromMs?: number;

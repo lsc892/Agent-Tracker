@@ -6,8 +6,8 @@ export interface SettingsReader { get<T>(key: string, fallback: T): T }
 export interface TrackerConfiguration {
   percentage: 'used' | 'remaining';
   detail: 'compact' | 'detailed';
-  claude: { dataHome: string; showStatusBar: boolean; pollingSeconds: number };
-  codex: { dataHome: string; executable: string; showStatusBar: boolean; pollingSeconds: number };
+  claude: { enabled: boolean; dataHome: string; pollingSeconds: number };
+  codex: { enabled: boolean; dataHome: string; executable: string; showStatusBar: boolean; pollingSeconds: number };
   roots: SourceRoot[];
   timezone: string;
   timezoneWarning?: string;
@@ -22,6 +22,7 @@ export function readConfiguration(settings: SettingsReader): TrackerConfiguratio
   const codexHome = expandPath(settings.get('codex.dataHome', '') || process.env.CODEX_HOME || join(homedir(), '.codex'));
   const claudeRoots = settings.get<string[]>('usage.claudeRoots', []);
   const codexRoots = settings.get<string[]>('usage.codexRoots', []);
+  const enabled = { claude: settings.get('claude.enabled', true), codex: settings.get('codex.enabled', true) };
   let timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
   let timezoneWarning: string | undefined;
   const configuredTimezone = settings.get<unknown>('usage.timezone', '');
@@ -40,12 +41,12 @@ export function readConfiguration(settings: SettingsReader): TrackerConfiguratio
   return {
     percentage: settings.get('display.percentage', 'used'),
     detail: settings.get('display.detail', 'detailed'),
-    claude: { dataHome: claudeHome, showStatusBar: settings.get('claude.showStatusBar', true), pollingSeconds: settings.get('claude.pollingIntervalSeconds', 900) },
-    codex: { dataHome: codexHome, executable: settings.get('codex.executable', 'codex'), showStatusBar: settings.get('codex.showStatusBar', true), pollingSeconds: settings.get('codex.pollingIntervalSeconds', 900) },
+    claude: { enabled: enabled.claude, dataHome: claudeHome, pollingSeconds: settings.get('claude.pollingIntervalSeconds', 900) },
+    codex: { enabled: enabled.codex, dataHome: codexHome, executable: settings.get('codex.executable', 'codex'), showStatusBar: settings.get('codex.showStatusBar', true), pollingSeconds: settings.get('codex.pollingIntervalSeconds', 900) },
     roots: [
       ...(claudeRoots.length ? claudeRoots : [join(claudeHome, 'projects')]).map(path => ({ provider: 'claude' as const, path: expandPath(path) })),
       ...(codexRoots.length ? codexRoots : [join(codexHome, 'sessions'), join(codexHome, 'archived_sessions')]).map(path => ({ provider: 'codex' as const, path: expandPath(path) })),
-    ],
+    ].filter(root => enabled[root.provider]),
     timezone, timezoneWarning,
   };
 }
