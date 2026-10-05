@@ -46,10 +46,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       if (detail !== 'compact' && detail !== 'detailed') return;
       await vscode.workspace.getConfiguration('agentTracker').update('display.detail', detail, vscode.ConfigurationTarget.Global);
     }),
-    vscode.commands.registerCommand('agentTracker.manageProvider', async (provider: unknown) => {
-      if (provider !== 'claude' && provider !== 'codex') return;
-      await vscode.commands.executeCommand('extension.open', provider === 'claude' ? 'anthropic.claude-code' : 'openai.chatgpt');
-    }),
     vscode.commands.registerCommand('agentTracker.openSettings', () => vscode.commands.executeCommand('workbench.action.openSettings', '@ext:agent-tracker.agent-tracker')),
     vscode.commands.registerCommand('agentTracker.clearUsageData', () => {
       clearingData ??= (async () => {
@@ -68,8 +64,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand('agentTracker.refreshQuota', refreshQuota),
     vscode.commands.registerCommand('agentTracker.openDashboard', open),
     vscode.commands.registerCommand('agentTracker.openUsage', () => open()),
-    vscode.commands.registerCommand('agentTracker.refreshClaude', () => quota.refresh('claude', true)),
-    vscode.commands.registerCommand('agentTracker.refreshCodex', () => quota.refresh('codex', true)),
     vscode.window.onDidChangeWindowState(state => quota.setFocused(state.focused)),
     vscode.workspace.onDidChangeConfiguration(event => {
       if (!event.affectsConfiguration('agentTracker')) return;

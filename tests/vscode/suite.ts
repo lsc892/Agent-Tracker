@@ -102,13 +102,14 @@ export async function run(): Promise<void> {
     await extension.activate();
     assert.ok(extension.isActive);
     const commands = await vscode.commands.getCommands(true);
-    for (const command of ['agentTracker.openUsage', 'agentTracker.toggleQuotaTooltip', 'agentTracker.setStatusBarDetail', 'agentTracker.manageProvider', 'agentTracker.refreshQuota']) assert.ok(commands.includes(command), `${command} is registered`);
+    for (const command of ['agentTracker.openUsage', 'agentTracker.toggleQuotaTooltip', 'agentTracker.setStatusBarDetail', 'agentTracker.openSettings', 'agentTracker.clearUsageData', 'agentTracker.refreshQuota']) assert.ok(commands.includes(command), `${command} is registered`);
+    for (const command of ['agentTracker.manageProvider', 'agentTracker.refreshClaude', 'agentTracker.refreshCodex']) assert.ok(!commands.includes(command));
     assert.ok(!commands.includes('agentTracker.toggleQuota'), 'the old panel toggle is removed');
     assert.ok(!extension.packageJSON.contributes.viewsContainers, 'no quota panel is contributed');
     assert.ok(currentTooltip instanceof vscode.MarkdownString, 'real status bar receives a rich hover');
     const fixture: import('../../src/quota/types').QuotaState = {
       provider: 'codex', status: 'ready', refreshing: false, error: null, lastSuccessAt: 0, nextAllowedAt: 0,
-      snapshot: { provider: 'codex', fetchedAt: 0, windows: [
+      snapshot: { provider: 'codex', fetchedAt: 0, rateLimitResetCredits: { availableCount: 2, nextExpiresAt: (17 * 24 + 8) * 3_600_000 }, windows: [
         { id: 'primary', label: '5h', usedPercent: 42, current: 42, maximum: 100, resetsAt: 90_000, windowDurationMins: 300 },
         { id: 'weekly', label: '7d', usedPercent: 75, current: 75, maximum: 100, resetsAt: 3_600_000, windowDurationMins: 10080 },
         { id: 'extra', label: '| [run](command:evil)\n<img src=x>', usedPercent: NaN, current: 0, maximum: 100, resetsAt: null, windowDurationMins: null },
@@ -116,12 +117,16 @@ export async function run(): Promise<void> {
     };
     const card = originalTooltip([fixture], { percentage: 'remaining', detail: 'compact' }, 0);
     assert.equal(card.supportThemeIcons, true);
-    assert.ok(!card.supportHtml, 'arbitrary HTML is not enabled');
+    assert.equal(card.supportHtml, true, 'controlled color spans accompany SVG usage meters');
     assert.ok(typeof card.isTrusted === 'object' && !card.isTrusted.enabledCommands.includes('evil'));
     assert.match(card.value, /58%/);
     assert.match(card.value, /25%/);
     assert.match(card.value, /2분 후/);
     assert.match(card.value, /1시간 0분 후/);
+    assert.match(card.value, /2m 후 초기화/);
+    assert.match(card.value, /rate-limit 재설정 2회 사용 가능/);
+    assert.match(card.value, /다음 항목이 17d 8h 후 만료됨/);
+    assert.doesNotMatch(card.value, /\| 기간 \|/);
     assert.doesNotMatch(card.value, /\]\(command:evil\)/, 'provider labels cannot introduce command links');
     assert.doesNotMatch(card.value, /<img src=x>/, 'provider HTML remains text');
     const advanced = originalTooltip([{ ...fixture, status: 'stale', refreshing: true }], { percentage: 'used', detail: 'detailed' }, 61_000);
@@ -131,7 +136,7 @@ export async function run(): Promise<void> {
     assert.match(advanced.value, /조회 중/);
     assert.doesNotMatch(advanced.value, /\]\(command:agentTracker.refreshQuota\)/, 'busy refresh is not a clickable action');
     const unavailable = originalTooltip([{ ...fixture, snapshot: null, status: 'unavailable', error: { code: 'authentication', message: 'CLI에서 로그인하세요.' } }], { percentage: 'used', detail: 'detailed' }, 0);
-    assert.match(unavailable.value, /조회 불가/);
+    assert.match(unavailable.value, /조회불가/);
     assert.match(unavailable.value.replace(/&nbsp;/g, ' '), /CLI에서 로그인하세요/);
     outcomes.push('native Markdown hover: all windows, remaining percentages, reset countdown, stale/loading/error states, escaped labels');
     const userData = process.env.AGENT_TRACKER_TEST_USER_DATA!;
@@ -182,10 +187,39 @@ export async function run(): Promise<void> {
       onReport = undefined;
       await vscode.commands.executeCommand('workbench.action.closeAllEditors');
     }
+    const scansBeforeSettings = scanCount;
+    const config = vscode.workspace.getConfiguration('agentTracker');
+    const sourcePath = join(process.env.AGENT_TRACKER_TEST_ROOT!, 'claude', 'projects', 'session.jsonl');
+    const originalSource = readFileSync(sourcePath, 'utf8');
+    await config.update('usage.enabled', false, vscode.ConfigurationTarget.Global);
+    await until(() => Boolean(currentTooltip?.value.includes('사용량 통계 (꺼짐)')), 'disabled statistics card');
+    await vscode.commands.executeCommand('agentTracker.openUsage');
+    assert.equal(scanCount, scansBeforeSettings, 'disabled statistics cannot start a scan');
+    assert.equal(countFiles(), 1, 'disabling statistics preserves cached data');
+    const settingsLink = currentTooltip!.value.match(/\]\(command:(agentTracker\.openSettings)\)/);
+    assert.ok(settingsLink, 'settings remains available with statistics off');
+    await vscode.commands.executeCommand(settingsLink[1]);
+    await vscode.commands.executeCommand('agentTracker.clearUsageData');
+    assert.equal(countFiles(), 0, 'the command deletes manifest records');
+    assert.equal((database.prepare('SELECT count(*) n FROM turn_summary').get() as {n: number}).n, 0);
+    assert.equal(readFileSync(sourcePath, 'utf8'), originalSource, 'original transcript survives deletion');
+    assert.equal(scanCount, scansBeforeSettings, 'deletion does not trigger a rebuild');
+    await config.update('claude.enabled', false, vscode.ConfigurationTarget.Global);
+    await until(() => Boolean(currentTooltip && !currentTooltip.value.includes('agent-tracker-claude')), 'disabled provider card');
+    assert.match(currentTooltip!.value, /agent-tracker-codex/);
+    const properties = extension.packageJSON.contributes.configuration.properties;
+    assert.match(properties['agentTracker.usage.enabled'].markdownDescription, /command:agentTracker.clearUsageData/);
+    assert.deepEqual(properties['agentTracker.quota.refreshPolicy'].enum, ['automatic', 'manual']);
+    outcomes.push('settings navigation, statistics off, provider selection and derived-data deletion preserve original transcripts');
     const reportDirectory = join(extensionRoot, 'test-results');
     await mkdir(reportDirectory, { recursive: true });
     await writeFile(join(reportDirectory, 'vscode-smoke.json'), JSON.stringify({ version: vscode.version, node: process.versions.node, passed: true, outcomes }, null, 2));
     console.log('Agent Tracker real VS Code smoke passed:', outcomes.join('; '));
+  } catch (error) {
+    const reportDirectory = join(extensionRoot, 'test-results');
+    await mkdir(reportDirectory, { recursive: true });
+    await writeFile(join(reportDirectory, 'vscode-smoke.json'), JSON.stringify({ passed: false, error: error instanceof Error ? error.stack : String(error), outcomes }, null, 2));
+    throw error;
   } finally {
     onReport = undefined;
     database?.close();

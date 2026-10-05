@@ -44,7 +44,7 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
   const externalCommands: { command: string; arguments: unknown[] }[] = [];
   const items: StatusItem[] = [];
   const refreshes: { provider: string; force: boolean }[] = [];
-  const configValues = new Map<string, unknown>();
+  const configValues = new Map<string, unknown>([['claude.showStatusBar', false]]);
   const configUpdates: { key: string; value: unknown; target: number }[] = [];
   const configuration = event<{ affectsConfiguration(section: string): boolean }>();
   const themes = event<{ kind: number }>();
@@ -58,6 +58,14 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
   let initializations = 0;
   let quotaDisposals = 0;
   let summaryDisposals = 0;
+  let cancellations = 0;
+  let clears = 0;
+  let releaseScan: (() => void) | undefined;
+  let deferScan = false;
+  let lastRoots: import('../src/summary/types').SourceRoot[] = [];
+  let lastQuery: import('../src/summary/types').UsageQuery = {};
+  const policies: string[] = [];
+  const pollingIntervals: number[] = [];
   const uri = (fsPath: string): { fsPath: string; toString(): string } => ({ fsPath, toString: () => fsPath });
   const disposable: Disposable = { dispose() {} };
   const activeColorTheme = { kind: 2 };
@@ -96,6 +104,7 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
       state: { focused: true }, activeColorTheme,
       onDidChangeWindowState: focus.subscribe, onDidChangeActiveColorTheme: themes.subscribe,
       showErrorMessage: (message: string) => { errors.push(message); },
+      showInformationMessage: () => {},
       createStatusBarItem: (id: string, alignment: number, priority: number) => {
         const item: StatusItem = { id, alignment, priority, visible: false, disposed: false,
           show() { this.visible = true; }, hide() { this.visible = false; }, dispose() { this.disposed = true; } };
@@ -115,25 +124,36 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     },
   };
   class FakeQuota {
-    start() {} setFocused() {} setPollingInterval() {} subscribe() { return disposable; }
+    constructor(private readonly providers: { id: string }[], options: {refreshPolicy: string; pollingSeconds: number}) {
+      policies.push(options.refreshPolicy); pollingIntervals.push(options.pollingSeconds);
+    }
+    start() {} setFocused() {} subscribe() { return disposable; }
+    setPollingInterval(seconds: number) { pollingIntervals.push(seconds); }
+    setRefreshPolicy(policy: string) { policies.push(policy); }
     async dispose() { quotaDisposals++; }
     getState(provider: string) { return { provider, snapshot: {provider,fetchedAt:0,windows:[
       {id:'five-hour',label:'5h',usedPercent:23,current:23,maximum:100,resetsAt:null,windowDurationMins:300},
       {id:'weekly',label:'7d',usedPercent:92,current:92,maximum:100,resetsAt:null,windowDurationMins:10080},
-    ]}, refreshing: false, status: 'ready', error: null, lastSuccessAt: 0, nextAllowedAt: 0 }; }
-    getStates() { return ['claude', 'codex'].map(provider => this.getState(provider)); }
+    ], ...(provider === 'codex' ? { rateLimitResetCredits: { availableCount: 2, nextExpiresAt: Date.now() + (17 * 24 + 8) * 3_600_000 } } : {}) }, refreshing: false, status: 'ready', error: null, lastSuccessAt: 0, nextAllowedAt: 0 }; }
+    getStates() { return this.providers.map(provider => this.getState(provider.id)); }
     async refresh(provider: string, force: boolean) { refreshes.push({ provider, force }); }
   }
   class FakeSummary {
     async initialize() { initializations++; }
-    async refresh() { scans++; return { discovered: 0, parsed: 0, reused: 0, failed: 0, bodyBytes: 0 }; }
-    async query() { queries++; return { rows: [], total: 0, coverage: {} }; }
+    async refresh(options: {roots: typeof lastRoots}) {
+      scans++; lastRoots = options.roots;
+      if (deferScan) await new Promise<void>(resolve => { releaseScan = resolve; });
+      return { discovered: 0, parsed: 0, reused: 0, failed: 0, bodyBytes: 0 };
+    }
+    async query(query: typeof lastQuery) { queries++; lastQuery = query; return { rows: [], total: 0, coverage: {} }; }
     async diagnostics() { diagnostics++; return { files: [], summaries: [], counts: {} }; }
     subscribe() { return () => {}; } cancel() {} async dispose() { summaryDisposals++; }
+    async cancelRefresh() { cancellations++; releaseScan?.(); releaseScan = undefined; }
+    async clearData() { clears++; await this.cancelRefresh(); }
   }
   Module._load = function(request, parent, isMain) {
     if (request === 'vscode') return vscode;
-    if (request === './quota') return { QuotaService: FakeQuota, ClaudeQuotaProvider: class {}, CodexQuotaProvider: class {} };
+    if (request === './quota') return { QuotaService: FakeQuota, ClaudeQuotaProvider: class { id = 'claude'; }, CodexQuotaProvider: class { id = 'codex'; } };
     if (request === './summary/client') return { SummaryClient: FakeSummary };
     return original.call(this, request, parent, isMain);
   };
@@ -150,7 +170,10 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     return items[0].tooltip as import('vscode').MarkdownString;
   };
   const cardAction = async (id: string, argument?: string): Promise<void> => {
-    const links = [...tooltip().value.matchAll(/\]\(command:([^)?]+)(?:\?([^)]*))?\)/g)];
+    const links = [
+      ...tooltip().value.matchAll(/\]\(command:([^)?]+)(?:\?([^)]*))?\)/g),
+      ...tooltip().value.matchAll(/<a href="command:([^"?]+)(?:\?([^"]*))?"/g),
+    ];
     const link = links.find(value => value[1] === id && (!argument || JSON.parse(decodeURIComponent(value[2]))[0] === argument));
     assert.ok(link, `the card exposes ${id} with ${argument ?? 'no argument'}`);
     const trusted = tooltip().isTrusted;
@@ -160,6 +183,7 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
   try {
     extension = require('../src/extension') as typeof import('../src/extension');
     await extension.activate({ globalStorageUri: uri(storage), extensionUri: uri(process.cwd()), subscriptions } as unknown as import('vscode').ExtensionContext);
+    assert.deepEqual(pollingIntervals, [900]);
     assert.equal(initializations, 1);
     assert.equal(scans, 0);
     assert.equal(panels.length, 0);
@@ -178,9 +202,13 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     assert.deepEqual(externalCommands.at(-1), { command: 'workbench.action.showHover', arguments: [] }, 'an unpatched renderer can still open the focused hover');
     assert.equal(commands.has('agentTracker.toggleQuota'), false);
     assert.equal(tooltip().supportThemeIcons, true);
-    assert.match(tooltip().value, /### 사용량/);
-    assert.equal(tooltip().value.match(/\| 7d \|/g)?.length, 2);
-    assert.equal(tooltip().value.match(/\| 5h \|/g)?.length, 2);
+    assert.match(tooltip().value, /<h3>사용량<\/h3>/);
+    assert.equal(tooltip().value.match(/wk !\[/g)?.length, 2);
+    assert.equal(tooltip().value.match(/5h !\[/g)?.length, 2);
+    assert.equal(tooltip().supportHtml, true);
+    assert.doesNotMatch(tooltip().value, /\| 기간 \|/);
+    assert.match(tooltip().value, /rate-limit 재설정 2회 사용 가능/);
+    assert.match(tooltip().value, /다음 항목이 17d 8h 후 만료됨/);
     assert.equal(scans, 0);
     assert.equal(panels.length, 0);
     await click(items[1].command);
@@ -189,21 +217,19 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     assert.equal(refreshes.length, 4);
     assert.equal(scans, 0);
 
-    await cardAction('agentTracker.manageProvider', 'claude');
-    await cardAction('agentTracker.manageProvider', 'codex');
-    assert.deepEqual(externalCommands.filter(call => call.command === 'extension.open').map(call => call.arguments),
-      [['anthropic.claude-code'], ['openai.chatgpt']]);
+    await cardAction('agentTracker.openSettings');
+    assert.deepEqual(externalCommands.at(-1), {command: 'workbench.action.openSettings', arguments: ['@ext:agent-tracker.agent-tracker']});
+    assert.ok(tooltip().value.indexOf('command:agentTracker.openSettings') > tooltip().value.indexOf('command:agentTracker.openUsage'));
+    assert.doesNotMatch(tooltip().value, /manageProvider|refreshClaude|refreshCodex|확장 관리/);
+    for (const id of ['agentTracker.manageProvider', 'agentTracker.refreshClaude', 'agentTracker.refreshCodex']) assert.equal(commands.has(id), false);
     await cardAction('agentTracker.setStatusBarDetail', 'compact');
     assert.deepEqual(configUpdates, [{ key: 'display.detail', value: 'compact', target: 1 }]);
     assert.doesNotMatch(items[0].text!,/7일|92%/);
     assert.equal(items[0].text!.match(/5시간/g)?.length,2);
-    assert.equal(tooltip().value.match(/\| 7d \|/g)?.length, 2, 'compact status still shows every window in the hover');
+    assert.equal(tooltip().value.match(/wk !\[/g)?.length, 2, 'compact status still shows every window in the hover');
     await cardAction('agentTracker.setStatusBarDetail', 'detailed');
     assert.equal(items[0].text!.match(/7일/g)?.length, 2);
     const commandCount = externalCommands.length;
-    for (const provider of ['../../credential', 'arbitrary.extension', undefined, {}]) {
-      await click({ command: 'agentTracker.manageProvider', arguments: [provider] });
-    }
     for (const detail of ['unsafe', undefined, {}]) {
       await click({ command: 'agentTracker.setStatusBarDetail', arguments: [detail] });
     }
@@ -238,9 +264,6 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     await click(items[1].command);
     assert.equal(refreshes.length, 6);
     assert.equal(scans, 2, 'quota refresh does not scan even while statistics are open');
-    await click('agentTracker.refreshClaude');
-    await click('agentTracker.refreshCodex');
-    assert.deepEqual(refreshes.slice(-2), [{ provider: 'claude', force: true }, { provider: 'codex', force: true }]);
     assert.equal(scans, 2);
     assert.equal(externalCommands.some(value => /quotaView\.focus|closePanel/.test(value.command)), false, 'quota actions never open or close the terminal panel');
     await click({ command: 'agentTracker.openDashboard', arguments: [{ tab: 'quota' }] });
@@ -248,13 +271,80 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     assert.equal(scans, 2);
     assert.deepEqual(errors, []);
 
+    const update = async (key: string, value: unknown): Promise<void> => {
+      await vscode.workspace.getConfiguration().update(key, value, 1);
+      await tick();
+    };
+    await update('quota.pollingIntervalSeconds', 120);
+    assert.deepEqual(pollingIntervals, [900, 120]);
+    assert.equal(quotaDisposals, 0, 'common interval changes apply without recreating providers');
+    assert.equal(scans, 2, 'common quota interval changes never scan transcripts');
+    await update('quota.refreshPolicy', 'manual');
+    assert.equal(policies.at(-1), 'manual');
+    await update('claude.enabled', false);
+    assert.equal(pollingIntervals.at(-1), 120, 'recreated providers retain the common interval');
+    assert.equal(panels[0].disposed, true);
+    assert.doesNotMatch(items[0].text!, /claude/);
+    assert.doesNotMatch(tooltip().value, /Claude/);
+    assert.doesNotMatch(items[0].accessibilityInformation!.label, /Claude/);
+    const refreshCount = refreshes.length;
+    await click('agentTracker.refreshQuota');
+    assert.deepEqual(refreshes.slice(refreshCount), [{provider: 'codex', force: true}]);
+    await click('agentTracker.openUsage');
+    panels[1].webview.receive({type: 'ready'}); await tick();
+    assert.ok(lastRoots.length > 0 && lastRoots.every(root => root.provider === 'codex'));
+    assert.deepEqual(lastQuery.providers, ['codex']);
+
+    deferScan = true;
+    await click('agentTracker.openUsage');
+    const scansBeforeDisable = scans;
+    const queriesBeforeDisable = queries;
+    await update('usage.enabled', false);
+    assert.ok(cancellations >= 2);
+    assert.equal(panels[1].disposed, true);
+    assert.equal(queries, queriesBeforeDisable, 'cancelled scan must not query after statistics are disabled');
+    assert.doesNotMatch(tooltip().value, /command:agentTracker.openUsage/);
+    assert.match(tooltip().value, /사용량 통계 \(꺼짐\)/);
+    await click('agentTracker.openUsage');
+    assert.equal(panels.length, 2);
+    assert.equal(scans, scansBeforeDisable);
+    assert.equal(externalCommands.at(-1)?.command, 'workbench.action.openSettings');
+    await click('agentTracker.clearUsageData');
+    assert.equal(clears, 1, 'derived data can be cleared even when statistics are disabled');
+    assert.equal(scans, scansBeforeDisable);
+    deferScan = false;
+    await update('usage.enabled', true);
+    await click('agentTracker.openUsage');
+    panels[2].webview.receive({type: 'ready'}); await tick();
+    assert.equal(scans, scansBeforeDisable + 1);
+    await update('codex.enabled', false);
+    assert.ok(items.every(item => !item.visible));
+    await update('quota.pollingIntervalSeconds', 60);
+    assert.equal(pollingIntervals.at(-1), 60, 'common interval can change with both providers disabled');
+    const noProviders = refreshes.length;
+    await click('agentTracker.refreshQuota');
+    assert.equal(refreshes.length, noProviders);
+    await update('claude.enabled', true);
+    assert.equal(pollingIntervals.at(-1), 60);
+    assert.equal(items[0].visible, true);
+    assert.match(items[0].text!, /claude/);
+    assert.doesNotMatch(items[0].text!, /codex/);
+    const scansBeforeReopen = scans;
+    assert.deepEqual(errors, []);
+
     await extension.deactivate();
     for (const subscription of subscriptions) subscription.dispose();
-    assert.equal(quotaDisposals, 1);
+    assert.equal(quotaDisposals, 4);
     assert.equal(summaryDisposals, 1);
     assert.equal(panels[0].disposed, true);
     assert.ok(items.every(item => item.disposed));
     assert.equal(themes.size(), 0);
+
+    configValues.set('usage.enabled', false);
+    await extension.activate({ globalStorageUri: uri(storage), extensionUri: uri(process.cwd()), subscriptions } as unknown as import('vscode').ExtensionContext);
+    assert.equal(initializations, 1, 'disabled statistics do not start the worker on activation');
+    await click('agentTracker.openUsage');
+    assert.equal(scans, scansBeforeReopen);
   } finally {
     await extension?.deactivate();
     for (const subscription of subscriptions) subscription.dispose();

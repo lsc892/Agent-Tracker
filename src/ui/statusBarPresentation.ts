@@ -23,7 +23,6 @@ export function quotaHoverSummary(states: readonly QuotaState[], now = Date.now(
     if (!state) return undefined;
     const view = statusBarPresentation(state, 'remaining', 'compact', now);
     return view.accessibleText
-      .replace(/조회 불가\.$/, '조회 불가')
       .replace('5시간:', '5시간 -')
       .replace(', 재설정 ', ', 재설정까지 ');
   }).filter((line): line is string => line !== undefined);
@@ -40,7 +39,7 @@ export function statusBarPresentation(
   const icon = `$(agent-tracker-${state.provider})`;
   const windows = state.snapshot?.windows ?? [];
   if (!windows.length) {
-    const message = state.refreshing ? '조회 중…' : '조회 불가.';
+    const message = state.refreshing ? '조회 중…' : '조회불가';
     return { text: `${icon} ${message}`, accessibleText: `${name}: ${message}` };
   }
   const codexWindows = state.provider === 'codex' ? windows.filter(window => window.limitId === 'codex') : [];

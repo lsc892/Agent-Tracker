@@ -75,7 +75,7 @@ export class Dashboard implements vscode.Disposable {
     switch (message.type) {
       case 'ready': if (!this.ready) { this.ready = true; this.navigate(); } break;
       case 'tab': this.tab = message.tab; if (this.tab === 'usage') await this.loadUsage(); else if (this.tab === 'diagnostics') await this.loadDiagnostics(0); break;
-      case 'settings': await vscode.commands.executeCommand('workbench.action.openSettings', '@ext:agent-tracker.agent-tracker agentTracker.usage'); break;
+      case 'settings': await vscode.commands.executeCommand('agentTracker.openSettings'); break;
       case 'cancelUsage': this.dependencies.summary.cancel(); break;
       case 'queryUsage': this.query = message.query; this.fromDay = message.fromDay; this.toDay = message.toDay; if (this.ready) await this.loadUsage(); break;
       case 'diagnostics': await this.loadDiagnostics(message.offset); break;

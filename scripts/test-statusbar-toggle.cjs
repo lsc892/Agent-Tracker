@@ -49,9 +49,10 @@ class Cdp {
 
 async function main() {
   const baseline = process.argv.includes('--baseline');
+  const quotaFixture = process.argv.includes('--quota-fixture');
   const appRoot = resolveAppRoot();
   const patch = baseline ? { appRoot, version: JSON.parse(readFileSync(join(appRoot, 'package.json'), 'utf8')).version } : operate({ check: true });
-  const reportName = baseline ? 'statusbar-toggle-baseline.json' : 'statusbar-toggle.json';
+  const reportName = baseline ? 'statusbar-toggle-baseline.json' : quotaFixture ? 'quota-card.json' : 'statusbar-toggle.json';
   const root = resolve(__dirname, '..');
   const resultDirectory = join(root, 'test-results');
   await mkdir(resultDirectory, { recursive: true });
@@ -61,11 +62,12 @@ async function main() {
   await mkdir(join(userData, 'User'), { recursive: true });
   await writeFile(join(sandbox, 'empty.txt'), 'Agent Tracker native popup test\n');
   await writeFile(join(userData, 'User', 'settings.json'), JSON.stringify({
-    'workbench.startupEditor': 'none', 'security.workspace.trust.enabled': false,
+    'workbench.startupEditor': 'none', 'workbench.colorTheme': 'Default Dark Modern', 'security.workspace.trust.enabled': false,
     'telemetry.telemetryLevel': 'off', 'extensions.autoCheckUpdates': false, 'update.mode': 'none',
     // A short delay makes an accidentally retained automatic hover observable.
     'workbench.hover.delay': 100,
     'agentTracker.display.detail': 'compact',
+    'agentTracker.quota.refreshPolicy': 'manual',
     'agentTracker.claude.dataHome': join(sandbox, 'claude'),
     'agentTracker.codex.dataHome': join(sandbox, 'codex'),
     'agentTracker.codex.executable': join(sandbox, 'codex-not-installed.exe'),
@@ -82,6 +84,7 @@ async function main() {
   const environment = { ...process.env };
   delete environment.ELECTRON_RUN_AS_NODE; delete environment.VSCODE_IPC_HOOK_CLI;
   const child = spawn(executable, ['--user-data-dir', userData, '--extensions-dir', join(sandbox, 'extensions'),
+    ...(quotaFixture ? ['--extensionTestsPath', join(root, 'dist/tests/vscode/quotaCardFixture.js')] : []),
     '--extensionDevelopmentPath', root, '--disable-extensions', '--skip-welcome', '--skip-release-notes',
     '--disable-gpu', '--disable-workspace-trust', '--no-sandbox', '--new-window',
     '--remote-debugging-address=127.0.0.1', `--remote-debugging-port=${port}`, join(sandbox, 'empty.txt')],
@@ -114,7 +117,7 @@ async function main() {
     })()`), 'quota status item');
     const editor = await cdp.evaluate(`(() => { const rect=document.querySelector('.part.editor').getBoundingClientRect();return {x:rect.x+rect.width/3,y:rect.y+100}; })()`);
     const visible = () => cdp.evaluate(`(() => {
-      const card=[...document.querySelectorAll('.monaco-hover')].find(node => node.innerText.includes('사용량 통계') && node.innerText.includes('확장 관리'));
+      const card=[...document.querySelectorAll('.monaco-hover')].find(node => node.innerText.includes('사용량 통계') && node.querySelector('a[data-href="command:agentTracker.openSettings"]'));
       if(!card)return null;const rect=card.getBoundingClientRect();return rect.width&&rect.height ? {top:rect.top,bottom:rect.bottom} : null;
     })()`);
     if (baseline) {
@@ -144,8 +147,8 @@ async function main() {
     };
     await cdp.call('Input.dispatchMouseEvent', { type: 'mouseMoved', x: button.x, y: button.y });
     const preview = await until(summary, 'hover opens the short preview');
-    assert.match(preview, /Claude: 조회 불가/);
-    assert.match(preview, /Codex: 조회 불가/);
+    assert.match(preview, quotaFixture ? /Claude: 5시간 - 67% 남음/ : /Claude: 조회불가/);
+    assert.match(preview, quotaFixture ? /Codex: 5시간 - 31% 남음/ : /Codex: 조회불가/);
     await assertStaysClosed('hover alone must not open the quota card');
     outcomes.push('hover shows only the short provider summary and click instruction');
     await cdp.click(button);
@@ -172,6 +175,39 @@ async function main() {
     assert.ok(await visible(), 'refresh updates the pinned card in place');
     assert.equal(await summary(), null, 'a quota update must not replace the card with a preview');
     outcomes.push('quota refresh retains the pinned UI and suppresses the preview');
+    if (quotaFixture) {
+      const inspect = () => cdp.evaluate(`(() => {
+        const card=[...document.querySelectorAll('.monaco-hover')].find(node => node.innerText.includes('rate-limit 재설정'));
+        if(!card)return null;
+        const rect=card.getBoundingClientRect();
+        return {text:card.innerText,tables:[...card.querySelectorAll('table')].filter(table=>!table.querySelector('h3')).length,
+          meters:[...card.querySelectorAll('img[alt^="사용 "], img[alt^="남음 "]')].map(img=>({loaded:img.complete&&img.naturalWidth>0,width:img.width,height:img.height})),
+          colors:[...card.querySelectorAll('span[style]')].map(span=>getComputedStyle(span).color),
+          clip:{x:rect.x,y:rect.y,width:rect.width,height:rect.height,scale:1}};
+      })()`);
+      const rendered = await until(async () => {
+        const value=await inspect(); return value?.meters.length === 5 && value.meters.every(meter=>meter.loaded) ? value : null;
+      }, 'native usage meters load');
+      assert.equal(rendered.tables, 0, 'provider summaries replace the old quota table');
+      assert.match(rendered.text, /4h 37m 후 초기화/);
+      assert.match(rendered.text, /rate-limit 재설정 2회 사용 가능/);
+      assert.match(rendered.text, /다음 항목이 17d 8h 후 만료됨/);
+      assert.ok(rendered.meters.every(meter=>meter.width === 36 && meter.height === 8));
+      assert.ok(rendered.colors.includes('rgb(233, 164, 0)'), 'moderate usage is amber');
+      assert.ok(rendered.colors.includes('rgb(250, 48, 72)'), 'high usage is red');
+      const dark = await cdp.call('Page.captureScreenshot', {format:'png',clip:rendered.clip});
+      await writeFile(join(resultDirectory,'quota-card-dark.png'),Buffer.from(dark.data,'base64'));
+      const settingsPath = join(userData, 'User', 'settings.json');
+      const settings = JSON.parse(readFileSync(settingsPath, 'utf8'));
+      settings['workbench.colorTheme'] = 'Default Light Modern';
+      await writeFile(settingsPath, JSON.stringify(settings, null, 2));
+      await until(()=>cdp.evaluate('document.querySelector(".monaco-workbench")?.classList.contains("vs")'), 'light theme applies');
+      await sleep(750);
+      const lightCard = await until(inspect, 'usage card stays open after theme change');
+      const light = await cdp.call('Page.captureScreenshot', {format:'png',clip:lightCard.clip});
+      await writeFile(join(resultDirectory,'quota-card-light.png'),Buffer.from(light.data,'base64'));
+      outcomes.push('provider summaries, SVG meters, usage colors and earned-reset metadata render in dark and light themes');
+    }
     const screenshot = await cdp.call('Page.captureScreenshot', { format: 'png' });
     await writeFile(join(resultDirectory, 'statusbar-toggle.png'), Buffer.from(screenshot.data, 'base64'));
     await cdp.click(button);
