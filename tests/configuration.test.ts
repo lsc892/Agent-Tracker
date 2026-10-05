@@ -6,11 +6,19 @@ function settings(values: Record<string, unknown>): SettingsReader {
   return { get<T>(key: string, fallback: T): T { return (key in values ? values[key] : fallback) as T; } };
 }
 
+test('quota polling uses one common interval setting', () => {
+  assert.equal(readConfiguration(settings({})).pollingSeconds, 900);
+  assert.equal(readConfiguration(settings({ 'quota.pollingIntervalSeconds': 120 })).pollingSeconds, 120);
+});
+
 test('tracking switches exclude source roots independently of status visibility', () => {
+  const defaults = readConfiguration(settings({}));
+  assert.equal(defaults.refreshPolicy, 'automatic');
   for (const provider of ['claude', 'codex'] as const) {
-    const config = readConfiguration(settings({ [`${provider}.enabled`]: false }));
+    const config = readConfiguration(settings({ [`${provider}.enabled`]: false, 'quota.refreshPolicy': 'manual' }));
     assert.equal(config[provider].enabled, false);
     assert.ok(config.roots.length > 0 && config.roots.every(root => root.provider !== provider));
+    assert.equal(config.refreshPolicy, 'manual');
   }
   assert.equal(readConfiguration(settings({'codex.showStatusBar': false})).codex.enabled, true);
   assert.deepEqual(readConfiguration(settings({'claude.enabled': false, 'codex.enabled': false})).roots, []);

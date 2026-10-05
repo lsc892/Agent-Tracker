@@ -42,36 +42,67 @@ function deferred<T>(): { promise: Promise<T>; resolve(value: T): void } {
   return { promise, resolve };
 }
 
-test('quota uses focused 15 minute polling; focus return debounce and provider intervals are independent', async () => {
+test('manual refresh policy skips startup, focus and timers and can switch live', async () => {
   const clock = new FakeClock();
   let reads = 0;
-  const service = new QuotaService([{ id: 'claude', read: async () => { reads++; return snapshot(clock.now()); } }], { clock });
+  const service = new QuotaService([{id: 'claude', read: async () => { reads++; return snapshot(clock.now()); }}], {clock, refreshPolicy: 'manual'});
+  try {
+    service.start(); await settle();
+    await clock.advance(3_600_000);
+    service.setFocused(false); service.setFocused(true); await settle();
+    await service.refresh('claude');
+    assert.equal(reads, 0);
+    await service.refresh('claude', true);
+    assert.equal(reads, 1);
+    assert.equal(clock.tasks.size, 0);
+    service.setRefreshPolicy('automatic'); await settle();
+    assert.equal(reads, 2);
+    await clock.advance(900_000);
+    assert.equal(reads, 3);
+    service.setRefreshPolicy('manual');
+    await clock.advance(3_600_000);
+    assert.equal(reads, 3);
+    assert.equal(clock.tasks.size, 0);
+  } finally { await service.dispose(); }
+});
+
+test('both providers use common focused polling and live interval changes preserve focus debounce and minimum delay', async () => {
+  const clock = new FakeClock();
+  const reads = { claude: 0, codex: 0 };
+  const service = new QuotaService((['claude', 'codex'] as const).map(id => ({
+    id, read: async () => { reads[id]++; return { ...snapshot(clock.now()), provider: id }; },
+  })), { clock });
   service.start();
   await settle();
-  assert.equal(reads, 1);
+  assert.deepEqual(reads, { claude: 1, codex: 1 });
   await clock.advance(299_000);
   service.setFocused(false); service.setFocused(true);
   await settle();
-  assert.equal(reads, 1);
+  assert.deepEqual(reads, { claude: 1, codex: 1 });
   await clock.advance(1000);
   service.setFocused(false); service.setFocused(true);
   await settle();
-  assert.equal(reads, 2);
+  assert.deepEqual(reads, { claude: 2, codex: 2 });
   await clock.advance(899_999);
-  assert.equal(reads, 2);
+  assert.deepEqual(reads, { claude: 2, codex: 2 });
   await clock.advance(1);
-  assert.equal(reads, 3);
+  assert.deepEqual(reads, { claude: 3, codex: 3 });
   service.setFocused(false);
   await clock.advance(3_600_000);
-  assert.equal(reads, 3);
+  assert.deepEqual(reads, { claude: 3, codex: 3 });
   service.setFocused(true);
   await settle();
-  assert.equal(reads, 4);
-  service.setPollingInterval('claude', 1);
-  await clock.advance(29_999);
-  assert.equal(reads, 4);
+  assert.deepEqual(reads, { claude: 4, codex: 4 });
+  service.setPollingInterval(120);
+  await clock.advance(119_999);
+  assert.deepEqual(reads, { claude: 4, codex: 4 });
   await clock.advance(1);
-  assert.equal(reads, 5);
+  assert.deepEqual(reads, { claude: 5, codex: 5 });
+  service.setPollingInterval(1);
+  await clock.advance(29_999);
+  assert.deepEqual(reads, { claude: 5, codex: 5 });
+  await clock.advance(1);
+  assert.deepEqual(reads, { claude: 6, codex: 6 });
   await service.dispose();
   assert.equal(clock.tasks.size, 0);
 });
@@ -171,7 +202,7 @@ test('long polling intervals respect the Node timer delay bound without refreshi
   const clock = new FakeClock();
   let reads = 0;
   const service = new QuotaService([{ id: 'claude', read: async () => { reads++; return snapshot(clock.now()); } }],
-    { clock, pollingSeconds: { claude: 10_000_000 } });
+    { clock, pollingSeconds: 10_000_000 });
   service.start(); await settle();
   assert.equal([...clock.tasks.values()][0].at - clock.now(), 2_147_483_647);
   await clock.advance(2_147_483_647);

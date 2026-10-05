@@ -13,7 +13,8 @@ const systemClock: QuotaClock = {
 };
 export interface QuotaServiceOptions {
   clock?: QuotaClock;
-  pollingSeconds?: Partial<Record<QuotaProviderId, number>>;
+  pollingSeconds?: number;
+  refreshPolicy?: 'automatic' | 'manual';
 }
 interface Entry {
   provider: QuotaProvider;
@@ -23,7 +24,6 @@ interface Entry {
   failures: number;
   nextAllowedAt: number;
   nextPollAt: number;
-  intervalMs: number;
   running: Promise<void> | null;
   rerunRequested: boolean;
   abort: AbortController | null;
@@ -38,14 +38,17 @@ export class QuotaService {
   private started = false;
   private disposed = false;
   private timer: unknown;
+  private refreshPolicy: 'automatic' | 'manual';
+  private pollingIntervalMs: number;
 
   constructor(providers: readonly QuotaProvider[], options: QuotaServiceOptions = {}) {
     this.clock = options.clock ?? systemClock;
+    this.refreshPolicy = options.refreshPolicy ?? 'automatic';
+    this.pollingIntervalMs = intervalMs(options.pollingSeconds ?? 900);
     for (const provider of providers) {
       if (this.entries.has(provider.id)) throw new Error(`Duplicate quota provider: ${provider.id}`);
       this.entries.set(provider.id, { provider, snapshot: null, lastSuccessAt: null, error: null,
         failures: 0, nextAllowedAt: 0, nextPollAt: 0,
-        intervalMs: intervalMs(options.pollingSeconds?.[provider.id] ?? 900),
         running: null, rerunRequested: false, abort: null });
     }
   }
@@ -54,14 +57,14 @@ export class QuotaService {
     if (this.started || this.disposed) return;
     this.started = true;
     this.focused = focused;
-    if (focused) for (const id of this.entries.keys()) void this.refresh(id);
+    if (focused && this.refreshPolicy === 'automatic') for (const id of this.entries.keys()) void this.refresh(id);
     this.schedule();
   }
 
   setFocused(focused: boolean): void {
     if (this.disposed || this.focused === focused) return;
     this.focused = focused;
-    if (focused && this.started) {
+    if (focused && this.started && this.refreshPolicy === 'automatic') {
       const now = this.clock.now();
       for (const [id, entry] of this.entries) {
         if (entry.lastSuccessAt === null || entry.error || now - entry.lastSuccessAt >= 300_000) {
@@ -72,10 +75,20 @@ export class QuotaService {
     this.schedule();
   }
 
-  setPollingInterval(provider: QuotaProviderId, seconds: number): void {
-    const entry = this.entry(provider);
-    entry.intervalMs = intervalMs(seconds);
-    entry.nextPollAt = this.clock.now() + entry.intervalMs;
+  setPollingInterval(seconds: number): void {
+    if (this.disposed) return;
+    this.pollingIntervalMs = intervalMs(seconds);
+    const nextPollAt = this.clock.now() + this.pollingIntervalMs;
+    for (const entry of this.entries.values()) entry.nextPollAt = nextPollAt;
+    this.schedule();
+  }
+
+  setRefreshPolicy(policy: 'automatic' | 'manual'): void {
+    if (this.refreshPolicy === policy || this.disposed) return;
+    this.refreshPolicy = policy;
+    if (policy === 'automatic' && this.started && this.focused) {
+      for (const id of this.entries.keys()) void this.refresh(id);
+    }
     this.schedule();
   }
 
@@ -87,7 +100,7 @@ export class QuotaService {
       if (force) entry.rerunRequested = true;
       return entry.running;
     }
-    if (!force && (!this.focused || this.clock.now() < entry.nextAllowedAt)) return Promise.resolve();
+    if (!force && (this.refreshPolicy === 'manual' || !this.focused || this.clock.now() < entry.nextAllowedAt)) return Promise.resolve();
     // Defer execution until running has been installed, including synchronous observers/providers.
     entry.running = Promise.resolve().then(async () => {
       try {
@@ -161,7 +174,7 @@ export class QuotaService {
       }
       this.expire(entry);
     } finally {
-      entry.nextPollAt = this.clock.now() + entry.intervalMs;
+      entry.nextPollAt = this.clock.now() + this.pollingIntervalMs;
     }
   }
 
@@ -188,7 +201,7 @@ export class QuotaService {
     const now = this.clock.now();
     let due = Infinity;
     for (const entry of this.entries.values()) {
-      if (this.focused && !entry.running) due = Math.min(due, Math.max(entry.nextPollAt, entry.nextAllowedAt));
+      if (this.refreshPolicy === 'automatic' && this.focused && !entry.running) due = Math.min(due, Math.max(entry.nextPollAt, entry.nextAllowedAt));
       if (entry.snapshot && entry.error && entry.lastSuccessAt !== null) {
         due = Math.min(due, entry.lastSuccessAt + (entry.error.code === 'rate-limit' ? 86_400_000 : 1_800_000));
       }
@@ -198,7 +211,7 @@ export class QuotaService {
       let expired = false;
       for (const [id, entry] of this.entries) {
         expired = this.expire(entry) || expired;
-        if (this.focused && this.clock.now() >= Math.max(entry.nextPollAt, entry.nextAllowedAt)) void this.refresh(id);
+        if (this.refreshPolicy === 'automatic' && this.focused && this.clock.now() >= Math.max(entry.nextPollAt, entry.nextAllowedAt)) void this.refresh(id);
       }
       if (expired) this.emit();
       this.schedule();

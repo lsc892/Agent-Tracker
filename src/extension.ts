@@ -17,7 +17,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const createQuota = (config: TrackerConfiguration): QuotaService => new QuotaService([
     ...(config.claude.enabled ? [new ClaudeQuotaProvider({ dataHome: config.claude.dataHome })] : []),
     ...(config.codex.enabled ? [new CodexQuotaProvider({ dataHome: config.codex.dataHome, executable: config.codex.executable })] : []),
-  ], { pollingSeconds: { claude: config.claude.pollingSeconds, codex: config.codex.pollingSeconds } });
+  ], { pollingSeconds: config.pollingSeconds, refreshPolicy: config.refreshPolicy });
   let quota = createQuota(settings);
   await mkdir(context.globalStorageUri.fsPath, { recursive: true });
   const summary = new SummaryClient({ dbPath: join(context.globalStorageUri.fsPath, 'agent-tracker.sqlite'), roots: settings.roots, timezone: settings.timezone });
@@ -91,8 +91,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           subscription = quota.subscribe(render);
           quota.start(vscode.window.state.focused);
         } else {
-          if (previous.claude.pollingSeconds !== settings.claude.pollingSeconds) quota.setPollingInterval('claude', settings.claude.pollingSeconds);
-          if (previous.codex.pollingSeconds !== settings.codex.pollingSeconds) quota.setPollingInterval('codex', settings.codex.pollingSeconds);
+          if (previous.pollingSeconds !== settings.pollingSeconds) quota.setPollingInterval(settings.pollingSeconds);
+          quota.setRefreshPolicy(settings.refreshPolicy);
         }
         render();
         dashboard.configurationChanged();
