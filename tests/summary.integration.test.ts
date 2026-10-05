@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, writeFile, appendFile, unlink, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile, appendFile, unlink, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SummaryDatabase } from '../src/summary/db';
@@ -270,6 +270,45 @@ test('two workers sharing a DB serialize refreshes and preserve unchanged reads'
     assert.equal(a.failed+b.failed,0);assert.equal(a.parsed+b.parsed,1);assert.equal(a.reused+b.reused,1);
     assert.equal((await first.query({groupBy:'all'})).rows[0].total_tokens,200);
   } finally {await Promise.all([first.dispose(),second.dispose()]);await rm(base,{recursive:true,force:true});}
+});
+
+test('clearing derived data cancels a scan, respects the shared lock and rebuilds from unchanged sources', async () => {
+  const base = await mkdtemp(join(tmpdir(), 'agent-tracker-clear-'));
+  const root = join(base, 'projects'); await mkdir(root);
+  const path = join(root, 'main.jsonl');
+  const source = jsonl([user(), response()]);
+  await writeFile(path, source);
+  const options = {dbPath: join(base, 'db.sqlite'), roots: [{provider: 'claude' as const, path: root}]};
+  const client = new SummaryClient(options);
+  const observer = new SummaryClient(options);
+  let release: (() => Promise<void>) | undefined;
+  try {
+    await client.refresh(); await observer.initialize();
+    assert.equal((await client.query()).total, 1);
+    release = await acquireRefreshLock(options.dbPath);
+    const scan = client.refresh();
+    let cleared = false;
+    const clearing = client.clearData().then(() => { cleared = true; });
+    assert.equal((await scan).interrupted, true);
+    await new Promise(resolve => setTimeout(resolve, 100));
+    assert.equal(cleared, false, 'deletion waits for another window holding the refresh lock');
+    assert.equal((await observer.query()).total, 1);
+    await release(); release = undefined;
+    await clearing;
+    assert.equal((await client.query()).total, 0);
+    assert.equal((await observer.query()).total, 0, 'other database connections observe the deletion');
+    const diagnostics = await client.diagnostics();
+    assert.equal(diagnostics.counts.files, 0);
+    assert.equal(diagnostics.lastRefresh, undefined);
+    assert.equal(await readFile(path, 'utf8'), source);
+    const rebuilt = await client.refresh();
+    assert.equal(rebuilt.parsed, 1);
+    assert.equal((await client.query()).rows[0].total_tokens, 200);
+  } finally {
+    await release?.();
+    await Promise.all([client.dispose(), observer.dispose()]);
+    await rm(base, {recursive: true, force: true});
+  }
 });
 
 test('line byte budget failure preserves prior summary and exposes the exact source offset',async () => fixture(async(database,options,root)=>{

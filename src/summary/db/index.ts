@@ -145,6 +145,11 @@ export class SummaryDatabase {
     }
   }
 
+  /** Removes only derived statistics; transcript sources and lock files are untouched. */
+  clearData(): void {
+    this.transaction(() => this.connection.exec('DELETE FROM turn_summary; DELETE FROM manifest;'));
+  }
+
   findManifest(provider: Provider, path: string): ManifestRow | undefined {
     return this.statement('SELECT * FROM manifest WHERE provider = ? AND path = ?')
       .get(provider, path) as unknown as ManifestRow | undefined;

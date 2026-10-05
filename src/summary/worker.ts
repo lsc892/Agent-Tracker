@@ -1,6 +1,7 @@
 import { parentPort, workerData } from 'node:worker_threads';
 import { SummaryDatabase } from './db';
 import { refreshSummary } from './scanner';
+import { acquireRefreshLock } from './lock';
 import type { SummaryOptions, UsageQuery, SourceRoot, RefreshResult } from './types';
 
 if (!parentPort) throw new Error('Summary worker requires a parent');
@@ -35,6 +36,12 @@ port.on('message',(message: {id?:number;method:string;payload?:unknown}) => {
           : database.queryUsageCount(query,query.groupBy === 'all' || !query.groupBy ? 'total' : query.groupBy,query.timezone ?? options.timezone ?? 'UTC');
         result = {rows,total,coverage:database.diagnostics({limit:1}).counts};
       } else if (message.method === 'diagnostics') result = {...database.diagnostics((message.payload ?? {}) as {limit?:number;offset?:number;afterId?:number}),lastRefresh};
+      else if (message.method === 'clearData') {
+        // Use the same cross-window lock as scanning; never unlink a live DB or lock file.
+        const release = await acquireRefreshLock(options.dbPath, AbortSignal.timeout(30_000));
+        try { database.clearData(); lastRefresh = undefined; }
+        finally { await release(); }
+      }
       else if (message.method === 'dispose') { database.close();database=undefined; }
       else throw new Error('Unknown summary operation');
       port.postMessage({id:message.id,result});

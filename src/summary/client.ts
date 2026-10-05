@@ -10,6 +10,7 @@ export class SummaryClient {
   private readonly pending = new Map<number, Pending>();
   private readonly listeners = new Set<(progress: SummaryProgress) => void>();
   private refreshPending: Promise<RefreshResult> | undefined;
+  private clearPending: Promise<void> | undefined;
   private disposed = false;
   private closing: Promise<void> | undefined;
   private cancellation: Int32Array | undefined;
@@ -17,6 +18,7 @@ export class SummaryClient {
 
   initialize(): Promise<void> { return this.request('initialize'); }
   refresh(options: { roots?: SourceRoot[]; timezone?: string } = {}): Promise<RefreshResult> {
+    if (this.clearPending) return this.clearPending.then(() => this.refresh(options));
     if (!this.refreshPending) {
       this.cancellation = new Int32Array(new SharedArrayBuffer(4));
       this.refreshPending = this.request<RefreshResult>('refresh',{...options,cancellation:this.cancellation.buffer}).finally(() => {
@@ -25,8 +27,19 @@ export class SummaryClient {
     }
     return this.refreshPending;
   }
-  query(query: UsageQuery = {}): Promise<UsageResult> { return this.request('query',query); }
-  diagnostics(page: {limit?:number;offset?:number;afterId?:number} = {}): Promise<DiagnosticsResult> { return this.request('diagnostics',page); }
+  async query(query: UsageQuery = {}): Promise<UsageResult> { await this.clearPending; return this.request('query',query); }
+  async diagnostics(page: {limit?:number;offset?:number;afterId?:number} = {}): Promise<DiagnosticsResult> { await this.clearPending; return this.request('diagnostics',page); }
+  async cancelRefresh(): Promise<void> {
+    this.cancel();
+    await this.refreshPending?.catch(() => undefined);
+  }
+  clearData(): Promise<void> {
+    this.clearPending ??= (async () => {
+      await this.cancelRefresh();
+      await this.request('clearData');
+    })().finally(() => { this.clearPending = undefined; });
+    return this.clearPending;
+  }
   subscribe(listener: (progress: SummaryProgress) => void): () => void {
     this.listeners.add(listener); return () => { this.listeners.delete(listener); };
   }

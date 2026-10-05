@@ -61,7 +61,8 @@ export class Dashboard implements vscode.Disposable {
     if (this.ready && this.tab === 'usage') void this.loadUsage().catch(error => this.error(error));
   }
 
-  dispose(): void { this.unsubscribe(); this.panel?.dispose(); }
+  close(): void { this.panel?.dispose(); }
+  dispose(): void { this.unsubscribe(); this.close(); }
 
   private async handle(message: NonNullable<ReturnType<typeof parseDashboardMessage>>): Promise<void> {
     switch (message.type) {
