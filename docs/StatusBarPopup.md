@@ -69,13 +69,15 @@ VS Code 자체의 사용량 카드에는 DOM으로 만든 대시보드가 사용
 
 ## Agent Tracker에 적용한 구현
 
-- [src/ui/quotaTooltip.ts](../src/ui/quotaTooltip.ts): 실제 quota 상태로 Markdown 카드를 만든다. 제공자별 모든 기간, 잔량 아이콘, 사용률/남은 비율, 상대 초기화 시간, 조회 중·오래된 값·오류 안내와 마지막 갱신 시각을 표시한다. 외부 문자열은 `appendText`로 넣고 표의 줄바꿈·구분 문자를 정리한다.
+- [src/ui/quotaTooltip.ts](../src/ui/quotaTooltip.ts): 제공자 이름과 다음 초기화 시간을 한 줄로, 기간별 색상 막대·비율을 그 아래에 표시한다. 막대는 자체 생성한 SVG data URI를 사용하며 사용률에 따라 초록·노랑·빨강으로 표시한다. 추가 quota, 조회 중·오래된 값·오류 안내와 마지막 갱신 시각도 유지한다. `supportHtml`은 제한된 색상 span에 사용하고 외부 문자열은 `appendText`로 이스케이프한다. Codex 응답의 `rateLimitResetCredits.availableCount`와 사용 가능한 항목의 가장 빠른 `expiresAt`을 재설정 가능 횟수·다음 만료 시간으로 표시한다. 상세 항목 수로 횟수를 추정하지 않으며, 만료 정보가 없으면 횟수만 표시한다. [Codex App Server](https://learn.chatgpt.com/docs/app-server#6-rate-limits-chatgpt)
 - [src/ui/statusBar.ts](../src/ui/statusBar.ts): `tooltip`에는 전체 카드를, 접근성 label에는 짧은 요약을 제공하고 클릭 명령을 `agentTracker.toggleQuotaTooltip`으로 지정한다. 패치가 label을 자동 호버에 사용하므로 스크린리더와 마우스 사용자가 같은 요약을 받는다. [statusBarPresentation.ts](../src/ui/statusBarPresentation.ts)의 `quotaHoverSummary`는 Claude·Codex 순서로 5시간 남은 비율과 재설정까지의 시간을 표시한다. 카운트다운은 1분마다 현재 snapshot에서 다시 계산하며 네트워크 조회나 통계 스캔을 시작하지 않는다.
-- [src/extension.ts](../src/extension.ts): 새로고침·사용량 통계 링크는 기존 명령을 사용한다. 상세/압축 설정과 확장 관리는 허용된 값만 받는 별도 명령을 등록했다. 관리 링크는 Claude/Codex의 고정된 확장 ID만 연다. 패치가 없는 설치에서 클릭 명령은 `workbench.action.showHover`로 열린다.
+- [src/extension.ts](../src/extension.ts): 전체 새로고침·사용량 통계·상세/압축 명령과 Agent Tracker 설정 열기를 등록한다. 제공자별 새로고침·확장 관리 명령은 제거했다. 설정에서 추적 대상, 자동/수동 갱신, 통계 사용 여부와 계산 데이터 삭제를 관리한다. 패치가 없는 설치에서 클릭 명령은 `workbench.action.showHover`로 열린다.
 - [package.json](../package.json): 하단 사용량 패널 등록과 기존 `agentTracker.toggleQuota` 명령을 제거했다. 기존 quota Webview 구현과 전용 JS/CSS도 제거했다. 사용량 통계·Diagnostics Webview는 계속 사용한다.
 - [scripts/vscode/statusbar-toggle.cjs](../scripts/vscode/statusbar-toggle.cjs): Agent Tracker 클릭 명령을 내부 토글 객체에 연결하는 로컬 설치 패치와 적용 확인·복원을 제공한다.
 
-카드의 상세/압축 설정은 상태표시줄에만 적용하며, 카드에는 숨긴 제공자를 포함해 모든 quota 기간을 표시한다. 두 제공자의 상태표시줄 표시를 모두 숨기면 카드 진입점도 숨겨진다. 드래그 이동과 임의 CSS는 제공하지 않는다.
+카드의 상세/압축 설정은 상태표시줄에만 적용하며, 카드에는 추적 중인 제공자의 모든 quota 기간을 표시한다. Claude는 추적이 켜져 있으면 상태표시줄에도 표시한다. `codex.showStatusBar`만 끈 Codex는 카드에 남지만, `enabled`로 추적을 끈 제공자는 조회와 카드·통계 표시에서 제외한다. Claude 추적을 끄고 Codex 상태표시줄도 숨기면 카드 진입점도 숨겨진다. `사용량 통계` 아래의 `설정`과 명령 팔레트의 `Agent Tracker: 설정 열기`는 확장 설정 화면으로 연결된다. 제목 행은 너비 100%의 HTML 표로 구성하고, `새로고침`을 오른쪽 셀의 `align="right"`로 정렬한다. 조회 중에는 같은 위치에 진행 상태를 표시하고 새로고침 링크를 제거한다. 정렬에는 마크다운 렌더러가 허용하는 `width`·`align` 속성을 사용한다. [렌더러 소스](https://github.com/microsoft/vscode/blob/main/src/vs/base/browser/markdownRenderer.ts)
+
+제공자별 텍스트 영역과 하단 명령 영역은 카드 양쪽 끝까지 이어지는 Markdown 수평선으로 구분한다. 기본 수평선은 테마에 따라 잘 보이지 않아 로컬 workbench 패치가 Agent Tracker 설정 링크를 포함하는 카드의 선만 2px·`#888888`로 표시한다. 내용의 좌우 여백을 상쇄하므로 카드 너비가 바뀌어도 구분선이 가장자리까지 이어진다. 각 제공자의 추가 한도·재설정 안내·오류·마지막 갱신 시각은 해당 영역에 모으고, 상태표시줄의 Claude·Codex 사이에는 세로 구분선 `│`를 표시한다.
 
 ## 내장 클릭 토글에 연결하는 알고리즘
 
@@ -111,7 +113,7 @@ npm run restore:vscode
 
 Windows 기본 설치는 환경 변수에서 찾고 `bin/code.cmd`가 가리키는 현재 버전의 `resources/app`을 사용한다. 개인 계정이나 저장소 절대 경로는 코드에 고정하지 않는다. 선택한 Windows CLI를 대상으로 하려면 `npm run patch:vscode -- --cli "<code.cmd 경로>"`를 사용한다. 별도 설치는 `--executable` 또는 `--app-root`로 지정한다. 확인과 복원에도 동일한 대상 옵션을 사용한다.
 
-수정 전에 등록된 workbench checksum과 JavaScript 구문을 검증한다. 원본 `workbench.desktop.main.js`와 `product.json`을 각각 `.agent-tracker-toggle.bak`으로 보관하며 변경 전후 SHA-256을 `.agent-tracker-toggle.json`에 기록한다. `product.json`에서는 해당 workbench 파일의 checksum만 갱신한다. 재실행은 중복 삽입하지 않고, 기존 v1·v2 토글 패치는 원본 백업을 보존하며 v3 요약·카드 분리 패치로 갱신한다. 복원은 원본 파일을 정확히 되돌린다. 이후 다른 수정이나 백업 손상이 감지되면 덮어쓰지 않는다. 적용·갱신 도중 한 파일만 변경된 경우도 백업으로 복원할 수 있다.
+수정 전에 등록된 workbench checksum과 JavaScript 구문을 검증한다. 원본 `workbench.desktop.main.js`와 `product.json`을 각각 `.agent-tracker-toggle.bak`으로 보관하며 변경 전후 SHA-256을 `.agent-tracker-toggle.json`에 기록한다. `product.json`에서는 해당 workbench 파일의 checksum만 갱신한다. 재실행은 중복 삽입하지 않고, 기존 v1·v2·v3 토글 패치는 원본 백업을 보존하며 v4 요약·카드 분리 및 구분선 스타일 패치로 갱신한다. 복원은 원본 파일을 정확히 되돌린다. 이후 다른 수정이나 백업 손상이 감지되면 덮어쓰지 않는다. 적용·갱신 도중 한 파일만 변경된 경우도 백업으로 복원할 수 있다.
 
 이는 비공개 구현에 의존하는 로컬 패치다. **VS Code 업데이트 뒤에는 재적용해야 한다.** VSIX 패키징·확장 활성화·CI에서는 설치 파일을 자동 수정하지 않는다. 지원하지 않는 내부 구조에서는 적용을 중단하며, 패치가 없는 설치는 기본 마우스 호버와 클릭 열기 경로를 사용한다.
 

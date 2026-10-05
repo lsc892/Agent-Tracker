@@ -15,9 +15,11 @@ npm ci
 npm run build
 ```
 
-아래의 로컬 VS Code 패치를 적용하면 상태 표시줄의 Claude·Codex 사용량 항목을 **클릭해 바로 위에 카드를 열고, 다시 클릭해 닫습니다.** 카드가 닫혀 있을 때 마우스를 올리면 제공자별 5시간 남은 비율·재설정까지의 시간과 `클릭하여 열기/닫기` 안내가 나옵니다. 카드가 열려 있으면 이 요약 호버는 숨겨지며, 열린 카드는 마우스를 옮겨도 유지됩니다. 바깥 클릭이나 Esc로도 닫습니다. 카드에는 모든 quota 기간의 사용률·잔량·초기화 시간, 조회 상태와 마지막 갱신 시각이 나옵니다. `상세`/`압축` 링크는 상태 표시줄의 표시량을 바꾸며, 상세는 7일·5시간 사용량을, 압축은 5시간 사용량만 표시합니다. 카드는 두 모드 모두 모든 quota 기간을 표시합니다. 각 제공자의 `확장 관리` 링크로 관리 화면을 열고, `사용량 통계` 링크로 통계 Webview를 엽니다. 명령 팔레트의 `Agent Tracker: 대시보드 열기` 또는 `Agent Tracker: 사용 통계 열기`로도 통계에 진입할 수 있습니다.
+아래의 로컬 VS Code 패치를 적용하면 상태 표시줄의 Claude·Codex 사용량 항목을 **클릭해 바로 위에 카드를 열고, 다시 클릭해 닫습니다.** 카드가 닫혀 있을 때 마우스를 올리면 제공자별 5시간 남은 비율·재설정까지의 시간과 `클릭하여 열기/닫기` 안내가 나옵니다. 카드가 열려 있으면 이 요약 호버는 숨겨지며, 열린 카드는 마우스를 옮겨도 유지됩니다. 바깥 클릭이나 Esc로도 닫습니다. 카드에는 모든 quota 기간의 사용률·잔량·초기화 시간, 조회 상태와 마지막 갱신 시각이 나옵니다. `상세`/`압축` 링크는 상태 표시줄의 표시량을 바꾸며, 상세는 7일·5시간 사용량을, 압축은 5시간 사용량만 표시합니다. 카드는 두 모드 모두 모든 quota 기간을 표시합니다. `사용량 통계` 링크로 통계 Webview를 열고, 바로 아래 `설정` 링크로 VS Code의 Agent Tracker 확장 설정을 엽니다. 명령 팔레트의 `Agent Tracker: 대시보드 열기` 또는 `Agent Tracker: 사용 통계 열기`로도 통계에 진입할 수 있습니다.
 
-오른쪽 새로고침 버튼과 툴팁의 새로고침 링크는 현재 quota만 조회합니다. 제공자별 새로고침 링크는 해당 제공자만 조회합니다. 조회 중인 링크는 갱신 상태 문구로 바뀝니다. 로고 SVG와 상태줄·툴팁용 아이콘 폰트는 `resource/icon`에 포함됩니다.
+카드의 제공자 이름 옆에는 다음 quota 초기화까지 남은 시간이 나오고, 아래에는 `5h`·`wk` 등의 기간과 색상 막대·사용률을 표시합니다. 사용률이 50% 이상이면 노랑, 80% 이상이면 빨강이며 낮은 사용률은 초록입니다. 추가 quota도 별도 줄에 표시하고, 막대에 마우스를 올리면 해당 기간의 초기화 시간을 확인할 수 있습니다. Codex 아래에는 서버가 제공한 **rate-limit 재설정 N회 사용 가능**과 **다음 항목이 … 후 만료됨**을 표시합니다. 재설정 횟수는 quota 기간 수와 별개이며, 만료 상세 정보가 없으면 횟수만 표시합니다. [Codex App Server 응답](https://learn.chatgpt.com/docs/app-server#6-rate-limits-chatgpt)
+
+오른쪽 새로고침 버튼과 툴팁 상단의 새로고침 링크는 추적 중인 제공자의 현재 quota만 조회합니다. 조회 중인 링크는 갱신 상태 문구로 바뀝니다. 제공자별 새로고침·확장 관리 링크는 제공하지 않습니다. 툴팁 상단의 새로고침은 제목과 같은 행의 오른쪽에 표시합니다. 로고 SVG와 상태줄·툴팁용 아이콘 폰트는 `resource/icon`에 포함됩니다.
 
 VSIX를 만들려면 다음 명령을 사용합니다. 생성된 `agent-tracker-0.1.0.vsix`를 VS Code의 **Extensions: Install from VSIX...**로 설치합니다.
 
@@ -41,22 +43,29 @@ npm run restore:vscode         # 원본 복원
 
 | 설정 | 기본값 |
 |---|---|
+| `agentTracker.claude.enabled` / `agentTracker.codex.enabled` | 각 제공자 추적 켜짐 |
+| `agentTracker.quota.refreshPolicy` | `automatic`; 수동 새로고침만 사용하려면 `manual` |
+| `agentTracker.usage.enabled` | 사용량 통계 켜짐 |
 | `agentTracker.claude.dataHome` | `CLAUDE_CONFIG_DIR` 또는 `~/.claude` |
 | `agentTracker.codex.dataHome` | `CODEX_HOME` 또는 `~/.codex` |
 | `agentTracker.codex.executable` | PATH의 `codex` |
 | `agentTracker.usage.claudeRoots` | Claude 홈의 `projects` |
 | `agentTracker.usage.codexRoots` | Codex 홈의 `sessions`, `archived_sessions` |
 | `agentTracker.usage.timezone` | 시스템 시간대; 예: `Asia/Seoul` |
-| `agentTracker.*.pollingIntervalSeconds` | 제공자별 900초, 최소 30초 |
-| `agentTracker.*.showStatusBar` | 표시 |
+| `agentTracker.quota.pollingIntervalSeconds` | Claude·Codex 공통 900초, 최소 30초 |
+| `agentTracker.codex.showStatusBar` | Codex 상태 표시줄 표시 |
 | `agentTracker.display.percentage` | `used`; 남은 비율은 `remaining` |
 | `agentTracker.display.detail` | `detailed`; 간략 표시는 `compact` |
 
 Windows의 npm Codex 설치는 `.cmd` 옆 패키지에서 네이티브 실행 파일을 찾습니다. 다른 설치 방식이면 `.exe` 경로를 지정하세요. WSL·SSH·컨테이너에서는 확장이 실행되는 환경의 CLI·로그 경로를 사용합니다.
 
+추적을 끈 제공자는 quota 조회·통계 수집을 중단하고 카드와 통계에서 숨깁니다. 기존 통계 데이터는 보관하며 다시 켜면 표시합니다. Claude는 추적이 켜져 있으면 상태 표시줄에 표시합니다. `codex.showStatusBar`는 Codex의 상태 표시줄만 숨기는 설정입니다. 자동 갱신은 Claude·Codex에 같은 간격을 적용하며 활성 창에서만 동작합니다. 창으로 돌아올 때 마지막 성공 조회가 5분 이상 지났거나 조회에 실패했다면 재시도합니다. 수동 정책은 시작 시에도 조회하지 않고 새로고침을 누를 때만 조회합니다.
+
+`Usage: Enabled`를 끄면 진행 중인 통계 수집을 취소하고 통계 창을 닫습니다. 이 설정 아래의 **통계 계산 데이터 삭제** 링크 또는 같은 이름의 명령 팔레트 명령으로 파일 처리 정보(`manifest`)와 집계 결과(`turn_summary`)를 함께 비울 수 있습니다. 원본 대화 로그는 유지됩니다. 삭제 직후 재수집하지 않으며, 통계를 켜고 다시 열면 재계산합니다. 상태 표시줄 항목이 모두 숨겨져도 명령 팔레트의 **Agent Tracker: 설정 열기**에서 다시 설정할 수 있습니다.
+
 ## 데이터 처리
 
-활성화 시 SQLite schema만 준비하고 quota를 조회합니다. JSONL 스캔은 사용량 통계에 진입할 때만 시작합니다. quota 툴팁 표시·카운트다운·새로고침·상세/압축 변경, 통계 내부 탭·날짜·시간대·그룹·페이지 변경은 스캔을 시작하지 않습니다. 비활성 창에서는 quota 자동 조회를 생략합니다.
+통계 기능이 켜져 있으면 활성화 시 SQLite schema만 준비합니다. quota는 추적 대상과 갱신 정책에 따라 조회합니다. JSONL 스캔은 사용량 통계에 진입할 때만 시작합니다. quota 툴팁 표시·카운트다운·새로고침·상세/압축 변경, 통계 내부 탭·날짜·시간대·그룹·페이지 변경은 스캔을 시작하지 않습니다. 비활성 창에서는 quota 자동 조회를 생략합니다.
 
 SQLite는 확장 `globalStorageUri`의 `agent-tracker.sqlite`에 저장됩니다. 영속 테이블은 `manifest`, `turn_summary` 두 개입니다. 변경된 세션은 원본 전체를 다시 읽어 중복 응답을 제거하고 교체하며, 변화가 없는 세션은 본문을 읽지 않습니다. 하위 에이전트의 토큰은 부모 요청에 더하고 시간은 부모 요청 값만 사용합니다.
 

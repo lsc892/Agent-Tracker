@@ -148,7 +148,7 @@ manual refresh
 
 복귀 실패 backoff는 복귀 이벤트의 재시도 허용 간격이며, 비활성 창에서 고빈도 재시도 timer를 실행한다는 뜻이 아니다. 성공하면 해당 제공자의 실패 횟수를 초기화한다. VS Code에서는 창 focus 상태를 기준으로 자동 조회를 제어한다.
 
-제공자별 자동 갱신 간격은 설정으로 변경할 수 있다. 기본값은 각각 900초, 최소값은 30초이며 정기 조회 간격만 바꾼다. 복귀 5분 debounce와 실패 backoff는 별도다. 일반 실패 snapshot은 마지막 성공 이후 최대 30분, `429` snapshot은 최대 24시간 유지하되 오래된 값임을 명시한다. reset countdown 표시 갱신은 네트워크 요청을 유발하지 않으며 reset 시각이 지났다고 사용률을 임의로 0으로 바꾸지 않는다.
+자동 갱신 간격은 공통 설정 `agentTracker.quota.pollingIntervalSeconds`로 변경하며 추적 중인 Claude·Codex에 함께 적용한다. 기본값은 900초, 최소값은 30초이며 정기 조회 간격만 바꾼다. 복귀 5분 debounce와 제공자별 실패 backoff는 별도다. 일반 실패 snapshot은 마지막 성공 이후 최대 30분, `429` snapshot은 최대 24시간 유지하되 오래된 값임을 명시한다. reset countdown 표시 갱신은 네트워크 요청을 유발하지 않으며 reset 시각이 지났다고 사용률을 임의로 0으로 바꾸지 않는다.
 
 ### 3.4 상태 표시줄과 카드형 툴팁
 
@@ -160,9 +160,10 @@ manual refresh
 
 ### 3.5 카드 내용과 설정
 
-- Quota 카드: 모든 quota window, 사용률/남은 비율, 잔량 아이콘, 상대 reset 시간, 마지막 성공 갱신 시각, 조회 중·오래된 값·갱신 실패 안내.
-- 카드의 새로고침 링크: 전체 또는 해당 제공자의 quota만 수동 새로 고침. 조회 중인 링크는 갱신 상태로 대체한다.
-- 카드의 확장 관리 링크: Claude/Codex의 고정된 확장 관리 화면으로 이동한다.
+- Quota 카드: 제공자 이름 옆 다음 초기화 시간, 아래 모든 quota window의 기간·색상 막대·사용률/남은 비율, 마지막 성공 갱신 시각, 조회 중·오래된 값·갱신 실패 안내. 기본 quota는 5h·wk 순서로 표시하고 추가 quota는 아래 줄에 표시한다. 막대의 색은 사용률 50% 미만 초록, 50% 이상 노랑, 80% 이상 빨강이며 해당 기간의 초기화 시간은 막대 호버로 확인한다.
+- Codex 재설정 안내: `account/rateLimits/read`의 `rateLimitResetCredits.availableCount`를 사용 가능한 횟수로 표시한다. 상세 항목 중 `resetType=codexRateLimits`, `status=available`인 항목의 가장 빠른 `expiresAt`을 다음 만료 시간으로 표시한다. 상세 목록은 서버에서 제한될 수 있으므로 항목 수로 횟수를 계산하지 않는다. 횟수·만료 정보를 받지 못한 경우 값을 추정하지 않는다. [응답 형식](https://learn.chatgpt.com/docs/app-server#6-rate-limits-chatgpt)
+- 카드의 새로고침 링크: 제목 행 오른쪽에서 추적 중인 제공자의 quota를 함께 수동 새로고침한다. 조회 중인 링크는 갱신 상태로 대체한다.
+- 카드의 설정 링크: 사용량 통계 링크 아래에서 Agent Tracker 확장 설정 화면으로 이동한다.
 - 카드의 상세/압축 링크: 상태 표시줄 표시량을 변경한다. 카드의 quota 기간은 항상 모두 표시한다.
 - Usage: 일·월·프로젝트·세션별 token 총량과 완료 turn 평균 token·시간. 상세 통계 버튼으로 이동한다.
 - Diagnostics: manifest와 turn summary의 현재 처리 상태, 중단 단계·위치와 오류. quota 조회 실패 상태도 확인한다.
@@ -171,12 +172,10 @@ manual refresh
 |---|---|---|
 | 공통 | 사용률 / 남은 비율 표시 | 사용률 |
 | 공통 | 상태바 간략 / 상세 표시 | 상세 |
-| Claude | 상태바 표시 / 숨김 | 표시 |
 | Codex | 상태바 표시 / 숨김 | 표시 |
-| Claude | 자동 갱신 간격 | 900초 |
-| Codex | 자동 갱신 간격 | 900초 |
+| 공통 | Claude·Codex 자동 갱신 간격 | 900초 |
 
-상태바 압축 모드는 5시간 window만, 상세 모드는 7일·5시간 window를 표시한다. 5시간 window가 없으면 압축 상태바에 정보 없음으로 표시하고 장기 window로 대체하지 않는다. Quota 툴팁은 상태바 모드와 관계없이 모든 window를 표시한다. 상태바 숨김은 provider 비활성화와 구분하며 툴팁에서는 숨긴 제공자도 볼 수 있다. 두 제공자를 모두 숨기면 툴팁 진입점도 숨긴다. 표시 설정 변경은 기존 snapshot에 즉시 반영한다.
+상태바 압축 모드는 5시간 window만, 상세 모드는 7일·5시간 window를 표시한다. 5시간 window가 없으면 압축 상태바에 정보 없음으로 표시하고 장기 window로 대체하지 않는다. Quota 툴팁은 상태바 모드와 관계없이 모든 window를 표시한다. Claude는 추적이 켜져 있으면 상태바에 표시한다. Codex 상태바 숨김은 provider 비활성화와 구분하며 툴팁에서는 숨긴 Codex도 볼 수 있다. Claude 추적을 끄고 Codex 상태바도 숨기면 툴팁 진입점도 숨긴다. 표시 설정 변경은 기존 snapshot에 즉시 반영한다.
 
 ### 3.6 Codex App Server 사용
 
