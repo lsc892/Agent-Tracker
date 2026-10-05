@@ -83,7 +83,8 @@ export interface TurnEvent {
   duration?: number | null;
   durationQuality?: 'exact' | 'derived' | 'approximate' | 'missing';
   completed?: boolean;
-  status?: 'completed' | 'in_progress' | 'failed';
+  /** Aborted outcomes exist only in staging and never become persisted request summaries. */
+  status?: 'completed' | 'in_progress' | 'failed' | 'aborted';
   statusAt?: number | null;
   flags?: string[];
   offset: number;

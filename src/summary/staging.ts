@@ -272,7 +272,8 @@ export class SummaryStaging {
         row_number() OVER(PARTITION BY r.provider,r.session_id ORDER BY r.started IS NULL,r.started,r.root_id) turn_index
       FROM roots r JOIN scan_files f ON f.id=coalesce(
         (SELECT sf.id FROM scan_files sf WHERE sf.provider=r.provider AND sf.session_id=r.session_id AND sf.is_main=1 AND sf.removed=0 ORDER BY sf.id LIMIT 1),r.file_id)
-      LEFT JOIN outcomes o ON o.provider=r.provider AND o.session_id=r.session_id AND o.root_id=r.root_id AND o.rank=1;
+      LEFT JOIN outcomes o ON o.provider=r.provider AND o.session_id=r.session_id AND o.root_id=r.root_id AND o.rank=1
+      WHERE o.status IS NULL OR o.status<>'aborted';
     `);
   }
 

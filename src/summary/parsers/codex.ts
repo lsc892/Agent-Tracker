@@ -83,7 +83,8 @@ export class CodexCurrentParserAdapter {
       if (event === 'task_started') {
         this.currentClosed = false; this.hasUserInTurn = false; this.pendingLifecycle = true;
         if (this.root) this.sink.event({ kind: 'turn', rootId: this.root, isMain: this.identityValue.isMain,
-          startedAt: lifecycleTimestamp(payload.started_at) ?? time, offset });
+          startedAt: lifecycleTimestamp(payload.started_at) ?? time, status: 'in_progress',
+          statusAt: lifecycleTimestamp(payload.started_at) ?? time, offset });
       } else if (event === 'user_message') {
         if (ownTurns && (!this.root || this.currentClosed || this.hasUserInTurn && !this.pendingLifecycle)) {
           this.root = string(payload.id) ?? (time === null ? undefined : `legacy-${time}`);
@@ -98,7 +99,12 @@ export class CodexCurrentParserAdapter {
         this.sink.event({ kind: 'turn', rootId: this.root, isMain: this.identityValue.isMain, completed: true,
           completedAt: lifecycleTimestamp(payload.completed_at) ?? time,
           duration: typeof payload.duration_ms === 'number' ? number(payload.duration_ms) : null,
-          durationQuality: typeof payload.duration_ms === 'number' ? 'exact' : 'derived', offset });
+          durationQuality: typeof payload.duration_ms === 'number' ? 'exact' : 'derived',
+          status: 'completed', statusAt: lifecycleTimestamp(payload.completed_at) ?? time, offset });
+      } else if (event === 'turn_aborted') {
+        this.currentClosed = true; this.pendingLifecycle = false;
+        if (this.root) this.sink.event({ kind: 'turn', rootId: this.root, isMain: this.identityValue.isMain,
+          status: 'aborted', statusAt: lifecycleTimestamp(payload.completed_at) ?? time, offset });
       } else if (event === 'agent_message' && this.root) {
         this.sink.event({ kind: 'turn', rootId: this.root, isMain: this.identityValue.isMain, lastAssistantAt: time, offset });
       } else if (event === 'token_count' && !this.sawCurrent) this.legacy(payload, offset);

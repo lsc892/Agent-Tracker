@@ -474,6 +474,8 @@ provider별 우선순위를 둔다.
 4순위: 마지막 agent message timestamp - user message timestamp
 ```
 
+main/root의 최신 lifecycle 결과가 `turn_aborted`이면 완료되지 않은 대화로 보고 요청 summary를 저장하지 않으며 요청 목록·turn 수·token 총량·평균에서 제외한다. 중단 이전 누적 token 카운터는 이후 요청의 high-water delta 계산에 유지한다. 같은 root를 다시 시작해 완료한 경우 최신 결과로 판정하고, subagent의 중단은 완료한 main/root 요청을 제외시키지 않는다.
+
 공통 품질 값:
 
 ```text
@@ -688,7 +690,7 @@ WHERE started_at_ms >= :period_start_ms
 GROUP BY provider, project_key, session_id;
 ```
 
-위 예시는 기간 내 project/session별 조회다. 전체·일·월·project·session 조회는 필요한 filter와 grouping만 선택한다. token 총량에는 진행 중·실패한 요청에서 확인한 값도 포함하고, turn 평균 token·시간은 성공적으로 완료한 요청만 대상으로 한다. duration 누락은 0으로 채우지 않고 평균에서 제외하며 유효 시간 표본 수를 함께 표시한다. 시각을 알 수 없는 요청은 전체/project/session 총량에는 포함하되 일·월 조회에서는 '시각 미상'으로 별도 표시한다.
+위 예시는 기간 내 project/session별 조회다. 전체·일·월·project·session 조회는 필요한 filter와 grouping만 선택한다. token 총량에는 진행 중·실패한 요청에서 확인한 값도 포함하되 `turn_aborted`로 중단된 Codex root 요청은 제외한다. turn 평균 token·시간은 성공적으로 완료한 요청만 대상으로 한다. duration 누락은 0으로 채우지 않고 평균에서 제외하며 유효 시간 표본 수를 함께 표시한다. 시각을 알 수 없는 요청은 전체/project/session 총량에는 포함하되 일·월 조회에서는 '시각 미상'으로 별도 표시한다.
 
 schema version 2는 기존 `turn_summary`의 행·id·manifest 참조를 보존하며 `failed` 상태를 추가한다. parser version 4는 변경되지 않은 원본도 다음 통계 갱신에서 재파싱해 기존 시간과 실패 분류를 보정한다.
 

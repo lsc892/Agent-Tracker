@@ -29,6 +29,13 @@
 
 ## 2026-10-06 — 사용자
 
+### 중단된 Codex 요청 제외와 이후 누적 token 보존
+
+- **의사결정**: Codex main/root의 최신 결과가 `turn_aborted`이면 요청 summary와 token·turn·시간 집계에서 제외한다. 중단 이전 누적 token 카운터는 이후 요청의 delta 계산에 유지한다.
+- **근거**: 중단된 대화는 완성된 turn으로 세지 않으며, 카운터까지 제거하면 이후 완료 요청에 중단 요청의 사용량이 다시 합산된다.
+- **결과**: 나중에 같은 root를 다시 시작해 완료하면 최신 결과로 재집계한다. subagent만 중단된 경우 완료한 main/root의 사용량은 유지한다. UI와 명세의 안내도 맞추고 이 수정의 parser version을 8로 올린다.
+- **검증**: main/root 중단과 후속 delta, 중단 후 같은 root의 완료 재시도, 중단된 subagent의 완료 main 귀속을 통합 테스트로 확인했다. 이번 커밋의 staged 상태에서 타입 검사·린트·148개 테스트를 통과했다.
+
 ### JSONL 이미지 본문 건너뛰기와 원본 byte offset 보존
 
 - **의사결정**: JSONL의 `data:image/...;base64,` 문자열은 헤더와 JSON 경계만 유지하고 본문을 스트리밍 중 버린다.

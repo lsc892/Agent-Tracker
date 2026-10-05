@@ -240,6 +240,48 @@ const currentUsage = (thread:string,turn:string,root:string,input:number) => ({t
 const legacyUsage = (input:number) => ({type:'event_msg',payload:{type:'token_count',info:{total_token_usage:{input_tokens:input,output_tokens:0},last_token_usage:{input_tokens:input,output_tokens:0}}}});
 const rootlessStart = (turn:string) => ({type:'event_msg',timestamp:'2026-10-01T00:00:00Z',payload:{type:'task_started',turn_id:turn}});
 
+test('aborted Codex roots and descendants leave no request summary while later cumulative deltas stay correct',async () => fixture(async (database,options,root) => {
+  const codexOptions={...options,roots:[{provider:'codex' as const,path:root}]};
+  const count = (input:number) => ({type:'event_msg',payload:{type:'token_count',info:{total_token_usage:{input_tokens:input,output_tokens:0}}}});
+  await writeFile(join(root,'main.jsonl'),jsonl([codexMeta('main'),codexStart('aborted'),count(100),
+    {type:'event_msg',timestamp:'2026-10-01T00:00:01Z',payload:{type:'turn_aborted',turn_id:'aborted',completed_at:1790812801,duration_ms:1000}},
+    {...codexStart('next'),timestamp:'2026-10-01T00:00:02Z'},count(150),
+    {type:'event_msg',timestamp:'2026-10-01T00:00:03Z',payload:{type:'task_complete',turn_id:'next',duration_ms:1000}}]));
+  await writeFile(join(root,'child.jsonl'),jsonl([codexMeta('child','main'),codexStart('child-turn','aborted'),
+    currentUsage('child','child-turn','aborted',40),
+    {type:'event_msg',payload:{type:'task_complete',turn_id:'child-turn',root_turn_id:'aborted',duration_ms:500}}]));
+  assert.equal((await refreshSummary(database,codexOptions)).failed,0);
+  const turns=database.queryTurns();assert.equal(turns.length,1);
+  assert.equal(turns[0].root_turn_id,'next');assert.equal(turns[0].turn_index,1);assert.equal(turns[0].total_tokens,50);
+  const usage=database.queryUsage()[0];assert.equal(usage.turn_count,1);assert.equal(usage.total_tokens,50);
+  assert.equal(usage.avg_tokens_per_turn,50);assert.equal(database.diagnostics().summaries.length,0);
+}));
+
+test('a Codex abort removes an accepted summary and a later completed retry can restore the same root',async () => fixture(async (database,options,root) => {
+  const codexOptions={...options,roots:[{provider:'codex' as const,path:root}]};
+  const path=join(root,'main.jsonl');
+  await writeFile(path,jsonl([codexMeta('main'),codexStart('request'),legacyUsage(100),
+    {type:'event_msg',timestamp:'2026-10-01T00:00:01Z',payload:{type:'task_complete',turn_id:'request',duration_ms:1000}}]));
+  await refreshSummary(database,codexOptions);assert.equal(database.queryTurns().length,1);
+  await appendFile(path,jsonl([{type:'event_msg',timestamp:'2026-10-01T00:00:02Z',payload:{type:'turn_aborted',turn_id:'request'}}]));
+  assert.equal((await refreshSummary(database,codexOptions)).failed,0);assert.equal(database.queryTurns().length,0);
+  assert.equal(database.findManifest('codex',path)!.processing_status,'done');
+  await appendFile(path,jsonl([{...codexStart('request'),timestamp:'2026-10-01T00:00:03Z'},
+    {type:'event_msg',timestamp:'2026-10-01T00:00:04Z',payload:{type:'task_complete',turn_id:'request',duration_ms:1000}}]));
+  assert.equal((await refreshSummary(database,codexOptions)).failed,0);
+  assert.equal(database.queryTurns()[0].status,'completed');assert.equal(database.queryTurns()[0].total_tokens,100);
+}));
+
+test('an aborted subagent does not discard its successfully completed main request',async () => fixture(async (database,options,root) => {
+  const codexOptions={...options,roots:[{provider:'codex' as const,path:root}]};
+  await writeFile(join(root,'main.jsonl'),jsonl([codexMeta('main'),codexStart('request'),currentUsage('main','request','request',100),
+    {type:'event_msg',timestamp:'2026-10-01T00:00:01Z',payload:{type:'task_complete',turn_id:'request',duration_ms:1000}}]));
+  await writeFile(join(root,'child.jsonl'),jsonl([codexMeta('child','main'),codexStart('child-turn','request'),currentUsage('child','child-turn','request',40),
+    {type:'event_msg',timestamp:'2026-10-01T00:00:02Z',payload:{type:'turn_aborted',turn_id:'child-turn',root_turn_id:'request'}}]));
+  assert.equal((await refreshSummary(database,codexOptions)).failed,0);
+  const turns=database.queryTurns();assert.equal(turns.length,1);assert.equal(turns[0].status,'completed');assert.equal(turns[0].total_tokens,140);
+}));
+
 test('Codex lifecycle seconds produce correct calendar groups, date filters and derived durations',async () => fixture(async (database,options,root) => {
   const codexOptions={...options,roots:[{provider:'codex' as const,path:root}]};
   const started=Date.parse('2026-09-30T14:59:59Z');const completed=started+3000;
