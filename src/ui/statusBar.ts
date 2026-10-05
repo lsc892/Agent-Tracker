@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import type { TrackerConfiguration } from '../configuration';
 import type { QuotaState } from '../quota/types';
-import { statusBarPresentation } from './statusBarPresentation';
+import { quotaHoverSummary, statusBarPresentation } from './statusBarPresentation';
 import { createQuotaTooltip } from './quotaTooltip';
 export { statusBarPresentation, remainingBar } from './statusBarPresentation';
 
@@ -37,7 +37,9 @@ export class QuotaStatusBar implements vscode.Disposable {
     const views = visible.map(state => statusBarPresentation(state, settings.percentage, settings.detail));
     this.quota.text = views.map(view => view.text).join('   ');
     this.quota.tooltip = createQuotaTooltip(states, settings);
-    this.quota.accessibilityInformation = { label: `${views.map(view => view.accessibleText).join('. ')}. 클릭하여 사용량 카드 열기 / 닫기`, role: 'button' };
+    // The renderer uses this plain-text preview for automatic hover; the Markdown
+    // tooltip remains the full quota UI opened by the native click toggle.
+    this.quota.accessibilityInformation = { label: quotaHoverSummary(states), role: 'button' };
     this.refresh.text = states.some(state => state.refreshing) ? '$(sync~spin)' : '$(refresh)';
     if (visible.length) {
       this.quota.show();

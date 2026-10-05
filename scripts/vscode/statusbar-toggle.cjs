@@ -6,11 +6,41 @@ const { spawnSync } = require('node:child_process');
 const command = 'agentTracker.toggleQuotaTooltip';
 const extensionId = 'agent-tracker.agent-tracker';
 const checksumKey = 'vs/workbench/workbench.desktop.main.js';
-const begin = '/*agent-tracker:statusbar-toggle:v2*/';
+const begin = '/*agent-tracker:statusbar-toggle:v3*/';
+const clickOnlyBegin = '/*agent-tracker:statusbar-toggle:v2*/';
 const legacyBegin = '/*agent-tracker:statusbar-toggle:v1*/';
 const end = '/*agent-tracker:statusbar-toggle:end*/';
 const hash = value => createHash('sha256').update(value).digest('hex');
 const checksum = value => createHash('sha256').update(value).digest('base64').replace(/=+$/, '');
+
+// Serialized into the renderer. Keep this function self-contained and scoped to
+// one status item: the original delegate is shared by the rest of the status bar.
+function configureQuotaHover(item, summary) {
+  item._agentTrackerSummary = summary;
+  if (item._agentTrackerHoverConfigured) return;
+  item._agentTrackerHoverConfigured = true;
+  const delegate = item.hoverDelegate;
+  item.hoverDelegate = {
+    get delay() { return delegate.delay; },
+    get placement() { return delegate.placement; },
+    get showNativeHover() { return delegate.showNativeHover; },
+    showHover(options, focus) {
+      if (item._agentTrackerSummary !== undefined && !focus) {
+        if (item.hoverService.getStickyHover(item.container)) return undefined;
+        options = { ...options, content: item._agentTrackerSummary };
+      }
+      return delegate.showHover(options, focus);
+    },
+    onDidHideHover() { delegate.onDidHideHover?.(); },
+  };
+  const stop = event => {
+    if (item._agentTrackerSummary !== undefined && item.hoverService.getStickyHover(item.container)) event.stopImmediatePropagation();
+  };
+  for (const type of ['mouseover', 'focus']) item.container.addEventListener(type, stop, { capture: true });
+  item._register({ dispose() {
+    for (const type of ['mouseover', 'focus']) item.container.removeEventListener(type, stop, { capture: true });
+  } });
+}
 
 function patchSource(source) {
   const symbols = [...source.matchAll(/\b([\w$]+)\s*=\s*\{\s*id:\s*["']statusBar\.entry\.toggleTooltip["'],\s*title:\s*["']["']\s*\}/g)];
@@ -18,7 +48,7 @@ function patchSource(source) {
   let original = source;
   const markers = [...source.matchAll(/\/\*agent-tracker:statusbar-toggle:v\d+\*\//g)];
   if (markers.length || source.includes(end)) {
-    if (markers.length !== 1 || source.split(end).length !== 2 || ![begin, legacyBegin].includes(markers[0][0])) throw new Error('토글 패치 표식이 손상되었습니다.');
+    if (markers.length !== 1 || source.split(end).length !== 2 || ![begin, clickOnlyBegin, legacyBegin].includes(markers[0][0])) throw new Error('토글 패치 표식이 손상되었습니다.');
     const start = markers[0].index, finish = source.indexOf(end);
     if (finish < start) throw new Error('토글 패치 표식 순서가 잘못되었습니다.');
     original = source.slice(0, start) + source.slice(finish + end.length);
@@ -30,15 +60,16 @@ function patchSource(source) {
   if (!context.includes('getStickyHover(this.container)') || !context.includes('commandPointerListener')) throw new Error('내장 클릭 토글 구현이 예상과 다릅니다.');
   const condition = `${argument}.extensionId===${JSON.stringify(extensionId)}&&${argument}.command?.id===${JSON.stringify(command)}`;
   const mapping = `${argument}={...${argument},command:${symbols[0][1]}};`;
-  // Register before setupManagedHover's capture listeners. Suppress automatic
-  // mouse/focus opening only; native click/keyboard toggling and dismissal stay intact.
+  // Keep the exact v2 injection to safely recognize upgrades and restore backups.
   const clickOnly = `if(!this._agentTrackerClickOnly){this._agentTrackerClickOnly=true;const stop=event=>{if(this.entry?.extensionId===${JSON.stringify(extensionId)}&&this.entry?.command===${symbols[0][1]})event.stopImmediatePropagation();};for(const type of ["mouseover","focus"])this.container.addEventListener(type,stop,{capture:true});this._register({dispose:()=>{for(const type of ["mouseover","focus"])this.container.removeEventListener(type,stop,{capture:true});}});}`;
-  const injection = `${begin}if(${condition}){${mapping}${clickOnly}}${end}`;
+  const configureSource = configureQuotaHover.toString().replace(/\r\n/g, '\n');
+  const injection = `${begin}if(${condition}){(${configureSource})(this,${argument}.ariaLabel??${argument}.name??"");${mapping}}else{this._agentTrackerSummary=undefined;}${end}`;
   const position = target.index + target[0].length;
   const patched = original.slice(0, position) + injection + original.slice(position);
   const legacy = original.slice(0, position) + `${legacyBegin}if(${condition}){${mapping}}${end}` + original.slice(position);
-  if (![original, patched, legacy].includes(source)) throw new Error('기존 토글 패치가 예상 코드와 다릅니다. 자동으로 덮어쓰지 않습니다.');
-  return { original, patched, alreadyPatched: source === patched, upgradeRequired: source === legacy };
+  const clickOnlySource = original.slice(0, position) + `${clickOnlyBegin}if(${condition}){${mapping}${clickOnly}}${end}` + original.slice(position);
+  if (![original, patched, legacy, clickOnlySource].includes(source)) throw new Error('기존 토글 패치가 예상 코드와 다릅니다. 자동으로 덮어쓰지 않습니다.');
+  return { original, patched, alreadyPatched: source === patched, upgradeRequired: source === legacy || source === clickOnlySource };
 }
 
 function appRootFromInstallation(root, launcher = join(root, 'bin', 'code.cmd')) {

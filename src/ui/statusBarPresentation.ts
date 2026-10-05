@@ -7,13 +7,28 @@ export function remainingBar(usedPercent: number): string {
 }
 
 function resetTime(window: QuotaWindow, now: number): string {
-  if (window.resetsAt === null) return '';
+  if (window.resetsAt === null || !Number.isFinite(window.resetsAt)) return '';
   const minutes = Math.max(0, Math.ceil((window.resetsAt - now) / 60_000));
   if (!minutes) return '재설정 대기';
   const days = Math.floor(minutes / 1440);
   const hours = Math.floor((minutes % 1440) / 60);
   if (days) return `${days}d ${hours}h`;
   return hours ? `${hours}h ${minutes % 60}m` : `${minutes}m`;
+}
+
+/** A short, plain-text preview, also used as the status item's accessible label. */
+export function quotaHoverSummary(states: readonly QuotaState[], now = Date.now()): string {
+  const lines = (['claude', 'codex'] as const).map(provider => {
+    const state = states.find(value => value.provider === provider);
+    const name = provider === 'claude' ? 'Claude' : 'Codex';
+    if (!state) return `${name}: 조회 불가`;
+    const view = statusBarPresentation(state, 'remaining', 'compact', now);
+    return view.accessibleText
+      .replace(/조회 불가\.$/, '조회 불가')
+      .replace('5시간:', '5시간 -')
+      .replace(', 재설정 ', ', 재설정까지 ');
+  });
+  return [...lines, '클릭하여 열기/닫기'].join('\n');
 }
 
 export function statusBarPresentation(
@@ -56,4 +71,3 @@ export function statusBarPresentation(
     accessibleText: `${name}: ${values.map(value => value.accessibleText).join(', ')}${stale ? ', 이전 조회 값' : ''}`,
   };
 }
-

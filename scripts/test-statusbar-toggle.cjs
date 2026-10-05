@@ -4,7 +4,7 @@ const { existsSync, readFileSync } = require('node:fs');
 const { join, resolve } = require('node:path');
 const { spawn } = require('node:child_process');
 const { createServer } = require('node:net');
-const { operate, checksum } = require('./vscode/statusbar-toggle.cjs');
+const { operate, checksum, resolveAppRoot } = require('./vscode/statusbar-toggle.cjs');
 
 const sleep = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
 async function until(probe, description, timeout = 15000) {
@@ -48,7 +48,10 @@ class Cdp {
 }
 
 async function main() {
-  const patch = operate({ check: true });
+  const baseline = process.argv.includes('--baseline');
+  const appRoot = resolveAppRoot();
+  const patch = baseline ? { appRoot, version: JSON.parse(readFileSync(join(appRoot, 'package.json'), 'utf8')).version } : operate({ check: true });
+  const reportName = baseline ? 'statusbar-toggle-baseline.json' : 'statusbar-toggle.json';
   const root = resolve(__dirname, '..');
   const resultDirectory = join(root, 'test-results');
   await mkdir(resultDirectory, { recursive: true });
@@ -93,7 +96,7 @@ async function main() {
       try { const pages = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json(); return pages.find(page => page.type === 'page' && page.url.includes('workbench')); } catch { return false; }
     }, 'isolated workbench debugger');
     cdp = await Cdp.connect(page.webSocketDebuggerUrl);
-    const runtimeChecksums = await cdp.evaluate('globalThis.vscode.context.configuration().product.checksums');
+    const runtimeChecksums = await until(() => cdp.evaluate('globalThis.vscode?.context?.configuration?.()?.product?.checksums'), 'workbench preload configuration');
     const diskChecksums = JSON.parse(readFileSync(join(patch.appRoot, 'product.json'), 'utf8')).checksums;
     const integrity = Object.entries(runtimeChecksums).map(([file, expected]) => ({
       file, expected, actual: checksum(readFileSync(join(patch.appRoot, 'out', file))),
@@ -114,20 +117,61 @@ async function main() {
       const card=[...document.querySelectorAll('.monaco-hover')].find(node => node.innerText.includes('사용량 통계') && node.innerText.includes('확장 관리'));
       if(!card)return null;const rect=card.getBoundingClientRect();return rect.width&&rect.height ? {top:rect.top,bottom:rect.bottom} : null;
     })()`);
+    if (baseline) {
+      await cdp.click(button);
+      await until(visible, 'baseline first click opens the card');
+      await cdp.evaluate(`globalThis.quotaMutations=[];globalThis.quotaObserver=new MutationObserver(records=>{
+        for(const record of records) for(const [kind,nodes] of [['removed',record.removedNodes],['added',record.addedNodes]])
+          for(const node of nodes) if(node.nodeType===1 && (node.matches('.monaco-hover') || node.querySelector('.monaco-hover'))) globalThis.quotaMutations.push(kind);
+      });globalThis.quotaObserver.observe(document.body,{childList:true,subtree:true});`);
+      await cdp.click(button);
+      await sleep(500);
+      assert.ok(await visible(), 'baseline bug: second click reopens the card');
+      const mutations = await cdp.evaluate('globalThis.quotaObserver.disconnect();globalThis.quotaMutations');
+      assert.ok(mutations.includes('removed') && mutations.includes('added'), 'baseline observes dismissal followed by recreation');
+      await writeFile(join(resultDirectory, reportName), JSON.stringify({ reproduced: true, version: patch.version, mutations, cause: 'mousedown dismisses the card; workbench.action.showHover opens it again on click' }, null, 2));
+      console.log('Reproduced: the second click removes the quota card and creates it again.');
+      return;
+    }
+    const summary = () => cdp.evaluate(`(() => {
+      const hover=[...document.querySelectorAll('.monaco-hover')].find(node => node.innerText.includes('클릭하여 열기/닫기'));
+      if(!hover)return null;const rect=hover.getBoundingClientRect();return rect.width&&rect.height ? hover.innerText : null;
+    })()`);
     const assertStaysClosed = async description => {
       for (let attempt = 0; attempt < 15; attempt++) {
         await sleep(100); assert.equal(await visible(), null, description);
       }
     };
     await cdp.call('Input.dispatchMouseEvent', { type: 'mouseMoved', x: button.x, y: button.y });
+    const preview = await until(summary, 'hover opens the short preview');
+    assert.match(preview, /Claude: 조회 불가/);
+    assert.match(preview, /Codex: 조회 불가/);
     await assertStaysClosed('hover alone must not open the quota card');
-    outcomes.push('hover does not open the card with a normal short delay');
+    outcomes.push('hover shows only the short provider summary and click instruction');
     await cdp.click(button);
     const card = await until(visible, 'first click opens quota card');
+    assert.equal(await summary(), null, 'click replaces the preview with the quota UI');
     assert.ok(card.bottom <= button.top + 8, 'card is anchored above the status bar');
     await cdp.call('Input.dispatchMouseEvent', { type: 'mouseMoved', x: editor.x, y: editor.y });
     await sleep(500); assert.ok(await visible(), 'card remains pinned after the mouse leaves');
     outcomes.push('first click opens and pins the card above the status bar');
+    await cdp.call('Input.dispatchMouseEvent', { type: 'mouseMoved', x: button.x, y: button.y });
+    for (let attempt = 0; attempt < 15; attempt++) {
+      await sleep(100);
+      assert.equal(await summary(), null, 'an open quota UI suppresses the preview');
+      assert.ok(await visible(), 'hover cannot replace the pinned quota UI');
+    }
+    outcomes.push('hover preview stays suppressed while the quota UI is pinned');
+    const refresh = await cdp.evaluate(`(() => {
+      const link=document.querySelector('.monaco-hover a[data-href="command:agentTracker.refreshQuota"]');
+      if(!link)return null;const rect=link.getBoundingClientRect();return {x:rect.x+rect.width/2,y:rect.y+rect.height/2};
+    })()`);
+    assert.ok(refresh, 'the quota UI has a refresh action');
+    await cdp.click(refresh);
+    await sleep(500);
+    assert.ok(await visible(), 'refresh updates the pinned card in place');
+    assert.equal(await summary(), null, 'a quota update must not replace the card with a preview');
+    outcomes.push('quota refresh retains the pinned UI and suppresses the preview');
     const screenshot = await cdp.call('Page.captureScreenshot', { format: 'png' });
     await writeFile(join(resultDirectory, 'statusbar-toggle.png'), Buffer.from(screenshot.data, 'base64'));
     await cdp.click(button);
@@ -135,9 +179,15 @@ async function main() {
     await assertStaysClosed('the card stays closed while the mouse remains over the button');
     await cdp.call('Input.dispatchMouseEvent', { type: 'mouseMoved', x: editor.x, y: editor.y });
     await cdp.call('Input.dispatchMouseEvent', { type: 'mouseMoved', x: button.x, y: button.y });
+    await until(summary, 'preview is available again after closing');
     await assertStaysClosed('hovering again after closing must not reopen the card');
     outcomes.push('second click closes the pinned card');
     outcomes.push('closed card stays closed on mouse reentry');
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await cdp.click(button); await until(visible, 'repeated click opens');
+      await cdp.click(button); await assertStaysClosed('repeated second click must not reopen');
+    }
+    outcomes.push('repeated open/close clicks never reopen a dismissed card');
     await cdp.click(button); await until(visible, 'reopen');
     await cdp.click(editor); await until(async () => !await visible(), 'outside click closes card');
     await cdp.click(button); await until(visible, 'reopen after outside dismissal');
@@ -147,14 +197,21 @@ async function main() {
     await until(async () => !await visible(), 'Escape closes card');
     await cdp.click(button); await until(visible, 'reopen after Escape');
     outcomes.push('Escape followed by one click reopens correctly');
+    await cdp.evaluate(`document.querySelector('[id$="agentTracker.quota"] .statusbar-item-label').focus()`);
+    for (const open of [false, true]) {
+      await cdp.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
+      await cdp.call('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
+      await until(async () => Boolean(await visible()) === open, `Enter toggles ${open ? 'open' : 'closed'}`);
+    }
+    outcomes.push('keyboard Enter toggles the same quota UI');
     await sleep(3000);
     const notificationText = await cdp.evaluate('[...document.querySelectorAll(".notification-list-item-message")].map(node=>node.innerText).join("\\n")');
     assert.doesNotMatch(notificationText, /installation appears to be corrupt|설치가 손상/iu, 'fresh startup must not show an installation corruption warning');
     outcomes.push('fresh startup has no installation integrity warning');
-    await writeFile(join(resultDirectory, 'statusbar-toggle.json'), JSON.stringify({ passed: true, version: patch.version, outcomes }, null, 2));
+    await writeFile(join(resultDirectory, reportName), JSON.stringify({ passed: true, version: patch.version, outcomes }, null, 2));
     console.log('Native statusbar click toggle passed:', outcomes.join('; '));
   } catch (error) {
-    await writeFile(join(resultDirectory, 'statusbar-toggle.json'), JSON.stringify({ passed: false, version: patch.version, error: error.message, outcomes }, null, 2));
+    await writeFile(join(resultDirectory, reportName), JSON.stringify({ passed: false, version: patch.version, error: error.message, outcomes }, null, 2));
     throw error;
   } finally {
     await writeFile(join(resultDirectory, 'statusbar-toggle.log'), log);

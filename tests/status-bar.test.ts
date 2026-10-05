@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { remainingBar, statusBarPresentation } from '../src/ui/statusBarPresentation';
+import { quotaHoverSummary, remainingBar, statusBarPresentation } from '../src/ui/statusBarPresentation';
 import type { QuotaState } from '../src/quota/types';
 
 const state: QuotaState = {
@@ -12,6 +12,18 @@ const state: QuotaState = {
     { id: 'secondary', label: '7d', usedPercent: 92, current: 92, maximum: 100, resetsAt: 507_600_000, windowDurationMins: 10080 },
   ] },
 };
+
+test('hover preview shows both providers, five-hour remaining quota, reset countdown and click instruction', () => {
+  const codex = { ...state, snapshot: { ...state.snapshot!, windows: [
+    { ...state.snapshot!.windows[0], usedPercent: 17, resetsAt: 11_400_000 }, state.snapshot!.windows[1],
+  ] } };
+  const claude = { ...state, provider: 'claude' as const, snapshot: null };
+  assert.equal(quotaHoverSummary([codex, claude], 0), 'Claude: 조회 불가\nCodex: 5시간 - 83% 남음, 재설정까지 3h 10m\n클릭하여 열기/닫기');
+  assert.match(quotaHoverSummary([codex], 60_000), /3h 9m/);
+  assert.match(quotaHoverSummary([{ ...claude, refreshing: true }], 0), /Claude: 조회 중…\nCodex: 조회 불가/);
+  assert.match(quotaHoverSummary([{ ...codex, status: 'stale' }], 0), /이전 조회 값/);
+  assert.doesNotMatch(quotaHoverSummary([codex], 0), /7일|92%|\$\(/);
+});
 
 test('status uses logo glyphs, remaining meters, reset times, and accessible provider names', () => {
   const view = statusBarPresentation(state, 'used', 'detailed', 0);

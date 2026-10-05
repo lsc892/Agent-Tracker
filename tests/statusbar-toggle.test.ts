@@ -48,23 +48,52 @@ test('native toggle mapping preserves object identity and is limited to the Agen
   assert.throws(() => patcher.patchSource(source + source), /유일하게/);
 });
 
-test('only the quota card automatic mouse and focus activation is suppressed; click and disposal still work', () => {
+test('the preview uses plain text, the clicked card retains Markdown, and pinned cards suppress automatic hover', () => {
   const context: Record<string, any> = { EventTarget };
   runInNewContext(patcher.patchSource(source).patched, context);
   const target = new EventTarget();
   const item = new context.Item(target);
-  const entry = { extensionId: 'agent-tracker.agent-tracker', command: { id: patcher.command } };
+  let pinned = false;
+  const shown: { content: unknown; focus?: boolean }[] = [];
+  const delegate = { delay: 100, placement: 'element', showHover: (options: { content: unknown }, focus?: boolean) => { shown.push({ content: options.content, focus }); } };
+  item.hoverDelegate = delegate;
+  item.hoverService = { getStickyHover: () => pinned ? {} : undefined };
+  const entry = { extensionId: 'agent-tracker.agent-tracker', command: { id: patcher.command }, ariaLabel: 'Claude: 조회 불가\nCodex: 5시간 - 83% 남음, 재설정까지 3h 10m\n클릭하여 열기/닫기' };
   item.update(entry); item.update(entry);
   assert.equal(item.disposables.length, 1, 'updates do not register duplicate capture filters');
+  assert.notEqual(item.hoverDelegate, delegate, 'the shared delegate is not modified');
+  assert.equal(item.hoverDelegate.delay, 100);
+  delegate.delay = 500;
+  assert.equal(item.hoverDelegate.delay, 500, 'configuration changes remain observable');
+  const card = { value: '### 사용량' };
+  item.hoverDelegate.showHover({ content: card }, false);
+  assert.deepEqual(shown.at(-1), { content: entry.ariaLabel, focus: false });
+  item.hoverDelegate.showHover({ content: card }, true);
+  assert.deepEqual(shown.at(-1), { content: card, focus: true });
+  pinned = true;
+  const count = shown.length;
+  item.hoverDelegate.showHover({ content: card }, false);
+  assert.equal(shown.length, count, 'a pending preview cannot replace a pinned card');
   const events: string[] = [];
   for (const type of ['mouseover', 'focus', 'click', 'pointerdown', 'keydown']) {
     target.addEventListener(type, () => events.push(type), true);
     target.dispatchEvent(new Event(type));
   }
   assert.deepEqual(events, ['click', 'pointerdown', 'keydown']);
+  pinned = false;
+  target.dispatchEvent(new Event('mouseover'));
+  assert.equal(events.at(-1), 'mouseover', 'closed cards allow ordinary preview hover');
+  item.update({ ...entry, ariaLabel: 'updated preview' });
+  item.hoverDelegate.showHover({ content: card }, false);
+  assert.equal(shown.at(-1)?.content, 'updated preview', 'refresh uses the latest summary');
+  item.hoverDelegate.showHover({ content: card }, true);
+  assert.equal(shown.at(-1)?.content, card, 'refresh of a pinned card keeps full content');
   item.update({ ...entry, command: { id: 'another.command' } });
+  pinned = true;
   target.dispatchEvent(new Event('mouseover'));
   assert.equal(events.at(-1), 'mouseover', 'a different command retains ordinary hover');
+  item.hoverDelegate.showHover({ content: card }, false);
+  assert.equal(shown.at(-1)?.content, card, 'another command retains its own tooltip');
   item.update(entry);
   for (const disposable of item.disposables) disposable.dispose();
   target.dispatchEvent(new Event('focus'));
@@ -74,11 +103,13 @@ test('only the quota card automatic mouse and focus activation is suppressed; cl
   assert.equal(other.disposables.length, 0, 'another extension receives no capture filter');
 });
 
-test('the previous toggle patch upgrades to click-only while retaining the original restore backups', () => {
+for (const version of [1, 2]) test(`v${version} upgrades to separate preview and card while retaining the original restore backups`, () => {
   const files = fixture();
   try {
     const anchor = 'update(e){';
-    const old = source.replace(anchor, `${anchor}/*agent-tracker:statusbar-toggle:v1*/if(e.extensionId==="agent-tracker.agent-tracker"&&e.command?.id==="${patcher.command}"){e={...e,command:nativeToggle};}/*agent-tracker:statusbar-toggle:end*/`);
+    // Exact historical v2 payload: automatic activation was always suppressed.
+    const clickOnly = version === 1 ? '' : `if(!this._agentTrackerClickOnly){this._agentTrackerClickOnly=true;const stop=event=>{if(this.entry?.extensionId==="agent-tracker.agent-tracker"&&this.entry?.command===nativeToggle)event.stopImmediatePropagation();};for(const type of ["mouseover","focus"])this.container.addEventListener(type,stop,{capture:true});this._register({dispose:()=>{for(const type of ["mouseover","focus"])this.container.removeEventListener(type,stop,{capture:true});}});}`;
+    const old = source.replace(anchor, `${anchor}/*agent-tracker:statusbar-toggle:v${version}*/if(e.extensionId==="agent-tracker.agent-tracker"&&e.command?.id==="${patcher.command}"){e={...e,command:nativeToggle};${clickOnly}}/*agent-tracker:statusbar-toggle:end*/`);
     const oldProduct = JSON.stringify({ checksums: { 'vs/workbench/workbench.desktop.main.js': patcher.checksum(old), unrelated: 'unchanged' } });
     writeFileSync(`${files.target}.agent-tracker-toggle.bak`, source);
     writeFileSync(`${files.productPath}.agent-tracker-toggle.bak`, files.product);

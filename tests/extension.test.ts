@@ -9,6 +9,7 @@ type Command = string | { command: string; arguments?: unknown[] };
 type StatusItem = Disposable & {
   id: string; alignment: number; priority: number; text?: string; color?: string;
   tooltip?: string | import('vscode').MarkdownString;
+  accessibilityInformation?: { label: string; role?: string };
   command?: Command; visible: boolean; disposed: boolean; show(): void; hide(): void;
 };
 
@@ -172,6 +173,7 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     assert.equal(items[0].color, '#000000');
 
     assert.equal(items[0].command, 'agentTracker.toggleQuotaTooltip', 'the renderer uses this command to toggle the native card');
+    assert.equal(items[0].accessibilityInformation?.label, 'Claude: 5시간 - 77% 남음\nCodex: 5시간 - 77% 남음\n클릭하여 열기/닫기');
     await click(items[0].command);
     assert.deepEqual(externalCommands.at(-1), { command: 'workbench.action.showHover', arguments: [] }, 'an unpatched renderer can still open the focused hover');
     assert.equal(commands.has('agentTracker.toggleQuota'), false);
