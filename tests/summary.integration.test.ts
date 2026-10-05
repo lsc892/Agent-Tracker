@@ -282,6 +282,23 @@ test('an aborted subagent does not discard its successfully completed main reque
   const turns=database.queryTurns();assert.equal(turns.length,1);assert.equal(turns[0].status,'completed');assert.equal(turns[0].total_tokens,140);
 }));
 
+test('copied parent metadata preserves child lineage and only the verified inherited usage is removed',async () => fixture(async (database,options,root) => {
+  const codexOptions={...options,roots:[{provider:'codex' as const,path:root}]};
+  const inherited=[rootlessStart('inherited'),legacyUsage(100),
+    {type:'event_msg',payload:{type:'task_complete',turn_id:'inherited',duration_ms:1000}}];
+  await writeFile(join(root,'main.jsonl'),jsonl([codexMeta('main'),...inherited]));
+  const child=join(root,'child.jsonl');
+  await writeFile(child,jsonl([codexMeta('child','main','main'),codexMeta('main'),...inherited,
+    rootlessStart('own'),{type:'event_msg',payload:{type:'token_count',info:{total_token_usage:{input_tokens:140,output_tokens:0},last_token_usage:{input_tokens:40,output_tokens:0}}}},
+    {type:'event_msg',payload:{type:'task_complete',turn_id:'own',duration_ms:500}}]));
+  assert.equal((await refreshSummary(database,codexOptions)).failed,0);
+  const turns=database.queryTurns();assert.equal(turns.length,2);
+  assert.equal(turns.find(row=>row.session_id==='main')!.total_tokens,100);
+  const own=turns.find(row=>row.session_id==='child')!;assert.equal(own.root_turn_id,'own');assert.equal(own.total_tokens,40);
+  assert.equal(database.findManifest('codex',child)!.session_id,'child');
+  assert.ok(turns.every(row=>!row.quality_flags?.includes('missing-parent')));
+}));
+
 test('Codex lifecycle seconds produce correct calendar groups, date filters and derived durations',async () => fixture(async (database,options,root) => {
   const codexOptions={...options,roots:[{provider:'codex' as const,path:root}]};
   const started=Date.parse('2026-09-30T14:59:59Z');const completed=started+3000;

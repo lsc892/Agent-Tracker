@@ -27,17 +27,22 @@ export class CodexCurrentParserAdapter {
     if (row.type === 'session_meta') {
       const id = string(payload.id) ?? string(payload.thread_id);
       if (!id) throw new SummaryError('missing-session-id', offset);
+      // Forked rollouts can contain copied parent session_meta rows. The first identity owns this file.
+      if (this.identityValue && id !== this.identityValue.threadId) return;
       const source = object(payload.source ?? payload.thread_source);
       const subagent = object(source.subagent);
       const spawned = object(subagent.thread_spawn);
-      const parent = string(payload.parent_thread_id) ?? string(spawned.parent_thread_id) ?? null;
-      this.identityValue = { sessionId: string(payload.session_id) ?? string(payload.sessionId) ?? parent ?? id,
+      const parent = string(payload.parent_thread_id) ?? string(spawned.parent_thread_id) ?? this.identityValue?.parentThreadId ?? null;
+      const cwd = string(payload.cwd);
+      this.identityValue = { sessionId: string(payload.session_id) ?? string(payload.sessionId) ?? this.identityValue?.sessionId ?? parent ?? id,
         threadId: id, parentThreadId: parent, isMain: parent === null,
-        forkedFromId: string(payload.forked_from_id) ?? null,
-        sessionName: displayName(payload.thread_name) ?? displayName(payload.name) ?? displayName(payload.title),
-        ...project(string(payload.cwd) ?? this.context.sourceRoot) };
+        forkedFromId: string(payload.forked_from_id) ?? this.identityValue?.forkedFromId ?? null,
+        sessionName: displayName(payload.thread_name) ?? displayName(payload.name) ?? displayName(payload.title) ?? this.identityValue?.sessionName,
+        ...(cwd ? project(cwd) : this.identityValue
+          ? { projectKey: this.identityValue.projectKey, projectName: this.identityValue.projectName } : project(this.context.sourceRoot)),
+      };
       // A fork is not automatically a subagent; inherited history needs independently verified lineage.
-      if (payload.forked_from_id) this.forkMissing = true;
+      this.forkMissing = Boolean(this.identityValue.forkedFromId);
       return;
     }
     if (!this.identityValue) {

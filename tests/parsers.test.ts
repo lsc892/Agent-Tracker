@@ -107,3 +107,18 @@ test('a later explicit root keeps a Codex subagent attached despite rootless inh
   assert.equal(identity!.sessionId,'parent');assert.equal(identity!.isMain,false);assert.equal(identity!.parentThreadId,'parent');
   assert.equal(identity!.standaloneSubagent,undefined);
 });
+
+test('copied parent metadata cannot replace the child identity and partial own metadata retains lineage', () => {
+  let identity: ParsedIdentity | undefined;
+  const parser = new CodexCurrentParserAdapter({provider:'codex',path:'/sessions/child.jsonl',sourceRoot:'/sessions',fileId:1},
+    {identity:value=>{identity=value;},event:()=>undefined});
+  parser.row({type:'session_meta',payload:{id:'child',parent_thread_id:'parent',forked_from_id:'parent',cwd:'/child-project',name:'Child'}},0);
+  parser.row({type:'session_meta',payload:{id:'parent',cwd:'/parent-project',name:'Parent'}},1);
+  parser.row({type:'session_meta',payload:{id:'child',name:'Updated child'}},2);
+  parser.row({type:'event_msg',payload:{type:'task_started',turn_id:'child-turn',root_turn_id:'parent-turn'}},3);
+  parser.finish();
+  assert.equal(identity!.threadId,'child'); assert.equal(identity!.sessionId,'parent');
+  assert.equal(identity!.parentThreadId,'parent'); assert.equal(identity!.forkedFromId,'parent');
+  assert.equal(identity!.isMain,false); assert.equal(identity!.sessionName,'Updated child');
+  assert.equal(identity!.projectName,'child-project');
+});
