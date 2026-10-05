@@ -13,6 +13,9 @@ h2 { margin: 0; font-weight: 600; font-size: 19px; }
 h3 { font-size: 15px; }
 .eyebrow { color: var(--vscode-descriptionForeground); font-size: 10px; letter-spacing: 2px; }
 .muted { color: var(--vscode-descriptionForeground); }
+.name-filter { color: var(--vscode-textLink-foreground); background: none; padding: 0; text-align: left; }
+.name-filter:hover { background: none; text-decoration: underline; }
+.session-start { display: block; margin-top: 5px; font-size: 11px; }
 nav { display: flex; gap: 24px; border-bottom: 1px solid var(--vscode-panel-border); margin-bottom: 30px; }
 nav button { background: none; border-radius: 0; padding: 12px 0; border-bottom: 2px solid transparent; }
 nav button[aria-current=page] { border-bottom-color: var(--vscode-focusBorder); color: var(--vscode-foreground); }

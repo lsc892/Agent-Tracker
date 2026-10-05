@@ -29,3 +29,33 @@ test('webview uses external local assets, a nonce CSP, and text-only dynamic lab
   assert.doesNotThrow(() => new Script(source));
   assert.doesNotMatch(source, /\.innerHTML\s*=|insertAdjacentHTML/);
 });
+
+test('request table renders API failures separately from completed and running requests', () => {
+  class Element {
+    textContent = '';value = '';children: Element[] = [];
+    append(...children: Element[]): void {this.children.push(...children);}
+    replaceChildren(): void {this.children = [];}
+    setAttribute(): void {}
+    addEventListener(): void {}
+  }
+  const elements = new Map<string,Element>();
+  const getElement = (id: string): Element => {
+    if (!elements.has(id)) elements.set(id,new Element());
+    return elements.get(id)!;
+  };
+  getElement('group').value = 'turn';
+  let receive: ((event: {data:unknown})=>void) | undefined;
+  new Script(readFileSync(join(__dirname,'../../media/dashboard.js'),'utf8')).runInNewContext({
+    acquireVsCodeApi:()=>({getState:()=>undefined,setState:()=>undefined,postMessage:()=>undefined}),
+    document:{getElementById:getElement,createElement:()=>new Element(),querySelectorAll:()=>[]},
+    window:{addEventListener:(_name:string,listener:typeof receive)=>{receive=listener;}},
+  });
+  assert.ok(receive);
+  receive({data:{type:'usage',result:{groupBy:'turn',total:3,
+    rows:['completed','failed','in_progress'].map(status=>({provider:'claude',project_name:'Project',
+      root_turn_id:status,session_id:'session',started_at_ms:null,duration_ms:null,duration_quality:'missing',status})),
+    coverage:{files:1,done:1,error:0,interrupted:0,stale_summaries:0},
+  }}});
+  const rows = getElement('usage-table').children[0].children[1].children;
+  assert.deepEqual(rows.map(row=>row.children.at(-1)!.textContent),['완료 · missing','실패 · missing','진행 중 · missing']);
+});

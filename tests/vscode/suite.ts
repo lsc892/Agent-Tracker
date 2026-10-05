@@ -65,11 +65,12 @@ export async function run(): Promise<void> {
               check(document.getElementById('usage-table').textContent.includes('150'),'usage table renders total');
               check(document.getElementById('usage').hidden === false,'usage is the visible default tab');
               phase = 'turn'; document.getElementById('group').value = 'turn';
-              document.getElementById('session-id').value = 'ui-session';
+              document.getElementById('session-name').value = '통계 화면 검증';
               document.getElementById('usage-filters').requestSubmit();
             } else if (phase === 'turn' && message.type === 'usage' && message.result.groupBy === 'turn') {
               check(message.result.rows.length === 1 && message.result.rows[0].root_turn_id === 'ui-turn','request group and session filter are applied');
               check(document.getElementById('usage-table').textContent.includes('ui-turn'),'request identity is rendered');
+              check(document.getElementById('usage-table').textContent.includes('통계 화면 검증'),'session title is rendered');
               phase = 'empty'; document.getElementById('from-day').value = '2026-10-04';
               document.getElementById('usage-filters').requestSubmit();
             } else if (phase === 'empty' && message.type === 'usage') {

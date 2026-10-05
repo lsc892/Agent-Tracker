@@ -30,7 +30,7 @@ export function parseDashboardMessage(input: unknown): DashboardMessage | null {
       if (!['day', 'month', 'project', 'session', 'all', 'turn'].includes(String(groupBy))) return null;
       const query: UsageQuery = { groupBy: groupBy as UsageQuery['groupBy'], limit: 100, offset: boundedOffset(raw.offset) };
       if (raw.provider === 'claude' || raw.provider === 'codex') query.provider = raw.provider;
-      for (const key of ['projectKey', 'sessionId'] as const) if (typeof raw[key] === 'string' && raw[key].length <= 2048 && raw[key]) query[key] = raw[key];
+      for (const key of ['projectKey', 'sessionId', 'projectName', 'sessionName'] as const) if (typeof raw[key] === 'string' && raw[key].length <= 2048 && raw[key]) query[key] = raw[key];
       for (const key of ['fromMs', 'toMs'] as const) if (typeof raw[key] === 'number' && Number.isSafeInteger(raw[key]) && Math.abs(raw[key]) <= 8.64e15) query[key] = raw[key];
       const message: DashboardMessage = { type: 'queryUsage', query };
       for (const key of ['fromDay', 'toDay'] as const) if (typeof raw[key] === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw[key])) message[key] = raw[key];

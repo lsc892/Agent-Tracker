@@ -14,6 +14,7 @@ async function main() {
   await mkdir(join(userData, 'User'), { recursive: true });
   await mkdir(source, { recursive: true });
   const fixture = [
+    { type: 'ai-title', sessionId: 'ui-session', aiTitle: '통계 화면 검증' },
     { type: 'user', sessionId: 'ui-session', promptId: 'ui-turn', timestamp: '2026-10-03T00:00:00Z', cwd: '/synthetic/project', message: { content: 'synthetic request' } },
     { type: 'assistant', promptId: 'ui-turn', requestId: 'ui-request', timestamp: '2026-10-03T00:00:03Z', message: { id: 'ui-response', stop_reason: 'end_turn', usage: { input_tokens: 100, output_tokens: 50 } } },
   ];

@@ -5,11 +5,24 @@
   const send = message => vscode.postMessage(message);
   const number = value => value === null || value === undefined ? '—' : new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 1 }).format(value);
   const duration = value => value === null || value === undefined ? '—' : value < 1000 ? `${number(value)} ms` : `${number(value / 1000)}초`;
+  const tokenHeaders = [
+    { label: 'Input', title: '캐시 읽기·쓰기를 제외한 입력 토큰' },
+    { label: 'Output', title: '생성한 출력 토큰' },
+    { label: 'Cache Write', title: '새 캐시를 생성하며 기록한 입력 토큰' },
+    { label: 'Cache Read', title: '기존 캐시에서 재사용한 입력 토큰' },
+  ];
+  const tokenValues = row => [
+    number(row.input_tokens == null || row.cache_write_input_tokens == null || row.cache_read_input_tokens == null
+      ? null : Math.max(0, row.input_tokens - row.cache_write_input_tokens - row.cache_read_input_tokens)),
+    number(row.output_tokens), number(row.cache_write_input_tokens), number(row.cache_read_input_tokens),
+  ];
   let timezone;
   const date = value => value === null || value === undefined ? '알 수 없음' : new Intl.DateTimeFormat('ko-KR', { dateStyle: 'short', timeStyle: 'medium', timeZone: timezone }).format(new Date(value));
   let offset = 0;
   let diagnosticOffset = 0;
   let latestUsage;
+  let selectedProject;
+  let selectedSession;
   const saved = vscode.getState();
   if (saved && ['day', 'month', 'project', 'session', 'turn', 'all'].includes(saved.group)) $('group').value = saved.group;
 
@@ -32,8 +45,10 @@
   function query() {
     const request = { groupBy: $('group').value, offset };
     if ($('provider').value) request.provider = $('provider').value;
-    if ($('project-key').value.trim()) request.projectKey = $('project-key').value.trim();
-    if ($('session-id').value.trim()) request.sessionId = $('session-id').value.trim();
+    if (selectedProject) request.projectKey = selectedProject;
+    else if ($('project-name').value.trim()) request.projectName = $('project-name').value.trim();
+    if (selectedSession) request.sessionId = selectedSession;
+    else if ($('session-name').value.trim()) request.sessionName = $('session-name').value.trim();
     if ($('from-day').value) request.fromDay = $('from-day').value;
     if ($('to-day').value) request.toDay = $('to-day').value;
     send({ type: 'queryUsage', query: request });
@@ -45,29 +60,67 @@
     const node = element('table');
     const head = element('thead');
     const tr = element('tr');
-    for (const header of headers) tr.append(element('th', header));
+    for (const header of headers) {
+      const cell = element('th', typeof header === 'string' ? header : header.label);
+      cell.setAttribute('scope', 'col');
+      if (typeof header !== 'string') cell.title = header.title;
+      tr.append(cell);
+    }
     head.append(tr);
     node.append(head);
     const body = element('tbody');
     for (const values of rows) {
       const row = element('tr');
-      for (const value of values) row.append(element('td', value ?? '—'));
+      for (const value of values) {
+        const cell = element('td');
+        if (value && typeof value === 'object') cell.append(value);
+        else cell.textContent = String(value ?? '—');
+        row.append(cell);
+      }
       body.append(row);
     }
     node.append(body);
     target.append(node);
+  }
+  function projectLabel(row) {
+    const node = element('button', row.project_name || '이름 없는 프로젝트', 'name-filter');
+    node.type = 'button';
+    node.title = row.project_key || '';
+    node.addEventListener('click', () => {
+      selectedProject = row.project_key;
+      selectedSession = undefined;
+      $('project-name').value = row.project_name || '';
+      $('session-name').value = '';
+      offset = 0; query();
+    });
+    return node;
+  }
+  function sessionLabel(row, request = false) {
+    const node = element('button', `${request ? `${row.root_turn_id} / ` : `${row.project_name || '이름 없는 프로젝트'} / `}${row.session_name || '이름 없는 세션'}`, 'name-filter');
+    node.type = 'button';
+    node.title = `${row.project_key || ''}\n세션 ID: ${row.session_id}`;
+    if (!request) node.append(element('span', date(row.session_started_at_ms), 'muted session-start'));
+    node.addEventListener('click', () => {
+      selectedProject = row.project_key;
+      selectedSession = row.session_id;
+      $('project-name').value = row.project_name || '';
+      $('session-name').value = row.session_name || '';
+      $('provider').value = row.provider;
+      offset = 0; query();
+    });
+    return node;
   }
   function renderUsage(result) {
     latestUsage = result;
     const turn = result.groupBy === 'turn';
     const rows = result.rows;
     if (turn) {
-      table($('usage-table'), ['제공자 / 프로젝트', '요청 / 세션', '시작 시각', '입력', '출력', '총 토큰', '소요 시간', '상태 / 품질'], rows.map(row => [
-        `${row.provider} / ${row.project_name}`, `${row.root_turn_id} / ${row.session_id}`, date(row.started_at_ms), number(row.input_tokens), number(row.output_tokens), number(row.total_tokens), duration(row.duration_ms), `${row.status === 'completed' ? '완료' : '진행 중'} · ${row.duration_quality}${row.quality_flags ? ` · ${row.quality_flags}` : ''}${row.last_error ? ` · 이전 값: ${row.last_error}` : ''}`,
+      table($('usage-table'), ['제공자 / 프로젝트', '요청 / 세션', '시작 시각', ...tokenHeaders, '총 토큰', '소요 시간', '상태 / 품질'], rows.map(row => [
+        `${row.provider} / ${row.project_name}`, sessionLabel(row, true), date(row.started_at_ms), ...tokenValues(row), number(row.total_tokens), duration(row.duration_ms), `${row.status === 'completed' ? '완료' : row.status === 'failed' ? '실패' : '진행 중'} · ${row.duration_quality}${row.quality_flags ? ` · ${row.quality_flags}` : ''}${row.last_error ? ` · 이전 값: ${row.last_error}` : ''}`,
       ]));
     } else {
-      table($('usage-table'), ['제공자', '기간 / 프로젝트 / 세션', '입력', '출력', '총 토큰', '완료 / 전체 요청', '평균 토큰', '평균 시간 / 표본'], rows.map(row => [
-        row.provider, row.period ?? row.session_id ?? (row.project_name ? `${row.project_name} (${row.project_key})` : ['day', 'month'].includes(result.groupBy) ? '시각 미상' : '전체'), number(row.input_tokens), number(row.output_tokens), number(row.total_tokens), `${number(row.completed_turns)} / ${number(row.turn_count)}`, number(row.avg_tokens_per_turn), `${duration(row.avg_duration_ms)} / ${number(row.turns_with_duration)}개`,
+      table($('usage-table'), ['제공자', '기간 / 프로젝트 / 세션', ...tokenHeaders, '총 토큰', '완료 / 전체 요청', '평균 토큰', '평균 시간 / 표본'], rows.map(row => [
+        row.provider, row.period ?? (row.session_id ? sessionLabel(row) : row.project_key ? projectLabel(row) : ['day', 'month'].includes(result.groupBy) ? '시각 미상' : '전체'), ...tokenValues(row), number(row.total_tokens), `${number(row.completed_turns)} / ${number(row.turn_count)}`, number(row.avg_tokens_per_turn), `${duration(row.avg_duration_ms)} / ${number(row.turns_with_duration)}개`,
       ]));
     }
     $('previous').disabled = offset === 0;
@@ -90,6 +143,9 @@
   $('settings').addEventListener('click', () => send({ type: 'settings' }));
   $('cancel-usage').addEventListener('click', () => send({ type: 'cancelUsage' }));
   $('usage-filters').addEventListener('submit', event => { event.preventDefault(); offset = 0; query(); });
+  $('project-name').addEventListener('input', () => { selectedProject = undefined; selectedSession = undefined; });
+  $('session-name').addEventListener('input', () => { selectedSession = undefined; });
+  $('provider').addEventListener('change', () => { selectedSession = undefined; });
   $('previous').addEventListener('click', () => { offset = Math.max(0, offset - 100); query(); });
   $('next').addEventListener('click', () => { offset += 100; query(); });
   const diagnostics = () => send({ type: 'diagnostics', offset: diagnosticOffset });
@@ -107,7 +163,7 @@
         $('configuration-warning').hidden = !message.timezoneWarning;
         if (Array.isArray(message.providers)) {
           for (const option of $('provider').options) option.disabled = Boolean(option.value) && !message.providers.includes(option.value);
-          if ($('provider').selectedOptions[0]?.disabled) { $('provider').value = ''; offset = 0; query(); }
+          if ($('provider').selectedOptions[0]?.disabled) { $('provider').value = ''; selectedSession = undefined; offset = 0; query(); }
         }
         if (latestUsage) renderUsage(latestUsage);
         break;
