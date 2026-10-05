@@ -30,6 +30,11 @@ export class Dashboard implements vscode.Disposable {
   }
 
   open(tab: DashboardTab = 'usage'): void {
+    if (!this.dependencies.settings().usageEnabled) {
+      void vscode.window.showInformationMessage('사용량 통계가 꺼져 있습니다. Agent Tracker 설정에서 켤 수 있습니다.');
+      void vscode.commands.executeCommand('agentTracker.openSettings');
+      return;
+    }
     this.tab = tab;
     if (this.panel) {
       this.panel.reveal(vscode.ViewColumn.Active);
@@ -66,6 +71,7 @@ export class Dashboard implements vscode.Disposable {
   dispose(): void { this.unsubscribe(); this.close(); }
 
   private async handle(message: NonNullable<ReturnType<typeof parseDashboardMessage>>): Promise<void> {
+    if (!this.dependencies.settings().usageEnabled) return;
     switch (message.type) {
       case 'ready': if (!this.ready) { this.ready = true; this.navigate(); } break;
       case 'tab': this.tab = message.tab; if (this.tab === 'usage') await this.loadUsage(); else if (this.tab === 'diagnostics') await this.loadDiagnostics(0); break;
@@ -85,6 +91,7 @@ export class Dashboard implements vscode.Disposable {
   }
 
   private async refreshUsage(): Promise<void> {
+    if (!this.dependencies.settings().usageEnabled) return;
     this.post({ type: 'busy', busy: true });
     if (this.refreshPromise) return this.refreshPromise;
     this.refreshPromise = (async () => {
@@ -101,6 +108,7 @@ export class Dashboard implements vscode.Disposable {
   }
 
   private async loadUsage(): Promise<void> {
+    if (!this.dependencies.settings().usageEnabled) return;
     const version = ++this.queryVersion;
     const timezone = this.dependencies.settings().timezone;
     const query = { ...this.query, timezone, providers: this.providers() };
@@ -112,6 +120,7 @@ export class Dashboard implements vscode.Disposable {
   }
 
   private async loadDiagnostics(offset: number): Promise<void> {
+    if (!this.dependencies.settings().usageEnabled) return;
     const version = ++this.diagnosticsVersion;
     this.update();
     const result = await this.dependencies.summary.diagnostics({ limit: 100, offset, providers: this.providers() });

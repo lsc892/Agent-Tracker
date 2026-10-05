@@ -13,11 +13,13 @@ test('quota polling uses one common interval setting', () => {
 
 test('tracking switches exclude source roots independently of status visibility', () => {
   const defaults = readConfiguration(settings({}));
+  assert.equal(defaults.usageEnabled, true);
   assert.equal(defaults.refreshPolicy, 'automatic');
   for (const provider of ['claude', 'codex'] as const) {
-    const config = readConfiguration(settings({ [`${provider}.enabled`]: false, 'quota.refreshPolicy': 'manual' }));
+    const config = readConfiguration(settings({ [`${provider}.enabled`]: false, 'usage.enabled': false, 'quota.refreshPolicy': 'manual' }));
     assert.equal(config[provider].enabled, false);
     assert.ok(config.roots.length > 0 && config.roots.every(root => root.provider !== provider));
+    assert.equal(config.usageEnabled, false);
     assert.equal(config.refreshPolicy, 'manual');
   }
   assert.equal(readConfiguration(settings({'codex.showStatusBar': false})).codex.enabled, true);

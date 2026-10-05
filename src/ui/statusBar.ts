@@ -5,7 +5,7 @@ import { quotaHoverSummary, statusBarPresentation } from './statusBarPresentatio
 import { createQuotaTooltip } from './quotaTooltip';
 export { statusBarPresentation, remainingBar } from './statusBarPresentation';
 
-type StatusSettings = Pick<TrackerConfiguration, 'percentage' | 'detail' | 'claude' | 'codex'>;
+type StatusSettings = Pick<TrackerConfiguration, 'percentage' | 'detail' | 'claude' | 'codex' | 'usageEnabled'>;
 
 /** One quota card with native click pinning, followed by its refresh button. */
 export class QuotaStatusBar implements vscode.Disposable {

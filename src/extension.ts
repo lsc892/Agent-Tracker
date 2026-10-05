@@ -50,6 +50,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       if (provider !== 'claude' && provider !== 'codex') return;
       await vscode.commands.executeCommand('extension.open', provider === 'claude' ? 'anthropic.claude-code' : 'openai.chatgpt');
     }),
+    vscode.commands.registerCommand('agentTracker.openSettings', () => vscode.commands.executeCommand('workbench.action.openSettings', '@ext:agent-tracker.agent-tracker')),
     vscode.commands.registerCommand('agentTracker.clearUsageData', () => {
       clearingData ??= (async () => {
         await configurationQueue;
@@ -77,7 +78,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         const previous = settings;
         settings = readConfiguration(vscode.workspace.getConfiguration('agentTracker'));
         const changedTracking = previous.claude.enabled !== settings.claude.enabled || previous.codex.enabled !== settings.codex.enabled;
-        if (JSON.stringify(previous.roots) !== JSON.stringify(settings.roots)) {
+        if (previous.usageEnabled !== settings.usageEnabled || JSON.stringify(previous.roots) !== JSON.stringify(settings.roots)) {
           dashboard.close();
           await summary.cancelRefresh();
           if (disposed) return;
@@ -110,7 +111,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   render();
   quota.start(vscode.window.state.focused);
   // Initializes only the two-table schema. Transcript scans are exclusively requested by Usage.
-  void summary.initialize().catch(() => { /* Usage/Diagnostics reports the initialization failure when opened. */ });
+  if (settings.usageEnabled) void summary.initialize().catch(() => { /* Usage/Diagnostics reports the initialization failure when opened. */ });
 }
 
 export async function deactivate(): Promise<void> {

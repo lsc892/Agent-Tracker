@@ -25,7 +25,7 @@ function resetText(window: QuotaWindow, now: number): string {
 /** Quota labels remain plain text even though the tooltip allows our command links. */
 export function createQuotaTooltip(
   states: readonly QuotaState[],
-  settings: Pick<TrackerConfiguration, 'percentage' | 'detail'>,
+  settings: Pick<TrackerConfiguration, 'percentage' | 'detail'> & Partial<Pick<TrackerConfiguration, 'usageEnabled'>>,
   now = Date.now(),
 ): vscode.MarkdownString {
   const tooltip = new vscode.MarkdownString();
@@ -76,6 +76,6 @@ export function createQuotaTooltip(
     if (!state.refreshing) tooltip.appendMarkdown(`${commandLink('새로고침', refresh)} · `);
     tooltip.appendMarkdown(commandLink('확장 관리', 'agentTracker.manageProvider', [provider]));
   }
-  tooltip.appendMarkdown(`\n\n---\n\n${commandLink('$(graph) 사용량 통계', 'agentTracker.openUsage')}`);
+  tooltip.appendMarkdown(`\n\n---\n\n${settings.usageEnabled === false ? '$(graph) 사용량 통계 (꺼짐)' : commandLink('$(graph) 사용량 통계', 'agentTracker.openUsage')}`);
   return tooltip;
 }
