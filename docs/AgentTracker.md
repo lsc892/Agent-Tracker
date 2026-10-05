@@ -275,7 +275,7 @@ response별 증분 상태를 영속화하지 않으므로 append도 tail만 더�
 **처리 절차**:
 
 1. 디렉터리를 iterator로 순회하고 metadata 발견·manifest 조회·방문 기록은 최대 n개씩 처리한다. 초기 n은 256이며 byte 예산에 먼저 도달하면 더 작은 묶음으로 처리한다.
-2. session의 원본 파일 목록과 staging 결과도 page 단위로 읽는다. 파일 본문은 스트리밍으로 읽고 parser/row buffer에 byte 한도를 둔다.
+2. session의 원본 파일 목록과 staging 결과도 page 단위로 읽는다. 파일 본문은 스트리밍으로 읽고 parser/row buffer에 byte 한도를 둔다. `data:image/...;base64,` 문자열은 헤더와 JSON 경계만 보존하고 이미지 본문은 버린다. 기본 4MiB 줄 예산은 보존하는 JSON에 적용하며, 오류 위치는 원래 파일의 byte offset을 사용한다. 버리는 문자열의 escape·제어 문자도 검증하고 newline 없는 마지막 줄은 보류한다.
 3. 변경·삭제·session 귀속 목록, response 중복 제거와 agent 연결, turn 합산 결과는 임시 디스크 staging에 기록한다.
 4. 다음 묶음은 현재 묶음의 처리가 진행된 만큼만 받아 대기열이 무제한으로 늘어나지 않도록 한다.
 5. 파일 읽기·파싱·집계가 끝난 뒤 결과 반영에만 write transaction을 사용한다. 한 session의 결과를 여러 묶음으로 읽어 쓰더라도 COMMIT은 그 반영 단위가 완성됐을 때 수행한다.
