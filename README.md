@@ -15,15 +15,25 @@ npm ci
 npm run build
 ```
 
-상태 표시줄의 Claude·Codex 통합 버튼을 누르면 하단 사용량 패널을 열고 닫습니다. `상세`/`압축`은 상태 표시줄의 표시량을 바꾸며, 상세는 7일·5시간 사용량을, 압축은 5시간 사용량만 표시합니다. 사용량 패널은 두 모드 모두 Claude·Codex의 모든 정보를 표시합니다. 각 제공자 오른쪽 화살표로 해당 확장 관리 화면을 엽니다. 패널의 `사용량 통계`를 누르면 통계 Webview가 열립니다. 명령 팔레트의 `Agent Tracker: 대시보드 열기` 또는 `Agent Tracker: 사용 통계 열기`로도 통계에 진입할 수 있습니다.
+아래의 로컬 VS Code 패치를 적용하면 상태 표시줄의 Claude·Codex 사용량 항목을 **클릭해 바로 위에 카드를 열고, 다시 클릭해 닫습니다.** 마우스를 올리는 것만으로는 열리지 않으며 열린 카드는 마우스를 옮겨도 유지됩니다. 바깥 클릭이나 Esc로도 닫습니다. 카드에는 모든 quota 기간의 사용률·잔량·초기화 시간, 조회 상태와 마지막 갱신 시각이 나옵니다. `상세`/`압축` 링크는 상태 표시줄의 표시량을 바꾸며, 상세는 7일·5시간 사용량을, 압축은 5시간 사용량만 표시합니다. 툴팁은 두 모드 모두 모든 quota 기간을 표시합니다. 각 제공자의 `확장 관리` 링크로 관리 화면을 열고, `사용량 통계` 링크로 통계 Webview를 엽니다. 명령 팔레트의 `Agent Tracker: 대시보드 열기` 또는 `Agent Tracker: 사용 통계 열기`로도 통계에 진입할 수 있습니다.
 
-오른쪽 새로고침 버튼과 사용량 패널의 새로고침 버튼은 Claude·Codex의 현재 quota만 조회합니다. 계정 관리 메뉴는 제공하지 않습니다. 로고 SVG와 상태줄용 아이콘 폰트는 `resource/icon`에 포함됩니다.
+오른쪽 새로고침 버튼과 툴팁의 새로고침 링크는 현재 quota만 조회합니다. 제공자별 새로고침 링크는 해당 제공자만 조회합니다. 조회 중인 링크는 갱신 상태 문구로 바뀝니다. 로고 SVG와 상태줄·툴팁용 아이콘 폰트는 `resource/icon`에 포함됩니다.
 
 VSIX를 만들려면 다음 명령을 사용합니다. 생성된 `agent-tracker-0.1.0.vsix`를 VS Code의 **Extensions: Install from VSIX...**로 설치합니다.
 
 ```sh
 npm run package
 ```
+
+클릭 토글은 VS Code 내부의 `ToggleTooltipCommand`에 연결하므로 VSIX 설치와 별도로 로컬 workbench 패치가 필요합니다. 저장소 루트에서 다음 명령을 실행하고 **모든 VS Code 창을 종료한 뒤 다시 실행하세요.** 창 새로고침만으로는 메인 프로세스가 가진 이전 checksum 기준값이 갱신되지 않아 설치 손상 경고가 남을 수 있습니다. 일반 빌드나 확장 활성화에서는 VS Code 설치 파일을 수정하지 않습니다.
+
+```sh
+npm run patch:vscode
+npm run patch:vscode -- --check # 적용 확인
+npm run restore:vscode         # 원본 복원
+```
+
+패치는 원본과 무결성 정보를 백업하고 Agent Tracker의 해당 클릭 명령만 내부 토글 객체로 연결합니다. 사용량 카드의 자동 마우스·포커스 열기도 차단하며 다른 항목의 호버는 유지합니다. 이전 토글 패치는 원본 백업을 유지하며 클릭 전용으로 갱신합니다. VS Code 1.140.0에서 실제 호버 억제와 클릭을 검증했습니다. VS Code 업데이트 뒤에는 패치를 다시 적용해야 하며, 지원하지 않는 내부 구조이면 적용을 중단합니다. Windows 기본 설치는 환경 변수와 현재 CLI에서 찾으며, 다른 설치는 `--cli <code.cmd 경로>`, `--executable <실행 파일>` 또는 `--app-root <resources/app 경로>`로 지정합니다. 패치가 없는 환경에서는 VS Code의 기본 마우스 호버와 클릭 열기 경로를 사용합니다.
 
 ## 로그인과 경로
 
@@ -46,7 +56,7 @@ Windows의 npm Codex 설치는 `.cmd` 옆 패키지에서 네이티브 실행 �
 
 ## 데이터 처리
 
-활성화 시 SQLite schema만 준비하고 quota를 조회합니다. JSONL 스캔은 사용량 통계에 진입할 때만 시작합니다. quota 열기·닫기와 새로고침, 통계 내부 탭·날짜·시간대·그룹·페이지 변경은 스캔을 시작하지 않습니다. 비활성 창에서는 quota 자동 조회를 생략합니다.
+활성화 시 SQLite schema만 준비하고 quota를 조회합니다. JSONL 스캔은 사용량 통계에 진입할 때만 시작합니다. quota 툴팁 표시·카운트다운·새로고침·상세/압축 변경, 통계 내부 탭·날짜·시간대·그룹·페이지 변경은 스캔을 시작하지 않습니다. 비활성 창에서는 quota 자동 조회를 생략합니다.
 
 SQLite는 확장 `globalStorageUri`의 `agent-tracker.sqlite`에 저장됩니다. 영속 테이블은 `manifest`, `turn_summary` 두 개입니다. 변경된 세션은 원본 전체를 다시 읽어 중복 응답을 제거하고 교체하며, 변화가 없는 세션은 본문을 읽지 않습니다. 하위 에이전트의 토큰은 부모 요청에 더하고 시간은 부모 요청 값만 사용합니다.
 
@@ -63,6 +73,7 @@ Codex 하위 에이전트 파일 전체에 `root_turn_id`가 없는 구형 로�
 ```sh
 npm run check       # 타입 검사, lint, fixture/worker/process/UI 연결 테스트
 npm run test:vscode # 격리된 실제 VS Code에서 light/dark Webview 동작 검증
+npm run test:toggle # 패치된 로컬 VS Code에서 실제 클릭·유지·닫기 검증
 npm run benchmark   # 합성 파일 301개 + 큰 세션 2,000개 요청
 npm run benchmark:quota # 합성 App Server 성공/오류/timeout/취소의 시간·메모리·종료 검증
 ```
@@ -71,11 +82,13 @@ npm run benchmark:quota # 합성 App Server 성공/오류/timeout/취소의 시�
 
 `test:vscode`는 별도 프로필과 합성 로그를 `.vscode-test/`에 만듭니다. Windows에서는 설치된 VS Code를 우선 사용하고, 그 외에는 테스트용 VS Code를 다운로드합니다. `VSCODE_TEST_VERSION`으로 다운로드 버전을, `VSCODE_EXECUTABLE`로 실행 파일을 지정할 수 있습니다. Linux의 화면 없는 환경에서는 `xvfb-run -a npm run test:vscode`를 실행합니다. 결과는 `test-results/vscode-smoke.json`에 기록합니다.
 
+`test:toggle`은 패치가 적용된 설치를 읽기 전용으로 확인하고 격리된 창에서 실제 마우스 이동·클릭과 Esc를 보냅니다. hover 지연을 100ms로 설정하고 1.5초 동안 관찰해 마우스를 올려도 열리지 않는지, 클릭으로 닫은 뒤 재호버해도 닫힌 상태를 유지하는지 검증합니다. 결과와 화면은 `test-results/statusbar-toggle.json`, `statusbar-toggle.png`에 기록합니다.
+
 PR CI는 Windows·Linux·macOS, Node 22·24의 단위·통합 테스트와 Linux의 최소 지원 VS Code 1.101.0·stable 실제 확장 호스트 테스트를 구성했습니다. 버전 tag는 검증을 거쳐 VSIX artifact를 만들며 Marketplace 게시 단계는 포함하지 않습니다.
 
 ## 현재 제약
 
-- VS Code 공개 API는 상태 표시줄에 붙는 클릭형 Webview 팝업을 제공하지 않아, 같은 내용을 하단 패널의 토글 UI로 표시합니다. 상태줄은 SVG 원본에서 만든 폰트 아이콘을 쓰며 단일 항목 전체에 밝은 테마는 검정, 어두운 테마는 흰색을 적용합니다. 사용량 패널의 Claude SVG는 원래 주황색입니다. 막대는 남은 잔량을 표시하며, 숫자는 `display.percentage` 설정을 따릅니다.
+- 사용량 카드는 `StatusBarItem.tooltip`과 `MarkdownString`을 사용합니다. 클릭 토글에는 로컬 VS Code 패치가 필요하며 드래그 이동은 제공하지 않습니다. 카드의 위치·크기·테마는 VS Code가 결정합니다. 상태줄은 SVG 원본에서 만든 폰트 아이콘을 쓰며 단일 항목 전체에 밝은 테마는 검정, 어두운 테마는 흰색을 적용합니다. 막대는 남은 잔량을 표시하며, 숫자는 `display.percentage` 설정을 따릅니다. API 조사와 구현 지점은 [상태표시줄 팝업 문서](docs/StatusBarPopup.md)를 참고하세요.
 - Claude OAuth usage는 비공개 endpoint입니다. 401이면 CLI가 보관한 credential을 한 번 다시 읽고, 계속 실패하면 CLI 재로그인을 안내합니다. refresh token을 직접 교체하지 않습니다.
 - 로컬 JSONL은 제공자의 안정된 API 계약이 아닙니다. 확인할 수 없는 부모 관계나 요청은 임의로 합산하지 않고 Diagnostics에 표시합니다. fork 이력은 부모와 일치하는 순차 legacy prefix만 제외합니다.
 - 로컬 Codex 실제 quota 조회와 조회 후 프로세스 종료를 확인했습니다. Claude 실제 조회는 인증 오류여서 Claude Code 재로그인 후 확인이 필요합니다. 실제 VS Code light/dark 테마의 탭·필터·표시 동작은 자동 검증하며, 화면 가독성과 원격 환경은 수동 검증 대상입니다. 자동 테스트는 합성 fixture와 대체 App Server 프로세스를 사용합니다.

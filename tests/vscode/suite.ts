@@ -5,7 +5,7 @@ import { join, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import * as vscode from 'vscode';
 
-interface SmokeReport { type: 'smoke-report'; ok: boolean; detail: string; stage: 'quota' | 'usage'; theme: string }
+interface SmokeReport { type: 'smoke-report'; ok: boolean; detail: string; stage: 'usage'; theme: string }
 
 /** Runs in a real Extension Development Host; the ordinary node:test suite skips this file. */
 export async function run(): Promise<void> {
@@ -14,38 +14,25 @@ export async function run(): Promise<void> {
   assert.ok(extension, 'Extension is discoverable by VS Code');
   const htmlModule = require(join(extensionRoot, 'dist/src/ui/html')) as typeof import('../../src/ui/html');
   const protocol = require(join(extensionRoot, 'dist/src/ui/presentation')) as typeof import('../../src/ui/presentation');
-  const quotaModule = require(join(extensionRoot, 'dist/src/ui/quotaViewPresentation')) as typeof import('../../src/ui/quotaViewPresentation');
+  const tooltipModule = require(join(extensionRoot, 'dist/src/ui/quotaTooltip')) as typeof import('../../src/ui/quotaTooltip');
   const summaryModule = require(join(extensionRoot, 'dist/src/summary/client')) as typeof import('../../src/summary/client');
   const originalHtml = htmlModule.dashboardHtml;
   const originalParser = protocol.parseDashboardMessage;
-  const originalQuotaHtml = quotaModule.quotaHtml;
-  const originalQuotaParser = quotaModule.parseQuotaMessage;
+  const originalTooltip = tooltipModule.createQuotaTooltip;
+  let currentTooltip: vscode.MarkdownString | undefined;
   const originalRefresh = summaryModule.SummaryClient.prototype.refresh;
   let onReport: ((message: SmokeReport) => void) | undefined;
   let expectedTheme = 'vscode-dark';
   let expectTimezoneWarning = false;
   let scanCount = 0;
-  let refreshClicks = 0;
-  let usageClicks = 0;
-  const managedProviders = new Set<string>();
-  const detailModes = new Set<string>();
   const isReport = (raw: unknown): raw is SmokeReport => Boolean(raw && typeof raw === 'object' && (raw as { type?: string }).type === 'smoke-report');
   protocol.parseDashboardMessage = (raw: unknown) => {
     if (isReport(raw)) { onReport?.(raw); return null; }
     return originalParser(raw);
   };
-  quotaModule.parseQuotaMessage = (raw: unknown) => {
-    if (isReport(raw)) { onReport?.(raw); return null; }
-    const message = originalQuotaParser(raw);
-    if (message?.type === 'manage') {
-      // Exercise the actual button and allowlist without leaving the quota view for the marketplace.
-      managedProviders.add(message.provider);
-      return null;
-    }
-    if (message?.type === 'detail') detailModes.add(message.detail);
-    if (message?.type === 'refreshQuota') refreshClicks++;
-    if (message?.type === 'openUsage') usageClicks++;
-    return message;
+  tooltipModule.createQuotaTooltip = (...args) => {
+    currentTooltip = originalTooltip(...args);
+    return currentTooltip;
   };
   summaryModule.SummaryClient.prototype.refresh = function (...args: Parameters<typeof originalRefresh>) {
     scanCount++;
@@ -58,90 +45,6 @@ export async function run(): Promise<void> {
     return html.replace(/<script nonce="[^"]+" src="[^"]+"><\/script>/,
       () => `<script nonce="${nonce}">${script}</script><script nonce="${nonce}">${driver}</script>`);
   };
-  quotaModule.quotaHtml = assets => {
-    const driver = `
-      (() => {
-        let phase = 'idle';
-        let testedTheme;
-        let theme;
-        let sawRefreshing = false;
-        const report = (ok, detail) => window.dispatchEvent(new CustomEvent('tracker-smoke-report', {detail:{type:'smoke-report',stage:'quota',theme,ok,detail}}));
-        const check = (condition, detail) => { if (!condition) throw new Error(detail); };
-        window.addEventListener('error', event => report(false,event.message));
-        window.addEventListener('message', event => {
-          try {
-            const message = event.data;
-            if (message.type !== 'quota') return;
-            const visibleTheme = document.body.classList.contains('vscode-light') ? 'vscode-light' : 'vscode-dark';
-            if ((phase === 'idle' || phase === 'complete') && visibleTheme !== testedTheme && !message.states.some(state => state.refreshing)) {
-              phase = 'checking'; theme = visibleTheme; testedTheme = theme;
-              check(document.body.classList.contains(theme),'VS Code theme class is applied to quota');
-              check(document.querySelectorAll('.provider').length === 2,'two provider cards rendered');
-              check(document.querySelector('#provider-claude .availability').textContent === '조회 불가','Claude unavailable label is correct');
-              check(document.querySelector('#provider-codex .availability').textContent === '조회 불가','Codex unavailable label is correct');
-              check(!document.querySelector('main').textContent.includes('모든 에이전트') && !document.querySelector('main').textContent.includes('계정 관리'),'removed quota controls are absent');
-              check(getComputedStyle(document.querySelector('.quota-panel')).borderRadius === '14px','quota stylesheet is loaded');
-              const filter = getComputedStyle(document.querySelector('.codex-icon')).filter;
-              check(filter.includes('brightness(0)') && (theme === 'vscode-dark' ? filter.includes('invert(1)') : !filter.includes('invert(1)')),'Codex icon switches white/black with the theme');
-              const originalNow = Date.now;
-              const now = originalNow();
-              const emit = data => window.dispatchEvent(new MessageEvent('message', {data}));
-              try {
-                const windows = [
-                  {id:'five-hour',label:'5h',usedPercent:42,current:42,maximum:100,resetsAt:now+90000,windowDurationMins:300},
-                  {id:'weekly',label:'7d',usedPercent:75,current:75,maximum:100,resetsAt:now+3600000,windowDurationMins:10080}
-                ];
-                const state = {...message,percentage:'used',detail:'detailed',states:[
-                  {provider:'codex',status:'ready',snapshot:{provider:'codex',fetchedAt:now,windows},refreshing:false,error:null,lastSuccessAt:now},
-                  {provider:'claude',status:'ready',snapshot:{provider:'claude',fetchedAt:now,windows},refreshing:false,error:null,lastSuccessAt:now}
-                ]};
-                emit(state);
-                const manage = document.querySelector('#provider-codex .manage');
-                manage.focus(); emit(state);
-                check(document.activeElement === manage,'quota updates preserve focused management action');
-                check(document.querySelectorAll('#provider-codex progress').length === 2,'detailed quota shows both windows');
-                check(document.querySelectorAll('#provider-claude progress').length === 2,'Claude quota shows both windows');
-                check(document.querySelector('.display-options-label').textContent === '상태 표시줄','detail controls identify the status bar as their target');
-                check(document.querySelector('#provider-codex progress').value === 58,'quota slider displays remaining percentage');
-                const countdown = document.querySelector('#provider-codex .availability');
-                const before = countdown.textContent;
-                Date.now = () => now + 61000; window.trackerCountdownTick();
-                check(countdown.textContent !== before,'countdown advances while management action has focus');
-                check(document.activeElement === manage,'countdown does not rebuild or blur controls');
-                Date.now = () => now + 120000; window.trackerCountdownTick();
-                check(countdown.textContent.includes('시각 지남'),'expired countdown waits for the next quota read');
-                check(document.querySelector('#provider-codex progress').value === 58,'countdown never invents a reset quota');
-                document.querySelector('[data-detail="compact"]').click();
-                check(document.querySelectorAll('#provider-codex progress').length === 2 && document.querySelectorAll('#provider-claude progress').length === 2,'status compact mode keeps both windows in both quota cards');
-                check(document.querySelector('#provider-codex progress').value === 58,'status toggle preserves the displayed quota values');
-                check(document.querySelector('[data-detail="compact"]').getAttribute('aria-pressed') === 'true','compact selection is accessible');
-                emit({...state,detail:'compact'});
-                check(document.querySelectorAll('#provider-codex progress').length === 2 && document.querySelectorAll('#provider-claude progress').length === 2,'host updates in compact mode also render all quota windows');
-                document.querySelector('[data-detail="detailed"]').click();
-                check(document.querySelectorAll('#provider-codex progress').length === 2 && document.querySelectorAll('#provider-claude progress').length === 2,'status detailed mode leaves the quota cards detailed');
-                emit({...state,percentage:'remaining'});
-                check(document.querySelector('#provider-codex .quota-window').textContent.includes('58% 남음'),'remaining text agrees with slider');
-                emit({...state,states:state.states.map(value => value.provider === 'codex' ? {...value,status:'stale'} : value)});
-                check(!document.querySelector('#provider-codex .stale').hidden,'stale quota keeps its last value visible');
-                document.querySelector('#provider-codex .manage').click();
-                document.querySelector('#provider-claude .manage').click();
-              } finally { Date.now = originalNow; emit(message); }
-              phase = 'refresh'; sawRefreshing = false; document.getElementById('refresh').click();
-            } else if (phase === 'refresh') {
-              if (message.states.some(state => state.refreshing)) sawRefreshing = true;
-              else if (sawRefreshing) {
-                check(!document.getElementById('refresh').disabled,'refresh becomes available after quota completion');
-                phase = 'complete'; report(true,'quota cards, remaining sliders, countdown, actions, and refresh in '+theme);
-                document.getElementById('open-usage').click();
-              }
-            }
-          } catch(error) { phase='failed'; report(false,error.message); }
-        });
-      })();`;
-    const countdownBridge = `const originalSetInterval = window.setInterval.bind(window);
-      window.setInterval = (callback, delay, ...args) => { if (delay === 30000) window.trackerCountdownTick = callback; return originalSetInterval(callback, delay, ...args); };`;
-    return inlineScript(originalQuotaHtml(assets), 'quota.js', assets.nonce, driver, countdownBridge);
-  };
   htmlModule.dashboardHtml = (...args: Parameters<typeof originalHtml>) => {
     const driver = `
       (() => {
@@ -153,7 +56,7 @@ export async function run(): Promise<void> {
           try {
             const message = event.data;
             if (message.type === 'navigate') {
-              check(message.tab === 'usage','quota footer opens usage directly');
+              check(message.tab === 'usage','hover statistics link opens usage directly');
               check(document.body.classList.contains(${JSON.stringify(expectedTheme)}),'VS Code theme class is applied to statistics');
               check(!document.getElementById('quota') && !document.querySelector('[data-tab="quota"]') && !document.getElementById('refresh-usage'),'quota and summary refresh controls are absent from statistics');
               check(document.getElementById('configuration-warning').hidden === ${JSON.stringify(!expectTimezoneWarning)},'invalid timezone warning is visible and clears after correction');
@@ -186,7 +89,7 @@ export async function run(): Promise<void> {
             } else if (phase === 'diagnostics-return' && message.type === 'diagnostics') {
               check(message.offset === 0 && document.getElementById('diagnostic-previous').disabled,'returning to diagnostics resets page and controls together');
               check(document.getElementById('diagnostic-page').textContent.startsWith('1번째'),'diagnostics label matches returned rows');
-              phase='complete'; report(true,'quota footer → usage filters → diagnostics in '+${JSON.stringify(expectedTheme)});
+              phase='complete'; report(true,'hover statistics link → usage filters → diagnostics in '+${JSON.stringify(expectedTheme)});
             } else if (message.type === 'error') { phase='failed'; report(false,message.message); }
           } catch(error) { phase='failed'; report(false,error.message); }
         });
@@ -196,11 +99,41 @@ export async function run(): Promise<void> {
   const outcomes: string[] = [];
   let database: DatabaseSync | undefined;
   try {
-    assert.equal(originalQuotaParser({ type: 'manage', provider: 'arbitrary-command' }), null, 'management action rejects unknown providers');
     await extension.activate();
     assert.ok(extension.isActive);
     const commands = await vscode.commands.getCommands(true);
-    for (const command of ['agentTracker.openUsage', 'agentTracker.toggleQuota', 'agentTracker.refreshQuota']) assert.ok(commands.includes(command), `${command} is registered`);
+    for (const command of ['agentTracker.openUsage', 'agentTracker.toggleQuotaTooltip', 'agentTracker.setStatusBarDetail', 'agentTracker.manageProvider', 'agentTracker.refreshQuota']) assert.ok(commands.includes(command), `${command} is registered`);
+    assert.ok(!commands.includes('agentTracker.toggleQuota'), 'the old panel toggle is removed');
+    assert.ok(!extension.packageJSON.contributes.viewsContainers, 'no quota panel is contributed');
+    assert.ok(currentTooltip instanceof vscode.MarkdownString, 'real status bar receives a rich hover');
+    const fixture: import('../../src/quota/types').QuotaState = {
+      provider: 'codex', status: 'ready', refreshing: false, error: null, lastSuccessAt: 0, nextAllowedAt: 0,
+      snapshot: { provider: 'codex', fetchedAt: 0, windows: [
+        { id: 'primary', label: '5h', usedPercent: 42, current: 42, maximum: 100, resetsAt: 90_000, windowDurationMins: 300 },
+        { id: 'weekly', label: '7d', usedPercent: 75, current: 75, maximum: 100, resetsAt: 3_600_000, windowDurationMins: 10080 },
+        { id: 'extra', label: '| [run](command:evil)\n<img src=x>', usedPercent: NaN, current: 0, maximum: 100, resetsAt: null, windowDurationMins: null },
+      ] },
+    };
+    const card = originalTooltip([fixture], { percentage: 'remaining', detail: 'compact' }, 0);
+    assert.equal(card.supportThemeIcons, true);
+    assert.ok(!card.supportHtml, 'arbitrary HTML is not enabled');
+    assert.ok(typeof card.isTrusted === 'object' && !card.isTrusted.enabledCommands.includes('evil'));
+    assert.match(card.value, /58%/);
+    assert.match(card.value, /25%/);
+    assert.match(card.value, /2분 후/);
+    assert.match(card.value, /1시간 0분 후/);
+    assert.doesNotMatch(card.value, /\]\(command:evil\)/, 'provider labels cannot introduce command links');
+    assert.doesNotMatch(card.value, /<img src=x>/, 'provider HTML remains text');
+    const advanced = originalTooltip([{ ...fixture, status: 'stale', refreshing: true }], { percentage: 'used', detail: 'detailed' }, 61_000);
+    assert.match(advanced.value, /42%/);
+    assert.match(advanced.value, /1분 후/);
+    assert.match(advanced.value, /마지막 조회 값/);
+    assert.match(advanced.value, /조회 중/);
+    assert.doesNotMatch(advanced.value, /\]\(command:agentTracker.refreshQuota\)/, 'busy refresh is not a clickable action');
+    const unavailable = originalTooltip([{ ...fixture, snapshot: null, status: 'unavailable', error: { code: 'authentication', message: 'CLI에서 로그인하세요.' } }], { percentage: 'used', detail: 'detailed' }, 0);
+    assert.match(unavailable.value, /조회 불가/);
+    assert.match(unavailable.value.replace(/&nbsp;/g, ' '), /CLI에서 로그인하세요/);
+    outcomes.push('native Markdown hover: all windows, remaining percentages, reset countdown, stale/loading/error states, escaped labels');
     const userData = process.env.AGENT_TRACKER_TEST_USER_DATA!;
     const databasePath = join(userData, 'User', 'globalStorage', 'agent-tracker.agent-tracker', 'agent-tracker.sqlite');
     await until(() => existsSync(databasePath), 'schema initialization');
@@ -215,40 +148,36 @@ export async function run(): Promise<void> {
     for (const theme of [{ name: 'Default Dark Modern', css: 'vscode-dark' }, { name: 'Default Light Modern', css: 'vscode-light' }]) {
       expectedTheme = theme.css;
       expectTimezoneWarning = theme.css === 'vscode-dark';
-      managedProviders.clear(); detailModes.clear();
-      const scansBefore = scanCount;
+      const scansBefore: number = scanCount;
       const filesBefore = countFiles();
-      const refreshBefore = refreshClicks;
-      const usageBefore = usageClicks;
       await vscode.commands.executeCommand('workbench.action.closePanel');
       await vscode.workspace.getConfiguration('agentTracker').update('usage.timezone', expectTimezoneWarning ? 'Not/A_Timezone' : 'Asia/Seoul', vscode.ConfigurationTarget.Global);
       await vscode.workspace.getConfiguration('workbench').update('colorTheme', theme.name, vscode.ConfigurationTarget.Global);
       await new Promise(resolve => setTimeout(resolve, 500));
       const completed = new Promise<void>((resolveReport, reject) => {
         const timeout = setTimeout(() => reject(new Error(`Webview smoke timed out (${theme.css})`)), 30_000);
-        let quotaPassed = false;
         onReport = message => {
           try {
             assert.ok(message.ok, message.detail);
             assert.equal(message.theme, theme.css, 'the active theme is tested');
-            if (message.stage === 'quota') {
-              assert.equal(scanCount, scansBefore, 'quota view and refresh do not invoke summary.refresh');
-              assert.equal(countFiles(), filesBefore, 'quota refresh leaves the summary manifest unchanged');
-              assert.equal(refreshClicks, refreshBefore + 1, 'quota header refresh is delivered once');
-              assert.deepEqual([...managedProviders].sort(), ['claude', 'codex'], 'both management arrows use allowlisted providers');
-              assert.deepEqual([...detailModes].sort(), ['compact', 'detailed'], 'both detail actions reach the host');
-              quotaPassed = true; outcomes.push(message.detail);
-            } else {
-              assert.ok(quotaPassed, 'quota checks run before the statistics footer');
-              assert.equal(usageClicks, usageBefore + 1, 'statistics footer is delivered once');
-              assert.equal(scanCount, scansBefore + 1, 'only opening statistics scans; filters and tabs reuse cached summaries');
-              assert.equal(countFiles(), 1, 'statistics scans the fixture');
-              clearTimeout(timeout); outcomes.push(message.detail); resolveReport();
-            }
+            assert.equal(scanCount, scansBefore + 1, 'only opening statistics scans; filters and tabs reuse cached summaries');
+            assert.equal(countFiles(), 1, 'statistics scans the fixture');
+            clearTimeout(timeout); outcomes.push(message.detail); resolveReport();
           } catch (error) { clearTimeout(timeout); reject(error); }
         };
       });
-      await vscode.commands.executeCommand('agentTracker.toggleQuota');
+      for (const detail of ['compact', 'detailed']) {
+        await vscode.commands.executeCommand('agentTracker.setStatusBarDetail', detail);
+        await new Promise(resolve => setTimeout(resolve, 100));
+        assert.ok(currentTooltip!.value.includes(detail === 'compact' ? '**압축**' : '**상세**'));
+      }
+      await vscode.commands.executeCommand('agentTracker.refreshQuota');
+      assert.equal(scanCount, scansBefore, 'quota refresh and display changes never scan summaries');
+      assert.equal(countFiles(), filesBefore, 'quota controls leave the summary manifest unchanged');
+      const usageLink = currentTooltip!.value.match(/\]\(command:(agentTracker\.openUsage)\)/);
+      assert.ok(usageLink, 'hover exposes a statistics command link');
+      assert.ok(typeof currentTooltip!.isTrusted === 'object' && currentTooltip!.isTrusted.enabledCommands.includes(usageLink[1]));
+      await vscode.commands.executeCommand(usageLink[1]);
       await completed;
       onReport = undefined;
       await vscode.commands.executeCommand('workbench.action.closeAllEditors');
@@ -262,8 +191,7 @@ export async function run(): Promise<void> {
     database?.close();
     htmlModule.dashboardHtml = originalHtml;
     protocol.parseDashboardMessage = originalParser;
-    quotaModule.quotaHtml = originalQuotaHtml;
-    quotaModule.parseQuotaMessage = originalQuotaParser;
+    tooltipModule.createQuotaTooltip = originalTooltip;
     summaryModule.SummaryClient.prototype.refresh = originalRefresh;
     await vscode.commands.executeCommand('workbench.action.closeAllEditors');
     await vscode.commands.executeCommand('workbench.action.closePanel');

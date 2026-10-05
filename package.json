@@ -30,6 +30,9 @@
     "lint": "eslint src tests scripts --max-warnings 0",
     "test": "npm run build && node scripts/run-tests.cjs",
     "test:vscode": "npm run build && node scripts/test-vscode.cjs",
+    "test:toggle": "npm run build && node scripts/test-statusbar-toggle.cjs",
+    "patch:vscode": "node scripts/vscode/statusbar-toggle.cjs",
+    "restore:vscode": "node scripts/vscode/statusbar-toggle.cjs --restore",
     "check": "npm run typecheck && npm run lint && npm test",
     "watch": "tsc -p tsconfig.json --watch",
     "vscode:prepublish": "npm run build",
@@ -38,12 +41,6 @@
     "benchmark:quota": "npm run build && node scripts/quota/benchmark.cjs"
   },
   "contributes": {
-    "viewsContainers": {
-      "panel": [{ "id": "agentTracker", "title": "Agent Tracker", "icon": "resource/icon/codex.svg" }]
-    },
-    "views": {
-      "agentTracker": [{ "type": "webview", "id": "agentTracker.quotaView", "name": "사용량" }]
-    },
     "commands": [
       {
         "command": "agentTracker.openDashboard",
@@ -60,10 +57,6 @@
       {
         "command": "agentTracker.refreshCodex",
         "title": "Agent Tracker: Codex 사용률 새로 고침"
-      },
-      {
-        "command": "agentTracker.toggleQuota",
-        "title": "Agent Tracker: 현재 사용량 열기 / 닫기"
       },
       {
         "command": "agentTracker.refreshQuota",
@@ -90,7 +83,7 @@
             "detailed"
           ],
           "default": "detailed",
-          "description": "상태 표시줄의 표시 방식입니다. 상세는 7일·5시간, 압축은 5시간 사용량만 표시합니다. 사용량 패널은 항상 모든 정보를 표시합니다."
+          "description": "상태 표시줄의 표시 방식입니다. 상세는 7일·5시간, 압축은 5시간 사용량만 표시합니다. 사용량 툴팁은 항상 모든 정보를 표시합니다."
         },
         "agentTracker.claude.showStatusBar": {
           "type": "boolean",

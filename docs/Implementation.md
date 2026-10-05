@@ -2,6 +2,18 @@
 
 2026-10-04 기준 구현 기록입니다. 설계 기준은 [AgentTracker.md](AgentTracker.md)이며, quota·summary 두 에이전트와 summary 산하 DB 에이전트로 분담했습니다. 서비스 사용량 제한으로 중단된 작업은 주 에이전트가 이어서 통합했습니다.
 
+## 2026-10-05 사용량 카드 변경
+
+하단 사용량 Webview 패널을 제거하고 상태표시줄 항목의 Markdown 툴팁으로 교체했습니다. `src/ui/quotaTooltip.ts`가 모든 quota 기간과 초기화 시간, 조회 상태를 표시하며 새로고침·상세/압축·확장 관리·사용량 통계 명령 링크를 제공합니다. `agentTracker.toggleQuotaTooltip` 클릭 명령을 로컬 VS Code 내부 `ToggleTooltipCommand` 객체에 연결해 클릭으로 열어 유지하고 재클릭으로 닫습니다. 위치·테마·크기는 VS Code가 결정합니다. API 조사와 적용 지점은 [StatusBarPopup.md](StatusBarPopup.md)를 참고하세요.
+
+`scripts/vscode/statusbar-toggle.cjs`가 현재 설치의 내부 구현과 checksum을 확인하고 workbench에 연결 코드를 적용합니다. 원본 workbench와 product 파일, 변경 전후 hash를 보관하고 복원할 수 있습니다. 다른 확장·명령에는 적용하지 않습니다. 일반 빌드·확장 활성화에는 설치 파일 변경이 포함되지 않으며 업데이트 뒤 재적용이 필요합니다.
+
+클릭 전용 패치(v2)는 자동 호버 등록 전에 사용량 항목의 `mouseover`·`focus` 이벤트를 걸러 자동 열기를 제거합니다. 클릭·pointerdown·키보드 토글과 닫기 처리는 유지하며, 다른 항목에는 적용하지 않습니다. 기존 v1 패치는 원본 백업을 보존하며 갱신하고 복원할 수 있습니다.
+
+`npm run check`의 타입 검사·lint와 102개 테스트가 통과했습니다. `npm run test:toggle`로 실제 VS Code 1.140.0에서 hover 지연을 100ms로 설정하고 자동 호버 억제와 클릭을 검증했습니다. 마우스를 올려도 열리지 않고, 첫 클릭으로 상태표시줄 위 카드가 열려 마우스를 옮겨도 유지되며, 재클릭으로 닫힙니다. 닫은 뒤 마우스를 계속 올려 두거나 다시 올려도 닫힌 상태를 유지합니다. 바깥 클릭·Esc로 닫은 뒤에도 한 번 클릭으로 재열기에 성공했습니다. `test-results/statusbar-toggle.json`과 `statusbar-toggle.png`에 결과와 화면을 저장합니다.
+
+아래의 Quota Webview 관련 검증 기록은 교체 전 구현에 대한 기록입니다. 현재 테스트는 Markdown 카드와 명령 링크, quota 동작의 통계 스캔 분리, Usage·Diagnostics Webview를 검증하도록 변경했습니다.
+
 ## 코드 구조
 
 | 경로 | 역할 |
@@ -13,7 +25,9 @@
 | `src/summary/parsers/` | Claude·Codex current/legacy 정규화 |
 | `src/summary/staging.ts` | 디스크 임시 테이블, 중복 제거·lineage·root 요청 합산 |
 | `src/summary/db/` | 두 영속 테이블, transaction, 페이지·시간대 집계 |
-| `src/ui/`, `media/` | Quota·Usage·Diagnostics Webview |
+| `src/ui/`, `media/` | Quota Markdown 툴팁, Usage·Diagnostics Webview |
+| `scripts/vscode/statusbar-toggle.cjs` | 로컬 VS Code 내장 클릭 토글 연결, 백업·무결성 검사·복원 |
+| `scripts/test-statusbar-toggle.cjs` | 격리된 실제 VS Code의 클릭·닫기·재열기 검증 |
 
 ## 구현 결정
 
