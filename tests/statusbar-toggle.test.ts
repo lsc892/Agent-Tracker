@@ -17,6 +17,17 @@ class Item{constructor(container=new EventTarget()){this.label={};this.container
 show(){return this.hoverService.getStickyHover(this.container)}}
 globalThis.Item=Item;globalThis.nativeToggle=nativeToggle;`;
 
+function rendererContext(): Record<string, any> {
+  const styles: { id?: string; textContent?: string }[] = [];
+  const document = {
+    getElementById: (id: string) => styles.find(style => style.id === id),
+    createElement: () => ({}),
+    head: { appendChild: (style: { id?: string; textContent?: string }) => styles.push(style) },
+  };
+  class Container extends EventTarget { readonly ownerDocument = document; }
+  return { EventTarget: Container, styles };
+}
+
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), 'tracker-vscode-patch-'));
   const directory = join(root, 'out', 'vs', 'workbench');
@@ -32,7 +43,7 @@ function fixture() {
 
 test('native toggle mapping preserves object identity and is limited to the Agent Tracker extension and command', () => {
   const result = patcher.patchSource(source);
-  const context: Record<string, any> = { EventTarget };
+  const context = rendererContext();
   runInNewContext(result.patched, context);
   const entry = { extensionId: 'agent-tracker.agent-tracker', command: { id: patcher.command, title: '' } };
   const item = new context.Item(); item.update(entry);
@@ -49,9 +60,9 @@ test('native toggle mapping preserves object identity and is limited to the Agen
 });
 
 test('the preview uses plain text, the clicked card retains Markdown, and pinned cards suppress automatic hover', () => {
-  const context: Record<string, any> = { EventTarget };
+  const context = rendererContext();
   runInNewContext(patcher.patchSource(source).patched, context);
-  const target = new EventTarget();
+  const target = new context.EventTarget();
   const item = new context.Item(target);
   let pinned = false;
   const shown: { content: unknown; focus?: boolean }[] = [];
@@ -101,15 +112,19 @@ test('the preview uses plain text, the clicked card retains Markdown, and pinned
   const other = new context.Item();
   other.update({ ...entry, extensionId: 'another.extension' });
   assert.equal(other.disposables.length, 0, 'another extension receives no capture filter');
+  assert.equal(context.styles.length, 1, 'quota updates install only one divider stylesheet per document');
 });
 
-for (const version of [1, 2]) test(`v${version} upgrades to separate preview and card while retaining the original restore backups`, () => {
+for (const version of [1, 2, 3]) test(`v${version} upgrades while retaining the original restore backups`, () => {
   const files = fixture();
   try {
     const anchor = 'update(e){';
     // Exact historical v2 payload: automatic activation was always suppressed.
     const clickOnly = version === 1 ? '' : `if(!this._agentTrackerClickOnly){this._agentTrackerClickOnly=true;const stop=event=>{if(this.entry?.extensionId==="agent-tracker.agent-tracker"&&this.entry?.command===nativeToggle)event.stopImmediatePropagation();};for(const type of ["mouseover","focus"])this.container.addEventListener(type,stop,{capture:true});this._register({dispose:()=>{for(const type of ["mouseover","focus"])this.container.removeEventListener(type,stop,{capture:true});}});}`;
-    const old = source.replace(anchor, `${anchor}/*agent-tracker:statusbar-toggle:v${version}*/if(e.extensionId==="agent-tracker.agent-tracker"&&e.command?.id==="${patcher.command}"){e={...e,command:nativeToggle};${clickOnly}}/*agent-tracker:statusbar-toggle:end*/`);
+    const old = version === 3
+      ? patcher.patchSource(source).patched.replace(':statusbar-toggle:v4*/', ':statusbar-toggle:v3*/')
+        .replace(/\(function configureQuotaDividers\(item\) \{[\s\S]*?\}\)\(this\);/, '')
+      : source.replace(anchor, `${anchor}/*agent-tracker:statusbar-toggle:v${version}*/if(e.extensionId==="agent-tracker.agent-tracker"&&e.command?.id==="${patcher.command}"){e={...e,command:nativeToggle};${clickOnly}}/*agent-tracker:statusbar-toggle:end*/`);
     const oldProduct = JSON.stringify({ checksums: { 'vs/workbench/workbench.desktop.main.js': patcher.checksum(old), unrelated: 'unchanged' } });
     writeFileSync(`${files.target}.agent-tracker-toggle.bak`, source);
     writeFileSync(`${files.productPath}.agent-tracker-toggle.bak`, files.product);

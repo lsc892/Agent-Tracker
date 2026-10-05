@@ -6,7 +6,8 @@ const { spawnSync } = require('node:child_process');
 const command = 'agentTracker.toggleQuotaTooltip';
 const extensionId = 'agent-tracker.agent-tracker';
 const checksumKey = 'vs/workbench/workbench.desktop.main.js';
-const begin = '/*agent-tracker:statusbar-toggle:v3*/';
+const begin = '/*agent-tracker:statusbar-toggle:v4*/';
+const previewBegin = '/*agent-tracker:statusbar-toggle:v3*/';
 const clickOnlyBegin = '/*agent-tracker:statusbar-toggle:v2*/';
 const legacyBegin = '/*agent-tracker:statusbar-toggle:v1*/';
 const end = '/*agent-tracker:statusbar-toggle:end*/';
@@ -42,13 +43,24 @@ function configureQuotaHover(item, summary) {
   } });
 }
 
+// Keep the v3 hover function unchanged so upgrades can verify its exact payload.
+function configureQuotaDividers(item) {
+  const document = item.container.ownerDocument;
+  const id = 'agent-tracker-quota-divider-style';
+  if (document.getElementById(id)) return;
+  const style = document.createElement('style');
+  style.id = id;
+  style.textContent = '.monaco-hover:has(a[data-href="command:agentTracker.openSettings"]) hr{border-top:2px solid #888888;border-bottom:0;height:2px;margin:8px -8px;}';
+  document.head.appendChild(style);
+}
+
 function patchSource(source) {
   const symbols = [...source.matchAll(/\b([\w$]+)\s*=\s*\{\s*id:\s*["']statusBar\.entry\.toggleTooltip["'],\s*title:\s*["']["']\s*\}/g)];
   if (symbols.length !== 1) throw new Error('내장 ToggleTooltipCommand를 유일하게 찾을 수 없습니다. 지원하지 않는 VS Code 빌드입니다.');
   let original = source;
   const markers = [...source.matchAll(/\/\*agent-tracker:statusbar-toggle:v\d+\*\//g)];
   if (markers.length || source.includes(end)) {
-    if (markers.length !== 1 || source.split(end).length !== 2 || ![begin, clickOnlyBegin, legacyBegin].includes(markers[0][0])) throw new Error('토글 패치 표식이 손상되었습니다.');
+    if (markers.length !== 1 || source.split(end).length !== 2 || ![begin, previewBegin, clickOnlyBegin, legacyBegin].includes(markers[0][0])) throw new Error('토글 패치 표식이 손상되었습니다.');
     const start = markers[0].index, finish = source.indexOf(end);
     if (finish < start) throw new Error('토글 패치 표식 순서가 잘못되었습니다.');
     original = source.slice(0, start) + source.slice(finish + end.length);
@@ -63,13 +75,16 @@ function patchSource(source) {
   // Keep the exact v2 injection to safely recognize upgrades and restore backups.
   const clickOnly = `if(!this._agentTrackerClickOnly){this._agentTrackerClickOnly=true;const stop=event=>{if(this.entry?.extensionId===${JSON.stringify(extensionId)}&&this.entry?.command===${symbols[0][1]})event.stopImmediatePropagation();};for(const type of ["mouseover","focus"])this.container.addEventListener(type,stop,{capture:true});this._register({dispose:()=>{for(const type of ["mouseover","focus"])this.container.removeEventListener(type,stop,{capture:true});}});}`;
   const configureSource = configureQuotaHover.toString().replace(/\r\n/g, '\n');
-  const injection = `${begin}if(${condition}){(${configureSource})(this,${argument}.ariaLabel??${argument}.name??"");${mapping}}else{this._agentTrackerSummary=undefined;}${end}`;
+  const dividerSource = configureQuotaDividers.toString().replace(/\r\n/g, '\n');
+  const previewInjection = `if(${condition}){(${configureSource})(this,${argument}.ariaLabel??${argument}.name??"");${mapping}}else{this._agentTrackerSummary=undefined;}`;
+  const injection = `${begin}if(${condition}){(${configureSource})(this,${argument}.ariaLabel??${argument}.name??"");${mapping}(${dividerSource})(this);}else{this._agentTrackerSummary=undefined;}${end}`;
   const position = target.index + target[0].length;
   const patched = original.slice(0, position) + injection + original.slice(position);
   const legacy = original.slice(0, position) + `${legacyBegin}if(${condition}){${mapping}}${end}` + original.slice(position);
   const clickOnlySource = original.slice(0, position) + `${clickOnlyBegin}if(${condition}){${mapping}${clickOnly}}${end}` + original.slice(position);
-  if (![original, patched, legacy, clickOnlySource].includes(source)) throw new Error('기존 토글 패치가 예상 코드와 다릅니다. 자동으로 덮어쓰지 않습니다.');
-  return { original, patched, alreadyPatched: source === patched, upgradeRequired: source === legacy || source === clickOnlySource };
+  const preview = original.slice(0, position) + `${previewBegin}${previewInjection}${end}` + original.slice(position);
+  if (![original, patched, legacy, clickOnlySource, preview].includes(source)) throw new Error('기존 토글 패치가 예상 코드와 다릅니다. 자동으로 덮어쓰지 않습니다.');
+  return { original, patched, alreadyPatched: source === patched, upgradeRequired: source === legacy || source === clickOnlySource || source === preview };
 }
 
 function appRootFromInstallation(root, launcher = join(root, 'bin', 'code.cmd')) {

@@ -183,6 +183,8 @@ async function main() {
         return {text:card.innerText,tables:[...card.querySelectorAll('table')].filter(table=>!table.querySelector('h3')).length,
           meters:[...card.querySelectorAll('img[alt^="사용 "], img[alt^="남음 "]')].map(img=>({loaded:img.complete&&img.naturalWidth>0,width:img.width,height:img.height})),
           colors:[...card.querySelectorAll('span[style]')].map(span=>getComputedStyle(span).color),
+          dividers:[...card.querySelectorAll('hr')].map(line=>{const bounds=line.getBoundingClientRect(),style=getComputedStyle(line);return {
+            leftGap:bounds.left-rect.left,rightGap:rect.right-bounds.right,height:bounds.height,color:style.borderTopColor,borderWidth:style.borderTopWidth,borderStyle:style.borderTopStyle};}),
           clip:{x:rect.x,y:rect.y,width:rect.width,height:rect.height,scale:1}};
       })()`);
       const rendered = await until(async () => {
@@ -195,6 +197,18 @@ async function main() {
       assert.ok(rendered.meters.every(meter=>meter.width === 36 && meter.height === 8));
       assert.ok(rendered.colors.includes('rgb(233, 164, 0)'), 'moderate usage is amber');
       assert.ok(rendered.colors.includes('rgb(250, 48, 72)'), 'high usage is red');
+      const assertDividers = card => {
+        assert.equal(card.dividers.length, 3, 'provider sections and footer each have a divider');
+        for (const line of card.dividers) {
+          assert.ok(Math.abs(line.leftGap) <= 2 && Math.abs(line.rightGap) <= 2, 'dividers reach both card edges');
+          assert.equal(line.height, 2, 'dividers are two CSS pixels thick');
+          // Chromium snaps borders to device pixels (2px becomes 1.6px at 125% scaling).
+          assert.ok(parseFloat(line.borderWidth) >= 1.5 && parseFloat(line.borderWidth) <= 2, 'border thickness survives display scaling');
+          assert.equal(line.borderStyle, 'solid');
+          assert.equal(line.color, 'rgb(136, 136, 136)', 'dividers use a visible gray in either theme');
+        }
+      };
+      assertDividers(rendered);
       const dark = await cdp.call('Page.captureScreenshot', {format:'png',clip:rendered.clip});
       await writeFile(join(resultDirectory,'quota-card-dark.png'),Buffer.from(dark.data,'base64'));
       const settingsPath = join(userData, 'User', 'settings.json');
@@ -204,9 +218,11 @@ async function main() {
       await until(()=>cdp.evaluate('document.querySelector(".monaco-workbench")?.classList.contains("vs")'), 'light theme applies');
       await sleep(750);
       const lightCard = await until(inspect, 'usage card stays open after theme change');
+      assertDividers(lightCard);
       const light = await cdp.call('Page.captureScreenshot', {format:'png',clip:lightCard.clip});
       await writeFile(join(resultDirectory,'quota-card-light.png'),Buffer.from(light.data,'base64'));
       outcomes.push('provider summaries, SVG meters, usage colors and earned-reset metadata render in dark and light themes');
+      outcomes.push('three visible 2px dividers reach both card edges in dark and light themes');
     }
     const screenshot = await cdp.call('Page.captureScreenshot', { format: 'png' });
     await writeFile(join(resultDirectory, 'statusbar-toggle.png'), Buffer.from(screenshot.data, 'base64'));
