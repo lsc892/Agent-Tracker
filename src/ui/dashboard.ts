@@ -93,16 +93,26 @@ export class Dashboard implements vscode.Disposable {
   private async refreshUsage(): Promise<void> {
     if (!this.dependencies.settings().usageEnabled) return;
     this.post({ type: 'busy', busy: true });
-    if (this.refreshPromise) return this.refreshPromise;
+    const panel = this.panel;
+    if (this.refreshPromise) {
+      try {
+        await this.refreshPromise;
+        if (this.panel === panel && this.ready) await this.loadUsage();
+      } finally {
+        if (this.panel === panel) this.post({ type: 'busy', busy: false });
+      }
+      return;
+    }
     this.refreshPromise = (async () => {
       const settings = this.dependencies.settings();
       // The cached page remains visible during this operation.
       const result = await this.dependencies.summary.refresh({ roots: settings.roots, timezone: settings.timezone });
+      if (this.panel !== panel || !this.ready || !this.dependencies.settings().usageEnabled) return;
       this.post({ type: 'refreshResult', result });
       await this.loadUsage();
     })().finally(() => {
       this.refreshPromise = undefined;
-      this.post({ type: 'busy', busy: false });
+      if (this.panel === panel) this.post({ type: 'busy', busy: false });
     });
     return this.refreshPromise;
   }

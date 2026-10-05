@@ -329,7 +329,20 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     assert.equal(items[0].visible, true);
     assert.match(items[0].text!, /claude/);
     assert.doesNotMatch(items[0].text!, /codex/);
+    deferScan = true;
+    await click('agentTracker.openUsage');
+    const closingPanel = panels.at(-1)!;
+    closingPanel.webview.receive({type: 'ready'}); await tick();
     const scansBeforeReopen = scans;
+    closingPanel.dispose();
+    await click('agentTracker.openUsage');
+    const reopened = panels.at(-1)!.webview;
+    reopened.receive({type: 'ready'}); await tick();
+    releaseScan?.(); releaseScan = undefined; await tick();
+    assert.equal(scans, scansBeforeReopen, 'reopening while a scan runs shares that scan');
+    assert.ok(reopened.messages.some(message => message.type === 'usage'));
+    assert.equal(reopened.messages.filter(message => message.type === 'busy').at(-1)?.busy, false);
+    deferScan = false;
     assert.deepEqual(errors, []);
 
     await extension.deactivate();
