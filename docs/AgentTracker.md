@@ -26,7 +26,7 @@ VS Code 확장으로 다음 두 기능을 제공한다.
 Claude OAuth usage adapter ─┐
                             ├─ QuotaService ── StatusBar Claude / Codex
 Codex App Server ───────────┘       │
-                                   └─ click ── Webview quota 탭
+                                   └─ 클릭 토글 ── Markdown quota 카드
 
                     지연 누계 경로
 
@@ -150,56 +150,20 @@ manual refresh
 
 제공자별 자동 갱신 간격은 설정으로 변경할 수 있다. 기본값은 각각 900초, 최소값은 30초이며 정기 조회 간격만 바꾼다. 복귀 5분 debounce와 실패 backoff는 별도다. 일반 실패 snapshot은 마지막 성공 이후 최대 30분, `429` snapshot은 최대 24시간 유지하되 오래된 값임을 명시한다. reset countdown 표시 갱신은 네트워크 요청을 유발하지 않으며 reset 시각이 지났다고 사용률을 임의로 0으로 바꾸지 않는다.
 
-### 3.4 상태 표시줄과 클릭 구현
+### 3.4 상태 표시줄과 카드형 툴팁
 
-상태 표시줄 오른쪽 영역에 두 개의 네이티브 StatusBarItem을 나란히 배치한다. 두 항목 사이의 순서는 Claude가 왼쪽, Codex가 오른쪽이다. 클릭하면 공통 Webview의 Quota 탭을 열고 선택한 제공자 카드로 이동한다. hover는 짧은 안내만 표시한다.
+상태 표시줄 오른쪽에 Claude·Codex 통합 사용량 항목과 새로고침 버튼을 배치한다. 통합 항목 안에서는 Claude가 왼쪽, Codex가 오른쪽이다. 로컬 VS Code에 클릭 전용 패치를 적용하면 사용량 항목 클릭으로 `StatusBarItem.tooltip`의 `MarkdownString` 카드를 바로 위에 열어 유지하고 재클릭으로 닫는다. 마우스를 올리거나 포커스만 주어서는 자동으로 열리지 않는다. 바깥 클릭이나 Esc로도 닫으며, 그 뒤 한 번 클릭으로 다시 열린다. 하단 quota 패널이나 별도 창은 만들지 않는다.
 
-```ts
-const claudeItem = vscode.window.createStatusBarItem(
-  'agentTracker.claudeQuota', vscode.StatusBarAlignment.Right, 100,
-);
-const codexItem = vscode.window.createStatusBarItem(
-  'agentTracker.codexQuota', vscode.StatusBarAlignment.Right, 99,
-);
-claudeItem.text = 'Claude 5h:32% 7d:18%';
-codexItem.text = 'Codex 5h:42% 7d:11%';
-claudeItem.command = {
-  title: 'Claude 사용량 보기', command: 'agentTracker.openDashboard',
-  arguments: [{ tab: 'quota', provider: 'claude' }],
-};
-codexItem.command = {
-  title: 'Codex 사용량 보기', command: 'agentTracker.openDashboard',
-  arguments: [{ tab: 'quota', provider: 'codex' }],
-};
-claudeItem.tooltip = '클릭하여 Claude 사용량 보기';
-codexItem.tooltip = '클릭하여 Codex 사용량 보기';
-claudeItem.show();
-codexItem.show();
-```
+클릭 명령은 `agentTracker.toggleQuotaTooltip`이다. `scripts/vscode/statusbar-toggle.cjs`가 Agent Tracker의 이 명령만 내부 `ToggleTooltipCommand` 객체로 변환한다. 공개 API의 기능은 아니므로 확장 설치·활성화와 패치 적용을 구분한다. 원본 백업과 복원 명령을 제공하며 VS Code 업데이트 뒤 재적용한다. 패치가 없는 설치에서는 기본 호버와 클릭 열기 경로를 사용한다.
 
-예시는 5시간/주간 window가 있는 경우이며 실제 label은 provider 응답으로 만든다. `statusBarItem.errorBackground`는 해당 제공자의 사용률이 90% 이상일 때만 사용한다. 남은 비율 표시 모드에서도 경고 판단은 사용률을 기준으로 한다. 외부 label은 Webview에 넣기 전에 escape한다.
+`src/ui/quotaTooltip.ts`가 현재 snapshot으로 카드 내용을 만든다. 외부 label과 오류 메시지는 `appendText`로 이스케이프하고, 명령 링크는 필요한 명령만 `isTrusted.enabledCommands`에 허용한다. 위치와 스타일은 VS Code 기본 툴팁을 따른다. API 근거와 구현 상세는 [StatusBarPopup.md](StatusBarPopup.md)에 정리한다.
 
-### 3.5 클릭 화면과 설정
+### 3.5 카드 내용과 설정
 
-```text
-상태 표시줄
-[ Claude 5h:32% 7d:18% ] [ Codex 5h:42% 7d:11% ]
-                  클릭 ↓
-
-Claude 사용량                          [↻] [⚙]
-5시간       █████░░░░░    사용 32%   초기화까지 2시간
-주간        ███░░░░░░░    사용 18%   초기화까지 3일
-마지막 성공 갱신: 4분 전
-
-Codex 사용량                           [↻] [⚙]
-...
-
-[기간별·프로젝트별 상세 통계]
-```
-
-- Quota: 모든 quota window, 사용률/남은 비율, 상대·절대 reset 시각, 마지막 성공 갱신 시각, 오래된 값·갱신 실패 안내.
-- 카드의 `↻` 클릭: 해당 제공자만 수동 새로 고침.
-- 카드 오른쪽 끝의 `⚙` 클릭: 해당 제공자의 VS Code Settings 항목으로 이동. 공통 표시 설정에도 접근할 수 있게 한다. hover로 설정을 열지 않는다.
+- Quota 카드: 모든 quota window, 사용률/남은 비율, 잔량 아이콘, 상대 reset 시간, 마지막 성공 갱신 시각, 조회 중·오래된 값·갱신 실패 안내.
+- 카드의 새로고침 링크: 전체 또는 해당 제공자의 quota만 수동 새로 고침. 조회 중인 링크는 갱신 상태로 대체한다.
+- 카드의 확장 관리 링크: Claude/Codex의 고정된 확장 관리 화면으로 이동한다.
+- 카드의 상세/압축 링크: 상태 표시줄 표시량을 변경한다. 카드의 quota 기간은 항상 모두 표시한다.
 - Usage: 일·월·프로젝트·세션별 token 총량과 완료 turn 평균 token·시간. 상세 통계 버튼으로 이동한다.
 - Diagnostics: manifest와 turn summary의 현재 처리 상태, 중단 단계·위치와 오류. quota 조회 실패 상태도 확인한다.
 
@@ -212,7 +176,7 @@ Codex 사용량                           [↻] [⚙]
 | Claude | 자동 갱신 간격 | 900초 |
 | Codex | 자동 갱신 간격 | 900초 |
 
-상태바 압축 모드는 5시간 window만, 상세 모드는 7일·5시간 window를 표시한다. 5시간 window가 없으면 압축 상태바에 정보 없음으로 표시하고 장기 window로 대체하지 않는다. Quota 화면은 상태바 모드와 관계없이 모든 window를 표시한다. 상태바 숨김은 provider 비활성화와 구분하며 Quota 화면에서는 숨긴 제공자도 볼 수 있다. 표시 설정 변경은 기존 snapshot에 즉시 반영한다.
+상태바 압축 모드는 5시간 window만, 상세 모드는 7일·5시간 window를 표시한다. 5시간 window가 없으면 압축 상태바에 정보 없음으로 표시하고 장기 window로 대체하지 않는다. Quota 툴팁은 상태바 모드와 관계없이 모든 window를 표시한다. 상태바 숨김은 provider 비활성화와 구분하며 툴팁에서는 숨긴 제공자도 볼 수 있다. 두 제공자를 모두 숨기면 툴팁 진입점도 숨긴다. 표시 설정 변경은 기존 snapshot에 즉시 반영한다.
 
 ### 3.6 Codex App Server 사용
 
@@ -904,8 +868,8 @@ last successful session update
 
 - extension 활성화만으로 JSONL 전체 scan이 발생하지 않는다.
 - 조회 중 provider notification은 수신 즉시 반영하고 활성 창의 정기 조회는 제공자별 기본 15분 간격으로 수행한다. 조회 사이 Codex App Server는 상주하지 않는다.
-- 상태바는 Claude 왼쪽/Codex 오른쪽 두 항목이고 클릭 화면에서 quota·reset·마지막 성공 갱신 시각을 볼 수 있다.
-- click하면 공통 Quota Webview의 해당 카드로 이동하고 제공자별 새로 고침·클릭 설정·상세 통계 이동을 사용할 수 있다.
+- 상태바 사용량 항목 안에서 Claude는 왼쪽, Codex는 오른쪽이고, 바로 위 툴팁에서 quota·reset·마지막 성공 갱신 시각을 볼 수 있다.
+- 클릭하면 Markdown Quota 카드가 뜨고 제공자별 새로 고침·상세/압축 설정·확장 관리·사용량 통계 링크를 사용할 수 있다. 패치한 로컬 VS Code에서는 자동 호버 억제, 클릭 유지·재클릭 닫기, 닫은 뒤 재호버 억제와 바깥 클릭·Esc 후 재열기를 실제 UI에서 검증한다.
 - 누계 refresh에서 변경 없는 session의 파일 body는 다시 읽지 않는다.
 - 전체 경로·manifest·파싱 결과를 메모리에 적재하지 않고 n개·byte 예산·DB 조회 page 경계를 지킨다.
 - 영속 table은 manifest와 turn_summary 두 개이고, session summary와 정상 metadata·삭제는 함께 commit한다. 부재 판정은 전체 순회 성공 후 수행한다.

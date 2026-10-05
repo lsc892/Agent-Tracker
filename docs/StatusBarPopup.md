@@ -1,12 +1,14 @@
 # 상태표시줄 위 카드형 팝업 조사
 
-조사일: 2026-10-05. VS Code 공개 API 문서와 VS Code 1.140.0 소스를 기준으로 정리했다. 아래 내용은 API와 소스 조사 결과이며, 클릭 토글 우회 방법을 실제 UI에서 검증한 결과는 아니다.
+조사·구현·검증일: 2026-10-05. VS Code 공개 API 문서와 VS Code 1.140.0 소스를 기준으로 정리했다. Markdown 카드와 로컬 workbench 패치를 구현하고 실제 VS Code에서 클릭 토글을 검증했다.
 
 ## 결론
 
 상태표시줄의 사용량 항목 바로 위에 카드 형태로 내용을 띄우는 공개 API는 **Rich Status Bar Hover**다. `StatusBarItem.tooltip`에 `MarkdownString`을 지정하면 제목, 표, 아이콘, 명령 링크를 포함한 툴팁을 표시할 수 있다. 기존 VS Code 창 안에 겹쳐 표시되므로 터미널 패널 공간이나 별도 창이 필요하지 않다. [공식 API][statusbar-api], [공식 기능 소개][rich-hover]
 
 다만 공개 API로 지원되는 기본 동작은 **마우스를 올려 표시하는 툴팁**이다. 원하는 **클릭으로 열고 다시 클릭해서 닫는 동작**과 **현재 HTML 카드의 디자인을 그대로 옮기는 기능**은 공개 API에 없다. VS Code 내부에는 클릭 토글 구현이 있지만 일반 확장에서 그대로 사용할 수 있는 API는 아니다. [공개 API][statusbar-api], [내부 상태표시줄 구현][statusbar-item]
+
+Agent Tracker에서는 **로컬 VS Code의 내부 토글 객체에 연결하는 클릭 전용 패치**를 적용했다. 상태표시줄 사용량 항목을 클릭하면 카드가 위에 열려 유지되고, 다시 클릭하면 닫힌다. 마우스를 올려 자동으로 여는 동작은 제거했다. 바깥 클릭이나 Esc로도 닫을 수 있다. 이 연결에는 확장 VSIX 외에 아래의 workbench 패치가 필요하다.
 
 ## 요구사항과 지원 범위
 
@@ -17,8 +19,8 @@
 | 상태표시줄 항목 바로 위에 카드 표시 | Rich Hover로 가능. 표시 위치는 VS Code가 결정한다. |
 | 사용량, 사용률, 초기화 시간 표시 | Markdown 텍스트와 표로 가능. |
 | 새로고침, 사용량 통계 열기 | 허용한 명령으로 연결되는 링크로 가능. |
-| 마우스를 올려 열기 | 공개 API의 기본 동작. |
-| 클릭으로 열고 다시 클릭해 닫기 | 공개된 상태표시줄 API에 토글 기능이 없다. |
+| 마우스를 올려 열기 | 공개 API의 기본 동작이지만 클릭 전용 패치에서 제거했다. |
+| 클릭으로 열고 다시 클릭해 닫기 | 공개 API에는 없다. 로컬 workbench 패치로 내장 토글에 연결해 구현·검증했다. |
 | 현재 카드의 CSS, 버튼, 상세/압축 탭을 그대로 재사용 | Markdown 툴팁으로는 불가. HTML 지원도 제한된 요소만 허용한다. |
 | 사용자가 카드를 드래그해 위치 이동 | 공개된 상태표시줄 툴팁 API에 해당 기능이 없다. |
 
@@ -65,13 +67,63 @@ export const ToggleTooltipCommand: Command = {
 
 VS Code 자체의 사용량 카드에는 DOM으로 만든 대시보드가 사용된다. 이 내부 구현이 존재한다는 사실과 일반 확장에서 같은 HTML 팝업을 사용할 수 있다는 것은 별개의 문제다. [내장 대시보드 소스][chat-dashboard]
 
-## Agent Tracker의 현재 코드와 적용 지점
+## Agent Tracker에 적용한 구현
 
-- [src/ui/statusBar.ts](../src/ui/statusBar.ts): 현재 사용량 항목의 `tooltip`은 문자열이다. Rich Hover를 적용한다면 이 값을 quota 상태에서 만든 `MarkdownString`으로 바꾸는 것이 적용 지점이다.
-- [src/ui/quotaView.ts](../src/ui/quotaView.ts): 현재 `toggle()`은 `agentTracker.quotaView.focus`와 `workbench.action.closePanel`로 하단 패널을 열고 닫는다. 상태표시줄 위 툴팁 토글과는 다른 동작이다.
-- [package.json](../package.json): 사용량 Webview는 `viewsContainers.panel` 아래에 등록되어 있다. 공개 Webview API에는 이를 상태표시줄에 붙는 팝업으로 전환하는 옵션이 없다. [Webview 문서][webview-guide]
+- [src/ui/quotaTooltip.ts](../src/ui/quotaTooltip.ts): 실제 quota 상태로 Markdown 카드를 만든다. 제공자별 모든 기간, 잔량 아이콘, 사용률/남은 비율, 상대 초기화 시간, 조회 중·오래된 값·오류 안내와 마지막 갱신 시각을 표시한다. 외부 문자열은 `appendText`로 넣고 표의 줄바꿈·구분 문자를 정리한다.
+- [src/ui/statusBar.ts](../src/ui/statusBar.ts): 기존 문자열 `tooltip`을 위 카드로 교체하고 클릭 명령을 `agentTracker.toggleQuotaTooltip`으로 지정했다. 카운트다운은 1분마다 현재 snapshot에서 다시 계산하며 네트워크 조회나 통계 스캔을 시작하지 않는다.
+- [src/extension.ts](../src/extension.ts): 새로고침·사용량 통계 링크는 기존 명령을 사용한다. 상세/압축 설정과 확장 관리는 허용된 값만 받는 별도 명령을 등록했다. 관리 링크는 Claude/Codex의 고정된 확장 ID만 연다. 패치가 없는 설치에서 클릭 명령은 `workbench.action.showHover`로 열린다.
+- [package.json](../package.json): 하단 사용량 패널 등록과 기존 `agentTracker.toggleQuota` 명령을 제거했다. 기존 quota Webview 구현과 전용 JS/CSS도 제거했다. 사용량 통계·Diagnostics Webview는 계속 사용한다.
+- [scripts/vscode/statusbar-toggle.cjs](../scripts/vscode/statusbar-toggle.cjs): Agent Tracker 클릭 명령을 내부 토글 객체에 연결하는 로컬 설치 패치와 적용 확인·복원을 제공한다.
 
-공개 API 범위에서 선택할 수 있는 구현은 Markdown 카드형 툴팁이다. 클릭 토글이 필수라면 이 조사만으로 요구사항이 충족되는 구현을 확보한 상태는 아니다. 이 문서는 조사 내용을 기록하며 실제 UI 코드는 변경하지 않았다.
+카드의 상세/압축 설정은 상태표시줄에만 적용하며, 카드에는 숨긴 제공자를 포함해 모든 quota 기간을 표시한다. 두 제공자의 상태표시줄 표시를 모두 숨기면 카드 진입점도 숨겨진다. 드래그 이동과 임의 CSS는 제공하지 않는다.
+
+## 내장 클릭 토글에 연결하는 알고리즘
+
+1. 현재 VS Code 설치의 workbench bundle에서 `statusBar.entry.toggleTooltip` 객체와 `StatusbarEntryItem.update` 처리 지점을 찾는다. 변수 이름은 현재 bundle에서 구하며 고정하지 않는다. 중복되거나 예상한 pointer·sticky hover 처리가 없으면 중단한다.
+2. `update(entry)` 시작에 `entry.extensionId === 'agent-tracker.agent-tracker'`이고 `entry.command.id === 'agentTracker.toggleQuotaTooltip'`인 경우만 명령 객체를 내부 `ToggleTooltipCommand`로 바꾸는 코드를 삽입한다. 입력 객체는 복사하므로 원래 entry는 변경하지 않는다.
+3. 카드의 자동 호버 등록 전에 해당 항목의 `mouseover`·`focus` capture listener를 등록한다. 현재 항목이 Agent Tracker의 내부 토글 명령인 경우만 `stopImmediatePropagation()`으로 자동 열기를 막는다. 갱신 때 중복 등록하지 않고 항목 해제 시 listener를 제거한다. 이 이벤트는 내장 자동 호버의 시작점이다. [자동 호버 소스][hover-service]
+4. VS Code의 기존 pointerdown·click 처리는 그대로 실행된다. pointerdown에서 기존 sticky hover 여부를 기록하므로 mousedown의 기본 닫기 처리 뒤에도 두 번째 클릭을 닫기로 판단할 수 있다. 열기는 `hover.show(true)`를 사용해 마우스를 옮겨도 유지한다. [내장 처리 소스][statusbar-item]
+5. 다른 확장·명령과 quota 데이터 조회는 이 변환을 거치지 않는다. 닫기·외부 클릭·Esc의 상태 처리는 VS Code가 맡는다.
+
+명령 ID만 전달하는 방식에서 부족했던 **객체 동일성**을 2번에서 해결한다. 3번은 자동 열기를 없애고 명시적인 클릭·키보드 토글과 열린 카드의 갱신을 유지한다. 확장 호스트가 내부 sentinel 객체를 직접 얻는 방식은 아니다.
+
+## 적용·확인·복원
+
+저장소 루트에서 VSIX를 설치한 뒤 실행한다.
+
+```sh
+npm run patch:vscode
+npm run patch:vscode -- --check
+npm run test:toggle
+```
+
+적용·갱신 뒤에는 **모든 VS Code 창을 종료하고 다시 실행한다.** `Developer: Reload Window`는 메인 프로세스를 재시작하지 않으므로 패치 전에 읽은 product checksum으로 변경된 파일을 검사해 설치 손상 경고가 나올 수 있다. 복원 뒤에도 완전히 종료하고 다시 실행한다.
+
+```sh
+npm run restore:vscode
+```
+
+Windows 기본 설치는 환경 변수에서 찾고 `bin/code.cmd`가 가리키는 현재 버전의 `resources/app`을 사용한다. 개인 계정이나 저장소 절대 경로는 코드에 고정하지 않는다. 선택한 Windows CLI를 대상으로 하려면 `npm run patch:vscode -- --cli "<code.cmd 경로>"`를 사용한다. 별도 설치는 `--executable` 또는 `--app-root`로 지정한다. 확인과 복원에도 동일한 대상 옵션을 사용한다.
+
+수정 전에 등록된 workbench checksum과 JavaScript 구문을 검증한다. 원본 `workbench.desktop.main.js`와 `product.json`을 각각 `.agent-tracker-toggle.bak`으로 보관하며 변경 전후 SHA-256을 `.agent-tracker-toggle.json`에 기록한다. `product.json`에서는 해당 workbench 파일의 checksum만 갱신한다. 재실행은 중복 삽입하지 않고, 기존 v1 토글 패치는 원본 백업을 보존하며 v2 클릭 전용 패치로 갱신한다. 복원은 원본 파일을 정확히 되돌린다. 이후 다른 수정이나 백업 손상이 감지되면 덮어쓰지 않는다. 적용·갱신 도중 한 파일만 변경된 경우도 백업으로 복원할 수 있다.
+
+이는 비공개 구현에 의존하는 로컬 패치다. **VS Code 업데이트 뒤에는 재적용해야 한다.** VSIX 패키징·확장 활성화·CI에서는 설치 파일을 자동 수정하지 않는다. 지원하지 않는 내부 구조에서는 적용을 중단하며, 패치가 없는 설치는 기본 마우스 호버와 클릭 열기 경로를 사용한다.
+
+### 설치 손상 경고를 받은 경우
+
+VS Code는 현재 파일 checksum을 실행 시 전달받은 product 기준값과 비교한다. 패치 당시 실행 중이던 메인 프로세스는 이전 기준값을 계속 사용할 수 있으므로 창 새로고침 후에도 경고가 날 수 있다. [무결성 검사 소스][integrity-service], [렌더러 product 설정][product-configuration]
+
+2026-10-05에 사용자의 경고를 조사했을 때 디스크의 등록된 검사 대상 10개는 모두 현재 checksum과 일치했고, 메인 프로세스는 product 파일 변경 전에 시작되어 있었다. 이전 기준값이 남은 경우로 판단했으며 원본 백업도 유지되어 있다. 경고를 숨기거나 무결성 검사를 끄지 않고 완전 재시작으로 새 기준값을 읽도록 한다. 재시작 후에도 반복되면 실제 검사 실패 항목을 확인하고, 필요하면 위 복원 명령으로 원본으로 되돌린다.
+
+후속 조사에서도 12:47에 시작된 메인 프로세스가 유지되어 새 창이 기존 프로세스를 사용하고 있었다. 별도 프로필의 새 VS Code 프로세스에서 `vscode.context.configuration().product.checksums`를 직접 읽어 디스크 registry와 일치함을 확인하고, 등록된 파일 10개가 실제 runtime 기준값과 모두 일치하는 것을 검증했다. 이 새 프로세스에서는 설치 손상 경고가 표시되지 않았으며 클릭 전용 토글도 통과했다. 결과는 `test-results/statusbar-integrity.json`에 저장한다. 종료할 때는 상단 **파일 → 종료**를 사용하고 다른 VS Code 창이나 메인 프로세스가 남아 있지 않은 상태에서 다시 실행한다.
+
+## 구현 검증
+
+- `npm run check`: 타입 검사·lint와 102개 테스트 통과. 카드 명령과 통계 스캔 분리 외에 내부 객체 동일성, 확장·명령 범위, 자동 호버 차단과 listener 해제, v1 패치 갱신, 현재 CLI 경로 선택, checksum·백업·복원, 중단된 적용 복구를 검증했다.
+- `npm run test:vscode`: 실제 VS Code 1.140.0에서 `MarkdownString`의 문자열 이스케이프, 모든 기간 표시, 사용률/남은 비율, 초기화 카운트다운과 조회 상태를 검증했다. 카드에 연결된 통계 명령과 Usage·Diagnostics Webview는 light/dark 테마에서 통과했다.
+- `npm run test:toggle`: 격리된 실제 VS Code 1.140.0에서 마우스를 올려도 열리지 않음, 첫 클릭 열기, 상태표시줄 위 배치, 마우스 이탈 뒤 유지, 두 번째 클릭 닫기, 닫은 뒤 재호버 억제, 바깥 클릭·Esc 뒤 한 번 클릭 재열기를 통과했다. hover 지연을 100ms로 설정하고 1.5초간 관찰했으며 실제 마우스·키보드 이벤트를 전송했다. [검증 스크립트](../scripts/test-statusbar-toggle.cjs)
+- 같은 테스트에서 새 프로세스가 로드한 product checksum과 디스크 registry, 파일 10개의 실제 checksum이 일치함을 검증하고 설치 손상 알림이 표시되지 않는지 확인한다.
+- 클릭 결과는 `test-results/statusbar-toggle.json`, 실제 화면은 `test-results/statusbar-toggle.png`에 저장했다. 합성 계정 오류 상태의 카드 화면도 직접 확인했다. 모든 제공자 상태·창 크기·원격 환경의 화면 검증까지 포함한 결과는 아니다.
 
 [statusbar-api]: https://code.visualstudio.com/api/references/vscode-api#StatusBarItem
 [markdown-api]: https://code.visualstudio.com/api/references/vscode-api#MarkdownString
@@ -80,6 +132,9 @@ VS Code 자체의 사용량 카드에는 DOM으로 만든 대시보드가 사용
 [webview-guide]: https://code.visualstudio.com/api/extension-guides/webview
 [statusbar-service]: https://github.com/microsoft/vscode/blob/1.140.0/src/vs/workbench/services/statusbar/browser/statusbar.ts
 [statusbar-item]: https://github.com/microsoft/vscode/blob/1.140.0/src/vs/workbench/browser/parts/statusbar/statusbarItem.ts
+[hover-service]: https://github.com/microsoft/vscode/blob/1.140.0/src/vs/platform/hover/browser/hoverService.ts#L543
+[integrity-service]: https://github.com/microsoft/vscode/blob/1.140.0/src/vs/workbench/services/integrity/electron-browser/integrityService.ts#L96
+[product-configuration]: https://github.com/microsoft/vscode/blob/1.140.0/src/vs/platform/product/common/product.ts#L23
 [ext-host-commands]: https://github.com/microsoft/vscode/blob/1.140.0/src/vs/workbench/api/common/extHostCommands.ts
 [statusbar-extension]: https://github.com/microsoft/vscode/blob/1.140.0/src/vs/workbench/api/browser/statusBarExtensionPoint.ts
 [chat-dashboard]: https://github.com/microsoft/vscode/blob/1.140.0/src/vs/workbench/contrib/chat/browser/chatStatus/chatStatusDashboard.ts
