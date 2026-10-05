@@ -2,6 +2,11 @@ import { SummaryError } from '../jsonl';
 import type { FileContext, ParsedIdentity, ParseSink, TokenVector } from '../types';
 import { codexTokens, number, object, project, string, timestamp, tokenFlags } from './common';
 
+/** Codex lifecycle payloads use Unix seconds; row timestamps and durations keep their existing units. */
+function lifecycleTimestamp(value: unknown): number | null {
+  return timestamp(typeof value === 'number' ? value * 1000 : value);
+}
+
 export class CodexCurrentParserAdapter {
   private identityValue: ParsedIdentity | undefined;
   private root: string | undefined;
@@ -77,7 +82,7 @@ export class CodexCurrentParserAdapter {
       if (event === 'task_started') {
         this.currentClosed = false; this.hasUserInTurn = false; this.pendingLifecycle = true;
         if (this.root) this.sink.event({ kind: 'turn', rootId: this.root, isMain: this.identityValue.isMain,
-          startedAt: timestamp(payload.started_at) ?? time, offset });
+          startedAt: lifecycleTimestamp(payload.started_at) ?? time, offset });
       } else if (event === 'user_message') {
         if (ownTurns && (!this.root || this.currentClosed || this.hasUserInTurn && !this.pendingLifecycle)) {
           this.root = string(payload.id) ?? (time === null ? undefined : `legacy-${time}`);
@@ -90,7 +95,7 @@ export class CodexCurrentParserAdapter {
         this.currentClosed = true;
         if (!this.root) return;
         this.sink.event({ kind: 'turn', rootId: this.root, isMain: this.identityValue.isMain, completed: true,
-          completedAt: timestamp(payload.completed_at) ?? time,
+          completedAt: lifecycleTimestamp(payload.completed_at) ?? time,
           duration: typeof payload.duration_ms === 'number' ? number(payload.duration_ms) : null,
           durationQuality: typeof payload.duration_ms === 'number' ? 'exact' : 'derived', offset });
       } else if (event === 'agent_message' && this.root) {

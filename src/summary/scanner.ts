@@ -10,7 +10,7 @@ import { ClaudeParserAdapter, CodexCurrentParserAdapter } from './parsers';
 import { acquireRefreshLock } from './lock';
 import type { SourceRoot, SummaryOptions, SummaryProgress, RefreshResult } from './types';
 
-export const PARSER_VERSION = 2;
+export const PARSER_VERSION = 3;
 const componentPredicate = `EXISTS(SELECT 1 FROM component c WHERE c.provider=scan_files.provider
   AND (c.session_id=scan_files.session_id OR c.session_id=scan_files.old_session))`;
 

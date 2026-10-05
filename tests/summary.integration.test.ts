@@ -4,7 +4,7 @@ import { mkdtemp, mkdir, writeFile, readFile, appendFile, unlink, rm } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SummaryDatabase } from '../src/summary/db';
-import { refreshSummary } from '../src/summary/scanner';
+import { PARSER_VERSION, refreshSummary } from '../src/summary/scanner';
 import { SummaryClient } from '../src/summary/client';
 import type { SummaryOptions } from '../src/summary/types';
 import { acquireRefreshLock } from '../src/summary/lock';
@@ -120,6 +120,57 @@ const codexStart = (turn:string,root=turn) => ({type:'event_msg',timestamp:'2026
 const currentUsage = (thread:string,turn:string,root:string,input:number) => ({type:'token_usage_record',payload:{thread_id:thread,turn_id:turn,root_turn_id:root,response_id:`r-${thread}`,usage:{input_tokens:input,output_tokens:0}}});
 const legacyUsage = (input:number) => ({type:'event_msg',payload:{type:'token_count',info:{total_token_usage:{input_tokens:input,output_tokens:0},last_token_usage:{input_tokens:input,output_tokens:0}}}});
 const rootlessStart = (turn:string) => ({type:'event_msg',timestamp:'2026-10-01T00:00:00Z',payload:{type:'task_started',turn_id:turn}});
+
+test('Codex lifecycle seconds produce correct calendar groups, date filters and derived durations',async () => fixture(async (database,options,root) => {
+  const codexOptions={...options,roots:[{provider:'codex' as const,path:root}]};
+  const started=Date.parse('2026-09-30T14:59:59Z');const completed=started+3000;
+  const rows: unknown[]=[codexMeta('main')];
+  for (const [turn,duration,input] of [['exact',2750,100],['derived',undefined,200]] as const) {
+    rows.push(
+      {type:'event_msg',timestamp:'2026-09-30T15:00:00.100Z',payload:{type:'task_started',turn_id:turn,started_at:started/1000}},
+      {type:'event_msg',timestamp:'2026-09-30T15:00:00.200Z',payload:{type:'user_message'}},
+      legacyUsage(input),
+      {type:'event_msg',timestamp:'2026-09-30T15:00:02.200Z',payload:{type:'task_complete',turn_id:turn,completed_at:completed/1000,duration_ms:duration}},
+    );
+  }
+  await writeFile(join(root,'main.jsonl'),jsonl(rows));
+  assert.equal((await refreshSummary(database,codexOptions)).failed,0);
+  const turns=database.queryTurns();assert.equal(turns.length,2);
+  assert.ok(turns.every(row=>row.started_at_ms===started && row.completed_at_ms===completed));
+  const exact=turns.find(row=>row.root_turn_id==='exact')!;const derived=turns.find(row=>row.root_turn_id==='derived')!;
+  assert.equal(exact.duration_ms,2750);assert.equal(exact.duration_quality,'exact');
+  assert.equal(derived.duration_ms,3000);assert.equal(derived.duration_quality,'derived');
+  const filter={fromMs:Date.parse('2026-09-29T15:00:00Z'),toMs:Date.parse('2026-09-30T15:00:00Z')};
+  assert.equal(database.queryTurns(filter).length,2);
+  const days=database.queryUsage(filter,'day','Asia/Seoul');assert.equal(days.length,1);
+  assert.equal(days[0].period,'2026-09-30');assert.equal(days[0].total_tokens,300);
+  assert.equal(database.queryUsage({},'month','Asia/Seoul')[0].period,'2026-09');
+  assert.equal(database.queryTurns({fromMs:filter.toMs}).length,0);
+}));
+
+test('Codex parser version rebuilds cached seconds timestamps without changes to source files',async () => fixture(async (database,options,root) => {
+  const codexOptions={...options,roots:[{provider:'codex' as const,path:root}]};
+  const main=join(root,'main.jsonl');
+  await writeFile(main,jsonl([codexMeta('main'),
+    {type:'event_msg',timestamp:'2026-08-16T05:28:27.439Z',payload:{type:'task_started',turn_id:'t',started_at:1786858107}},
+    legacyUsage(100),
+    {type:'event_msg',timestamp:'2026-08-16T05:49:14.489Z',payload:{type:'task_complete',turn_id:'t',completed_at:1786859354,duration_ms:1247169}},
+  ]));
+  await refreshSummary(database,codexOptions);
+  // Recreate the accepted v2 cache; source size, mtime and identity stay unchanged.
+  database.connection.exec(`UPDATE manifest SET parser_version=2;
+    UPDATE turn_summary SET started_at_ms=1786858107,completed_at_ms=1786859354`);
+  assert.equal(database.queryUsage({},'month','Asia/Seoul')[0].period,'1970-01');
+  const refreshed=await refreshSummary(database,codexOptions);
+  assert.equal(refreshed.failed,0);assert.equal(refreshed.parsed,1);assert.ok(refreshed.bodyBytes>0);
+  const turns=database.queryTurns();assert.equal(turns.length,1);
+  assert.equal(turns[0].started_at_ms,1786858107000);assert.equal(turns[0].completed_at_ms,1786859354000);
+  assert.equal(turns[0].total_tokens,100);assert.equal(turns[0].duration_ms,1247169);
+  assert.equal(database.queryUsage({},'month','Asia/Seoul')[0].period,'2026-08');
+  assert.equal(database.findManifest('codex',main)!.parser_version,PARSER_VERSION);
+  const unchanged=await refreshSummary(database,codexOptions);
+  assert.equal(unchanged.failed,0);assert.equal(unchanged.reused,1);assert.equal(unchanged.bodyBytes,0);
+}));
 
 test('rootless legacy subagents become separate sessions without counting verified inherited usage twice',async () => fixture(async (database,options,root) => {
   const codexOptions={...options,roots:[{provider:'codex' as const,path:root}]};

@@ -31,6 +31,32 @@ test('current Codex uses response usage and treats cumulative snapshots as valid
   assert.equal(events.filter(event=>event.kind==='usage').length,1);assert.equal((events.find(event=>event.kind==='usage') as UsageEvent).tokens.input,100);
   assert.ok(events.some(event=>event.kind==='turn' && event.duration===400));
 });
+
+test('Codex lifecycle timestamps convert Unix seconds while preserving explicit millisecond durations', () => {
+  const events = codex([
+    {type:'event_msg',timestamp:'2026-08-16T05:28:27.439Z',payload:{type:'task_started',turn_id:'t',started_at:1786858107}},
+    {type:'event_msg',timestamp:'2026-08-16T05:49:14.489Z',payload:{type:'task_complete',turn_id:'t',completed_at:1786859354,duration_ms:1247169}},
+  ]);
+  assert.ok(events.some(event=>event.kind==='turn' && event.startedAt===Date.parse('2026-08-16T05:28:27Z')));
+  assert.ok(events.some(event=>event.kind==='turn' && event.completedAt===Date.parse('2026-08-16T05:49:14Z')
+    && event.duration===1247169 && event.durationQuality==='exact'));
+});
+
+test('Codex lifecycle timestamps retain ISO values and fall back to row timestamps for invalid values', () => {
+  const rowTime = Date.parse('2026-10-01T00:00:00.123Z');
+  for (const [value,expected] of [
+    ['2026-09-30T23:59:59Z',Date.parse('2026-09-30T23:59:59Z')], [0,0],
+    [undefined,rowTime], [null,rowTime], ['invalid',rowTime], [NaN,rowTime], [Infinity,rowTime], [8.64e12+1,rowTime],
+  ] as const) {
+    const events = codex([
+      {type:'event_msg',timestamp:rowTime,payload:{type:'task_started',turn_id:'t',started_at:value}},
+      {type:'event_msg',timestamp:rowTime,payload:{type:'task_completed',turn_id:'t',completed_at:value}},
+    ]);
+    assert.ok(events.some(event=>event.kind==='turn' && event.startedAt===expected), `started_at: ${value}`);
+    assert.ok(events.some(event=>event.kind==='turn' && event.completedAt===expected), `completed_at: ${value}`);
+  }
+});
+
 test('legacy high-water clamps regression and suppresses repeated snapshots',() => {
   const count = (input:number) => ({type:'event_msg',payload:{type:'token_count',info:{total_token_usage:{input_tokens:input,output_tokens:0}}}});
   const events = codex([{type:'turn_context',payload:{turn_id:'t'}},count(100),count(100),count(60),count(120)]);
