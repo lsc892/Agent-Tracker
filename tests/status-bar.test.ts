@@ -40,7 +40,7 @@ test('compact status does not substitute weekly quota when the five-hour window 
   assert.match(statusBarPresentation(weeklyOnly,'used','detailed',0).text,/7일 .*92% 사용/);
 });
 
-test('status prefers overall provider windows while other quota buckets remain available to the panel', () => {
+test('status prefers overall provider windows while other quota buckets remain available to the hover', () => {
   const windows=state.snapshot!.windows.map(window=>({...window,limitId:'codex'}));
   const codex={...state,snapshot:{...state.snapshot!,windows:[{...windows[0],id:'review:primary',limitId:'review',usedPercent:99},...windows]}};
   assert.match(statusBarPresentation(codex,'used','compact',0).text,/23% 사용/);

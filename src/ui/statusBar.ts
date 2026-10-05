@@ -2,11 +2,12 @@ import * as vscode from 'vscode';
 import type { TrackerConfiguration } from '../configuration';
 import type { QuotaState } from '../quota/types';
 import { statusBarPresentation } from './statusBarPresentation';
+import { createQuotaTooltip } from './quotaTooltip';
 export { statusBarPresentation, remainingBar } from './statusBarPresentation';
 
 type StatusSettings = Pick<TrackerConfiguration, 'percentage' | 'detail' | 'claude' | 'codex'>;
 
-/** One combined quota button, followed by a refresh button on its right. */
+/** One quota card with native click pinning, followed by its refresh button. */
 export class QuotaStatusBar implements vscode.Disposable {
   private readonly quota = vscode.window.createStatusBarItem('agentTracker.quota', vscode.StatusBarAlignment.Right, -1000);
   private readonly refresh = vscode.window.createStatusBarItem('agentTracker.refreshQuota', vscode.StatusBarAlignment.Right, -1001);
@@ -16,7 +17,7 @@ export class QuotaStatusBar implements vscode.Disposable {
 
   constructor() {
     this.quota.name = 'Agent Tracker: 사용량';
-    this.quota.command = 'agentTracker.toggleQuota';
+    this.quota.command = 'agentTracker.toggleQuotaTooltip';
     this.refresh.name = 'Agent Tracker: 현재 사용량 새로고침';
     this.refresh.command = 'agentTracker.refreshQuota';
     this.refresh.tooltip = '현재 Claude/Codex 사용량 새로고침';
@@ -35,8 +36,8 @@ export class QuotaStatusBar implements vscode.Disposable {
     const visible = ['claude', 'codex'].flatMap(provider => states.filter(state => state.provider === provider && settings[state.provider].showStatusBar));
     const views = visible.map(state => statusBarPresentation(state, settings.percentage, settings.detail));
     this.quota.text = views.map(view => view.text).join('   ');
-    this.quota.tooltip = `${views.map(view => view.accessibleText).join('\n')}\n클릭하여 사용량 열기 / 닫기`;
-    this.quota.accessibilityInformation = { label: `${views.map(view => view.accessibleText).join('. ')}. 사용량 열기 / 닫기`, role: 'button' };
+    this.quota.tooltip = createQuotaTooltip(states, settings);
+    this.quota.accessibilityInformation = { label: `${views.map(view => view.accessibleText).join('. ')}. 클릭하여 사용량 카드 열기 / 닫기`, role: 'button' };
     this.refresh.text = states.some(state => state.refreshing) ? '$(sync~spin)' : '$(refresh)';
     if (visible.length) {
       this.quota.show();

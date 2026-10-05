@@ -6,7 +6,6 @@ import { ClaudeQuotaProvider, CodexQuotaProvider, QuotaService } from './quota';
 import { SummaryClient } from './summary/client';
 import { Dashboard } from './ui/dashboard';
 import { QuotaStatusBar } from './ui/statusBar';
-import { QuotaView } from './ui/quotaView';
 
 let shutdown: (() => Promise<void>) | undefined;
 
@@ -25,22 +24,27 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const refreshQuota = async (): Promise<void> => {
     await Promise.all([quota.refresh('claude', true), quota.refresh('codex', true)]);
   };
-  const quotaView = new QuotaView({ extensionUri: context.extensionUri, settings: () => settings,
-    quota: () => quota.getStates(), refresh: refreshQuota, openUsage: () => dashboard.open('usage') });
   const statusBar = new QuotaStatusBar();
-  const render = (): void => {
-    statusBar.update(quota.getStates(), settings);
-    quotaView.update();
-  };
+  const render = (): void => statusBar.update(quota.getStates(), settings);
   let subscription = quota.subscribe(render);
-  const open = (argument?: unknown): void | Promise<void> => {
+  const open = (argument?: unknown): void => {
     const value = argument && typeof argument === 'object' ? argument as Record<string, unknown> : {};
-    if (value.tab === 'quota') return quotaView.toggle();
+    // Legacy quota navigation must not accidentally start a transcript scan.
+    if (value.tab === 'quota') return;
     dashboard.open(value.tab === 'diagnostics' ? 'diagnostics' : 'usage');
   };
-  context.subscriptions.push(statusBar, quotaView, dashboard,
-    vscode.window.registerWebviewViewProvider('agentTracker.quotaView', quotaView, { webviewOptions: { retainContextWhenHidden: true } }),
-    vscode.commands.registerCommand('agentTracker.toggleQuota', () => quotaView.toggle()),
+  context.subscriptions.push(statusBar, dashboard,
+    // Patched VS Code maps this command to its native ToggleTooltipCommand before
+    // command dispatch. The ordinary command remains a click-to-open fallback.
+    vscode.commands.registerCommand('agentTracker.toggleQuotaTooltip', () => vscode.commands.executeCommand('workbench.action.showHover')),
+    vscode.commands.registerCommand('agentTracker.setStatusBarDetail', async (detail: unknown) => {
+      if (detail !== 'compact' && detail !== 'detailed') return;
+      await vscode.workspace.getConfiguration('agentTracker').update('display.detail', detail, vscode.ConfigurationTarget.Global);
+    }),
+    vscode.commands.registerCommand('agentTracker.manageProvider', async (provider: unknown) => {
+      if (provider !== 'claude' && provider !== 'codex') return;
+      await vscode.commands.executeCommand('extension.open', provider === 'claude' ? 'anthropic.claude-code' : 'openai.chatgpt');
+    }),
     vscode.commands.registerCommand('agentTracker.refreshQuota', refreshQuota),
     vscode.commands.registerCommand('agentTracker.openDashboard', open),
     vscode.commands.registerCommand('agentTracker.openUsage', () => dashboard.open('usage')),
@@ -75,7 +79,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     disposed = true;
     subscription.dispose();
     statusBar.dispose();
-    quotaView.dispose();
     dashboard.dispose();
     await Promise.allSettled([quota.dispose(), summary.dispose(), configurationQueue]);
   };
