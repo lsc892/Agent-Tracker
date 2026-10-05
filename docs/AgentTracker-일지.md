@@ -1,6 +1,6 @@
 # Agent Tracker 설계 결정 일지
 
-> 기준 문서: [Agent Tracker 설계 명세](./AgentTracker.md). 아래 결과는 구현 완료가 아니라 설계 명세에 반영된 결정이다.
+> 기준 문서: [Agent Tracker 설계 명세](./AgentTracker.md). 각 항목의 결과에 설계 명세 또는 실제 구현의 반영 범위를 기록한다.
 
 ## 현재 설계 결정 요약
 
@@ -13,7 +13,7 @@
 - **사용량 화면과 설정**: Claude 왼쪽·Codex 오른쪽의 두 상태바 항목을 클릭해 공통 Quota 화면으로 이동하고 provider별 새로 고침·설정도 클릭으로 실행한다. 근거: 상세 통계와 조작을 명시적으로 제공하는 대신 상태바·Webview·설정 간 연결을 관리해야 한다.
 - **인증 범위**: 자체 로그인·계정 추가·삭제·전환 UI 없이 기존 CLI 로그인과 data home을 재사용하며 제공자 VS Code 확장 설치는 필수가 아니다. 근거: 인증 관리 UI를 줄이는 대신 기존 credential 만료·실행 파일 탐색·환경 불일치 처리는 필요하다.
 - **실패와 오래된 값**: 마지막 성공 값·시각과 갱신 실패 안내를 유지하고, 성공 이력이 없거나 유지 기한이 지나면 조회 불가를 표시한다. 근거: 일시 실패에도 정보를 보존하되 오래된 값을 현재 값으로 오인시키지 않는다.
-- **영속 저장소**: 원본은 provider JSONL, SQLite 영속 table은 manifest와 turn_summary 두 개로 둔다. project·session 정보는 summary column에 직접 저장한다. 근거: 현재 조회는 사용자 요청 최종 합계만으로 가능하며 별도 agent·response candidate·scan 이력 table은 필요하지 않다.
+- **영속 저장소와 이름**: 원본은 provider JSONL과 제목 metadata, SQLite 영속 table은 manifest·projects·sessions·turn_summary로 둔다. 이름은 프로젝트·세션당 한 번 저장하고 요청별 통계는 ID로 연결한다. 근거: 요청마다 이름을 반복 저장하는 양과 이름 변경 비용을 줄이는 대신 조회 시 metadata 연결과 기존 DB 전환을 관리한다.
 - **갱신 단위**: manifest 발견·비교는 최대 n개씩, 재집계와 summary 교체는 영향 session 단위로 수행한다. 중복 제거·agent 연결은 임시 디스크 staging에서 처리한다. 근거: candidate를 영속화하지 않아 구조가 단순해지는 대신 append도 해당 session 원본 전체를 다시 읽어야 한다.
 - **파일 조회·삭제·이동 판정**: 파일은 (provider, path)로 조회하고 source_root로 삭제 범위를 제한하며, 신뢰 가능한 dev/inode로 이동을 판단한다. 근거: 순회한 루트의 미방문 파일만 삭제하고 경로가 바뀐 파일의 동일성을 확인한다.
 - **삭제 판정과 수동 재실행**: 전체 순회 성공 후 이번 실행에서만 미방문 파일을 삭제 대상으로 판단하고 summary 교체와 함께 삭제한다. 오류·중단 후 자동 재시도 없이 다음 화면 진입·수동 새로 고침에서 새로 조사한다. 근거: 삭제 상태나 재처리 대기열을 영속화하지 않아도 transaction으로 기존 통계와 metadata를 보존할 수 있다.
@@ -23,9 +23,17 @@
 - **token 정규화**: parser 내부에서 cache·reasoning component를 정규화한 뒤 summary에는 input/output/total 합계만 저장한다. 근거: provider별 포함 관계로 인한 이중 집계를 방지하되 사용하지 않는 세부 component는 영속화하지 않는다.
 - **평균과 디버깅**: 평균 token·시간은 완료 요청을 대상으로 하고 누락 duration은 분모에서 제외한다. manifest 진단은 상태·처리 위치·기록 시각·오류 네 column, summary는 문제 원본 정보로 제한한다. 근거: 사용자 issue 보고에 필요한 최근 상태만 기록하고 자동 복구용 cursor와 전체 처리 이력은 관리하지 않는다.
 - **메모리 경계**: Extension Host에는 최신 quota snapshot, refresh 상태와 현재 Webview page만 유지하고 worker는 n개 파일 metadata와 byte 예산 내 parser/row buffer를 관리한다. 근거: 전체 경로·manifest·본문·집계 map의 적재를 피하되 한 줄 크기와 DB cache·임시 작업은 별도로 제한해야 한다.
-- **개인정보 경계**: SQLite에는 prompt·response·tool 본문을 저장하지 않고 식별자, 숫자, 시각과 품질 정보만 보존한다. 근거: 분석에 불필요한 대화 내용과 credential을 장기 저장하지 않는다.
+- **개인정보 경계**: SQLite에는 식별자, 표시 이름, 숫자, 시각과 품질 정보를 보존하며 prompt·response·tool 본문은 저장하지 않는다. 세션 제목은 원본 metadata에서만 가져온다. 근거: 읽을 수 있는 이름을 제공하면서 분석에 불필요한 대화 본문과 credential을 장기 저장하지 않는다.
 
 ---
+
+## 2026-10-05 — 사용자
+
+### 프로젝트·세션 이름을 ID로 연결하는 별도 테이블로 정규화
+
+- **의사결정**: projects는 project_key당 프로젝트명 한 행, sessions는 (provider, session_id)당 세션명 한 행을 저장하고 turn_summary에는 식별자와 요청별 수치를 둔다. 같은 프로젝트 안에서 AI가 같은 세션명을 붙여도 이름으로 묶지 않는다.
+- **근거**: 요청마다 프로젝트명과 세션명을 반복 저장하면 요청 수에 비례해 문자열 저장량이 늘고 제목 변경도 여러 행에 반영해야 한다. 이름을 한곳에서 관리하는 대신 조회 시 metadata 연결과 기존 SQLite schema 전환 비용을 감수한다.
+- **결과**: 실제 저장 schema와 명세를 네 table로 변경하고 기존 DB의 요청 ID·통계·파일 참조를 보존하는 전환을 추가했다. 통계 화면은 원본 제목과 프로젝트명으로 표시·검색하고 특정 행 선택은 ID를 사용한다. Codex 제목 변경은 변경 없는 대화 로그를 다시 읽지 않고 반영한다.
 
 ## 2026-10-03 — 사용자
 

@@ -46,7 +46,9 @@
 - 다음 사용자 요청에서 새 scan으로 재조사; 다시 나타난 파일은 삭제 대상으로 판정하지 않음
 - 대상에서 제외된 루트는 이번 scan의 삭제 판정에서 제외
 - 여러 창의 refresh 직렬 실행; 일부 session 반영을 전체 최신 통계로 표시하지 않음
-- 영속 schema에는 manifest와 turn_summary 두 table만 존재
+- 영속 schema는 manifest·projects·sessions·turn_summary로 구성하며 이름은 요청별 행에 반복 저장하지 않음
+- 동일 프로젝트의 중복 세션 제목은 ID로 분리하며 이름 검색·행 선택·제목 변경을 검증
+- 기존 DB 전환은 요청 ID·통계·manifest 참조를 보존
 
 ### Claude parser
 

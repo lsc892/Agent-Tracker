@@ -15,7 +15,7 @@ VS Code 확장으로 다음 두 기능을 제공한다.
 
 - quota는 실시간성이 중요하므로 작은 최신 상태만 메모리에 유지한다.
 - 과거 누계는 화면을 열거나 사용자가 새로 고침을 요청할 때만 manifest와 JSONL을 비교하는 lazy 방식으로 갱신한다.
-- SQLite 영속 table은 manifest와 사용자 요청당 한 행인 turn_summary 두 개로 제한한다. 식별자, 합계, 시각과 현재 처리·오류 정보만 저장한다.
+- SQLite 영속 table은 manifest·projects·sessions·turn_summary로 둔다. 표시 이름은 프로젝트·세션당 한 번 저장하고 요청별 통계는 식별자로 연결한다.
 - subagent token은 부모의 사용자 요청에 합산하지만, 시간은 root/main turn의 경과 시간만 사용한다.
 
 ## 2. 전체 구조
@@ -203,7 +203,7 @@ Codex:  ~/.codex/sessions/**/*.jsonl
 
 ### 4.3 manifest
 
-영속 SQLite table은 `manifest`와 `turn_summary` 두 개로 둔다. manifest는 JSONL 파일마다 한 행, turn summary는 main과 subagent를 합친 외부 사용자 요청마다 한 행이다. project·session은 summary의 column으로 저장하며 agent별 row와 response candidate는 영속화하지 않는다.
+영속 SQLite table은 `manifest`, `projects`, `sessions`, `turn_summary`로 둔다. manifest는 JSONL 파일마다 한 행, turn summary는 main과 subagent를 합친 외부 사용자 요청마다 한 행이다. 프로젝트명은 project_key당 한 행, 세션명은 (provider, session_id)당 한 행으로 저장하고 summary에는 식별자만 둔다. agent별 row와 response candidate는 영속화하지 않는다.
 
 manifest 전체를 메모리에 적재하지 않는다. 파일 metadata 전수조사는 유지하되 발견·조회·비교는 최대 `n`개씩 처리한다. 진단용 정보는 상태·처리 위치·기록 시각·오류 네 column으로 제한한다.
 
@@ -266,7 +266,7 @@ response별 증분 상태를 영속화하지 않으므로 append도 tail만 더�
 
 누계 갱신은 Usage 화면 진입 또는 사용자 새로 고침으로 시작한다. 파일 조사와 방문 기록은 최대 n개씩 수행하고, 통계의 확정 단위는 논리 session이다. 하나의 session에는 main과 여러 subagent 파일이 함께 속할 수 있다. 파일의 session 귀속이 바뀌면 이전·새 session을 같은 반영 단위로 묶는다.
 
-아래 절차는 각 문제에 대한 처리 기준이다. scan ID, 이번 실행의 대상 루트와 순회 완료 여부는 worker의 실행 상태로만 관리한다. 임시 작업 목록과 집계 결과는 디스크 staging에 두고 종료 시 폐기하며, 영속 table은 manifest와 turn_summary 두 개로 유지한다.
+아래 절차는 각 문제에 대한 처리 기준이다. scan ID, 이번 실행의 대상 루트와 순회 완료 여부는 worker의 실행 상태로만 관리한다. 임시 작업 목록과 집계 결과는 디스크 staging에 두고 종료 시 폐기하며, 영속 table은 manifest·projects·sessions·turn_summary로 유지한다.
 
 #### 4.4.1 파일과 집계 결과가 커져 메모리·DB 잠금이 늘어나는 문제
 
@@ -293,7 +293,7 @@ response별 증분 상태를 영속화하지 않으므로 append도 tail만 더�
 3. 현재 귀속을 기준으로 두 session의 summary를 모두 다시 계산한다.
 4. 두 결과와 관련 manifest의 session_id·정상 metadata를 같은 transaction에서 교체한다. 어느 한쪽의 파싱·반영이 실패하면 두 session 모두 이전 정상 결과를 유지한다.
 
-**처리 결과**: session 간 기여 이동이 함께 확정되어 중복·누락을 막는다. 별도 영속 session table이나 귀속 변경 이력은 만들지 않는다.
+**처리 결과**: session 간 기여 이동이 함께 확정되어 중복·누락을 막는다. sessions는 표시 이름만 관리하고 귀속 변경 이력은 만들지 않는다.
 
 #### 4.4.3 여러 창·화면의 갱신이 겹치는 문제
 
@@ -457,11 +457,13 @@ provider별 우선순위를 둔다.
 
 ```text
 1순위: system/subtype=turn_duration의 durationMs
-2순위: root prompt 시작부터 대응 Stop/완료 marker까지
+2순위: root prompt 시작부터 대응 Stop/완료 marker까지 (`stop_hook_summary.preventedContinuation=false` 포함)
 3순위: 마지막 root assistant timestamp - 최초 외부 user timestamp
 ```
 
 `turn_duration`은 공개 transcript schema 계약이 아니고 버전에 따라 없을 수 있다. 없다고 parse 실패로 처리하지 않는다.
+
+`stop_hook_summary`는 `preventedContinuation`이 명시적으로 `false`일 때 완료로 사용한다. `true`이면 이전 assistant의 `end_turn` 뒤에도 작업이 계속되므로 진행 중으로 되돌리고, 이어서 나오는 구간별 `turn_duration`으로 완료시키지 않는다. 해당 필드가 없으면 메시지 시각 fallback을 유지한다. `isApiErrorMessage=true`인 assistant는 정상 완료가 아닌 실패다. 실패 이후 같은 요청의 재시도가 성공하면 완료로 전환하며, root/main의 최신 상태 시각을 기준으로 판정한다. subagent 실패는 root 요청의 상태를 변경하지 않는다.
 
 ### Codex
 
@@ -538,11 +540,13 @@ Both:
   total_tokens = input_tokens + output_tokens
 ```
 
-summary에는 `input_tokens`, `output_tokens`, `total_tokens`만 저장한다. cache/reasoning component는 중복 제거와 정규화에 사용한 뒤 별도로 보존하지 않는다.
+summary에는 `input_tokens`, `output_tokens`, `cache_write_input_tokens`, `cache_read_input_tokens`, `total_tokens`를 저장한다. 입력 총량은 cache를 포함하고, 화면의 Input은 cache read/write를 뺀 값이다. 공식 문서의 용어에 맞춰 화면에서는 `Input / Output / Cache Write / Cache Read` 순서로 표시한다. Claude의 cache creation과 Codex의 cache write는 Cache Write, Claude의 cache read와 Codex의 cached input은 Cache Read에 대응한다. [OpenAI Prompt caching](https://developers.openai.com/api/docs/guides/prompt-caching), [Claude Prompt caching](https://platform.claude.com/docs/en/build-with-claude/prompt-caching).
+
+schema v4는 이전 summary의 cache component를 NULL로 유지해 미확인 수치를 0으로 표시하지 않는다. parser version 변경으로 다음 조회 시 원본을 다시 집계하며, 일부 summary가 재계산되지 않은 집계에서는 cache 열과 Input을 —로 표시한다. reasoning은 output에 포함하며 별도 summary column으로 저장하지 않는다.
 
 ## 8. SQLite schema
 
-DB 위치는 `ExtensionContext.globalStorageUri` 아래로 한다. 영속 table은 파일 처리 상태를 담는 `manifest`와 조회 결과를 담는 `turn_summary` 두 개다. prompt·response·tool 본문, agent별 결과, response candidate, 별도 project/session/scan 이력 table은 저장하지 않는다.
+DB 위치는 `ExtensionContext.globalStorageUri` 아래로 한다. 영속 table은 파일 처리 상태를 담는 `manifest`, 이름을 관리하는 `projects`·`sessions`, 조회 수치를 담는 `turn_summary`다. prompt·response·tool 본문, agent별 결과, response candidate와 scan 이력은 저장하지 않는다. 세션 제목 metadata는 이름 테이블에만 저장한다.
 
 ```sql
 PRAGMA foreign_keys = ON;
@@ -577,32 +581,46 @@ CREATE INDEX idx_manifest_root_id
 CREATE INDEX idx_manifest_session
   ON manifest(provider, session_id, id);                    -- 재집계할 session의 원본 파일 page 조회
 
+CREATE TABLE projects (
+  project_key        TEXT PRIMARY KEY,
+  project_name       TEXT NOT NULL
+) WITHOUT ROWID;
+
+CREATE TABLE sessions (
+  provider           TEXT NOT NULL,
+  session_id         TEXT NOT NULL,
+  session_name       TEXT,                                    -- 제목이 없으면 NULL; 이름 중복 허용
+  PRIMARY KEY(provider, session_id)
+) WITHOUT ROWID;
+
 CREATE TABLE turn_summary (
   id                 INTEGER PRIMARY KEY,                   -- 내부 summary id
   provider           TEXT NOT NULL,                          -- claude / codex
-  project_key        TEXT NOT NULL,                          -- 프로젝트 집계용 안정적인 경로 식별자
-  project_name       TEXT NOT NULL,                          -- 프로젝트 표시 이름
+  project_key        TEXT NOT NULL REFERENCES projects(project_key), -- 프로젝트 집계용 경로 식별자
   session_id         TEXT NOT NULL,                          -- 대화 또는 session tree root의 논리 id
   root_turn_id       TEXT NOT NULL,                          -- 외부 사용자 요청 id; subagent까지 합산한 한 행
   turn_index         INTEGER NOT NULL,                       -- session 안에서 사용자 요청 표시 순번
   started_at_ms      INTEGER,                                -- 요청 시작 시각(epoch ms); 알 수 없으면 NULL
-  completed_at_ms    INTEGER,                                -- root 요청 완료 시각(epoch ms); 미완료면 NULL
+  completed_at_ms    INTEGER,                                -- root 요청 종료 시각(epoch ms); 진행 중이면 NULL
   duration_ms        INTEGER CHECK(duration_ms >= 0),         -- main/root 경과 시간; 알 수 없으면 NULL
   duration_quality   TEXT NOT NULL                           -- 시간 값의 근거 품질
                        CHECK(duration_quality IN ('exact', 'derived', 'approximate', 'missing')),
   input_tokens       INTEGER NOT NULL CHECK(input_tokens >= 0),  -- cache를 포함한 정규화 input 합계
   output_tokens      INTEGER NOT NULL CHECK(output_tokens >= 0), -- 정규화 output 합계
+  cache_write_input_tokens INTEGER CHECK(cache_write_input_tokens >= 0), -- 입력 중 캐시 생성; 이전 summary는 NULL
+  cache_read_input_tokens INTEGER CHECK(cache_read_input_tokens >= 0), -- 입력 중 캐시 재사용; 이전 summary는 NULL
   total_tokens       INTEGER NOT NULL                        -- main + subagent의 중복 제거 후 총량
                        CHECK(total_tokens = input_tokens + output_tokens),
-  status             TEXT NOT NULL                           -- 완료한 요청 / 진행 중 요청
-                       CHECK(status IN ('completed', 'in_progress')),
+  status             TEXT NOT NULL                           -- 성공한 요청 / 진행 중 요청 / 실패한 요청
+                       CHECK(status IN ('completed', 'in_progress', 'failed')),
   quality_flags      TEXT,                                   -- 누락·근사값 등 품질 경고 목록
   diagnostic_file_id INTEGER REFERENCES manifest(id)         -- 최근 문제 또는 확인할 원본 파일
                        ON DELETE SET NULL,
   diagnostic_offset  INTEGER,                                -- 해당 원본의 문제 byte 위치; 알 수 없으면 NULL
   last_error         TEXT,                                   -- 최근 summary 생성 문제; 수치 보존 시 이유 표시
   updated_at         TEXT NOT NULL,                          -- 이 summary를 마지막 정상 교체한 시각(UTC)
-  UNIQUE(provider, session_id, root_turn_id)                  -- 사용자 요청당 한 행; agent row는 만들지 않음
+  UNIQUE(provider, session_id, root_turn_id),                 -- 사용자 요청당 한 행; agent row는 만들지 않음
+  FOREIGN KEY(provider, session_id) REFERENCES sessions(provider, session_id)
 );
 
 CREATE INDEX idx_summary_period
@@ -615,7 +633,11 @@ CREATE INDEX idx_summary_session
   ON turn_summary(provider, session_id, turn_index);          -- 특정 provider·세션의 turn을 표시 순서로 조회
 ```
 
-`project_key`와 `project_name`은 summary에 직접 저장한다. 이름이 같은 프로젝트는 key로 구분하고 session별 집계도 `session_id`로 수행한다. `root_turn_id`와 `turn_index`는 식별자와 표시 순번이므로 분리한다. 논리 session에 속하는 모든 파일을 읽어야 재집계할 수 있으므로 summary를 파일 하나의 자식 row로 두거나 삭제 cascade하지 않는다.
+표시 이름은 projects·sessions에만 저장한다. 이름에는 UNIQUE 제약을 두지 않는다. 이름이 같은 프로젝트는 project_key로, 같은 프로젝트 안의 같은 세션명도 (provider, session_id)로 구분한다. 조회 시 이름을 연결하고 집계 기준은 기존 ID를 유지한다. 이름을 찾지 못하면 ‘이름 없는 세션’으로 표시한다. 원본 제목을 사용하며 첫 prompt를 제목으로 복사하지 않는다.
+
+Claude는 main JSONL의 custom-title을 ai-title보다 우선한다. Codex는 읽기 전용 state_N.sqlite의 threads.name/title을 session_index.jsonl의 thread_name보다 우선하고 session_meta 제목을 보완 경로로 사용한다. metadata는 디스크 TEMP에 묶음 처리하며 통계 화면 진입 시 제목만 바뀐 세션도 갱신한다. metadata를 읽을 수 없으면 기존 제목을 유지한다. 제목·프로젝트명 검색은 부분 문자열로 처리하고, 행의 이름을 선택하면 ID와 제공자로 정확히 조회한다. 세션별 행에는 프로젝트명과 세션 시작 시각을 함께 표시하고 tooltip으로 전체 경로·ID를 확인한다.
+
+schema v1·v2는 기존 이름을 projects로 옮기고 요청 ID·통계·manifest 참조를 보존한 채 전환한다. 세션 제목은 다음 scan에서 채운다. 이름 metadata와 summary 교체는 같은 transaction에 반영하며, 참조하는 summary가 없어진 이름 행은 정리한다. `root_turn_id`와 `turn_index`는 식별자와 표시 순번이므로 분리한다. 논리 session에 속하는 모든 파일을 읽어야 재집계할 수 있으므로 summary를 파일 하나의 자식 row로 두거나 삭제 cascade하지 않는다.
 
 ### 8.1 사용자에게 보여 줄 turn summary
 
@@ -624,7 +646,8 @@ CREATE INDEX idx_summary_session
 | Column | 설명 |
 |---|---|
 | `provider` | `claude` 또는 `codex` |
-| `project_name` | 프로젝트 표시 이름; 집계 key는 `project_key` |
+| `project_name` | projects에서 조회한 표시 이름; 저장·집계 key는 `project_key` |
+| `session_name` | sessions에서 조회한 표시 이름; 중복 허용 |
 | `session_id` | 대화 session 또는 session tree root |
 | `root_turn_id` | 사용자 요청 식별자 |
 | `turn_index` | session 내부 사용자 요청 순번 |
@@ -632,16 +655,18 @@ CREATE INDEX idx_summary_session
 | `duration_ms` | main/root 요청의 경과 시간; 모르면 NULL |
 | `duration_quality` | exact / derived / approximate / missing |
 | `input_tokens` | main과 subagent를 합친 cache 포함 총 input |
+| `cache_write_input_tokens` | 중복 제거 후 캐시 생성 입력 합계; 화면의 Cache Write |
+| `cache_read_input_tokens` | 중복 제거 후 캐시 재사용 입력 합계; 화면의 Cache Read |
 | `output_tokens` | main과 subagent를 합친 총 output |
 | `total_tokens` | input + output |
-| `status` | 완료 / 진행 중; 평균 계산 대상 구분 |
+| `status` | 완료 / 진행 중 / 실패; 완료 요청만 평균 계산 |
 | `quality_flags` | 품질 경고; 상세 오류는 원본 파일·offset과 함께 표시 |
 
-model별·agent별 분석과 비용 계산은 현재 기능 범위에 포함하지 않는다. cache/reasoning component는 parser의 정규화·중복 검증에만 사용하고 별도 summary column으로 저장하지 않는다.
+model별·agent별 분석과 비용 계산은 현재 기능 범위에 포함하지 않는다. cache component는 중복 제거한 response에서 저장·집계하고 reasoning은 output에 포함한다.
 
 ### 8.2 일·월·프로젝트·session별 총량과 turn 평균
 
-`turn_summary`의 filter와 `GROUP BY`만으로 조회한다. 일·월은 configured timezone의 시작·끝 경계를 UTC millisecond로 변환한 뒤 `started_at_ms`에 적용한다. 한 요청의 token과 duration은 시작 시점의 일·월에 귀속하고 날짜 경계에서 나누지 않는다. timezone 변경은 조회 경계를 바꾸며 원본 재파싱은 요구하지 않는다.
+수치는 `turn_summary`의 filter와 `GROUP BY`로 조회하고 이름은 projects·sessions에서 연결한다. 이름 검색 조건은 같은 ID의 metadata에 적용하므로 중복 제목이 합쳐지지 않는다. 일·월은 configured timezone의 시작·끝 경계를 UTC millisecond로 변환한 뒤 `started_at_ms`에 적용한다. 한 요청의 token과 duration은 시작 시점의 일·월에 귀속하고 날짜 경계에서 나누지 않는다. timezone 변경은 조회 경계를 바꾸며 원본 재파싱은 요구하지 않는다.
 
 ```sql
 SELECT
@@ -663,7 +688,9 @@ WHERE started_at_ms >= :period_start_ms
 GROUP BY provider, project_key, session_id;
 ```
 
-위 예시는 기간 내 project/session별 조회다. 전체·일·월·project·session 조회는 필요한 filter와 grouping만 선택한다. token 총량에는 진행 중 요청에서 확인한 값도 포함하고, turn 평균 token·시간은 완료 요청만 대상으로 한다. duration 누락은 0으로 채우지 않고 평균에서 제외하며 유효 시간 표본 수를 함께 표시한다. 시각을 알 수 없는 요청은 전체/project/session 총량에는 포함하되 일·월 조회에서는 '시각 미상'으로 별도 표시한다.
+위 예시는 기간 내 project/session별 조회다. 전체·일·월·project·session 조회는 필요한 filter와 grouping만 선택한다. token 총량에는 진행 중·실패한 요청에서 확인한 값도 포함하고, turn 평균 token·시간은 성공적으로 완료한 요청만 대상으로 한다. duration 누락은 0으로 채우지 않고 평균에서 제외하며 유효 시간 표본 수를 함께 표시한다. 시각을 알 수 없는 요청은 전체/project/session 총량에는 포함하되 일·월 조회에서는 '시각 미상'으로 별도 표시한다.
+
+schema version 2는 기존 `turn_summary`의 행·id·manifest 참조를 보존하며 `failed` 상태를 추가한다. parser version 4는 변경되지 않은 원본도 다음 통계 갱신에서 재파싱해 기존 시간과 실패 분류를 보정한다.
 
 ## 9. 디버깅 표시
 
@@ -720,7 +747,7 @@ SQLite 자체보다 주의할 부분은 VS Code extension 배포 방식이다.
 
 설명용 가정으로 실행 중 평균 100 MiB, 실행 시간 2초이면 평균 추가 메모리는 약 0.22 MiB다. 실행 순간에는 100 MiB를 차지하며 이는 실측값이 아니다. peak RSS, 시간 평균 RSS와 CPU 시간을 서로 다른 지표로 기록한다. 8시간의 기본 15분 주기는 약 32회의 실행이며 최초·복귀·수동 조회 및 실패 재시도로 횟수가 추가될 수 있다.
 
-파일 수를 F, 전체 본문을 B, 영향 session의 현재 원본 합계를 B_affected라 하면 읽기 단계의 기준은 metadata 전수조사 O(F)와 session 재집계 O(B_affected)다. append가 1 MiB여도 해당 session 원본이 200 MiB라면 약 200 MiB를 다시 읽는다. 두 table 설계에서는 변경 byte만 읽는 O(ΔB)나 전체 스캔 대비 고정 배수의 속도 개선을 주장하지 않는다.
+파일 수를 F, 전체 본문을 B, 영향 session의 현재 원본 합계를 B_affected라 하면 읽기 단계의 기준은 metadata 전수조사 O(F)와 session 재집계 O(B_affected)다. 이름 metadata 조회 비용도 별도로 발생한다. append가 1 MiB여도 해당 session 원본이 200 MiB라면 약 200 MiB를 다시 읽는다. 변경 byte만 읽는 O(ΔB)나 전체 스캔 대비 고정 배수의 속도 개선을 주장하지 않는다.
 
 구현 후 필요한 비교 항목:
 
@@ -871,7 +898,7 @@ last successful session update
 - 클릭하면 Markdown Quota 카드가 뜨고 제공자별 새로 고침·상세/압축 설정·확장 관리·사용량 통계 링크를 사용할 수 있다. 패치한 로컬 VS Code에서는 자동 호버 억제, 클릭 유지·재클릭 닫기, 닫은 뒤 재호버 억제와 바깥 클릭·Esc 후 재열기를 실제 UI에서 검증한다.
 - 누계 refresh에서 변경 없는 session의 파일 body는 다시 읽지 않는다.
 - 전체 경로·manifest·파싱 결과를 메모리에 적재하지 않고 n개·byte 예산·DB 조회 page 경계를 지킨다.
-- 영속 table은 manifest와 turn_summary 두 개이고, session summary와 정상 metadata·삭제는 함께 commit한다. 부재 판정은 전체 순회 성공 후 수행한다.
+- 영속 table은 manifest·projects·sessions·turn_summary이고, session summary와 이름·정상 metadata·삭제는 함께 commit한다. 부재 판정은 전체 순회 성공 후 수행한다.
 - 오류·중단은 네 진단 항목으로 기록하고 자동 재시도하지 않는다. 다음 화면 진입·수동 새로 고침에서 새로 조사한다.
 - append/rewrite/delete 후 full rebuild 결과와 증분 결과가 같다.
 - Claude response duplicate와 Codex cumulative snapshot이 이중 집계되지 않는다.

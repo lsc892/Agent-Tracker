@@ -53,7 +53,7 @@
 
 - quota focus/polling/backoff/강제 재실행/stale 유지, 응답 notification
 - App Server handshake, API key·미로그인·RPC 오류·비정상 종료·잘못된 응답·timeout·취소 후 PID 종료
-- SQLite 두 테이블, rollback, session 이동, 미방문·제외된 루트와 삭제 처리
+- SQLite 이름 테이블 정규화, 기존 DB 전환, rollback, session 이동, 미방문·제외된 루트와 삭제 처리
 - Claude vector dedup과 tool result, Codex current/legacy·중첩 lineage·검증된 fork prefix
 - append/truncate/delete와 full rebuild 결과 일치, 변화 없음 body read 0, 부분 줄, 오류 보존·재요청, 취소
 - 일·월 집계 및 DST, 완료 요청 평균과 NULL 소요 시간 분모
