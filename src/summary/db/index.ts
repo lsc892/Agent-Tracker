@@ -1,7 +1,7 @@
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync, type SQLInputValue, type StatementSync } from 'node:sqlite';
-import { SCHEMA_SQL, SCHEMA_VERSION } from './schema';
+import { SCHEMA_SQL, SCHEMA_VERSION, SCHEMA_LEGACY_MIGRATION_SQL, SCHEMA_CACHE_MIGRATION_SQL } from './schema';
 import { calendarPeriod } from './timezone';
 import type {
   DiagnosticsPage, FileMetadata, KeysetPage, ManifestRow, OffsetPage,
@@ -25,21 +25,34 @@ function nonnegative(value: number, name: string): number {
 }
 
 const TURN_INSERT = `INSERT INTO turn_summary (
-  provider, project_key, project_name, session_id, root_turn_id, turn_index,
+  provider, project_key, session_id, root_turn_id, turn_index,
   started_at_ms, completed_at_ms, duration_ms, duration_quality,
-  input_tokens, output_tokens, total_tokens, status, quality_flags,
+  input_tokens, output_tokens, cache_write_input_tokens, cache_read_input_tokens, total_tokens, status, quality_flags,
   diagnostic_file_id, diagnostic_offset, last_error, updated_at
-) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`;
+) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`;
+
+const NAMED_TURNS = `(SELECT t.*, p.project_name, s.session_name FROM turn_summary t
+  JOIN projects p ON p.project_key=t.project_key
+  JOIN sessions s ON s.provider=t.provider AND s.session_id=t.session_id)`;
 
 function turnValues(row: TurnSummaryInput, now: string): SQLInputValue[] {
   for (const name of ['input_tokens', 'output_tokens', 'total_tokens', 'turn_index'] as const) {
     nonnegative(row[name], name);
   }
   if (row.duration_ms != null) nonnegative(row.duration_ms, 'duration_ms');
+  for (const name of ['cache_write_input_tokens', 'cache_read_input_tokens'] as const) {
+    if (row[name] != null) nonnegative(row[name], name);
+  }
+  if ((row.cache_write_input_tokens ?? 0) + (row.cache_read_input_tokens ?? 0) > row.input_tokens) {
+    throw new RangeError('Cache components cannot exceed input tokens');
+  }
   return [
-    row.provider, row.project_key, row.project_name, row.session_id, row.root_turn_id, row.turn_index,
+    row.provider, row.project_key, row.session_id, row.root_turn_id, row.turn_index,
     row.started_at_ms ?? null, row.completed_at_ms ?? null, row.duration_ms ?? null, row.duration_quality,
-    row.input_tokens, row.output_tokens, row.total_tokens, row.status, row.quality_flags ?? null,
+    row.input_tokens, row.output_tokens,
+    row.cache_write_input_tokens === undefined ? 0 : row.cache_write_input_tokens,
+    row.cache_read_input_tokens === undefined ? 0 : row.cache_read_input_tokens,
+    row.total_tokens, row.status, row.quality_flags ?? null,
     row.diagnostic_file_id ?? null, row.diagnostic_offset ?? null, row.last_error ?? null, row.updated_at ?? now,
   ];
 }
@@ -55,6 +68,15 @@ function whereClause(filter: SummaryFilter): { sql: string; values: SQLInputValu
     if (filter[name] !== undefined) {
       clauses.push(`${column} = ?`);
       values.push(filter[name]!);
+    }
+  }
+  for (const [name, table, condition, column] of [
+    ['projectName', 'projects', 'projects.project_key=turn_summary.project_key', 'project_name'],
+    ['sessionName', 'sessions', 'sessions.provider=turn_summary.provider AND sessions.session_id=turn_summary.session_id', 'session_name'],
+  ] as const) {
+    if (filter[name]) {
+      clauses.push(`EXISTS(SELECT 1 FROM ${table} WHERE ${condition} AND ${column} LIKE ? ESCAPE '\\')`);
+      values.push(`%${filter[name]!.replace(/[\\%_]/g, character => `\\${character}`)}%`);
     }
   }
   const time: string[] = [];
@@ -115,7 +137,12 @@ export class SummaryDatabase {
       if (version.user_version > SCHEMA_VERSION) throw new Error('Database schema is newer than this extension');
       if (version.user_version < SCHEMA_VERSION) {
         this.transaction(() => {
-          this.connection.exec(SCHEMA_SQL);
+          // Another window can finish migration while this connection waits for the write lock.
+          const current = this.connection.prepare('PRAGMA user_version').get() as { user_version: number };
+          if (current.user_version > SCHEMA_VERSION) throw new Error('Database schema is newer than this extension');
+          if (current.user_version === SCHEMA_VERSION) return;
+          this.connection.exec(current.user_version === 1 || current.user_version === 2 ? SCHEMA_LEGACY_MIGRATION_SQL
+            : current.user_version === 3 ? SCHEMA_CACHE_MIGRATION_SQL : SCHEMA_SQL);
           this.connection.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
         });
       }
@@ -151,7 +178,7 @@ export class SummaryDatabase {
 
   /** Removes only derived statistics; transcript sources and lock files are untouched. */
   clearData(): void {
-    this.transaction(() => this.connection.exec('DELETE FROM turn_summary; DELETE FROM manifest;'));
+    this.transaction(() => this.connection.exec('DELETE FROM turn_summary; DELETE FROM manifest; DELETE FROM sessions; DELETE FROM projects;'));
   }
 
   findManifest(provider: Provider, path: string): ManifestRow | undefined {
@@ -225,7 +252,9 @@ export class SummaryDatabase {
     this.transaction(() => {
       this.connection.exec(`CREATE TEMP TABLE IF NOT EXISTS db_replacement_sessions (
         provider TEXT NOT NULL, session_id TEXT NOT NULL, PRIMARY KEY(provider, session_id)
-      ) WITHOUT ROWID; DELETE FROM db_replacement_sessions;`);
+      ) WITHOUT ROWID; DELETE FROM db_replacement_sessions;
+      CREATE TEMP TABLE IF NOT EXISTS db_replacement_projects(project_key TEXT PRIMARY KEY) WITHOUT ROWID;
+      DELETE FROM db_replacement_projects;`);
       const addSession = this.statement('INSERT OR IGNORE INTO db_replacement_sessions VALUES (?, ?)');
       for (const session of replacement.sessions) addSession.run(session.provider, session.session_id);
       const hasSession = this.statement('SELECT 1 FROM db_replacement_sessions WHERE provider = ? AND session_id = ?');
@@ -237,6 +266,8 @@ export class SummaryDatabase {
       };
       // Row-value IN lets SQLite seek idx_summary_session for the small group;
       // a correlated EXISTS scans every stored turn for each replaced session.
+      this.connection.exec(`INSERT OR IGNORE INTO db_replacement_projects SELECT project_key FROM turn_summary
+        WHERE (provider,session_id) IN (SELECT provider,session_id FROM db_replacement_sessions)`);
       this.connection.exec(`DELETE FROM turn_summary WHERE (provider, session_id) IN (
         SELECT provider, session_id FROM db_replacement_sessions
       )`);
@@ -256,8 +287,17 @@ export class SummaryDatabase {
         if (result.changes !== 1) throw new Error('Replacement refers to an unknown manifest file');
       }
       const insert = this.statement(TURN_INSERT);
+      const project = this.statement(`INSERT INTO projects VALUES (?,?) ON CONFLICT(project_key)
+        DO UPDATE SET project_name=excluded.project_name WHERE project_name<>excluded.project_name`);
+      const session = this.statement(`INSERT INTO sessions VALUES (?,?,?) ON CONFLICT(provider,session_id)
+        DO UPDATE SET session_name=excluded.session_name
+        WHERE excluded.session_name IS NOT NULL AND session_name IS NOT excluded.session_name`);
+      const addProject = this.statement('INSERT OR IGNORE INTO db_replacement_projects VALUES (?)');
       for (const summary of replacement.summaries) {
         if (!hasSession.get(summary.provider, summary.session_id)) throw new Error('Summary is outside the replacement session group');
+        project.run(summary.project_key, summary.project_name);
+        session.run(summary.provider, summary.session_id, summary.session_name?.trim() || null);
+        addProject.run(summary.project_key);
         insert.run(...turnValues(summary, now));
       }
       const remove = this.statement('DELETE FROM manifest WHERE id = ?');
@@ -266,7 +306,12 @@ export class SummaryDatabase {
         if (previous) requireSession(previous.provider, previous.session_id);
         remove.run(id);
       }
-      this.connection.exec('DELETE FROM db_replacement_sessions');
+      this.connection.exec(`DELETE FROM sessions WHERE (provider,session_id) IN (SELECT provider,session_id FROM db_replacement_sessions)
+        AND NOT EXISTS(SELECT 1 FROM turn_summary t WHERE t.provider=sessions.provider AND t.session_id=sessions.session_id);
+        DELETE FROM projects WHERE project_key IN (SELECT project_key FROM db_replacement_projects)
+        AND NOT EXISTS(SELECT 1 FROM turn_summary t WHERE t.provider='claude' AND t.project_key=projects.project_key)
+        AND NOT EXISTS(SELECT 1 FROM turn_summary t WHERE t.provider='codex' AND t.project_key=projects.project_key);
+        DELETE FROM db_replacement_sessions; DELETE FROM db_replacement_projects;`);
     });
   }
 
@@ -274,7 +319,7 @@ export class SummaryDatabase {
     const where = whereClause(filter);
     const after = nonnegative(page.afterId ?? 0, 'afterId');
     const offset = nonnegative(page.offset ?? 0, 'offset');
-    return this.connection.prepare(`SELECT * FROM turn_summary WHERE ${where.sql} AND id > ? ORDER BY id LIMIT ? OFFSET ?`)
+    return this.connection.prepare(`SELECT * FROM ${NAMED_TURNS} AS turn_summary WHERE ${where.sql} AND id > ? ORDER BY id LIMIT ? OFFSET ?`)
       .all(...where.values, after, pageLimit(page.limit), offset) as unknown as TurnSummaryRow[];
   }
 
@@ -316,10 +361,14 @@ export class SummaryDatabase {
     const prefix: SQLInputValue[] = calendar ? [timezone, groupBy] : [];
     return this.connection.prepare(`SELECT provider,
       ${project ? 'project_key' : 'NULL'} AS project_key,
-      ${project ? 'MIN(project_name)' : 'NULL'} AS project_name,
+      ${project ? '(SELECT project_name FROM projects p WHERE p.project_key=turn_summary.project_key)' : 'NULL'} AS project_name,
       ${groupBy === 'session' ? 'session_id' : 'NULL'} AS session_id,
+      ${groupBy === 'session' ? '(SELECT session_name FROM sessions s WHERE s.provider=turn_summary.provider AND s.session_id=turn_summary.session_id)' : 'NULL'} AS session_name,
+      ${groupBy === 'session' ? '(SELECT MIN(t.started_at_ms) FROM turn_summary t WHERE t.provider=turn_summary.provider AND t.session_id=turn_summary.session_id)' : 'NULL'} AS session_started_at_ms,
       ${period} AS period,
       SUM(input_tokens) AS input_tokens, SUM(output_tokens) AS output_tokens,
+      CASE WHEN COUNT(cache_write_input_tokens) = COUNT(*) THEN SUM(cache_write_input_tokens) END AS cache_write_input_tokens,
+      CASE WHEN COUNT(cache_read_input_tokens) = COUNT(*) THEN SUM(cache_read_input_tokens) END AS cache_read_input_tokens,
       SUM(total_tokens) AS total_tokens, COUNT(*) AS turn_count,
       SUM(status = 'completed') AS completed_turns,
       AVG(CASE WHEN status = 'completed' THEN total_tokens END) AS avg_tokens_per_turn,
@@ -343,7 +392,7 @@ export class SummaryDatabase {
     const where = whereClause({ providers: page.providers });
     const files = this.connection.prepare(`SELECT * FROM manifest WHERE ${where.sql} AND id > ? ORDER BY id LIMIT ? OFFSET ?`)
       .all(...where.values, nonnegative(page.afterId ?? 0, 'afterId'), limit, offset) as unknown as ManifestRow[];
-    const summaries = this.connection.prepare(`SELECT * FROM turn_summary WHERE ${where.sql} AND id > ? AND
+    const summaries = this.connection.prepare(`SELECT * FROM ${NAMED_TURNS} AS turn_summary WHERE ${where.sql} AND id > ? AND
       (last_error IS NOT NULL OR (quality_flags IS NOT NULL AND quality_flags <> '[]' AND quality_flags <> ''))
       ORDER BY id LIMIT ? OFFSET ?`)
       .all(...where.values, nonnegative(page.afterSummaryId ?? 0, 'afterSummaryId'), limit, offset) as unknown as TurnSummaryRow[];

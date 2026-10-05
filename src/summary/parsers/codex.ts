@@ -1,6 +1,6 @@
 import { SummaryError } from '../jsonl';
 import type { FileContext, ParsedIdentity, ParseSink, TokenVector } from '../types';
-import { codexTokens, number, object, project, string, timestamp, tokenFlags } from './common';
+import { codexTokens, displayName, number, object, project, string, timestamp, tokenFlags } from './common';
 
 /** Codex lifecycle payloads use Unix seconds; row timestamps and durations keep their existing units. */
 function lifecycleTimestamp(value: unknown): number | null {
@@ -34,6 +34,7 @@ export class CodexCurrentParserAdapter {
       this.identityValue = { sessionId: string(payload.session_id) ?? string(payload.sessionId) ?? parent ?? id,
         threadId: id, parentThreadId: parent, isMain: parent === null,
         forkedFromId: string(payload.forked_from_id) ?? null,
+        sessionName: displayName(payload.thread_name) ?? displayName(payload.name) ?? displayName(payload.title),
         ...project(string(payload.cwd) ?? this.context.sourceRoot) };
       // A fork is not automatically a subagent; inherited history needs independently verified lineage.
       if (payload.forked_from_id) this.forkMissing = true;

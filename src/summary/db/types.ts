@@ -28,6 +28,8 @@ export interface TurnSummaryInput {
   project_key: string;
   project_name: string;
   session_id: string;
+  /** Ingestion metadata; names are stored only in projects/sessions. */
+  session_name?: string | null;
   root_turn_id: string;
   turn_index: number;
   started_at_ms?: number | null;
@@ -36,8 +38,11 @@ export interface TurnSummaryInput {
   duration_quality: DurationQuality;
   input_tokens: number;
   output_tokens: number;
+  /** Input components; null means an older summary needs to be rebuilt. */
+  cache_write_input_tokens?: number | null;
+  cache_read_input_tokens?: number | null;
   total_tokens: number;
-  status: 'completed' | 'in_progress';
+  status: 'completed' | 'in_progress' | 'failed';
   quality_flags?: string | null;
   diagnostic_file_id?: number | null;
   diagnostic_offset?: number | null;
@@ -66,6 +71,8 @@ export interface SummaryFilter {
   providers?: Provider[];
   projectKey?: string;
   sessionId?: string;
+  projectName?: string;
+  sessionName?: string;
   fromMs?: number;
   toMs?: number;
   /** Calendar groups include a separate unknown-period row by default, even with a date range. */
@@ -89,10 +96,14 @@ export interface UsageRow {
   project_key: string | null;
   project_name: string | null;
   session_id: string | null;
+  session_name: string | null;
+  session_started_at_ms: number | null;
   /** YYYY-MM-DD, YYYY-MM, or null for an unknown timestamp / non-calendar group. */
   period: string | null;
   input_tokens: number;
   output_tokens: number;
+  cache_write_input_tokens: number | null;
+  cache_read_input_tokens: number | null;
   total_tokens: number;
   turn_count: number;
   completed_turns: number;

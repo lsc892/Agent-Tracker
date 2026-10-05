@@ -3,7 +3,16 @@ import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 import { test, type TestContext } from 'node:test';
+import { DatabaseSync } from 'node:sqlite';
 import { SummaryDatabase, periodBounds, type FileMetadata, type TurnSummaryInput } from '../src/summary/db';
+import { SCHEMA_SQL, SCHEMA_VERSION } from '../src/summary/db/schema';
+
+// The pre-normalization schema stored the project label on every request.
+const legacySchema = SCHEMA_SQL
+  .replace(/CREATE TABLE IF NOT EXISTS projects[\s\S]*?WITHOUT ROWID;\s*CREATE TABLE IF NOT EXISTS sessions[\s\S]*?WITHOUT ROWID;/, '')
+  .replace('project_key TEXT NOT NULL REFERENCES projects(project_key),', 'project_key TEXT NOT NULL,\n  project_name TEXT NOT NULL,')
+  .replace(/,\s*FOREIGN KEY\(provider, session_id\) REFERENCES sessions\(provider, session_id\)/, '')
+  .replace(/^  cache_(write|read)_input_tokens.*\r?\n/gm, '');
 
 function database(t: TestContext): SummaryDatabase {
   const db = new SummaryDatabase(':memory:');
@@ -66,7 +75,7 @@ test('tracking selection filters usage, pagination counts and diagnostics withou
   assert.equal(db.queryTurnsCount(), 1, 'clear preserves a usable schema');
 });
 
-test('schema persists only manifest and turn_summary and uses bounded disk staging cache', t => {
+test('schema normalizes names and uses bounded disk staging cache', t => {
   const parent = realpathSync(tmpdir());
   const directory = mkdtempSync(join(parent, 'agent-tracker-db-test-'));
   const dbPath = join(directory, 'summary.sqlite');
@@ -86,9 +95,82 @@ test('schema persists only manifest and turn_summary and uses bounded disk stagi
   const second = new SummaryDatabase(dbPath);
   t.after(() => second.close());
   assert.deepEqual(second.connection.prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name").all()
-    .map(row => row.name), ['manifest', 'turn_summary']);
+    .map(row => row.name), ['manifest', 'projects', 'sessions', 'turn_summary']);
   assert.equal(second.queryUsage()[0].total_tokens, 110);
   second.close();
+});
+
+for (const version of [1,2]) test(`v${version} migration preserves summaries, manifest references and indexes while permitting failed requests`, t => {
+  const parent = realpathSync(tmpdir());
+  const directory = mkdtempSync(join(parent,'agent-tracker-db-migration-'));
+  const dbPath = join(directory,'summary.sqlite');
+  let db: SummaryDatabase | undefined;
+  t.after(() => {
+    db?.close();
+    const target = resolve(directory);
+    assert.ok(target.startsWith(`${parent}${sep}`));
+    assert.ok(target.split(sep).at(-1)?.startsWith('agent-tracker-db-migration-'));
+    rmSync(target,{recursive:true,force:true});
+  });
+  const legacy = new DatabaseSync(dbPath);
+  let beforeFiles: unknown[];let beforeTurns: unknown[];
+  try {
+    legacy.exec(version===1 ? legacySchema.replace("'completed','in_progress','failed'","'completed','in_progress'") : legacySchema);
+    legacy.exec(`PRAGMA user_version=${version}`);
+    const file = {...metadata(),id:42,processing_status:'done',recorded_at:'2026-10-03T00:00:02.000Z'};
+    const summary = {...turn(),id:99,diagnostic_file_id:42,quality_flags:'duration-approximate',diagnostic_offset:12,last_error:'parse-error'};
+    for (const [table,row] of [['manifest',file],['turn_summary',summary]] as const) {
+      const keys = Object.keys(row);
+      legacy.prepare(`INSERT INTO ${table} (${keys.join(',')}) VALUES (${keys.map(()=>'?').join(',')})`).run(...Object.values(row));
+    }
+    beforeFiles = legacy.prepare('SELECT * FROM manifest').all();
+    beforeTurns = legacy.prepare('SELECT * FROM turn_summary').all();
+    if (version===1) assert.throws(()=>legacy.exec("UPDATE turn_summary SET status='failed'"),/CHECK constraint/);
+  } finally {legacy.close();}
+  db = new SummaryDatabase(dbPath);
+  assert.deepEqual(db.connection.prepare('SELECT * FROM manifest').all(),beforeFiles);
+  assert.deepEqual(db.queryTurns().map(row=>({...row})),beforeTurns.map(row=>({
+    ...row as object,session_name:null,cache_write_input_tokens:null,cache_read_input_tokens:null,
+  })));
+  assert.equal(db.connection.prepare('PRAGMA user_version').get()?.user_version,SCHEMA_VERSION);
+  assert.deepEqual(db.connection.prepare('PRAGMA foreign_key_check').all(),[]);
+  assert.deepEqual(db.connection.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all().map(row=>row.name),['manifest','projects','sessions','turn_summary']);
+  assert.equal(db.connection.prepare("SELECT count(*) count FROM sqlite_master WHERE type='index' AND name LIKE 'idx_summary_%'").get()?.count,3);
+  db.connection.exec("UPDATE turn_summary SET status='failed'");
+  assert.equal(db.queryUsage()[0].total_tokens,110);assert.equal(db.queryUsage()[0].completed_turns,0);
+  assert.equal(db.queryUsage()[0].avg_duration_ms,null);
+  db.close();db = new SummaryDatabase(dbPath);
+  assert.equal(db.queryTurns()[0].id,99);assert.equal(db.queryTurns()[0].status,'failed');
+});
+
+test('migration rechecks the version after another window finishes the transition', t => {
+  const parent = realpathSync(tmpdir());
+  const directory = mkdtempSync(join(parent,'agent-tracker-db-race-'));
+  const dbPath = join(directory,'summary.sqlite');
+  t.after(()=> {
+    const target = resolve(directory);
+    assert.ok(target.startsWith(`${parent}${sep}`) && target.split(sep).at(-1)?.startsWith('agent-tracker-db-race-'));
+    rmSync(target,{recursive:true,force:true});
+  });
+  const legacy = new DatabaseSync(dbPath);
+  legacy.exec(legacySchema);legacy.exec('PRAGMA user_version=2');
+  const row = turn();
+  const keys = Object.keys(row);
+  legacy.prepare(`INSERT INTO turn_summary (${keys.join(',')}) VALUES (${keys.map(()=>'?').join(',')})`).run(...Object.values(row));
+  legacy.close();
+  class WaitingDatabase extends SummaryDatabase {
+    override transaction<T>(action: ()=>T): T {
+      // Simulate the other opener committing after our initial version read, before our lock is acquired.
+      const other = new SummaryDatabase(dbPath);other.close();
+      return super.transaction(action);
+    }
+  }
+  const db = new WaitingDatabase(dbPath);
+  try {
+    assert.equal(db.queryTurns()[0].project_name,'Project');
+    assert.equal(db.queryUsage()[0].total_tokens,110);
+    assert.equal(db.connection.prepare('PRAGMA user_version').get()?.user_version,SCHEMA_VERSION);
+  } finally { db.close(); }
 });
 
 test('discovery and failure preserve accepted metadata and previous successful values', t => {

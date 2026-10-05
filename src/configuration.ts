@@ -50,8 +50,8 @@ export function readConfiguration(settings: SettingsReader): TrackerConfiguratio
     claude: { enabled: enabled.claude, dataHome: claudeHome },
     codex: { enabled: enabled.codex, dataHome: codexHome, executable: settings.get('codex.executable', 'codex'), showStatusBar: settings.get('codex.showStatusBar', true) },
     roots: [
-      ...(claudeRoots.length ? claudeRoots : [join(claudeHome, 'projects')]).map(path => ({ provider: 'claude' as const, path: expandPath(path) })),
-      ...(codexRoots.length ? codexRoots : [join(codexHome, 'sessions'), join(codexHome, 'archived_sessions')]).map(path => ({ provider: 'codex' as const, path: expandPath(path) })),
+      ...(claudeRoots.length ? claudeRoots : [join(claudeHome, 'projects')]).map(path => ({ provider: 'claude' as const, path: expandPath(path), dataHome: claudeHome })),
+      ...(codexRoots.length ? codexRoots : [join(codexHome, 'sessions'), join(codexHome, 'archived_sessions')]).map(path => ({ provider: 'codex' as const, path: expandPath(path), dataHome: codexHome })),
     ].filter(root => enabled[root.provider]),
     timezone, timezoneWarning,
   };

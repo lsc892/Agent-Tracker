@@ -8,9 +8,10 @@ import { SummaryStaging, type StagedFile } from './staging';
 import { readJsonl, SummaryError } from './jsonl';
 import { ClaudeParserAdapter, CodexCurrentParserAdapter } from './parsers';
 import { acquireRefreshLock } from './lock';
+import { applySessionNames, readSessionNames } from './names';
 import type { SourceRoot, SummaryOptions, SummaryProgress, RefreshResult } from './types';
 
-export const PARSER_VERSION = 3;
+export const PARSER_VERSION = 6;
 const componentPredicate = `EXISTS(SELECT 1 FROM component c WHERE c.provider=scan_files.provider
   AND (c.session_id=scan_files.session_id OR c.session_id=scan_files.old_session))`;
 
@@ -159,6 +160,8 @@ export async function refreshSummary(
     for (const root of roots) for (const file of database.unseenFiles(root.provider,root.path,result.scanId)) {
       staging.addFile(file,file.session_id,true,true);
     }
+    await readSessionNames(staging,roots,isCancelled);
+    check();
     phase = 'parsing'; report(true);
     for (const file of staging.files('changed=1 AND removed=0')) await parse(file);
     // Expands the set on disk: every surviving source of an affected logical session is reread.
@@ -201,7 +204,7 @@ export async function refreshSummary(
           staging.addFile({...previous,size_bytes:stat.size,mtime_ms:stat.mtimeMs,dev:String(stat.dev),inode:String(stat.ino)},previous.session_id,true);
         } catch {
           staging.addFile(previous,previous.session_id,true);
-          failFile({...previous,old_session:previous.session_id,changed:1,parsed:0,removed:0,failed:0,project_key:null,project_name:null,thread_id:null,parent_thread_id:null,is_main:1,forked_from_id:null},new SummaryError('source-unavailable-outside-scan'));
+          failFile({...previous,old_session:previous.session_id,changed:1,parsed:0,removed:0,failed:0,project_key:null,project_name:null,session_name:null,thread_id:null,parent_thread_id:null,is_main:1,forked_from_id:null},new SummaryError('source-unavailable-outside-scan'));
         }
       }
       const next = staging.files(`parsed=0 AND failed=0 AND removed=0 AND EXISTS(
@@ -247,6 +250,8 @@ export async function refreshSummary(
     for (const file of staging.files('removed=1 AND old_session IS NULL')) {
       database.replaceSessions({sessions:[],summaries:[],files:[],removedFileIds:[file.id]});
     }
+    check();
+    database.transaction(() => applySessionNames(database.connection));
   } catch (error) {
     result.interrupted = true;
     const code = isCancelled() ? 'interrupted' : error instanceof SummaryError ? error.code : 'source-discovery-error';

@@ -11,6 +11,7 @@ export interface StagedFile extends FileMetadata {
   failed: number;
   project_key: string | null;
   project_name: string | null;
+  session_name: string | null;
   thread_id: string | null;
   parent_thread_id: string | null;
   is_main: number;
@@ -30,7 +31,7 @@ export class SummaryStaging {
         dev TEXT, inode TEXT, parser_version INTEGER NOT NULL, changed INTEGER NOT NULL,
         parsed INTEGER NOT NULL DEFAULT 0, removed INTEGER NOT NULL DEFAULT 0, failed INTEGER NOT NULL DEFAULT 0,
         settled INTEGER NOT NULL DEFAULT 0,
-        project_key TEXT, project_name TEXT, thread_id TEXT, parent_thread_id TEXT, forked_from_id TEXT, is_main INTEGER DEFAULT 1
+        project_key TEXT, project_name TEXT, session_name TEXT, thread_id TEXT, parent_thread_id TEXT, forked_from_id TEXT, is_main INTEGER DEFAULT 1
       );
       CREATE INDEX temp.scan_session ON scan_files(provider,session_id,id);
       CREATE INDEX temp.scan_old_session ON scan_files(provider,old_session,id);
@@ -38,12 +39,14 @@ export class SummaryStaging {
       CREATE TEMP TABLE affected(provider TEXT NOT NULL, session_id TEXT NOT NULL, PRIMARY KEY(provider,session_id));
       CREATE TEMP TABLE links(provider TEXT NOT NULL, a TEXT NOT NULL,b TEXT NOT NULL, PRIMARY KEY(provider,a,b));
       CREATE TEMP TABLE component(provider TEXT NOT NULL,session_id TEXT NOT NULL,PRIMARY KEY(provider,session_id));
+      CREATE TEMP TABLE session_names(provider TEXT NOT NULL,session_id TEXT NOT NULL,session_name TEXT NOT NULL,
+        priority INTEGER NOT NULL,PRIMARY KEY(provider,session_id)) WITHOUT ROWID;
       CREATE TEMP TABLE events (
         id INTEGER PRIMARY KEY, file_id INTEGER NOT NULL, kind TEXT NOT NULL, root_id TEXT NOT NULL,
         response_id TEXT, request_id TEXT, thread_id TEXT, turn_id TEXT,
         input INTEGER,output INTEGER,cache_read INTEGER,cache_write INTEGER,reasoning INTEGER,
         is_main INTEGER,started INTEGER,completed_at INTEGER,last_assistant INTEGER,duration INTEGER,
-        duration_quality TEXT,completed INTEGER,flags TEXT,byte_offset INTEGER NOT NULL,schema_kind TEXT
+        duration_quality TEXT,completed INTEGER,status TEXT,status_at INTEGER,flags TEXT,byte_offset INTEGER NOT NULL,schema_kind TEXT
       );
       CREATE INDEX temp.events_file ON events(file_id,id);
       CREATE INDEX temp.events_file_root ON events(file_id,root_id,kind);
@@ -53,8 +56,8 @@ export class SummaryStaging {
         PRIMARY KEY(file_id,root_id,flag));
     `);
     this.insertEvent = connection.prepare(`INSERT INTO events(file_id,kind,root_id,response_id,request_id,thread_id,turn_id,
-      input,output,cache_read,cache_write,reasoning,is_main,started,completed_at,last_assistant,duration,duration_quality,completed,flags,byte_offset,schema_kind)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
+      input,output,cache_read,cache_write,reasoning,is_main,started,completed_at,last_assistant,duration,duration_quality,completed,status,status_at,flags,byte_offset,schema_kind)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
     this.insertFlag = connection.prepare('INSERT OR IGNORE INTO flags VALUES (?,?,?)');
     this.insertAffected = connection.prepare('INSERT OR IGNORE INTO affected VALUES (?,?)');
   }
@@ -71,8 +74,8 @@ export class SummaryStaging {
   }
   identity(fileId: number, identity: ParsedIdentity): void {
     const previous = this.connection.prepare('SELECT * FROM scan_files WHERE id=?').get(fileId) as unknown as StagedFile;
-    this.connection.prepare(`UPDATE scan_files SET session_id=?,project_key=?,project_name=?,thread_id=?,parent_thread_id=?,forked_from_id=?,is_main=?,parsed=1 WHERE id=?`)
-      .run(identity.sessionId,identity.projectKey,identity.projectName,identity.threadId,identity.parentThreadId,identity.forkedFromId ?? null,Number(identity.isMain),fileId);
+    this.connection.prepare(`UPDATE scan_files SET session_id=?,project_key=?,project_name=?,session_name=?,thread_id=?,parent_thread_id=?,forked_from_id=?,is_main=?,parsed=1 WHERE id=?`)
+      .run(identity.sessionId,identity.projectKey,identity.projectName,identity.sessionName ?? null,identity.threadId,identity.parentThreadId,identity.forkedFromId ?? null,Number(identity.isMain),fileId);
     if (identity.standaloneSubagent) {
       this.connection.prepare("UPDATE events SET is_main=1 WHERE file_id=? AND kind='turn'").run(fileId);
       this.flag(fileId,'*','standalone-subagent');
@@ -90,7 +93,8 @@ export class SummaryStaging {
       usage?.threadId ?? null,usage?.turnId ?? null,usage?.tokens.input ?? null,usage?.tokens.output ?? null,
       usage?.tokens.cacheRead ?? null,usage?.tokens.cacheWrite ?? null,usage?.tokens.reasoning ?? null,
       turn ? Number(turn.isMain) : null,turn?.startedAt ?? null,turn?.completedAt ?? null,turn?.lastAssistantAt ?? null,
-      turn?.duration ?? null,turn?.durationQuality ?? null,turn?.completed ? 1 : 0,null,event.offset,event.kind === 'usage' ? event.schema ?? null : null);
+      turn?.duration ?? null,turn?.durationQuality ?? null,turn?.completed ? 1 : 0,
+      turn?.status ?? null,turn?.statusAt ?? null,null,event.offset,event.kind === 'usage' ? event.schema ?? null : null);
     if ('flags' in event) for (const flag of event.flags ?? []) this.flag(fileId,event.rootId,flag);
   }
   /** A bounded synchronous TEMP-only transaction; persistent tables and file I/O stay outside. */
@@ -238,7 +242,16 @@ export class SummaryStaging {
             OR e.output<>coalesce((SELECT sum(w.output) FROM winners w WHERE w.provider=f.provider AND w.session_id=f.session_id AND w.thread_id=e.thread_id AND w.turn_id=e.turn_id),0));
       DROP TABLE IF EXISTS temp.prepared_turns;
       CREATE TEMP TABLE prepared_turns AS
-      WITH roots AS (
+      WITH source_outcomes AS (
+        SELECT f.provider,f.session_id,e.root_id,e.status,e.status_at,e.duration_quality,e.id,
+          max(e.status_at) OVER(PARTITION BY e.file_id,e.root_id) ordering_at,
+          row_number() OVER(PARTITION BY e.file_id,e.root_id ORDER BY e.id DESC) source_rank
+        FROM component_events e JOIN scan_files f ON f.id=e.file_id
+        WHERE e.is_main=1 AND e.status IS NOT NULL
+      ), outcomes AS (
+        SELECT *,row_number() OVER(PARTITION BY provider,session_id,root_id ORDER BY ordering_at DESC,id DESC) rank
+        FROM source_outcomes WHERE source_rank=1
+      ), roots AS (
         SELECT f.provider,f.session_id,e.root_id,min(CASE WHEN e.is_main=1 THEN e.started END) started,
           max(CASE WHEN e.is_main=1 AND e.completed=1 THEN e.completed_at END) completed_at,
           max(CASE WHEN e.is_main=1 THEN e.last_assistant END) last_assistant,
@@ -249,43 +262,57 @@ export class SummaryStaging {
           max(CASE WHEN f.is_main=1 THEN 1 ELSE 0 END) has_main
         FROM component_events e JOIN scan_files f ON f.id=e.file_id
         WHERE f.failed=0 AND f.removed=0 GROUP BY f.provider,f.session_id,e.root_id
-      ) SELECT r.*,f.project_key,f.project_name,
+      ) SELECT r.*,o.status latest_status,o.status_at latest_status_at,o.duration_quality latest_status_quality,f.project_key,f.project_name,
         coalesce((SELECT sum(w.input) FROM winners w WHERE w.provider=r.provider AND w.session_id=r.session_id AND w.root_id=r.root_id),0) input_tokens,
         coalesce((SELECT sum(w.output) FROM winners w WHERE w.provider=r.provider AND w.session_id=r.session_id AND w.root_id=r.root_id),0) output_tokens,
+        coalesce((SELECT sum(min(w.input,w.cache_read)) FROM winners w WHERE w.provider=r.provider AND w.session_id=r.session_id AND w.root_id=r.root_id),0) cache_read_input_tokens,
+        coalesce((SELECT sum(min(max(0,w.input-w.cache_read),w.cache_write)) FROM winners w WHERE w.provider=r.provider AND w.session_id=r.session_id AND w.root_id=r.root_id),0) cache_write_input_tokens,
         (SELECT group_concat(DISTINCT x.flag) FROM flags x JOIN scan_files sf ON sf.id=x.file_id
           WHERE sf.provider=r.provider AND sf.session_id=r.session_id AND (x.root_id=r.root_id OR x.root_id='*')) flags,
         row_number() OVER(PARTITION BY r.provider,r.session_id ORDER BY r.started IS NULL,r.started,r.root_id) turn_index
       FROM roots r JOIN scan_files f ON f.id=coalesce(
-        (SELECT sf.id FROM scan_files sf WHERE sf.provider=r.provider AND sf.session_id=r.session_id AND sf.is_main=1 AND sf.removed=0 ORDER BY sf.id LIMIT 1),r.file_id);
+        (SELECT sf.id FROM scan_files sf WHERE sf.provider=r.provider AND sf.session_id=r.session_id AND sf.is_main=1 AND sf.removed=0 ORDER BY sf.id LIMIT 1),r.file_id)
+      LEFT JOIN outcomes o ON o.provider=r.provider AND o.session_id=r.session_id AND o.root_id=r.root_id AND o.rank=1;
     `);
   }
 
   *summaries(): Generator<TurnSummaryInput> {
     let after = 0;
+    const sessionName = this.connection.prepare(`SELECT coalesce(
+      (SELECT session_name FROM session_names WHERE provider=? AND session_id=?),
+      (SELECT session_name FROM scan_files WHERE provider=? AND session_id=? AND is_main=1
+        AND removed=0 AND failed=0 AND session_name IS NOT NULL ORDER BY id DESC LIMIT 1)) AS name`);
     while (true) {
       const rows = this.connection.prepare('SELECT rowid AS cursor,* FROM prepared_turns WHERE rowid>? ORDER BY rowid LIMIT 100').all(after);
       if (!rows.length) return;
       for (const raw of rows) {
         const row = raw as unknown as {cursor:number;provider:Provider;session_id:string;root_id:string;started:number|null;completed_at:number|null;
           last_assistant:number|null;completed:number;explicit_duration:number|null;lifecycle:number;file_id:number;byte_offset:number;has_main:number;
-          project_key:string;project_name:string;input_tokens:number;output_tokens:number;flags:string|null;turn_index:number};
+          latest_status:TurnSummaryInput['status']|null;latest_status_at:number|null;latest_status_quality:TurnSummaryInput['duration_quality']|null;
+          project_key:string;project_name:string;input_tokens:number;output_tokens:number;
+          cache_read_input_tokens:number;cache_write_input_tokens:number;flags:string|null;turn_index:number};
         after = row.cursor;
         let duration: number | null = null;
         let quality: TurnSummaryInput['duration_quality'] = 'missing';
-        if (row.explicit_duration !== null) { duration = row.explicit_duration; quality = 'exact'; }
-        else if (row.started !== null && row.completed_at !== null && row.completed_at >= row.started) {
-          duration = row.completed_at - row.started; quality = row.lifecycle ? 'derived' : 'approximate';
-        } else if (row.completed && row.started !== null && row.last_assistant !== null && row.last_assistant >= row.started) {
+        const status = row.latest_status ?? (row.completed ? 'completed' : 'in_progress');
+        const completedAt = status === 'in_progress' ? null : row.latest_status !== null ? row.latest_status_at : row.completed_at;
+        if (status !== 'in_progress' && row.explicit_duration !== null) { duration = row.explicit_duration; quality = 'exact'; }
+        else if (row.started !== null && completedAt !== null && completedAt >= row.started) {
+          const lifecycle = row.latest_status !== null ? row.latest_status_quality === 'derived' : row.lifecycle;
+          duration = completedAt - row.started; quality = status === 'completed' && lifecycle ? 'derived' : 'approximate';
+        } else if (status === 'completed' && row.started !== null && row.last_assistant !== null && row.last_assistant >= row.started) {
           duration = row.last_assistant - row.started; quality = 'approximate';
         }
         const flags = new Set((row.flags ?? '').split(',').filter(Boolean));
         if (quality === 'missing') flags.add('duration-missing');
         if (quality === 'approximate') flags.add('duration-approximate');
         if (!row.has_main) flags.add('missing-root-turn');
-        yield { provider:row.provider,project_key:row.project_key,project_name:row.project_name,session_id:row.session_id,
-          root_turn_id:row.root_id,turn_index:row.turn_index,started_at_ms:row.started,completed_at_ms:row.completed_at,
+        const name = sessionName.get(row.provider,row.session_id,row.provider,row.session_id)?.name as string | null;
+        yield { provider:row.provider,project_key:row.project_key,project_name:row.project_name,session_id:row.session_id,session_name:name,
+          root_turn_id:row.root_id,turn_index:row.turn_index,started_at_ms:row.started,completed_at_ms:completedAt,
           duration_ms:duration,duration_quality:quality,input_tokens:row.input_tokens,output_tokens:row.output_tokens,
-          total_tokens:row.input_tokens+row.output_tokens,status:row.completed ? 'completed':'in_progress',
+          cache_read_input_tokens:row.cache_read_input_tokens,cache_write_input_tokens:row.cache_write_input_tokens,
+          total_tokens:row.input_tokens+row.output_tokens,status,
           quality_flags:[...flags].join(',') || null,diagnostic_file_id:flags.size ? row.file_id : null,
           diagnostic_offset:flags.size ? row.byte_offset : null };
       }
@@ -295,6 +322,6 @@ export class SummaryStaging {
   close(): void {
     this.connection.exec(`DROP TABLE IF EXISTS temp.prepared_turns; DROP TABLE IF EXISTS temp.winners; DROP TABLE IF EXISTS temp.component_events;
       DROP TABLE temp.flags; DROP TABLE temp.events; DROP TABLE temp.component; DROP TABLE temp.links;
-      DROP TABLE temp.affected; DROP TABLE temp.scan_files;`);
+      DROP TABLE temp.affected; DROP TABLE temp.scan_files; DROP TABLE temp.session_names;`);
   }
 }

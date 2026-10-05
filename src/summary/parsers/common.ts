@@ -6,6 +6,9 @@ export function object(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
 export function string(value: unknown): string | undefined { return typeof value === 'string' && value.length > 0 ? value : undefined; }
+export function displayName(value: unknown): string | undefined {
+  return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, 512) || undefined : undefined;
+}
 export function number(value: unknown): number { return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0; }
 export function timestamp(value: unknown): number | null {
   const parsed = typeof value === 'number' ? value : typeof value === 'string' ? Date.parse(value) : NaN;
@@ -25,7 +28,7 @@ export function codexTokens(raw: Record<string, unknown>): TokenVector {
   validateTokens(raw);
   const details = object(raw.input_tokens_details);
   return { input: number(raw.input_tokens), output: number(raw.output_tokens),
-    cacheRead: number(raw.cached_input_tokens ?? details.cached_tokens), cacheWrite: number(raw.cache_write_input_tokens),
+    cacheRead: number(raw.cached_input_tokens ?? details.cached_tokens), cacheWrite: number(raw.cache_write_input_tokens ?? details.cache_write_tokens),
     reasoning: number(raw.reasoning_output_tokens ?? object(raw.output_tokens_details).reasoning_tokens) };
 }
 

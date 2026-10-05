@@ -1,12 +1,15 @@
 import { basename, dirname, sep } from 'node:path';
 import { SummaryError } from '../jsonl';
 import type { FileContext, ParsedIdentity, ParseSink } from '../types';
-import { claudeTokens, number, object, project, string, timestamp } from './common';
+import { claudeTokens, displayName, number, object, project, string, timestamp } from './common';
 
 export class ClaudeParserAdapter {
   private currentRoot: string | undefined;
   private identityValue: ParsedIdentity;
   private recognized = false;
+  private apiFailed = false;
+  private stopBlocked = false;
+  private customTitle = false;
 
   constructor(private readonly context: FileContext, private readonly sink: ParseSink) {
     const parts = context.path.split(/[\\/]/);
@@ -21,6 +24,13 @@ export class ClaudeParserAdapter {
   row(row: Record<string, unknown>, offset: number): void {
     const type = string(row.type);
     if (!type) return;
+    if (this.identityValue.isMain && (type === 'ai-title' || type === 'custom-title')) {
+      const name = displayName(type === 'custom-title' ? row.customTitle : row.aiTitle);
+      if (name && (type === 'custom-title' || !this.customTitle)) {
+        this.identityValue.sessionName = name;
+        this.customTitle = type === 'custom-title';
+      }
+    }
     if (['user', 'assistant', 'system', 'progress', 'file-history-snapshot', 'queue-operation', 'summary'].includes(type)) this.recognized = true;
     const sessionId = string(row.sessionId);
     // Subagent sessionId is sometimes its own thread. Its path establishes the parent session.
@@ -32,10 +42,12 @@ export class ClaudeParserAdapter {
     const content = message.content;
     const toolResult = Array.isArray(content) && content.some((item: unknown) => object(item).type === 'tool_result');
     const external = type === 'user' && row.isMeta !== true && !toolResult && row.isSidechain !== true;
+    const previousRoot = this.currentRoot;
     if (explicitPrompt) this.currentRoot = explicitPrompt;
     if (external && !this.currentRoot) this.currentRoot = string(row.uuid);
     if (external && !explicitPrompt && string(row.uuid)) this.currentRoot = string(row.uuid);
     const rootId = this.currentRoot;
+    if (external || rootId !== previousRoot) { this.apiFailed = false; this.stopBlocked = false; }
     const time = timestamp(row.timestamp);
     if (external && rootId) this.sink.event({ kind: 'turn', rootId, isMain: this.identityValue.isMain,
       startedAt: time, flags: explicitPrompt ? [] : ['missing-request-id'], offset });
@@ -45,16 +57,32 @@ export class ClaudeParserAdapter {
       if (!responseId) throw new SummaryError('missing-response-id', offset);
       this.sink.event({ kind: 'usage', rootId, responseId, requestId: string(row.requestId) ?? null,
         threadId: this.identityValue.threadId, turnId: rootId, tokens: claudeTokens(object(message.usage)), offset });
-      const stopped = message.stop_reason === 'end_turn' || message.stop_reason === 'stop_sequence';
-      this.sink.event({ kind: 'turn', rootId, isMain: this.identityValue.isMain, lastAssistantAt: time,
-        completed: stopped, completedAt: stopped ? time : null, durationQuality: 'approximate', offset });
     }
-    if (rootId && type === 'system' && row.subtype === 'turn_duration' && typeof row.durationMs === 'number') {
+    if (type === 'assistant' && rootId) {
+      this.apiFailed = row.isApiErrorMessage === true;
+      this.stopBlocked = false;
+      const stopped = !this.apiFailed && (message.stop_reason === 'end_turn' || message.stop_reason === 'stop_sequence');
+      this.sink.event({ kind: 'turn', rootId, isMain: this.identityValue.isMain, lastAssistantAt: time,
+        completed: stopped, completedAt: stopped ? time : null, durationQuality: 'approximate',
+        status: this.apiFailed ? 'failed' : stopped ? 'completed' : 'in_progress', statusAt: time,
+        flags: this.apiFailed ? ['api-error'] : [], offset });
+    }
+    if (rootId && type === 'system' && row.subtype === 'stop_hook_summary') {
+      // Only an explicit outcome can supersede the assistant timestamp fallback.
+      if (typeof row.preventedContinuation !== 'boolean') return;
+      this.stopBlocked = row.preventedContinuation;
+      const completed = !this.stopBlocked && !this.apiFailed;
+      this.sink.event({ kind: 'turn', rootId, isMain: this.identityValue.isMain, completed,
+        completedAt: completed ? time : null, durationQuality: 'derived',
+        status: this.stopBlocked ? 'in_progress' : this.apiFailed ? 'failed' : 'completed', statusAt: time, offset });
+    } else if (rootId && !this.stopBlocked && type === 'system' && row.subtype === 'turn_duration' && typeof row.durationMs === 'number') {
       this.sink.event({ kind: 'turn', rootId, isMain: this.identityValue.isMain, duration: number(row.durationMs),
-        durationQuality: 'exact', completed: true, completedAt: time, offset });
-    } else if (rootId && (type === 'system' && ['stop', 'turn_complete', 'task_complete'].includes(String(row.subtype)))) {
-      this.sink.event({ kind: 'turn', rootId, isMain: this.identityValue.isMain, completed: true,
-        completedAt: time, durationQuality: 'derived', offset });
+        durationQuality: 'exact', completed: !this.apiFailed, completedAt: this.apiFailed ? null : time,
+        status: this.apiFailed ? 'failed' : 'completed', statusAt: time, offset });
+    } else if (rootId && !this.stopBlocked && (type === 'system' && ['stop', 'turn_complete', 'task_complete'].includes(String(row.subtype)))) {
+      this.sink.event({ kind: 'turn', rootId, isMain: this.identityValue.isMain, completed: !this.apiFailed,
+        completedAt: this.apiFailed ? null : time, durationQuality: 'derived',
+        status: this.apiFailed ? 'failed' : 'completed', statusAt: time, offset });
     }
   }
 

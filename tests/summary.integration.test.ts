@@ -22,6 +22,125 @@ async function fixture(run: (database: SummaryDatabase, options: SummaryOptions,
   finally { database.close();await rm(base,{recursive:true,force:true}); }
 }
 
+const stopHook = (time = '2026-10-01T00:00:16Z', blocked = false) => ({
+  type:'system',subtype:'stop_hook_summary',timestamp:time,preventedContinuation:blocked,
+});
+const apiError = (time = '2026-10-01T00:00:05Z', root = 'prompt-one') => ({
+  type:'assistant',promptId:root,timestamp:time,isApiErrorMessage:true,error:'rate_limit',apiErrorStatus:429,
+  message:{id:`error-${root}`,stop_reason:'stop_sequence',usage:{input_tokens:0,output_tokens:0}},
+});
+
+test('Claude Stop summaries measure the root elapsed time and explicit durations still take priority',async () => fixture(async (database,options,root) => {
+  const main = join(root,'session-one.jsonl');
+  await mkdir(join(root,'session-one','subagents'),{recursive:true});
+  await writeFile(main,jsonl([user(),response(),stopHook()]));
+  await writeFile(join(root,'session-one','subagents','agent-one.jsonl'),jsonl([
+    response(20,'prompt-one','child-response','child-request'),stopHook('2026-10-01T00:01:00Z'),
+  ]));
+  assert.equal((await refreshSummary(database,options)).failed,0);
+  let turn = database.queryTurns()[0];
+  assert.equal(turn.duration_ms,16000);assert.equal(turn.duration_quality,'derived');
+  assert.equal(turn.completed_at_ms,Date.parse('2026-10-01T00:00:16Z'));
+  assert.equal(turn.total_tokens,320);
+  await appendFile(main,jsonl([{type:'system',subtype:'turn_duration',durationMs:15000,timestamp:'2026-10-01T00:00:16Z'}]));
+  await refreshSummary(database,options);turn = database.queryTurns()[0];
+  assert.equal(turn.duration_ms,15000);assert.equal(turn.duration_quality,'exact');
+}));
+
+test('a blocked Claude Stop reopens the request until its continuation finishes',async () => fixture(async (database,options,root) => {
+  const main = join(root,'session-one.jsonl');
+  await writeFile(main,jsonl([user(),response(),stopHook('2026-10-01T00:00:06Z',true),
+    {type:'system',subtype:'turn_duration',durationMs:6000,timestamp:'2026-10-01T00:00:06Z'}]));
+  await refreshSummary(database,options);
+  let turn = database.queryTurns()[0];
+  assert.equal(turn.status,'in_progress');assert.equal(turn.duration_ms,null);assert.equal(turn.completed_at_ms,null);
+  assert.equal(database.queryUsage()[0].turns_with_duration,0);
+  await appendFile(main,jsonl([
+    {...response(20,'prompt-one','continued-response','continued-request'),timestamp:'2026-10-01T00:00:10Z'},stopHook(),
+  ]));
+  await refreshSummary(database,options);turn = database.queryTurns()[0];
+  assert.equal(turn.status,'completed');assert.equal(turn.duration_ms,16000);assert.equal(turn.duration_quality,'derived');
+}));
+
+test('Claude Stop records without an explicit continuation outcome retain message timestamp fallback',async () => fixture(async (database,options,root) => {
+  const main = join(root,'session-one.jsonl');
+  for (const preventedContinuation of [undefined,null,'false']) {
+    await writeFile(main,jsonl([user(),response(),{...stopHook(),preventedContinuation}]));
+    assert.equal((await refreshSummary(database,options)).failed,0);
+    const turn = database.queryTurns()[0];
+    assert.equal(turn.status,'completed');assert.equal(turn.duration_ms,3000);assert.equal(turn.duration_quality,'approximate');
+  }
+}));
+
+test('Claude API failures stay out of completed averages while retaining tokens spent before failure',async () => fixture(async (database,options,root) => {
+  await writeFile(join(root,'session-one.jsonl'),jsonl([
+    user(),{...response(),message:{...response().message,stop_reason:'tool_use'}},apiError(),stopHook(),
+    {type:'system',subtype:'turn_duration',durationMs:16000,timestamp:'2026-10-01T00:00:16Z'},
+    user('success'),response(50,'success','success-response','success-request'),
+  ]));
+  assert.equal((await refreshSummary(database,options)).failed,0);
+  const failure = database.queryTurns().find(row=>row.root_turn_id==='prompt-one')!;
+  assert.equal(failure.status,'failed');assert.equal(failure.total_tokens,200);assert.match(failure.quality_flags!,/api-error/);
+  const usage = database.queryUsage()[0];
+  assert.equal(usage.turn_count,2);assert.equal(usage.completed_turns,1);assert.equal(usage.total_tokens,350);
+  assert.equal(usage.avg_tokens_per_turn,150);assert.equal(usage.avg_duration_ms,3000);assert.equal(usage.turns_with_duration,1);
+}));
+
+test('a Claude error after an earlier end_turn overrides completion and a later successful retry restores it',async () => fixture(async (database,options,root) => {
+  const main = join(root,'session-one.jsonl');
+  await writeFile(main,jsonl([user(),response(),apiError()]));await refreshSummary(database,options);
+  assert.equal(database.queryTurns()[0].status,'failed');assert.equal(database.queryUsage()[0].avg_duration_ms,null);
+  await appendFile(main,jsonl([
+    {...response(30,'prompt-one','retry-response','retry-request'),timestamp:'2026-10-01T00:00:12Z'},stopHook(),
+  ]));
+  await refreshSummary(database,options);
+  assert.equal(database.queryTurns()[0].status,'completed');assert.equal(database.queryTurns()[0].duration_ms,16000);
+  assert.equal(database.queryUsage()[0].completed_turns,1);assert.equal(database.queryUsage()[0].total_tokens,330);
+}));
+
+test('Claude completion without a usage vector still ends the request and subagent errors do not fail its parent',async () => fixture(async (database,options,root) => {
+  await mkdir(join(root,'session-one','subagents'),{recursive:true});
+  await writeFile(join(root,'session-one.jsonl'),jsonl([user(),
+    {...response(),message:{...response().message,stop_reason:'tool_use'}},
+    {type:'assistant',timestamp:'2026-10-01T00:00:10Z',message:{stop_reason:'end_turn'}},stopHook(),
+  ]));
+  await writeFile(join(root,'session-one','subagents','agent-error.jsonl'),jsonl([apiError('2026-10-01T00:00:30Z')]));
+  assert.equal((await refreshSummary(database,options)).failed,0);
+  const turn = database.queryTurns()[0];
+  assert.equal(turn.status,'completed');assert.equal(turn.duration_ms,16000);assert.equal(turn.total_tokens,200);
+}));
+
+test('Claude duplicate sources use the latest outcome timestamp rather than file parse order',async () => fixture(async (database,options,root) => {
+  await writeFile(join(root,'a-success.jsonl'),jsonl([user(),response(),stopHook()]));
+  await writeFile(join(root,'z-old-error.jsonl'),jsonl([user(),apiError()]));
+  assert.equal((await refreshSummary(database,options)).failed,0);
+  assert.equal(database.queryTurns()[0].status,'completed');assert.equal(database.queryTurns()[0].duration_ms,16000);
+}));
+
+test('a Claude API failure without a timestamp still supersedes earlier completion in its source',async () => fixture(async (database,options,root) => {
+  await writeFile(join(root,'session-one.jsonl'),jsonl([user(),response(),{...apiError(),timestamp:undefined}]));
+  assert.equal((await refreshSummary(database,options)).failed,0);
+  const turn = database.queryTurns()[0];
+  assert.equal(turn.status,'failed');assert.equal(turn.completed_at_ms,null);assert.equal(turn.duration_ms,null);
+  assert.equal(database.queryUsage()[0].completed_turns,0);assert.equal(database.queryUsage()[0].avg_duration_ms,null);
+}));
+
+test('Claude parser version repairs cached durations and API error averages without source changes',async () => fixture(async (database,options,root) => {
+  const main = join(root,'session-one.jsonl');
+  await writeFile(main,jsonl([user(),response(),stopHook(),user('error'),apiError('2026-10-01T00:00:05Z','error')]));
+  await refreshSummary(database,options);
+  database.connection.exec(`UPDATE manifest SET parser_version=3;
+    UPDATE turn_summary SET status='completed',duration_ms=3000,duration_quality='approximate'`);
+  assert.equal(database.queryUsage()[0].completed_turns,2);
+  const refreshed = await refreshSummary(database,options);
+  assert.equal(refreshed.failed,0);assert.equal(refreshed.parsed,1);assert.ok(refreshed.bodyBytes>0);
+  const usage = database.queryUsage()[0];
+  assert.equal(usage.completed_turns,1);assert.equal(usage.avg_duration_ms,16000);
+  assert.equal(database.findManifest('claude',main)!.parser_version,PARSER_VERSION);
+  const unchanged = await refreshSummary(database,options);
+  assert.equal(unchanged.reused,1);assert.equal(unchanged.bodyBytes,0);
+}));
+
 test('session rebuild deduplicates full vectors, includes subagent tokens, and reuses unchanged bodies',async () => fixture(async (database,options,root) => {
   await mkdir(join(root,'session-one','subagents'),{recursive:true});
   await writeFile(join(root,'session-one.jsonl'),jsonl([user(),response(50),response(100),

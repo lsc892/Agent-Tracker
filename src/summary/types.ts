@@ -1,5 +1,5 @@
 export type Provider = 'claude' | 'codex';
-export interface SourceRoot { provider: Provider; path: string }
+export interface SourceRoot { provider: Provider; path: string; dataHome?: string }
 export interface SummaryOptions {
   dbPath: string;
   roots: SourceRoot[];
@@ -19,6 +19,8 @@ export interface UsageQuery {
   providers?: Provider[];
   projectKey?: string;
   sessionId?: string;
+  projectName?: string;
+  sessionName?: string;
   limit?: number;
   offset?: number;
   afterId?: number;
@@ -66,6 +68,7 @@ export interface ParsedIdentity {
   parentThreadId: string | null;
   projectKey: string;
   projectName: string;
+  sessionName?: string;
   isMain: boolean;
   forkedFromId?: string | null;
   standaloneSubagent?: boolean;
@@ -80,6 +83,8 @@ export interface TurnEvent {
   duration?: number | null;
   durationQuality?: 'exact' | 'derived' | 'approximate' | 'missing';
   completed?: boolean;
+  status?: 'completed' | 'in_progress' | 'failed';
+  statusAt?: number | null;
   flags?: string[];
   offset: number;
 }

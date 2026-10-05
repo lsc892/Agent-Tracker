@@ -104,7 +104,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   };
   render();
   quota.start(vscode.window.state.focused);
-  // Initializes only the two-table schema. Transcript scans are exclusively requested by Usage.
+  // Initializes only the schema. Transcript scans are exclusively requested by Usage.
   if (settings.usageEnabled) void summary.initialize().catch(() => { /* Usage/Diagnostics reports the initialization failure when opened. */ });
 }
 
