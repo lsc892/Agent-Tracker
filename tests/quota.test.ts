@@ -306,6 +306,26 @@ test('Codex prefers multi-bucket data, uses dynamic durations, seconds reset and
   assert.throws(() => parseCodexQuota({ rateLimits: { primary: { usedPercent: NaN } } }, 1), { code: 'protocol' });
 });
 
+test('Codex reset credits keep the authoritative count and earliest available credit expiry', () => {
+  const rateLimits = { primary: { usedPercent: 25, windowDurationMins: 300, resetsAt: 1700000000 } };
+  const credit = (expiresAt: unknown, status = 'available', resetType = 'codexRateLimits') => ({ expiresAt, status, resetType });
+  const result = parseCodexQuota({ rateLimits, rateLimitResetCredits: { availableCount: 7, credits: [
+    credit(1700000900), credit(1700000300), credit(1700000001, 'redeemed'), credit(1700000002, 'available', 'unknown'), credit(null), credit('invalid'),
+  ] } }, 1);
+  assert.deepEqual(result.rateLimitResetCredits, { availableCount: 7, nextExpiresAt: 1700000300000 });
+  for (const credits of [null, []]) {
+    assert.deepEqual(parseCodexQuota({ rateLimits, rateLimitResetCredits: { availableCount: 2, credits } }, 1).rateLimitResetCredits,
+      { availableCount: 2, nextExpiresAt: null });
+  }
+  assert.deepEqual(parseCodexQuota({ rateLimits, rateLimitResetCredits: { availableCount: 0, credits: [credit(1700000300)] } }, 1).rateLimitResetCredits,
+    { availableCount: 0, nextExpiresAt: null });
+  for (const summary of [undefined, null, {}, { availableCount: -1 }, { availableCount: 1.5 }, { availableCount: '2' }]) {
+    const snapshot = parseCodexQuota({ rateLimits, rateLimitResetCredits: summary }, 1);
+    assert.equal(snapshot.rateLimitResetCredits, undefined);
+    assert.equal(snapshot.windows[0].usedPercent, 25, 'optional credit metadata never hides valid quota usage');
+  }
+});
+
 const fixture = resolve('tests/fixtures/quota-app-server.cjs');
 test('Codex short-lived subprocess handshakes, reads once, forwards notification, and confirms process exit', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'agent-tracker-quota-'));
@@ -317,6 +337,7 @@ test('Codex short-lived subprocess handshakes, reads once, forwards notification
       env: { QUOTA_FIXTURE_MODE: 'notification', QUOTA_FIXTURE_LOG: log }, onLifecycle: event => events.push(event.event) });
     const result = await provider.read({ signal: signal(), onSnapshot: value => received.push(value.windows[0].usedPercent) });
     assert.equal(result.windows[0].usedPercent, 43);
+    assert.deepEqual(result.rateLimitResetCredits, { availableCount: 2, nextExpiresAt: 1700600000000 });
     assert.deepEqual(received, [42]);
     assert.deepEqual(events, ['started', 'stopped']);
     const recorded = JSON.parse(await readFile(log, 'utf8')) as { methods: string[]; pid: number; dataHome: string };

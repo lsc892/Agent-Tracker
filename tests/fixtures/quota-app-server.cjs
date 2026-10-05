@@ -24,7 +24,9 @@ rl.on('line', line => {
     if (mode === 'rpc-error') send({ id: message.id, error: { code: 429, message: 'secret-token-must-not-escape' } });
     else {
       if (mode === 'notification') send({ method: 'account/rateLimits/updated', params: limits(42) });
-      send({ id: message.id, result: limits(43) });
+      send({ id: message.id, result: { ...limits(43), rateLimitResetCredits: { availableCount: 2, credits: [
+        { resetType: 'codexRateLimits', status: 'available', expiresAt: 1700600000 },
+      ] } } });
     }
   }
 });

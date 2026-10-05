@@ -296,7 +296,27 @@ export function parseCodexQuota(value: unknown, fetchedAt: number): QuotaSnapsho
     }
   }
   if (windows.length === 0) throw new QuotaError('unavailable', 'Codex 구독 quota window 정보를 사용할 수 없습니다.');
-  return { provider: 'codex', fetchedAt, windows };
+  const rateLimitResetCredits = parseResetCredits(result.rateLimitResetCredits);
+  return { provider: 'codex', fetchedAt, windows, ...(rateLimitResetCredits ? { rateLimitResetCredits } : {}) };
+}
+
+function parseResetCredits(value: unknown): QuotaSnapshot['rateLimitResetCredits'] {
+  const summary = asRecord(value);
+  const count = summary?.availableCount;
+  // The backend may cap detail rows; their length is never the available reset count.
+  if (typeof count !== 'number' || !Number.isSafeInteger(count) || count < 0) return undefined;
+  let nextExpiresAt: number | null = null;
+  if (count > 0 && Array.isArray(summary?.credits)) {
+    for (const raw of summary.credits) {
+      const credit = asRecord(raw);
+      if (credit?.status !== 'available' || credit.resetType !== 'codexRateLimits') continue;
+      const expiresAt = credit.expiresAt;
+      if (typeof expiresAt !== 'number' || !Number.isFinite(expiresAt) || expiresAt < 0 || expiresAt > 8.64e12) continue;
+      const timestamp = expiresAt * 1000;
+      if (nextExpiresAt === null || timestamp < nextExpiresAt) nextExpiresAt = timestamp;
+    }
+  }
+  return { availableCount: count, nextExpiresAt };
 }
 
 function protocolError(): QuotaError { return new QuotaError('protocol', 'Codex quota 응답 형식을 지원하지 않습니다. CLI 업데이트를 확인해 주세요.'); }

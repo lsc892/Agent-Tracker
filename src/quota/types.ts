@@ -17,6 +17,7 @@ export interface QuotaSnapshot {
   provider: QuotaProviderId;
   fetchedAt: number;
   windows: QuotaWindow[];
+  rateLimitResetCredits?: { availableCount: number; nextExpiresAt: number | null };
 }
 
 export type QuotaErrorCode = 'authentication' | 'unsupported-account' | 'rate-limit' |
