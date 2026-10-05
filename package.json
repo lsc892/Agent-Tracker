@@ -51,17 +51,18 @@
         "title": "Agent Tracker: 사용 통계 열기"
       },
       {
-        "command": "agentTracker.refreshClaude",
-        "title": "Agent Tracker: Claude 사용률 새로 고침"
-      },
-      {
-        "command": "agentTracker.refreshCodex",
-        "title": "Agent Tracker: Codex 사용률 새로 고침"
-      },
-      {
         "command": "agentTracker.refreshQuota",
         "title": "Agent Tracker: 현재 사용량 새로고침",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "agentTracker.openSettings",
+        "title": "Agent Tracker: 설정 열기",
+        "icon": "$(settings-gear)"
+      },
+      {
+        "command": "agentTracker.clearUsageData",
+        "title": "Agent Tracker: 통계 계산 데이터 삭제"
       }
     ],
     "configuration": {
@@ -85,27 +86,17 @@
           "default": "detailed",
           "description": "상태 표시줄의 표시 방식입니다. 상세는 7일·5시간, 압축은 5시간 사용량만 표시합니다. 사용량 툴팁은 항상 모든 정보를 표시합니다."
         },
-        "agentTracker.claude.showStatusBar": {
-          "type": "boolean",
-          "default": true,
-          "description": "Claude 상태 표시줄을 표시합니다. 숨겨도 quota 조회는 유지합니다."
-        },
         "agentTracker.codex.showStatusBar": {
           "type": "boolean",
           "default": true,
           "description": "Codex 상태 표시줄을 표시합니다. 숨겨도 quota 조회는 유지합니다."
         },
-        "agentTracker.claude.pollingIntervalSeconds": {
+        "agentTracker.quota.pollingIntervalSeconds": {
           "type": "number",
           "minimum": 30,
           "default": 900,
-          "description": "활성 창에서 Claude quota를 조회하는 간격입니다."
-        },
-        "agentTracker.codex.pollingIntervalSeconds": {
-          "type": "number",
-          "minimum": 30,
-          "default": 900,
-          "description": "활성 창에서 Codex quota를 조회하는 간격입니다."
+          "order": 4,
+          "markdownDescription": "자동 갱신 시 추적 중인 Claude Code와 Codex의 구독 사용량을 함께 조회하는 공통 간격(초)입니다. 기본 900초(15분), 최소 30초입니다. 수동 갱신 정책에서는 사용하지 않습니다."
         },
         "agentTracker.claude.dataHome": {
           "type": "string",
@@ -147,6 +138,42 @@
           "type": "string",
           "default": "",
           "description": "일·월 통계의 IANA 시간대. 비우면 시스템 시간대를 사용합니다."
+        },
+        "agentTracker.claude.enabled": {
+          "type": "boolean",
+          "default": true,
+          "order": 1,
+          "description": "Claude Code를 추적합니다. 끄면 사용량 조회와 원본 로그 수집을 중단하고 통계에서 숨깁니다. 기존 계산 데이터는 유지됩니다."
+        },
+        "agentTracker.codex.enabled": {
+          "type": "boolean",
+          "default": true,
+          "order": 2,
+          "description": "Codex를 추적합니다. 끄면 사용량 조회와 원본 로그 수집을 중단하고 통계에서 숨깁니다. 기존 계산 데이터는 유지됩니다."
+        },
+        "agentTracker.quota.refreshPolicy": {
+          "type": "string",
+          "enum": [
+            "automatic",
+            "manual"
+          ],
+          "default": "automatic",
+          "order": 3,
+          "enumItemLabels": [
+            "자동 갱신",
+            "수동 갱신"
+          ],
+          "enumDescriptions": [
+            "활성 창에서 시작 시와 설정한 간격마다 갱신합니다. 창으로 돌아올 때 마지막 성공 조회가 5분 이상 지났거나 조회 오류가 있으면 다시 조회합니다.",
+            "새로고침을 눌렀을 때만 조회합니다."
+          ],
+          "markdownDescription": "현재 구독 사용량의 갱신 정책입니다. 자동 갱신은 비활성 창에서 멈추며, 실패 시 재시도 간격을 늘립니다. 통계 계산은 사용량 통계를 열 때만 실행됩니다."
+        },
+        "agentTracker.usage.enabled": {
+          "type": "boolean",
+          "default": true,
+          "order": 5,
+          "markdownDescription": "사용량 통계를 사용합니다. 끄면 진행 중인 수집을 중단하고 통계 화면을 닫습니다. 구독 사용량 조회에는 영향을 주지 않습니다.\n\n[통계 계산 데이터 삭제](command:agentTracker.clearUsageData): 저장된 파일 처리 정보와 집계 결과를 삭제합니다. 원본 대화 로그는 유지되며, 통계를 다시 열면 재계산합니다."
         }
       }
     },
