@@ -66,6 +66,9 @@ export function createQuotaTooltip(
     ? '$(sync~spin) 현재 사용량 조회 중…'
     : '<a href="command:agentTracker.refreshQuota">$(refresh) 새로고침</a>';
   tooltip.appendMarkdown(`<table width="100%"><tr><td><h3>사용량</h3></td><td align="right">${refresh}</td></tr></table>\n\n`);
+  const successTimes = states.flatMap(state => state.lastSuccessAt !== null && Number.isFinite(state.lastSuccessAt) ? [state.lastSuccessAt] : []);
+  tooltip.appendText(`마지막 갱신: ${successTimes.length ? new Date(Math.max(...successTimes)).toLocaleString('ko-KR') : '—'}`);
+  tooltip.appendMarkdown('\n\n');
   tooltip.appendMarkdown('상태 표시줄: ');
   tooltip.appendMarkdown((['detailed', 'compact'] as const).map(detail => {
     const label = detail === 'detailed' ? '상세' : '압축';
@@ -112,10 +115,6 @@ export function createQuotaTooltip(
     }
     if (state.error) {
       section.appendText(state.error.message);
-      section.appendMarkdown('\n\n');
-    }
-    if (state.lastSuccessAt !== null && Number.isFinite(state.lastSuccessAt)) {
-      section.appendText(`마지막 갱신: ${new Date(state.lastSuccessAt).toLocaleString('ko-KR')}`);
       section.appendMarkdown('\n\n');
     }
     tooltip.appendMarkdown(`\n\n${sectionDivider}\n\n${section.value}`);
