@@ -24,6 +24,7 @@ export interface UsageQuery {
   limit?: number;
   offset?: number;
   afterId?: number;
+  chartMetric?: import('./db/types').ChartMetric;
 }
 export interface RefreshResult {
   scanId: string;
@@ -47,6 +48,7 @@ export interface UsageResult {
   rows: import('./db/types').UsageRow[] | import('./db/types').TurnSummaryRow[];
   total: number;
   coverage: import('./db/types').DiagnosticsPage['counts'];
+  chart?: import('./db/types').UsageChart;
 }
 export type DiagnosticsResult = import('./db/types').DiagnosticsPage & { lastRefresh?: RefreshResult };
 export interface TokenVector {

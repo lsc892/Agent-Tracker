@@ -6,7 +6,7 @@ import { calendarPeriod } from './timezone';
 import type {
   DiagnosticsPage, FileMetadata, KeysetPage, ManifestRow, OffsetPage,
   ProcessingStatus, Provider, SessionReplacement, SummaryFilter,
-  TurnSummaryInput, TurnSummaryRow, UsageGrouping, UsageRow,
+  TurnSummaryInput, TurnSummaryRow, UsageGrouping, UsageRow, ChartMetric, UsageChart,
 } from './types';
 
 export * from './types';
@@ -34,6 +34,21 @@ const TURN_INSERT = `INSERT INTO turn_summary (
 const NAMED_TURNS = `(SELECT t.*, p.project_name, s.session_name FROM turn_summary t
   JOIN projects p ON p.project_key=t.project_key
   JOIN sessions s ON s.provider=t.provider AND s.session_id=t.session_id)`;
+
+const USAGE_SUMS = `SUM(input_tokens) AS input_tokens, SUM(output_tokens) AS output_tokens,
+  CASE WHEN COUNT(cache_write_input_tokens) = COUNT(*) THEN SUM(cache_write_input_tokens) END AS cache_write_input_tokens,
+  CASE WHEN COUNT(cache_read_input_tokens) = COUNT(*) THEN SUM(cache_read_input_tokens) END AS cache_read_input_tokens,
+  SUM(total_tokens) AS total_tokens, COUNT(*) AS turn_count,
+  SUM(status = 'completed') AS completed_turns,
+  AVG(CASE WHEN status = 'completed' THEN total_tokens END) AS avg_tokens_per_turn,
+  AVG(CASE WHEN status = 'completed' THEN duration_ms END) AS avg_duration_ms,
+  SUM(status = 'completed' AND duration_ms IS NOT NULL) AS turns_with_duration,
+  SUM(status = 'completed' AND duration_quality = 'exact') AS exact_duration_turns,
+  SUM(status = 'completed' AND duration_quality = 'derived') AS derived_duration_turns,
+  SUM(status = 'completed' AND duration_quality = 'approximate') AS approximate_duration_turns,
+  SUM(status = 'completed' AND duration_ms IS NULL) AS missing_duration_turns,
+  SUM(started_at_ms IS NULL) AS unknown_time_turns,
+  SUM(last_error IS NOT NULL) AS stale_turns, MAX(updated_at) AS last_successful_update`;
 
 function turnValues(row: TurnSummaryInput, now: string): SQLInputValue[] {
   for (const name of ['input_tokens', 'output_tokens', 'total_tokens', 'turn_index'] as const) {
@@ -345,7 +360,7 @@ export class SummaryDatabase {
     )`).get(...prefix, ...where.values) as { count: number }).count;
   }
 
-  queryUsage(filter: SummaryFilter = {}, groupBy: UsageGrouping = 'total', timezone = 'UTC', page: OffsetPage = {}): UsageRow[] {
+  queryUsage(filter: SummaryFilter = {}, groupBy: UsageGrouping = 'total', timezone = 'UTC', page: OffsetPage & { sortBy?: ChartMetric } = {}): UsageRow[] {
     if (!['total', 'project', 'session', 'day', 'month'].includes(groupBy)) throw new RangeError('Unknown usage grouping');
     if (groupBy === 'day' || groupBy === 'month') calendarPeriod(0, timezone, groupBy);
     const calendar = groupBy === 'day' || groupBy === 'month';
@@ -359,6 +374,8 @@ export class SummaryDatabase {
     if (groupBy === 'session') groups.push('session_id');
     if (calendar) groups.push('period');
     const prefix: SQLInputValue[] = calendar ? [timezone, groupBy] : [];
+    const metricColumns = { tokens: 'total_tokens', requests: 'turn_count', averageTokens: 'avg_tokens_per_turn', averageDuration: 'avg_duration_ms' };
+    const order = page.sortBy ? `${metricColumns[page.sortBy]} DESC, ${groups.join(', ')}` : groups.join(', ');
     return this.connection.prepare(`SELECT provider,
       ${project ? 'project_key' : 'NULL'} AS project_key,
       ${project ? '(SELECT project_name FROM projects p WHERE p.project_key=turn_summary.project_key)' : 'NULL'} AS project_name,
@@ -366,24 +383,49 @@ export class SummaryDatabase {
       ${groupBy === 'session' ? '(SELECT session_name FROM sessions s WHERE s.provider=turn_summary.provider AND s.session_id=turn_summary.session_id)' : 'NULL'} AS session_name,
       ${groupBy === 'session' ? '(SELECT MIN(t.started_at_ms) FROM turn_summary t WHERE t.provider=turn_summary.provider AND t.session_id=turn_summary.session_id)' : 'NULL'} AS session_started_at_ms,
       ${period} AS period,
-      SUM(input_tokens) AS input_tokens, SUM(output_tokens) AS output_tokens,
-      CASE WHEN COUNT(cache_write_input_tokens) = COUNT(*) THEN SUM(cache_write_input_tokens) END AS cache_write_input_tokens,
-      CASE WHEN COUNT(cache_read_input_tokens) = COUNT(*) THEN SUM(cache_read_input_tokens) END AS cache_read_input_tokens,
-      SUM(total_tokens) AS total_tokens, COUNT(*) AS turn_count,
-      SUM(status = 'completed') AS completed_turns,
-      AVG(CASE WHEN status = 'completed' THEN total_tokens END) AS avg_tokens_per_turn,
-      AVG(CASE WHEN status = 'completed' THEN duration_ms END) AS avg_duration_ms,
-      SUM(status = 'completed' AND duration_ms IS NOT NULL) AS turns_with_duration,
-      SUM(status = 'completed' AND duration_quality = 'exact') AS exact_duration_turns,
-      SUM(status = 'completed' AND duration_quality = 'derived') AS derived_duration_turns,
-      SUM(status = 'completed' AND duration_quality = 'approximate') AS approximate_duration_turns,
-      SUM(status = 'completed' AND duration_ms IS NULL) AS missing_duration_turns,
-      SUM(started_at_ms IS NULL) AS unknown_time_turns,
-      SUM(last_error IS NOT NULL) AS stale_turns,
-      MAX(updated_at) AS last_successful_update
+      ${USAGE_SUMS}
       FROM turn_summary WHERE ${where.sql}
-      GROUP BY ${groups.join(', ')} ORDER BY ${groups.join(', ')} LIMIT ? OFFSET ?`)
+      GROUP BY ${groups.join(', ')} ORDER BY ${order} LIMIT ? OFFSET ?`)
       .all(...prefix, ...where.values, pageLimit(page.limit), nonnegative(page.offset ?? 0, 'offset')) as unknown as UsageRow[];
+  }
+
+  /** Bounded chart data is computed from the entire filter, independently of table pagination. */
+  queryUsageChart(filter: SummaryFilter, groupBy: UsageGrouping | 'all' | 'turn', timezone: string, metric: ChartMetric): UsageChart {
+    if (!['tokens', 'requests', 'averageTokens', 'averageDuration'].includes(metric)) throw new RangeError('Unknown chart metric');
+    if (groupBy === 'turn') {
+      const where = whereClause(filter);
+      const rows = this.connection.prepare(`SELECT * FROM ${NAMED_TURNS} AS turn_summary WHERE ${where.sql}
+        ORDER BY started_at_ms DESC, id DESC LIMIT 60`).all(...where.values) as unknown as TurnSummaryRow[];
+      rows.reverse();
+      return { rows, mode: 'turn', metric: metric === 'averageDuration' ? metric : 'tokens', total: this.queryTurnsCount(filter) };
+    }
+    const grouping = groupBy === 'all' ? 'total' : groupBy;
+    const total = this.queryUsageCount(filter, grouping, timezone);
+    if (grouping !== 'day' && grouping !== 'month') {
+      return { rows: this.queryUsage(filter, grouping, timezone, { limit: 10, sortBy: metric }),
+        mode: grouping === 'total' ? 'total' : 'ranking', metric, total };
+    }
+    calendarPeriod(0, timezone, grouping);
+    const where = whereClause(filter.unknownTime === undefined ? { ...filter, unknownTime: 'include' } : filter);
+    // At most 30 chronological bins per provider. Average raw completed turns,
+    // never averages of daily averages; undated turns retain their own bin.
+    const rows = this.connection.prepare(`WITH filtered AS (
+      SELECT *, agent_tracker_period(started_at_ms, ?, ?) AS chart_period FROM turn_summary WHERE ${where.sql}
+    ), periods AS (
+      SELECT chart_period, NTILE(30) OVER (ORDER BY chart_period) AS bucket
+      FROM (SELECT DISTINCT chart_period FROM filtered WHERE chart_period IS NOT NULL)
+    ), ranges AS (
+      SELECT bucket, MIN(chart_period) AS first_period, MAX(chart_period) AS last_period,
+        COUNT(*) AS period_count FROM periods GROUP BY bucket
+    ) SELECT provider, NULL AS project_key, NULL AS project_name, NULL AS session_id,
+      NULL AS session_name, NULL AS session_started_at_ms,
+      CASE WHEN first_period = last_period THEN first_period
+        ELSE first_period || ' ~ ' || last_period END AS period,
+      COALESCE(ranges.period_count, 0) AS period_count, ${USAGE_SUMS}
+      FROM filtered LEFT JOIN periods USING (chart_period) LEFT JOIN ranges USING (bucket)
+      GROUP BY bucket, provider ORDER BY bucket IS NULL, bucket, provider`)
+      .all(timezone, grouping, ...where.values) as unknown as UsageRow[];
+    return { rows, mode: 'calendar', metric, total };
   }
 
   diagnostics(page: KeysetPage & { afterSummaryId?: number; offset?: number; providers?: Provider[] } = {}): DiagnosticsPage {

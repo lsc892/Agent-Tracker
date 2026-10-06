@@ -90,6 +90,13 @@ export interface OffsetPage {
 }
 
 export type UsageGrouping = 'total' | 'project' | 'session' | 'day' | 'month';
+export type ChartMetric = 'tokens' | 'requests' | 'averageTokens' | 'averageDuration';
+export interface UsageChart {
+  rows: (UsageRow & { period_count?: number })[] | TurnSummaryRow[];
+  mode: 'calendar' | 'ranking' | 'turn' | 'total';
+  metric: ChartMetric;
+  total: number;
+}
 
 export interface UsageRow {
   provider: Provider;

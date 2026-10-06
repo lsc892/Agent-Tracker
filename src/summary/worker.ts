@@ -34,7 +34,8 @@ port.on('message',(message: {id?:number;method:string;payload?:unknown}) => {
           : database.queryUsage(query,query.groupBy === 'all' || !query.groupBy ? 'total' : query.groupBy,query.timezone ?? options.timezone ?? 'UTC',query);
         const total = query.groupBy === 'turn' ? database.queryTurnsCount(query)
           : database.queryUsageCount(query,query.groupBy === 'all' || !query.groupBy ? 'total' : query.groupBy,query.timezone ?? options.timezone ?? 'UTC');
-        result = {rows,total,coverage:database.diagnostics({limit:1,providers:query.providers}).counts};
+        const chart = query.chartMetric ? database.queryUsageChart(query, query.groupBy ?? 'all', query.timezone ?? options.timezone ?? 'UTC', query.chartMetric) : undefined;
+        result = {rows,total,chart,coverage:database.diagnostics({limit:1,providers:query.providers}).counts};
       } else if (message.method === 'diagnostics') result = {...database.diagnostics((message.payload ?? {}) as {limit?:number;offset?:number;afterId?:number;providers?:SourceRoot['provider'][]}),lastRefresh};
       else if (message.method === 'clearData') {
         // Use the same cross-window lock as scanning; never unlink a live DB or lock file.

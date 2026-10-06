@@ -27,6 +27,27 @@ nav button[aria-current=page] { border-bottom-color: var(--vscode-focusBorder); 
 .filters label { display: flex; flex-direction: column; gap: 6px; color: var(--vscode-descriptionForeground); font-size: 12px; }
 input, select { border: 1px solid var(--vscode-input-border, transparent); color: var(--vscode-input-foreground); background: var(--vscode-input-background); padding: 7px 9px; border-radius: 3px; max-width: 200px; }
 .table-wrap { overflow-x: auto; border: 1px solid var(--vscode-panel-border); border-radius: 5px; }
+.usage-chart { margin: 24px 0 28px; }
+.chart-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.chart-heading h3 { margin: 0; }
+.chart-heading label { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--vscode-descriptionForeground); }
+#chart-scope { font-size: 12px; }
+.chart-legend { display: flex; flex-wrap: wrap; gap: 16px; margin: 12px 0; font-size: 12px; }
+.chart-legend-item { display: inline-flex; align-items: center; gap: 6px; }
+.chart-plot { overflow-x: auto; }
+.chart-svg { display: block; font-family: inherit; font-variant-numeric: tabular-nums; }
+.chart-series-0 { fill: var(--vscode-charts-blue, var(--vscode-terminal-ansiBlue)); }
+.chart-series-1 { fill: var(--vscode-charts-orange, var(--vscode-terminal-ansiYellow)); }
+.chart-series-2 { fill: var(--vscode-charts-purple, var(--vscode-terminal-ansiMagenta)); }
+.chart-series-3 { fill: var(--vscode-charts-green, var(--vscode-terminal-ansiGreen)); }
+.chart-unknown { fill: var(--vscode-descriptionForeground); }
+.chart-measure { fill: var(--vscode-charts-blue, var(--vscode-terminal-ansiBlue)); }
+.chart-grid { stroke: var(--vscode-panel-border); stroke-width: 1; }
+.chart-axis-label, .chart-provider { fill: var(--vscode-descriptionForeground); font-size: 11px; }
+.chart-value, .chart-label { fill: var(--vscode-foreground); font-size: 12px; }
+.chart-hit { fill: transparent; }
+.chart-bar:focus .chart-hit, .chart-bar:hover .chart-hit { stroke: var(--vscode-focusBorder); stroke-width: 1; }
+.chart-detail { min-height: 36px; margin: 12px 0 0; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
 table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 12px; }
 th, td { text-align: left; padding: 12px; border-bottom: 1px solid var(--vscode-panel-border); }
 th { font-weight: 500; color: var(--vscode-descriptionForeground); background: var(--vscode-sideBar-background); white-space: nowrap; }

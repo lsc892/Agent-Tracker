@@ -49,6 +49,8 @@ export async function run(): Promise<void> {
     const driver = `
       (() => {
         let phase = 'usage';
+        const chartGroups = ['project', 'session', 'all', 'month'];
+        const submitGroup = group => { document.getElementById('group').value = group; document.getElementById('usage-filters').requestSubmit(); };
         const report = (ok, detail) => window.dispatchEvent(new CustomEvent('tracker-smoke-report', {detail:{type:'smoke-report',stage:'usage',theme:${JSON.stringify(expectedTheme)},ok,detail}}));
         const check = (condition, detail) => { if (!condition) throw new Error(detail); };
         window.addEventListener('error', event => report(false,event.message));
@@ -64,6 +66,29 @@ export async function run(): Promise<void> {
               check(message.result.rows[0].total_tokens === 150,'worker usage reached Webview');
               check(document.getElementById('usage-table').textContent.includes('150'),'usage table renders total');
               check(document.getElementById('usage').hidden === false,'usage is the visible default tab');
+              check(message.result.chart.mode === 'calendar','calendar chart arrives from the worker');
+              const marks = [...document.querySelectorAll('#usage-chart .chart-segment')];
+              check(marks.length === 4,'total tokens render as four stacked segments');
+              const fills = marks.map(mark => getComputedStyle(mark).fill);
+              check(new Set(fills).size === 4 && fills.every(fill => fill !== 'none'),'four token colors resolve in the active theme');
+              document.querySelector('#usage-chart .chart-bar').focus();
+              check(document.getElementById('chart-detail').textContent.includes('Input 50 / Output 50 / Cache Write 20 / Cache Read 30'),'keyboard focus exposes token breakdown');
+              phase = 'chart-requests'; document.getElementById('chart-metric').value = 'requests';
+              document.getElementById('chart-metric').dispatchEvent(new Event('change'));
+            } else if (phase === 'chart-requests' && message.type === 'usage' && message.result.chart.metric === 'requests') {
+              check(document.querySelectorAll('#usage-chart .chart-segment').length === 1,'request metric displays one measure');
+              check(document.getElementById('chart-legend').children.length === 0,'non-token metric clears token legend');
+              phase = 'chart-duration'; document.getElementById('chart-metric').value = 'averageDuration';
+              document.getElementById('chart-metric').dispatchEvent(new Event('change'));
+            } else if (phase === 'chart-duration' && message.type === 'usage' && message.result.chart.metric === 'averageDuration') {
+              check(document.getElementById('chart-detail').textContent.includes('시간 표본 1개'),'duration averages display their sample count');
+              phase = 'chart-groups'; document.getElementById('chart-metric').value = 'tokens';
+              submitGroup(chartGroups[0]);
+            } else if (phase === 'chart-groups' && message.type === 'usage' && message.result.groupBy === chartGroups[0]) {
+              check(document.querySelectorAll('#usage-chart .chart-segment').length === 4,'stacked chart survives grouping '+chartGroups[0]);
+              check(document.getElementById('chart-title').textContent === '총 토큰','grouped chart keeps its token metric');
+              chartGroups.shift();
+              if (chartGroups.length) { submitGroup(chartGroups[0]); return; }
               phase = 'turn'; document.getElementById('group').value = 'turn';
               document.getElementById('session-name').value = '통계 화면 검증';
               document.getElementById('usage-filters').requestSubmit();
@@ -71,11 +96,14 @@ export async function run(): Promise<void> {
               check(message.result.rows.length === 1 && message.result.rows[0].root_turn_id === 'ui-turn','request group and session filter are applied');
               check(document.getElementById('usage-table').textContent.includes('ui-turn'),'request identity is rendered');
               check(document.getElementById('usage-table').textContent.includes('통계 화면 검증'),'session title is rendered');
+              check(message.result.chart.mode === 'turn' && document.querySelectorAll('#usage-chart .chart-segment').length === 4,'request chart uses token composition');
+              check(document.getElementById('chart-metric').querySelector('[value="requests"]').disabled,'request chart disables aggregate metrics');
               phase = 'empty'; document.getElementById('from-day').value = '2026-10-04';
               document.getElementById('usage-filters').requestSubmit();
             } else if (phase === 'empty' && message.type === 'usage') {
               check(message.result.total === 0,'date filter excludes earlier requests');
               check(document.querySelector('#usage-table .empty'),'empty state renders');
+              check(document.querySelector('#usage-chart .empty') && !document.querySelector('#usage-chart .chart-segment'),'empty query clears the chart');
               check(document.getElementById('previous').disabled && document.getElementById('next').disabled,'empty pagination is disabled');
               phase = 'diagnostics'; document.querySelector('[data-tab="diagnostics"]').click();
             } else if (phase === 'diagnostics' && message.type === 'diagnostics') {
@@ -90,7 +118,7 @@ export async function run(): Promise<void> {
             } else if (phase === 'diagnostics-return' && message.type === 'diagnostics') {
               check(message.offset === 0 && document.getElementById('diagnostic-previous').disabled,'returning to diagnostics resets page and controls together');
               check(document.getElementById('diagnostic-page').textContent.startsWith('1번째'),'diagnostics label matches returned rows');
-              phase='complete'; report(true,'hover statistics link → usage filters → diagnostics in '+${JSON.stringify(expectedTheme)});
+              phase='complete'; report(true,'statistics link → six chart groups, token colors and keyboard details, metrics → filters → diagnostics in '+${JSON.stringify(expectedTheme)});
             } else if (message.type === 'error') { phase='failed'; report(false,message.message); }
           } catch(error) { phase='failed'; report(false,error.message); }
         });
