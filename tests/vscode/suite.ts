@@ -170,6 +170,12 @@ export async function run(): Promise<void> {
               check(message.result.total === 1 && document.querySelectorAll('#session-list .name-option').length === 2,'names remain available outside the date filter');
               window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));
               check(document.getElementById('session-options').hidden && document.activeElement === document.getElementById('session-name'),'Escape closes the list and returns keyboard focus');
+              phase = 'reset'; document.getElementById('reset-filters').click();
+            } else if (phase === 'reset' && message.type === 'usage') {
+              check(message.result.groupBy === 'day' && message.result.total === 1,'reset restores daily query results');
+              for (const id of ['provider','from-day','to-day']) check(document.getElementById(id).value === '','reset clears '+id);
+              check(document.getElementById('project-name').textContent === '전체 프로젝트' && document.getElementById('session-name').textContent === '전체 세션','reset clears selected identities');
+              check(document.getElementById('chart-metric').value === 'tokens' && message.result.cumulative.by === 'provider','reset restores metric and provider cumulative');
               check(!receivedDiagnostics,'statistics does not receive diagnostic logs');
               const link = document.getElementById('open-diagnostics');
               link.focus(); check(document.activeElement === link,'diagnostic hyperlink accepts keyboard focus');
@@ -213,7 +219,7 @@ export async function run(): Promise<void> {
             } else if (phase === 'previous' && message.type === 'diagnostics') {
               check(message.offset === 0 && document.getElementById('diagnostic-previous').disabled,'diagnostics previous page updates rows and controls together');
               check(document.getElementById('diagnostic-page').textContent.startsWith('1번째'),'diagnostics label matches returned rows');
-              phase = 'complete'; report(true,'statistics charts, token hover, project/session choices and filters → footer diagnostic hyperlink → separate log webview, reload and pagination in '+${JSON.stringify(expectedTheme)});
+              phase = 'complete'; report(true,'statistics charts, model/provider cumulative, cost on/off, API and zero subscription costs, reset and name filters → separate diagnostic webview in '+${JSON.stringify(expectedTheme)});
             } else if (message.type === 'error') { phase = 'failed'; report(false,message.message); }
           } catch(error) { phase = 'failed'; report(false,error.message); }
         });

@@ -24,7 +24,7 @@ class Element {
   focus(): void {}
 }
 
-function view() {
+function view(saved?: Record<string,unknown>) {
   const elements = new Map<string,Element>();
   const get = (id: string): Element => {
     if (!elements.has(id)) elements.set(id,new Element());
@@ -32,20 +32,41 @@ function view() {
   };
   const messages: {type:string;query?:Record<string,unknown>;requestId?:number}[] = [];
   let receive: ((event:{data:unknown})=>void) | undefined;
+  let state: unknown;
   get('group').value='session';
   new Script(readFileSync(join(__dirname,'../../../media/dashboard.js'),'utf8')).runInNewContext({
-    acquireVsCodeApi:()=>({getState:()=>undefined,setState:()=>undefined,postMessage:(message:typeof messages[number])=>messages.push(message)}),
+    acquireVsCodeApi:()=>({getState:()=>saved,setState:(value:unknown)=>{state=value;},postMessage:(message:typeof messages[number])=>messages.push(message)}),
     document:{getElementById:get,createElement:()=>new Element(),querySelectorAll:()=>[]},
     window:{addEventListener:(event:string,listener:typeof receive)=>{if (event==='message') receive=listener;}},
   });
   const respond = (result: unknown, request = messages.at(-1)!) => receive!({data:{type:'names',kind:request.query?.kind,requestId:request.requestId,result}});
-  return { get, messages, respond, receive: (data:unknown) => receive!({data}) };
+  return { get, messages, respond, state:()=>state, receive: (data:unknown) => receive!({data}) };
 }
 const sessions = [
   {provider:'codex',project_key:'/project',project_name:'Project',session_id:'one',session_name:'같은 이름',session_started_at_ms:0},
   {provider:'codex',project_key:'/project',project_name:'Project',session_id:'two',session_name:'같은 이름',session_started_at_ms:1000},
   {provider:'claude',project_key:'/project',project_name:'Project',session_id:'three',session_name:null,session_started_at_ms:null},
 ];
+
+test('reset returns every query control and cumulative page to defaults while retaining the cost display preference',()=>{
+  const {get,messages,respond,state} = view({group:'month',chartMetric:'averageTokens',cumulativeBy:'model',showCosts:true});
+  assert.equal(messages[0].query?.cumulativeBy,'model');assert.equal(messages[0].query?.includeCosts,true);
+  get('from-day').value='2026-10-01';get('to-day').value='2026-10-02';
+  get('session-name').listeners.get('click')!();respond({rows:sessions,total:3});
+  get('session-list').children[2].listeners.get('click')!();
+  assert.equal(messages.at(-1)?.query?.sessionId,'two');
+  get('next').listeners.get('click')!();get('cumulative-next').listeners.get('click')!();
+  get('project-name').listeners.get('click')!();
+  get('reset-filters').listeners.get('click')!();
+  const query = messages.at(-1)?.query;
+  assert.equal(query?.groupBy,'day');assert.equal(query?.chartMetric,'tokens');
+  for (const name of ['provider','sessionId','projectKey','fromDay','toDay']) assert.equal(query?.[name],undefined);
+  assert.equal(query?.offset,0);assert.equal(query?.cumulativeOffset,0);assert.equal(query?.cumulativeBy,'provider');
+  assert.equal(query?.includeCosts,true);assert.equal(get('project-options').hidden,true);
+  assert.equal(get('billing-control').hidden,true);assert.equal(get('project-name').textContent,'전체 프로젝트');
+  assert.equal(get('session-name').textContent,'전체 세션');
+  assert.deepEqual(JSON.parse(JSON.stringify(state())),{group:'day',chartMetric:'tokens',cumulativeBy:'provider',showCosts:true});
+});
 
 test('cost toggle displays stored costs and unknown coverage in table and cumulative model rows without refreshing sources',()=>{
   const {get,messages,receive,respond} = view();

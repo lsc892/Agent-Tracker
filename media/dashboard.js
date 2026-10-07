@@ -383,6 +383,13 @@
   $('settings').addEventListener('click', () => send({ type: 'settings' }));
   $('cancel-usage').addEventListener('click', () => send({ type: 'cancelUsage' }));
   $('usage-filters').addEventListener('submit', event => { event.preventDefault(); offset = 0; cumulativeOffset = 0; query(); });
+  $('reset-filters').addEventListener('click', () => {
+    closeNames(); selectedProject = undefined; selectedSession = undefined;
+    for (const id of ['provider', 'from-day', 'to-day']) $(id).value = '';
+    $('group').value = 'day'; $('chart-metric').value = 'tokens';
+    nameCaption('project', ''); nameCaption('session', '');
+    offset = 0; cumulativeOffset = 0; cumulativeBy = 'provider'; query();
+  });
   $('show-costs').addEventListener('change', query);
   $('billing-mode').addEventListener('change', () => {
     if (!selectedSession || !$('provider').value) return;
