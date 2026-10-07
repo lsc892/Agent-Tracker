@@ -61,6 +61,10 @@
         "icon": "$(settings-gear)"
       },
       {
+        "command": "agentTracker.configureStatusColor",
+        "title": "Agent Tracker: 상태 표시줄 색상 선택"
+      },
+      {
         "command": "agentTracker.clearUsageData",
         "title": "Agent Tracker: 통계 계산 데이터 삭제"
       }
@@ -85,6 +89,31 @@
           ],
           "default": "detailed",
           "description": "상태 표시줄의 표시 방식입니다. 상세는 7일·5시간, 압축은 5시간 사용량만 표시합니다. 사용량 툴팁은 항상 모든 정보를 표시합니다."
+        },
+        "agentTracker.display.colorMode": {
+          "type": "string",
+          "enum": ["automatic", "white", "black", "custom"],
+          "enumItemLabels": ["자동", "흰색", "검은색", "사용자 지정"],
+          "enumDescriptions": [
+            "현재 VS Code 테마와 작업공간의 상태 표시줄 기본 색상을 따릅니다.",
+            "흰색으로 표시합니다.",
+            "검은색으로 표시합니다.",
+            "Display: Custom Color의 HEX 색상으로 표시합니다."
+          ],
+          "default": "automatic",
+          "scope": "window",
+          "order": 6,
+          "markdownDescription": "사용량 항목의 로고·잔량 막대·글자와 새로고침 버튼 색상입니다. 자동은 2026 Dark·Light·고대비를 포함한 현재 테마의 기본 색상과 작업공간 색상 설정을 따릅니다. [색상 선택 열기](command:agentTracker.configureStatusColor)"
+        },
+        "agentTracker.display.customColor": {
+          "type": "string",
+          "default": "#ffffff",
+          "format": "color-hex",
+          "pattern": "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$",
+          "patternErrorMessage": "#RGB, #RGBA, #RRGGBB 또는 #RRGGBBAA 형식으로 입력하세요.",
+          "scope": "window",
+          "order": 7,
+          "markdownDescription": "사용자 지정 모드에서 사용할 HEX 색상입니다. 예: `#abc`, `#aabbcc`, `#ffffffcc`(투명도 포함). [색상 선택 열기](command:agentTracker.configureStatusColor)에서 색상 견본을 클릭하거나 HEX 값을 입력할 수 있습니다. 잘못된 값은 테마 기본 색상으로 표시합니다."
         },
         "agentTracker.codex.showStatusBar": {
           "type": "boolean",

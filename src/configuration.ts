@@ -1,11 +1,14 @@
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import type { SourceRoot } from './summary/types';
+import { colorMode, normalizeHexColor, type StatusColorMode } from './ui/colors';
 
 export interface SettingsReader { get<T>(key: string, fallback: T): T }
 export interface TrackerConfiguration {
   percentage: 'used' | 'remaining';
   detail: 'compact' | 'detailed';
+  colorMode: StatusColorMode;
+  customColor: string | undefined;
   refreshPolicy: 'automatic' | 'manual';
   pollingSeconds: number;
   usageEnabled: boolean;
@@ -44,6 +47,8 @@ export function readConfiguration(settings: SettingsReader): TrackerConfiguratio
   return {
     percentage: settings.get('display.percentage', 'used'),
     detail: settings.get('display.detail', 'detailed'),
+    colorMode: colorMode(settings.get<unknown>('display.colorMode', 'automatic')),
+    customColor: normalizeHexColor(settings.get<unknown>('display.customColor', '#ffffff')),
     refreshPolicy: settings.get('quota.refreshPolicy', 'automatic'),
     pollingSeconds: settings.get('quota.pollingIntervalSeconds', 900),
     usageEnabled: settings.get('usage.enabled', true),

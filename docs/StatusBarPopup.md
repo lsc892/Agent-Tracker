@@ -69,6 +69,8 @@ VS Code 자체의 사용량 카드에는 DOM으로 만든 대시보드가 사용
 
 ## Agent Tracker에 적용한 구현
 
+상태 표시줄 색상은 `display.colorMode`의 자동·흰색·검은색·사용자 지정으로 설정한다. 자동은 전경색 지정을 해제해 현재 테마와 작업공간의 기본 상태 표시줄 색상을 상속한다. `display.customColor`는 짧은 HEX와 투명도를 포함한 HEX를 지원하며, 설정 설명의 색상 선택 링크로 [colorSettings.ts](../src/ui/colorSettings.ts)의 견본·HEX·불투명도 편집 화면을 연다. 사용량 항목과 새로고침에 함께 적용하며 Markdown 카드의 의미별 막대 색은 기존 규칙을 유지한다.
+
 - [src/ui/quotaTooltip.ts](../src/ui/quotaTooltip.ts): 제공자 이름과 다음 초기화 시간을 한 줄로, 기간별 색상 막대·비율을 그 아래에 표시한다. 막대는 자체 생성한 SVG data URI를 사용하며 사용률에 따라 초록·노랑·빨강으로 표시한다. 추가 quota, 조회 중·오래된 값·오류 안내와 마지막 갱신 시각도 유지한다. `supportHtml`은 제한된 색상 span에 사용하고 외부 문자열은 `appendText`로 이스케이프한다. Codex 응답의 `rateLimitResetCredits.availableCount`와 사용 가능한 항목의 가장 빠른 `expiresAt`을 재설정 가능 횟수·다음 만료 시간으로 표시한다. 상세 항목 수로 횟수를 추정하지 않으며, 만료 정보가 없으면 횟수만 표시한다. [Codex App Server](https://learn.chatgpt.com/docs/app-server#6-rate-limits-chatgpt)
 - [src/ui/statusBar.ts](../src/ui/statusBar.ts): `tooltip`에는 전체 카드를, 접근성 label에는 짧은 요약을 제공하고 클릭 명령을 `agentTracker.toggleQuotaTooltip`으로 지정한다. 패치가 label을 자동 호버에 사용하므로 스크린리더와 마우스 사용자가 같은 요약을 받는다. [statusBarPresentation.ts](../src/ui/statusBarPresentation.ts)의 `quotaHoverSummary`는 Claude·Codex 순서로 5시간 남은 비율과 재설정까지의 시간을 표시한다. 카운트다운은 1분마다 현재 snapshot에서 다시 계산하며 네트워크 조회나 통계 스캔을 시작하지 않는다.
 - [src/extension.ts](../src/extension.ts): 전체 새로고침·사용량 통계·상세/압축 명령과 Agent Tracker 설정 열기를 등록한다. 제공자별 새로고침·확장 관리 명령은 제거했다. 설정에서 추적 대상, 자동/수동 갱신, 통계 사용 여부와 계산 데이터 삭제를 관리한다. 패치가 없는 설치에서 클릭 명령은 `workbench.action.showHover`로 열린다.

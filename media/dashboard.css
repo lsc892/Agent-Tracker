@@ -74,3 +74,10 @@ tr:last-child td { border-bottom: 0; }
 #usage-progress { color: var(--vscode-descriptionForeground); min-height: 18px; }
 [hidden] { display: none !important; }
 @media(max-width: 720px) { body { padding: 20px 16px; } header, .section-title { align-items: flex-start; } h1 { font-size: 21px; } }
+.color-settings { max-width: 660px; }
+.color-settings label { display: flex; flex-direction: column; gap: 8px; margin: 18px 0; }
+.color-inputs { display: flex; gap: 20px; align-items: center; }
+.color-settings input[type=color] { width: 64px; height: 40px; padding: 3px; cursor: pointer; }
+.color-settings input[type=range] { width: 240px; max-width: 100%; padding: 0; }
+.color-preview { padding: 12px; border: 1px solid var(--vscode-panel-border); border-radius: 5px; color: var(--tracker-status-color, var(--vscode-statusBar-foreground, var(--vscode-foreground))); background: var(--vscode-statusBar-background); }
+.color-preview.no-workspace { color: var(--tracker-status-color, var(--vscode-statusBar-noFolderForeground, var(--vscode-statusBar-foreground, var(--vscode-foreground)))); background: var(--vscode-statusBar-noFolderBackground, var(--vscode-statusBar-background)); }

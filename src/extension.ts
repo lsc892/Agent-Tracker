@@ -6,6 +6,7 @@ import { ClaudeQuotaProvider, CodexQuotaProvider, QuotaService } from './quota';
 import { SummaryClient } from './summary/client';
 import { Dashboard } from './ui/dashboard';
 import { QuotaStatusBar } from './ui/statusBar';
+import { ColorSettings } from './ui/colorSettings';
 
 let shutdown: (() => Promise<void>) | undefined;
 
@@ -22,6 +23,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   await mkdir(context.globalStorageUri.fsPath, { recursive: true });
   const summary = new SummaryClient({ dbPath: join(context.globalStorageUri.fsPath, 'agent-tracker.sqlite'), roots: settings.roots, timezone: settings.timezone });
   const dashboard = new Dashboard({ extensionUri: context.extensionUri, summary, settings: () => settings });
+  const colorSettings = new ColorSettings(context.extensionUri);
   const refreshQuota = async (): Promise<void> => {
     await configurationQueue;
     if (!disposed) await Promise.all(quota.getStates().map(state => quota.refresh(state.provider, true)));
@@ -38,7 +40,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     if (value.tab === 'quota') return;
     dashboard.open();
   };
-  context.subscriptions.push(statusBar, dashboard,
+  context.subscriptions.push(statusBar, dashboard, colorSettings,
     // Patched VS Code maps this command to its native ToggleTooltipCommand before
     // command dispatch. The ordinary command remains a click-to-open fallback.
     vscode.commands.registerCommand('agentTracker.toggleQuotaTooltip', () => vscode.commands.executeCommand('workbench.action.showHover')),
@@ -47,6 +49,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       await vscode.workspace.getConfiguration('agentTracker').update('display.detail', detail, vscode.ConfigurationTarget.Global);
     }),
     vscode.commands.registerCommand('agentTracker.openSettings', () => vscode.commands.executeCommand('workbench.action.openSettings', '@ext:agent-tracker.agent-tracker')),
+    vscode.commands.registerCommand('agentTracker.configureStatusColor', () => colorSettings.open()),
     vscode.commands.registerCommand('agentTracker.clearUsageData', () => {
       clearingData ??= (async () => {
         await configurationQueue;
@@ -91,6 +94,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         }
         render();
         dashboard.configurationChanged();
+        colorSettings.update();
       }).catch(() => { void vscode.window.showErrorMessage('Agent Tracker 설정을 적용하지 못했습니다. 설정 값을 확인해 주세요.'); });
     }),
   );
@@ -100,6 +104,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     subscription.dispose();
     statusBar.dispose();
     dashboard.dispose();
+    colorSettings.dispose();
     await Promise.allSettled([quota.dispose(), summary.dispose(), configurationQueue, clearingData]);
   };
   render();

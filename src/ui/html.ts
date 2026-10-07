@@ -1,5 +1,22 @@
 import { escapeHtml } from './presentation';
 
+export function colorSettingsHtml(scriptUri:string,styleUri:string,cspSource:string,nonce:string):string {
+  return `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${escapeHtml(cspSource)}; script-src 'nonce-${escapeHtml(nonce)}';">
+<title>Agent Tracker 색상</title><link rel="stylesheet" href="${escapeHtml(styleUri)}"></head>
+<body><header><div><p class="eyebrow">AGENT TRACKER</p><h1>상태 표시줄 색상</h1><p class="muted">로고·잔량 막대·글자와 새로고침 버튼에 적용합니다.</p></div></header>
+<main><form id="color-settings" class="color-settings">
+<label>색상 모드<select id="color-mode"><option value="automatic">자동</option><option value="white">흰색</option><option value="black">검은색</option><option value="custom">사용자 지정</option></select></label>
+<p class="muted note">자동은 현재 VS Code 테마와 작업공간의 상태 표시줄 색상을 따릅니다.</p>
+<div class="color-inputs"><label>색상 선택<input id="color-picker" type="color" value="#ffffff" aria-label="색상 견본을 클릭해 선택"></label><label>HEX 색상<input id="color-hex" type="text" value="#ffffff" placeholder="#abc 또는 #aabbcc" maxlength="9" spellcheck="false" autocomplete="off"></label></div>
+<label>불투명도 <output id="color-opacity-value">100%</output><input id="color-opacity" type="range" min="0" max="255" value="255" step="1"></label>
+<p class="muted note">색상 견본을 클릭하거나 #RGB·#RGBA·#RRGGBB·#RRGGBBAA 값을 입력하면 사용자 지정 모드로 전환됩니다.</p>
+<p class="muted">미리 보기</p><div id="color-preview" class="color-preview">Claude ▰ 33% 사용　│　Codex ▰ 69% 사용　↻</div>
+<label>저장 위치<select id="color-target"><option value="user">사용자 — 모든 창</option><option value="workspace">현재 작업공간</option></select></label><p class="muted note">작업공간에 지정한 값은 사용자 설정보다 우선합니다.</p>
+<p id="color-status" role="status" aria-live="polite"></p><button id="color-apply" type="submit">적용</button>
+</form></main><script nonce="${escapeHtml(nonce)}" src="${escapeHtml(scriptUri)}"></script></body></html>`;
+}
+
 export function dashboardHtml(scriptUri: string, styleUri: string, cspSource: string, nonce: string): string {
   return `<!DOCTYPE html>
 <html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">

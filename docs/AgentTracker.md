@@ -160,6 +160,12 @@ manual refresh
 
 ### 3.5 카드 내용과 설정
 
+상태 표시줄 전경색은 확장 설정의 `agentTracker.display.colorMode`에서 자동(`automatic`, 기본)·흰색(`white`)·검은색(`black`)·사용자 지정(`custom`)을 선택한다. 자동은 `StatusBarItem.color`를 지정하지 않아 현재 테마의 상태 표시줄 색상과 `workbench.colorCustomizations`, 작업공간의 기본 색상을 상속한다. 밝음/어두움만 보고 순백·검정을 지정하지 않으므로 2026 Dark의 기본 회색, 밝은 테마, 고대비·디버깅·폴더 없는 창의 색상도 VS Code가 결정한다. 로고·잔량 막대·문자는 하나의 항목이므로 같은 전경색을 사용하며 새로고침 버튼에도 같은 모드를 적용한다. [StatusBarItem API](https://code.visualstudio.com/api/references/vscode-api#StatusBarItem), [상태표시줄 테마 색상](https://code.visualstudio.com/api/references/theme-color#status-bar-colors)
+
+`agentTracker.display.customColor`는 `#RGB`·`#RGBA`·`#RRGGBB`·`#RRGGBBAA`를 받으며 짧은 값을 확장하고 투명도를 유지한다. 기본값은 `#ffffff`이고 사용자 지정 모드에서만 사용한다. 잘못된 HEX나 알 수 없는 모드는 테마 기본 색상으로 처리한다. 두 설정은 window scope로 사용자·작업공간에 저장하고 VS Code의 작업공간 우선순위를 따른다.
+
+설정 설명의 `색상 선택 열기`와 명령 팔레트의 `Agent Tracker: 상태 표시줄 색상 선택`은 별도 색상 설정 Webview를 연다. 색상 견본을 클릭해 네이티브 색상 선택기를 사용하거나 HEX·불투명도를 편집하며, 편집 시 사용자 지정 모드로 전환한다. 적용 전 미리 보기와 사용자/현재 작업공간 저장 위치를 제공한다. 작업공간이 없으면 작업공간 저장을 허용하지 않는다. 저장·설정 변경은 상태 표시줄을 즉시 갱신하고 색상 선택 창을 닫아도 설정은 유지한다. 색상 조작은 quota 조회나 원본 통계 스캔을 시작하지 않는다. 카드의 위험도 막대 색상과 통계 도표의 항목 색상은 각각의 기존 의미를 따른다.
+
 - Quota 카드: 제공자 이름 옆 다음 초기화 시간, 아래 모든 quota window의 기간·색상 막대·사용률/남은 비율, 조회 중·오래된 값·갱신 실패 안내. 기본 quota는 5h·wk 순서로 표시하고 추가 quota는 아래 줄에 표시한다. 막대의 색은 사용률 50% 미만 초록, 50% 이상 노랑, 80% 이상 빨강이며 해당 기간의 초기화 시간은 막대 호버로 확인한다.
 - 카드의 마지막 갱신: `사용량` 제목과 `상태 표시줄` 선택 사이에 한 번 표시한다. 추적 중인 제공자들의 가장 최근 성공 갱신 시각을 사용하고, 성공 이력이 없으면 `—`로 표시한다.
 - Codex 재설정 안내: `account/rateLimits/read`의 `rateLimitResetCredits.availableCount`를 사용 가능한 횟수로 표시한다. 상세 항목 중 `resetType=codexRateLimits`, `status=available`인 항목의 가장 빠른 `expiresAt`을 다음 만료 시간으로 표시한다. 상세 목록은 서버에서 제한될 수 있으므로 항목 수로 횟수를 계산하지 않는다. 횟수·만료 정보를 받지 못한 경우 값을 추정하지 않는다. [응답 형식](https://learn.chatgpt.com/docs/app-server#6-rate-limits-chatgpt)

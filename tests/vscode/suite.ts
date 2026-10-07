@@ -18,6 +18,19 @@ export async function run(): Promise<void> {
   const summaryModule = require(join(extensionRoot, 'dist/src/summary/client')) as typeof import('../../src/summary/client');
   const originalHtml = htmlModule.dashboardHtml;
   const originalDiagnosticsHtml = htmlModule.diagnosticsHtml;
+  const originalColorHtml = htmlModule.colorSettingsHtml;
+  const colorModule = require(join(extensionRoot,'dist/src/ui/colors')) as typeof import('../../src/ui/colors');
+  const originalColorParser = colorModule.parseColorSettingsMessage;
+  const statusModule = require(join(extensionRoot,'dist/src/ui/statusBar')) as typeof import('../../src/ui/statusBar');
+  const originalStatusUpdate = statusModule.QuotaStatusBar.prototype.update;
+  let statusColors: (string | vscode.ThemeColor | undefined)[] = [];
+  const observedColors = new Set<string>();
+  statusModule.QuotaStatusBar.prototype.update = function(...args) {
+    originalStatusUpdate.apply(this,args);
+    const items=this as unknown as {quota:vscode.StatusBarItem;refresh:vscode.StatusBarItem};
+    statusColors=[items.quota.color,items.refresh.color];
+    for (const color of statusColors) observedColors.add(typeof color==='string' ? color : '<automatic>');
+  };
   const originalParser = protocol.parseDashboardMessage;
   const originalTooltip = tooltipModule.createQuotaTooltip;
   let currentTooltip: vscode.MarkdownString | undefined;
@@ -30,6 +43,10 @@ export async function run(): Promise<void> {
   protocol.parseDashboardMessage = (raw: unknown) => {
     if (isReport(raw)) { onReport?.(raw); return null; }
     return originalParser(raw);
+  };
+  colorModule.parseColorSettingsMessage = (raw: unknown) => {
+    if (isReport(raw)) {onReport?.(raw);return null;}
+    return originalColorParser(raw);
   };
   tooltipModule.createQuotaTooltip = (...args) => {
     currentTooltip = originalTooltip(...args);
@@ -45,6 +62,47 @@ export async function run(): Promise<void> {
       .replace('const vscode = acquireVsCodeApi();', `const vscode = acquireVsCodeApi();${bridge}${extraBridge}`);
     return html.replace(/<script nonce="[^"]+" src="[^"]+"><\/script>/,
       () => `<script nonce="${nonce}">${script}</script><script nonce="${nonce}">${driver}</script>`);
+  };
+  htmlModule.colorSettingsHtml = (...args: Parameters<typeof originalColorHtml>) => {
+    const driver = `(() => {
+      let phase='initial';
+      const $=id=>document.getElementById(id);
+      const check=(condition,message)=>{if(!condition)throw new Error(message);};
+      const report=(ok,detail)=>window.dispatchEvent(new CustomEvent('tracker-smoke-report',{detail:{type:'smoke-report',stage:'usage',theme:${JSON.stringify(expectedTheme)},ok,detail}}));
+      const apply=()=> $('color-settings').requestSubmit();
+      const select=mode=>{$('color-mode').value=mode;$('color-mode').dispatchEvent(new Event('change'));};
+      window.addEventListener('error',event=>report(false,event.message));
+      window.addEventListener('message',event=>{
+        try {
+          const message=event.data;
+          if (phase==='initial' && message.type==='state') {
+            check(document.body.classList.contains(${JSON.stringify(expectedTheme)}),'color picker follows active theme');
+            check($('color-picker').type==='color','clickable native color swatch is available');
+            const themeColor=getComputedStyle(document.documentElement).getPropertyValue('--vscode-statusBar-noFolderForeground').trim();
+            const probe=document.createElement('span');probe.style.color=themeColor;document.body.append(probe);
+            check(getComputedStyle($('color-preview')).color===getComputedStyle(probe).color,'automatic preview matches native status bar theme color');probe.remove();
+            $('color-hex').value='#abcd';$('color-hex').dispatchEvent(new Event('input'));
+            check($('color-picker').value==='#aabbcc' && $('color-opacity').value==='221','short HEX and alpha update the swatch');
+            check($('color-preview').style.getPropertyValue('--tracker-status-color')==='#aabbccdd','custom preview retains opacity');
+            phase='hex';apply();
+          } else if (message.type==='saved' && phase==='hex') {
+            check($('color-hex').value==='#aabbccdd','HEX persists through extension settings');
+            $('color-picker').value='#123456';$('color-picker').dispatchEvent(new Event('input'));
+            $('color-opacity').value='128';$('color-opacity').dispatchEvent(new Event('input'));
+            check($('color-hex').value==='#12345680','native swatch and opacity generate HEX');phase='swatch';apply();
+          } else if (message.type==='saved' && phase==='swatch') {
+            phase='white';select('white');check(getComputedStyle($('color-preview')).color==='rgb(255, 255, 255)','white is visible in preview');apply();
+          } else if (message.type==='saved' && phase==='white') {
+            phase='black';select('black');check(getComputedStyle($('color-preview')).color==='rgb(0, 0, 0)','black is visible in preview');apply();
+          } else if (message.type==='saved' && phase==='black') {
+            phase='automatic';select('automatic');check(!$('color-preview').style.getPropertyValue('--tracker-status-color'),'automatic releases custom foreground');apply();
+          } else if (message.type==='saved' && phase==='automatic') {
+            phase='complete';report(true,'theme automatic, white, black, HEX, clickable swatch and alpha settings in '+${JSON.stringify(expectedTheme)});
+          } else if (message.type==='error') {phase='failed';report(false,message.message);}
+        } catch(error) {phase='failed';report(false,error.message);}
+      });
+    })();`;
+    return inlineScript(originalColorHtml(...args),'color-settings.js',args[3],driver);
   };
   htmlModule.dashboardHtml = (...args: Parameters<typeof originalHtml>) => {
     const driver = `
@@ -232,7 +290,7 @@ export async function run(): Promise<void> {
     await extension.activate();
     assert.ok(extension.isActive);
     const commands = await vscode.commands.getCommands(true);
-    for (const command of ['agentTracker.openUsage', 'agentTracker.toggleQuotaTooltip', 'agentTracker.setStatusBarDetail', 'agentTracker.openSettings', 'agentTracker.clearUsageData', 'agentTracker.refreshQuota']) assert.ok(commands.includes(command), `${command} is registered`);
+    for (const command of ['agentTracker.openUsage', 'agentTracker.toggleQuotaTooltip', 'agentTracker.setStatusBarDetail', 'agentTracker.openSettings', 'agentTracker.configureStatusColor', 'agentTracker.clearUsageData', 'agentTracker.refreshQuota']) assert.ok(commands.includes(command), `${command} is registered`);
     for (const command of ['agentTracker.manageProvider', 'agentTracker.refreshClaude', 'agentTracker.refreshCodex']) assert.ok(!commands.includes(command));
     assert.ok(!commands.includes('agentTracker.toggleQuota'), 'the old panel toggle is removed');
     assert.ok(!extension.packageJSON.contributes.viewsContainers, 'no quota panel is contributed');
@@ -317,6 +375,29 @@ export async function run(): Promise<void> {
       onReport = undefined;
       await vscode.commands.executeCommand('workbench.action.closeAllEditors');
     }
+    for (const theme of [{name:'Dark 2026',css:'vscode-dark'}, {name:'Light 2026',css:'vscode-light'},
+      {name:'Dark Modern',css:'vscode-dark'}, {name:'Default High Contrast',css:'vscode-high-contrast'}]) {
+      expectedTheme=theme.css;
+      const before:number=scanCount;
+      await vscode.workspace.getConfiguration('workbench').update('colorTheme',theme.name,vscode.ConfigurationTarget.Global);
+      await vscode.workspace.getConfiguration('agentTracker').update('display.colorMode','automatic',vscode.ConfigurationTarget.Global);
+      await vscode.workspace.getConfiguration('agentTracker').update('display.customColor','#ffffff',vscode.ConfigurationTarget.Global);
+      await new Promise(resolve=>setTimeout(resolve,500));
+      const completed=new Promise<void>((resolveReport,reject)=>{
+        const timeout=setTimeout(()=>reject(new Error('Color settings timed out: '+theme.name)),30_000);
+        onReport=message=>{
+          clearTimeout(timeout);
+          if (!message.ok) {reject(new Error(message.detail));return;}
+          outcomes.push(theme.name+': '+message.detail);resolveReport();
+        };
+      });
+      await vscode.commands.executeCommand('agentTracker.configureStatusColor');await completed;onReport=undefined;
+      await until(()=>statusColors.length===2 && statusColors.every(color=>color===undefined),'automatic restores both status item colors');
+      assert.equal(vscode.workspace.getConfiguration('agentTracker').get('display.customColor'),'#12345680','native picker and opacity persist');
+      assert.equal(scanCount,before,'color settings never scan transcripts');
+      await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+    }
+    for (const color of ['#ffffff','#000000','#aabbccdd','#12345680','<automatic>']) assert.ok(observedColors.has(color),'live status items receive '+color);
     const scansBeforeSettings = scanCount;
     const config = vscode.workspace.getConfiguration('agentTracker');
     const sourcePath = join(process.env.AGENT_TRACKER_TEST_ROOT!, 'claude', 'projects', 'session.jsonl');
@@ -355,6 +436,9 @@ export async function run(): Promise<void> {
     database?.close();
     htmlModule.dashboardHtml = originalHtml;
     htmlModule.diagnosticsHtml = originalDiagnosticsHtml;
+    htmlModule.colorSettingsHtml = originalColorHtml;
+    colorModule.parseColorSettingsMessage = originalColorParser;
+    statusModule.QuotaStatusBar.prototype.update = originalStatusUpdate;
     protocol.parseDashboardMessage = originalParser;
     tooltipModule.createQuotaTooltip = originalTooltip;
     summaryModule.SummaryClient.prototype.refresh = originalRefresh;
