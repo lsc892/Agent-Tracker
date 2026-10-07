@@ -17,6 +17,7 @@ export async function run(): Promise<void> {
   const tooltipModule = require(join(extensionRoot, 'dist/src/ui/quotaTooltip')) as typeof import('../../src/ui/quotaTooltip');
   const summaryModule = require(join(extensionRoot, 'dist/src/summary/client')) as typeof import('../../src/summary/client');
   const originalHtml = htmlModule.dashboardHtml;
+  const originalDiagnosticsHtml = htmlModule.diagnosticsHtml;
   const originalParser = protocol.parseDashboardMessage;
   const originalTooltip = tooltipModule.createQuotaTooltip;
   let currentTooltip: vscode.MarkdownString | undefined;
@@ -49,6 +50,7 @@ export async function run(): Promise<void> {
     const driver = `
       (() => {
         let phase = 'usage';
+        let receivedDiagnostics = false;
         const chartGroups = ['project', 'session', 'all', 'month'];
         const submitGroup = group => { document.getElementById('group').value = group; document.getElementById('usage-filters').requestSubmit(); };
         const report = (ok, detail) => window.dispatchEvent(new CustomEvent('tracker-smoke-report', {detail:{type:'smoke-report',stage:'usage',theme:${JSON.stringify(expectedTheme)},ok,detail}}));
@@ -71,15 +73,19 @@ export async function run(): Promise<void> {
         window.addEventListener('message', event => {
           try {
             const message = event.data;
-            if (message.type === 'navigate') {
-              check(message.tab === 'usage','hover statistics link opens usage directly');
+            if (message.type === 'diagnostics') receivedDiagnostics = true;
+            if (message.type === 'state') {
               check(document.body.classList.contains(${JSON.stringify(expectedTheme)}),'VS Code theme class is applied to statistics');
+              check(!document.querySelector('[data-tab]'),'statistics has no tab controls');
+              const diagnosticLink = document.getElementById('open-diagnostics');
+              check(diagnosticLink.tagName === 'A' && diagnosticLink.textContent === '데이터 확인' && document.querySelector('main').lastElementChild.contains(diagnosticLink),'statistics ends with a data check hyperlink');
+              check(!document.getElementById('diagnostics') && !document.getElementById('diagnostic-files'),'diagnostic logs are absent from the statistics page');
               check(!document.getElementById('quota') && !document.querySelector('[data-tab="quota"]') && !document.getElementById('refresh-usage'),'quota and summary refresh controls are absent from statistics');
               check(document.getElementById('configuration-warning').hidden === ${JSON.stringify(!expectTimezoneWarning)},'invalid timezone warning is visible and clears after correction');
             } else if (phase === 'usage' && message.type === 'usage' && message.result.rows.length) {
               check(message.result.rows[0].total_tokens === 150,'worker usage reached Webview');
               check(document.getElementById('usage-table').textContent.includes('150'),'usage table renders total');
-              check(document.getElementById('usage').hidden === false,'usage is the visible default tab');
+              check(document.getElementById('usage').hidden === false,'usage stays visible in the statistics page');
               check(message.result.chart.mode === 'calendar','calendar chart arrives from the worker');
               const marks = [...document.querySelectorAll('#usage-chart .chart-segment')];
               check(marks.length === 4,'total tokens render as four stacked segments');
@@ -142,25 +148,55 @@ export async function run(): Promise<void> {
               check(message.result.total === 1 && document.querySelectorAll('#session-list .name-option').length === 2,'names remain available outside the date filter');
               window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));
               check(document.getElementById('session-options').hidden && document.activeElement === document.getElementById('session-name'),'Escape closes the list and returns keyboard focus');
-              phase = 'diagnostics'; document.querySelector('[data-tab="diagnostics"]').click();
-            } else if (phase === 'diagnostics' && message.type === 'diagnostics') {
-              check(message.result.counts.files === 1,'diagnostics returns fixture manifest');
-              check(document.getElementById('diagnostic-files').textContent.includes('session.jsonl'),'diagnostics renders source filename');
-              phase='diagnostics-page'; document.getElementById('diagnostic-next').disabled=false;
-              document.getElementById('diagnostic-next').click();
-            } else if (phase === 'diagnostics-page' && message.type === 'diagnostics') {
-              check(message.offset === 100,'diagnostics next page requests the next offset');
-              phase='diagnostics-return'; document.querySelector('[data-tab="usage"]').click();
-              document.querySelector('[data-tab="diagnostics"]').click();
-            } else if (phase === 'diagnostics-return' && message.type === 'diagnostics') {
-              check(message.offset === 0 && document.getElementById('diagnostic-previous').disabled,'returning to diagnostics resets page and controls together');
-              check(document.getElementById('diagnostic-page').textContent.startsWith('1번째'),'diagnostics label matches returned rows');
-              phase='complete'; report(true,'statistics link → six chart groups, token colors and keyboard details, metrics → filters → diagnostics in '+${JSON.stringify(expectedTheme)});
+              check(!receivedDiagnostics,'statistics does not receive diagnostic logs');
+              const link = document.getElementById('open-diagnostics');
+              link.focus(); check(document.activeElement === link,'diagnostic hyperlink accepts keyboard focus');
+              phase = 'complete'; link.click();
             } else if (message.type === 'error') { phase='failed'; report(false,message.message); }
           } catch(error) { phase='failed'; report(false,error.message); }
         });
       })();`;
     return inlineScript(originalHtml(...args), 'dashboard.js', args[3], driver);
+  };
+  htmlModule.diagnosticsHtml = (...args: Parameters<typeof originalDiagnosticsHtml>) => {
+    const driver = `
+      (() => {
+        let phase = 'initial';
+        const report = (ok, detail) => window.dispatchEvent(new CustomEvent('tracker-smoke-report', {detail:{type:'smoke-report',stage:'usage',theme:${JSON.stringify(expectedTheme)},ok,detail}}));
+        const check = (condition, detail) => { if (!condition) throw new Error(detail); };
+        window.addEventListener('error', event => report(false,event.message));
+        window.addEventListener('message', event => {
+          try {
+            const message = event.data;
+            if (message.type === 'state') {
+              check(document.body.classList.contains(${JSON.stringify(expectedTheme)}),'VS Code theme is applied to the separate diagnostic webview');
+              check(document.title === 'Agent Tracker 데이터 확인' && document.querySelector('h1').textContent === '데이터 확인' && !document.getElementById('usage'),'data check is a dedicated page');
+              check(document.getElementById('refresh-diagnostics').title.includes('원본을 재검증하지 않고'),'diagnostics explains that reload only reads stored results');
+              check(document.getElementById('configuration-warning').hidden === ${JSON.stringify(!expectTimezoneWarning)},'diagnostic timezone warning follows settings');
+            } else if (phase === 'initial' && message.type === 'diagnostics') {
+              check(message.result.counts.files === 1,'diagnostics returns fixture manifest');
+              check(document.getElementById('diagnostic-files').textContent.includes('session.jsonl'),'separate webview renders the source log');
+              check(document.getElementById('diagnostic-summaries'),'separate webview retains the request warnings table');
+              phase = 'reload'; document.getElementById('refresh-diagnostics').click();
+            } else if (phase === 'reload' && message.type === 'diagnostics') {
+              check(message.offset === 0,'diagnostic reload reads the current page');
+              phase = 'next'; document.getElementById('diagnostic-next').disabled = false;
+              document.getElementById('diagnostic-next').click();
+            } else if (phase === 'next' && message.type === 'diagnostics') {
+              check(message.offset === 100,'diagnostics next page requests the next offset');
+              phase = 'reload-next'; document.getElementById('refresh-diagnostics').click();
+            } else if (phase === 'reload-next' && message.type === 'diagnostics') {
+              check(message.offset === 100,'diagnostics reload preserves the current page');
+              phase = 'previous'; document.getElementById('diagnostic-previous').click();
+            } else if (phase === 'previous' && message.type === 'diagnostics') {
+              check(message.offset === 0 && document.getElementById('diagnostic-previous').disabled,'diagnostics previous page updates rows and controls together');
+              check(document.getElementById('diagnostic-page').textContent.startsWith('1번째'),'diagnostics label matches returned rows');
+              phase = 'complete'; report(true,'statistics charts, token hover, project/session choices and filters → footer diagnostic hyperlink → separate log webview, reload and pagination in '+${JSON.stringify(expectedTheme)});
+            } else if (message.type === 'error') { phase = 'failed'; report(false,message.message); }
+          } catch(error) { phase = 'failed'; report(false,error.message); }
+        });
+      })();`;
+    return inlineScript(originalDiagnosticsHtml(...args), 'diagnostics.js', args[3], driver);
   };
   const outcomes: string[] = [];
   let database: DatabaseSync | undefined;
@@ -231,7 +267,7 @@ export async function run(): Promise<void> {
           try {
             assert.ok(message.ok, message.detail);
             assert.equal(message.theme, theme.css, 'the active theme is tested');
-            assert.equal(scanCount, scansBefore + 1, 'only opening statistics scans; filters and tabs reuse cached summaries');
+            assert.equal(scanCount, scansBefore + 1, 'only opening statistics scans; filters and diagnostic controls reuse cached summaries');
             assert.equal(countFiles(), 1, 'statistics scans the fixture');
             clearTimeout(timeout); outcomes.push(message.detail); resolveReport();
           } catch (error) { clearTimeout(timeout); reject(error); }
@@ -290,6 +326,7 @@ export async function run(): Promise<void> {
     onReport = undefined;
     database?.close();
     htmlModule.dashboardHtml = originalHtml;
+    htmlModule.diagnosticsHtml = originalDiagnosticsHtml;
     protocol.parseDashboardMessage = originalParser;
     tooltipModule.createQuotaTooltip = originalTooltip;
     summaryModule.SummaryClient.prototype.refresh = originalRefresh;

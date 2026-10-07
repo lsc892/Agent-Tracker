@@ -36,7 +36,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     const value = argument && typeof argument === 'object' ? argument as Record<string, unknown> : {};
     // Legacy quota navigation must not accidentally start a transcript scan.
     if (value.tab === 'quota') return;
-    dashboard.open(value.tab === 'diagnostics' ? 'diagnostics' : 'usage');
+    dashboard.open();
   };
   context.subscriptions.push(statusBar, dashboard,
     // Patched VS Code maps this command to its native ToggleTooltipCommand before

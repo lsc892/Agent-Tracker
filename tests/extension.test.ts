@@ -65,6 +65,7 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
   let lastRoots: import('../src/summary/types').SourceRoot[] = [];
   let lastQuery: import('../src/summary/types').UsageQuery = {};
   let lastNameQuery: import('../src/summary/types').NameQuery | undefined;
+  let lastDiagnosticsPage: { offset?: number; providers?: string[] } | undefined;
   const policies: string[] = [];
   const pollingIntervals: number[] = [];
   const uri = (fsPath: string): { fsPath: string; toString(): string } => ({ fsPath, toString: () => fsPath });
@@ -147,8 +148,8 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
       return { discovered: 0, parsed: 0, reused: 0, failed: 0, bodyBytes: 0 };
     }
     async query(query: typeof lastQuery) { queries++; lastQuery = query; return { rows: [], total: 0, coverage: {} }; }
-    async diagnostics() { diagnostics++; return { files: [], summaries: [], counts: {} }; }
     async queryNames(query: NonNullable<typeof lastNameQuery>) { lastNameQuery = query; return { rows: [], total: 0 }; }
+    async diagnostics(page: NonNullable<typeof lastDiagnosticsPage>) { diagnostics++; lastDiagnosticsPage = page; return { files: [], summaries: [], counts: {} }; }
     subscribe() { return () => {}; } cancel() {} async dispose() { summaryDisposals++; }
     async cancelRefresh() { cancellations++; releaseScan?.(); releaseScan = undefined; }
     async clearData() { clears++; await this.cancelRefresh(); }
@@ -246,25 +247,49 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     const dashboard = panels[0].webview;
     dashboard.receive({ type: 'ready' }); await tick();
     assert.equal(scans, 1);
-    assert.ok(dashboard.messages.some(message => message.type === 'navigate' && message.tab === 'usage'));
+    assert.ok(dashboard.messages.some(message => message.type === 'state'));
+    assert.equal(diagnostics, 0, 'statistics alone does not load diagnostic logs');
+    assert.ok(!dashboard.messages.some(message => message.type === 'diagnostics'));
     dashboard.receive({ type: 'ready' }); await tick();
     assert.equal(scans, 1, 'duplicate ready messages do not start another summary');
-    dashboard.receive({ type: 'tab', tab: 'diagnostics' }); await tick();
+    dashboard.receive({ type: 'openDiagnostics' }); await tick();
+    assert.equal(panels.length, 2, 'the footer link creates a separate diagnostic webview');
+    const diagnosticPanel = panels[1];
+    assert.match(diagnosticPanel.webview.html, /<h1>데이터 확인<\/h1>/);
+    assert.doesNotMatch(diagnosticPanel.webview.html, /id="usage-table"/);
+    diagnosticPanel.webview.receive({ type: 'ready' }); await tick();
     assert.equal(diagnostics, 1);
-    dashboard.receive({ type: 'tab', tab: 'usage' }); await tick();
+    assert.ok(diagnosticPanel.webview.messages.some(message => message.type === 'diagnostics' && message.offset === 0));
+    diagnosticPanel.webview.receive({ type: 'ready' }); await tick();
+    assert.equal(diagnostics, 1, 'duplicate ready messages do not reload diagnostics');
+    dashboard.receive({ type: 'openDiagnostics' }); await tick();
+    assert.equal(panels.length, 2, 'repeated diagnostic clicks reuse the diagnostic webview');
+    assert.ok(diagnosticPanel.revealCount > 0);
+    assert.equal(diagnostics, 2);
+    const queriesBeforeDiagnostics = queries;
+    diagnosticPanel.webview.receive({ type: 'queryUsage', query: { groupBy: 'month' } });
+    dashboard.receive({ type: 'diagnostics', offset: 100 }); await tick();
+    assert.equal(queries, queriesBeforeDiagnostics, 'diagnostic webview cannot query usage');
+    assert.equal(diagnostics, 2, 'diagnostic requests from the usage webview are ignored');
+    diagnosticPanel.webview.receive({ type: 'diagnostics', offset: 100 }); await tick();
+    assert.equal(diagnostics, 3);
+    assert.deepEqual(lastDiagnosticsPage, { limit: 100, offset: 100, providers: ['claude', 'codex'] });
     dashboard.receive({ type: 'queryUsage', query: { groupBy: 'month' } }); await tick();
-    assert.ok(queries >= 3, 'usage tabs and filters read cached summary rows');
+    assert.ok(queries >= 2, 'usage filters read cached summary rows');
     dashboard.receive({type:'queryNames',requestId:7,query:{kind:'session',provider:'codex',projectKey:'/project',offset:100,providers:[]}}); await tick();
     assert.deepEqual(lastNameQuery,{kind:'session',provider:'codex',projectKey:'/project',offset:100,limit:100,providers:['claude','codex']});
     assert.ok(dashboard.messages.some(message=>message.type==='names' && message.requestId===7));
     assert.equal(scans, 1);
-    for (const message of [{ type: 'refreshUsage' }, { type: 'refreshQuota', provider: 'claude' }, { type: 'tab', tab: 'quota' }]) dashboard.receive(message);
+    for (const message of [{ type: 'refreshUsage' }, { type: 'refreshQuota', provider: 'claude' }, { type: 'tab', tab: 'quota' }, { type: 'tab', tab: 'diagnostics' }]) dashboard.receive(message);
     await tick();
     assert.equal(scans, 1);
+    assert.equal(diagnostics, 3, 'obsolete tab messages cannot reload diagnostics');
     assert.equal(refreshes.length, 4);
     await click('agentTracker.openUsage');
     assert.equal(scans, 2, 'explicit entry into usage refreshes its summary');
-    assert.equal(panels.length, 1);
+    assert.equal(diagnostics, 4, 'summary refresh updates the open diagnostic webview');
+    assert.equal(lastDiagnosticsPage?.offset, 0, 'entry resets diagnostics to the first page');
+    assert.equal(panels.length, 2);
     assert.ok(panels[0].revealCount > 0);
     await click(items[1].command);
     assert.equal(refreshes.length, 6);
@@ -272,7 +297,7 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     assert.equal(scans, 2);
     assert.equal(externalCommands.some(value => /quotaView\.focus|closePanel/.test(value.command)), false, 'quota actions never open or close the terminal panel');
     await click({ command: 'agentTracker.openDashboard', arguments: [{ tab: 'quota' }] });
-    assert.equal(panels.length, 1, 'legacy quota navigation cannot create a statistics panel');
+    assert.equal(panels.length, 2, 'legacy quota navigation cannot create a statistics panel');
     assert.equal(scans, 2);
     assert.deepEqual(errors, []);
 
@@ -289,6 +314,7 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     await update('claude.enabled', false);
     assert.equal(pollingIntervals.at(-1), 120, 'recreated providers retain the common interval');
     assert.equal(panels[0].disposed, true);
+    assert.equal(diagnosticPanel.disposed, true, 'provider changes close diagnostic and usage webviews together');
     assert.doesNotMatch(items[0].text!, /claude/);
     assert.doesNotMatch(tooltip().value, /Claude/);
     assert.doesNotMatch(items[0].accessibilityInformation!.label, /Claude/);
@@ -296,7 +322,7 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     await click('agentTracker.refreshQuota');
     assert.deepEqual(refreshes.slice(refreshCount), [{provider: 'codex', force: true}]);
     await click('agentTracker.openUsage');
-    panels[1].webview.receive({type: 'ready'}); await tick();
+    panels.at(-1)!.webview.receive({type: 'ready'}); await tick();
     assert.ok(lastRoots.length > 0 && lastRoots.every(root => root.provider === 'codex'));
     assert.deepEqual(lastQuery.providers, ['codex']);
 
@@ -306,12 +332,12 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     const queriesBeforeDisable = queries;
     await update('usage.enabled', false);
     assert.ok(cancellations >= 2);
-    assert.equal(panels[1].disposed, true);
+    assert.equal(panels.at(-1)!.disposed, true);
     assert.equal(queries, queriesBeforeDisable, 'cancelled scan must not query after statistics are disabled');
     assert.doesNotMatch(tooltip().value, /command:agentTracker.openUsage/);
     assert.match(tooltip().value, /사용량 통계 \(꺼짐\)/);
     await click('agentTracker.openUsage');
-    assert.equal(panels.length, 2);
+    assert.equal(panels.length, 3);
     assert.equal(scans, scansBeforeDisable);
     assert.equal(externalCommands.at(-1)?.command, 'workbench.action.openSettings');
     await click('agentTracker.clearUsageData');
@@ -320,7 +346,7 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     deferScan = false;
     await update('usage.enabled', true);
     await click('agentTracker.openUsage');
-    panels[2].webview.receive({type: 'ready'}); await tick();
+    panels.at(-1)!.webview.receive({type: 'ready'}); await tick();
     assert.equal(scans, scansBeforeDisable + 1);
     await update('codex.enabled', false);
     assert.ok(items.every(item => !item.visible));

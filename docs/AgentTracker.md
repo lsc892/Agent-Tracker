@@ -33,7 +33,7 @@ Codex App Server ───────────┘       │
 Claude projects/**/*.jsonl ─┐
                             ├─ manifest diff ─ session 재집계 ─ SQLite
 Codex sessions/**/*.jsonl ──┘                              │
-                                                          └─ Webview usage 탭
+                                                          └─ Webview 사용량 화면
 ```
 
 두 경로는 분리한다. 상태 표시줄 quota 갱신이 JSONL 전체 통계 갱신을 유발해서는 안 된다.
@@ -718,9 +718,9 @@ schema version 2는 기존 `turn_summary`의 행·id·manifest 참조를 보존�
 
 worker가 필터 전체에서 도표 결과를 계산하므로 표의 100행 페이지 이동은 도표 범위를 바꾸지 않는다. 기간을 묶을 때 평균은 원래 완료 요청에서 계산하며 기간별 평균을 다시 평균 내지 않는다. 도표는 최대 62개 기간·제공자 행 또는 60개 요청으로 제한하고 전체 목록을 Extension Host에 적재하지 않는다. 긴 도표는 해당 영역 안에서 가로 스크롤하며, 막대에 마우스를 올리거나 키보드로 초점을 옮기면 정확한 수치·구성·평균 표본을 표시한다. 색상은 VS Code의 테마별 chart 색상을 사용하며 외부 도표 라이브러리는 사용하지 않는다.
 
-## 9. 디버깅 표시
+## 9. 데이터 확인 화면
 
-별도 diagnostics table이나 처리 이력 table은 만들지 않는다. 기본 통계에는 품질 표시만 붙이고 디버깅 화면에서는 다음 현재 상태를 조회한다.
+별도 diagnostics table이나 처리 이력 table은 만들지 않는다. 기본 통계에는 품질 표시를 붙이고, 사용량 통계 화면 맨 아래에는 `데이터 확인` 하이퍼링크만 표시한다. 링크를 클릭하면 별도의 `Agent Tracker 데이터 확인` Webview에서 다음 현재 상태를 조회한다. 이미 열려 있는 데이터 확인 Webview는 다시 표시하고 첫 페이지부터 조회한다. 데이터 확인은 제공자 추적 설정을 따르며, 창 열기·`다시 조회`·페이지 이동은 저장된 DB 결과만 읽고 원본 스캔·검증·재집계를 시작하지 않는다. 통계 갱신이 끝나면 열려 있는 데이터 확인 Webview도 갱신한다. 통계 기능을 끄거나 제공자 구성이 바뀌면 두 Webview를 함께 닫는다.
 
 | 대상 | 표시할 정보 |
 |---|---|
@@ -730,6 +730,8 @@ worker가 필터 전체에서 도표 결과를 계산하므로 표의 100행 페
 
 진단은 사용자의 issue 보고를 위한 최근 기록이다. 처리 위치 문자열을 자동 재개 지점으로 사용하지 않고, 전체 시도 이력·agent 실행 내역·response 본문도 보관하지 않는다. 이전 정상 summary를 유지한 session은 해당 실패를 표시하여 최신 값으로 오인하지 않게 한다.
 
+`확인이 필요한 요청`은 `turn_summary`에 저장된 요청 중 `last_error` 또는 비어 있지 않은 `quality_flags`가 있는 목록이다. 경고만으로 통계에서 제외하지 않으며, 재집계 실패 시 이전 정상 summary를 통계에 유지한다. 소요 시간이 없는 요청은 시간 평균의 표본에서 제외하고, 중단된 Codex 요청은 기존 집계 규칙에 따라 저장·집계하지 않는다. 새 파일의 첫 파싱이 실패해 정상 summary가 없다면 manifest에 파일 오류만 기록된다. 원본 재검증은 다음 사용량 통계 화면 진입에서 수행하고, 변경 없는 정상 session은 본문을 다시 읽지 않고 재사용한다.
+
 manifest의 processing_status = done은 이번 통계 처리가 끝났다는 뜻이다. agent의 대화 요청 완료 여부는 turn_summary.status로 구분하므로 실행 중인 요청도 정상적으로 조회할 수 있다.
 
 ## 10. 메모리와 성능
@@ -738,7 +740,7 @@ Extension Host 메모리에 유지하는 값:
 
 - Claude/Codex 최신 quota snapshot
 - 진행 중인 single-flight 상태
-- Webview에 현재 보이는 한 page의 turn row
+- 사용량·데이터 확인 Webview마다 현재 보이는 제한된 한 page의 row
 - worker가 보내는 작은 진행 상태와 현재 조회 page·제한된 도표 결과
 
 누계 worker는 최대 `n`개 파일의 metadata·manifest diff와 byte 예산 내 parser/정규화 row buffer만 유지한다. 변경 session의 중복 제거·연결·합산 작업은 디스크 staging에 기록하고 session 교체 후 폐기한다. 한 session이 커도 파일 목록·response 후보·summary를 메모리에 한꺼번에 올리지 않는다. 디렉터리 순회·파싱·DB 반영 사이에는 backpressure를 적용하여 다음 묶음이 무제한 대기열에 쌓이지 않게 한다.

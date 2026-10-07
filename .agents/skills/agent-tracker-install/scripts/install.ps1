@@ -112,7 +112,7 @@ try {
             throw 'The VSIX identity or version differs from the source manifest.'
         }
         $mainPath = 'extension/' + (($packaged.main -replace '^\./', '') -replace '\\', '/')
-        foreach ($entryPath in @($mainPath, 'extension/dist/src/summary/worker.js', 'extension/media/dashboard.js', 'extension/media/dashboard.css')) {
+        foreach ($entryPath in @($mainPath, 'extension/dist/src/summary/worker.js', 'extension/media/dashboard.js', 'extension/media/diagnostics.js', 'extension/media/dashboard.css')) {
             $entry = $archive.GetEntry($entryPath)
             if ($null -eq $entry -or $entry.Length -eq 0) {
                 throw "Required runtime file is missing or empty in the VSIX: $entryPath"

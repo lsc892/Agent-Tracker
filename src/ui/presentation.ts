@@ -5,10 +5,9 @@ export const providerName = (id: QuotaProviderId): string => id === 'claude' ? '
 export function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]!);
 }
-export type DashboardTab = 'usage' | 'diagnostics';
 export type DashboardMessage =
   | { type: 'ready' }
-  | { type: 'tab'; tab: DashboardTab }
+  | { type: 'openDiagnostics' }
   | { type: 'settings' }
   | { type: 'cancelUsage' }
   | { type: 'queryUsage'; query: UsageQuery; fromDay?: string; toDay?: string }
@@ -20,8 +19,7 @@ export function parseDashboardMessage(input: unknown): DashboardMessage | null {
   if (!input || typeof input !== 'object') return null;
   const value = input as Record<string, unknown>;
   switch (value.type) {
-    case 'ready': case 'cancelUsage': return { type: value.type };
-    case 'tab': return ['usage', 'diagnostics'].includes(String(value.tab)) ? { type: 'tab', tab: value.tab as DashboardTab } : null;
+    case 'ready': case 'cancelUsage': case 'openDiagnostics': return { type: value.type };
     case 'settings': return value.provider === undefined ? { type: 'settings' } : null;
     case 'diagnostics': return { type: 'diagnostics', offset: boundedOffset(value.offset) };
     case 'queryNames': {

@@ -20,7 +20,6 @@
   let timezone;
   const date = value => value === null || value === undefined ? '알 수 없음' : new Intl.DateTimeFormat('ko-KR', { dateStyle: 'short', timeStyle: 'medium', timeZone: timezone }).format(new Date(value));
   let offset = 0;
-  let diagnosticOffset = 0;
   let latestUsage;
   let selectedProject;
   let selectedSession;
@@ -36,16 +35,6 @@
     if (text !== undefined) node.textContent = String(text);
     if (className) node.className = className;
     return node;
-  }
-  function tab(name, notify = true) {
-    if (!['usage', 'diagnostics'].includes(name)) return;
-    if (name === 'diagnostics') diagnosticOffset = 0;
-    for (const item of ['usage', 'diagnostics']) $(item).hidden = item !== name;
-    document.querySelectorAll('[data-tab]').forEach(node => {
-      if (node.dataset.tab === name) node.setAttribute('aria-current', 'page');
-      else node.removeAttribute('aria-current');
-    });
-    if (notify) send({ type: 'tab', tab: name });
   }
   function query() {
     const request = { groupBy: $('group').value, offset };
@@ -362,16 +351,7 @@
     const durationCoverage = turn ? '' : ` · 시간 품질(현재 페이지) 정확 ${number(rows.reduce((n, r) => n + (r.exact_duration_turns ?? 0), 0))} / 계산 ${number(rows.reduce((n, r) => n + (r.derived_duration_turns ?? 0), 0))} / 근사 ${number(rows.reduce((n, r) => n + (r.approximate_duration_turns ?? 0), 0))} / 미상 ${number(rows.reduce((n, r) => n + (r.missing_duration_turns ?? 0), 0))}`;
     $('coverage').textContent = `파일 ${number(coverage.files)} · 정상 ${number(coverage.done)} · 오류 ${number(coverage.error)} · 중단 ${number(coverage.interrupted)} · 이전 수치 유지 요청 ${number(coverage.stale_summaries)}${durationCoverage}`;
   }
-  function renderDiagnostics(result) {
-    const counts = result.counts;
-    $('diagnostic-counts').textContent = `파일 ${number(counts.files)} · 처리 중 ${number(counts.processing)} · 완료 ${number(counts.done)} · 오류 ${number(counts.error)} · 중단 ${number(counts.interrupted)} · 이전 수치 유지 ${number(counts.stale_summaries)}${result.lastRefresh?.error ? ` · 최근 스캔: ${result.lastRefresh.error}` : ''}`;
-    table($('diagnostic-files'), ['제공자 / 파일', '세션', '상태 / 위치', '기록 시각', '원인'], result.files.map(row => [`${row.provider} · ${row.path}`, row.session_id, `${row.processing_status} · ${row.processing_position ?? '—'}`, date(row.recorded_at), row.last_error]));
-    table($('diagnostic-summaries'), ['프로젝트 / 요청 / 세션', '마지막 정상 갱신', '품질', '원본 / byte', '원인'], result.summaries.map(row => [`${row.project_name} · ${row.root_turn_id} · ${row.session_id}`, date(row.updated_at), row.quality_flags, `${row.diagnostic_file_id ?? '—'} / ${row.diagnostic_offset ?? '—'}`, row.last_error]));
-    $('diagnostic-previous').disabled = diagnosticOffset === 0;
-    $('diagnostic-next').disabled = !result.nextFileId && !result.nextSummaryId;
-    $('diagnostic-page').textContent = `${number(diagnosticOffset + 1)}번째부터`;
-  }
-  document.querySelectorAll('[data-tab]').forEach(node => node.addEventListener('click', () => tab(node.dataset.tab)));
+  $('open-diagnostics').addEventListener('click', event => { event.preventDefault(); send({ type: 'openDiagnostics' }); });
   $('settings').addEventListener('click', () => send({ type: 'settings' }));
   $('cancel-usage').addEventListener('click', () => send({ type: 'cancelUsage' }));
   $('usage-filters').addEventListener('submit', event => { event.preventDefault(); offset = 0; query(); });
@@ -395,10 +375,6 @@
   $('chart-metric').addEventListener('change', query);
   $('previous').addEventListener('click', () => { offset = Math.max(0, offset - 100); query(); });
   $('next').addEventListener('click', () => { offset += 100; query(); });
-  const diagnostics = () => send({ type: 'diagnostics', offset: diagnosticOffset });
-  $('refresh-diagnostics').addEventListener('click', diagnostics);
-  $('diagnostic-previous').addEventListener('click', () => { diagnosticOffset = Math.max(0, diagnosticOffset - 100); diagnostics(); });
-  $('diagnostic-next').addEventListener('click', () => { diagnosticOffset += 100; diagnostics(); });
   window.addEventListener('message', event => {
     const message = event.data;
     if (!message || typeof message !== 'object') return;
@@ -415,9 +391,7 @@
         }
         if (latestUsage) renderUsage(latestUsage);
         break;
-      case 'navigate': tab(message.tab, false); break;
       case 'usage': $('error').hidden = true; renderUsage(message.result); break;
-      case 'diagnostics': diagnosticOffset = message.offset; renderDiagnostics(message.result); break;
       case 'names': renderNames(message); break;
       case 'busy': $('cancel-usage').hidden = !message.busy; if (message.busy) $('usage-progress').textContent = '기록을 갱신하고 있습니다…'; break;
       case 'progress': { const p = message.progress; $('usage-progress').textContent = `${({ scanning: '파일 확인', parsing: '요청 집계', committing: '통계 저장', complete: '완료' })[p.phase] ?? p.phase} · 발견 ${number(p.discovered)} · 읽음 ${number(p.parsed)} · 실패 ${number(p.failed)}`; break; }

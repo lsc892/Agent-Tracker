@@ -4,7 +4,7 @@ body { margin: 0 auto; padding: 30px 36px 48px; max-width: 1280px; color: var(--
 button, input, select { font: inherit; }
 button { color: var(--vscode-button-secondaryForeground); background: var(--vscode-button-secondaryBackground); border: 1px solid transparent; border-radius: 5px; padding: 8px 12px; cursor: pointer; }
 button:hover { background: var(--vscode-button-secondaryHoverBackground); }
-button:focus-visible, input:focus, select:focus { outline: 1px solid var(--vscode-focusBorder); outline-offset: 2px; }
+button:focus-visible, a:focus-visible, input:focus, select:focus { outline: 1px solid var(--vscode-focusBorder); outline-offset: 2px; }
 button:disabled { opacity: .5; cursor: default; }
 header, .section-title, .pagination { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 header { margin-bottom: 25px; }
@@ -16,9 +16,9 @@ h3 { font-size: 15px; }
 .name-filter { color: var(--vscode-textLink-foreground); background: none; padding: 0; text-align: left; }
 .name-filter:hover { background: none; text-decoration: underline; }
 .session-start { display: block; margin-top: 5px; font-size: 11px; }
-nav { display: flex; gap: 24px; border-bottom: 1px solid var(--vscode-panel-border); margin-bottom: 30px; }
-nav button { background: none; border-radius: 0; padding: 12px 0; border-bottom: 2px solid transparent; }
-nav button[aria-current=page] { border-bottom-color: var(--vscode-focusBorder); color: var(--vscode-foreground); }
+.dashboard-footer { margin-top: 28px; }
+.dashboard-footer a { color: var(--vscode-textLink-foreground); text-decoration: none; }
+.dashboard-footer a:hover { color: var(--vscode-textLink-activeForeground); text-decoration: underline; }
 .actions { display: flex; gap: 8px; flex-shrink: 0; }
 .error { color: var(--vscode-errorForeground); white-space: pre-wrap; overflow-wrap: anywhere; }
 .stale { color: var(--vscode-editorWarning-foreground); }

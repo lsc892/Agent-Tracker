@@ -3,9 +3,9 @@ import * as vscode from 'vscode';
 import type { TrackerConfiguration } from '../configuration';
 import type { SummaryClient } from '../summary/client';
 import type { UsageQuery } from '../summary/types';
-import { dashboardHtml } from './html';
+import { dashboardHtml, diagnosticsHtml } from './html';
 import { periodBounds } from '../summary/db/timezone';
-import { parseDashboardMessage, type DashboardTab } from './presentation';
+import { parseDashboardMessage } from './presentation';
 
 export interface DashboardDependencies {
   extensionUri: vscode.Uri;
@@ -15,8 +15,9 @@ export interface DashboardDependencies {
 
 export class Dashboard implements vscode.Disposable {
   private panel: vscode.WebviewPanel | undefined;
+  private diagnosticsPanel: vscode.WebviewPanel | undefined;
   private ready = false;
-  private tab: DashboardTab = 'usage';
+  private diagnosticsReady = false;
   private query: UsageQuery = { groupBy: 'day', limit: 100, offset: 0 };
   private queryVersion = 0;
   private diagnosticsVersion = 0;
@@ -29,16 +30,15 @@ export class Dashboard implements vscode.Disposable {
     this.unsubscribe = dependencies.summary.subscribe(progress => this.post({ type: 'progress', progress }));
   }
 
-  open(tab: DashboardTab = 'usage'): void {
+  open(): void {
     if (!this.dependencies.settings().usageEnabled) {
       void vscode.window.showInformationMessage('사용량 통계가 꺼져 있습니다. Agent Tracker 설정에서 켤 수 있습니다.');
       void vscode.commands.executeCommand('agentTracker.openSettings');
       return;
     }
-    this.tab = tab;
     if (this.panel) {
       this.panel.reveal(vscode.ViewColumn.Active);
-      this.navigate();
+      this.enter();
       return;
     }
     const media = vscode.Uri.joinPath(this.dependencies.extensionUri, 'media');
@@ -48,7 +48,7 @@ export class Dashboard implements vscode.Disposable {
     const webview = this.panel.webview;
     webview.html = dashboardHtml(webview.asWebviewUri(vscode.Uri.joinPath(media, 'dashboard.js')).toString(),
       webview.asWebviewUri(vscode.Uri.joinPath(media, 'dashboard.css')).toString(), webview.cspSource, randomBytes(18).toString('base64'));
-    this.panel.onDidDispose(() => { this.panel = undefined; this.ready = false; this.queryVersion++; this.diagnosticsVersion++; });
+    this.panel.onDidDispose(() => { this.panel = undefined; this.ready = false; this.queryVersion++; });
     webview.onDidReceiveMessage((raw: unknown) => {
       if (this.panel?.webview !== webview) return;
       const message = parseDashboardMessage(raw);
@@ -59,26 +59,27 @@ export class Dashboard implements vscode.Disposable {
 
   update(): void {
     const settings = this.dependencies.settings();
-    this.post({ type: 'state', timezone: settings.timezone, timezoneWarning: settings.timezoneWarning, providers: this.providers() });
+    const message = { type: 'state', timezone: settings.timezone, timezoneWarning: settings.timezoneWarning, providers: this.providers() };
+    this.post(message);
+    this.postDiagnostics(message);
   }
 
   configurationChanged(): void {
     this.update();
-    if (this.ready && this.tab === 'usage') void this.loadUsage().catch(error => this.error(error));
+    if (this.ready || this.diagnosticsReady) void this.loadDashboard().catch(error => this.error(error));
   }
 
-  close(): void { this.panel?.dispose(); }
+  close(): void { this.panel?.dispose(); this.diagnosticsPanel?.dispose(); }
   dispose(): void { this.unsubscribe(); this.close(); }
 
   private async handle(message: NonNullable<ReturnType<typeof parseDashboardMessage>>): Promise<void> {
     if (!this.dependencies.settings().usageEnabled) return;
     switch (message.type) {
-      case 'ready': if (!this.ready) { this.ready = true; this.navigate(); } break;
-      case 'tab': this.tab = message.tab; if (this.tab === 'usage') await this.loadUsage(); else if (this.tab === 'diagnostics') await this.loadDiagnostics(0); break;
+      case 'ready': if (!this.ready) { this.ready = true; this.enter(); } break;
+      case 'openDiagnostics': this.openDiagnostics(); break;
       case 'settings': await vscode.commands.executeCommand('agentTracker.openSettings'); break;
       case 'cancelUsage': this.dependencies.summary.cancel(); break;
       case 'queryUsage': this.query = message.query; this.fromDay = message.fromDay; this.toDay = message.toDay; if (this.ready) await this.loadUsage(); break;
-      case 'diagnostics': await this.loadDiagnostics(message.offset); break;
       case 'queryNames': {
         if (!this.ready) break;
         const panel = this.panel;
@@ -93,12 +94,42 @@ export class Dashboard implements vscode.Disposable {
     }
   }
 
-  private navigate(): void {
+  private openDiagnostics(): void {
+    if (!this.dependencies.settings().usageEnabled) return;
+    if (this.diagnosticsPanel) {
+      this.diagnosticsPanel.reveal(vscode.ViewColumn.Active);
+      void this.loadDiagnostics(0).catch(error => this.error(error, true));
+      return;
+    }
+    const media = vscode.Uri.joinPath(this.dependencies.extensionUri, 'media');
+    const panel = vscode.window.createWebviewPanel('agentTracker.diagnostics', 'Agent Tracker 데이터 확인', vscode.ViewColumn.Active, {
+      enableScripts: true, retainContextWhenHidden: true, localResourceRoots: [media],
+    });
+    this.diagnosticsPanel = panel;
+    const webview = panel.webview;
+    webview.html = diagnosticsHtml(webview.asWebviewUri(vscode.Uri.joinPath(media, 'diagnostics.js')).toString(),
+      webview.asWebviewUri(vscode.Uri.joinPath(media, 'dashboard.css')).toString(), webview.cspSource, randomBytes(18).toString('base64'));
+    panel.onDidDispose(() => { this.diagnosticsPanel = undefined; this.diagnosticsReady = false; this.diagnosticsVersion++; });
+    webview.onDidReceiveMessage((raw: unknown) => {
+      if (this.diagnosticsPanel !== panel) return;
+      const message = parseDashboardMessage(raw);
+      if (!message || !this.dependencies.settings().usageEnabled) return;
+      if (message.type === 'ready') {
+        if (this.diagnosticsReady) return;
+        this.diagnosticsReady = true;
+        void this.loadDiagnostics(0).catch(error => this.error(error, true));
+      } else if (message.type === 'diagnostics' && this.diagnosticsReady) {
+        void this.loadDiagnostics(message.offset).catch(error => this.error(error, true));
+      } else if (message.type === 'settings') {
+        void vscode.commands.executeCommand('agentTracker.openSettings');
+      }
+    });
+  }
+
+  private enter(): void {
     if (!this.ready) return;
     this.update();
-    this.post({ type: 'navigate', tab: this.tab });
-    if (this.tab === 'usage') void this.refreshUsage().catch(error => this.error(error));
-    if (this.tab === 'diagnostics') void this.loadDiagnostics(0).catch(error => this.error(error));
+    void this.refreshUsage().catch(error => this.error(error));
   }
 
   private async refreshUsage(): Promise<void> {
@@ -108,7 +139,7 @@ export class Dashboard implements vscode.Disposable {
     if (this.refreshPromise) {
       try {
         await this.refreshPromise;
-        if (this.panel === panel && this.ready) await this.loadUsage();
+        if (this.panel === panel && this.ready) await this.loadDashboard();
       } finally {
         if (this.panel === panel) this.post({ type: 'busy', busy: false });
       }
@@ -120,7 +151,7 @@ export class Dashboard implements vscode.Disposable {
       const result = await this.dependencies.summary.refresh({ roots: settings.roots, timezone: settings.timezone });
       if (this.panel !== panel || !this.ready || !this.dependencies.settings().usageEnabled) return;
       this.post({ type: 'refreshResult', result });
-      await this.loadUsage();
+      await this.loadDashboard();
     })().finally(() => {
       this.refreshPromise = undefined;
       if (this.panel === panel) this.post({ type: 'busy', busy: false });
@@ -128,8 +159,12 @@ export class Dashboard implements vscode.Disposable {
     return this.refreshPromise;
   }
 
+  private async loadDashboard(): Promise<void> {
+    await Promise.all([this.loadUsage(), this.loadDiagnostics(0).catch(error => this.error(error, true))]);
+  }
+
   private async loadUsage(): Promise<void> {
-    if (!this.dependencies.settings().usageEnabled) return;
+    if (!this.ready || !this.dependencies.settings().usageEnabled) return;
     const version = ++this.queryVersion;
     const timezone = this.dependencies.settings().timezone;
     const query = { ...this.query, timezone, providers: this.providers() };
@@ -141,22 +176,27 @@ export class Dashboard implements vscode.Disposable {
   }
 
   private async loadDiagnostics(offset: number): Promise<void> {
-    if (!this.dependencies.settings().usageEnabled) return;
+    if (!this.diagnosticsReady || !this.dependencies.settings().usageEnabled) return;
     const version = ++this.diagnosticsVersion;
-    this.update();
+    const settings = this.dependencies.settings();
+    this.postDiagnostics({ type: 'state', timezone: settings.timezone, timezoneWarning: settings.timezoneWarning });
     const result = await this.dependencies.summary.diagnostics({ limit: 100, offset, providers: this.providers() });
-    if (version === this.diagnosticsVersion) this.post({ type: 'diagnostics', result, offset });
+    if (version === this.diagnosticsVersion) this.postDiagnostics({ type: 'diagnostics', result, offset });
   }
 
   private post(message: unknown): void {
     if (this.ready && this.panel) void this.panel.webview.postMessage(message);
   }
+  private postDiagnostics(message: unknown): void {
+    if (this.diagnosticsReady && this.diagnosticsPanel) void this.diagnosticsPanel.webview.postMessage(message);
+  }
   private providers(): ('claude' | 'codex')[] {
     const settings = this.dependencies.settings();
     return (['claude', 'codex'] as const).filter(provider => settings[provider].enabled);
   }
-  private error(error: unknown): void {
-    const message = error instanceof Error ? error.message : '작업에 실패했습니다. Diagnostics에서 처리 상태를 확인해 주세요.';
-    this.post({ type: 'error', message });
+  private error(error: unknown, diagnostics = false): void {
+    const message = error instanceof Error ? error.message : '작업에 실패했습니다. 데이터 확인 화면에서 처리 상태를 확인해 주세요.';
+    if (diagnostics) this.postDiagnostics({ type: 'error', message });
+    else this.post({ type: 'error', message });
   }
 }
