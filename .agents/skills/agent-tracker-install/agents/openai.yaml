@@ -1,4 +1,0 @@
-interface:
-  display_name: "Agent Tracker 설치"
-  short_description: "Agent Tracker를 빌드하고 VSIX로 패키징하여 VS Code에 설치"
-  default_prompt: "$agent-tracker-install로 현재 Agent Tracker 프로젝트를 빌드하고 VS Code에 설치해줘."

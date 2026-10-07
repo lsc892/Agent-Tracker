@@ -1,0 +1,4 @@
+interface:
+  display_name: "build"
+  short_description: "build 요청으로 Agent Tracker를 빌드·패키징해 VS Code에 설치"
+  default_prompt: "$build로 현재 Agent Tracker 프로젝트를 빌드하고 VS Code에 설치해줘."
