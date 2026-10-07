@@ -23,3 +23,4 @@
 - 코드 변경은 변경에 맞는 검증을 수행하고 `npm run check`로 타입 검사·린트·테스트를 확인한다.
 - 문서만 변경한 경우 링크·내용과 `git diff --check`를 확인한다.
 - 이 저장소에서 `$build`, `build`, `build해줘`, `빌드해줘` 등 빌드 실행 요청과 로컬 VS Code 설치·업데이트 요청은 [build 스킬](.agents/skills/build/SKILL.md)을 따른다. 별도 범위를 지정하지 않은 빌드 요청은 빌드·VSIX 패키징·로컬 설치까지 수행한다.
+- 실제 Claude·Codex quota QA와 실계정 사용량 대조 요청은 [quota-qa 스킬](.agents/skills/quota-qa/SKILL.md)을 따른다. 일반 `npm run check`와 CI에는 실제 계정 호출을 포함하지 않는다.

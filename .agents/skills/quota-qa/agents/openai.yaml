@@ -1,0 +1,4 @@
+interface:
+  display_name: "quota-qa"
+  short_description: "Claude·Codex 실제 구독 quota와 Agent Tracker 표시 값 대조"
+  default_prompt: "$quota-qa로 Claude와 Codex의 실제 quota 값이 Agent Tracker와 맞는지 검증해줘."

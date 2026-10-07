@@ -30,6 +30,7 @@
     "lint": "eslint src tests tools --max-warnings 0",
     "test": "npm run build && node tests/runners/run-tests.cjs",
     "test:vscode": "npm run build && node tests/runners/test-vscode.cjs",
+    "test:quota:live": "npm run build && node tools/quota/live-qa.cjs --real",
     "test:toggle": "npm run build && node tests/vscode/statusbar-toggle.cjs",
     "patch:vscode": "node tools/vscode/statusbar-toggle.cjs",
     "restore:vscode": "node tools/vscode/statusbar-toggle.cjs --restore",
