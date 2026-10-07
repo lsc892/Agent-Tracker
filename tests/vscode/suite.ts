@@ -53,6 +53,20 @@ export async function run(): Promise<void> {
         const submitGroup = group => { document.getElementById('group').value = group; document.getElementById('usage-filters').requestSubmit(); };
         const report = (ok, detail) => window.dispatchEvent(new CustomEvent('tracker-smoke-report', {detail:{type:'smoke-report',stage:'usage',theme:${JSON.stringify(expectedTheme)},ok,detail}}));
         const check = (condition, detail) => { if (!condition) throw new Error(detail); };
+        const checkSegmentHover = () => {
+          const segments = [...document.querySelectorAll('#usage-chart .chart-segment')];
+          for (const [index, label] of ['Input: 50 토큰', 'Output: 50 토큰', 'Cache Write: 20 토큰', 'Cache Read: 30 토큰'].entries()) {
+            const segment = segments[index];
+            segment.scrollIntoView({block:'center',inline:'nearest'});
+            const bounds = segment.getBoundingClientRect();
+            check(document.elementFromPoint(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2) === segment,'colored component remains the pointer target');
+            check(segment.querySelector('title').textContent.endsWith(label),'native tooltip displays the component count '+label);
+            segment.dispatchEvent(new MouseEvent('mouseenter'));
+            check(document.getElementById('chart-detail').textContent.endsWith(label),'hover detail displays the component count '+label);
+            segment.dispatchEvent(new MouseEvent('mouseleave'));
+            check(document.getElementById('chart-detail').textContent.includes('Input 50 / Output 50 / Cache Write 20 / Cache Read 30'),'leaving a component restores the bar breakdown');
+          }
+        };
         window.addEventListener('error', event => report(false,event.message));
         window.addEventListener('message', event => {
           try {
@@ -71,6 +85,7 @@ export async function run(): Promise<void> {
               check(marks.length === 4,'total tokens render as four stacked segments');
               const fills = marks.map(mark => getComputedStyle(mark).fill);
               check(new Set(fills).size === 4 && fills.every(fill => fill !== 'none'),'four token colors resolve in the active theme');
+              checkSegmentHover();
               document.querySelector('#usage-chart .chart-bar').focus();
               check(document.getElementById('chart-detail').textContent.includes('Input 50 / Output 50 / Cache Write 20 / Cache Read 30'),'keyboard focus exposes token breakdown');
               phase = 'chart-requests'; document.getElementById('chart-metric').value = 'requests';
@@ -87,6 +102,7 @@ export async function run(): Promise<void> {
             } else if (phase === 'chart-groups' && message.type === 'usage' && message.result.groupBy === chartGroups[0]) {
               check(document.querySelectorAll('#usage-chart .chart-segment').length === 4,'stacked chart survives grouping '+chartGroups[0]);
               check(document.getElementById('chart-title').textContent === '총 토큰','grouped chart keeps its token metric');
+              checkSegmentHover();
               chartGroups.shift();
               if (chartGroups.length) { submitGroup(chartGroups[0]); return; }
               phase = 'project-names'; document.getElementById('project-name').click();
@@ -111,6 +127,7 @@ export async function run(): Promise<void> {
               check(document.getElementById('usage-table').textContent.includes('ui-turn'),'request identity is rendered');
               check(document.getElementById('usage-table').textContent.includes('통계 화면 검증'),'session title is rendered');
               check(message.result.chart.mode === 'turn' && document.querySelectorAll('#usage-chart .chart-segment').length === 4,'request chart uses token composition');
+              checkSegmentHover();
               check(document.getElementById('chart-metric').querySelector('[value="requests"]').disabled,'request chart disables aggregate metrics');
               check(document.getElementById('session-name').textContent === '통계 화면 검증' && document.getElementById('session-options').hidden,'session selection applies immediately and closes the popup');
               phase = 'empty'; document.getElementById('from-day').value = '2026-10-04';

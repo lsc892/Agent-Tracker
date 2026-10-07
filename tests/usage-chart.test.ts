@@ -142,7 +142,7 @@ function ui() {
   } } }) };
 }
 
-test('all chart groupings stack cache-exclusive Input with the other three components', () => {
+test('all chart groupings stack cache-exclusive Input and expose the hovered component token count', () => {
   const view = ui();
   const row = { ...turn(1), period: '2026-01-02', avg_duration_ms: 1000, avg_tokens_per_turn: 150, completed_turns: 1, turn_count: 1, turns_with_duration: 1 };
   for (const [group, mode] of [['day', 'calendar'], ['month', 'calendar'], ['project', 'ranking'], ['session', 'ranking'], ['all', 'total'], ['turn', 'turn']]) {
@@ -155,6 +155,15 @@ test('all chart groupings stack cache-exclusive Input with the other three compo
     assert.match(bar.attributes.get('aria-label')!, /Input 50 \/ Output 50 \/ Cache Write 20 \/ Cache Read 30/);
     bar.listeners.get('focus')!();
     assert.match(view.get('chart-detail').textContent, /150 토큰/);
+    const queriesBeforeHover = view.messages.length;
+    for (const [index, detail] of ['Input: 50 토큰', 'Output: 50 토큰', 'Cache Write: 20 토큰', 'Cache Read: 30 토큰'].entries()) {
+      assert.ok(marks[index].children.find(child => child.tag === 'title')?.textContent.endsWith(detail), `${group}: native tooltip names the hovered component`);
+      marks[index].listeners.get('mouseenter')!();
+      assert.ok(view.get('chart-detail').textContent.endsWith(detail), `${group}: hover displays only the selected component count`);
+      marks[index].listeners.get('mouseleave')!();
+      assert.match(view.get('chart-detail').textContent, /Input 50 \/ Output 50 \/ Cache Write 20 \/ Cache Read 30/);
+    }
+    assert.equal(view.messages.length, queriesBeforeHover, 'component hover reuses the rendered data');
   }
 });
 
@@ -166,6 +175,13 @@ test('unknown compositions keep total bars neutral while zero components remain 
   assert.match(marks[0].attributes.get('class')!, /chart-unknown/);
   assert.match(view.get('chart-detail').textContent, /구성 미확인/);
   assert.match(view.get('chart-legend').textContent, /구성 미확인/);
+  marks[0].listeners.get('mouseenter')!();
+  assert.match(view.get('chart-detail').textContent, /총 토큰 \(구성 미확인\): 150 토큰/);
+  assert.doesNotMatch(view.get('chart-detail').textContent, /Input:|Cache Read:/);
+  marks[1].listeners.get('mouseenter')!();
+  assert.match(view.get('chart-detail').textContent, /Input: 100 토큰/);
+  marks[2].listeners.get('mouseenter')!();
+  assert.match(view.get('chart-detail').textContent, /Output: 50 토큰/);
   view.render('all', 'total', 'tokens', []);
   assert.match(view.get('usage-chart').textContent, /표시할 기록이 없습니다/);
   assert.equal(view.get('chart-legend').textContent, '');

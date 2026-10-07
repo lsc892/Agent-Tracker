@@ -205,9 +205,9 @@
     return `${provider} · ${row.project_name || '이름 없는 프로젝트'}${row.session_id ? ` / ${row.session_name || '이름 없는 세션'}` : ''}`;
   }
   function chartSegments(row) {
-    if (row.cache_write_input_tokens == null || row.cache_read_input_tokens == null) return [{ value: row.total_tokens, className: 'chart-unknown' }];
+    if (row.cache_write_input_tokens == null || row.cache_read_input_tokens == null) return [{ value: row.total_tokens, className: 'chart-unknown', label: '총 토큰 (구성 미확인)' }];
     return [Math.max(0, row.input_tokens - row.cache_write_input_tokens - row.cache_read_input_tokens), row.output_tokens,
-      row.cache_write_input_tokens, row.cache_read_input_tokens].map((value, index) => ({ value, className: `chart-series-${index}` }));
+      row.cache_write_input_tokens, row.cache_read_input_tokens].map((value, index) => ({ value, className: `chart-series-${index}`, label: tokenHeaders[index].label }));
   }
   function chartDescription(row, chart) {
     const turn = chart.mode === 'turn';
@@ -311,8 +311,16 @@
       for (const segment of segments) {
         if (segment.value == null || segment.value <= 0) continue;
         const size = segment.value / maximum * length;
-        group.append(svgElement('rect', { x: vertical ? x : x + consumed, y: vertical ? y - consumed - size : y,
-          width: vertical ? barSize : size, height: vertical ? size : barSize, class: `chart-segment ${segment.className}` }));
+        const mark = svgElement('rect', { x: vertical ? x : x + consumed, y: vertical ? y - consumed - size : y,
+          width: vertical ? barSize : size, height: vertical ? size : barSize, class: `chart-segment ${segment.className}` });
+        if (metric === 'tokens') {
+          const detail = `${chartLabel(row, chart.mode)} · ${segment.label}: ${number(segment.value)} 토큰`;
+          mark.append(svgElement('title', {}, detail));
+          mark.setAttribute('aria-label', detail);
+          mark.addEventListener('mouseenter', () => { $('chart-detail').textContent = detail; });
+          mark.addEventListener('mouseleave', () => { $('chart-detail').textContent = description; });
+        }
+        group.append(mark);
         consumed += size;
       }
       if (value === 0) group.append(svgElement('line', { x1: x, x2: x + (vertical ? barSize : 2), y1: y, y2: y + (vertical ? 0 : barSize), class: 'chart-grid' }));
