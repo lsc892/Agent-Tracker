@@ -2,7 +2,7 @@ import { parentPort, workerData } from 'node:worker_threads';
 import { SummaryDatabase } from './db';
 import { refreshSummary } from './scanner';
 import { acquireRefreshLock } from './lock';
-import type { SummaryOptions, UsageQuery, SourceRoot, RefreshResult } from './types';
+import type { SummaryOptions, UsageQuery, SourceRoot, RefreshResult, NameQuery } from './types';
 
 if (!parentPort) throw new Error('Summary worker requires a parent');
 const port = parentPort;
@@ -36,7 +36,8 @@ port.on('message',(message: {id?:number;method:string;payload?:unknown}) => {
           : database.queryUsageCount(query,query.groupBy === 'all' || !query.groupBy ? 'total' : query.groupBy,query.timezone ?? options.timezone ?? 'UTC');
         const chart = query.chartMetric ? database.queryUsageChart(query, query.groupBy ?? 'all', query.timezone ?? options.timezone ?? 'UTC', query.chartMetric) : undefined;
         result = {rows,total,chart,coverage:database.diagnostics({limit:1,providers:query.providers}).counts};
-      } else if (message.method === 'diagnostics') result = {...database.diagnostics((message.payload ?? {}) as {limit?:number;offset?:number;afterId?:number;providers?:SourceRoot['provider'][]}),lastRefresh};
+      } else if (message.method === 'names') result = database.queryNames(message.payload as NameQuery);
+      else if (message.method === 'diagnostics') result = {...database.diagnostics((message.payload ?? {}) as {limit?:number;offset?:number;afterId?:number;providers?:SourceRoot['provider'][]}),lastRefresh};
       else if (message.method === 'clearData') {
         // Use the same cross-window lock as scanning; never unlink a live DB or lock file.
         const release = await acquireRefreshLock(options.dbPath, AbortSignal.timeout(30_000));

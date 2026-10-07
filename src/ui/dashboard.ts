@@ -79,6 +79,17 @@ export class Dashboard implements vscode.Disposable {
       case 'cancelUsage': this.dependencies.summary.cancel(); break;
       case 'queryUsage': this.query = message.query; this.fromDay = message.fromDay; this.toDay = message.toDay; if (this.ready) await this.loadUsage(); break;
       case 'diagnostics': await this.loadDiagnostics(message.offset); break;
+      case 'queryNames': {
+        if (!this.ready) break;
+        const panel = this.panel;
+        try {
+          const result = await this.dependencies.summary.queryNames({ ...message.query, providers: this.providers() });
+          if (this.panel === panel) this.post({ type: 'names', kind: message.query.kind, requestId: message.requestId, offset: message.query.offset, result });
+        } catch {
+          if (this.panel === panel) this.post({ type: 'names', kind: message.query.kind, requestId: message.requestId, error: '이름 목록을 불러오지 못했습니다. 다시 열어 주세요.' });
+        }
+        break;
+      }
     }
   }
 

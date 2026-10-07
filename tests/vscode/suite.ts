@@ -89,15 +89,30 @@ export async function run(): Promise<void> {
               check(document.getElementById('chart-title').textContent === '총 토큰','grouped chart keeps its token metric');
               chartGroups.shift();
               if (chartGroups.length) { submitGroup(chartGroups[0]); return; }
-              phase = 'turn'; document.getElementById('group').value = 'turn';
-              document.getElementById('session-name').value = '통계 화면 검증';
-              document.getElementById('usage-filters').requestSubmit();
+              phase = 'project-names'; document.getElementById('project-name').click();
+            } else if (phase === 'project-names' && message.type === 'names' && message.kind === 'project') {
+              check(!message.error && message.result.total === 1,'full project names arrive from the worker');
+              const list = document.getElementById('project-options');
+              check(!list.hidden && getComputedStyle(list).overflowY === 'auto' && getComputedStyle(list).maxHeight === '300px','name popup has a bounded scroll area');
+              check(document.querySelectorAll('#project-list .name-option').length === 2,'project list includes all and each stored project');
+              phase = 'project-selected'; document.querySelectorAll('#project-list .name-option')[1].click();
+            } else if (phase === 'project-selected' && message.type === 'usage') {
+              check(document.getElementById('project-name').textContent === 'project','project choice updates the filter');
+              check(document.getElementById('project-options').hidden,'project choice closes the popup');
+              phase = 'session-names'; document.getElementById('session-name').click();
+            } else if (phase === 'session-names' && message.type === 'names' && message.kind === 'session') {
+              check(!message.error && message.result.total === 1,'project session names arrive from the worker');
+              const option = document.querySelectorAll('#session-list .name-option')[1];
+              check(option.textContent.includes('통계 화면 검증') && option.textContent.includes('Claude') && option.textContent.includes('project'),'session choice shows title and disambiguating context');
+              check(option.title.includes('ui-session'),'session tooltip keeps exact identity');
+              phase = 'turn'; document.getElementById('group').value = 'turn'; option.click();
             } else if (phase === 'turn' && message.type === 'usage' && message.result.groupBy === 'turn') {
               check(message.result.rows.length === 1 && message.result.rows[0].root_turn_id === 'ui-turn','request group and session filter are applied');
               check(document.getElementById('usage-table').textContent.includes('ui-turn'),'request identity is rendered');
               check(document.getElementById('usage-table').textContent.includes('통계 화면 검증'),'session title is rendered');
               check(message.result.chart.mode === 'turn' && document.querySelectorAll('#usage-chart .chart-segment').length === 4,'request chart uses token composition');
               check(document.getElementById('chart-metric').querySelector('[value="requests"]').disabled,'request chart disables aggregate metrics');
+              check(document.getElementById('session-name').textContent === '통계 화면 검증' && document.getElementById('session-options').hidden,'session selection applies immediately and closes the popup');
               phase = 'empty'; document.getElementById('from-day').value = '2026-10-04';
               document.getElementById('usage-filters').requestSubmit();
             } else if (phase === 'empty' && message.type === 'usage') {
@@ -105,6 +120,11 @@ export async function run(): Promise<void> {
               check(document.querySelector('#usage-table .empty'),'empty state renders');
               check(document.querySelector('#usage-chart .empty') && !document.querySelector('#usage-chart .chart-segment'),'empty query clears the chart');
               check(document.getElementById('previous').disabled && document.getElementById('next').disabled,'empty pagination is disabled');
+              phase = 'empty-names'; document.getElementById('session-name').click();
+            } else if (phase === 'empty-names' && message.type === 'names' && message.kind === 'session') {
+              check(message.result.total === 1 && document.querySelectorAll('#session-list .name-option').length === 2,'names remain available outside the date filter');
+              window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));
+              check(document.getElementById('session-options').hidden && document.activeElement === document.getElementById('session-name'),'Escape closes the list and returns keyboard focus');
               phase = 'diagnostics'; document.querySelector('[data-tab="diagnostics"]').click();
             } else if (phase === 'diagnostics' && message.type === 'diagnostics') {
               check(message.result.counts.files === 1,'diagnostics returns fixture manifest');

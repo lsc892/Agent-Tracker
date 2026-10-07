@@ -26,6 +26,23 @@ export interface UsageQuery {
   afterId?: number;
   chartMetric?: import('./db/types').ChartMetric;
 }
+export interface NameQuery {
+  kind: 'project' | 'session';
+  provider?: Provider;
+  providers?: Provider[];
+  projectKey?: string;
+  limit?: number;
+  offset?: number;
+}
+export interface NameOption {
+  project_key: string;
+  project_name: string;
+  provider: Provider | null;
+  session_id: string | null;
+  session_name: string | null;
+  session_started_at_ms: number | null;
+}
+export interface NameResult { rows: NameOption[]; total: number }
 export interface RefreshResult {
   scanId: string;
   discovered: number;

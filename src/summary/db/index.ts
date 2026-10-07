@@ -3,6 +3,7 @@ import { dirname } from 'node:path';
 import { DatabaseSync, type SQLInputValue, type StatementSync } from 'node:sqlite';
 import { SCHEMA_SQL, SCHEMA_VERSION, SCHEMA_LEGACY_MIGRATION_SQL, SCHEMA_CACHE_MIGRATION_SQL } from './schema';
 import { calendarPeriod } from './timezone';
+import type { NameQuery, NameResult } from '../types';
 import type {
   DiagnosticsPage, FileMetadata, KeysetPage, ManifestRow, OffsetPage,
   ProcessingStatus, Provider, SessionReplacement, SummaryFilter,
@@ -328,6 +329,29 @@ export class SummaryDatabase {
         AND NOT EXISTS(SELECT 1 FROM turn_summary t WHERE t.provider='codex' AND t.project_key=projects.project_key);
         DELETE FROM db_replacement_sessions; DELETE FROM db_replacement_projects;`);
     });
+  }
+
+  /** Name choices cover all stored usage, independently of dates and the table page. */
+  queryNames(query: NameQuery): NameResult {
+    if (!['project', 'session'].includes(query.kind)) throw new RangeError('Unknown name kind');
+    const session = query.kind === 'session';
+    const where = whereClause({ provider: query.provider, providers: query.providers,
+      projectKey: session ? query.projectKey : undefined });
+    const groups = session ? 'provider, project_key, session_id' : 'project_key';
+    const total = (this.connection.prepare(`SELECT COUNT(*) AS count FROM (
+      SELECT 1 FROM turn_summary WHERE ${where.sql} GROUP BY ${groups}
+    )`).get(...where.values) as { count: number }).count;
+    const rows = this.connection.prepare(`SELECT project_key,
+      (SELECT project_name FROM projects p WHERE p.project_key=turn_summary.project_key) AS project_name,
+      ${session ? 'provider' : 'NULL'} AS provider,
+      ${session ? 'session_id' : 'NULL'} AS session_id,
+      ${session ? '(SELECT session_name FROM sessions s WHERE s.provider=turn_summary.provider AND s.session_id=turn_summary.session_id)' : 'NULL'} AS session_name,
+      ${session ? 'MIN(started_at_ms)' : 'NULL'} AS session_started_at_ms
+      FROM turn_summary WHERE ${where.sql} GROUP BY ${groups}
+      ORDER BY ${session ? "COALESCE(session_name, '이름 없는 세션') COLLATE NOCASE, provider," : ''}
+        project_name COLLATE NOCASE, project_key${session ? ', session_started_at_ms, session_id' : ''}
+      LIMIT ? OFFSET ?`).all(...where.values, pageLimit(query.limit), nonnegative(query.offset ?? 0, 'offset')) as unknown as NameResult['rows'];
+    return { rows, total };
   }
 
   queryTurns(filter: SummaryFilter = {}, page: KeysetPage & { offset?: number } = {}): TurnSummaryRow[] {

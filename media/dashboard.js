@@ -24,6 +24,9 @@
   let latestUsage;
   let selectedProject;
   let selectedSession;
+  let openNameKind;
+  let nameRequestId = 0;
+  const namePages = { project: { loaded: 0, total: 0 }, session: { loaded: 0, total: 0 } };
   const saved = vscode.getState();
   if (saved && ['day', 'month', 'project', 'session', 'turn', 'all'].includes(saved.group)) $('group').value = saved.group;
   if (saved && Object.hasOwn(chartMetrics, saved.chartMetric)) $('chart-metric').value = saved.chartMetric;
@@ -51,13 +54,92 @@
     $('chart-metric').value = request.chartMetric;
     if ($('provider').value) request.provider = $('provider').value;
     if (selectedProject) request.projectKey = selectedProject;
-    else if ($('project-name').value.trim()) request.projectName = $('project-name').value.trim();
     if (selectedSession) request.sessionId = selectedSession;
-    else if ($('session-name').value.trim()) request.sessionName = $('session-name').value.trim();
     if ($('from-day').value) request.fromDay = $('from-day').value;
     if ($('to-day').value) request.toDay = $('to-day').value;
     send({ type: 'queryUsage', query: request });
     vscode.setState({ group: request.groupBy, chartMetric: request.chartMetric });
+  }
+  function nameCaption(kind, text, title = '') {
+    $(`${kind}-name`).textContent = text || (kind === 'project' ? '전체 프로젝트' : '전체 세션');
+    $(`${kind}-name`).title = title;
+  }
+  function closeNames(focus = false) {
+    const previous = openNameKind;
+    openNameKind = undefined;
+    for (const kind of ['project', 'session']) {
+      $(`${kind}-options`).hidden = true;
+      $(`${kind}-name`).setAttribute('aria-expanded', 'false');
+      $(`${kind}-list`).replaceChildren();
+      namePages[kind].pending = undefined;
+    }
+    if (focus && previous) $(`${previous}-name`).focus();
+  }
+  function chooseProject(row) {
+    selectedProject = row?.project_key;
+    selectedSession = undefined;
+    nameCaption('project', row ? row.project_name || '이름 없는 프로젝트' : '', row?.project_key);
+    nameCaption('session', '');
+    closeNames(true); offset = 0; query();
+  }
+  function chooseSession(row) {
+    selectedSession = row?.session_id;
+    if (row) {
+      selectedProject = row.project_key;
+      nameCaption('project', row.project_name || '이름 없는 프로젝트', row.project_key);
+      $('provider').value = row.provider;
+    }
+    nameCaption('session', row ? row.session_name || '이름 없는 세션' : '', row ? `세션 ID: ${row.session_id}` : '');
+    closeNames(true); offset = 0; query();
+  }
+  function loadNames(kind) {
+    const page = namePages[kind];
+    if (openNameKind !== kind || page.pending !== undefined) return;
+    const request = { kind, offset: page.loaded };
+    if ($('provider').value) request.provider = $('provider').value;
+    if (kind === 'session' && selectedProject) request.projectKey = selectedProject;
+    page.pending = ++nameRequestId;
+    $(`${kind}-list-status`).textContent = '목록을 불러오는 중…';
+    send({ type: 'queryNames', query: request, requestId: page.pending });
+  }
+  function nameOption(kind, row) {
+    const title = kind === 'project' ? row?.project_name || '이름 없는 프로젝트' : row?.session_name || '이름 없는 세션';
+    const node = element('button', row ? title : kind === 'project' ? '전체 프로젝트' : '전체 세션', 'name-option');
+    node.type = 'button';
+    const selected = row ? kind === 'project' ? selectedProject === row.project_key
+      : selectedProject === row.project_key && selectedSession === row.session_id && $('provider').value === row.provider
+      : kind === 'project' ? !selectedProject : !selectedSession;
+    node.setAttribute('aria-pressed', String(selected));
+    if (row) {
+      node.title = `${row.project_key}${row.session_id ? `\n세션 ID: ${row.session_id}` : ''}`;
+      node.append(element('span', kind === 'project' ? row.project_key
+        : `${providerLabel(row.provider)} · ${row.project_name} · ${date(row.session_started_at_ms)}`, 'muted'));
+    }
+    node.addEventListener('click', () => kind === 'project' ? chooseProject(row) : chooseSession(row));
+    return node;
+  }
+  function toggleNames(kind) {
+    if (openNameKind === kind) { closeNames(); return; }
+    closeNames(); openNameKind = kind;
+    namePages[kind] = { loaded: 0, total: 0 };
+    $(`${kind}-options`).hidden = false;
+    $(`${kind}-options`).scrollTop = 0;
+    $(`${kind}-name`).setAttribute('aria-expanded', 'true');
+    $(`${kind}-list`).append(nameOption(kind));
+    loadNames(kind);
+  }
+  function renderNames(message) {
+    const kind = message.kind;
+    const page = namePages[kind];
+    if (openNameKind !== kind || !page || page.pending !== message.requestId) return;
+    page.pending = undefined;
+    if (message.error) { $(`${kind}-list-status`).textContent = message.error; return; }
+    for (const row of message.result.rows) $(`${kind}-list`).append(nameOption(kind, row));
+    page.loaded += message.result.rows.length;
+    page.total = message.result.total;
+    $(`${kind}-list-status`).textContent = page.total ? `${number(page.loaded)} / ${number(page.total)}개${page.loaded < page.total ? ' · 아래로 스크롤하면 계속 표시합니다.' : ''}` : '선택할 기록이 없습니다.';
+    const list = $(`${kind}-options`);
+    if (message.result.rows.length && page.loaded < page.total && list.scrollHeight <= list.clientHeight) loadNames(kind);
   }
   function table(target, headers, rows) {
     target.replaceChildren();
@@ -91,13 +173,7 @@
     const node = element('button', row.project_name || '이름 없는 프로젝트', 'name-filter');
     node.type = 'button';
     node.title = row.project_key || '';
-    node.addEventListener('click', () => {
-      selectedProject = row.project_key;
-      selectedSession = undefined;
-      $('project-name').value = row.project_name || '';
-      $('session-name').value = '';
-      offset = 0; query();
-    });
+    node.addEventListener('click', () => chooseProject(row));
     return node;
   }
   function sessionLabel(row, request = false) {
@@ -105,14 +181,7 @@
     node.type = 'button';
     node.title = `${row.project_key || ''}\n세션 ID: ${row.session_id}`;
     if (!request) node.append(element('span', date(row.session_started_at_ms), 'muted session-start'));
-    node.addEventListener('click', () => {
-      selectedProject = row.project_key;
-      selectedSession = row.session_id;
-      $('project-name').value = row.project_name || '';
-      $('session-name').value = row.session_name || '';
-      $('provider').value = row.provider;
-      offset = 0; query();
-    });
+    node.addEventListener('click', () => chooseSession(row));
     return node;
   }
   function svgElement(tag, attributes = {}, text) {
@@ -298,9 +367,23 @@
   $('settings').addEventListener('click', () => send({ type: 'settings' }));
   $('cancel-usage').addEventListener('click', () => send({ type: 'cancelUsage' }));
   $('usage-filters').addEventListener('submit', event => { event.preventDefault(); offset = 0; query(); });
-  $('project-name').addEventListener('input', () => { selectedProject = undefined; selectedSession = undefined; });
-  $('session-name').addEventListener('input', () => { selectedSession = undefined; });
-  $('provider').addEventListener('change', () => { selectedSession = undefined; });
+  for (const kind of ['project', 'session']) {
+    $(`${kind}-name`).addEventListener('click', () => toggleNames(kind));
+    $(`${kind}-options`).addEventListener('scroll', () => {
+      const list = $(`${kind}-options`);
+      if (namePages[kind].loaded < namePages[kind].total && list.scrollTop + list.clientHeight >= list.scrollHeight - 40) loadNames(kind);
+    });
+    $(`${kind}-picker`).addEventListener('focusout', event => {
+      if (openNameKind === kind && !$(`${kind}-picker`).contains(event.relatedTarget)) closeNames();
+    });
+  }
+  window.addEventListener('click', event => {
+    if (openNameKind && !$(`${openNameKind}-picker`).contains(event.target)) closeNames();
+  });
+  window.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && openNameKind) { event.preventDefault(); closeNames(true); }
+  });
+  $('provider').addEventListener('change', () => { selectedSession = undefined; nameCaption('session', ''); closeNames(); });
   $('chart-metric').addEventListener('change', query);
   $('previous').addEventListener('click', () => { offset = Math.max(0, offset - 100); query(); });
   $('next').addEventListener('click', () => { offset += 100; query(); });
@@ -319,16 +402,18 @@
         $('configuration-warning').hidden = !message.timezoneWarning;
         if (Array.isArray(message.providers)) {
           for (const option of $('provider').options) option.disabled = Boolean(option.value) && !message.providers.includes(option.value);
-          if ($('provider').selectedOptions[0]?.disabled) { $('provider').value = ''; selectedSession = undefined; offset = 0; query(); }
+          closeNames();
+          if ($('provider').selectedOptions[0]?.disabled) { $('provider').value = ''; selectedSession = undefined; nameCaption('session', ''); offset = 0; query(); }
         }
         if (latestUsage) renderUsage(latestUsage);
         break;
       case 'navigate': tab(message.tab, false); break;
       case 'usage': $('error').hidden = true; renderUsage(message.result); break;
       case 'diagnostics': diagnosticOffset = message.offset; renderDiagnostics(message.result); break;
+      case 'names': renderNames(message); break;
       case 'busy': $('cancel-usage').hidden = !message.busy; if (message.busy) $('usage-progress').textContent = '기록을 갱신하고 있습니다…'; break;
       case 'progress': { const p = message.progress; $('usage-progress').textContent = `${({ scanning: '파일 확인', parsing: '요청 집계', committing: '통계 저장', complete: '완료' })[p.phase] ?? p.phase} · 발견 ${number(p.discovered)} · 읽음 ${number(p.parsed)} · 실패 ${number(p.failed)}`; break; }
-      case 'refreshResult': { const r = message.result; $('usage-progress').textContent = `${r.interrupted ? '중단됨' : r.failed ? '일부 실패 · 이전 정상 통계를 유지했습니다' : '갱신 완료'} · 발견 ${number(r.discovered)} · 읽음 ${number(r.parsed)} · 재사용 ${number(r.reused)} · 실패 ${number(r.failed)} · 읽은 데이터 ${number(r.bodyBytes)} bytes${r.error ? ` · 원인: ${r.error}` : ''}`; break; }
+      case 'refreshResult': { closeNames(); const r = message.result; $('usage-progress').textContent = `${r.interrupted ? '중단됨' : r.failed ? '일부 실패 · 이전 정상 통계를 유지했습니다' : '갱신 완료'} · 발견 ${number(r.discovered)} · 읽음 ${number(r.parsed)} · 재사용 ${number(r.reused)} · 실패 ${number(r.failed)} · 읽은 데이터 ${number(r.bodyBytes)} bytes${r.error ? ` · 원인: ${r.error}` : ''}`; break; }
       case 'error': $('error').textContent = message.message; $('error').hidden = false; break;
     }
   });

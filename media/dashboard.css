@@ -25,6 +25,16 @@ nav button[aria-current=page] { border-bottom-color: var(--vscode-focusBorder); 
 .note { font-size: 12px; line-height: 1.7; max-width: 820px; }
 .filters { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin: 24px 0 16px; }
 .filters label { display: flex; flex-direction: column; gap: 6px; color: var(--vscode-descriptionForeground); font-size: 12px; }
+.name-picker { position: relative; display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--vscode-descriptionForeground); }
+.name-picker > button { width: 200px; padding: 7px 28px 7px 9px; text-align: left; border: 1px solid var(--vscode-input-border, transparent); border-radius: 3px; color: var(--vscode-input-foreground); background: var(--vscode-input-background); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.name-picker > button::after { content: '▾'; position: absolute; right: 10px; }
+.name-options { position: absolute; top: 100%; left: 0; z-index: 10; margin-top: 6px; width: 400px; max-width: calc(100vw - 72px); max-height: 300px; overflow-y: auto; overscroll-behavior: contain; border: 1px solid var(--vscode-dropdown-border, var(--vscode-panel-border)); border-radius: 5px; background: var(--vscode-dropdown-background, var(--vscode-editor-background)); color: var(--vscode-dropdown-foreground, var(--vscode-foreground)); box-shadow: 0 4px 12px var(--vscode-widget-shadow); }
+.name-option { display: block; width: 100%; padding: 10px 12px; text-align: left; border-radius: 0; color: inherit; background: transparent; overflow-wrap: anywhere; }
+.name-option:hover, .name-option:focus-visible { color: var(--vscode-list-hoverForeground, inherit); background: var(--vscode-list-hoverBackground); }
+.name-option[aria-pressed=true] { background: var(--vscode-list-activeSelectionBackground); color: var(--vscode-list-activeSelectionForeground); }
+.name-option .muted { display: block; margin-top: 4px; font-size: 11px; }
+.name-option[aria-pressed=true] .muted { color: inherit; }
+.name-options > p { margin: 0; padding: 10px 12px; }
 input, select { border: 1px solid var(--vscode-input-border, transparent); color: var(--vscode-input-foreground); background: var(--vscode-input-background); padding: 7px 9px; border-radius: 3px; max-width: 200px; }
 .table-wrap { overflow-x: auto; border: 1px solid var(--vscode-panel-border); border-radius: 5px; }
 .usage-chart { margin: 24px 0 28px; }

@@ -64,6 +64,7 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
   let deferScan = false;
   let lastRoots: import('../src/summary/types').SourceRoot[] = [];
   let lastQuery: import('../src/summary/types').UsageQuery = {};
+  let lastNameQuery: import('../src/summary/types').NameQuery | undefined;
   const policies: string[] = [];
   const pollingIntervals: number[] = [];
   const uri = (fsPath: string): { fsPath: string; toString(): string } => ({ fsPath, toString: () => fsPath });
@@ -147,6 +148,7 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     }
     async query(query: typeof lastQuery) { queries++; lastQuery = query; return { rows: [], total: 0, coverage: {} }; }
     async diagnostics() { diagnostics++; return { files: [], summaries: [], counts: {} }; }
+    async queryNames(query: NonNullable<typeof lastNameQuery>) { lastNameQuery = query; return { rows: [], total: 0 }; }
     subscribe() { return () => {}; } cancel() {} async dispose() { summaryDisposals++; }
     async cancelRefresh() { cancellations++; releaseScan?.(); releaseScan = undefined; }
     async clearData() { clears++; await this.cancelRefresh(); }
@@ -252,6 +254,9 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     dashboard.receive({ type: 'tab', tab: 'usage' }); await tick();
     dashboard.receive({ type: 'queryUsage', query: { groupBy: 'month' } }); await tick();
     assert.ok(queries >= 3, 'usage tabs and filters read cached summary rows');
+    dashboard.receive({type:'queryNames',requestId:7,query:{kind:'session',provider:'codex',projectKey:'/project',offset:100,providers:[]}}); await tick();
+    assert.deepEqual(lastNameQuery,{kind:'session',provider:'codex',projectKey:'/project',offset:100,limit:100,providers:['claude','codex']});
+    assert.ok(dashboard.messages.some(message=>message.type==='names' && message.requestId===7));
     assert.equal(scans, 1);
     for (const message of [{ type: 'refreshUsage' }, { type: 'refreshQuota', provider: 'claude' }, { type: 'tab', tab: 'quota' }]) dashboard.receive(message);
     await tick();

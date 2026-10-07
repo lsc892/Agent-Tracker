@@ -215,9 +215,14 @@ test('worker initialization creates only schema; refresh is lazy and requests ar
   const client = new SummaryClient({dbPath:join(base,'db.sqlite'),roots:[{provider:'claude',path:root}]});
   try {
     await client.initialize();assert.equal((await client.diagnostics()).counts.files,0);
+    assert.deepEqual(await client.queryNames({kind:'project'}),{rows:[],total:0});
     const a = client.refresh();const b = client.refresh();assert.equal(a,b);
     assert.equal((await a).failed,0);const query = await client.query({groupBy:'all'});
     assert.equal(query.rows[0].total_tokens,200);assert.equal(query.total,1);
+    const names = await client.queryNames({kind:'session',providers:['claude']});
+    assert.equal(names.total,1);assert.equal(names.rows[0].session_id,'session-one');
+    assert.equal(names.rows[0].project_name,'project');
+    assert.equal((await client.queryNames({kind:'session',providers:['codex']})).total,0);
   } finally {await client.dispose();await rm(base,{recursive:true,force:true});}
 });
 

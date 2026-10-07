@@ -640,7 +640,7 @@ CREATE INDEX idx_summary_session
 
 표시 이름은 projects·sessions에만 저장한다. 이름에는 UNIQUE 제약을 두지 않는다. 이름이 같은 프로젝트는 project_key로, 같은 프로젝트 안의 같은 세션명도 (provider, session_id)로 구분한다. 조회 시 이름을 연결하고 집계 기준은 기존 ID를 유지한다. 이름을 찾지 못하면 ‘이름 없는 세션’으로 표시한다. 원본 제목을 사용하며 첫 prompt를 제목으로 복사하지 않는다.
 
-Claude는 main JSONL의 custom-title을 ai-title보다 우선한다. Codex는 읽기 전용 state_N.sqlite의 threads.name/title을 session_index.jsonl의 thread_name보다 우선하고 session_meta 제목을 보완 경로로 사용한다. metadata는 디스크 TEMP에 묶음 처리하며 통계 화면 진입 시 제목만 바뀐 세션도 갱신한다. metadata를 읽을 수 없으면 기존 제목을 유지한다. 제목·프로젝트명 검색은 부분 문자열로 처리하고, 행의 이름을 선택하면 ID와 제공자로 정확히 조회한다. 세션별 행에는 프로젝트명과 세션 시작 시각을 함께 표시하고 tooltip으로 전체 경로·ID를 확인한다.
+Claude는 main JSONL의 custom-title을 ai-title보다 우선한다. Codex는 읽기 전용 state_N.sqlite의 threads.name/title을 session_index.jsonl의 thread_name보다 우선하고 session_meta 제목을 보완 경로로 사용한다. metadata는 디스크 TEMP에 묶음 처리하며 통계 화면 진입 시 제목만 바뀐 세션도 갱신한다. metadata를 읽을 수 없으면 기존 제목을 유지한다. 프로젝트명·세션명 필터는 클릭해 이름 목록을 열고 스크롤해 선택하는 방식으로 제공하며, 선택 즉시 표·도표를 ID와 제공자로 정확히 조회한다. 목록이나 세션별 행에는 프로젝트명과 세션 시작 시각을 함께 표시하고 tooltip으로 전체 경로·ID를 확인한다.
 
 schema v1·v2는 기존 이름을 projects로 옮기고 요청 ID·통계·manifest 참조를 보존한 채 전환한다. 세션 제목은 다음 scan에서 채운다. 이름 metadata와 summary 교체는 같은 transaction에 반영하며, 참조하는 summary가 없어진 이름 행은 정리한다. `root_turn_id`와 `turn_index`는 식별자와 표시 순번이므로 분리한다. 논리 session에 속하는 모든 파일을 읽어야 재집계할 수 있으므로 summary를 파일 하나의 자식 row로 두거나 삭제 cascade하지 않는다.
 
@@ -671,7 +671,9 @@ model별·agent별 분석과 비용 계산은 현재 기능 범위에 포함하�
 
 ### 8.2 일·월·프로젝트·session별 총량과 turn 평균
 
-수치는 `turn_summary`의 filter와 `GROUP BY`로 조회하고 이름은 projects·sessions에서 연결한다. 이름 검색 조건은 같은 ID의 metadata에 적용하므로 중복 제목이 합쳐지지 않는다. 일·월은 configured timezone의 시작·끝 경계를 UTC millisecond로 변환한 뒤 `started_at_ms`에 적용한다. 한 요청의 token과 duration은 시작 시점의 일·월에 귀속하고 날짜 경계에서 나누지 않는다. timezone 변경은 조회 경계를 바꾸며 원본 재파싱은 요구하지 않는다.
+수치는 `turn_summary`의 filter와 `GROUP BY`로 조회하고 이름은 projects·sessions에서 연결한다. 이름 목록에서 선택한 project_key·session_id·provider로 조회하므로 중복 제목이 합쳐지지 않는다. 일·월은 configured timezone의 시작·끝 경계를 UTC millisecond로 변환한 뒤 `started_at_ms`에 적용한다. 한 요청의 token과 duration은 시작 시점의 일·월에 귀속하고 날짜 경계에서 나누지 않는다. timezone 변경은 조회 경계를 바꾸며 원본 재파싱은 요구하지 않는다.
+
+이름 목록은 통계가 저장된 전체 프로젝트·세션을 대상으로 하고 날짜·표 페이지·선택된 세션 조건을 적용하지 않는다. 활성 제공자와 제공자 필터를 따르며 세션 목록에는 선택된 프로젝트 조건만 추가한다. 프로젝트는 project_key당 한 항목, 세션은 provider·project_key·session_id당 한 항목으로 이름순 정렬한다. 목록을 열 때 worker가 100개씩 조회하고 아래로 스크롤하면 다음 묶음을 표시한다. Extension Host는 한 묶음만 전달하고 Webview는 열린 목록의 이름 metadata만 누적하며 닫으면 해제한다. 선택은 표의 첫 페이지부터 적용하고 ‘전체 프로젝트’·‘전체 세션’으로 해제한다. 프로젝트를 바꾸면 기존 세션 선택을 해제하며 세션을 고르면 프로젝트·제공자도 맞춘다. 목록 조회와 선택은 원본 재스캔을 시작하지 않는다.
 
 ```sql
 SELECT

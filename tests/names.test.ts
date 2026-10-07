@@ -124,3 +124,33 @@ test('names are stored once, filters escape wildcard characters, and failed repl
   assert.equal(db.connection.prepare('SELECT count(*) n FROM projects').get()?.n,0);
   assert.deepEqual(db.connection.prepare('PRAGMA foreign_key_check').all(),[]);
 });
+
+test('name choices page through every stored identity with stable ordering and provider/project scoping', t => {
+  const db = new SummaryDatabase(':memory:');t.after(()=>db.close());
+  const summaries: TurnSummaryInput[] = Array.from({length:125},(_,index)=>({
+    provider:'codex',project_key:`/project-${index}`,project_name:'같은 프로젝트명',
+    session_id:`session-${index}`,session_name:index===124 ? null : '같은 세션명',root_turn_id:'request',turn_index:1,
+    started_at_ms:index,duration_quality:'missing',input_tokens:10,output_tokens:2,total_tokens:12,status:'in_progress',
+  }));
+  summaries.push({...summaries[0],provider:'claude'});
+  db.replaceSessions({sessions:summaries.map(row=>({provider:row.provider,session_id:row.session_id})),files:[],summaries});
+  const projects = db.queryNames({kind:'project'});
+  assert.equal(projects.total,125);assert.equal(projects.rows.length,100);
+  const projectTail = db.queryNames({kind:'project',offset:100});
+  assert.equal(projectTail.rows.length,25);
+  assert.equal(new Set([...projects.rows,...projectTail.rows].map(row=>row.project_key)).size,125);
+  assert.equal(db.queryNames({kind:'project',provider:'claude'}).total,1);
+  assert.equal(db.queryNames({kind:'project',providers:['claude'],provider:'codex'}).total,0);
+  assert.equal(db.queryNames({kind:'session',providers:[]}).total,0);
+  const first = db.queryNames({kind:'session'});
+  const last = db.queryNames({kind:'session',offset:100});
+  assert.equal(first.total,126);assert.equal(first.rows.length,100);assert.equal(last.rows.length,26);
+  assert.equal(new Set([...first.rows,...last.rows].map(row=>`${row.provider}/${row.project_key}/${row.session_id}`)).size,126);
+  const sameId = db.queryNames({kind:'session',projectKey:'/project-0'});
+  assert.equal(sameId.total,2);assert.deepEqual(sameId.rows.map(row=>row.provider),['claude','codex']);
+  const unnamed = db.queryNames({kind:'session',projectKey:'/project-124'}).rows[0];
+  assert.equal(unnamed.session_name,null);assert.equal(unnamed.session_started_at_ms,124);
+  assert.equal(db.queryNames({kind:'session',offset:1000}).rows.length,0);
+  assert.throws(()=>db.queryNames({kind:'project',limit:1001}),RangeError);
+  assert.throws(()=>db.queryNames({kind:'session',offset:-1}),RangeError);
+});
