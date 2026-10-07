@@ -6,3 +6,8 @@ dist/
 coverage/
 tests/results/
 tests/.cache/
+
+# Legacy test output and caches retained in existing checkouts.
+test-results/
+benchmark-results/
+.vscode-test/
