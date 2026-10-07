@@ -1,4 +1,14 @@
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 7;
+
+export const SCHEMA_CAPABILITY_SQL = `
+CREATE TABLE IF NOT EXISTS turn_capability_usage (
+  turn_id INTEGER NOT NULL REFERENCES turn_summary(id) ON DELETE CASCADE,
+  category TEXT NOT NULL CHECK(category IN ('skill','subagent','plugin','model')),
+  name TEXT NOT NULL,
+  usage_count INTEGER NOT NULL CHECK(usage_count > 0),
+  PRIMARY KEY(turn_id, category, name)
+) WITHOUT ROWID;
+`;
 
 export const SCHEMA_MODEL_SQL = `
 CREATE TABLE IF NOT EXISTS turn_model_usage (
@@ -87,6 +97,7 @@ CREATE TABLE IF NOT EXISTS manifest (
   dev TEXT,
   inode TEXT,
   parser_version INTEGER NOT NULL DEFAULT 0,
+  capabilities_collected INTEGER NOT NULL DEFAULT 0 CHECK(capabilities_collected IN (0,1)),
   last_seen_scan_id TEXT,
   processing_status TEXT NOT NULL DEFAULT 'processing'
     CHECK(processing_status IN ('processing','done','error','interrupted')),
@@ -102,6 +113,7 @@ ${NAMES_SQL}
 ${TURN_SUMMARY_SQL}
 ${TURN_SUMMARY_INDEX_SQL}
 ${SCHEMA_MODEL_SQL}
+${SCHEMA_CAPABILITY_SQL}
 `;
 
 /** Both v1 and v2 stored project names on every turn. Preserve ids, statistics and diagnostics. */

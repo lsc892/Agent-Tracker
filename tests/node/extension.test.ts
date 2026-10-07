@@ -68,6 +68,7 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
   const billingChanges: {provider:string;sessionId:string;mode:string}[] = [];
   let lastDiagnosticsPage: { offset?: number; providers?: string[] } | undefined;
   const policies: string[] = [];
+  const collectionSwitches: boolean[] = [];
   const pollingIntervals: number[] = [];
   const uri = (fsPath: string): { fsPath: string; toString(): string } => ({ fsPath, toString: () => fsPath });
   const disposable: Disposable = { dispose() {} };
@@ -142,6 +143,7 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     async refresh(provider: string, force: boolean) { refreshes.push({ provider, force }); }
   }
   class FakeSummary {
+    async setCapabilityCollectionEnabled(enabled:boolean) {collectionSwitches.push(enabled);await this.cancelRefresh();}
     async initialize() { initializations++; }
     async refresh(options: {roots: typeof lastRoots}) {
       scans++; lastRoots = options.roots;
@@ -164,6 +166,10 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
   };
   let extension: typeof import('../../src/extension') | undefined;
   const tick = (): Promise<void> => new Promise(resolve => setImmediate(resolve));
+  const update = async (key: string, value: unknown): Promise<void> => {
+    await vscode.workspace.getConfiguration().update(key, value, 1);
+    await tick();
+  };
   const click = async (command: Command | undefined): Promise<void> => {
     assert.ok(command);
     await vscode.commands.executeCommand(typeof command === 'string' ? command : command.command,
@@ -260,13 +266,17 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     assert.ok(!dashboard.messages.some(message => message.type === 'diagnostics'));
     dashboard.receive({ type: 'ready' }); await tick();
     assert.equal(scans, 1, 'duplicate ready messages do not start another summary');
-    dashboard.receive({type:'queryUsage',query:{groupBy:'all',provider:'claude',sessionId:'chosen',includeCosts:true,cumulativeBy:'model'}});await tick();
-    assert.equal(lastQuery.includeCosts,true);assert.equal(lastQuery.cumulativeBy,'model');
+    dashboard.receive({type:'queryUsage',query:{groupBy:'all',provider:'claude',sessionId:'chosen',includeCosts:true,chartBy:'model'}});await tick();
+    assert.equal(lastQuery.includeCosts,false,'webview cannot override the extension cost setting');assert.equal(lastQuery.chartBy,'model');
+    await update('usage.showApiCosts',true);await tick();
+    assert.equal(lastQuery.includeCosts,true);assert.ok(dashboard.messages.some(message=>message.type==='state' && message.showApiCosts===true));
+    await update('usage.showApiCosts',false);await tick();
+    assert.equal(lastQuery.includeCosts,false);
     dashboard.receive({type:'setSessionBilling',provider:'claude',sessionId:'other',mode:'api'});await tick();
     assert.equal(billingChanges.length,0,'billing changes must match the selected session');
     dashboard.receive({type:'setSessionBilling',provider:'claude',sessionId:'chosen',mode:'subscription'});await tick();
     assert.deepEqual(billingChanges,[{provider:'claude',sessionId:'chosen',mode:'subscription'}]);
-    assert.equal(scans,1,'billing and cumulative changes query the DB without transcript scans');
+    assert.equal(scans,1,'billing, chart grouping and cost settings query the DB without transcript scans');
     dashboard.receive({ type: 'openDiagnostics' }); await tick();
     assert.equal(panels.length, 2, 'the footer link creates a separate diagnostic webview');
     const diagnosticPanel = panels[1];
@@ -316,10 +326,6 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     assert.equal(scans, 2);
     assert.deepEqual(errors, []);
 
-    const update = async (key: string, value: unknown): Promise<void> => {
-      await vscode.workspace.getConfiguration().update(key, value, 1);
-      await tick();
-    };
     await update('quota.pollingIntervalSeconds', 120);
     assert.deepEqual(pollingIntervals, [900, 120]);
     assert.equal(quotaDisposals, 0, 'common interval changes apply without recreating providers');
@@ -389,6 +395,13 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     assert.ok(reopened.messages.some(message => message.type === 'usage'));
     assert.equal(reopened.messages.filter(message => message.type === 'busy').at(-1)?.busy, false);
     deferScan = false;
+    const beforeSkillSwitch=scans,quotaBeforeSkillSwitch=refreshes.length;
+    await update('usage.skillsEnabled',false);
+    assert.equal(scans,beforeSkillSwitch,'turning Skill off does not rescan');
+    assert.equal(reopened.messages.filter(message=>message.type==='state').at(-1)?.capabilitiesEnabled,false);
+    await update('usage.skillsEnabled',true);await tick();
+    assert.equal(scans,beforeSkillSwitch+1,'turning Skill on backfills while the statistics page is open');
+    assert.deepEqual(collectionSwitches,[false,true]);assert.equal(refreshes.length,quotaBeforeSkillSwitch);
     assert.deepEqual(errors, []);
 
     await extension.deactivate();
@@ -403,7 +416,7 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     await extension.activate({ globalStorageUri: uri(storage), extensionUri: uri(process.cwd()), subscriptions } as unknown as import('vscode').ExtensionContext);
     assert.equal(initializations, 1, 'disabled statistics do not start the worker on activation');
     await click('agentTracker.openUsage');
-    assert.equal(scans, scansBeforeReopen);
+    assert.equal(scans, beforeSkillSwitch+1);
   } finally {
     await extension?.deactivate();
     for (const subscription of subscriptions) subscription.dispose();

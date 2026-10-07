@@ -11,6 +11,19 @@ test('quota polling uses one common interval setting', () => {
   assert.equal(readConfiguration(settings({ 'quota.pollingIntervalSeconds': 120 })).pollingSeconds, 120);
 });
 
+test('API cost display is controlled by extension settings and defaults off',()=>{
+  assert.equal(readConfiguration(settings({})).showApiCosts,false);
+  const enabled=readConfiguration(settings({'usage.showApiCosts':true}));
+  assert.equal(enabled.showApiCosts,true);assert.equal(enabled.usageEnabled,true);assert.equal(enabled.skillsEnabled,true);
+});
+
+test('Skill statistics include AI calls by default and can be disabled independently of tokens and quota',()=>{
+  const defaults=readConfiguration(settings({}));assert.equal(defaults.skillsEnabled,true);
+  const disabled=readConfiguration(settings({'usage.skillsEnabled':false}));
+  assert.equal(disabled.skillsEnabled,false);assert.equal(disabled.usageEnabled,true);
+  assert.equal(disabled.claude.enabled,true);assert.equal(disabled.codex.enabled,true);
+});
+
 test('tracking switches exclude source roots independently of status visibility', () => {
   const defaults = readConfiguration(settings({}));
   assert.equal(defaults.usageEnabled, true);

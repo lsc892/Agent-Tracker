@@ -12,6 +12,8 @@ export interface TrackerConfiguration {
   refreshPolicy: 'automatic' | 'manual';
   pollingSeconds: number;
   usageEnabled: boolean;
+  skillsEnabled: boolean;
+  showApiCosts: boolean;
   claude: { enabled: boolean; dataHome: string };
   codex: { enabled: boolean; dataHome: string; executable: string; showStatusBar: boolean };
   roots: SourceRoot[];
@@ -52,6 +54,8 @@ export function readConfiguration(settings: SettingsReader): TrackerConfiguratio
     refreshPolicy: settings.get('quota.refreshPolicy', 'automatic'),
     pollingSeconds: settings.get('quota.pollingIntervalSeconds', 900),
     usageEnabled: settings.get('usage.enabled', true),
+    skillsEnabled: settings.get('usage.skillsEnabled', true),
+    showApiCosts: settings.get('usage.showApiCosts', false),
     claude: { enabled: enabled.claude, dataHome: claudeHome },
     codex: { enabled: enabled.codex, dataHome: codexHome, executable: settings.get('codex.executable', 'codex'), showStatusBar: settings.get('codex.showStatusBar', true) },
     roots: [

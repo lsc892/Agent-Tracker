@@ -43,12 +43,20 @@ export function parseDashboardMessage(input: unknown): DashboardMessage | null {
       const groupBy = raw.groupBy;
       if (!['day', 'month', 'project', 'session', 'all', 'turn'].includes(String(groupBy))) return null;
       const query: UsageQuery = { groupBy: groupBy as UsageQuery['groupBy'], limit: 100, offset: boundedOffset(raw.offset) };
+      if (raw.section !== undefined && raw.section !== 'tokens' && raw.section !== 'skills') return null;
+      if (raw.section) query.section = raw.section;
+      if (raw.capabilityOffsets && typeof raw.capabilityOffsets === 'object') {
+        const offsets=raw.capabilityOffsets as Record<string,unknown>;
+        query.capabilityOffsets=Object.fromEntries((['skill','subagent','plugin','model'] as const)
+          .map(category=>[category,boundedOffset(offsets[category])]));
+      }
       if (typeof raw.includeCosts === 'boolean') query.includeCosts = raw.includeCosts;
       if (raw.cumulativeBy === 'provider' || raw.cumulativeBy === 'model') {
         query.cumulativeBy = raw.cumulativeBy;
         query.cumulativeOffset = boundedOffset(raw.cumulativeOffset);
       }
       if (['tokens', 'requests', 'averageTokens', 'averageDuration'].includes(String(raw.chartMetric))) query.chartMetric = raw.chartMetric as UsageQuery['chartMetric'];
+      if (raw.chartBy === 'provider' || raw.chartBy === 'model') query.chartBy = raw.chartBy;
       if (raw.provider === 'claude' || raw.provider === 'codex') query.provider = raw.provider;
       for (const key of ['projectKey', 'sessionId'] as const) if (typeof raw[key] === 'string' && raw[key].length <= 2048 && raw[key]) query[key] = raw[key];
       for (const key of ['fromMs', 'toMs'] as const) if (typeof raw[key] === 'number' && Number.isSafeInteger(raw[key]) && Math.abs(raw[key]) <= 8.64e15) query[key] = raw[key];

@@ -2,6 +2,7 @@ import { basename, dirname, sep } from 'node:path';
 import { SummaryError } from '../jsonl';
 import type { FileContext, ParsedIdentity, ParseSink } from '../types';
 import { billingMode, claudeTokens, displayName, number, object, project, string, timestamp } from './common';
+import { toolCapabilities } from './capabilities';
 
 export class ClaudeParserAdapter {
   private currentRoot: string | undefined;
@@ -51,15 +52,32 @@ export class ClaudeParserAdapter {
     const rootId = this.currentRoot;
     if (external || rootId !== previousRoot) { this.apiFailed = false; this.stopBlocked = false; }
     const time = timestamp(row.timestamp);
+    if (this.context.collectCapabilities !== false && rootId && type === 'assistant' && Array.isArray(content)) {
+      for (const item of content) {
+        const call=object(item);
+        const eventId=string(call.id);
+        const name=string(call.name);
+        if (call.type !== 'tool_use' || !eventId || !name) continue;
+        for (const use of toolCapabilities(name,call.input)) this.sink.event({kind:'capability',rootId,
+          threadId:this.identityValue.threadId,eventId:`${eventId}:${use.index}`,category:use.category,name:use.name,offset});
+      }
+    }
     if (external && rootId) this.sink.event({ kind: 'turn', rootId, isMain: this.identityValue.isMain,
       startedAt: time, flags: explicitPrompt ? [] : ['missing-request-id'], offset });
     if (type === 'assistant' && Object.keys(object(message.usage)).length > 0) {
-      if (!rootId) throw new SummaryError('missing-root-turn', offset);
-      const responseId = string(message.id);
-      if (!responseId) throw new SummaryError('missing-response-id', offset);
-      this.sink.event({ kind: 'usage', rootId, responseId, requestId: string(row.requestId) ?? null,
-        threadId: this.identityValue.threadId, turnId: rootId, tokens: claudeTokens(object(message.usage)),
-        model: displayName(message.model), billingMode: billingMode(message.billing_mode ?? row.billing_mode ?? row.auth_mode ?? this.billing), offset });
+      const tokens = claudeTokens(object(message.usage));
+      const model = displayName(message.model);
+      const synthetic = model === '<synthetic>';
+      // Local error notices carry a zero usage vector, rather than an API response.
+      // Retain any reported tokens, but never treat the placeholder as a model.
+      if ((!synthetic && row.isApiErrorMessage !== true) || tokens.input + tokens.output > 0) {
+        if (!rootId) throw new SummaryError('missing-root-turn', offset);
+        const responseId = string(message.id);
+        if (!responseId) throw new SummaryError('missing-response-id', offset);
+        this.sink.event({ kind: 'usage', rootId, responseId, requestId: string(row.requestId) ?? null,
+          threadId: this.identityValue.threadId, turnId: rootId, tokens,
+          model: synthetic ? undefined : model, billingMode: billingMode(message.billing_mode ?? row.billing_mode ?? row.auth_mode ?? this.billing), offset });
+      }
     }
     if (type === 'assistant' && rootId) {
       this.apiFailed = row.isApiErrorMessage === true;

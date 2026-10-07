@@ -5,11 +5,12 @@ import { join, resolve, sep } from 'node:path';
 import { test, type TestContext } from 'node:test';
 import { DatabaseSync } from 'node:sqlite';
 import { SummaryDatabase, periodBounds, type FileMetadata, type TurnSummaryInput } from '../../src/summary/db';
-import { SCHEMA_SQL, SCHEMA_VERSION, SCHEMA_MODEL_SQL } from '../../src/summary/db/schema';
+import { SCHEMA_SQL, SCHEMA_VERSION, SCHEMA_MODEL_SQL, SCHEMA_CAPABILITY_SQL } from '../../src/summary/db/schema';
 
 // The pre-normalization schema stored the project label on every request.
 const legacySchema = SCHEMA_SQL
   .replace(SCHEMA_MODEL_SQL, '')
+  .replace(SCHEMA_CAPABILITY_SQL, '')
   .replace(/CREATE TABLE IF NOT EXISTS projects[\s\S]*?WITHOUT ROWID;\s*CREATE TABLE IF NOT EXISTS sessions[\s\S]*?WITHOUT ROWID;/, '')
   .replace('project_key TEXT NOT NULL REFERENCES projects(project_key),', 'project_key TEXT NOT NULL,\n  project_name TEXT NOT NULL,')
   .replace(/,\s*FOREIGN KEY\(provider, session_id\) REFERENCES sessions\(provider, session_id\)/, '')
@@ -28,7 +29,7 @@ function metadata(index = 1, session = 'session-a', sourceRoot = '/synthetic/cla
   };
 }
 
-function turn(root = 'turn-a', override: Partial<Omit<TurnSummaryInput, 'model_usage' | 'billing'>> = {}): Omit<TurnSummaryInput, 'model_usage' | 'billing'> {
+function turn(root = 'turn-a', override: Partial<Omit<TurnSummaryInput, 'model_usage' | 'capability_usage' | 'billing'>> = {}): Omit<TurnSummaryInput, 'model_usage' | 'capability_usage' | 'billing'> {
   return {
     provider: 'claude', project_key: '/synthetic/project-a', project_name: 'Project', session_id: 'session-a',
     root_turn_id: root, turn_index: 1, started_at_ms: Date.parse('2026-10-03T00:00:00Z'),
@@ -96,7 +97,7 @@ test('schema normalizes names and uses bounded disk staging cache', t => {
   const second = new SummaryDatabase(dbPath);
   t.after(() => second.close());
   assert.deepEqual(second.connection.prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name").all()
-    .map(row => row.name), ['manifest', 'projects', 'session_billing', 'sessions', 'turn_costs', 'turn_model_usage', 'turn_summary']);
+    .map(row => row.name), ['manifest', 'projects', 'session_billing', 'sessions', 'turn_capability_usage', 'turn_costs', 'turn_model_usage', 'turn_summary']);
   assert.equal(second.queryUsage()[0].total_tokens, 110);
   second.close();
 });
@@ -135,7 +136,7 @@ for (const version of [1,2]) test(`v${version} migration preserves summaries, ma
   })));
   assert.equal(db.connection.prepare('PRAGMA user_version').get()?.user_version,SCHEMA_VERSION);
   assert.deepEqual(db.connection.prepare('PRAGMA foreign_key_check').all(),[]);
-  assert.deepEqual(db.connection.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all().map(row=>row.name),['manifest','projects','session_billing','sessions','turn_costs','turn_model_usage','turn_summary']);
+  assert.deepEqual(db.connection.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all().map(row=>row.name),['manifest','projects','session_billing','sessions','turn_capability_usage','turn_costs','turn_model_usage','turn_summary']);
   assert.equal(db.connection.prepare("SELECT count(*) count FROM sqlite_master WHERE type='index' AND name LIKE 'idx_summary_%'").get()?.count,3);
   db.connection.exec("UPDATE turn_summary SET status='failed'");
   assert.equal(db.queryUsage()[0].total_tokens,110);assert.equal(db.queryUsage()[0].completed_turns,0);

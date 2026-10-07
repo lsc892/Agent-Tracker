@@ -24,6 +24,23 @@ test('Claude tool results retain the current external prompt without inventing a
   assert.equal(events.filter(event=>event.kind==='turn' && event.startedAt !== undefined).length,1);
   assert.equal(events.find(event=>event.kind==='usage')!.rootId,'p');assert.equal(identity!.sessionId,'s');
 });
+
+test('Claude ignores zero-token local notices but retains unexpected positive synthetic usage as an unknown model', () => {
+  const events: ParseEvent[] = [];
+  const parser = new ClaudeParserAdapter({provider:'claude',path:'/projects/session.jsonl',sourceRoot:'/projects',fileId:1},
+    {identity:()=>undefined,event:event=>events.push(event)});
+  parser.row({type:'assistant',message:{model:'<synthetic>',usage:{input_tokens:0,output_tokens:0}}},0);
+  parser.row({type:'user',promptId:'r'},1);
+  parser.row({type:'assistant',isApiErrorMessage:true,message:{usage:{input_tokens:0,output_tokens:0}}},2);
+  parser.row({type:'assistant',message:{id:'spent',model:'<synthetic>',usage:{input_tokens:3,output_tokens:2}}},3);
+  parser.row({type:'assistant',message:{id:'zero-response',model:'claude-sonnet-4-6',usage:{input_tokens:0,output_tokens:0}}},4);
+  parser.finish();
+  const usage = events.filter((event): event is UsageEvent => event.kind === 'usage');
+  assert.equal(usage.length,2);
+  assert.equal(usage[0].model,undefined);assert.equal(usage[0].tokens.input+usage[0].tokens.output,5);
+  assert.equal(usage[1].model,'claude-sonnet-4-6','a real named response is retained even with zero tokens');
+  assert.ok(events.some(event=>event.kind==='turn' && event.status==='failed'));
+});
 test('current Codex uses response usage and treats cumulative snapshots as validation only',() => {
   const events = codex([{type:'event_msg',payload:{type:'task_started',turn_id:'t',root_turn_id:'t'},timestamp:'2026-10-01T00:00:00Z'},
     {type:'token_usage_record',payload:{session_id:'thread-one',thread_id:'thread-one',turn_id:'t',root_turn_id:'t',response_id:'r',usage:{input_tokens:100,output_tokens:10},turn_token_usage:{input_tokens:100,output_tokens:10},thread_token_usage:{input_tokens:900,output_tokens:90}}},

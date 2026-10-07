@@ -15,9 +15,15 @@ export class SummaryClient {
   private disposed = false;
   private closing: Promise<void> | undefined;
   private cancellation: Int32Array | undefined;
-  constructor(private readonly options: SummaryOptions) {}
+  constructor(private readonly options: SummaryOptions) { this.options={...options}; }
 
   initialize(): Promise<void> { return this.request('initialize'); }
+  async setCapabilityCollectionEnabled(enabled: boolean): Promise<void> {
+    this.options.collectCapabilities=enabled;
+    await this.cancelRefresh();
+    await this.clearPending;
+    if (this.worker) await this.request('configureCapabilities',{enabled});
+  }
   refresh(options: { roots?: SourceRoot[]; timezone?: string } = {}): Promise<RefreshResult> {
     if (this.clearPending) return this.clearPending.then(() => this.refresh(options));
     if (!this.refreshPending) {

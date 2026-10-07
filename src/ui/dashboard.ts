@@ -59,13 +59,20 @@ export class Dashboard implements vscode.Disposable {
 
   update(): void {
     const settings = this.dependencies.settings();
-    const message = { type: 'state', timezone: settings.timezone, timezoneWarning: settings.timezoneWarning, providers: this.providers() };
+    const message = { type: 'state', timezone: settings.timezone, timezoneWarning: settings.timezoneWarning, providers: this.providers(),capabilitiesEnabled:settings.skillsEnabled,showApiCosts:settings.showApiCosts };
     this.post(message);
     this.postDiagnostics(message);
   }
 
-  configurationChanged(): void {
+  configurationChanged(rebuildCapabilities=false): void {
+    this.queryVersion++;
     this.update();
+    if (rebuildCapabilities && this.ready) {
+      void (this.refreshPromise ?? Promise.resolve()).then(()=>{
+        if (this.ready && this.dependencies.settings().usageEnabled && this.dependencies.settings().skillsEnabled) return this.refreshUsage();
+      }).catch(error=>this.error(error));
+      return;
+    }
     if (this.ready || this.diagnosticsReady) void this.loadDashboard().catch(error => this.error(error));
   }
 
@@ -172,8 +179,9 @@ export class Dashboard implements vscode.Disposable {
   private async loadUsage(): Promise<void> {
     if (!this.ready || !this.dependencies.settings().usageEnabled) return;
     const version = ++this.queryVersion;
-    const timezone = this.dependencies.settings().timezone;
-    const query = { ...this.query, timezone, providers: this.providers() };
+    const settings = this.dependencies.settings();
+    const timezone = settings.timezone;
+    const query = { ...this.query, timezone, providers: this.providers(), includeCosts: settings.showApiCosts };
     if (this.fromDay) query.fromMs = periodBounds(this.fromDay, timezone).fromMs;
     if (this.toDay) query.toMs = periodBounds(this.toDay, timezone).toMs;
     if (query.fromMs !== undefined && query.toMs !== undefined && query.fromMs >= query.toMs) throw new Error('조회 시작일은 종료일보다 늦을 수 없습니다.');

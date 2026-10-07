@@ -2,6 +2,10 @@ export type Provider = 'claude' | 'codex';
 export type ProcessingStatus = 'processing' | 'done' | 'error' | 'interrupted';
 export type DurationQuality = 'exact' | 'derived' | 'approximate' | 'missing';
 export type BillingMode = 'subscription' | 'api' | 'unknown';
+export type CapabilityCategory = 'skill' | 'subagent' | 'plugin' | 'model';
+export interface CapabilityUsageInput { category: CapabilityCategory; name: string; usage_count: number }
+export interface CapabilityRow extends CapabilityUsageInput { provider: Provider; percentage: number }
+export interface CapabilityPage { rows: CapabilityRow[]; chartRows: CapabilityRow[]; total: number; totalUses: number }
 export interface CostFields {
   cost_usd?: number | null;
   unknown_costs?: number;
@@ -18,6 +22,8 @@ export interface FileMetadata {
   dev: string | null;
   inode: string | null;
   parser_version: number;
+  /** 0 when Skill counts were skipped; re-enable rebuilds these sources. */
+  capabilities_collected?: 0 | 1;
 }
 
 export interface ManifestRow extends FileMetadata {
@@ -56,6 +62,7 @@ export interface TurnSummaryInput {
   updated_at?: string;
   /** Ingestion only; persisted separately after response deduplication. */
   model_usage?: Iterable<ModelUsageInput>;
+  capability_usage?: Iterable<CapabilityUsageInput>;
   billing?: BillingMode;
 }
 
@@ -67,13 +74,18 @@ export interface ModelUsageInput {
   cache_read_input_tokens: number | null;
 }
 
-export interface CumulativeRow extends ModelUsageInput, CostFields {
+export interface CumulativeRow extends Omit<ModelUsageInput, 'model'>, CostFields {
+  /** null identifies a request without model metadata or recorded token usage. */
+  model: string | null;
   provider: Provider;
   total_tokens: number;
 }
 
-export interface TurnSummaryRow extends Required<Omit<TurnSummaryInput, 'model_usage' | 'billing'>>, CostFields {
+export interface TurnSummaryRow extends Required<Omit<TurnSummaryInput, 'model_usage' | 'capability_usage' | 'billing'>>, CostFields {
   id: number;
+  /** null means no recorded usage; an empty string means usage with an unknown model. */
+  model?: string | null;
+  other_models?: number;
 }
 
 export interface SessionRef {
@@ -82,6 +94,7 @@ export interface SessionRef {
 }
 
 export interface SessionReplacement {
+  preserveCapabilities?: boolean;
   sessions: Iterable<SessionRef>;
   summaries: Iterable<TurnSummaryInput>;
   files: Iterable<FileMetadata & { id: number }>;
@@ -115,6 +128,7 @@ export interface OffsetPage {
 export type UsageGrouping = 'total' | 'project' | 'session' | 'day' | 'month';
 export type ChartMetric = 'tokens' | 'requests' | 'averageTokens' | 'averageDuration';
 export interface UsageChart {
+  by?: 'provider' | 'model';
   rows: (UsageRow & { period_count?: number })[] | TurnSummaryRow[];
   mode: 'calendar' | 'ranking' | 'turn' | 'total';
   metric: ChartMetric;
@@ -122,6 +136,9 @@ export interface UsageChart {
 }
 
 export interface UsageRow extends CostFields {
+  /** null means no recorded usage; an empty string means usage with an unknown model. */
+  model?: string | null;
+  other_models?: number;
   provider: Provider;
   project_key: string | null;
   project_name: string | null;

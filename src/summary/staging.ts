@@ -1,5 +1,5 @@
 import type { DatabaseSync, StatementSync } from 'node:sqlite';
-import type { FileMetadata, TurnSummaryInput, ModelUsageInput } from './db/types';
+import type { FileMetadata, TurnSummaryInput, ModelUsageInput, CapabilityUsageInput } from './db/types';
 import type { ParsedIdentity, ParseEvent, Provider } from './types';
 
 export interface StagedFile extends FileMetadata {
@@ -23,12 +23,12 @@ export class SummaryStaging {
   private readonly insertEvent: StatementSync;
   private readonly insertFlag: StatementSync;
   private readonly insertAffected: StatementSync;
-  constructor(readonly connection: DatabaseSync) {
+  constructor(readonly connection: DatabaseSync, private readonly collectCapabilities = true) {
     connection.exec(`
       CREATE TEMP TABLE scan_files (
         id INTEGER PRIMARY KEY, provider TEXT NOT NULL, source_root TEXT NOT NULL, path TEXT NOT NULL,
         session_id TEXT, old_session TEXT, size_bytes INTEGER NOT NULL, mtime_ms REAL NOT NULL,
-        dev TEXT, inode TEXT, parser_version INTEGER NOT NULL, changed INTEGER NOT NULL,
+        dev TEXT, inode TEXT, parser_version INTEGER NOT NULL, capabilities_collected INTEGER NOT NULL, changed INTEGER NOT NULL,
         parsed INTEGER NOT NULL DEFAULT 0, removed INTEGER NOT NULL DEFAULT 0, failed INTEGER NOT NULL DEFAULT 0,
         settled INTEGER NOT NULL DEFAULT 0,
         project_key TEXT, project_name TEXT, session_name TEXT, thread_id TEXT, parent_thread_id TEXT, forked_from_id TEXT, is_main INTEGER DEFAULT 1
@@ -46,7 +46,8 @@ export class SummaryStaging {
         response_id TEXT, request_id TEXT, thread_id TEXT, turn_id TEXT, model TEXT, billing_mode TEXT,
         input INTEGER,output INTEGER,cache_read INTEGER,cache_write INTEGER,reasoning INTEGER,
         is_main INTEGER,started INTEGER,completed_at INTEGER,last_assistant INTEGER,duration INTEGER,
-        duration_quality TEXT,completed INTEGER,status TEXT,status_at INTEGER,flags TEXT,byte_offset INTEGER NOT NULL,schema_kind TEXT
+        duration_quality TEXT,completed INTEGER,status TEXT,status_at INTEGER,flags TEXT,byte_offset INTEGER NOT NULL,schema_kind TEXT,
+        category TEXT,name TEXT,event_key TEXT
       );
       CREATE INDEX temp.events_file ON events(file_id,id);
       CREATE INDEX temp.events_file_root ON events(file_id,root_id,kind);
@@ -56,17 +57,17 @@ export class SummaryStaging {
         PRIMARY KEY(file_id,root_id,flag));
     `);
     this.insertEvent = connection.prepare(`INSERT INTO events(file_id,kind,root_id,response_id,request_id,thread_id,turn_id,
-      input,output,cache_read,cache_write,reasoning,is_main,started,completed_at,last_assistant,duration,duration_quality,completed,status,status_at,flags,byte_offset,schema_kind,model,billing_mode)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
+      input,output,cache_read,cache_write,reasoning,is_main,started,completed_at,last_assistant,duration,duration_quality,completed,status,status_at,flags,byte_offset,schema_kind,model,billing_mode,category,name,event_key)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
     this.insertFlag = connection.prepare('INSERT OR IGNORE INTO flags VALUES (?,?,?)');
     this.insertAffected = connection.prepare('INSERT OR IGNORE INTO affected VALUES (?,?)');
   }
 
   addFile(file: FileMetadata & { id: number }, oldSession: string | null, changed: boolean, removed = false): void {
     this.connection.prepare(`INSERT OR REPLACE INTO scan_files
-      (id,provider,source_root,path,session_id,old_session,size_bytes,mtime_ms,dev,inode,parser_version,changed,removed)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(file.id,file.provider,file.source_root,file.path,file.session_id,oldSession,
-      file.size_bytes,file.mtime_ms,file.dev,file.inode,file.parser_version,Number(changed),Number(removed));
+      (id,provider,source_root,path,session_id,old_session,size_bytes,mtime_ms,dev,inode,parser_version,capabilities_collected,changed,removed)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(file.id,file.provider,file.source_root,file.path,file.session_id,oldSession,
+      file.size_bytes,file.mtime_ms,file.dev,file.inode,file.parser_version,Number(this.collectCapabilities),Number(changed),Number(removed));
     if (changed && oldSession) this.affect(file.provider,oldSession);
   }
   affect(provider: Provider, session: string): void {
@@ -88,14 +89,16 @@ export class SummaryStaging {
   event(fileId: number, event: ParseEvent): void {
     const usage = event.kind === 'usage' || event.kind === 'check' ? event : undefined;
     const turn = event.kind === 'turn' ? event : undefined;
+    const capability = event.kind === 'capability' ? event : undefined;
     this.insertEvent.run(fileId,event.kind,event.rootId,
       event.kind === 'usage' ? event.responseId : null,event.kind === 'usage' ? event.requestId : null,
-      usage?.threadId ?? null,usage?.turnId ?? null,usage?.tokens.input ?? null,usage?.tokens.output ?? null,
+      usage?.threadId ?? capability?.threadId ?? null,usage?.turnId ?? null,usage?.tokens.input ?? null,usage?.tokens.output ?? null,
       usage?.tokens.cacheRead ?? null,usage?.tokens.cacheWrite ?? null,usage?.tokens.reasoning ?? null,
       turn ? Number(turn.isMain) : null,turn?.startedAt ?? null,turn?.completedAt ?? null,turn?.lastAssistantAt ?? null,
       turn?.duration ?? null,turn?.durationQuality ?? null,turn?.completed ? 1 : 0,
       turn?.status ?? null,turn?.statusAt ?? null,null,event.offset,event.kind === 'usage' ? event.schema ?? null : null,
-      event.kind === 'usage' ? event.model ?? '' : null,event.kind === 'usage' ? event.billingMode ?? 'unknown' : null);
+      event.kind === 'usage' ? event.model ?? '' : null,event.kind === 'usage' ? event.billingMode ?? 'unknown' : null,
+      capability?.category ?? null,capability?.name ?? null,capability?.eventId ?? null);
     if ('flags' in event) for (const flag of event.flags ?? []) this.flag(fileId,event.rootId,flag);
   }
   /** A bounded synchronous TEMP-only transaction; persistent tables and file I/O stay outside. */
@@ -174,7 +177,7 @@ export class SummaryStaging {
 
   /** Only identical, ordered legacy events from a referenced parent constitute an inherited prefix. */
   excludeVerifiedPrefixes(): void {
-    this.connection.exec('CREATE TEMP TABLE IF NOT EXISTS inherited(event_id INTEGER PRIMARY KEY); DELETE FROM inherited;');
+    this.connection.exec('CREATE TEMP TABLE IF NOT EXISTS inherited(event_id INTEGER PRIMARY KEY,parent_event_id INTEGER NOT NULL); DELETE FROM inherited;');
     for (const file of this.files("provider='codex' AND parsed=1 AND removed=0 AND failed=0 AND (forked_from_id IS NOT NULL OR parent_thread_id IS NOT NULL)")) {
       const parent = this.connection.prepare(`SELECT id FROM scan_files WHERE provider='codex' AND thread_id=?
         AND parsed=1 AND removed=0 AND failed=0 AND id<>? ORDER BY id LIMIT 1`).get(file.forked_from_id ?? file.parent_thread_id,file.id) as {id:number}|undefined;
@@ -187,7 +190,7 @@ export class SummaryStaging {
           if (next.done) break;
           const same = ['root_id','turn_id','response_id','input','output','cache_read','cache_write','reasoning'].every(key => child[key] === next.value[key]);
           if (!same) break;
-          this.connection.prepare('INSERT OR IGNORE INTO inherited VALUES (?)').run(child.id);
+          this.connection.prepare('INSERT OR IGNORE INTO inherited VALUES (?,?)').run(child.id,next.value.id);
         }
       } finally { parentRows.return?.(); childRows.return?.(); }
       this.connection.prepare("DELETE FROM flags WHERE file_id=? AND flag='missing-parent'").run(file.id);
@@ -196,12 +199,20 @@ export class SummaryStaging {
       this.connection.exec('DROP TABLE inherited');
       return;
     }
-    this.connection.exec(`CREATE TEMP TABLE inherited_roots AS
+    this.connection.exec(`DELETE FROM events AS child WHERE child.kind='capability' AND EXISTS(
+        SELECT 1 FROM inherited i JOIN events inherited_child ON inherited_child.id=i.event_id
+        JOIN events inherited_parent ON inherited_parent.id=i.parent_event_id
+        JOIN events parent ON parent.file_id=inherited_parent.file_id
+        WHERE inherited_child.file_id=child.file_id AND child.id<=inherited_child.id
+          AND parent.kind='capability' AND parent.id<=inherited_parent.id
+          AND parent.root_id=child.root_id AND parent.event_key=child.event_key
+          AND parent.category=child.category AND parent.name=child.name);
+      CREATE TEMP TABLE inherited_roots AS
         SELECT DISTINCT e.file_id,e.root_id FROM events e JOIN inherited i ON i.event_id=e.id
         WHERE NOT EXISTS(SELECT 1 FROM events remaining WHERE remaining.file_id=e.file_id AND remaining.root_id=e.root_id
           AND remaining.kind='usage' AND remaining.id NOT IN(SELECT event_id FROM inherited));
-      DELETE FROM events WHERE id IN(SELECT event_id FROM inherited) OR EXISTS(
-        SELECT 1 FROM inherited_roots r WHERE r.file_id=events.file_id AND r.root_id=events.root_id);
+      DELETE FROM events WHERE id IN(SELECT event_id FROM inherited) OR (kind<>'capability' AND EXISTS(
+        SELECT 1 FROM inherited_roots r WHERE r.file_id=events.file_id AND r.root_id=events.root_id));
       DROP TABLE inherited_roots; DROP TABLE inherited;`);
   }
 
@@ -233,6 +244,11 @@ export class SummaryStaging {
       ) SELECT * FROM ranked WHERE rank=1;
       CREATE INDEX temp.winners_root ON winners(provider,session_id,root_id);
       CREATE INDEX temp.winners_turn ON winners(provider,session_id,thread_id,turn_id);
+      DROP TABLE IF EXISTS temp.capability_winners;
+      CREATE TEMP TABLE capability_winners AS
+        SELECT DISTINCT f.provider,f.session_id,e.root_id,e.thread_id,e.event_key,e.category,e.name
+        FROM component_events e JOIN scan_files f ON f.id=e.file_id WHERE e.kind='capability';
+      CREATE INDEX temp.capability_winners_root ON capability_winners(provider,session_id,root_id);
       INSERT OR IGNORE INTO flags SELECT file_id,root_id,'missing-request-id' FROM winners
         WHERE provider='claude' AND canonical_request IS NULL;
       INSERT OR IGNORE INTO flags SELECT e.file_id,e.root_id,'token-total-mismatch'
@@ -317,6 +333,7 @@ export class SummaryStaging {
           duration_ms:duration,duration_quality:quality,input_tokens:row.input_tokens,output_tokens:row.output_tokens,
           cache_read_input_tokens:row.cache_read_input_tokens,cache_write_input_tokens:row.cache_write_input_tokens,
           model_usage:this.modelUsage(row.provider,row.session_id,row.root_id),
+          capability_usage:this.collectCapabilities ? this.capabilityUsage(row.provider,row.session_id,row.root_id) : undefined,
           billing:row.billing,
           total_tokens:row.input_tokens+row.output_tokens,status,
           quality_flags:[...flags].join(',') || null,diagnostic_file_id:flags.size ? row.file_id : null,
@@ -330,12 +347,22 @@ export class SummaryStaging {
       sum(input) AS input_tokens,sum(output) AS output_tokens,
       sum(min(input,cache_read)) AS cache_read_input_tokens,
       sum(min(max(0,input-cache_read),cache_write)) AS cache_write_input_tokens
-      FROM winners WHERE provider=? AND session_id=? AND root_id=? GROUP BY coalesce(model,'')`)
+      FROM winners WHERE provider=? AND session_id=? AND root_id=? GROUP BY coalesce(model,'')
+      HAVING coalesce(model,'')<>'' OR sum(input+output)>0`)
       .iterate(provider,session,root)) yield row as unknown as ModelUsageInput;
   }
 
+  private *capabilityUsage(provider: Provider, session: string, root: string): Generator<CapabilityUsageInput> {
+    for (const row of this.connection.prepare(`SELECT category,name,count(*) AS usage_count FROM capability_winners
+      WHERE provider=? AND session_id=? AND root_id=? GROUP BY category,name
+      UNION ALL SELECT 'model',coalesce(model,''),count(*) FROM winners
+      WHERE provider=? AND session_id=? AND root_id=? AND (coalesce(model,'')<>'' OR input+output>0)
+      GROUP BY coalesce(model,'')`)
+      .iterate(provider,session,root,provider,session,root)) yield row as unknown as CapabilityUsageInput;
+  }
+
   close(): void {
-    this.connection.exec(`DROP TABLE IF EXISTS temp.prepared_turns; DROP TABLE IF EXISTS temp.winners; DROP TABLE IF EXISTS temp.component_events;
+    this.connection.exec(`DROP TABLE IF EXISTS temp.prepared_turns; DROP TABLE IF EXISTS temp.winners; DROP TABLE IF EXISTS temp.capability_winners; DROP TABLE IF EXISTS temp.component_events;
       DROP TABLE temp.flags; DROP TABLE temp.events; DROP TABLE temp.component; DROP TABLE temp.links;
       DROP TABLE temp.affected; DROP TABLE temp.scan_files; DROP TABLE temp.session_names;`);
   }

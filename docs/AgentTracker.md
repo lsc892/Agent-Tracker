@@ -9,13 +9,13 @@
 VS Code 확장으로 다음 두 기능을 제공한다.
 
 1. Claude와 Codex의 현재 구독 quota 사용률과 reset 시각을 상태 표시줄에서 확인한다.
-2. 로컬 JSONL 기록을 필요할 때만 SQLite에 반영하여 일·월·프로젝트·세션별 token 총량과 완료한 사용자 요청 turn별 평균 token 사용량·소요 시간, 제공자별·모델별 누계와 충전 API 추정 비용을 조회한다.
+2. 로컬 JSONL 기록을 필요할 때만 SQLite에 반영하여 일·월·프로젝트·세션별 token 총량과 완료한 사용자 요청 turn별 평균 token 사용량·소요 시간, 제공자별·모델별 도표·표와 충전 API 추정 비용, 프로젝트·기간별 Skill 사용 횟수·비율을 조회한다.
 
 핵심 설계 원칙은 다음과 같다.
 
 - quota는 실시간성이 중요하므로 작은 최신 상태만 메모리에 유지한다.
 - 과거 누계는 화면을 열거나 사용자가 새로 고침을 요청할 때만 manifest와 JSONL을 비교하는 lazy 방식으로 갱신한다.
-- SQLite 영속 table은 manifest·projects·sessions·turn_summary와 모델·요금 정보를 담는 turn_model_usage·turn_costs·session_billing으로 둔다. 표시 이름은 프로젝트·세션당 한 번 저장하고 요청별 통계는 식별자로 연결한다.
+- SQLite 영속 table은 manifest·projects·sessions·turn_summary와 모델·요금 정보를 담는 turn_model_usage·turn_costs·session_billing, Skill 사용 횟수를 담는 turn_capability_usage로 둔다. 표시 이름은 프로젝트·세션당 한 번 저장하고 요청별 통계는 식별자로 연결한다.
 - subagent token은 부모의 사용자 요청에 합산하지만, 시간은 root/main turn의 경과 시간만 사용한다.
 
 ## 2. 전체 구조
@@ -192,7 +192,7 @@ Codex quota는 `codex app-server`를 실행하고 `initialize` → `initialized`
 
 ### 4.1 lazy 갱신 정책
 
-과거 누계는 Usage Webview를 열거나 사용자가 새로 고침을 요청할 때만 갱신한다. 갱신 시 manifest와 현재 JSONL metadata를 비교하고, 새로 생기거나 변경되거나 삭제된 파일이 속한 session만 재집계한 뒤 조회 결과를 반환한다.
+과거 누계는 Usage Webview를 열거나 사용자가 새로 고침을 요청하거나 열린 통계 창에서 Skill 집계를 다시 켤 때 갱신한다. 갱신 시 manifest와 현재 JSONL metadata를 비교하고, 새로 생기거나 변경되거나 삭제되거나 Skill 집계를 생략한 파일이 속한 session만 재집계한 뒤 조회 결과를 반환한다. Skill을 켜도 통계 창이 닫혀 있으면 다음 진입까지 스캔하지 않는다.
 
 extension 시작과 상태 표시줄 quota 갱신은 과거 누계 갱신을 실행하지 않는다.
 
@@ -210,7 +210,7 @@ Codex:  ~/.codex/sessions/**/*.jsonl
 
 ### 4.3 manifest
 
-영속 SQLite table은 `manifest`, `projects`, `sessions`, `turn_summary`, `turn_model_usage`, `turn_costs`, `session_billing`으로 둔다. manifest는 JSONL 파일마다 한 행, turn summary는 main과 subagent를 합친 외부 사용자 요청마다 한 행이다. 프로젝트명은 project_key당 한 행, 세션명은 (provider, session_id)당 한 행으로 저장하고 summary에는 식별자만 둔다. 요청의 모델별 토큰·추정 단가 결과는 turn_model_usage, 결제 방식에 따른 비용 합계는 turn_costs, 사용자가 지정한 세션 결제 방식은 session_billing에 저장한다. agent별 row와 response candidate는 영속화하지 않는다.
+영속 SQLite table은 `manifest`, `projects`, `sessions`, `turn_summary`, `turn_model_usage`, `turn_costs`, `session_billing`, `turn_capability_usage`로 둔다. manifest는 JSONL 파일마다 한 행, turn summary는 main과 subagent를 합친 외부 사용자 요청마다 한 행이다. 프로젝트명은 project_key당 한 행, 세션명은 (provider, session_id)당 한 행으로 저장하고 summary에는 식별자만 둔다. 요청의 모델별 토큰·추정 단가 결과는 turn_model_usage, 결제 방식에 따른 비용 합계는 turn_costs, 사용자가 지정한 세션 결제 방식은 session_billing, Skill 분류·이름별 횟수는 turn_capability_usage에 저장한다. agent별 실행 row와 response candidate는 영속화하지 않는다.
 
 manifest 전체를 메모리에 적재하지 않는다. 파일 metadata 전수조사는 유지하되 발견·조회·비교는 최대 `n`개씩 처리한다. 진단용 정보는 상태·처리 위치·기록 시각·오류 네 column으로 제한한다.
 
@@ -363,7 +363,7 @@ subagent:
   agent_role = subagent
 ```
 
-`agent_id`와 `agent_role`은 parser 내부에서 response 중복과 부모 사용자 요청을 구분할 때만 사용하며 영속 agent row를 만들지 않는다. 구체 역할 이름인 `agent_type`은 저장하지 않는다.
+`agent_id`와 `agent_role`은 parser 내부에서 response 중복과 부모 사용자 요청을 구분할 때만 사용하며 영속 agent 실행 row를 만들지 않는다. 서브에이전트 생성 호출의 역할 이름은 Skill 통계의 집계 이름으로만 저장한다.
 
 #### root turn
 
@@ -557,7 +557,7 @@ schema v4는 이전 summary의 cache component를 NULL로 유지해 미확인 �
 
 ## 8. SQLite schema
 
-DB 위치는 `ExtensionContext.globalStorageUri` 아래로 한다. 영속 table은 파일 처리 상태를 담는 `manifest`, 이름을 관리하는 `projects`·`sessions`, 조회 수치를 담는 `turn_summary`, 모델·비용 수치를 담는 `turn_model_usage`·`turn_costs`, 사용자가 지정한 결제 방식을 담는 `session_billing`이다. prompt·response·tool 본문, agent별 결과, response candidate와 scan 이력은 저장하지 않는다. 세션 제목 metadata는 이름 테이블에만 저장한다.
+DB 위치는 `ExtensionContext.globalStorageUri` 아래로 한다. 영속 table은 파일 처리 상태를 담는 `manifest`, 이름을 관리하는 `projects`·`sessions`, 조회 수치를 담는 `turn_summary`, 모델·비용 수치를 담는 `turn_model_usage`·`turn_costs`, 사용자가 지정한 결제 방식을 담는 `session_billing`, Skill 통계의 횟수를 담는 `turn_capability_usage`다. prompt·response·tool 본문, agent별 실행 결과, response candidate와 scan 이력은 저장하지 않는다. 세션 제목 metadata는 이름 테이블에만 저장한다.
 
 ```sql
 PRAGMA foreign_keys = ON;
@@ -574,6 +574,8 @@ CREATE TABLE manifest (
   dev                 TEXT,                                   -- 장치 식별자; inode와 묶어서 비교
   inode               TEXT,                                   -- 장치 내 파일 식별자; 신뢰 가능한 경우 이동 감지
   parser_version      INTEGER NOT NULL DEFAULT 0,             -- 마지막 정상 반영한 parser 버전; 미처리는 0
+  capabilities_collected INTEGER NOT NULL DEFAULT 0           -- Skill 횟수까지 정상 집계했으면 1; OFF 처리·이전 DB는 0
+                        CHECK(capabilities_collected IN (0,1)),
   last_seen_scan_id   TEXT,                                   -- 마지막 존재 확인 scan ID; 파싱 실패에도 갱신
   processing_status   TEXT NOT NULL DEFAULT 'processing'      -- 최근 시도의 상태; 자동 재처리 대기 상태가 아님
                         CHECK(processing_status IN ('processing', 'done', 'error', 'interrupted')),
@@ -673,7 +675,7 @@ schema v1·v2는 기존 이름을 projects로 옮기고 요청 ID·통계·manif
 | `status` | 완료 / 진행 중 / 실패; 완료 요청만 평균 계산 |
 | `quality_flags` | 품질 경고; 상세 오류는 원본 파일·offset과 함께 표시 |
 
-모델별 토큰 누계와 충전 API 추정 비용을 함께 제공한다. agent별 분석은 제공하지 않는다. cache component는 중복 제거한 response에서 저장·집계하고 reasoning은 output에 포함한다.
+모델별 토큰 누계와 충전 API 추정 비용을 함께 제공한다. Skill 구역의 서브에이전트 역할별 생성 횟수 외에 agent별 토큰·시간 분석은 제공하지 않는다. cache component는 중복 제거한 response에서 저장·집계하고 reasoning은 output에 포함한다.
 
 schema v5는 기존 요청·manifest·이름을 보존하며 다음 table을 추가한다.
 
@@ -683,21 +685,48 @@ schema v5는 기존 요청·manifest·이름을 보존하며 다음 table을 추
 | `turn_costs` | 요청별 `billing_mode`, nullable `cost_usd`, `unknown_costs`, `pricing_version`. 구독은 0, API는 확인한 모델 비용 합계, 미확인은 NULL이다. |
 | `session_billing` | `(provider, session_id)`별 사용자가 지정한 구독/API/미확인 방식. 요청 재집계 후에도 유지하고 해당 세션이 사라지면 함께 삭제한다. |
 
-Claude는 `message.model`, Codex는 usage record의 model 또는 해당 turn_context의 model을 사용한다. response 중복 제거 후 main/subagent의 모델별 토큰을 합산하므로 모델별 합계는 요청·제공자 총량과 같다. 모델이 없거나 이전 summary가 아직 재집계되지 않았다면 별도 모델 미상 그룹으로 남긴다. parser version 10은 다음 통계 진입에서 변경 없는 원본도 한 번 재파싱한다.
+Claude는 `message.model`, Codex는 usage record의 model 또는 해당 turn_context의 model을 사용한다. Claude의 0토큰 오류 안내(`isApiErrorMessage` 또는 `<synthetic>`)는 usage 후보에서 제외하고 요청 상태는 계속 처리한다. `<synthetic>`에 예상 밖의 양수 토큰이 있으면 모델 식별자만 미상으로 두고 토큰은 보존한다. response 중복 제거 후 main/subagent의 모델별 토큰을 합산하므로 모델별 합계는 요청·제공자 총량과 같다. 모델 정보가 없는 0토큰 snapshot은 모델별 행·횟수를 만들지 않으며 실제 모델명이 있는 0토큰 응답은 유지한다. 모델을 확인할 수 없는 양수 토큰은 별도 모델 미상 그룹으로 남기고 과거 모델을 추정하지 않는다. parser version 12는 다음 통계 갱신에서 변경 없는 원본도 한 번 재파싱해 이전 오류 안내 집계를 교체한다.
 
 원본의 명시적 `billing_mode`·`auth_mode`만 결제 방식 근거로 사용하고, 현재 로그인 방식으로 과거 기록을 분류하지 않는다. 명시적 근거가 없거나 한 요청에서 서로 다른 방식이 섞이면 미확인으로 남긴다. 사용자는 통계 창에서 세션을 선택한 뒤 세션 전체의 결제 방식을 지정할 수 있으며, 이 선택은 원본 metadata보다 우선한다. 변경은 기존 창 간 refresh lock을 사용한 worker DB transaction으로 비용만 갱신하며 원본을 다시 읽지 않는다.
 
 요금은 로컬 대화 기록의 모델·토큰을 [Anthropic 표준 단가](https://platform.claude.com/docs/en/about-claude/pricing)와 [OpenAI 표준 단가](https://developers.openai.com/api/docs/pricing)로 계산한 추정 USD 비용이다. 단가 버전은 `2026-10-07-standard-text`다. Input에서 cache write/read를 뺀 뒤 각 component를 한 번씩 계산한다. 미지원 모델·cache 구성·cache write 단가는 NULL로 남기고 확인한 비용과 미확인 건수를 함께 표시한다. 구독은 사용자의 지시에 따라 추가 사용 비용 0원이며 구독 결제액 자체를 합산하지 않는다. 실제 청구액·충전 잔액 조회, 로컬 기록에 없는 다른 API 호출, 도구 요금·할인·빠른 처리·긴 문맥·캐시 보관 기간별 추가 요금은 포함하지 않는다.
 
+### 8.1.1 Skill 사용 횟수 저장과 조회
+
+Skill 통계의 집계 대상·기간/비율 기준·분류별 사용 기준에 관한 부연설명은 네 분류 표·페이지 버튼 다음의 맨 아래에 표시한다. 별도 스킬 사용 횟수 도표와 분류·지표 선택은 표시하지 않는다.
+
+통계를 `토큰 / Skill` 구역으로 전환한다. Skill은 스킬·서브에이전트·플러그인·모델을 각각 별도 표로 표시하고 토큰과 같은 제공자·프로젝트·세션·기간 필터를 사용한다. 토큰의 일·월별 조회 단위는 Skill 구역에서 숨기며, 선택 범위 전체의 횟수를 보여 준다. 기간은 요청 시작일 기준이고 날짜 필터가 있으면 시작 시각 미상 요청은 제외한다. 구역 선택은 Webview state에 보존한다.
+
+Skill은 각 표 안의 비율 막대에서 상대 사용량을 표시한다. worker는 분류별 `chartRows`를 최대 20개씩 함께 반환해 표 페이지와 무관한 최다 사용 횟수 기준을 유지한다. 첫 표 페이지에서는 이미 조회한 행을 재사용하며 이후 페이지에서도 해당 분류 전체 횟수의 비율 분모를 유지한다. 빈 결과는 각 표에 기록 없음 안내를 표시한다. 이전 Webview state의 Skill 도표 분류·지표 값은 사용하지 않는다.
+
+`agentTracker.usage.skillsEnabled`는 기본 true로 사용자 지시 여부와 관계없이 AI의 호출 기록을 포함한다. 지시·자율 여부를 프롬프트 본문으로 추정하거나 구분 저장하지 않는다. OFF에서는 진행 중인 수집을 취소하고 worker의 Skill 호출 인식·모델 응답 횟수 합산과 Skill 조회를 중단한다. 토큰·모델별 토큰·API 비용·quota 기능은 유지한다. Skill 화면은 기존 표를 비우고 OFF 안내와 설정 열기 버튼을 제공한다.
+
+OFF 동안 토큰을 갱신할 때는 영향 session의 기존 요청별 Skill 횟수를 디스크 TEMP에 보존하고 같은 요청 식별자에 다시 연결한다. 사라진 요청은 기존 삭제 규칙을 따른다. schema v7은 manifest에 `capabilities_collected`를 추가하며 토큰만 처리한 파일은 0, Skill까지 처리한 파일은 1로 정상 metadata와 함께 저장한다. 이전 DB의 요청·토큰·비용·횟수는 유지하고 새 field는 0으로 둔다. ON으로 돌아오면 정상 파일도 이 값이 0이면 재파싱하여 원본에 남은 OFF 기간 호출을 복구한다. 집계를 교체하므로 이전 횟수에 중복 가산하지 않는다. 열린 통계 창은 즉시 갱신하고 닫힌 창에서는 다음 진입까지 기다린다. 설정 전환은 quota를 조회하지 않는다.
+
+schema v6의 `turn_capability_usage`는 `(turn_id, category, name)`을 기본 키로 양수 `usage_count`를 저장한다. 요청 삭제 시 cascade하고 session 교체·원본 삭제·통계 계산 데이터 삭제에 함께 반영한다. 이전 DB의 요청·토큰·비용은 유지하며 parser version 12의 다음 갱신에서 원본을 한 번 재파싱한다. 호출 인자·명령·스킬 파일 경로·본문·호출 ID는 영속화하지 않는다.
+
+| 분류 | 사용 1회의 기준과 표시 이름 |
+|---|---|
+| 스킬 | Claude `Skill`의 skill 이름 또는 `Read`·셸 읽기 호출의 `SKILL.md` 상위 폴더. 플러그인 cache 경로에서 소속을 확인하면 `plugin:skill`로 표시한다. |
+| 서브에이전트 | Claude `Agent`·`Task`, Codex `spawn_agent`의 생성 호출. 명시적 `subagent_type`·`agent_type`별로 표시하고 없는 역할은 `default`로 둔다. 대기·메시지 전달은 생성 횟수에 더하지 않는다. |
+| 플러그인 | 플러그인 스킬 호출·읽기 또는 `mcp__server__tool` 호출. 스킬은 확인한 플러그인 이름, 외부 도구는 MCP 서버 namespace를 이름으로 사용한다. 일반 도구 호출은 포함하지 않는다. |
+| 모델 | 기존 token response 중복 제거 결과의 응답 수. main·descendant의 각 모델을 사용하고 실제 토큰이 있지만 모델이 없는 응답은 모델 미상으로 표시한다. Claude의 0토큰 오류 안내와 모델 정보가 없는 0토큰 snapshot은 제외한다. 실제 모델명이 있는 0토큰 응답은 유지하며 구형 Codex는 중복 누계 snapshot을 제거한 사용량 event를 1회로 센다. |
+
+Codex `response_item`의 function/custom tool 호출과 `exec` 안의 정적인 `tools.method(...)`를 읽는다. exec은 코드에 등장하는 호출마다 1회로 세므로 실제 조건·반복·중간 오류에 따른 실행 횟수는 복원하지 않는다. transcript의 JavaScript를 실행하지 않으며 지원하지 않는 동적 호출이나 원본에 없는 실행은 추측하지 않는다. 도구 출력·스킬 목록·검색·일반 본문 언급은 호출로 세지 않는다. tool call identity·thread·분류·이름으로 디스크 TEMP에서 중복 제거하고 요청별 이름·횟수만 합산한다. 검증된 fork prefix 안의 동일 호출은 제외하고 같은 root의 새 호출은 유지한다. 중단된 Codex root의 횟수는 token summary와 함께 제외하며, 재집계 실패 시 이전 정상 횟수를 유지한다.
+
+각 표는 `(provider, name)`별 횟수 내림차순·제공자·이름순으로 100개씩 조회한다. 전체 횟수와 비율은 해당 분류의 필터 전체를 대상으로 계산한다. `비율 = 해당 행 사용 횟수 / 해당 분류 전체 사용 횟수 × 100`이며 페이지의 일부 행만 분모로 삼지 않는다. 모든 표의 ‘전체 비율’ 열은 숫자와 상대 막대를 함께 표시한다. 분류별 최다 사용 항목이 막대 전체를 채우며 `막대 길이 = 해당 행 사용 횟수 / 해당 분류의 최다 사용 횟수`다. 최댓값은 페이지와 독립적인 `chartRows`의 최다 항목에서 가져와 페이지 이동 후에도 유지한다. 막대는 Codex 파랑·Claude 주황이며 접근성 설명에 전체 비율·횟수와 최다 사용 대비 비율을 포함한다. 각 분류의 페이지는 독립적이고 조회 조건을 바꾸면 모두 첫 페이지로 돌아간다. 구역 전환·필터·페이지 이동은 worker DB만 조회하며 원본 스캔을 시작하지 않는다.
+
 ### 8.2 일·월·프로젝트·session별 총량과 turn 평균
 
-조회 조건 옆 `초기화`는 조회 단위 일별, 기간 제한 없음, 제공자·프로젝트·세션 전체, 표·누계 첫 페이지, 도표 총 토큰, 누계 제공자별로 즉시 조회한다. 열린 이름 목록과 저장된 조회 단위·도표·누계 선택도 초기화한다. DB 기록과 세션 결제 방식, API 비용 표시 on/off 선호는 유지한다.
+조회 조건 옆 `초기화`는 토큰 구역, 조회 단위 일별, 기간 제한 없음, 제공자·프로젝트·세션 전체, 표·Skill 분류별 첫 페이지, 토큰 도표 총 토큰·제공자별 집계로 즉시 조회한다. 열린 이름 목록과 저장된 통계 구역·조회 단위·도표 선택도 초기화한다. DB 기록과 세션 결제 방식, 확장 설정의 API 비용 표시 여부는 유지한다.
 
-누계의 `제공자별 / 모델별` 토글은 표 페이지와 독립적으로 선택 범위 전체의 토큰·비용을 조회한다. 조회 단위가 일·월이면 시각 미상 기록도 표와 같은 규칙으로 포함하고 그 외 기간 필터는 시작 시각을 따른다. 제공자와 모델을 함께 그룹화하며 모델 누계는 100개씩 페이지를 나눈다. 모델별 요청 수·시간 평균은 제공하지 않아 여러 모델을 사용한 요청의 분모를 늘리지 않는다.
+제공자 필터 바로 오른쪽의 `제공자별 / 모델별` 토글은 도표와 하단 표의 집계 기준을 함께 바꾸며 별도 누계 구역은 표시하지 않는다. `chartBy`는 Webview state에 보존하고 worker의 도표·표·표 행 수 조회에 적용한다. 기준 전환 시 표의 첫 페이지로 돌아간다. 모델별 표는 제공자 열을 모델 열로 바꾸며 사용자 요청별은 모델/프로젝트 열로 표시한다. 도표·표에는 제공자 이름을 앞세우지 않고 모델명을 직접 표시하며 Claude의 `claude-opus-5-5` 같은 식별자는 `opus5.5` 형식으로 줄인다. 원본 모델 식별자는 DB와 집계 키에서 유지한다.
 
-`API 비용 표시`는 기본 off이며 켜면 누계와 여섯 조회 단위의 표에 비용 열을 추가한다. 토글·필터·초기화·결제 방식 지정은 원본 재스캔 없이 저장된 DB만 조회·갱신한다. 비용 표시 선호와 누계 기준은 Webview state로 보존한다.
+모델별 도표와 표는 `turn_model_usage`와 요청을 연결한 같은 모델별 토큰 원천을 사용한다. 모델 정보와 토큰 사용량이 없는 요청은 ‘사용량 기록 없음’으로 구분하고, 실제 토큰이 있지만 모델이 없는 기존 요청은 ‘모델 미상’으로 포함한다. 조회 결과의 `model=null`은 사용량 기록 없음, 빈 문자열은 모델 미상이며 제공자별 조회는 model field를 생략한다. 표는 조회 단위별 `(provider,model,기간/프로젝트/세션)`으로 모든 모델을 개별 집계하며 사용자 요청별은 `(요청,model)` 행을 100개씩 표시한다. 토큰 구성·API 비용도 각 모델 행의 값으로 합산한다. 도표는 선택 범위의 토큰 상위 8개 `(provider,model)`을 유지하고 나머지는 제공자별 기타 모델로 묶으며 모델 미상·사용량 기록 없음은 별도로 둔다. 기타 모델은 같은 요청의 여러 모델을 먼저 합산해 요청 수·시간 표본을 한 번만 센다. 여러 모델을 사용한 요청은 각 모델의 요청 수에 포함되며 모델별 평균 토큰은 해당 모델의 완료 요청별 토큰, 평균 시간은 해당 모델을 포함한 완료 요청 전체의 시간이다. 도표 상세와 표 아래 설명에 이 의미를 명시한다. 제공자별은 기존 요청 수·평균 분모를 유지한다.
 
-수치는 `turn_summary`의 filter와 `GROUP BY`로 조회하고 이름은 projects·sessions에서 연결한다. 이름 목록에서 선택한 project_key·session_id·provider로 조회하므로 중복 제목이 합쳐지지 않는다. 일·월은 configured timezone의 시작·끝 경계를 UTC millisecond로 변환한 뒤 `started_at_ms`에 적용한다. 한 요청의 token과 duration은 시작 시점의 일·월에 귀속하고 날짜 경계에서 나누지 않는다. timezone 변경은 조회 경계를 바꾸며 원본 재파싱은 요구하지 않는다.
+`agentTracker.usage.showApiCosts`는 확장 설정의 boolean이며 기본 false다. 켜면 여섯 조회 단위의 토큰 표에 비용 열과 세션 결제 방식·추정 안내를 표시한다. Extension Host가 설정을 조회 조건의 `includeCosts`에 적용하고 Webview의 개별 비용 요청으로 덮어쓰지 않는다. 비용 표시 여부는 설정 state로 전달하며 Webview state에는 저장하지 않는다. 설정 변경·필터·초기화·결제 방식 지정은 원본 재스캔 없이 저장된 DB만 조회·갱신한다.
+
+수치는 제공자별에서는 `turn_summary`, 모델별에서는 `turn_model_usage`를 연결한 요청·모델 행에 filter와 `GROUP BY`를 적용해 조회하고 이름은 projects·sessions에서 연결한다. 이름 목록에서 선택한 project_key·session_id·provider로 조회하므로 중복 제목이 합쳐지지 않는다. 일·월은 configured timezone의 시작·끝 경계를 UTC millisecond로 변환한 뒤 `started_at_ms`에 적용한다. 한 요청의 token과 duration은 시작 시점의 일·월에 귀속하고 날짜 경계에서 나누지 않는다. timezone 변경은 조회 경계를 바꾸며 원본 재파싱은 요구하지 않는다.
 
 이름 목록은 통계가 저장된 전체 프로젝트·세션을 대상으로 하고 날짜·표 페이지·선택된 세션 조건을 적용하지 않는다. 활성 제공자와 제공자 필터를 따르며 세션 목록에는 선택된 프로젝트 조건만 추가한다. 프로젝트는 project_key당 한 항목, 세션은 provider·project_key·session_id당 한 항목으로 이름순 정렬한다. 목록을 열 때 worker가 100개씩 조회하고 아래로 스크롤하면 다음 묶음을 표시한다. Extension Host는 한 묶음만 전달하고 Webview는 열린 목록의 이름 metadata만 누적하며 닫으면 해제한다. 선택은 표의 첫 페이지부터 적용하고 ‘전체 프로젝트’·‘전체 세션’으로 해제한다. 프로젝트를 바꾸면 기존 세션 선택을 해제하며 세션을 고르면 프로젝트·제공자도 맞춘다. 목록 조회와 선택은 원본 재스캔을 시작하지 않는다.
 
@@ -727,9 +756,9 @@ schema version 2는 기존 `turn_summary`의 행·id·manifest 참조를 보존�
 
 ### 8.3 사용량 도표
 
-사용량 통계 표 위의 총 토큰 도표는 `Input / Output / Cache Write / Cache Read`를 네 색상으로 구분해 쌓은 누적 막대로 표시한다. 막대 전체 크기는 총 토큰이며 각 구간의 크기는 해당 항목의 토큰 수다. Input은 cache read/write를 제외한 화면 표시 값을 사용한다. 별도의 ‘토큰 구성’ 지표는 두지 않는다.
+사용량 통계 표 위의 총 토큰 도표는 `Input / Output / Cache Write / Cache Read`를 각각 VS Code 테마의 파랑·주황·보라·초록으로 구분해 쌓은 누적 막대로 표시한다. 제공자에 관계없이 같은 토큰 항목은 같은 색상을 사용하며 모든 구간은 불투명하게 표시한다. 도표 위의 토큰 구성 범례는 이 순서의 이름과 막대에 적용한 색상을 함께 표시하고 좁은 화면에서는 줄바꿈한다. 구성이 미확인인 막대가 있으면 회색 ‘구성 미확인’을 범례에 추가한다. 제공자별·모델별과 여섯 조회 단위에서 같은 범례를 사용하며, 총 토큰 외 지표와 빈 결과에서는 범례를 비우고 숨긴다. 막대 전체 크기는 총 토큰이며 각 구간의 크기는 해당 항목의 토큰 수다. Input은 cache read/write를 제외한 화면 표시 값을 사용한다. 별도의 ‘토큰 구성’ 지표는 두지 않는다.
 
-항목별 색상과 쌓는 순서는 조회 단위·제공자에 관계없이 동일하게 유지하고 범례로 항목명을 표시한다. 파랑은 Input, 주황은 Output, 보라는 Cache Write, 초록은 Cache Read를 나타낸다. 총 토큰 막대의 각 색상 조각에 마우스를 올리면 해당 조각의 항목명·정확한 토큰 수와 조회 대상이 SVG 툴팁과 도표 아래 상세 정보에 표시된다. 조각을 벗어나거나 막대 전체에 키보드 초점을 옮기면 전체 막대의 총량·구성 상세 정보를 표시한다. 이 동작은 렌더링된 도표 값으로 처리하고 worker 조회나 원본 재스캔을 시작하지 않는다. Claude·Codex는 막대의 위치와 이름으로 구분한다. 구성이 미확인인 경우 총 토큰을 중립색 막대로 표시하고 호버 시 ‘총 토큰 (구성 미확인)’과 총량을 표시하며, 미확인 항목을 0으로 채우거나 임의로 배분하지 않는다.
+월간·프로젝트별을 포함한 모든 조회 단위에서 모델별 도표와 토큰 표의 모델명 앞에 8px 정사각형을 표시한다. Claude는 주황 `#d97757`, Codex는 기존 VS Code 테마 파랑이며 모델 미상·기타 모델에도 해당 제공자 색상을 사용한다. 도표의 정사각형은 세로 막대의 회전된 모델명과 함께 배치하고 가로 막대에서는 모델명 왼쪽에 둔다. 모델명의 접근성 설명과 표의 마우스 안내로 제공자도 확인할 수 있다. 총 토큰 외 지표는 기존 테마 파랑 단일 막대를 사용한다. 각 토큰 조각에 마우스를 올리면 해당 항목명·정확한 토큰 수와 조회 대상이 SVG 툴팁과 상세 정보에 표시된다. 조각을 벗어나거나 막대 전체에 키보드 초점을 옮기면 총량·구성을 표시한다. 이 동작은 렌더링된 값으로 처리하고 worker 조회나 원본 재스캔을 시작하지 않는다. 구성이 미확인인 경우 총 토큰을 중립색 막대로 표시하고 ‘총 토큰 (구성 미확인)’과 총량을 안내하며 미확인 항목을 0으로 채우거나 임의로 배분하지 않는다.
 
 도표는 기존 필터와 집계 기준을 공유하고 `총 토큰 / 요청 수 / 평균 토큰 / 평균 시간`을 선택한다. 요청 수는 완료·진행 중·실패 요청을 합친 전체 요청 수이며 완료 수를 상세 정보에 함께 표시한다. 평균 토큰은 완료 요청 수, 평균 시간은 유효한 시간을 가진 완료 요청 수를 표본으로 사용한다. 사용자 요청별 조회에서는 `총 토큰 / 소요 시간`만 선택하고 각 요청의 개별 값을 표시한다.
 
@@ -742,7 +771,7 @@ schema version 2는 기존 `turn_summary`의 행·id·manifest 참조를 보존�
 | 전체 | 제공자별 가로 막대. |
 | 사용자 요청 | 시작 시각 기준 최근 60개를 시간순 세로 막대로 표시하고 표시/전체 요청 수를 명시한다. |
 
-worker가 필터 전체에서 도표 결과를 계산하므로 표의 100행 페이지 이동은 도표 범위를 바꾸지 않는다. 기간을 묶을 때 평균은 원래 완료 요청에서 계산하며 기간별 평균을 다시 평균 내지 않는다. 도표는 최대 62개 기간·제공자 행 또는 60개 요청으로 제한하고 전체 목록을 Extension Host에 적재하지 않는다. 긴 도표는 해당 영역 안에서 가로 스크롤하며, 막대에 마우스를 올리거나 키보드로 초점을 옮기면 정확한 수치·구성·평균 표본을 표시한다. 색상은 VS Code의 테마별 chart 색상을 사용하며 외부 도표 라이브러리는 사용하지 않는다.
+worker가 필터 전체에서 도표 결과를 계산하므로 표의 100행 페이지 이동은 도표 범위를 바꾸지 않는다. 기간을 묶을 때 평균은 원래 완료 요청에서 계산하며 기간별 평균을 다시 평균 내지 않는다. 제공자별 도표는 최대 62개 기간·제공자 행 또는 60개 요청, 모델별은 최대 12개 모델 그룹 × 31개 기간 구간 또는 최근 60개 모델·요청 행으로 제한한다. 프로젝트·세션 모델 도표는 지표순 상위 10개, 전체는 최대 12개 모델 그룹을 반환한다. 긴 도표는 해당 영역 안에서 가로 스크롤하며 같은 기간의 모델 수에 맞춰 폭을 확보하고 모델 이름을 막대 아래에 표시한다. 막대의 호버·키보드 초점으로 정확한 수치·구성·평균 표본을 표시하며 외부 도표 라이브러리는 사용하지 않는다.
 
 ## 9. 데이터 확인 화면
 
@@ -767,7 +796,7 @@ Extension Host 메모리에 유지하는 값:
 - Claude/Codex 최신 quota snapshot
 - 진행 중인 single-flight 상태
 - 사용량·데이터 확인 Webview마다 현재 보이는 제한된 한 page의 row
-- worker가 보내는 작은 진행 상태와 현재 조회 page·제한된 도표 결과·누계 한 페이지
+- worker가 보내는 작은 진행 상태와 현재 조회 page·제한된 제공자별·모델별 도표 결과
 
 누계 worker는 최대 `n`개 파일의 metadata·manifest diff와 byte 예산 내 parser/정규화 row buffer만 유지한다. 변경 session의 중복 제거·연결·합산 작업은 디스크 staging에 기록하고 session 교체 후 폐기한다. 한 session이 커도 파일 목록·response 후보·summary를 메모리에 한꺼번에 올리지 않는다. 디렉터리 순회·파싱·DB 반영 사이에는 backpressure를 적용하여 다음 묶음이 무제한 대기열에 쌓이지 않게 한다.
 
@@ -952,7 +981,7 @@ last successful session update
 - 클릭하면 Markdown Quota 카드가 뜨고 제공자별 새로 고침·상세/압축 설정·확장 관리·사용량 통계 링크를 사용할 수 있다. 패치한 로컬 VS Code에서는 자동 호버 억제, 클릭 유지·재클릭 닫기, 닫은 뒤 재호버 억제와 바깥 클릭·Esc 후 재열기를 실제 UI에서 검증한다.
 - 누계 refresh에서 변경 없는 session의 파일 body는 다시 읽지 않는다.
 - 전체 경로·manifest·파싱 결과를 메모리에 적재하지 않고 n개·byte 예산·DB 조회 page 경계를 지킨다.
-- 영속 table은 manifest·projects·sessions·turn_summary·turn_model_usage·turn_costs·session_billing이고, session summary·모델별 토큰·비용과 이름·정상 metadata·삭제는 함께 commit한다. 부재 판정은 전체 순회 성공 후 수행한다.
+- 영속 table은 manifest·projects·sessions·turn_summary·turn_model_usage·turn_costs·session_billing·turn_capability_usage이고, session summary·모델별 토큰·비용·Skill 횟수와 이름·정상 metadata·삭제는 함께 commit한다. 부재 판정은 전체 순회 성공 후 수행한다.
 - 오류·중단은 네 진단 항목으로 기록하고 자동 재시도하지 않는다. 다음 화면 진입·수동 새로 고침에서 새로 조사한다.
 - append/rewrite/delete 후 full rebuild 결과와 증분 결과가 같다.
 - Claude response duplicate와 Codex cumulative snapshot이 이중 집계되지 않는다.

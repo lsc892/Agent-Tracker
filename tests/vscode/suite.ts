@@ -42,6 +42,16 @@ export async function run(): Promise<void> {
   const isReport = (raw: unknown): raw is SmokeReport => Boolean(raw && typeof raw === 'object' && (raw as { type?: string }).type === 'smoke-report');
   protocol.parseDashboardMessage = (raw: unknown) => {
     if (isReport(raw)) { onReport?.(raw); return null; }
+    if (raw && typeof raw==='object' && (raw as {type?:string}).type==='smoke-skill-switch') {
+      const enabled=(raw as {enabled?:unknown}).enabled;
+      if (typeof enabled==='boolean') void vscode.workspace.getConfiguration('agentTracker').update('usage.skillsEnabled',enabled,vscode.ConfigurationTarget.Global);
+      return null;
+    }
+    if (raw && typeof raw==='object' && (raw as {type?:string}).type==='smoke-cost-switch') {
+      const enabled=(raw as {enabled?:unknown}).enabled;
+      if (typeof enabled==='boolean') void vscode.workspace.getConfiguration('agentTracker').update('usage.showApiCosts',enabled,vscode.ConfigurationTarget.Global);
+      return null;
+    }
     return originalParser(raw);
   };
   colorModule.parseColorSettingsMessage = (raw: unknown) => {
@@ -148,7 +158,13 @@ export async function run(): Promise<void> {
               const marks = [...document.querySelectorAll('#usage-chart .chart-segment')];
               check(marks.length === 4,'total tokens render as four stacked segments');
               const fills = marks.map(mark => getComputedStyle(mark).fill);
-              check(new Set(fills).size === 4 && fills.every(fill => fill !== 'none'),'four token colors resolve in the active theme');
+              check(new Set(fills).size === 4,'token components use four distinct colors');
+              const legend = document.getElementById('chart-legend');
+              check(!legend.hidden && legend.children.length === 4,'total tokens show the four token composition legend entries');
+              check([...legend.querySelectorAll('rect')].every((swatch,index)=>getComputedStyle(swatch).fill === fills[index]),'legend swatches match the rendered token components');
+              check(marks.every(mark=>getComputedStyle(mark).fillOpacity === '1'),'token components are fully opaque');
+              check(!document.getElementById('cumulative-table') && !document.getElementById('show-costs'),'separate cumulative section and cost switch are removed');
+              check(document.getElementById('provider').parentElement.nextElementSibling.id==='chart-by-control','model toggle sits immediately right of provider');
               checkSegmentHover();
               document.querySelector('#usage-chart .chart-bar').focus();
               check(document.getElementById('chart-detail').textContent.includes('Input 50 / Output 50 / Cache Write 20 / Cache Read 30'),'keyboard focus exposes token breakdown');
@@ -156,7 +172,7 @@ export async function run(): Promise<void> {
               document.getElementById('chart-metric').dispatchEvent(new Event('change'));
             } else if (phase === 'chart-requests' && message.type === 'usage' && message.result.chart.metric === 'requests') {
               check(document.querySelectorAll('#usage-chart .chart-segment').length === 1,'request metric displays one measure');
-              check(document.getElementById('chart-legend').children.length === 0,'non-token metric clears token legend');
+              check(document.getElementById('chart-legend').hidden && !document.getElementById('chart-legend').children.length,'non-token metrics hide and clear the token legend');
               phase = 'chart-duration'; document.getElementById('chart-metric').value = 'averageDuration';
               document.getElementById('chart-metric').dispatchEvent(new Event('change'));
             } else if (phase === 'chart-duration' && message.type === 'usage' && message.result.chart.metric === 'averageDuration') {
@@ -194,28 +210,77 @@ export async function run(): Promise<void> {
               checkSegmentHover();
               check(document.getElementById('chart-metric').querySelector('[value="requests"]').disabled,'request chart disables aggregate metrics');
               check(document.getElementById('session-name').textContent === '통계 화면 검증' && document.getElementById('session-options').hidden,'session selection applies immediately and closes the popup');
-              phase = 'costs-on'; document.getElementById('show-costs').click();
+              phase = 'costs-on'; window.dispatchEvent(new CustomEvent('tracker-smoke-report',{detail:{type:'smoke-cost-switch',enabled:true}}));
             } else if (phase === 'costs-on' && message.type === 'usage') {
               check(document.getElementById('usage-table').textContent.includes('API 추정 비용 (USD)'),'cost switch adds the cost column');
               check(!document.getElementById('billing-control').hidden && !document.getElementById('cost-note').hidden,'selected session exposes billing and estimate guidance');
-              phase = 'models'; document.getElementById('cumulative-model').click();
-            } else if (phase === 'models' && message.type === 'usage' && message.result.cumulative.by === 'model') {
-              check(message.result.cumulative.rows[0].model === 'claude-sonnet-4-6' && message.result.cumulative.rows[0].total_tokens === 150,'model cumulative retains all tokens');
-              check(document.getElementById('cumulative-table').textContent.includes('claude-sonnet-4-6'),'model name renders in the cumulative table');
-              check(document.getElementById('cumulative-model').getAttribute('aria-pressed') === 'true','model selection exposes pressed state');
+              phase = 'models'; document.getElementById('chart-model').click();
+            } else if (phase === 'models' && message.type === 'usage' && message.result.chart.by === 'model') {
+              check(message.result.chart.rows[0].model === 'claude-sonnet-4-6' && message.result.chart.rows[0].total_tokens === 150,'model chart retains all tokens');
+              check(document.getElementById('chart-detail').textContent.includes('sonnet4.6'),'compact model name renders in chart details');
+              check(message.result.by === 'model' && document.querySelector('#usage-table th').textContent === '모델 / 프로젝트','request table switches its provider column to model');
+              check(document.getElementById('usage-table').textContent.includes('sonnet4.6'),'table displays the model name');
+              for (const id of ['usage-chart','usage-table']) {
+                const marker = document.querySelector('#'+id+' .provider-marker');
+                check(marker && getComputedStyle(marker).fill === 'rgb(217, 119, 87)','Claude model name has an orange square in '+id);
+              }
+              check(document.getElementById('chart-model').getAttribute('aria-pressed') === 'true','model selection exposes pressed state');
+              phase = 'model-month'; submitGroup('month');
+            } else if (phase === 'model-month' && message.type === 'usage' && message.result.groupBy === 'month') {
+              const labels = [...document.querySelectorAll('#usage-chart .chart-provider')];
+              check(labels.length === 1 && labels[0].textContent === 'sonnet4.6','model bar displays the model directly without a provider line');
+              check(!document.getElementById('chart-legend').hidden && document.getElementById('chart-legend').children.length === 4,'model charts share the token composition legend');
+              check(document.querySelector('#usage-table th').textContent === '모델' && message.result.rows[0].model === 'claude-sonnet-4-6','monthly table groups by model');
               phase = 'billing-api'; document.getElementById('billing-mode').value = 'api';
               document.getElementById('billing-mode').dispatchEvent(new Event('change'));
             } else if (phase === 'billing-api' && message.type === 'usage') {
               check(message.result.billing === 'api' && Math.abs(message.result.rows[0].cost_usd - 0.000984) < 1e-12,'API classification saves estimated costs');
-              check(document.getElementById('cumulative-table').textContent.includes('$0.000984'),'model cumulative shows saved API cost');
+              check(document.getElementById('usage-table').textContent.includes('$0.000984'),'table shows saved API cost');
               phase = 'billing-subscription'; document.getElementById('billing-mode').value = 'subscription';
               document.getElementById('billing-mode').dispatchEvent(new Event('change'));
             } else if (phase === 'billing-subscription' && message.type === 'usage') {
               check(message.result.rows[0].cost_usd === 0 && document.getElementById('usage-table').textContent.includes('0원 (구독)'),'subscription usage displays zero cost');
-              phase = 'costs-off'; document.getElementById('show-costs').click();
+              phase = 'costs-off'; window.dispatchEvent(new CustomEvent('tracker-smoke-report',{detail:{type:'smoke-cost-switch',enabled:false}}));
             } else if (phase === 'costs-off' && message.type === 'usage') {
               check(!document.getElementById('usage-table').textContent.includes('API 추정 비용'),'cost switch removes cost columns');
               check(document.getElementById('billing-control').hidden,'cost switch hides billing controls');
+              phase = 'skills'; document.getElementById('section-skills').click();
+            } else if (phase === 'skills' && message.type === 'usage') {
+              check(document.getElementById('token-section').hidden && !document.getElementById('skill-section').hidden,'Skill section replaces token statistics');
+              check(getComputedStyle(document.getElementById('group-control')).display === 'none','token grouping is hidden in Skill statistics');
+              for (const [category,name] of [['skill','review:check'],['subagent','Explore'],['plugin','review'],['model','claude-sonnet-4-6']]) {
+                check(message.result.capabilities[category].totalUses === 1,'one usage counted for '+category);
+                check(document.getElementById(category+'-table').textContent.includes(name) && document.getElementById(category+'-table').textContent.includes('100%'),'name and percentage rendered for '+category);
+                const ratio=document.querySelector('#'+category+'-table .capability-ratio svg');
+                check(ratio && ratio.getAttribute('aria-label').includes('최다 사용 대비 100%'),'each category includes an accessible relative ratio bar');
+                check(Number(ratio.lastElementChild.getAttribute('width'))===160 && getComputedStyle(ratio.lastElementChild).fill==='rgb(217, 119, 87)','the leading item fills the ratio track in Claude orange');
+                check(document.getElementById(category+'-previous').disabled && document.getElementById(category+'-next').disabled,'single page buttons disabled for '+category);
+              }
+              check(document.getElementById('section-skills').getAttribute('aria-pressed') === 'true','Skill selection exposes pressed state');
+              check(document.getElementById('session-name').textContent === '통계 화면 검증','Skill keeps selected session');
+              check(!document.getElementById('skill-chart') && !document.getElementById('skill-chart-category'),'Skill usage chart and its controls are removed');
+              phase = 'skill-switch-off'; window.dispatchEvent(new CustomEvent('tracker-smoke-report',{detail:{type:'smoke-skill-switch',enabled:false}}));
+            } else if (phase === 'skill-switch-off' && message.type === 'usage' && message.result.capabilitiesEnabled === false) {
+              check(document.getElementById('skill-content').hidden && !document.getElementById('skill-disabled').hidden,'Skill off replaces counts with settings guidance');
+              check(!document.getElementById('skill-table').textContent,'Skill off clears cached counts');
+              phase = 'tokens-during-skill-off'; document.getElementById('section-tokens').click();
+            } else if (phase === 'tokens-during-skill-off' && message.type === 'usage') {
+              check(message.result.rows[0].total_tokens === 150 && document.getElementById('usage-table').textContent.includes('150'),'tokens remain available with Skill off');
+              phase = 'skill-switch-on'; window.dispatchEvent(new CustomEvent('tracker-smoke-report',{detail:{type:'smoke-skill-switch',enabled:true}}));
+            } else if (phase === 'skill-switch-on' && message.type === 'usage') {
+              check(document.getElementById('skill-disabled').hidden,'re-enable restores Skill access');
+              phase = 'skill-restored'; document.getElementById('section-skills').click();
+            } else if (phase === 'skill-restored' && message.type === 'usage') {
+              for (const category of ['skill','subagent','plugin','model']) check(message.result.capabilities[category].totalUses === 1,'re-enable preserves '+category+' counts without duplication');
+              phase = 'skills-empty'; document.getElementById('from-day').value = '2026-10-04';
+              document.getElementById('usage-filters').requestSubmit();
+            } else if (phase === 'skills-empty' && message.type === 'usage') {
+              for (const category of ['skill','subagent','plugin','model']) {
+                check(message.result.capabilities[category].totalUses === 0 && document.querySelector('#'+category+'-table .empty'),'date filter clears '+category+' statistics');
+              }
+              phase = 'tokens-return'; document.getElementById('section-tokens').click();
+            } else if (phase === 'tokens-return' && message.type === 'usage') {
+              check(!document.getElementById('token-section').hidden && document.getElementById('skill-section').hidden,'token statistics return with the same filters');
               phase = 'empty'; document.getElementById('from-day').value = '2026-10-04';
               document.getElementById('usage-filters').requestSubmit();
             } else if (phase === 'empty' && message.type === 'usage') {
@@ -233,7 +298,7 @@ export async function run(): Promise<void> {
               check(message.result.groupBy === 'day' && message.result.total === 1,'reset restores daily query results');
               for (const id of ['provider','from-day','to-day']) check(document.getElementById(id).value === '','reset clears '+id);
               check(document.getElementById('project-name').textContent === '전체 프로젝트' && document.getElementById('session-name').textContent === '전체 세션','reset clears selected identities');
-              check(document.getElementById('chart-metric').value === 'tokens' && message.result.cumulative.by === 'provider','reset restores metric and provider cumulative');
+              check(document.getElementById('chart-metric').value === 'tokens' && document.getElementById('chart-provider').getAttribute('aria-pressed')==='true','reset restores metric and provider chart');
               check(!receivedDiagnostics,'statistics does not receive diagnostic logs');
               const link = document.getElementById('open-diagnostics');
               link.focus(); check(document.activeElement === link,'diagnostic hyperlink accepts keyboard focus');
@@ -277,7 +342,7 @@ export async function run(): Promise<void> {
             } else if (phase === 'previous' && message.type === 'diagnostics') {
               check(message.offset === 0 && document.getElementById('diagnostic-previous').disabled,'diagnostics previous page updates rows and controls together');
               check(document.getElementById('diagnostic-page').textContent.startsWith('1번째'),'diagnostics label matches returned rows');
-              phase = 'complete'; report(true,'statistics charts, model/provider cumulative, cost on/off, API and zero subscription costs, reset and name filters → separate diagnostic webview in '+${JSON.stringify(expectedTheme)});
+              phase = 'complete'; report(true,'token/Skill sections, AI call counts, Skill off/on with token preservation and no duplicate restoration, shared filters, costs and diagnostics in '+${JSON.stringify(expectedTheme)});
             } else if (message.type === 'error') { phase = 'failed'; report(false,message.message); }
           } catch(error) { phase = 'failed'; report(false,error.message); }
         });
@@ -353,7 +418,7 @@ export async function run(): Promise<void> {
           try {
             assert.ok(message.ok, message.detail);
             assert.equal(message.theme, theme.css, 'the active theme is tested');
-            assert.equal(scanCount, scansBefore + 1, 'only opening statistics scans; filters and diagnostic controls reuse cached summaries');
+            assert.equal(scanCount, scansBefore + 2, 'opening statistics and re-enabling Skill scan; filters, off and diagnostics reuse cached summaries');
             assert.equal(countFiles(), 1, 'statistics scans the fixture');
             clearTimeout(timeout); outcomes.push(message.detail); resolveReport();
           } catch (error) { clearTimeout(timeout); reject(error); }

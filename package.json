@@ -203,6 +203,18 @@
           "default": true,
           "order": 5,
           "markdownDescription": "사용량 통계를 사용합니다. 끄면 진행 중인 수집을 중단하고 통계 화면을 닫습니다. 구독 사용량 조회에는 영향을 주지 않습니다.\n\n[통계 계산 데이터 삭제](command:agentTracker.clearUsageData): 저장된 파일 처리 정보와 집계 결과를 삭제합니다. 원본 대화 로그는 유지되며, 통계를 다시 열면 재계산합니다."
+        },
+        "agentTracker.usage.showApiCosts": {
+          "type": "boolean",
+          "default": false,
+          "order": 9,
+          "description": "토큰 통계 표에 API 추정 비용(USD)을 표시합니다. 구독은 0원이며 결제 방식·모델 단가·토큰 구성이 미확인인 비용은 별도로 표시합니다. 설정 변경은 저장된 통계만 조회합니다."
+        },
+        "agentTracker.usage.skillsEnabled": {
+          "type": "boolean",
+          "default": true,
+          "order": 8,
+          "markdownDescription": "Skill 통계의 스킬·서브에이전트·플러그인·모델 사용 횟수를 집계합니다. 사용자 지시 여부와 관계없이 AI가 호출한 기록을 기본으로 포함합니다. 끄면 새 횟수 집계와 Skill 통계 표시를 중단하고 기존 데이터는 보존합니다. 토큰·API 비용·구독 사용량에는 영향을 주지 않습니다. 다시 켜면 열린 통계 창에서 재계산하며, 통계 창이 닫혀 있으면 다음에 열 때 원본 로그에서 복구합니다."
         }
       }
     },

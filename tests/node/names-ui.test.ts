@@ -7,6 +7,7 @@ import { dashboardHtml } from '../../src/ui/html';
 import { parseDashboardMessage } from '../../src/ui/presentation';
 
 class Element {
+  constructor(readonly tagName = '') {}
   private text = '';
   value = ''; title = ''; hidden = true; children: Element[] = [];
   checked = false; disabled = false;
@@ -36,7 +37,7 @@ function view(saved?: Record<string,unknown>) {
   get('group').value='session';
   new Script(readFileSync(join(__dirname,'../../../media/dashboard.js'),'utf8')).runInNewContext({
     acquireVsCodeApi:()=>({getState:()=>saved,setState:(value:unknown)=>{state=value;},postMessage:(message:typeof messages[number])=>messages.push(message)}),
-    document:{getElementById:get,createElement:()=>new Element(),querySelectorAll:()=>[]},
+    document:{getElementById:(id:string)=>id.startsWith('skill-chart') ? null : get(id),createElement:(tag:string)=>new Element(tag),createElementNS:(_namespace:string,tag:string)=>new Element(tag),querySelectorAll:()=>[]},
     window:{addEventListener:(event:string,listener:typeof receive)=>{if (event==='message') receive=listener;}},
   });
   const respond = (result: unknown, request = messages.at(-1)!) => receive!({data:{type:'names',kind:request.query?.kind,requestId:request.requestId,result}});
@@ -48,37 +49,99 @@ const sessions = [
   {provider:'claude',project_key:'/project',project_name:'Project',session_id:'three',session_name:null,session_started_at_ms:null},
 ];
 
-test('reset returns every query control and cumulative page to defaults while retaining the cost display preference',()=>{
-  const {get,messages,respond,state} = view({group:'month',chartMetric:'averageTokens',cumulativeBy:'model',showCosts:true});
-  assert.equal(messages[0].query?.cumulativeBy,'model');assert.equal(messages[0].query?.includeCosts,true);
+test('Skill section shares project and period filters, renders four count/percentage tables and pages categories independently',()=>{
+  const {get,messages,receive,respond,state}=view();
+  get('from-day').value='2026-10-01';get('to-day').value='2026-10-07';
+  get('project-name').listeners.get('click')!();respond({rows:[sessions[0]],total:1});
+  get('project-list').children[1].listeners.get('click')!();
+  get('section-skills').listeners.get('click')!();
+  const query=messages.at(-1)?.query;
+  assert.equal(query?.section,'skills');assert.equal(query?.projectKey,'/project');
+  assert.equal(query?.fromDay,'2026-10-01');assert.equal(query?.toDay,'2026-10-07');
+  assert.equal(get('token-section').hidden,true);assert.equal(get('skill-section').hidden,false);
+  assert.equal(get('group-control').hidden,true);assert.equal(get('section-skills').attributes.get('aria-pressed'),'true');
+  const page={rows:[{provider:'codex',name:'commit',usage_count:3,percentage:75}],total:105,totalUses:4};
+  receive({type:'usage',result:{capabilities:{skill:page,subagent:page,plugin:page,model:page},rows:[],total:0}});
+  for (const category of ['skill','subagent','plugin','model']) {
+    assert.match(get(`${category}-table`).textContent,/사용 횟수.*전체 비율.*commit.*3.*75%/);
+    assert.equal(get(`${category}-total`).textContent,'전체 4회');
+  }
+  get('skill-next').listeners.get('click')!();
+  assert.deepEqual(JSON.parse(JSON.stringify(messages.at(-1)?.query?.capabilityOffsets)),{skill:100,subagent:0,plugin:0,model:0});
+  get('plugin-next').listeners.get('click')!();
+  assert.deepEqual(JSON.parse(JSON.stringify(messages.at(-1)?.query?.capabilityOffsets)),{skill:100,subagent:0,plugin:100,model:0});
+  get('usage-filters').listeners.get('submit')!({preventDefault:()=>{}});
+  assert.deepEqual(JSON.parse(JSON.stringify(messages.at(-1)?.query?.capabilityOffsets)),{skill:0,subagent:0,plugin:0,model:0});
+  assert.equal((state() as {section:string}).section,'skills');
+  get('section-tokens').listeners.get('click')!();
+  assert.equal(get('token-section').hidden,false);assert.equal(get('skill-section').hidden,true);
+  assert.equal(messages.at(-1)?.query?.projectKey,'/project');
+});
+
+test('Skill section selection is restored and reset returns to token defaults',()=>{
+  const {get,messages,state}=view({section:'skills',skillChartCategory:'plugin',skillChartMetric:'percentage'});
+  assert.equal(messages[0].query?.section,'skills');assert.equal(get('skill-section').hidden,false);
+  assert.equal((state() as Record<string,unknown>).skillChartCategory,undefined);
+  assert.equal((state() as Record<string,unknown>).skillChartMetric,undefined);
+  get('reset-filters').listeners.get('click')!();
+  assert.equal(messages.at(-1)?.query?.section,'tokens');assert.equal(get('skill-section').hidden,true);
+  assert.equal((state() as {section:string}).section,'tokens');
+});
+
+test('Skill statistics keep the four tables and descriptions without the removed usage chart',()=>{
+  const html=dashboardHtml('script','style','source','nonce');
+  assert.doesNotMatch(html,/skill-chart|스킬 사용 횟수|Skill 사용 도표/);
+  for (const category of ['skill','subagent','plugin','model']) assert.ok(html.includes(`id="${category}-table"`));
+  assert.ok(html.indexOf('id="model-next"')<html.indexOf('선택한 제공자·프로젝트·세션·기간의 사용 횟수입니다.'));
+});
+
+test('Skill off clears cached counts, shows settings guidance and leaves token statistics available',()=>{
+  const {get,messages,receive}=view({section:'skills'});
+  const rows=[{provider:'codex',name:'commit',usage_count:3,percentage:100}];
+  const page={rows,chartRows:rows,total:1,totalUses:3};
+  receive({type:'usage',result:{capabilitiesEnabled:true,capabilities:{skill:page,subagent:page,plugin:page,model:page},rows:[],total:0}});
+  assert.match(get('skill-table').textContent,/commit/);
+  receive({type:'state',timezone:'UTC',capabilitiesEnabled:false});
+  assert.equal(get('skill-content').hidden,true);assert.equal(get('skill-disabled').hidden,false);
+  assert.equal(get('skill-table').textContent,'','old counts cannot reappear during a state update');
+  receive({type:'usage',result:{capabilitiesEnabled:false,rows:[],total:0}});
+  get('skill-settings').listeners.get('click')!();assert.equal(messages.at(-1)?.type,'settings');
+  get('section-tokens').listeners.get('click')!();assert.equal(get('token-section').hidden,false);
+  receive({type:'state',timezone:'UTC',capabilitiesEnabled:true});
+  assert.equal(get('skill-disabled').hidden,true);assert.equal(get('skill-content').hidden,false);
+});
+
+test('reset returns query controls and chart grouping to defaults while retaining extension cost settings',()=>{
+  const {get,messages,receive,respond,state} = view({group:'month',chartMetric:'averageTokens',chartBy:'model',showCosts:true});
+  assert.equal(messages[0].query?.chartBy,'model');assert.equal(messages[0].query?.includeCosts,undefined);
+  receive({type:'state',timezone:'UTC',showApiCosts:true});
   get('from-day').value='2026-10-01';get('to-day').value='2026-10-02';
   get('session-name').listeners.get('click')!();respond({rows:sessions,total:3});
   get('session-list').children[2].listeners.get('click')!();
   assert.equal(messages.at(-1)?.query?.sessionId,'two');
-  get('next').listeners.get('click')!();get('cumulative-next').listeners.get('click')!();
+  get('next').listeners.get('click')!();
   get('project-name').listeners.get('click')!();
   get('reset-filters').listeners.get('click')!();
   const query = messages.at(-1)?.query;
   assert.equal(query?.groupBy,'day');assert.equal(query?.chartMetric,'tokens');
   for (const name of ['provider','sessionId','projectKey','fromDay','toDay']) assert.equal(query?.[name],undefined);
-  assert.equal(query?.offset,0);assert.equal(query?.cumulativeOffset,0);assert.equal(query?.cumulativeBy,'provider');
-  assert.equal(query?.includeCosts,true);assert.equal(get('project-options').hidden,true);
+  assert.equal(query?.offset,0);assert.equal(query?.chartBy,'provider');assert.equal(query?.cumulativeBy,undefined);
+  assert.equal(get('cost-note').hidden,false);assert.equal(get('project-options').hidden,true);
   assert.equal(get('billing-control').hidden,true);assert.equal(get('project-name').textContent,'전체 프로젝트');
   assert.equal(get('session-name').textContent,'전체 세션');
-  assert.deepEqual(JSON.parse(JSON.stringify(state())),{group:'day',chartMetric:'tokens',cumulativeBy:'provider',showCosts:true});
+  assert.deepEqual(JSON.parse(JSON.stringify(state())),{section:'tokens',group:'day',chartMetric:'tokens',chartBy:'provider'});
 });
 
-test('cost toggle displays stored costs and unknown coverage in table and cumulative model rows without refreshing sources',()=>{
+test('extension cost settings display stored costs and session billing without refreshing sources',()=>{
   const {get,messages,receive,respond} = view();
-  get('show-costs').checked=true;get('show-costs').listeners.get('change')!();
-  assert.equal(messages.at(-1)?.query?.includeCosts,true);assert.equal(get('cost-note').hidden,false);
-  get('cumulative-model').listeners.get('click')!();
-  assert.equal(messages.at(-1)?.query?.cumulativeBy,'model');assert.equal(get('cumulative-model').attributes.get('aria-pressed'),'true');
+  receive({type:'state',timezone:'UTC',showApiCosts:true});
+  assert.equal(get('cost-note').hidden,false);
+  get('chart-model').listeners.get('click')!();
+  assert.equal(messages.at(-1)?.query?.chartBy,'model');assert.equal(get('chart-model').attributes.get('aria-pressed'),'true');
   const row = {...sessions[0],input_tokens:100,output_tokens:50,cache_write_input_tokens:20,cache_read_input_tokens:30,total_tokens:150,
     cost_usd:0.001,billing_mode:'api',unknown_costs:1,model:'claude-sonnet-4-6'};
-  receive({type:'usage',result:{groupBy:'session',rows:[row],total:1,coverage:{files:1,done:1},cumulative:{by:'model',rows:[row],total:1}}});
+  receive({type:'usage',result:{groupBy:'session',rows:[row],total:1,coverage:{files:1,done:1}}});
   assert.match(get('usage-table').textContent,/API 추정 비용 \(USD\).*\$0.0010.*미확인 1건/);
-  assert.match(get('cumulative-table').textContent,/모델.*claude-sonnet-4-6.*\$0.0010.*미확인 1건/);
   get('session-name').listeners.get('click')!();respond({rows:sessions,total:3});
   get('session-list').children[1].listeners.get('click')!();
   assert.equal(get('billing-control').hidden,false);
@@ -87,11 +150,46 @@ test('cost toggle displays stored costs and unknown coverage in table and cumula
   assert.equal(get('billing-mode').value,'subscription');assert.equal(get('billing-mode').disabled,false);
   get('billing-mode').value='api';get('billing-mode').listeners.get('change')!();
   assert.equal(messages.at(-1)?.type,'setSessionBilling');
-  get('show-costs').checked=false;get('show-costs').listeners.get('change')!();
+  receive({type:'state',timezone:'UTC',showApiCosts:false});
   receive({type:'usage',result:{groupBy:'session',rows:[row],total:1,coverage:{files:1,done:1}}});
   assert.doesNotMatch(get('usage-table').textContent,/API 추정 비용|\$0.0010/);
   assert.equal(get('cost-note').hidden,true);assert.equal(get('billing-control').hidden,true);
   assert.ok(messages.every(message=>!['refreshUsage','refreshQuota'].includes(message.type)));
+});
+
+test('changing the token grouping basis resets pagination and uses the returned table basis',()=>{
+  const {get,messages,receive}=view();
+  get('next').listeners.get('click')!();assert.equal(messages.at(-1)?.query?.offset,100);
+  get('chart-model').listeners.get('click')!();assert.equal(messages.at(-1)?.query?.offset,0);
+  const row={...sessions[0],model:'claude-opus-5-5',total_tokens:150};
+  receive({type:'usage',result:{by:'model',groupBy:'session',rows:[row],total:1,coverage:{}}});
+  assert.match(get('usage-table').textContent,/모델.*opus5\.5/);
+  get('next').listeners.get('click')!();
+  get('chart-provider').listeners.get('click')!();assert.equal(messages.at(-1)?.query?.offset,0);
+  receive({type:'usage',result:{by:'provider',groupBy:'session',rows:[row],total:1,coverage:{}}});
+  assert.match(get('usage-table').textContent,/제공자.*Codex/);
+  assert.doesNotMatch(get('usage-table').textContent,/opus5\.5/);
+});
+
+test('every capability table paints ratios relative to the full-scope leader across pages',()=>{
+  const {get,receive}=view({section:'skills'});
+  const leader={provider:'claude',name:'leader',usage_count:200,percentage:20};
+  const second={provider:'codex',name:'second',usage_count:100,percentage:10};
+  const page={rows:[leader,second],chartRows:[leader,second],total:105,totalUses:1000};
+  const sendPage=(value:typeof page)=>receive({type:'usage',result:{capabilities:Object.fromEntries(['skill','subagent','plugin','model'].map(category=>[category,value])),rows:[],total:0}});
+  const fills=(category:string)=>get(`${category}-table`).children[0].children[1].children.map(row=>row.children[3].children[0].children[0].children[2]);
+  sendPage(page);
+  for (const category of ['skill','subagent','plugin','model']) {
+    assert.deepEqual(fills(category).map(fill=>Number(fill.attributes.get('width'))),[160,80]);
+    assert.match(get(`${category}-table`).textContent,/20%.*10%/);
+    assert.match(fills(category)[0].attributes.get('class')!,/claude/);
+    assert.match(fills(category)[1].attributes.get('class')!,/codex/);
+  }
+  sendPage({...page,rows:[{...second,usage_count:1,percentage:0.1}]});
+  for (const category of ['skill','subagent','plugin','model']) {
+    assert.equal(Number(fills(category)[0].attributes.get('width')),0.8,'a later page does not normalize its own leader to full width');
+    assert.match(get(`${category}-table`).textContent,/0.1%/);
+  }
 });
 
 test('table names and list selections use exact IDs and whole-list choices clear filters immediately', () => {

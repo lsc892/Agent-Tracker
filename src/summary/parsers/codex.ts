@@ -1,6 +1,7 @@
 import { SummaryError } from '../jsonl';
 import type { FileContext, ParsedIdentity, ParseSink, TokenVector } from '../types';
 import { billingMode, codexTokens, displayName, number, object, project, string, timestamp, tokenFlags } from './common';
+import { toolCapabilities } from './capabilities';
 
 /** Codex lifecycle payloads use Unix seconds; row timestamps and durations keep their existing units. */
 function lifecycleTimestamp(value: unknown): number | null {
@@ -87,6 +88,14 @@ export class CodexCurrentParserAdapter {
       return;
     }
     const time = timestamp(row.timestamp);
+    if (this.context.collectCapabilities !== false && row.type === 'response_item' && this.root && ['function_call','custom_tool_call'].includes(String(payload.type))) {
+      const name=string(payload.name);
+      const eventId=string(payload.call_id) ?? string(payload.id);
+      if (name && eventId) for (const use of toolCapabilities(name,payload.arguments ?? payload.input)) {
+        this.sink.event({kind:'capability',rootId:this.root,threadId:this.identityValue.threadId,
+          eventId:`${eventId}:${use.index}`,category:use.category,name:use.name,offset});
+      }
+    }
     if (row.type === 'event_msg') {
       const event = string(payload.type);
       const suppliedTurn = string(payload.turn_id);

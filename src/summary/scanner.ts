@@ -11,7 +11,7 @@ import { acquireRefreshLock } from './lock';
 import { applySessionNames, readSessionNames } from './names';
 import type { SourceRoot, SummaryOptions, SummaryProgress, RefreshResult } from './types';
 
-export const PARSER_VERSION = 10;
+export const PARSER_VERSION = 12;
 const componentPredicate = `EXISTS(SELECT 1 FROM component c WHERE c.provider=scan_files.provider
   AND (c.session_id=scan_files.session_id OR c.session_id=scan_files.old_session))`;
 
@@ -37,6 +37,7 @@ export async function refreshSummary(
 ): Promise<RefreshResult> {
   const result: RefreshResult = { scanId:randomUUID(),discovered:0,parsed:0,reused:0,failed:0,bodyBytes:0,interrupted:false,completedAt:'' };
   const cancellation = options.cancellation ? new Int32Array(options.cancellation) : undefined;
+  const collectCapabilities = options.collectCapabilities !== false;
   const isCancelled = (): boolean => Boolean(signal?.aborted || cancellation && Atomics.load(cancellation,0));
   if (isCancelled()) return {...result,interrupted:true,error:'interrupted',completedAt:new Date().toISOString()};
   let release: () => Promise<void>;
@@ -47,7 +48,7 @@ export async function refreshSummary(
   let staging: SummaryStaging;
   let roots: SourceRoot[];
   try {
-    staging = new SummaryStaging(database.connection);
+    staging = new SummaryStaging(database.connection,collectCapabilities);
     roots = options.roots.map(root => ({ ...root,path:resolve(root.path) }));
   } catch (error) { await release();throw error; }
   let phase: SummaryProgress['phase'] = 'scanning';
@@ -70,7 +71,7 @@ export async function refreshSummary(
     check();
     database.setManifestDiagnostic(file.id,'processing','parse: byte=0',null);
     const sink = { identity: staging.identity.bind(staging,file.id),event: staging.event.bind(staging,file.id) };
-    const context = {provider:file.provider,path:file.path,sourceRoot:file.source_root,fileId:file.id};
+    const context = {provider:file.provider,path:file.path,sourceRoot:file.source_root,fileId:file.id,collectCapabilities};
     const parser = file.provider === 'claude' ? new ClaudeParserAdapter(context,sink) : new CodexCurrentParserAdapter(context,sink);
     try {
       const snapshot = await lstat(file.path);
@@ -119,7 +120,7 @@ export async function refreshSummary(
           const observed = previous ? (database.markSeen(previous.id,result.scanId),previous) : database.observeFile(file,result.scanId);
           const changed = !previous || previous.path !== file.path || previous.source_root !== file.source_root || previous.processing_status !== 'done' || previous.size_bytes !== file.size_bytes
             || previous.mtime_ms !== file.mtime_ms || previous.dev !== file.dev || previous.inode !== file.inode
-            || previous.parser_version !== PARSER_VERSION;
+            || previous.parser_version !== PARSER_VERSION || collectCapabilities && previous.capabilities_collected !== 1;
           staging.addFile({...file,id:observed.id,session_id:previous?.session_id ?? null},previous?.session_id ?? null,changed);
           if (!changed) result.reused++;
         }
@@ -230,6 +231,7 @@ export async function refreshSummary(
         } else {
           try {
             database.replaceSessions({sessions:staging.componentSessions(),summaries:staging.summaries(),
+              preserveCapabilities:!collectCapabilities,
               files:staging.files(`removed=0 AND ${componentPredicate}`),
               removedFileIds:(function* () { for (const file of staging.files(`removed=1 AND ${componentPredicate}`)) yield file.id; })()});
           } catch {

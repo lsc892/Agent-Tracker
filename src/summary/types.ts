@@ -1,6 +1,7 @@
 export type Provider = 'claude' | 'codex';
 export interface SourceRoot { provider: Provider; path: string; dataHome?: string }
 export interface SummaryOptions {
+  collectCapabilities?: boolean;
   dbPath: string;
   roots: SourceRoot[];
   timezone?: string;
@@ -11,6 +12,8 @@ export interface SummaryOptions {
   cancellation?: SharedArrayBuffer;
 }
 export interface UsageQuery {
+  section?: 'tokens' | 'skills';
+  capabilityOffsets?: Partial<Record<import('./db/types').CapabilityCategory, number>>;
   includeCosts?: boolean;
   groupBy?: 'day' | 'month' | 'project' | 'session' | 'all' | 'turn';
   timezone?: string;
@@ -26,6 +29,7 @@ export interface UsageQuery {
   offset?: number;
   afterId?: number;
   chartMetric?: import('./db/types').ChartMetric;
+  chartBy?: 'provider' | 'model';
   cumulativeBy?: 'provider' | 'model';
   cumulativeOffset?: number;
 }
@@ -65,6 +69,9 @@ export interface SummaryProgress {
   bodyBytes: number;
 }
 export interface UsageResult {
+  by?: 'provider' | 'model';
+  capabilitiesEnabled?: boolean;
+  capabilities?: Record<import('./db/types').CapabilityCategory, import('./db/types').CapabilityPage>;
   billing?: import('./db/types').BillingMode;
   rows: import('./db/types').UsageRow[] | import('./db/types').TurnSummaryRow[];
   total: number;
@@ -81,6 +88,7 @@ export interface TokenVector {
   reasoning: number;
 }
 export interface FileContext {
+  collectCapabilities?: boolean;
   provider: Provider;
   path: string;
   sourceRoot: string;
@@ -131,7 +139,12 @@ export interface CheckEvent {
   kind: 'check'; rootId: string; threadId: string; turnId: string;
   tokens: TokenVector; offset: number;
 }
-export type ParseEvent = TurnEvent | UsageEvent | CheckEvent;
+export interface CapabilityEvent {
+  kind: 'capability'; rootId: string; threadId: string; eventId: string;
+  category: Exclude<import('./db/types').CapabilityCategory, 'model'>;
+  name: string; offset: number;
+}
+export type ParseEvent = TurnEvent | UsageEvent | CheckEvent | CapabilityEvent;
 export interface ParseSink {
   identity(identity: ParsedIdentity): void;
   event(event: ParseEvent): void;

@@ -38,18 +38,19 @@ h3 { font-size: 15px; }
 input, select { border: 1px solid var(--vscode-input-border, transparent); color: var(--vscode-input-foreground); background: var(--vscode-input-background); padding: 7px 9px; border-radius: 3px; max-width: 200px; }
 .table-wrap { overflow-x: auto; border: 1px solid var(--vscode-panel-border); border-radius: 5px; }
 .usage-chart { margin: 24px 0 28px; }
-.cumulative { margin: 24px 0; }
+.filter-toggle { display: flex; flex-direction: column; gap: 6px; color: var(--vscode-descriptionForeground); font-size: 12px; }
 .segmented { display: flex; gap: 4px; }
 .segmented button[aria-pressed=true] { color: var(--vscode-button-foreground); background: var(--vscode-button-background); }
 .cost-controls { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
 .cost-controls label { display: flex; align-items: center; gap: 8px; }
-.cost-toggle input { accent-color: var(--vscode-button-background); }
 .chart-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
 .chart-heading h3 { margin: 0; }
 .chart-heading label { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--vscode-descriptionForeground); }
+.chart-controls { display: flex; flex-wrap: wrap; gap: 12px; }
 #chart-scope { font-size: 12px; }
-.chart-legend { display: flex; flex-wrap: wrap; gap: 16px; margin: 12px 0; font-size: 12px; }
-.chart-legend-item { display: inline-flex; align-items: center; gap: 6px; }
+.chart-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; margin: 0 0 12px; padding: 0; list-style: none; font-size: 12px; }
+.chart-legend li { display: inline-flex; align-items: center; gap: 6px; }
+.chart-legend svg { display: block; flex-shrink: 0; }
 .chart-plot { overflow-x: auto; }
 .chart-svg { display: block; font-family: inherit; font-variant-numeric: tabular-nums; }
 .chart-series-0 { fill: var(--vscode-charts-blue, var(--vscode-terminal-ansiBlue)); }
@@ -58,6 +59,13 @@ input, select { border: 1px solid var(--vscode-input-border, transparent); color
 .chart-series-3 { fill: var(--vscode-charts-green, var(--vscode-terminal-ansiGreen)); }
 .chart-unknown { fill: var(--vscode-descriptionForeground); }
 .chart-measure { fill: var(--vscode-charts-blue, var(--vscode-terminal-ansiBlue)); }
+.chart-provider-codex { fill: var(--vscode-charts-blue, #3794ff); }
+.chart-provider-claude { fill: #d97757; }
+.model-name { display: inline-flex; align-items: baseline; gap: 6px; }
+.model-name svg { flex-shrink: 0; }
+.capability-ratio { display: flex; align-items: center; gap: 10px; min-width: 200px; }
+.capability-ratio svg { width: 160px; height: 12px; flex-shrink: 0; }
+.capability-ratio-track { fill: var(--vscode-panel-border, #808080); fill-opacity: .4; }
 .chart-grid { stroke: var(--vscode-panel-border); stroke-width: 1; }
 .chart-axis-label, .chart-provider { fill: var(--vscode-descriptionForeground); font-size: 11px; }
 .chart-value, .chart-label { fill: var(--vscode-foreground); font-size: 12px; }
@@ -74,6 +82,8 @@ tr:last-child td { border-bottom: 0; }
 #usage-progress { color: var(--vscode-descriptionForeground); min-height: 18px; }
 [hidden] { display: none !important; }
 @media(max-width: 720px) { body { padding: 20px 16px; } header, .section-title { align-items: flex-start; } h1 { font-size: 21px; } }
+.statistics-sections { margin: 12px 0 20px; }
+.capability-statistics { margin-top: 24px; }
 .color-settings { max-width: 660px; }
 .color-settings label { display: flex; flex-direction: column; gap: 8px; margin: 18px 0; }
 .color-inputs { display: flex; gap: 20px; align-items: center; }

@@ -19,7 +19,11 @@ port.on('message',(message: {id?:number;method:string;payload?:unknown}) => {
       database ??= new SummaryDatabase(options.dbPath);
       let result: unknown;
       if (message.method === 'initialize') result = undefined;
-      else if (message.method === 'refresh') {
+      else if (message.method === 'configureCapabilities') {
+        const config=message.payload as {enabled?:unknown};
+        if (typeof config.enabled !== 'boolean') throw new Error('Invalid capability collection setting');
+        options.collectCapabilities=config.enabled;
+      } else if (message.method === 'refresh') {
         const config = (message.payload ?? {}) as {roots?:SourceRoot[];timezone?:string;cancellation?:SharedArrayBuffer};
         if (config.roots) options.roots = config.roots;
         if (config.timezone) options.timezone = config.timezone;
@@ -31,15 +35,26 @@ port.on('message',(message: {id?:number;method:string;payload?:unknown}) => {
         finally { cancellation = undefined; }
       } else if (message.method === 'query') {
         const query = (message.payload ?? {}) as UsageQuery;
-        const rows = query.groupBy === 'turn' ? database.queryTurns(query,query)
-          : database.queryUsage(query,query.groupBy === 'all' || !query.groupBy ? 'total' : query.groupBy,query.timezone ?? options.timezone ?? 'UTC',query);
-        const total = query.groupBy === 'turn' ? database.queryTurnsCount(query)
-          : database.queryUsageCount(query,query.groupBy === 'all' || !query.groupBy ? 'total' : query.groupBy,query.timezone ?? options.timezone ?? 'UTC');
-        const chart = query.chartMetric ? database.queryUsageChart(query, query.groupBy ?? 'all', query.timezone ?? options.timezone ?? 'UTC', query.chartMetric) : undefined;
-        const cumulativeFilter = query.groupBy === 'day' || query.groupBy === 'month' ? {...query,unknownTime:'include' as const} : query;
-        const cumulative = query.cumulativeBy ? database.queryCumulative(cumulativeFilter,query.cumulativeBy,query.cumulativeOffset) : undefined;
-        const billing = query.includeCosts && query.provider && query.sessionId ? database.sessionBilling(query.provider,query.sessionId) : undefined;
-        result = {rows,total,chart,cumulative,billing,coverage:database.diagnostics({limit:1,providers:query.providers}).counts};
+        if (query.section === 'skills') {
+          if (options.collectCapabilities === false) {
+            result={rows:[],total:0,capabilitiesEnabled:false,coverage:database.diagnostics({limit:1,providers:query.providers}).counts};
+          } else {
+            const capabilities = Object.fromEntries((['skill','subagent','plugin','model'] as const)
+              .map(category=>[category,database!.queryCapabilities(query,category,query.capabilityOffsets?.[category])]));
+            result={rows:[],total:0,capabilities,capabilitiesEnabled:true,coverage:database.diagnostics({limit:1,providers:query.providers}).counts};
+          }
+        } else {
+          const by = query.chartBy ?? 'provider';
+          const rows = query.groupBy === 'turn' ? database.queryTurns(query,query,by)
+          : database.queryUsage(query,query.groupBy === 'all' || !query.groupBy ? 'total' : query.groupBy,query.timezone ?? options.timezone ?? 'UTC',query,by);
+          const total = query.groupBy === 'turn' ? database.queryTurnsCount(query,by)
+          : database.queryUsageCount(query,query.groupBy === 'all' || !query.groupBy ? 'total' : query.groupBy,query.timezone ?? options.timezone ?? 'UTC',by);
+          const chart = query.chartMetric ? database.queryUsageChart(query, query.groupBy ?? 'all', query.timezone ?? options.timezone ?? 'UTC', query.chartMetric, query.chartBy) : undefined;
+          const cumulativeFilter = query.groupBy === 'day' || query.groupBy === 'month' ? {...query,unknownTime:'include' as const} : query;
+          const cumulative = query.cumulativeBy ? database.queryCumulative(cumulativeFilter,query.cumulativeBy,query.cumulativeOffset) : undefined;
+          const billing = query.includeCosts && query.provider && query.sessionId ? database.sessionBilling(query.provider,query.sessionId) : undefined;
+          result = {rows,total,by,chart,cumulative,billing,coverage:database.diagnostics({limit:1,providers:query.providers}).counts};
+        }
       } else if (message.method === 'setBilling') {
         const {provider,sessionId,mode} = message.payload as {provider:Provider;sessionId:string;mode:BillingMode};
         const release = await acquireRefreshLock(options.dbPath,AbortSignal.timeout(30_000));

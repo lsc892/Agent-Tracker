@@ -1,7 +1,7 @@
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync, type SQLInputValue, type StatementSync } from 'node:sqlite';
-import { SCHEMA_SQL, SCHEMA_VERSION, SCHEMA_LEGACY_MIGRATION_SQL, SCHEMA_CACHE_MIGRATION_SQL, SCHEMA_MODEL_SQL } from './schema';
+import { SCHEMA_SQL, SCHEMA_VERSION, SCHEMA_LEGACY_MIGRATION_SQL, SCHEMA_CACHE_MIGRATION_SQL, SCHEMA_MODEL_SQL, SCHEMA_CAPABILITY_SQL } from './schema';
 import { calendarPeriod } from './timezone';
 import { estimateCost, PRICING_VERSION } from '../pricing';
 import type { NameQuery, NameResult } from '../types';
@@ -9,6 +9,7 @@ import type {
   DiagnosticsPage, FileMetadata, KeysetPage, ManifestRow, OffsetPage,
   ProcessingStatus, Provider, SessionReplacement, SummaryFilter,
   TurnSummaryInput, TurnSummaryRow, UsageGrouping, UsageRow, ChartMetric, UsageChart, CumulativeRow, BillingMode,
+  CapabilityCategory, CapabilityPage, CapabilityRow,
 } from './types';
 
 export * from './types';
@@ -35,7 +36,27 @@ const TURN_INSERT = `INSERT INTO turn_summary (
 
 const COSTED_TURNS = `(SELECT t.*,c.cost_usd,coalesce(c.unknown_costs,1) AS unknown_costs,
   coalesce(c.billing_mode,'unknown') AS billing_mode FROM turn_summary t LEFT JOIN turn_costs c ON c.turn_id=t.id)`;
-const namedTurns = (costs = false): string => `(SELECT t.*, p.project_name, s.session_name FROM ${costs ? COSTED_TURNS : 'turn_summary'} t
+// Keep unrecorded usage separate from tokens whose model is unknown.
+const MODEL_NAME = `CASE WHEN coalesce(m.model,'')='' AND coalesce(m.input_tokens+m.output_tokens,t.total_tokens)=0
+  THEN NULL ELSE coalesce(m.model,'') END AS model`;
+// One row per request/model; older summaries retain all reported tokens.
+const modelTurns = (costs = false): string => `(SELECT t.id,t.provider,t.project_key,t.session_id,t.root_turn_id,t.turn_index,
+  t.started_at_ms,t.completed_at_ms,t.duration_ms,t.duration_quality,t.status,t.quality_flags,
+  t.diagnostic_file_id,t.diagnostic_offset,t.last_error,t.updated_at,${MODEL_NAME},
+  coalesce(m.input_tokens,t.input_tokens) AS input_tokens,coalesce(m.output_tokens,t.output_tokens) AS output_tokens,
+  CASE WHEN m.turn_id IS NULL THEN t.cache_write_input_tokens ELSE m.cache_write_input_tokens END AS cache_write_input_tokens,
+  CASE WHEN m.turn_id IS NULL THEN t.cache_read_input_tokens ELSE m.cache_read_input_tokens END AS cache_read_input_tokens,
+  coalesce(m.input_tokens+m.output_tokens,t.total_tokens) AS total_tokens${costs ? `,
+  coalesce(c.billing_mode,'unknown') AS billing_mode,
+  CASE WHEN c.billing_mode='subscription' THEN 0 WHEN c.billing_mode='api' THEN m.estimated_cost_usd END AS cost_usd,
+  CASE WHEN c.billing_mode='subscription' OR c.billing_mode='api' AND m.estimated_cost_usd IS NOT NULL THEN 0 ELSE 1 END AS unknown_costs` : ''}
+  FROM turn_summary t LEFT JOIN turn_model_usage m ON m.turn_id=t.id${costs ? ' LEFT JOIN turn_costs c ON c.turn_id=t.id' : ''})`;
+const usageTurns = (costs = false, by: 'provider' | 'model' = 'provider'): string => {
+  if (by === 'model') return modelTurns(costs);
+  if (by !== 'provider') throw new RangeError('Unknown usage grouping basis');
+  return costs ? COSTED_TURNS : 'turn_summary';
+};
+const namedTurns = (costs = false, by: 'provider' | 'model' = 'provider'): string => `(SELECT t.*, p.project_name, s.session_name FROM ${usageTurns(costs,by)} t
   JOIN projects p ON p.project_key=t.project_key
   JOIN sessions s ON s.provider=t.provider AND s.session_id=t.session_id)`;
 const NAMED_TURNS = namedTurns();
@@ -166,6 +187,10 @@ export class SummaryDatabase {
           this.connection.exec(current.user_version === 1 || current.user_version === 2 ? SCHEMA_LEGACY_MIGRATION_SQL
             : current.user_version === 3 ? SCHEMA_CACHE_MIGRATION_SQL : SCHEMA_SQL);
           this.connection.exec(SCHEMA_MODEL_SQL);
+          this.connection.exec(SCHEMA_CAPABILITY_SQL);
+          if (!this.connection.prepare('PRAGMA table_info(manifest)').all().some(column=>column.name==='capabilities_collected')) {
+            this.connection.exec('ALTER TABLE manifest ADD COLUMN capabilities_collected INTEGER NOT NULL DEFAULT 0 CHECK(capabilities_collected IN (0,1))');
+          }
           this.connection.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
         });
       }
@@ -291,11 +316,21 @@ export class SummaryDatabase {
       // a correlated EXISTS scans every stored turn for each replaced session.
       this.connection.exec(`INSERT OR IGNORE INTO db_replacement_projects SELECT project_key FROM turn_summary
         WHERE (provider,session_id) IN (SELECT provider,session_id FROM db_replacement_sessions)`);
+      if (replacement.preserveCapabilities) this.connection.exec(`
+        CREATE TEMP TABLE IF NOT EXISTS db_saved_capabilities (
+          provider TEXT NOT NULL,session_id TEXT NOT NULL,root_turn_id TEXT NOT NULL,
+          category TEXT NOT NULL,name TEXT NOT NULL,usage_count INTEGER NOT NULL,
+          PRIMARY KEY(provider,session_id,root_turn_id,category,name)
+        ) WITHOUT ROWID;
+        DELETE FROM db_saved_capabilities;
+        INSERT INTO db_saved_capabilities SELECT t.provider,t.session_id,t.root_turn_id,u.category,u.name,u.usage_count
+          FROM turn_summary t JOIN turn_capability_usage u ON u.turn_id=t.id
+          WHERE (t.provider,t.session_id) IN (SELECT provider,session_id FROM db_replacement_sessions);`);
       this.connection.exec(`DELETE FROM turn_summary WHERE (provider, session_id) IN (
         SELECT provider, session_id FROM db_replacement_sessions
       )`);
       const updateFile = this.statement(`UPDATE manifest SET
-        source_root = ?, path = ?, session_id = ?, size_bytes = ?, mtime_ms = ?, dev = ?, inode = ?, parser_version = ?,
+        source_root = ?, path = ?, session_id = ?, size_bytes = ?, mtime_ms = ?, dev = ?, inode = ?, parser_version = ?, capabilities_collected = ?,
         processing_status = 'done', processing_position = 'committed', recorded_at = ?, last_error = NULL
         WHERE id = ? AND provider = ?`);
       const now = new Date().toISOString();
@@ -306,7 +341,7 @@ export class SummaryDatabase {
         requireSession(previous.provider, previous.session_id);
         requireSession(file.provider, file.session_id);
         const result = updateFile.run(file.source_root, file.path, file.session_id, file.size_bytes, file.mtime_ms,
-          file.dev, file.inode, file.parser_version, now, file.id, file.provider);
+          file.dev, file.inode, file.parser_version, file.capabilities_collected ?? 1, now, file.id, file.provider);
         if (result.changes !== 1) throw new Error('Replacement refers to an unknown manifest file');
       }
       const insert = this.statement(TURN_INSERT);
@@ -322,6 +357,12 @@ export class SummaryDatabase {
         session.run(summary.provider, summary.session_id, summary.session_name?.trim() || null);
         addProject.run(summary.project_key);
         const inserted = insert.run(...turnValues(summary, now));
+        for (const usage of summary.capability_usage ?? []) {
+          nonnegative(usage.usage_count, 'capability count');
+          if (usage.name.length > 512) throw new RangeError('Capability name is too long');
+          this.statement('INSERT INTO turn_capability_usage VALUES (?,?,?,?)')
+            .run(inserted.lastInsertRowid,usage.category,usage.name,usage.usage_count);
+        }
         let input = 0, output = 0, cacheWrite = 0, cacheRead = 0;
         for (const model of summary.model_usage ?? []) {
           nonnegative(model.input_tokens, 'model input tokens');
@@ -344,6 +385,10 @@ export class SummaryDatabase {
         this.saveTurnCost(inserted.lastInsertRowid,chosen ?? summary.billing ?? 'unknown');
       }
       const remove = this.statement('DELETE FROM manifest WHERE id = ?');
+      if (replacement.preserveCapabilities) this.connection.exec(`
+        INSERT INTO turn_capability_usage SELECT t.id,u.category,u.name,u.usage_count FROM db_saved_capabilities u
+          JOIN turn_summary t ON t.provider=u.provider AND t.session_id=u.session_id AND t.root_turn_id=u.root_turn_id;
+        DELETE FROM db_saved_capabilities;`);
       for (const id of replacement.removedFileIds ?? []) {
         const previous = existingFile.get(id);
         if (previous) requireSession(previous.provider, previous.session_id);
@@ -381,11 +426,11 @@ export class SummaryDatabase {
     return { rows, total };
   }
 
-  queryTurns(filter: SummaryFilter = {}, page: KeysetPage & { offset?: number } = {}): TurnSummaryRow[] {
+  queryTurns(filter: SummaryFilter = {}, page: KeysetPage & { offset?: number } = {}, by: 'provider' | 'model' = 'provider'): TurnSummaryRow[] {
     const where = whereClause(filter);
     const after = nonnegative(page.afterId ?? 0, 'afterId');
     const offset = nonnegative(page.offset ?? 0, 'offset');
-    return this.connection.prepare(`SELECT * FROM ${namedTurns(filter.includeCosts)} AS turn_summary WHERE ${where.sql} AND id > ? ORDER BY id LIMIT ? OFFSET ?`)
+    return this.connection.prepare(`SELECT * FROM ${namedTurns(filter.includeCosts,by)} AS turn_summary WHERE ${where.sql} AND id > ? ORDER BY id${by === 'model' ? ',model' : ''} LIMIT ? OFFSET ?`)
       .all(...where.values, after, pageLimit(page.limit), offset) as unknown as TurnSummaryRow[];
   }
 
@@ -423,18 +468,37 @@ export class SummaryDatabase {
       WHERE t.provider=? AND t.session_id=?`).get(provider,sessionId)?.mode as BillingMode ?? 'unknown';
   }
 
-  queryTurnsCount(filter: SummaryFilter = {}): number {
+  queryTurnsCount(filter: SummaryFilter = {}, by: 'provider' | 'model' = 'provider'): number {
     const where = whereClause(filter);
-    return (this.connection.prepare(`SELECT COUNT(*) AS count FROM turn_summary WHERE ${where.sql}`)
+    return (this.connection.prepare(`SELECT COUNT(*) AS count FROM ${usageTurns(false,by)} AS turn_summary WHERE ${where.sql}`)
       .get(...where.values) as { count: number }).count;
+  }
+
+  queryCapabilities(filter: SummaryFilter, category: CapabilityCategory, offset = 0): CapabilityPage {
+    if (!['skill','subagent','plugin','model'].includes(category)) throw new RangeError('Unknown capability category');
+    const where = whereClause(filter);
+    const source = `(SELECT t.*,u.category,u.name,u.usage_count FROM turn_summary t
+      JOIN turn_capability_usage u ON u.turn_id=t.id) AS turn_summary`;
+    const scope = `${where.sql} AND category=?`;
+    const counts = this.connection.prepare(`SELECT count(*) AS total,coalesce(sum(uses),0) AS totalUses FROM (
+      SELECT sum(usage_count) AS uses FROM ${source} WHERE ${scope} GROUP BY provider,name)`)
+      .get(...where.values,category) as {total:number;totalUses:number};
+    const ranking = this.connection.prepare(`SELECT provider,category,name,sum(usage_count) AS usage_count
+      FROM ${source} WHERE ${scope} GROUP BY provider,name ORDER BY usage_count DESC,provider,name LIMIT ? OFFSET ?`);
+    const pageOffset = nonnegative(offset,'offset');
+    const rows = ranking.all(...where.values,category,100,pageOffset) as unknown as CapabilityRow[];
+    const chartRows = pageOffset === 0 ? rows.slice(0,20)
+      : ranking.all(...where.values,category,20,0) as unknown as CapabilityRow[];
+    const withPercentage = (row: CapabilityRow): CapabilityRow => ({...row,percentage:counts.totalUses ? row.usage_count/counts.totalUses*100 : 0});
+    return {...counts,rows:rows.map(withPercentage),chartRows:chartRows.map(withPercentage)};
   }
 
   queryCumulative(filter: SummaryFilter, by: 'provider' | 'model', offset = 0): { rows: CumulativeRow[]; total: number; by: 'provider' | 'model' } {
     if (by !== 'provider' && by !== 'model') throw new RangeError('Unknown cumulative grouping');
     const where = whereClause(filter);
     if (by === 'provider') return { rows: this.queryUsage(filter).map(row => ({ ...row, model: '' })), total: this.queryUsageCount(filter), by };
-    // A LEFT JOIN retains older or zero-token requests in a separate unknown-model group.
-    const source = `(SELECT t.provider,t.project_key,t.session_id,t.started_at_ms,coalesce(m.model,'') AS model,
+    // Preserve zero-token requests without assigning them to an unknown model.
+    const source = `(SELECT t.provider,t.project_key,t.session_id,t.started_at_ms,${MODEL_NAME},
       coalesce(m.input_tokens,t.input_tokens) AS input_tokens,coalesce(m.output_tokens,t.output_tokens) AS output_tokens,
       CASE WHEN m.turn_id IS NULL THEN t.cache_write_input_tokens ELSE m.cache_write_input_tokens END AS cache_write_input_tokens,
       CASE WHEN m.turn_id IS NULL THEN t.cache_read_input_tokens ELSE m.cache_read_input_tokens END AS cache_read_input_tokens,
@@ -454,23 +518,23 @@ export class SummaryDatabase {
     return { rows, total, by };
   }
 
-  queryUsageCount(filter: SummaryFilter = {}, groupBy: UsageGrouping = 'total', timezone = 'UTC'): number {
+  queryUsageCount(filter: SummaryFilter = {}, groupBy: UsageGrouping = 'total', timezone = 'UTC', by: 'provider' | 'model' = 'provider'): number {
     if (!['total', 'project', 'session', 'day', 'month'].includes(groupBy)) throw new RangeError('Unknown usage grouping');
     const calendar = groupBy === 'day' || groupBy === 'month';
     if (calendar) calendarPeriod(0, timezone, groupBy);
     const where = whereClause(calendar && filter.unknownTime === undefined ? { ...filter, unknownTime: 'include' } : filter);
-    const groups = ['provider'];
+    const groups = by === 'model' ? ['provider','model'] : ['provider'];
     if (groupBy === 'project' || groupBy === 'session') groups.push('project_key');
     if (groupBy === 'session') groups.push('session_id');
     if (calendar) groups.push('period');
     const prefix: SQLInputValue[] = calendar ? [timezone, groupBy] : [];
     return (this.connection.prepare(`SELECT COUNT(*) AS count FROM (
       SELECT ${calendar ? 'agent_tracker_period(started_at_ms, ?, ?)' : 'NULL'} AS period
-      FROM turn_summary WHERE ${where.sql} GROUP BY ${groups.join(', ')}
+      FROM ${usageTurns(false,by)} AS turn_summary WHERE ${where.sql} GROUP BY ${groups.join(', ')}
     )`).get(...prefix, ...where.values) as { count: number }).count;
   }
 
-  queryUsage(filter: SummaryFilter = {}, groupBy: UsageGrouping = 'total', timezone = 'UTC', page: OffsetPage & { sortBy?: ChartMetric } = {}): UsageRow[] {
+  queryUsage(filter: SummaryFilter = {}, groupBy: UsageGrouping = 'total', timezone = 'UTC', page: OffsetPage & { sortBy?: ChartMetric } = {}, by: 'provider' | 'model' = 'provider'): UsageRow[] {
     if (!['total', 'project', 'session', 'day', 'month'].includes(groupBy)) throw new RangeError('Unknown usage grouping');
     if (groupBy === 'day' || groupBy === 'month') calendarPeriod(0, timezone, groupBy);
     const calendar = groupBy === 'day' || groupBy === 'month';
@@ -479,14 +543,14 @@ export class SummaryDatabase {
     const where = whereClause(calendar && filter.unknownTime === undefined ? { ...filter, unknownTime: 'include' } : filter);
     const project = groupBy === 'project' || groupBy === 'session';
     const period = calendar ? 'agent_tracker_period(started_at_ms, ?, ?)' : 'NULL';
-    const groups = ['provider'];
+    const groups = by === 'model' ? ['provider','model'] : ['provider'];
     if (project) groups.push('project_key');
     if (groupBy === 'session') groups.push('session_id');
     if (calendar) groups.push('period');
     const prefix: SQLInputValue[] = calendar ? [timezone, groupBy] : [];
     const metricColumns = { tokens: 'total_tokens', requests: 'turn_count', averageTokens: 'avg_tokens_per_turn', averageDuration: 'avg_duration_ms' };
     const order = page.sortBy ? `${metricColumns[page.sortBy]} DESC, ${groups.join(', ')}` : groups.join(', ');
-    return this.connection.prepare(`SELECT provider,
+    return this.connection.prepare(`SELECT provider,${by === 'model' ? 'model,' : ''}
       ${project ? 'project_key' : 'NULL'} AS project_key,
       ${project ? '(SELECT project_name FROM projects p WHERE p.project_key=turn_summary.project_key)' : 'NULL'} AS project_name,
       ${groupBy === 'session' ? 'session_id' : 'NULL'} AS session_id,
@@ -494,14 +558,16 @@ export class SummaryDatabase {
       ${groupBy === 'session' ? '(SELECT MIN(t.started_at_ms) FROM turn_summary t WHERE t.provider=turn_summary.provider AND t.session_id=turn_summary.session_id)' : 'NULL'} AS session_started_at_ms,
       ${period} AS period,
       ${USAGE_SUMS}${filter.includeCosts ? `,${COST_SUMS}` : ''}
-      FROM ${filter.includeCosts ? `${COSTED_TURNS} AS turn_summary` : 'turn_summary'} WHERE ${where.sql}
+      FROM ${usageTurns(filter.includeCosts,by)} AS turn_summary WHERE ${where.sql}
       GROUP BY ${groups.join(', ')} ORDER BY ${order} LIMIT ? OFFSET ?`)
       .all(...prefix, ...where.values, pageLimit(page.limit), nonnegative(page.offset ?? 0, 'offset')) as unknown as UsageRow[];
   }
 
   /** Bounded chart data is computed from the entire filter, independently of table pagination. */
-  queryUsageChart(filter: SummaryFilter, groupBy: UsageGrouping | 'all' | 'turn', timezone: string, metric: ChartMetric): UsageChart {
+  queryUsageChart(filter: SummaryFilter, groupBy: UsageGrouping | 'all' | 'turn', timezone: string, metric: ChartMetric, by: 'provider' | 'model' = 'provider'): UsageChart {
     if (!['tokens', 'requests', 'averageTokens', 'averageDuration'].includes(metric)) throw new RangeError('Unknown chart metric');
+    if (by === 'model') return this.queryModelChart(filter, groupBy, timezone, metric);
+    if (by !== 'provider') throw new RangeError('Unknown chart grouping');
     if (groupBy === 'turn') {
       const where = whereClause(filter);
       const rows = this.connection.prepare(`SELECT * FROM ${NAMED_TURNS} AS turn_summary WHERE ${where.sql}
@@ -536,6 +602,67 @@ export class SummaryDatabase {
       GROUP BY bucket, provider ORDER BY bucket IS NULL, bucket, provider`)
       .all(timezone, grouping, ...where.values) as unknown as UsageRow[];
     return { rows, mode: 'calendar', metric, total };
+  }
+
+  private queryModelChart(filter: SummaryFilter, groupBy: UsageGrouping | 'all' | 'turn', timezone: string, metric: ChartMetric): UsageChart {
+    if (!['total','all','day','month','project','session','turn'].includes(groupBy)) throw new RangeError('Unknown usage grouping');
+    const calendar = groupBy === 'day' || groupBy === 'month';
+    if (calendar) calendarPeriod(0, timezone, groupBy);
+    const where = whereClause(calendar && filter.unknownTime === undefined ? {...filter,unknownTime:'include'} : filter);
+    const args: SQLInputValue[] = [...(calendar ? [timezone,groupBy] : []),...where.values];
+    // Model rows are already deduplicated per root request. Keep unknown models and unrecorded usage
+    // and combine the tail per provider, preserving tokens and unique requests.
+    const scope = `WITH model_turns AS ${modelTurns()}, filtered AS (
+      SELECT *,${calendar ? 'agent_tracker_period(started_at_ms,?,?)' : 'NULL'} AS chart_period
+      FROM model_turns AS turn_summary WHERE ${where.sql}
+    ), ranked_models AS (
+      SELECT provider,model,ROW_NUMBER() OVER (ORDER BY sum(total_tokens) DESC,provider,model) AS rank
+      FROM filtered WHERE model<>'' GROUP BY provider,model
+    ), bounded AS (
+      SELECT id,provider,project_key,session_id,root_turn_id,turn_index,started_at_ms,status,duration_ms,duration_quality,
+        last_error,updated_at,chart_period,CASE WHEN rank>8 THEN '' ELSE model END AS model,
+        CASE WHEN rank>8 THEN 1 ELSE 0 END AS other_models,
+        SUM(input_tokens) AS input_tokens,SUM(output_tokens) AS output_tokens,
+        CASE WHEN count(cache_write_input_tokens)=count(*) THEN sum(cache_write_input_tokens) END AS cache_write_input_tokens,
+        CASE WHEN count(cache_read_input_tokens)=count(*) THEN sum(cache_read_input_tokens) END AS cache_read_input_tokens,
+        SUM(total_tokens) AS total_tokens
+      FROM filtered LEFT JOIN ranked_models USING(provider,model)
+      GROUP BY id,CASE WHEN rank>8 THEN '' ELSE model END,CASE WHEN rank>8 THEN 1 ELSE 0 END
+    )`;
+    if (groupBy === 'turn') {
+      const rows = this.connection.prepare(`${scope} SELECT b.*,
+        (SELECT project_name FROM projects p WHERE p.project_key=b.project_key) AS project_name,
+        (SELECT session_name FROM sessions s WHERE s.provider=b.provider AND s.session_id=b.session_id) AS session_name
+        FROM bounded b ORDER BY started_at_ms DESC,id DESC,provider,model,other_models LIMIT 60`)
+        .all(...args) as unknown as TurnSummaryRow[];
+      rows.reverse();
+      const total = (this.connection.prepare(`${scope} SELECT count(*) AS total FROM bounded`).get(...args) as {total:number}).total;
+      return {rows,mode:'turn',metric:metric === 'averageDuration' ? metric : 'tokens',total,by:'model'};
+    }
+    const project = groupBy === 'project' || groupBy === 'session';
+    const groups = ['provider','model','other_models',...(project ? ['project_key'] : []),...(groupBy === 'session' ? ['session_id'] : []),...(calendar ? ['chart_period'] : [])];
+    const total = (this.connection.prepare(`${scope} SELECT count(*) AS total FROM (
+      SELECT 1 FROM bounded GROUP BY ${groups.join(',')})`).get(...args) as {total:number}).total;
+    const periods = calendar ? `,periods AS (
+      SELECT chart_period,NTILE(30) OVER (ORDER BY chart_period) AS bucket
+      FROM (SELECT DISTINCT chart_period FROM bounded WHERE chart_period IS NOT NULL)
+    ),ranges AS (
+      SELECT bucket,MIN(chart_period) AS first_period,MAX(chart_period) AS last_period,count(*) AS period_count
+      FROM periods GROUP BY bucket)` : '';
+    const metricColumns = {tokens:'total_tokens',requests:'turn_count',averageTokens:'avg_tokens_per_turn',averageDuration:'avg_duration_ms'};
+    const rows = this.connection.prepare(`${scope}${periods} SELECT provider,model,other_models,
+      ${project ? 'project_key' : 'NULL'} AS project_key,
+      ${project ? '(SELECT project_name FROM projects p WHERE p.project_key=bounded.project_key)' : 'NULL'} AS project_name,
+      ${groupBy === 'session' ? 'session_id' : 'NULL'} AS session_id,
+      ${groupBy === 'session' ? '(SELECT session_name FROM sessions s WHERE s.provider=bounded.provider AND s.session_id=bounded.session_id)' : 'NULL'} AS session_name,
+      NULL AS session_started_at_ms,
+      ${calendar ? "CASE WHEN first_period=last_period THEN first_period ELSE first_period || ' ~ ' || last_period END" : 'NULL'} AS period,
+      ${calendar ? 'coalesce(ranges.period_count,0)' : '0'} AS period_count,${USAGE_SUMS}
+      FROM bounded ${calendar ? 'LEFT JOIN periods USING(chart_period) LEFT JOIN ranges USING(bucket)' : ''}
+      GROUP BY ${calendar ? 'bucket,provider,model,other_models' : groups.join(',')}
+      ORDER BY ${calendar ? 'bucket IS NULL,bucket,provider,other_models,model' : `${metricColumns[metric]} DESC,${groups.join(',')}`}
+      ${project ? 'LIMIT 10' : ''}`).all(...args) as unknown as UsageRow[];
+    return {rows,mode:calendar ? 'calendar' : project ? 'ranking' : 'total',metric,total,by:'model'};
   }
 
   diagnostics(page: KeysetPage & { afterSummaryId?: number; offset?: number; providers?: Provider[] } = {}): DiagnosticsPage {
