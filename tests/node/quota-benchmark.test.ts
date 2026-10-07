@@ -5,7 +5,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
-const script = resolve(__dirname, '../../scripts/quota/benchmark.cjs');
+const script = resolve(__dirname, '../../../tests/benchmarks/quota/benchmark.cjs');
 const { optionsFromArgs, summarizeSamples } = require(script) as {
   optionsFromArgs(args: string[]): { real: boolean; iterations: number };
   summarizeSamples(samples: Array<{ offsetMs: number; rssBytes: number; osPeakRssBytes?: number; cpuMs?: number }>,

@@ -4,9 +4,9 @@ import { mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync, appendFile
 import { tmpdir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { SummaryDatabase, type TurnSummaryInput } from '../src/summary/db';
-import { refreshSummary } from '../src/summary/scanner';
-import type { SummaryOptions } from '../src/summary/types';
+import { SummaryDatabase, type TurnSummaryInput } from '../../src/summary/db';
+import { refreshSummary } from '../../src/summary/scanner';
+import type { SummaryOptions } from '../../src/summary/types';
 
 const jsonl = (rows: unknown[]): string => rows.map(row => JSON.stringify(row)).join('\n') + '\n';
 const claude = (id: string, title: string): unknown[] => [

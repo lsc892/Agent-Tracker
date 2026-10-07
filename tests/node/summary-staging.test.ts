@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { SummaryDatabase } from '../src/summary/db';
-import { SummaryStaging } from '../src/summary/staging';
-import { readJsonl } from '../src/summary/jsonl';
+import { SummaryDatabase } from '../../src/summary/db';
+import { SummaryStaging } from '../../src/summary/staging';
+import { readJsonl } from '../../src/summary/jsonl';
 
 test('bounded TEMP event batches leave the persistent database available to another writer',async () => {
   const directory = await mkdtemp(join(tmpdir(),'agent-tracker-staging-'));

@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, readFile, appendFile, unlink, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { SummaryDatabase } from '../src/summary/db';
-import { PARSER_VERSION, refreshSummary } from '../src/summary/scanner';
-import { SummaryClient } from '../src/summary/client';
-import type { SummaryOptions } from '../src/summary/types';
-import { acquireRefreshLock } from '../src/summary/lock';
+import { SummaryDatabase } from '../../src/summary/db';
+import { PARSER_VERSION, refreshSummary } from '../../src/summary/scanner';
+import { SummaryClient } from '../../src/summary/client';
+import type { SummaryOptions } from '../../src/summary/types';
+import { acquireRefreshLock } from '../../src/summary/lock';
 
 const jsonl = (rows: unknown[]): string => rows.map(row => JSON.stringify(row)).join('\n') + '\n';
 const user = (root = 'prompt-one', session = 'session-one') => ({type:'user',sessionId:session,promptId:root,cwd:'/workspace/project',timestamp:'2026-10-01T00:00:00Z',message:{content:'synthetic prompt'}});

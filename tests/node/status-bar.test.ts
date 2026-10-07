@@ -2,8 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { quotaHoverSummary, remainingBar, statusBarPresentation } from '../src/ui/statusBarPresentation';
-import type { QuotaState } from '../src/quota/types';
+import { quotaHoverSummary, remainingBar, statusBarPresentation } from '../../src/ui/statusBarPresentation';
+import type { QuotaState } from '../../src/quota/types';
 
 const state: QuotaState = {
   provider: 'codex', status: 'ready', refreshing: false, lastSuccessAt: 0, error: null, nextAllowedAt: 0,
@@ -73,7 +73,7 @@ test('unavailable, refreshing, and stale states remain distinct', () => {
 });
 
 test('every status meter and logo references a shipped contributed icon font', () => {
-  const root = join(__dirname, '../..');
+  const root = join(__dirname, '../../..');
   const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as {
     contributes: { icons: Record<string, { default: { fontPath: string; fontCharacter: string } }> };
   };

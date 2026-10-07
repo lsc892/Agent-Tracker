@@ -1,17 +1,17 @@
 # Quota App Server 자원 벤치마크
 
-`scripts/quota/benchmark.cjs`는 `CodexQuotaProvider`를 그대로 사용하여 짧게 실행되는 App Server의 초기화·조회·종료 시간과 child process 메모리를 측정한다. 기본 실행은 합성 Node process이며 로그인이나 네트워크를 사용하지 않는다.
+`tests/benchmarks/quota/benchmark.cjs`는 `CodexQuotaProvider`를 그대로 사용하여 짧게 실행되는 App Server의 초기화·조회·종료 시간과 child process 메모리를 측정한다. 기본 실행은 합성 Node process이며 로그인이나 네트워크를 사용하지 않는다.
 
 ```sh
 npm run build
-node scripts/quota/benchmark.cjs
+node tests/benchmarks/quota/benchmark.cjs
 ```
 
-기본값은 success, error, timeout, cancel을 각각 두 번 실행한다. 결과는 `benchmark-results/quota.json`과 표준 출력에 JSON으로 기록한다. 폴더는 Git 및 VSIX 패키지에서 제외되어 있다. 다른 작업 디렉터리에서 실행해도 기본 출력 위치는 저장소의 `benchmark-results`다.
+기본값은 success, error, timeout, cancel을 각각 두 번 실행한다. 결과는 `tests/results/benchmarks/quota.json`과 표준 출력에 JSON으로 기록한다. 폴더는 Git 및 VSIX 패키지에서 제외되어 있다. 다른 작업 디렉터리에서 실행해도 기본 출력 위치는 저장소의 `tests/results/benchmarks`다.
 
 ```sh
-node scripts/quota/benchmark.cjs --iterations=1 --sample-ms=50
-node scripts/quota/benchmark.cjs --output=benchmark-results/quota-local.json
+node tests/benchmarks/quota/benchmark.cjs --iterations=1 --sample-ms=50
+node tests/benchmarks/quota/benchmark.cjs --output=tests/results/benchmarks/quota-local.json
 ```
 
 `--iterations`는 1–10, `--sample-ms`는 10–1000 범위를 허용한다. 샘플링 간격은 요청값이며 실제 간격은 OS 스케줄링과 process 조회 비용에 따라 길어진다. 실제 관측 간격도 결과에 기록한다.
@@ -21,8 +21,8 @@ node scripts/quota/benchmark.cjs --output=benchmark-results/quota-local.json
 실제 CLI 조회는 `--real`을 명시할 때만 실행한다. 기존 Codex 로그인과 환경을 사용하며 기본 한 번의 success 시나리오만 실행한다. 모델 추론이나 thread/turn 생성은 하지 않는다. 이 명령은 quota 네트워크 조회를 수행할 수 있다.
 
 ```sh
-node scripts/quota/benchmark.cjs --real
-node scripts/quota/benchmark.cjs --real --iterations=2 --output=benchmark-results/quota-real.json
+node tests/benchmarks/quota/benchmark.cjs --real
+node tests/benchmarks/quota/benchmark.cjs --real --iterations=2 --output=tests/results/benchmarks/quota-real.json
 ```
 
 필요하면 `--executable=...`, `--data-home=...`으로 CLI와 `CODEX_HOME`을 지정한다. 이 두 옵션은 `--real` 없이는 거부한다. Windows npm 설치의 `codex.cmd`는 provider가 native 실행 파일로 해석한다.
@@ -71,7 +71,7 @@ Windows는 숨겨진 PowerShell sampler를 먼저 시작하고 대상 PID만 전
 
 ```sh
 npm run build
-node --test dist/tests/quota.test.js dist/tests/quota-benchmark.test.js
+node --test dist/tests/node/quota.test.js dist/tests/node/quota-benchmark.test.js
 ```
 
 회귀 테스트는 실제 계정 옵트인 조건, RSS/CPU 지표 구분, success/error/timeout/cancel 결과, child/sampler 종료와 출력 내용 제한을 검증한다. 실제 Codex quota endpoint 및 계정 상태 확인은 `--real` 실행으로 별도 수행한다.

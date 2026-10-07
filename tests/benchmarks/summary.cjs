@@ -2,7 +2,7 @@ const { mkdtemp, mkdir, open, writeFile, rm } = require('node:fs/promises');
 const { tmpdir } = require('node:os');
 const { join, resolve } = require('node:path');
 const { performance } = require('node:perf_hooks');
-const { SummaryClient } = require('../dist/src/summary/client');
+const { SummaryClient } = require('../../dist/src/summary/client');
 
 const files = Math.max(1, Math.min(10000, Number(process.env.BENCHMARK_FILES) || 300));
 const turns = Math.max(1, Math.min(100000, Number(process.env.BENCHMARK_TURNS) || 2000));
@@ -44,7 +44,7 @@ async function main() {
       results.push({ scenario, elapsedMs, ...result, totalTokens: query.rows[0].total_tokens });
     }
     const report = { node: process.version, platform: process.platform, fileCount: files + 1, largeSessionTurns: turns, combinedHostWorkerPeakRssBytes: peakRss, sampledEveryMs: 10, results };
-    const output = resolve(__dirname, '..', 'benchmark-results');
+    const output = resolve(__dirname, '../results/benchmarks');
     await mkdir(output, { recursive: true });
     await writeFile(join(output, 'summary.json'), JSON.stringify(report, null, 2));
     console.log(JSON.stringify(report, null, 2));

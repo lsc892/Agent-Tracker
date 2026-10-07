@@ -25,4 +25,4 @@ jobs:
         if: always()
         with:
           name: benchmark-results
-          path: benchmark-results/
+          path: tests/results/benchmarks/

@@ -4,8 +4,8 @@ import { tmpdir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 import { test, type TestContext } from 'node:test';
 import { DatabaseSync } from 'node:sqlite';
-import { SummaryDatabase, periodBounds, type FileMetadata, type TurnSummaryInput } from '../src/summary/db';
-import { SCHEMA_SQL, SCHEMA_VERSION } from '../src/summary/db/schema';
+import { SummaryDatabase, periodBounds, type FileMetadata, type TurnSummaryInput } from '../../src/summary/db';
+import { SCHEMA_SQL, SCHEMA_VERSION } from '../../src/summary/db/schema';
 
 // The pre-normalization schema stored the project label on every request.
 const legacySchema = SCHEMA_SQL

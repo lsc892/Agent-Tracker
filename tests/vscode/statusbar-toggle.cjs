@@ -4,7 +4,7 @@ const { existsSync, readFileSync } = require('node:fs');
 const { join, resolve } = require('node:path');
 const { spawn } = require('node:child_process');
 const { createServer } = require('node:net');
-const { operate, checksum, resolveAppRoot } = require('./vscode/statusbar-toggle.cjs');
+const { operate, checksum, resolveAppRoot } = require('../../tools/vscode/statusbar-toggle.cjs');
 
 const sleep = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
 async function until(probe, description, timeout = 15000) {
@@ -53,11 +53,12 @@ async function main() {
   const appRoot = resolveAppRoot();
   const patch = baseline ? { appRoot, version: JSON.parse(readFileSync(join(appRoot, 'package.json'), 'utf8')).version } : operate({ check: true });
   const reportName = baseline ? 'statusbar-toggle-baseline.json' : quotaFixture ? 'quota-card.json' : 'statusbar-toggle.json';
-  const root = resolve(__dirname, '..');
-  const resultDirectory = join(root, 'test-results');
+  const root = resolve(__dirname, '../..');
+  const resultDirectory = join(root, 'tests', 'results');
   await mkdir(resultDirectory, { recursive: true });
-  await mkdir(join(root, '.vscode-test'), { recursive: true });
-  const sandbox = await mkdtemp(join(root, '.vscode-test', 'toggle-'));
+  const testHome = join(root, 'tests', '.cache', 'vscode');
+  await mkdir(testHome, { recursive: true });
+  const sandbox = await mkdtemp(join(testHome, 'toggle-'));
   const userData = join(sandbox, 'user-data');
   await mkdir(join(userData, 'User'), { recursive: true });
   await writeFile(join(sandbox, 'empty.txt'), 'Agent Tracker native popup test\n');
@@ -84,7 +85,7 @@ async function main() {
   const environment = { ...process.env };
   delete environment.ELECTRON_RUN_AS_NODE; delete environment.VSCODE_IPC_HOOK_CLI;
   const child = spawn(executable, ['--user-data-dir', userData, '--extensions-dir', join(sandbox, 'extensions'),
-    ...(quotaFixture ? ['--extensionTestsPath', join(root, 'dist/tests/vscode/quotaCardFixture.js')] : []),
+    ...(quotaFixture ? ['--extensionTestsPath', join(root, 'dist/tests/fixtures/quotaCardFixture.js')] : []),
     '--extensionDevelopmentPath', root, '--disable-extensions', '--skip-welcome', '--skip-release-notes',
     '--disable-gpu', '--disable-workspace-trust', '--no-sandbox', '--new-window',
     '--remote-debugging-address=127.0.0.1', `--remote-debugging-port=${port}`, join(sandbox, 'empty.txt')],

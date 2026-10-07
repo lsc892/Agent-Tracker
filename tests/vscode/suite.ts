@@ -313,12 +313,12 @@ export async function run(): Promise<void> {
     assert.match(properties['agentTracker.usage.enabled'].markdownDescription, /command:agentTracker.clearUsageData/);
     assert.deepEqual(properties['agentTracker.quota.refreshPolicy'].enum, ['automatic', 'manual']);
     outcomes.push('settings navigation, statistics off, provider selection and derived-data deletion preserve original transcripts');
-    const reportDirectory = join(extensionRoot, 'test-results');
+    const reportDirectory = join(extensionRoot, 'tests', 'results');
     await mkdir(reportDirectory, { recursive: true });
     await writeFile(join(reportDirectory, 'vscode-smoke.json'), JSON.stringify({ version: vscode.version, node: process.versions.node, passed: true, outcomes }, null, 2));
     console.log('Agent Tracker real VS Code smoke passed:', outcomes.join('; '));
   } catch (error) {
-    const reportDirectory = join(extensionRoot, 'test-results');
+    const reportDirectory = join(extensionRoot, 'tests', 'results');
     await mkdir(reportDirectory, { recursive: true });
     await writeFile(join(reportDirectory, 'vscode-smoke.json'), JSON.stringify({ passed: false, error: error instanceof Error ? error.stack : String(error), outcomes }, null, 2));
     throw error;

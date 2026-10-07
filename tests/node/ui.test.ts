@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Script } from 'node:vm';
-import { dashboardHtml, diagnosticsHtml } from '../src/ui/html';
-import { parseDashboardMessage } from '../src/ui/presentation';
+import { dashboardHtml, diagnosticsHtml } from '../../src/ui/html';
+import { parseDashboardMessage } from '../../src/ui/presentation';
 
 test('webview boundary only permits bounded known queries and provider commands', () => {
   assert.equal(parseDashboardMessage({ type: 'executeCommand', command: 'arbitrary' }), null);
@@ -31,7 +31,7 @@ test('webview uses external local assets, a nonce CSP, and text-only dynamic lab
   assert.match(diagnosticHtml, /script-src 'nonce-safe'/);
   assert.doesNotMatch(diagnosticHtml, /unsafe-inline|onclick=/);
   for (const file of ['dashboard.js', 'diagnostics.js']) {
-    const source = readFileSync(join(__dirname, '../../media', file), 'utf8');
+    const source = readFileSync(join(__dirname, '../../../media', file), 'utf8');
     assert.doesNotThrow(() => new Script(source));
     assert.doesNotMatch(source, /\.innerHTML\s*=|insertAdjacentHTML/);
   }
@@ -52,7 +52,7 @@ test('request table renders API failures separately from completed and running r
   };
   getElement('group').value = 'turn';
   let receive: ((event: {data:unknown})=>void) | undefined;
-  new Script(readFileSync(join(__dirname,'../../media/dashboard.js'),'utf8')).runInNewContext({
+  new Script(readFileSync(join(__dirname,'../../../media/dashboard.js'),'utf8')).runInNewContext({
     acquireVsCodeApi:()=>({getState:()=>undefined,setState:()=>undefined,postMessage:()=>undefined}),
     document:{getElementById:getElement,createElement:()=>new Element(),querySelectorAll:()=>[]},
     window:{addEventListener:(_name:string,listener:typeof receive)=>{receive=listener;}},

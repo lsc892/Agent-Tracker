@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { readJsonl } from '../src/summary/jsonl';
+import { readJsonl } from '../../src/summary/jsonl';
 
 async function fixture(text: string, run: (path: string, size: number) => Promise<void>): Promise<void> {
   const directory = await mkdtemp(join(tmpdir(), 'agent-tracker-jsonl-'));

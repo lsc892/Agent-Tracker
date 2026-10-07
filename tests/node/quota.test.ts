@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { ClaudeCliCredentials, ClaudeQuotaProvider, CodexQuotaProvider, parseClaudeQuota,
   parseCodexQuota, parseRetryAfter, QuotaError, QuotaService,
-  type QuotaClock, type QuotaProvider, type QuotaSnapshot } from '../src/quota';
+  type QuotaClock, type QuotaProvider, type QuotaSnapshot } from '../../src/quota';
 
 const signal = () => new AbortController().signal;
 const snapshot = (now: number, used = 25): QuotaSnapshot => ({ provider: 'claude', fetchedAt: now,

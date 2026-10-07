@@ -154,7 +154,7 @@ manual refresh
 
 상태 표시줄 오른쪽에 Claude·Codex 통합 사용량 항목과 새로고침 버튼을 배치한다. 통합 항목 안에서는 Claude가 왼쪽, Codex가 오른쪽이다. 로컬 VS Code에 클릭 전용 패치를 적용하면 사용량 항목 클릭으로 `StatusBarItem.tooltip`의 `MarkdownString` 카드를 바로 위에 열어 유지하고 재클릭으로 닫는다. 마우스를 올리거나 포커스만 주어서는 자동으로 열리지 않는다. 바깥 클릭이나 Esc로도 닫으며, 그 뒤 한 번 클릭으로 다시 열린다. 하단 quota 패널이나 별도 창은 만들지 않는다.
 
-클릭 명령은 `agentTracker.toggleQuotaTooltip`이다. `scripts/vscode/statusbar-toggle.cjs`가 Agent Tracker의 이 명령만 내부 `ToggleTooltipCommand` 객체로 변환한다. 공개 API의 기능은 아니므로 확장 설치·활성화와 패치 적용을 구분한다. 원본 백업과 복원 명령을 제공하며 VS Code 업데이트 뒤 재적용한다. 패치가 없는 설치에서는 기본 호버와 클릭 열기 경로를 사용한다.
+클릭 명령은 `agentTracker.toggleQuotaTooltip`이다. `tools/vscode/statusbar-toggle.cjs`가 Agent Tracker의 이 명령만 내부 `ToggleTooltipCommand` 객체로 변환한다. 공개 API의 기능은 아니므로 확장 설치·활성화와 패치 적용을 구분한다. 원본 백업과 복원 명령을 제공하며 VS Code 업데이트 뒤 재적용한다. 패치가 없는 설치에서는 기본 호버와 클릭 열기 경로를 사용한다.
 
 `src/ui/quotaTooltip.ts`가 현재 snapshot으로 카드 내용을 만든다. 외부 label과 오류 메시지는 `appendText`로 이스케이프하고, 명령 링크는 필요한 명령만 `isTrusted.enabledCommands`에 허용한다. 위치와 스타일은 VS Code 기본 툴팁을 따른다. API 근거와 구현 상세는 [StatusBarPopup.md](StatusBarPopup.md)에 정리한다.
 

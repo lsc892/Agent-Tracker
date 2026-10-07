@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ClaudeParserAdapter, CodexCurrentParserAdapter, claudeTokens,codexTokens } from '../src/summary/parsers';
-import type { ParseEvent, ParsedIdentity, UsageEvent } from '../src/summary/types';
+import { ClaudeParserAdapter, CodexCurrentParserAdapter, claudeTokens,codexTokens } from '../../src/summary/parsers';
+import type { ParseEvent, ParsedIdentity, UsageEvent } from '../../src/summary/types';
 
 function codex(rows: Record<string,unknown>[]): ParseEvent[] {
   const events: ParseEvent[] = [];

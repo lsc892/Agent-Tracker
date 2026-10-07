@@ -87,6 +87,21 @@ Codex 하위 에이전트 파일 전체에 `root_turn_id`가 없는 구형 로�
 
 ## 검증
 
+테스트 관련 코드는 `tests/` 아래에서 실행 역할에 따라 나눕니다.
+
+```text
+tests/
+├─ node/          Node에서 실행하는 단위·통합 테스트
+├─ vscode/        실제 VS Code 확장 호스트·마우스·키보드 검증
+├─ fixtures/      합성 데이터·가짜 프로세스·화면 상태 준비
+├─ runners/       테스트 파일 수집과 격리된 실행 환경 준비
+├─ benchmarks/    성능·메모리 측정 도구
+├─ .cache/        VS Code 프로필·다운로드·로컬 임시 검증 파일
+└─ results/       보고서·스크린샷·benchmarks/ 측정 결과
+```
+
+`.cache/`와 `results/`는 실행 중 생성되며 Git에서 제외합니다. 타입 검사·린트·테스트 수집에서도 제외하고, `tests/` 전체는 VSIX에 포함하지 않습니다. `tools/`에는 로컬 VS Code 토글 패치의 적용·확인·복원 도구만 둡니다. 아이콘은 저장소에 포함된 SVG와 WOFF를 그대로 사용합니다.
+
 ```sh
 npm run check       # 타입 검사, lint, fixture/worker/process/UI 연결 테스트
 npm run test:vscode # 격리된 실제 VS Code에서 light/dark Webview 동작 검증
@@ -95,11 +110,11 @@ npm run benchmark   # 합성 파일 301개 + 큰 세션 2,000개 요청
 npm run benchmark:quota # 합성 App Server 성공/오류/timeout/취소의 시간·메모리·종료 검증
 ```
 
-대량 benchmark는 `BENCHMARK_FILES`, `BENCHMARK_TURNS` 환경 변수로 조절합니다. 결과는 `benchmark-results/summary.json`에 남으며 실제 개인 대화 기록은 사용하지 않습니다. quota 자원 측정 옵션과 한계는 [측정 안내](docs/QuotaBenchmark.md)를 참고하세요.
+대량 benchmark는 `BENCHMARK_FILES`, `BENCHMARK_TURNS` 환경 변수로 조절합니다. 결과는 `tests/results/benchmarks/summary.json`에 남으며 실제 개인 대화 기록은 사용하지 않습니다. quota 자원 측정 옵션과 한계는 [측정 안내](docs/QuotaBenchmark.md)를 참고하세요.
 
-`test:vscode`는 별도 프로필과 합성 로그를 `.vscode-test/`에 만듭니다. Windows에서는 설치된 VS Code를 우선 사용하고, 그 외에는 테스트용 VS Code를 다운로드합니다. `VSCODE_TEST_VERSION`으로 다운로드 버전을, `VSCODE_EXECUTABLE`로 실행 파일을 지정할 수 있습니다. Linux의 화면 없는 환경에서는 `xvfb-run -a npm run test:vscode`를 실행합니다. 결과는 `test-results/vscode-smoke.json`에 기록합니다.
+`test:vscode`는 별도 프로필과 합성 로그를 `tests/.cache/vscode/`에 만듭니다. Windows에서는 설치된 VS Code를 우선 사용하고, 그 외에는 테스트용 VS Code를 다운로드합니다. `VSCODE_TEST_VERSION`으로 다운로드 버전을, `VSCODE_EXECUTABLE`로 실행 파일을 지정할 수 있습니다. Linux의 화면 없는 환경에서는 `xvfb-run -a npm run test:vscode`를 실행합니다. 결과는 `tests/results/vscode-smoke.json`에 기록합니다.
 
-`test:toggle`은 패치가 적용된 설치를 읽기 전용으로 확인하고 격리된 창에서 실제 마우스 이동·클릭과 키보드 입력을 보냅니다. hover 지연을 100ms로 설정하고 1.5초 동안 관찰해 요약 호버와 전체 카드가 분리되는지, 카드가 열린 동안 요약이 숨겨지는지, 반복 클릭으로 닫은 카드가 다시 열리지 않는지 검증합니다. 결과와 화면은 `test-results/statusbar-toggle.json`, `statusbar-toggle.png`에 기록합니다. 패치가 없는 설치에서는 `node scripts/test-statusbar-toggle.cjs --baseline`으로 클릭 시 카드가 닫힌 뒤 다시 생성되는 기존 버그를 재현하고 `statusbar-toggle-baseline.json`에 기록할 수 있습니다.
+`test:toggle`은 패치가 적용된 설치를 읽기 전용으로 확인하고 격리된 창에서 실제 마우스 이동·클릭과 키보드 입력을 보냅니다. hover 지연을 100ms로 설정하고 1.5초 동안 관찰해 요약 호버와 전체 카드가 분리되는지, 카드가 열린 동안 요약이 숨겨지는지, 반복 클릭으로 닫은 카드가 다시 열리지 않는지 검증합니다. 결과와 화면은 `tests/results/statusbar-toggle.json`, `statusbar-toggle.png`에 기록합니다. 패치가 없는 설치에서는 `node tests/vscode/statusbar-toggle.cjs --baseline`으로 클릭 시 카드가 닫힌 뒤 다시 생성되는 기존 버그를 재현하고 `statusbar-toggle-baseline.json`에 기록할 수 있습니다.
 
 PR CI는 Windows·Linux·macOS, Node 22·24의 단위·통합 테스트와 Linux의 최소 지원 VS Code 1.101.0·stable 실제 확장 호스트 테스트를 구성했습니다. 버전 tag는 검증을 거쳐 VSIX artifact를 만들며 Marketplace 게시 단계는 포함하지 않습니다.
 

@@ -8,11 +8,11 @@ import { join, resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { Worker } from 'node:worker_threads';
 import { DatabaseSync } from 'node:sqlite';
-import { acquireRefreshLock } from '../src/summary/lock';
-import { SummaryDatabase } from '../src/summary/db';
+import { acquireRefreshLock } from '../../src/summary/lock';
+import { SummaryDatabase } from '../../src/summary/db';
 
-const fixture = resolve(__dirname, '../../tests/fixtures/summary-lock.cjs');
-const config = (databasePath: string) => ({ databasePath, lockModule: require.resolve('../src/summary/lock') });
+const fixture = resolve(__dirname, '../../../tests/fixtures/summary-lock.cjs');
+const config = (databasePath: string) => ({ databasePath, lockModule: require.resolve('../../src/summary/lock') });
 
 async function within<T>(promise: Promise<T>): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;

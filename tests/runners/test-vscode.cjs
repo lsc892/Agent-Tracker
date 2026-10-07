@@ -4,9 +4,9 @@ const { existsSync } = require('node:fs');
 const { runTests } = require('@vscode/test-electron');
 
 async function main() {
-  const extension = resolve(__dirname, '..');
-  await rm(join(extension, 'test-results', 'vscode-smoke.json'), { force: true });
-  const testHome = join(extension, '.vscode-test');
+  const extension = resolve(__dirname, '../..');
+  await rm(join(extension, 'tests', 'results', 'vscode-smoke.json'), { force: true });
+  const testHome = join(extension, 'tests', '.cache', 'vscode');
   await mkdir(testHome, { recursive: true });
   const sandbox = await mkdtemp(join(testHome, 'profile-'));
   const userData = join(sandbox, 'user-data');
@@ -32,6 +32,7 @@ async function main() {
   const executable = process.env.VSCODE_EXECUTABLE || (!process.env.VSCODE_TEST_VERSION && process.platform === 'win32' && existsSync(installedWindows) ? installedWindows : undefined);
   console.log(`Isolated VS Code test profile: ${sandbox}`);
   await runTests({
+    cachePath: testHome,
     ...(executable ? { vscodeExecutablePath: executable } : { version: process.env.VSCODE_TEST_VERSION || 'stable' }),
     extensionDevelopmentPath: extension,
     extensionTestsPath: join(extension, 'dist', 'tests', 'vscode', 'suite.js'),

@@ -62,9 +62,9 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
   let clears = 0;
   let releaseScan: (() => void) | undefined;
   let deferScan = false;
-  let lastRoots: import('../src/summary/types').SourceRoot[] = [];
-  let lastQuery: import('../src/summary/types').UsageQuery = {};
-  let lastNameQuery: import('../src/summary/types').NameQuery | undefined;
+  let lastRoots: import('../../src/summary/types').SourceRoot[] = [];
+  let lastQuery: import('../../src/summary/types').UsageQuery = {};
+  let lastNameQuery: import('../../src/summary/types').NameQuery | undefined;
   let lastDiagnosticsPage: { offset?: number; providers?: string[] } | undefined;
   const policies: string[] = [];
   const pollingIntervals: number[] = [];
@@ -160,7 +160,7 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     if (request === './summary/client') return { SummaryClient: FakeSummary };
     return original.call(this, request, parent, isMain);
   };
-  let extension: typeof import('../src/extension') | undefined;
+  let extension: typeof import('../../src/extension') | undefined;
   const tick = (): Promise<void> => new Promise(resolve => setImmediate(resolve));
   const click = async (command: Command | undefined): Promise<void> => {
     assert.ok(command);
@@ -184,7 +184,7 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     await click({ command: id, arguments: link[2] ? JSON.parse(decodeURIComponent(link[2])) : [] });
   };
   try {
-    extension = require('../src/extension') as typeof import('../src/extension');
+    extension = require('../../src/extension') as typeof import('../../src/extension');
     await extension.activate({ globalStorageUri: uri(storage), extensionUri: uri(process.cwd()), subscriptions } as unknown as import('vscode').ExtensionContext);
     assert.deepEqual(pollingIntervals, [900]);
     assert.equal(initializations, 1);

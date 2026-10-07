@@ -13,6 +13,6 @@
     "sourceMap": true,
     "types": ["node", "vscode"]
   },
-  "include": ["src/**/*.ts", "tests/**/*.ts"],
-  "exclude": ["node_modules", "dist"]
+  "include": ["src/**/*.ts", "tests/node/**/*.ts", "tests/vscode/**/*.ts", "tests/fixtures/**/*.ts"],
+  "exclude": ["node_modules", "dist", "tests/.cache", "tests/results"]
 }

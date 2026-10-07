@@ -27,18 +27,18 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "eslint src tests scripts --max-warnings 0",
-    "test": "npm run build && node scripts/run-tests.cjs",
-    "test:vscode": "npm run build && node scripts/test-vscode.cjs",
-    "test:toggle": "npm run build && node scripts/test-statusbar-toggle.cjs",
-    "patch:vscode": "node scripts/vscode/statusbar-toggle.cjs",
-    "restore:vscode": "node scripts/vscode/statusbar-toggle.cjs --restore",
+    "lint": "eslint src tests tools --max-warnings 0",
+    "test": "npm run build && node tests/runners/run-tests.cjs",
+    "test:vscode": "npm run build && node tests/runners/test-vscode.cjs",
+    "test:toggle": "npm run build && node tests/vscode/statusbar-toggle.cjs",
+    "patch:vscode": "node tools/vscode/statusbar-toggle.cjs",
+    "restore:vscode": "node tools/vscode/statusbar-toggle.cjs --restore",
     "check": "npm run typecheck && npm run lint && npm test",
     "watch": "tsc -p tsconfig.json --watch",
     "vscode:prepublish": "npm run build",
     "package": "vsce package --no-dependencies --allow-missing-repository --skip-license",
-    "benchmark": "npm run build && node scripts/benchmark.cjs",
-    "benchmark:quota": "npm run build && node scripts/quota/benchmark.cjs"
+    "benchmark": "npm run build && node tests/benchmarks/summary.cjs",
+    "benchmark:quota": "npm run build && node tests/benchmarks/quota/benchmark.cjs"
   },
   "contributes": {
     "commands": [

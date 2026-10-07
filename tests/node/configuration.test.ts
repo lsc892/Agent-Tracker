@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readConfiguration, type SettingsReader } from '../src/configuration';
+import { readConfiguration, type SettingsReader } from '../../src/configuration';
 
 function settings(values: Record<string, unknown>): SettingsReader {
   return { get<T>(key: string, fallback: T): T { return (key in values ? values[key] : fallback) as T; } };

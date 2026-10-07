@@ -8,7 +8,7 @@ const { createInterface } = require('node:readline');
 
 function optionsFromArgs(args) {
   const result = { real: false, iterations: undefined, sampleMs: 50,
-    output: resolve(__dirname, '../../benchmark-results/quota.json'), executable: undefined, dataHome: undefined };
+    output: resolve(__dirname, '../../results/benchmarks/quota.json'), executable: undefined, dataHome: undefined };
   for (const arg of args) {
     if (arg === '--real') { result.real = true; continue; }
     const match = /^--(iterations|sample-ms|output|executable|data-home)=(.+)$/.exec(arg);
@@ -95,7 +95,7 @@ async function raceDelay(promise, ms) {
 }
 
 async function runScenario(options, scenario, iteration, directory) {
-  const { CodexQuotaProvider, QuotaError } = require('../../dist/src/quota');
+  const { CodexQuotaProvider, QuotaError } = require('../../../dist/src/quota');
   const sampler = await createSampler(options.sampleMs);
   const resourceFile = join(directory, `resources-${scenario}-${iteration}.json`);
   const controller = new AbortController();
@@ -109,7 +109,7 @@ async function runScenario(options, scenario, iteration, directory) {
   const start = performance.now();
   const provider = new CodexQuotaProvider({
     ...(options.real ? { executable: options.executable, dataHome: options.dataHome } : {
-      executable: process.execPath, args: [join(__dirname, 'fixture-app-server.cjs')], dataHome: directory,
+      executable: process.execPath, args: [join(__dirname, '../../fixtures/quota-benchmark-app-server.cjs')], dataHome: directory,
       env: { QUOTA_BENCHMARK_MODE: scenario, QUOTA_BENCHMARK_RESOURCE_FILE: resourceFile },
     }),
     timeoutMs: options.real ? 15_000 : scenario === 'timeout' ? 750 : 5000,

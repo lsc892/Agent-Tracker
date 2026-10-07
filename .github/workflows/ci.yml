@@ -30,8 +30,8 @@ jobs:
           name: vscode-${{ matrix.version }}
           include-hidden-files: true
           path: |
-            test-results/
-            .vscode-test/profile-*/user-data/logs/
+            tests/results/
+            tests/.cache/vscode/profile-*/user-data/logs/
   verify:
     strategy:
       fail-fast: false
@@ -53,7 +53,7 @@ jobs:
         if: always()
         with:
           name: tests-${{ matrix.os }}-node${{ matrix.node }}
-          path: test-results/
+          path: tests/results/
       - run: npm run package
       - uses: actions/upload-artifact@v4
         with:

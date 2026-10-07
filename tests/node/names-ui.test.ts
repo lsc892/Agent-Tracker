@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Script } from 'node:vm';
-import { dashboardHtml } from '../src/ui/html';
-import { parseDashboardMessage } from '../src/ui/presentation';
+import { dashboardHtml } from '../../src/ui/html';
+import { parseDashboardMessage } from '../../src/ui/presentation';
 
 class Element {
   private text = '';
@@ -32,7 +32,7 @@ function view() {
   const messages: {type:string;query?:Record<string,unknown>;requestId?:number}[] = [];
   let receive: ((event:{data:unknown})=>void) | undefined;
   get('group').value='session';
-  new Script(readFileSync(join(__dirname,'../../media/dashboard.js'),'utf8')).runInNewContext({
+  new Script(readFileSync(join(__dirname,'../../../media/dashboard.js'),'utf8')).runInNewContext({
     acquireVsCodeApi:()=>({getState:()=>undefined,setState:()=>undefined,postMessage:(message:typeof messages[number])=>messages.push(message)}),
     document:{getElementById:get,createElement:()=>new Element(),querySelectorAll:()=>[]},
     window:{addEventListener:(event:string,listener:typeof receive)=>{if (event==='message') receive=listener;}},

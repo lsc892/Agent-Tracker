@@ -4,6 +4,5 @@ dist/
 *.sqlite*
 *.db*
 coverage/
-test-results/
-benchmark-results/
-.vscode-test/
+tests/results/
+tests/.cache/

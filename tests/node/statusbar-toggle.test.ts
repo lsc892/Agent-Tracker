@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { runInNewContext } from 'node:vm';
 
-const patcher = require('../../scripts/vscode/statusbar-toggle.cjs') as {
+const patcher = require('../../../tools/vscode/statusbar-toggle.cjs') as {
   command: string; checksum(value: string): string;
   hash(value: string): string;
   resolveAppRoot(options: { cli?: string; executable?: string }): string;

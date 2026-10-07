@@ -5,11 +5,11 @@ import { join, resolve, sep } from 'node:path';
 import { test, type TestContext } from 'node:test';
 import { readFileSync } from 'node:fs';
 import { Script } from 'node:vm';
-import { SummaryDatabase, type TurnSummaryInput } from '../src/summary/db';
-import { SCHEMA_VERSION } from '../src/summary/db/schema';
-import { refreshSummary, PARSER_VERSION } from '../src/summary/scanner';
-import { codexTokens } from '../src/summary/parsers';
-import type { Provider, SummaryOptions } from '../src/summary/types';
+import { SummaryDatabase, type TurnSummaryInput } from '../../src/summary/db';
+import { SCHEMA_VERSION } from '../../src/summary/db/schema';
+import { refreshSummary, PARSER_VERSION } from '../../src/summary/scanner';
+import { codexTokens } from '../../src/summary/parsers';
+import type { Provider, SummaryOptions } from '../../src/summary/types';
 
 const jsonl = (rows: unknown[]): string => rows.map(row => JSON.stringify(row)).join('\n') + '\n';
 const claudeUsage = (id: string, input = 100, write = 30, read = 60, output = 10) => ({
@@ -167,7 +167,7 @@ test('all dashboard groups render four named token columns with unknown and zero
     return elements.get(id)!;
   };
   let receive: ((event: { data: unknown }) => void) | undefined;
-  new Script(readFileSync(join(__dirname, '../../media/dashboard.js'), 'utf8')).runInNewContext({
+  new Script(readFileSync(join(__dirname, '../../../media/dashboard.js'), 'utf8')).runInNewContext({
     acquireVsCodeApi: () => ({ getState: () => undefined, setState: () => undefined, postMessage: () => undefined }),
     document: { getElementById: getElement, createElement: () => new Element(), querySelectorAll: () => [] },
     window: { addEventListener: (_name: string, listener: typeof receive) => { receive = listener; } },
