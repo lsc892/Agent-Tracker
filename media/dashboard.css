@@ -38,6 +38,12 @@ h3 { font-size: 15px; }
 input, select { border: 1px solid var(--vscode-input-border, transparent); color: var(--vscode-input-foreground); background: var(--vscode-input-background); padding: 7px 9px; border-radius: 3px; max-width: 200px; }
 .table-wrap { overflow-x: auto; border: 1px solid var(--vscode-panel-border); border-radius: 5px; }
 .usage-chart { margin: 24px 0 28px; }
+.cumulative { margin: 24px 0; }
+.segmented { display: flex; gap: 4px; }
+.segmented button[aria-pressed=true] { color: var(--vscode-button-foreground); background: var(--vscode-button-background); }
+.cost-controls { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+.cost-controls label { display: flex; align-items: center; gap: 8px; }
+.cost-toggle input { accent-color: var(--vscode-button-background); }
 .chart-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
 .chart-heading h3 { margin: 0; }
 .chart-heading label { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--vscode-descriptionForeground); }

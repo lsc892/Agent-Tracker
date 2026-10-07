@@ -20,6 +20,8 @@
   let timezone;
   const date = value => value === null || value === undefined ? '알 수 없음' : new Intl.DateTimeFormat('ko-KR', { dateStyle: 'short', timeStyle: 'medium', timeZone: timezone }).format(new Date(value));
   let offset = 0;
+  let cumulativeBy = 'provider';
+  let cumulativeOffset = 0;
   let latestUsage;
   let selectedProject;
   let selectedSession;
@@ -29,6 +31,8 @@
   const saved = vscode.getState();
   if (saved && ['day', 'month', 'project', 'session', 'turn', 'all'].includes(saved.group)) $('group').value = saved.group;
   if (saved && Object.hasOwn(chartMetrics, saved.chartMetric)) $('chart-metric').value = saved.chartMetric;
+  if (saved?.cumulativeBy === 'model') cumulativeBy = 'model';
+  $('show-costs').checked = saved?.showCosts === true;
 
   function element(tag, text, className) {
     const node = document.createElement(tag);
@@ -37,7 +41,7 @@
     return node;
   }
   function query() {
-    const request = { groupBy: $('group').value, offset };
+    const request = { groupBy: $('group').value, offset, cumulativeBy, cumulativeOffset, includeCosts: $('show-costs').checked === true };
     const metric = $('chart-metric').value || 'tokens';
     request.chartMetric = request.groupBy === 'turn' && metric !== 'averageDuration' ? 'tokens' : metric;
     $('chart-metric').value = request.chartMetric;
@@ -47,7 +51,11 @@
     if ($('from-day').value) request.fromDay = $('from-day').value;
     if ($('to-day').value) request.toDay = $('to-day').value;
     send({ type: 'queryUsage', query: request });
-    vscode.setState({ group: request.groupBy, chartMetric: request.chartMetric });
+    vscode.setState({ group: request.groupBy, chartMetric: request.chartMetric, cumulativeBy, showCosts: request.includeCosts });
+    $('cost-note').hidden = !request.includeCosts;
+    $('billing-control').hidden = !request.includeCosts || !selectedSession || !$('provider').value;
+    $('billing-mode').disabled = true;
+    for (const by of ['provider', 'model']) $(`cumulative-${by}`).setAttribute('aria-pressed', String(cumulativeBy === by));
   }
   function nameCaption(kind, text, title = '') {
     $(`${kind}-name`).textContent = text || (kind === 'project' ? '전체 프로젝트' : '전체 세션');
@@ -69,7 +77,7 @@
     selectedSession = undefined;
     nameCaption('project', row ? row.project_name || '이름 없는 프로젝트' : '', row?.project_key);
     nameCaption('session', '');
-    closeNames(true); offset = 0; query();
+    closeNames(true); offset = 0; cumulativeOffset = 0; query();
   }
   function chooseSession(row) {
     selectedSession = row?.session_id;
@@ -79,7 +87,7 @@
       $('provider').value = row.provider;
     }
     nameCaption('session', row ? row.session_name || '이름 없는 세션' : '', row ? `세션 ID: ${row.session_id}` : '');
-    closeNames(true); offset = 0; query();
+    closeNames(true); offset = 0; cumulativeOffset = 0; query();
   }
   function loadNames(kind) {
     const page = namePages[kind];
@@ -333,15 +341,35 @@
   function renderUsage(result) {
     latestUsage = result;
     renderChart(result);
+    const showCosts = $('show-costs').checked === true;
+    const costHeaders = showCosts ? ['API 추정 비용 (USD)'] : [];
+    const cost = row => {
+      if (!showCosts) return [];
+      const value = row.billing_mode === 'subscription' ? '0원 (구독)' : row.cost_usd == null ? '—'
+        : new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 4, maximumFractionDigits: 6 }).format(row.cost_usd);
+      return [`${value}${row.unknown_costs ? ` · 미확인 ${number(row.unknown_costs)}건` : ''}`];
+    };
+    if (result.billing && selectedSession && showCosts) {
+      $('billing-mode').value = result.billing;
+      $('billing-mode').disabled = false;
+    }
+    if (result.cumulative) {
+      const cumulative = result.cumulative;
+      table($('cumulative-table'), ['제공자', ...(cumulative.by === 'model' ? ['모델'] : []), ...tokenHeaders, '총 토큰', ...costHeaders],
+        cumulative.rows.map(row => [providerLabel(row.provider), ...(cumulative.by === 'model' ? [row.model || '모델 미상'] : []), ...tokenValues(row), number(row.total_tokens), ...cost(row)]));
+      $('cumulative-previous').disabled = cumulativeOffset === 0;
+      $('cumulative-next').disabled = cumulativeOffset + cumulative.rows.length >= cumulative.total;
+      $('cumulative-page').textContent = cumulative.total ? `${number(cumulativeOffset + 1)}–${number(cumulativeOffset + cumulative.rows.length)} / ${number(cumulative.total)}` : '0개';
+    }
     const turn = result.groupBy === 'turn';
     const rows = result.rows;
     if (turn) {
-      table($('usage-table'), ['제공자 / 프로젝트', '요청 / 세션', '시작 시각', ...tokenHeaders, '총 토큰', '소요 시간', '상태 / 품질'], rows.map(row => [
-        `${row.provider} / ${row.project_name}`, sessionLabel(row, true), date(row.started_at_ms), ...tokenValues(row), number(row.total_tokens), duration(row.duration_ms), `${row.status === 'completed' ? '완료' : row.status === 'failed' ? '실패' : '진행 중'} · ${row.duration_quality}${row.quality_flags ? ` · ${row.quality_flags}` : ''}${row.last_error ? ` · 이전 값: ${row.last_error}` : ''}`,
+      table($('usage-table'), ['제공자 / 프로젝트', '요청 / 세션', '시작 시각', ...tokenHeaders, '총 토큰', '소요 시간', '상태 / 품질', ...costHeaders], rows.map(row => [
+        `${row.provider} / ${row.project_name}`, sessionLabel(row, true), date(row.started_at_ms), ...tokenValues(row), number(row.total_tokens), duration(row.duration_ms), `${row.status === 'completed' ? '완료' : row.status === 'failed' ? '실패' : '진행 중'} · ${row.duration_quality}${row.quality_flags ? ` · ${row.quality_flags}` : ''}${row.last_error ? ` · 이전 값: ${row.last_error}` : ''}`, ...cost(row),
       ]));
     } else {
-      table($('usage-table'), ['제공자', '기간 / 프로젝트 / 세션', ...tokenHeaders, '총 토큰', '완료 / 전체 요청', '평균 토큰', '평균 시간 / 표본'], rows.map(row => [
-        row.provider, row.period ?? (row.session_id ? sessionLabel(row) : row.project_key ? projectLabel(row) : ['day', 'month'].includes(result.groupBy) ? '시각 미상' : '전체'), ...tokenValues(row), number(row.total_tokens), `${number(row.completed_turns)} / ${number(row.turn_count)}`, number(row.avg_tokens_per_turn), `${duration(row.avg_duration_ms)} / ${number(row.turns_with_duration)}개`,
+      table($('usage-table'), ['제공자', '기간 / 프로젝트 / 세션', ...tokenHeaders, '총 토큰', '완료 / 전체 요청', '평균 토큰', '평균 시간 / 표본', ...costHeaders], rows.map(row => [
+        row.provider, row.period ?? (row.session_id ? sessionLabel(row) : row.project_key ? projectLabel(row) : ['day', 'month'].includes(result.groupBy) ? '시각 미상' : '전체'), ...tokenValues(row), number(row.total_tokens), `${number(row.completed_turns)} / ${number(row.turn_count)}`, number(row.avg_tokens_per_turn), `${duration(row.avg_duration_ms)} / ${number(row.turns_with_duration)}개`, ...cost(row),
       ]));
     }
     $('previous').disabled = offset === 0;
@@ -354,7 +382,18 @@
   $('open-diagnostics').addEventListener('click', event => { event.preventDefault(); send({ type: 'openDiagnostics' }); });
   $('settings').addEventListener('click', () => send({ type: 'settings' }));
   $('cancel-usage').addEventListener('click', () => send({ type: 'cancelUsage' }));
-  $('usage-filters').addEventListener('submit', event => { event.preventDefault(); offset = 0; query(); });
+  $('usage-filters').addEventListener('submit', event => { event.preventDefault(); offset = 0; cumulativeOffset = 0; query(); });
+  $('show-costs').addEventListener('change', query);
+  $('billing-mode').addEventListener('change', () => {
+    if (!selectedSession || !$('provider').value) return;
+    $('billing-mode').disabled = true;
+    send({ type: 'setSessionBilling', provider: $('provider').value, sessionId: selectedSession, mode: $('billing-mode').value });
+  });
+  for (const by of ['provider', 'model']) $(`cumulative-${by}`).addEventListener('click', () => {
+    cumulativeBy = by; cumulativeOffset = 0; query();
+  });
+  $('cumulative-previous').addEventListener('click', () => { cumulativeOffset = Math.max(0, cumulativeOffset - 100); query(); });
+  $('cumulative-next').addEventListener('click', () => { cumulativeOffset += 100; query(); });
   for (const kind of ['project', 'session']) {
     $(`${kind}-name`).addEventListener('click', () => toggleNames(kind));
     $(`${kind}-options`).addEventListener('scroll', () => {
@@ -396,7 +435,7 @@
       case 'busy': $('cancel-usage').hidden = !message.busy; if (message.busy) $('usage-progress').textContent = '기록을 갱신하고 있습니다…'; break;
       case 'progress': { const p = message.progress; $('usage-progress').textContent = `${({ scanning: '파일 확인', parsing: '요청 집계', committing: '통계 저장', complete: '완료' })[p.phase] ?? p.phase} · 발견 ${number(p.discovered)} · 읽음 ${number(p.parsed)} · 실패 ${number(p.failed)}`; break; }
       case 'refreshResult': { closeNames(); const r = message.result; $('usage-progress').textContent = `${r.interrupted ? '중단됨' : r.failed ? '일부 실패 · 이전 정상 통계를 유지했습니다' : '갱신 완료'} · 발견 ${number(r.discovered)} · 읽음 ${number(r.parsed)} · 재사용 ${number(r.reused)} · 실패 ${number(r.failed)} · 읽은 데이터 ${number(r.bodyBytes)} bytes${r.error ? ` · 원인: ${r.error}` : ''}`; break; }
-      case 'error': $('error').textContent = message.message; $('error').hidden = false; break;
+      case 'error': $('error').textContent = message.message; $('error').hidden = false; $('billing-mode').disabled = !selectedSession; break;
     }
   });
   // Restore the query before ready so the initial scan returns the selected group.

@@ -1,13 +1,14 @@
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync, type SQLInputValue, type StatementSync } from 'node:sqlite';
-import { SCHEMA_SQL, SCHEMA_VERSION, SCHEMA_LEGACY_MIGRATION_SQL, SCHEMA_CACHE_MIGRATION_SQL } from './schema';
+import { SCHEMA_SQL, SCHEMA_VERSION, SCHEMA_LEGACY_MIGRATION_SQL, SCHEMA_CACHE_MIGRATION_SQL, SCHEMA_MODEL_SQL } from './schema';
 import { calendarPeriod } from './timezone';
+import { estimateCost, PRICING_VERSION } from '../pricing';
 import type { NameQuery, NameResult } from '../types';
 import type {
   DiagnosticsPage, FileMetadata, KeysetPage, ManifestRow, OffsetPage,
   ProcessingStatus, Provider, SessionReplacement, SummaryFilter,
-  TurnSummaryInput, TurnSummaryRow, UsageGrouping, UsageRow, ChartMetric, UsageChart,
+  TurnSummaryInput, TurnSummaryRow, UsageGrouping, UsageRow, ChartMetric, UsageChart, CumulativeRow, BillingMode,
 } from './types';
 
 export * from './types';
@@ -32,9 +33,14 @@ const TURN_INSERT = `INSERT INTO turn_summary (
   diagnostic_file_id, diagnostic_offset, last_error, updated_at
 ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`;
 
-const NAMED_TURNS = `(SELECT t.*, p.project_name, s.session_name FROM turn_summary t
+const COSTED_TURNS = `(SELECT t.*,c.cost_usd,coalesce(c.unknown_costs,1) AS unknown_costs,
+  coalesce(c.billing_mode,'unknown') AS billing_mode FROM turn_summary t LEFT JOIN turn_costs c ON c.turn_id=t.id)`;
+const namedTurns = (costs = false): string => `(SELECT t.*, p.project_name, s.session_name FROM ${costs ? COSTED_TURNS : 'turn_summary'} t
   JOIN projects p ON p.project_key=t.project_key
   JOIN sessions s ON s.provider=t.provider AND s.session_id=t.session_id)`;
+const NAMED_TURNS = namedTurns();
+const COST_SUMS = `SUM(cost_usd) AS cost_usd,SUM(unknown_costs) AS unknown_costs,
+  CASE WHEN min(billing_mode)=max(billing_mode) THEN min(billing_mode) ELSE 'unknown' END AS billing_mode`;
 
 const USAGE_SUMS = `SUM(input_tokens) AS input_tokens, SUM(output_tokens) AS output_tokens,
   CASE WHEN COUNT(cache_write_input_tokens) = COUNT(*) THEN SUM(cache_write_input_tokens) END AS cache_write_input_tokens,
@@ -159,6 +165,7 @@ export class SummaryDatabase {
           if (current.user_version === SCHEMA_VERSION) return;
           this.connection.exec(current.user_version === 1 || current.user_version === 2 ? SCHEMA_LEGACY_MIGRATION_SQL
             : current.user_version === 3 ? SCHEMA_CACHE_MIGRATION_SQL : SCHEMA_SQL);
+          this.connection.exec(SCHEMA_MODEL_SQL);
           this.connection.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
         });
       }
@@ -314,7 +321,27 @@ export class SummaryDatabase {
         project.run(summary.project_key, summary.project_name);
         session.run(summary.provider, summary.session_id, summary.session_name?.trim() || null);
         addProject.run(summary.project_key);
-        insert.run(...turnValues(summary, now));
+        const inserted = insert.run(...turnValues(summary, now));
+        let input = 0, output = 0, cacheWrite = 0, cacheRead = 0;
+        for (const model of summary.model_usage ?? []) {
+          nonnegative(model.input_tokens, 'model input tokens');
+          nonnegative(model.output_tokens, 'model output tokens');
+          if (model.cache_write_input_tokens != null) nonnegative(model.cache_write_input_tokens, 'model cache write tokens');
+          if (model.cache_read_input_tokens != null) nonnegative(model.cache_read_input_tokens, 'model cache read tokens');
+          if ((model.cache_write_input_tokens ?? 0) + (model.cache_read_input_tokens ?? 0) > model.input_tokens) throw new RangeError('Invalid model cache components');
+          this.statement('INSERT INTO turn_model_usage VALUES (?,?,?,?,?,?,?,?)').run(inserted.lastInsertRowid,model.model,
+            model.input_tokens,model.output_tokens,model.cache_write_input_tokens,model.cache_read_input_tokens,
+            estimateCost(summary.provider,model),PRICING_VERSION);
+          input += model.input_tokens; output += model.output_tokens;
+          cacheWrite += model.cache_write_input_tokens ?? 0; cacheRead += model.cache_read_input_tokens ?? 0;
+        }
+        if (summary.model_usage && (input !== summary.input_tokens || output !== summary.output_tokens
+          || cacheWrite !== (summary.cache_write_input_tokens ?? 0) || cacheRead !== (summary.cache_read_input_tokens ?? 0))) {
+          throw new RangeError('Model totals must match the request summary');
+        }
+        const chosen = this.statement('SELECT billing_mode FROM session_billing WHERE provider=? AND session_id=?')
+          .get(summary.provider,summary.session_id)?.billing_mode as BillingMode | undefined;
+        this.saveTurnCost(inserted.lastInsertRowid,chosen ?? summary.billing ?? 'unknown');
       }
       const remove = this.statement('DELETE FROM manifest WHERE id = ?');
       for (const id of replacement.removedFileIds ?? []) {
@@ -358,14 +385,73 @@ export class SummaryDatabase {
     const where = whereClause(filter);
     const after = nonnegative(page.afterId ?? 0, 'afterId');
     const offset = nonnegative(page.offset ?? 0, 'offset');
-    return this.connection.prepare(`SELECT * FROM ${NAMED_TURNS} AS turn_summary WHERE ${where.sql} AND id > ? ORDER BY id LIMIT ? OFFSET ?`)
+    return this.connection.prepare(`SELECT * FROM ${namedTurns(filter.includeCosts)} AS turn_summary WHERE ${where.sql} AND id > ? ORDER BY id LIMIT ? OFFSET ?`)
       .all(...where.values, after, pageLimit(page.limit), offset) as unknown as TurnSummaryRow[];
+  }
+
+  private saveTurnCost(id: SQLInputValue, mode: BillingMode): void {
+    this.statement(`INSERT OR REPLACE INTO turn_costs
+      SELECT ?,?,CASE WHEN ?='subscription' THEN 0 WHEN ?='api' THEN sum(estimated_cost_usd) END,
+        CASE WHEN ?='subscription' THEN 0 WHEN ?='api' THEN max(1,count(*))-count(estimated_cost_usd) ELSE max(1,count(*)) END,?
+      FROM turn_model_usage WHERE turn_id=?`)
+      .run(id,mode,mode,mode,mode,mode,PRICING_VERSION,id);
+  }
+
+  setSessionBilling(provider: Provider, sessionId: string, mode: BillingMode): void {
+    if (!['claude','codex'].includes(provider) || !sessionId || !['subscription','api','unknown'].includes(mode)) throw new RangeError('Invalid session billing');
+    this.transaction(() => {
+      this.statement(`INSERT INTO session_billing VALUES (?,?,?)
+        ON CONFLICT(provider,session_id) DO UPDATE SET billing_mode=excluded.billing_mode`).run(provider,sessionId,mode);
+      // Page through ids to keep historical classification bounded, including large sessions.
+      let after = 0;
+      while (true) {
+        const turns = this.statement('SELECT id FROM turn_summary WHERE provider=? AND session_id=? AND id>? ORDER BY id LIMIT 100')
+          .all(provider,sessionId,after) as {id:number}[];
+        if (!turns.length) break;
+        for (const turn of turns) this.saveTurnCost(turn.id,mode);
+        after = turns[turns.length-1].id;
+      }
+    });
+  }
+
+  sessionBilling(provider: Provider, sessionId: string): BillingMode {
+    const chosen = this.statement('SELECT billing_mode FROM session_billing WHERE provider=? AND session_id=?')
+      .get(provider,sessionId)?.billing_mode as BillingMode | undefined;
+    if (chosen) return chosen;
+    return this.statement(`SELECT CASE WHEN count(*)=count(c.billing_mode) AND min(c.billing_mode)=max(c.billing_mode)
+      THEN min(c.billing_mode) ELSE 'unknown' END AS mode FROM turn_summary t LEFT JOIN turn_costs c ON c.turn_id=t.id
+      WHERE t.provider=? AND t.session_id=?`).get(provider,sessionId)?.mode as BillingMode ?? 'unknown';
   }
 
   queryTurnsCount(filter: SummaryFilter = {}): number {
     const where = whereClause(filter);
     return (this.connection.prepare(`SELECT COUNT(*) AS count FROM turn_summary WHERE ${where.sql}`)
       .get(...where.values) as { count: number }).count;
+  }
+
+  queryCumulative(filter: SummaryFilter, by: 'provider' | 'model', offset = 0): { rows: CumulativeRow[]; total: number; by: 'provider' | 'model' } {
+    if (by !== 'provider' && by !== 'model') throw new RangeError('Unknown cumulative grouping');
+    const where = whereClause(filter);
+    if (by === 'provider') return { rows: this.queryUsage(filter).map(row => ({ ...row, model: '' })), total: this.queryUsageCount(filter), by };
+    // A LEFT JOIN retains older or zero-token requests in a separate unknown-model group.
+    const source = `(SELECT t.provider,t.project_key,t.session_id,t.started_at_ms,coalesce(m.model,'') AS model,
+      coalesce(m.input_tokens,t.input_tokens) AS input_tokens,coalesce(m.output_tokens,t.output_tokens) AS output_tokens,
+      CASE WHEN m.turn_id IS NULL THEN t.cache_write_input_tokens ELSE m.cache_write_input_tokens END AS cache_write_input_tokens,
+      CASE WHEN m.turn_id IS NULL THEN t.cache_read_input_tokens ELSE m.cache_read_input_tokens END AS cache_read_input_tokens,
+      coalesce(c.billing_mode,'unknown') AS billing_mode,
+      CASE WHEN c.billing_mode='subscription' THEN 0 WHEN c.billing_mode='api' THEN m.estimated_cost_usd END AS cost_usd,
+      CASE WHEN c.billing_mode='subscription' OR c.billing_mode='api' AND m.estimated_cost_usd IS NOT NULL THEN 0 ELSE 1 END AS unknown_costs
+      FROM turn_summary t LEFT JOIN turn_model_usage m ON m.turn_id=t.id LEFT JOIN turn_costs c ON c.turn_id=t.id) AS turn_summary`;
+    const total = (this.connection.prepare(`SELECT count(*) AS count FROM (
+      SELECT 1 FROM ${source} WHERE ${where.sql} GROUP BY provider,model)`)
+      .get(...where.values) as {count:number}).count;
+    const rows = this.connection.prepare(`SELECT provider,model,sum(input_tokens) AS input_tokens,sum(output_tokens) AS output_tokens,
+      CASE WHEN count(cache_write_input_tokens)=count(*) THEN sum(cache_write_input_tokens) END AS cache_write_input_tokens,
+      CASE WHEN count(cache_read_input_tokens)=count(*) THEN sum(cache_read_input_tokens) END AS cache_read_input_tokens,
+      sum(input_tokens+output_tokens) AS total_tokens${filter.includeCosts ? `,${COST_SUMS}` : ''} FROM ${source} WHERE ${where.sql}
+      GROUP BY provider,model ORDER BY total_tokens DESC,provider,model LIMIT 100 OFFSET ?`)
+      .all(...where.values,nonnegative(offset,'offset')) as unknown as CumulativeRow[];
+    return { rows, total, by };
   }
 
   queryUsageCount(filter: SummaryFilter = {}, groupBy: UsageGrouping = 'total', timezone = 'UTC'): number {
@@ -407,8 +493,8 @@ export class SummaryDatabase {
       ${groupBy === 'session' ? '(SELECT session_name FROM sessions s WHERE s.provider=turn_summary.provider AND s.session_id=turn_summary.session_id)' : 'NULL'} AS session_name,
       ${groupBy === 'session' ? '(SELECT MIN(t.started_at_ms) FROM turn_summary t WHERE t.provider=turn_summary.provider AND t.session_id=turn_summary.session_id)' : 'NULL'} AS session_started_at_ms,
       ${period} AS period,
-      ${USAGE_SUMS}
-      FROM turn_summary WHERE ${where.sql}
+      ${USAGE_SUMS}${filter.includeCosts ? `,${COST_SUMS}` : ''}
+      FROM ${filter.includeCosts ? `${COSTED_TURNS} AS turn_summary` : 'turn_summary'} WHERE ${where.sql}
       GROUP BY ${groups.join(', ')} ORDER BY ${order} LIMIT ? OFFSET ?`)
       .all(...prefix, ...where.values, pageLimit(page.limit), nonnegative(page.offset ?? 0, 'offset')) as unknown as UsageRow[];
   }

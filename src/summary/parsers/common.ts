@@ -1,6 +1,14 @@
 import { basename, normalize } from 'node:path';
 import type { TokenVector } from '../types';
 import { SummaryError } from '../jsonl';
+import type { BillingMode } from '../db/types';
+
+/** Only explicit historical metadata identifies how usage was billed. */
+export function billingMode(value: unknown): BillingMode {
+  if (['subscription','chatgpt','chatgptAuthTokens','claudeAi'].includes(String(value))) return 'subscription';
+  if (['api','apiKey','api_key','apikey'].includes(String(value))) return 'api';
+  return 'unknown';
+}
 
 export function object(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};

@@ -1,6 +1,6 @@
 import { SummaryError } from '../jsonl';
 import type { FileContext, ParsedIdentity, ParseSink, TokenVector } from '../types';
-import { codexTokens, displayName, number, object, project, string, timestamp, tokenFlags } from './common';
+import { billingMode, codexTokens, displayName, number, object, project, string, timestamp, tokenFlags } from './common';
 
 /** Codex lifecycle payloads use Unix seconds; row timestamps and durations keep their existing units. */
 function lifecycleTimestamp(value: unknown): number | null {
@@ -19,6 +19,8 @@ export class CodexCurrentParserAdapter {
   private hasUserInTurn = false;
   private pendingLifecycle = false;
   private hasExplicitRoot = false;
+  private model: string | undefined;
+  private billing: import('../db/types').BillingMode = 'unknown';
 
   constructor(private readonly context: FileContext, private readonly sink: ParseSink) {}
 
@@ -43,6 +45,8 @@ export class CodexCurrentParserAdapter {
       };
       // A fork is not automatically a subagent; inherited history needs independently verified lineage.
       this.forkMissing = Boolean(this.identityValue.forkedFromId);
+      this.model = displayName(payload.model) ?? this.model;
+      if (payload.billing_mode !== undefined || payload.auth_mode !== undefined) this.billing = billingMode(payload.billing_mode ?? payload.auth_mode);
       return;
     }
     if (!this.identityValue) {
@@ -54,6 +58,8 @@ export class CodexCurrentParserAdapter {
     // Rootless subagents use their own turn ids; finish() gives the thread a separate session.
     const ownTurns = this.identityValue.isMain || !this.hasExplicitRoot;
     if (row.type === 'turn_context') {
+      this.model = displayName(payload.model);
+      if (payload.billing_mode !== undefined || payload.auth_mode !== undefined) this.billing = billingMode(payload.billing_mode ?? payload.auth_mode);
       if (string(payload.turn_id) && payload.turn_id !== this.turn) { this.hasUserInTurn = false; this.currentClosed = false; }
       this.turn = string(payload.turn_id) ?? this.turn;
       this.root = suppliedRoot ?? (ownTurns ? this.turn : this.root);
@@ -73,6 +79,8 @@ export class CodexCurrentParserAdapter {
       const tokens = codexTokens(object(payload.usage));
       this.sink.event({ kind: 'usage', rootId, turnId, responseId, requestId: null,
         threadId: string(payload.thread_id) ?? this.identityValue.threadId, tokens, schema: 'current',
+        model: displayName(payload.model) ?? this.model,
+        billingMode: billingMode(payload.billing_mode ?? payload.auth_mode ?? this.billing),
         flags: [...tokenFlags(tokens), ...(this.forkMissing ? ['missing-parent'] : [])], offset });
       if (payload.turn_token_usage) this.sink.event({ kind: 'check', rootId, threadId: string(payload.thread_id) ?? this.identityValue.threadId,
         turnId, tokens: codexTokens(object(payload.turn_token_usage)), offset });
@@ -139,7 +147,9 @@ export class CodexCurrentParserAdapter {
     }
     this.sink.event({ kind: 'usage', rootId: this.root, turnId: this.turn,
       responseId: `legacy-${signature}`, requestId: null,
-      threadId: this.identityValue.threadId, tokens, schema: 'legacy', flags: [...new Set([...flags, ...tokenFlags(tokens)])], offset });
+      threadId: this.identityValue.threadId, tokens, model: displayName(payload.model) ?? this.model,
+      billingMode: billingMode(payload.billing_mode ?? payload.auth_mode ?? this.billing),
+      schema: 'legacy', flags: [...new Set([...flags, ...tokenFlags(tokens)])], offset });
   }
 
   finish(): void {

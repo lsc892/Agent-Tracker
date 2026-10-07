@@ -1,6 +1,7 @@
 import { Worker } from 'node:worker_threads';
 import { join } from 'node:path';
 import type { SummaryOptions, SummaryProgress, RefreshResult, UsageQuery, UsageResult, DiagnosticsResult, SourceRoot, NameQuery, NameResult } from './types';
+import type { BillingMode, Provider } from './db/types';
 export * from './types';
 
 interface Pending { resolve(value: unknown): void; reject(error: Error): void }
@@ -29,6 +30,9 @@ export class SummaryClient {
   }
   async query(query: UsageQuery = {}): Promise<UsageResult> { await this.clearPending; return this.request('query',query); }
   async queryNames(query: NameQuery): Promise<NameResult> { await this.clearPending; return this.request('names',query); }
+  async setSessionBilling(provider: Provider, sessionId: string, mode: BillingMode): Promise<void> {
+    await this.clearPending; return this.request('setBilling',{provider,sessionId,mode});
+  }
   async diagnostics(page: {limit?:number;offset?:number;afterId?:number;providers?:SourceRoot['provider'][]} = {}): Promise<DiagnosticsResult> { await this.clearPending; return this.request('diagnostics',page); }
   async cancelRefresh(): Promise<void> {
     this.cancel();

@@ -10,6 +10,7 @@ export type DashboardMessage =
   | { type: 'openDiagnostics' }
   | { type: 'settings' }
   | { type: 'cancelUsage' }
+  | { type: 'setSessionBilling'; provider: 'claude' | 'codex'; sessionId: string; mode: import('../summary/db/types').BillingMode }
   | { type: 'queryUsage'; query: UsageQuery; fromDay?: string; toDay?: string }
   | { type: 'queryNames'; query: NameQuery; requestId: number }
   | { type: 'diagnostics'; offset: number };
@@ -21,6 +22,11 @@ export function parseDashboardMessage(input: unknown): DashboardMessage | null {
   switch (value.type) {
     case 'ready': case 'cancelUsage': case 'openDiagnostics': return { type: value.type };
     case 'settings': return value.provider === undefined ? { type: 'settings' } : null;
+    case 'setSessionBilling': {
+      if ((value.provider !== 'claude' && value.provider !== 'codex') || typeof value.sessionId !== 'string'
+        || !value.sessionId || value.sessionId.length > 2048 || !['subscription','api','unknown'].includes(String(value.mode))) return null;
+      return { type: 'setSessionBilling',provider:value.provider,sessionId:value.sessionId,mode:value.mode as import('../summary/db/types').BillingMode };
+    }
     case 'diagnostics': return { type: 'diagnostics', offset: boundedOffset(value.offset) };
     case 'queryNames': {
       if (!value.query || typeof value.query !== 'object' || !Number.isSafeInteger(value.requestId) || (value.requestId as number) < 0) return null;
@@ -37,6 +43,11 @@ export function parseDashboardMessage(input: unknown): DashboardMessage | null {
       const groupBy = raw.groupBy;
       if (!['day', 'month', 'project', 'session', 'all', 'turn'].includes(String(groupBy))) return null;
       const query: UsageQuery = { groupBy: groupBy as UsageQuery['groupBy'], limit: 100, offset: boundedOffset(raw.offset) };
+      if (typeof raw.includeCosts === 'boolean') query.includeCosts = raw.includeCosts;
+      if (raw.cumulativeBy === 'provider' || raw.cumulativeBy === 'model') {
+        query.cumulativeBy = raw.cumulativeBy;
+        query.cumulativeOffset = boundedOffset(raw.cumulativeOffset);
+      }
       if (['tokens', 'requests', 'averageTokens', 'averageDuration'].includes(String(raw.chartMetric))) query.chartMetric = raw.chartMetric as UsageQuery['chartMetric'];
       if (raw.provider === 'claude' || raw.provider === 'codex') query.provider = raw.provider;
       for (const key of ['projectKey', 'sessionId'] as const) if (typeof raw[key] === 'string' && raw[key].length <= 2048 && raw[key]) query[key] = raw[key];

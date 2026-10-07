@@ -65,6 +65,7 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
   let lastRoots: import('../../src/summary/types').SourceRoot[] = [];
   let lastQuery: import('../../src/summary/types').UsageQuery = {};
   let lastNameQuery: import('../../src/summary/types').NameQuery | undefined;
+  const billingChanges: {provider:string;sessionId:string;mode:string}[] = [];
   let lastDiagnosticsPage: { offset?: number; providers?: string[] } | undefined;
   const policies: string[] = [];
   const pollingIntervals: number[] = [];
@@ -149,6 +150,7 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     }
     async query(query: typeof lastQuery) { queries++; lastQuery = query; return { rows: [], total: 0, coverage: {} }; }
     async queryNames(query: NonNullable<typeof lastNameQuery>) { lastNameQuery = query; return { rows: [], total: 0 }; }
+    async setSessionBilling(provider: string, sessionId: string, mode: string) { billingChanges.push({provider,sessionId,mode}); }
     async diagnostics(page: NonNullable<typeof lastDiagnosticsPage>) { diagnostics++; lastDiagnosticsPage = page; return { files: [], summaries: [], counts: {} }; }
     subscribe() { return () => {}; } cancel() {} async dispose() { summaryDisposals++; }
     async cancelRefresh() { cancellations++; releaseScan?.(); releaseScan = undefined; }
@@ -252,6 +254,13 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     assert.ok(!dashboard.messages.some(message => message.type === 'diagnostics'));
     dashboard.receive({ type: 'ready' }); await tick();
     assert.equal(scans, 1, 'duplicate ready messages do not start another summary');
+    dashboard.receive({type:'queryUsage',query:{groupBy:'all',provider:'claude',sessionId:'chosen',includeCosts:true,cumulativeBy:'model'}});await tick();
+    assert.equal(lastQuery.includeCosts,true);assert.equal(lastQuery.cumulativeBy,'model');
+    dashboard.receive({type:'setSessionBilling',provider:'claude',sessionId:'other',mode:'api'});await tick();
+    assert.equal(billingChanges.length,0,'billing changes must match the selected session');
+    dashboard.receive({type:'setSessionBilling',provider:'claude',sessionId:'chosen',mode:'subscription'});await tick();
+    assert.deepEqual(billingChanges,[{provider:'claude',sessionId:'chosen',mode:'subscription'}]);
+    assert.equal(scans,1,'billing and cumulative changes query the DB without transcript scans');
     dashboard.receive({ type: 'openDiagnostics' }); await tick();
     assert.equal(panels.length, 2, 'the footer link creates a separate diagnostic webview');
     const diagnosticPanel = panels[1];

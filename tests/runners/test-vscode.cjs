@@ -16,7 +16,7 @@ async function main() {
   const fixture = [
     { type: 'ai-title', sessionId: 'ui-session', aiTitle: '통계 화면 검증' },
     { type: 'user', sessionId: 'ui-session', promptId: 'ui-turn', timestamp: '2026-10-03T00:00:00Z', cwd: '/synthetic/project', message: { content: 'synthetic request' } },
-    { type: 'assistant', promptId: 'ui-turn', requestId: 'ui-request', timestamp: '2026-10-03T00:00:03Z', message: { id: 'ui-response', stop_reason: 'end_turn', usage: { input_tokens: 50, output_tokens: 50, cache_creation_input_tokens: 20, cache_read_input_tokens: 30 } } },
+    { type: 'assistant', promptId: 'ui-turn', requestId: 'ui-request', timestamp: '2026-10-03T00:00:03Z', message: { id: 'ui-response', model: 'claude-sonnet-4-6', stop_reason: 'end_turn', usage: { input_tokens: 50, output_tokens: 50, cache_creation_input_tokens: 20, cache_read_input_tokens: 30 } } },
   ];
   await writeFile(join(source, 'session.jsonl'), fixture.map(row => JSON.stringify(row)).join('\n') + '\n');
   await writeFile(join(userData, 'User', 'settings.json'), JSON.stringify({

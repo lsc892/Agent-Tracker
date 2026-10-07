@@ -1,4 +1,32 @@
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
+
+export const SCHEMA_MODEL_SQL = `
+CREATE TABLE IF NOT EXISTS turn_model_usage (
+  turn_id INTEGER NOT NULL REFERENCES turn_summary(id) ON DELETE CASCADE,
+  model TEXT NOT NULL,
+  input_tokens INTEGER NOT NULL CHECK(input_tokens >= 0),
+  output_tokens INTEGER NOT NULL CHECK(output_tokens >= 0),
+  cache_write_input_tokens INTEGER CHECK(cache_write_input_tokens >= 0),
+  cache_read_input_tokens INTEGER CHECK(cache_read_input_tokens >= 0),
+  estimated_cost_usd REAL CHECK(estimated_cost_usd >= 0),
+  pricing_version TEXT NOT NULL,
+  PRIMARY KEY(turn_id, model)
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS session_billing (
+  provider TEXT NOT NULL,
+  session_id TEXT NOT NULL,
+  billing_mode TEXT NOT NULL CHECK(billing_mode IN ('subscription','api','unknown')),
+  PRIMARY KEY(provider,session_id),
+  FOREIGN KEY(provider,session_id) REFERENCES sessions(provider,session_id) ON DELETE CASCADE
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS turn_costs (
+  turn_id INTEGER PRIMARY KEY REFERENCES turn_summary(id) ON DELETE CASCADE,
+  billing_mode TEXT NOT NULL CHECK(billing_mode IN ('subscription','api','unknown')),
+  cost_usd REAL CHECK(cost_usd >= 0),
+  unknown_costs INTEGER NOT NULL CHECK(unknown_costs >= 0),
+  pricing_version TEXT NOT NULL
+);
+`;
 
 const NAMES_SQL = `
 CREATE TABLE IF NOT EXISTS projects (
@@ -73,6 +101,7 @@ CREATE INDEX IF NOT EXISTS idx_manifest_session ON manifest(provider, session_id
 ${NAMES_SQL}
 ${TURN_SUMMARY_SQL}
 ${TURN_SUMMARY_INDEX_SQL}
+${SCHEMA_MODEL_SQL}
 `;
 
 /** Both v1 and v2 stored project names on every turn. Preserve ids, statistics and diagnostics. */

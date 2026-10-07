@@ -11,6 +11,7 @@ export interface SummaryOptions {
   cancellation?: SharedArrayBuffer;
 }
 export interface UsageQuery {
+  includeCosts?: boolean;
   groupBy?: 'day' | 'month' | 'project' | 'session' | 'all' | 'turn';
   timezone?: string;
   fromMs?: number;
@@ -25,6 +26,8 @@ export interface UsageQuery {
   offset?: number;
   afterId?: number;
   chartMetric?: import('./db/types').ChartMetric;
+  cumulativeBy?: 'provider' | 'model';
+  cumulativeOffset?: number;
 }
 export interface NameQuery {
   kind: 'project' | 'session';
@@ -62,10 +65,12 @@ export interface SummaryProgress {
   bodyBytes: number;
 }
 export interface UsageResult {
+  billing?: import('./db/types').BillingMode;
   rows: import('./db/types').UsageRow[] | import('./db/types').TurnSummaryRow[];
   total: number;
   coverage: import('./db/types').DiagnosticsPage['counts'];
   chart?: import('./db/types').UsageChart;
+  cumulative?: { rows: import('./db/types').CumulativeRow[]; total: number; by: 'provider' | 'model' };
 }
 export type DiagnosticsResult = import('./db/types').DiagnosticsPage & { lastRefresh?: RefreshResult };
 export interface TokenVector {
@@ -116,6 +121,8 @@ export interface UsageEvent {
   threadId: string;
   turnId: string;
   tokens: TokenVector;
+  model?: string;
+  billingMode?: import('./db/types').BillingMode;
   schema?: 'current' | 'legacy';
   flags?: string[];
   offset: number;

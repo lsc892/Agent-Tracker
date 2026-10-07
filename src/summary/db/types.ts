@@ -1,6 +1,12 @@
 export type Provider = 'claude' | 'codex';
 export type ProcessingStatus = 'processing' | 'done' | 'error' | 'interrupted';
 export type DurationQuality = 'exact' | 'derived' | 'approximate' | 'missing';
+export type BillingMode = 'subscription' | 'api' | 'unknown';
+export interface CostFields {
+  cost_usd?: number | null;
+  unknown_costs?: number;
+  billing_mode?: BillingMode;
+}
 
 export interface FileMetadata {
   provider: Provider;
@@ -48,9 +54,25 @@ export interface TurnSummaryInput {
   diagnostic_offset?: number | null;
   last_error?: string | null;
   updated_at?: string;
+  /** Ingestion only; persisted separately after response deduplication. */
+  model_usage?: Iterable<ModelUsageInput>;
+  billing?: BillingMode;
 }
 
-export interface TurnSummaryRow extends Required<TurnSummaryInput> {
+export interface ModelUsageInput {
+  model: string;
+  input_tokens: number;
+  output_tokens: number;
+  cache_write_input_tokens: number | null;
+  cache_read_input_tokens: number | null;
+}
+
+export interface CumulativeRow extends ModelUsageInput, CostFields {
+  provider: Provider;
+  total_tokens: number;
+}
+
+export interface TurnSummaryRow extends Required<Omit<TurnSummaryInput, 'model_usage' | 'billing'>>, CostFields {
   id: number;
 }
 
@@ -67,6 +89,7 @@ export interface SessionReplacement {
 }
 
 export interface SummaryFilter {
+  includeCosts?: boolean;
   provider?: Provider;
   providers?: Provider[];
   projectKey?: string;
@@ -98,7 +121,7 @@ export interface UsageChart {
   total: number;
 }
 
-export interface UsageRow {
+export interface UsageRow extends CostFields {
   provider: Provider;
   project_key: string | null;
   project_name: string | null;

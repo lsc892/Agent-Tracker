@@ -1,7 +1,7 @@
 import { basename, dirname, sep } from 'node:path';
 import { SummaryError } from '../jsonl';
 import type { FileContext, ParsedIdentity, ParseSink } from '../types';
-import { claudeTokens, displayName, number, object, project, string, timestamp } from './common';
+import { billingMode, claudeTokens, displayName, number, object, project, string, timestamp } from './common';
 
 export class ClaudeParserAdapter {
   private currentRoot: string | undefined;
@@ -10,6 +10,7 @@ export class ClaudeParserAdapter {
   private apiFailed = false;
   private stopBlocked = false;
   private customTitle = false;
+  private billing: import('../db/types').BillingMode = 'unknown';
 
   constructor(private readonly context: FileContext, private readonly sink: ParseSink) {
     const parts = context.path.split(/[\\/]/);
@@ -22,6 +23,7 @@ export class ClaudeParserAdapter {
   }
 
   row(row: Record<string, unknown>, offset: number): void {
+    if (row.billing_mode !== undefined || row.auth_mode !== undefined) this.billing = billingMode(row.billing_mode ?? row.auth_mode);
     const type = string(row.type);
     if (!type) return;
     if (this.identityValue.isMain && (type === 'ai-title' || type === 'custom-title')) {
@@ -56,7 +58,8 @@ export class ClaudeParserAdapter {
       const responseId = string(message.id);
       if (!responseId) throw new SummaryError('missing-response-id', offset);
       this.sink.event({ kind: 'usage', rootId, responseId, requestId: string(row.requestId) ?? null,
-        threadId: this.identityValue.threadId, turnId: rootId, tokens: claudeTokens(object(message.usage)), offset });
+        threadId: this.identityValue.threadId, turnId: rootId, tokens: claudeTokens(object(message.usage)),
+        model: displayName(message.model), billingMode: billingMode(message.billing_mode ?? row.billing_mode ?? row.auth_mode ?? this.billing), offset });
     }
     if (type === 'assistant' && rootId) {
       this.apiFailed = row.isApiErrorMessage === true;

@@ -9,13 +9,13 @@
 VS Code 확장으로 다음 두 기능을 제공한다.
 
 1. Claude와 Codex의 현재 구독 quota 사용률과 reset 시각을 상태 표시줄에서 확인한다.
-2. 로컬 JSONL 기록을 필요할 때만 SQLite에 반영하여 일·월·프로젝트·세션별 token 총량과 완료한 사용자 요청 turn별 평균 token 사용량·소요 시간을 조회한다.
+2. 로컬 JSONL 기록을 필요할 때만 SQLite에 반영하여 일·월·프로젝트·세션별 token 총량과 완료한 사용자 요청 turn별 평균 token 사용량·소요 시간, 제공자별·모델별 누계와 충전 API 추정 비용을 조회한다.
 
 핵심 설계 원칙은 다음과 같다.
 
 - quota는 실시간성이 중요하므로 작은 최신 상태만 메모리에 유지한다.
 - 과거 누계는 화면을 열거나 사용자가 새로 고침을 요청할 때만 manifest와 JSONL을 비교하는 lazy 방식으로 갱신한다.
-- SQLite 영속 table은 manifest·projects·sessions·turn_summary로 둔다. 표시 이름은 프로젝트·세션당 한 번 저장하고 요청별 통계는 식별자로 연결한다.
+- SQLite 영속 table은 manifest·projects·sessions·turn_summary와 모델·요금 정보를 담는 turn_model_usage·turn_costs·session_billing으로 둔다. 표시 이름은 프로젝트·세션당 한 번 저장하고 요청별 통계는 식별자로 연결한다.
 - subagent token은 부모의 사용자 요청에 합산하지만, 시간은 root/main turn의 경과 시간만 사용한다.
 
 ## 2. 전체 구조
@@ -38,7 +38,7 @@ Codex sessions/**/*.jsonl ──┘                              │
 
 두 경로는 분리한다. 상태 표시줄 quota 갱신이 JSONL 전체 통계 갱신을 유발해서는 안 된다.
 
-현재 quota는 서버 조회 결과를 사용하고, 과거 token 통계는 manifest에서 변경 session을 찾아 turn_summary만 갱신한다.
+현재 quota는 서버 조회 결과를 사용하고, 과거 token 통계는 manifest에서 변경 session을 찾아 요청·모델·비용 집계를 함께 갱신한다.
 
 ## 3. 기능 1: 실시간 quota 표시
 
@@ -204,7 +204,7 @@ Codex:  ~/.codex/sessions/**/*.jsonl
 
 ### 4.3 manifest
 
-영속 SQLite table은 `manifest`, `projects`, `sessions`, `turn_summary`로 둔다. manifest는 JSONL 파일마다 한 행, turn summary는 main과 subagent를 합친 외부 사용자 요청마다 한 행이다. 프로젝트명은 project_key당 한 행, 세션명은 (provider, session_id)당 한 행으로 저장하고 summary에는 식별자만 둔다. agent별 row와 response candidate는 영속화하지 않는다.
+영속 SQLite table은 `manifest`, `projects`, `sessions`, `turn_summary`, `turn_model_usage`, `turn_costs`, `session_billing`으로 둔다. manifest는 JSONL 파일마다 한 행, turn summary는 main과 subagent를 합친 외부 사용자 요청마다 한 행이다. 프로젝트명은 project_key당 한 행, 세션명은 (provider, session_id)당 한 행으로 저장하고 summary에는 식별자만 둔다. 요청의 모델별 토큰·추정 단가 결과는 turn_model_usage, 결제 방식에 따른 비용 합계는 turn_costs, 사용자가 지정한 세션 결제 방식은 session_billing에 저장한다. agent별 row와 response candidate는 영속화하지 않는다.
 
 manifest 전체를 메모리에 적재하지 않는다. 파일 metadata 전수조사는 유지하되 발견·조회·비교는 최대 `n`개씩 처리한다. 진단용 정보는 상태·처리 위치·기록 시각·오류 네 column으로 제한한다.
 
@@ -267,7 +267,7 @@ response별 증분 상태를 영속화하지 않으므로 append도 tail만 더�
 
 누계 갱신은 Usage 화면 진입 또는 사용자 새로 고침으로 시작한다. 파일 조사와 방문 기록은 최대 n개씩 수행하고, 통계의 확정 단위는 논리 session이다. 하나의 session에는 main과 여러 subagent 파일이 함께 속할 수 있다. 파일의 session 귀속이 바뀌면 이전·새 session을 같은 반영 단위로 묶는다.
 
-아래 절차는 각 문제에 대한 처리 기준이다. scan ID, 이번 실행의 대상 루트와 순회 완료 여부는 worker의 실행 상태로만 관리한다. 임시 작업 목록과 집계 결과는 디스크 staging에 두고 종료 시 폐기하며, 영속 table은 manifest·projects·sessions·turn_summary로 유지한다.
+아래 절차는 각 문제에 대한 처리 기준이다. scan ID, 이번 실행의 대상 루트와 순회 완료 여부는 worker의 실행 상태로만 관리한다. 임시 작업 목록과 집계 결과는 디스크 staging에 두고 종료 시 폐기한다. 요청·모델·비용 결과와 이름·정상 metadata·삭제는 session transaction으로 함께 반영한다.
 
 #### 4.4.1 파일과 집계 결과가 커져 메모리·DB 잠금이 늘어나는 문제
 
@@ -551,7 +551,7 @@ schema v4는 이전 summary의 cache component를 NULL로 유지해 미확인 �
 
 ## 8. SQLite schema
 
-DB 위치는 `ExtensionContext.globalStorageUri` 아래로 한다. 영속 table은 파일 처리 상태를 담는 `manifest`, 이름을 관리하는 `projects`·`sessions`, 조회 수치를 담는 `turn_summary`다. prompt·response·tool 본문, agent별 결과, response candidate와 scan 이력은 저장하지 않는다. 세션 제목 metadata는 이름 테이블에만 저장한다.
+DB 위치는 `ExtensionContext.globalStorageUri` 아래로 한다. 영속 table은 파일 처리 상태를 담는 `manifest`, 이름을 관리하는 `projects`·`sessions`, 조회 수치를 담는 `turn_summary`, 모델·비용 수치를 담는 `turn_model_usage`·`turn_costs`, 사용자가 지정한 결제 방식을 담는 `session_billing`이다. prompt·response·tool 본문, agent별 결과, response candidate와 scan 이력은 저장하지 않는다. 세션 제목 metadata는 이름 테이블에만 저장한다.
 
 ```sql
 PRAGMA foreign_keys = ON;
@@ -667,9 +667,27 @@ schema v1·v2는 기존 이름을 projects로 옮기고 요청 ID·통계·manif
 | `status` | 완료 / 진행 중 / 실패; 완료 요청만 평균 계산 |
 | `quality_flags` | 품질 경고; 상세 오류는 원본 파일·offset과 함께 표시 |
 
-model별·agent별 분석과 비용 계산은 현재 기능 범위에 포함하지 않는다. cache component는 중복 제거한 response에서 저장·집계하고 reasoning은 output에 포함한다.
+모델별 토큰 누계와 충전 API 추정 비용을 함께 제공한다. agent별 분석은 제공하지 않는다. cache component는 중복 제거한 response에서 저장·집계하고 reasoning은 output에 포함한다.
+
+schema v5는 기존 요청·manifest·이름을 보존하며 다음 table을 추가한다.
+
+| Table | 저장 단위와 내용 |
+|---|---|
+| `turn_model_usage` | `(turn_id, model)`별 input·output·cache write/read, `estimated_cost_usd`, `pricing_version`. 요청 참조 삭제 시 함께 삭제한다. |
+| `turn_costs` | 요청별 `billing_mode`, nullable `cost_usd`, `unknown_costs`, `pricing_version`. 구독은 0, API는 확인한 모델 비용 합계, 미확인은 NULL이다. |
+| `session_billing` | `(provider, session_id)`별 사용자가 지정한 구독/API/미확인 방식. 요청 재집계 후에도 유지하고 해당 세션이 사라지면 함께 삭제한다. |
+
+Claude는 `message.model`, Codex는 usage record의 model 또는 해당 turn_context의 model을 사용한다. response 중복 제거 후 main/subagent의 모델별 토큰을 합산하므로 모델별 합계는 요청·제공자 총량과 같다. 모델이 없거나 이전 summary가 아직 재집계되지 않았다면 별도 모델 미상 그룹으로 남긴다. parser version 10은 다음 통계 진입에서 변경 없는 원본도 한 번 재파싱한다.
+
+원본의 명시적 `billing_mode`·`auth_mode`만 결제 방식 근거로 사용하고, 현재 로그인 방식으로 과거 기록을 분류하지 않는다. 명시적 근거가 없거나 한 요청에서 서로 다른 방식이 섞이면 미확인으로 남긴다. 사용자는 통계 창에서 세션을 선택한 뒤 세션 전체의 결제 방식을 지정할 수 있으며, 이 선택은 원본 metadata보다 우선한다. 변경은 기존 창 간 refresh lock을 사용한 worker DB transaction으로 비용만 갱신하며 원본을 다시 읽지 않는다.
+
+요금은 로컬 대화 기록의 모델·토큰을 [Anthropic 표준 단가](https://platform.claude.com/docs/en/about-claude/pricing)와 [OpenAI 표준 단가](https://developers.openai.com/api/docs/pricing)로 계산한 추정 USD 비용이다. 단가 버전은 `2026-10-07-standard-text`다. Input에서 cache write/read를 뺀 뒤 각 component를 한 번씩 계산한다. 미지원 모델·cache 구성·cache write 단가는 NULL로 남기고 확인한 비용과 미확인 건수를 함께 표시한다. 구독은 사용자의 지시에 따라 추가 사용 비용 0원이며 구독 결제액 자체를 합산하지 않는다. 실제 청구액·충전 잔액 조회, 로컬 기록에 없는 다른 API 호출, 도구 요금·할인·빠른 처리·긴 문맥·캐시 보관 기간별 추가 요금은 포함하지 않는다.
 
 ### 8.2 일·월·프로젝트·session별 총량과 turn 평균
+
+누계의 `제공자별 / 모델별` 토글은 표 페이지와 독립적으로 선택 범위 전체의 토큰·비용을 조회한다. 조회 단위가 일·월이면 시각 미상 기록도 표와 같은 규칙으로 포함하고 그 외 기간 필터는 시작 시각을 따른다. 제공자와 모델을 함께 그룹화하며 모델 누계는 100개씩 페이지를 나눈다. 모델별 요청 수·시간 평균은 제공하지 않아 여러 모델을 사용한 요청의 분모를 늘리지 않는다.
+
+`API 비용 표시`는 기본 off이며 켜면 누계와 여섯 조회 단위의 표에 비용 열을 추가한다. 토글·필터·결제 방식 지정은 원본 재스캔 없이 저장된 DB만 조회·갱신한다. 비용 표시 선호와 누계 기준은 Webview state로 보존한다.
 
 수치는 `turn_summary`의 filter와 `GROUP BY`로 조회하고 이름은 projects·sessions에서 연결한다. 이름 목록에서 선택한 project_key·session_id·provider로 조회하므로 중복 제목이 합쳐지지 않는다. 일·월은 configured timezone의 시작·끝 경계를 UTC millisecond로 변환한 뒤 `started_at_ms`에 적용한다. 한 요청의 token과 duration은 시작 시점의 일·월에 귀속하고 날짜 경계에서 나누지 않는다. timezone 변경은 조회 경계를 바꾸며 원본 재파싱은 요구하지 않는다.
 
@@ -741,7 +759,7 @@ Extension Host 메모리에 유지하는 값:
 - Claude/Codex 최신 quota snapshot
 - 진행 중인 single-flight 상태
 - 사용량·데이터 확인 Webview마다 현재 보이는 제한된 한 page의 row
-- worker가 보내는 작은 진행 상태와 현재 조회 page·제한된 도표 결과
+- worker가 보내는 작은 진행 상태와 현재 조회 page·제한된 도표 결과·누계 한 페이지
 
 누계 worker는 최대 `n`개 파일의 metadata·manifest diff와 byte 예산 내 parser/정규화 row buffer만 유지한다. 변경 session의 중복 제거·연결·합산 작업은 디스크 staging에 기록하고 session 교체 후 폐기한다. 한 session이 커도 파일 목록·response 후보·summary를 메모리에 한꺼번에 올리지 않는다. 디렉터리 순회·파싱·DB 반영 사이에는 backpressure를 적용하여 다음 묶음이 무제한 대기열에 쌓이지 않게 한다.
 
@@ -926,7 +944,7 @@ last successful session update
 - 클릭하면 Markdown Quota 카드가 뜨고 제공자별 새로 고침·상세/압축 설정·확장 관리·사용량 통계 링크를 사용할 수 있다. 패치한 로컬 VS Code에서는 자동 호버 억제, 클릭 유지·재클릭 닫기, 닫은 뒤 재호버 억제와 바깥 클릭·Esc 후 재열기를 실제 UI에서 검증한다.
 - 누계 refresh에서 변경 없는 session의 파일 body는 다시 읽지 않는다.
 - 전체 경로·manifest·파싱 결과를 메모리에 적재하지 않고 n개·byte 예산·DB 조회 page 경계를 지킨다.
-- 영속 table은 manifest·projects·sessions·turn_summary이고, session summary와 이름·정상 metadata·삭제는 함께 commit한다. 부재 판정은 전체 순회 성공 후 수행한다.
+- 영속 table은 manifest·projects·sessions·turn_summary·turn_model_usage·turn_costs·session_billing이고, session summary·모델별 토큰·비용과 이름·정상 metadata·삭제는 함께 commit한다. 부재 판정은 전체 순회 성공 후 수행한다.
 - 오류·중단은 네 진단 항목으로 기록하고 자동 재시도하지 않는다. 다음 화면 진입·수동 새로 고침에서 새로 조사한다.
 - append/rewrite/delete 후 full rebuild 결과와 증분 결과가 같다.
 - Claude response duplicate와 Codex cumulative snapshot이 이중 집계되지 않는다.

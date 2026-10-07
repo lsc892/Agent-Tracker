@@ -9,6 +9,7 @@ import { parseDashboardMessage } from '../../src/ui/presentation';
 class Element {
   private text = '';
   value = ''; title = ''; hidden = true; children: Element[] = [];
+  checked = false; disabled = false;
   scrollTop = 0; scrollHeight = 500; clientHeight = 200;
   readonly options = [{value:'',disabled:false},{value:'claude',disabled:false},{value:'codex',disabled:false}];
   get selectedOptions(): {value:string;disabled:boolean}[] { return this.options.filter(option=>option.value===this.value); }
@@ -45,6 +46,32 @@ const sessions = [
   {provider:'codex',project_key:'/project',project_name:'Project',session_id:'two',session_name:'같은 이름',session_started_at_ms:1000},
   {provider:'claude',project_key:'/project',project_name:'Project',session_id:'three',session_name:null,session_started_at_ms:null},
 ];
+
+test('cost toggle displays stored costs and unknown coverage in table and cumulative model rows without refreshing sources',()=>{
+  const {get,messages,receive,respond} = view();
+  get('show-costs').checked=true;get('show-costs').listeners.get('change')!();
+  assert.equal(messages.at(-1)?.query?.includeCosts,true);assert.equal(get('cost-note').hidden,false);
+  get('cumulative-model').listeners.get('click')!();
+  assert.equal(messages.at(-1)?.query?.cumulativeBy,'model');assert.equal(get('cumulative-model').attributes.get('aria-pressed'),'true');
+  const row = {...sessions[0],input_tokens:100,output_tokens:50,cache_write_input_tokens:20,cache_read_input_tokens:30,total_tokens:150,
+    cost_usd:0.001,billing_mode:'api',unknown_costs:1,model:'claude-sonnet-4-6'};
+  receive({type:'usage',result:{groupBy:'session',rows:[row],total:1,coverage:{files:1,done:1},cumulative:{by:'model',rows:[row],total:1}}});
+  assert.match(get('usage-table').textContent,/API 추정 비용 \(USD\).*\$0.0010.*미확인 1건/);
+  assert.match(get('cumulative-table').textContent,/모델.*claude-sonnet-4-6.*\$0.0010.*미확인 1건/);
+  get('session-name').listeners.get('click')!();respond({rows:sessions,total:3});
+  get('session-list').children[1].listeners.get('click')!();
+  assert.equal(get('billing-control').hidden,false);
+  receive({type:'usage',result:{groupBy:'session',rows:[{...row,cost_usd:0,billing_mode:'subscription',unknown_costs:0}],total:1,billing:'subscription',coverage:{files:1,done:1}}});
+  assert.match(get('usage-table').textContent,/0원 \(구독\)/);
+  assert.equal(get('billing-mode').value,'subscription');assert.equal(get('billing-mode').disabled,false);
+  get('billing-mode').value='api';get('billing-mode').listeners.get('change')!();
+  assert.equal(messages.at(-1)?.type,'setSessionBilling');
+  get('show-costs').checked=false;get('show-costs').listeners.get('change')!();
+  receive({type:'usage',result:{groupBy:'session',rows:[row],total:1,coverage:{files:1,done:1}}});
+  assert.doesNotMatch(get('usage-table').textContent,/API 추정 비용|\$0.0010/);
+  assert.equal(get('cost-note').hidden,true);assert.equal(get('billing-control').hidden,true);
+  assert.ok(messages.every(message=>!['refreshUsage','refreshQuota'].includes(message.type)));
+});
 
 test('table names and list selections use exact IDs and whole-list choices clear filters immediately', () => {
   const {get,messages,receive,respond} = view();

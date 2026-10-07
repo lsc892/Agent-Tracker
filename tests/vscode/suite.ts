@@ -136,6 +136,28 @@ export async function run(): Promise<void> {
               checkSegmentHover();
               check(document.getElementById('chart-metric').querySelector('[value="requests"]').disabled,'request chart disables aggregate metrics');
               check(document.getElementById('session-name').textContent === '통계 화면 검증' && document.getElementById('session-options').hidden,'session selection applies immediately and closes the popup');
+              phase = 'costs-on'; document.getElementById('show-costs').click();
+            } else if (phase === 'costs-on' && message.type === 'usage') {
+              check(document.getElementById('usage-table').textContent.includes('API 추정 비용 (USD)'),'cost switch adds the cost column');
+              check(!document.getElementById('billing-control').hidden && !document.getElementById('cost-note').hidden,'selected session exposes billing and estimate guidance');
+              phase = 'models'; document.getElementById('cumulative-model').click();
+            } else if (phase === 'models' && message.type === 'usage' && message.result.cumulative.by === 'model') {
+              check(message.result.cumulative.rows[0].model === 'claude-sonnet-4-6' && message.result.cumulative.rows[0].total_tokens === 150,'model cumulative retains all tokens');
+              check(document.getElementById('cumulative-table').textContent.includes('claude-sonnet-4-6'),'model name renders in the cumulative table');
+              check(document.getElementById('cumulative-model').getAttribute('aria-pressed') === 'true','model selection exposes pressed state');
+              phase = 'billing-api'; document.getElementById('billing-mode').value = 'api';
+              document.getElementById('billing-mode').dispatchEvent(new Event('change'));
+            } else if (phase === 'billing-api' && message.type === 'usage') {
+              check(message.result.billing === 'api' && Math.abs(message.result.rows[0].cost_usd - 0.000984) < 1e-12,'API classification saves estimated costs');
+              check(document.getElementById('cumulative-table').textContent.includes('$0.000984'),'model cumulative shows saved API cost');
+              phase = 'billing-subscription'; document.getElementById('billing-mode').value = 'subscription';
+              document.getElementById('billing-mode').dispatchEvent(new Event('change'));
+            } else if (phase === 'billing-subscription' && message.type === 'usage') {
+              check(message.result.rows[0].cost_usd === 0 && document.getElementById('usage-table').textContent.includes('0원 (구독)'),'subscription usage displays zero cost');
+              phase = 'costs-off'; document.getElementById('show-costs').click();
+            } else if (phase === 'costs-off' && message.type === 'usage') {
+              check(!document.getElementById('usage-table').textContent.includes('API 추정 비용'),'cost switch removes cost columns');
+              check(document.getElementById('billing-control').hidden,'cost switch hides billing controls');
               phase = 'empty'; document.getElementById('from-day').value = '2026-10-04';
               document.getElementById('usage-filters').requestSubmit();
             } else if (phase === 'empty' && message.type === 'usage') {

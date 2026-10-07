@@ -3,6 +3,7 @@ import { SummaryDatabase } from './db';
 import { refreshSummary } from './scanner';
 import { acquireRefreshLock } from './lock';
 import type { SummaryOptions, UsageQuery, SourceRoot, RefreshResult, NameQuery } from './types';
+import type { BillingMode, Provider } from './db/types';
 
 if (!parentPort) throw new Error('Summary worker requires a parent');
 const port = parentPort;
@@ -35,7 +36,14 @@ port.on('message',(message: {id?:number;method:string;payload?:unknown}) => {
         const total = query.groupBy === 'turn' ? database.queryTurnsCount(query)
           : database.queryUsageCount(query,query.groupBy === 'all' || !query.groupBy ? 'total' : query.groupBy,query.timezone ?? options.timezone ?? 'UTC');
         const chart = query.chartMetric ? database.queryUsageChart(query, query.groupBy ?? 'all', query.timezone ?? options.timezone ?? 'UTC', query.chartMetric) : undefined;
-        result = {rows,total,chart,coverage:database.diagnostics({limit:1,providers:query.providers}).counts};
+        const cumulativeFilter = query.groupBy === 'day' || query.groupBy === 'month' ? {...query,unknownTime:'include' as const} : query;
+        const cumulative = query.cumulativeBy ? database.queryCumulative(cumulativeFilter,query.cumulativeBy,query.cumulativeOffset) : undefined;
+        const billing = query.includeCosts && query.provider && query.sessionId ? database.sessionBilling(query.provider,query.sessionId) : undefined;
+        result = {rows,total,chart,cumulative,billing,coverage:database.diagnostics({limit:1,providers:query.providers}).counts};
+      } else if (message.method === 'setBilling') {
+        const {provider,sessionId,mode} = message.payload as {provider:Provider;sessionId:string;mode:BillingMode};
+        const release = await acquireRefreshLock(options.dbPath,AbortSignal.timeout(30_000));
+        try { database.setSessionBilling(provider,sessionId,mode); } finally { await release(); }
       } else if (message.method === 'names') result = database.queryNames(message.payload as NameQuery);
       else if (message.method === 'diagnostics') result = {...database.diagnostics((message.payload ?? {}) as {limit?:number;offset?:number;afterId?:number;providers?:SourceRoot['provider'][]}),lastRefresh};
       else if (message.method === 'clearData') {
