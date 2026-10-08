@@ -1,4 +1,4 @@
-import { basename, normalize } from 'node:path';
+import { basename, normalize, win32 } from 'node:path';
 import type { TokenVector } from '../types';
 import { SummaryError } from '../jsonl';
 import type { BillingMode } from '../db/types';
@@ -23,8 +23,11 @@ export function timestamp(value: unknown): number | null {
   return Number.isSafeInteger(parsed) && Math.abs(parsed) <= 8.64e15 ? parsed : null;
 }
 export function project(path: string): { projectKey: string; projectName: string } {
-  const key = normalize(path);
-  return { projectKey: key, projectName: basename(key.replace(/\\/g, '/')) || key };
+  const windows = /^[a-z]:[/\\]|^\\\\/i.test(path);
+  let normalized = windows ? win32.normalize(path) : normalize(path);
+  if (windows && normalized.length > win32.parse(normalized).root.length) normalized = normalized.replace(/[/\\]+$/, '');
+  const key = windows ? normalized.toLowerCase() : normalized;
+  return { projectKey: key, projectName: basename(normalized.replace(/\\/g, '/')) || normalized };
 }
 export function claudeTokens(raw: Record<string, unknown>): TokenVector {
   validateTokens(raw);
