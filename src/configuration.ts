@@ -15,7 +15,7 @@ export interface TrackerConfiguration {
   skillsEnabled: boolean;
   showApiCosts: boolean;
   excludeEmptyUsage: boolean;
-  claude: { enabled: boolean; dataHome: string };
+  claude: { enabled: boolean; dataHome: string; cleanupPeriodDays: number | null };
   codex: { enabled: boolean; dataHome: string; executable: string; showStatusBar: boolean; showReserve: boolean; showResetCredits: boolean };
   roots: SourceRoot[];
   timezone: string;
@@ -32,6 +32,7 @@ export function readConfiguration(settings: SettingsReader): TrackerConfiguratio
   const claudeRoots = settings.get<string[]>('usage.claudeRoots', []);
   const codexRoots = settings.get<string[]>('usage.codexRoots', []);
   const enabled = { claude: settings.get('claude.enabled', true), codex: settings.get('codex.enabled', true) };
+  const cleanup = settings.get<unknown>('claude.cleanupPeriodDays', null);
   let timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
   let timezoneWarning: string | undefined;
   const configuredTimezone = settings.get<unknown>('usage.timezone', '');
@@ -58,7 +59,8 @@ export function readConfiguration(settings: SettingsReader): TrackerConfiguratio
     skillsEnabled: settings.get('usage.skillsEnabled', true),
     showApiCosts: settings.get('usage.showApiCosts', false),
     excludeEmptyUsage: settings.get('usage.excludeEmptyUsage', true),
-    claude: { enabled: enabled.claude, dataHome: claudeHome },
+    claude: { enabled: enabled.claude, dataHome: claudeHome,
+      cleanupPeriodDays: typeof cleanup === 'number' && Number.isSafeInteger(cleanup) && cleanup >= 1 ? cleanup : null },
     codex: { enabled: enabled.codex, dataHome: codexHome, executable: settings.get('codex.executable', 'codex'),
       showStatusBar: settings.get('codex.showStatusBar', true), showReserve: settings.get('codex.showReserve', false),
       showResetCredits: settings.get('codex.showResetCredits', true) },

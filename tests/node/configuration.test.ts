@@ -11,6 +11,21 @@ test('quota polling uses one common interval setting', () => {
   assert.equal(readConfiguration(settings({ 'quota.pollingIntervalSeconds': 120 })).pollingSeconds, 120);
 });
 
+test('quota extras, empty usage and Claude retention use independent defaults and explicit settings', () => {
+  const defaults = readConfiguration(settings({}));
+  assert.equal(defaults.codex.showReserve, false);
+  assert.equal(defaults.codex.showResetCredits, true);
+  assert.equal(defaults.excludeEmptyUsage, true);
+  assert.equal(defaults.claude.cleanupPeriodDays, null);
+  const changed = readConfiguration(settings({ 'codex.showReserve': true, 'codex.showResetCredits': false,
+    'usage.excludeEmptyUsage': false, 'claude.cleanupPeriodDays': 365 }));
+  assert.equal(changed.codex.showReserve, true);
+  assert.equal(changed.codex.showResetCredits, false);
+  assert.equal(changed.excludeEmptyUsage, false);
+  assert.equal(changed.claude.cleanupPeriodDays, 365);
+  for (const value of [0, -1, 1.5, '30']) assert.equal(readConfiguration(settings({ 'claude.cleanupPeriodDays': value })).claude.cleanupPeriodDays, null);
+});
+
 test('API cost display is controlled by extension settings and defaults off',()=>{
   assert.equal(readConfiguration(settings({})).showApiCosts,false);
   const enabled=readConfiguration(settings({'usage.showApiCosts':true}));

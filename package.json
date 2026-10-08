@@ -133,6 +133,14 @@
           "order": 11,
           "description": "사용량 카드에 Codex 사용량 리셋권의 사용 가능 횟수와 다음 만료 시간을 표시합니다. 서버가 제공한 정보가 있을 때만 표시됩니다."
         },
+        "agentTracker.claude.cleanupPeriodDays": {
+          "type": ["integer", "null"],
+          "minimum": 1,
+          "default": null,
+          "scope": "machine",
+          "order": 12,
+          "markdownDescription": "Claude Code 대화 로그의 자동 삭제 기간(일)을 설정합니다. 1 이상의 값을 입력하면 Claude 데이터 홈의 `settings.json`에 `cleanupPeriodDays`를 반영합니다. `null`은 기존 설정 유지이며 Claude 기본값은 30일입니다. 삭제는 Claude Code가 시작 시 처리하며 이미 삭제된 로그는 복구되지 않습니다."
+        },
         "agentTracker.usage.excludeEmptyUsage": {
           "type": "boolean",
           "default": true,

@@ -7,11 +7,17 @@ import { SummaryClient } from './summary/client';
 import { Dashboard } from './ui/dashboard';
 import { QuotaStatusBar } from './ui/statusBar';
 import { ColorSettings } from './ui/colorSettings';
+import { setClaudeCleanupPeriod } from './claudeSettings';
 
 let shutdown: (() => Promise<void>) | undefined;
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   let settings = readConfiguration(vscode.workspace.getConfiguration('agentTracker'));
+  const applyClaudeCleanup = async (): Promise<void> => {
+    try { await setClaudeCleanupPeriod(settings.claude.dataHome, settings.claude.cleanupPeriodDays); }
+    catch { void vscode.window.showErrorMessage('Claude 로그 보존 기간을 적용하지 못했습니다. Claude 데이터 홈의 settings.json과 쓰기 권한을 확인해 주세요. 기존 파일은 유지됩니다.'); }
+  };
+  await applyClaudeCleanup();
   let disposed = false;
   let configurationQueue = Promise.resolve();
   let clearingData: Promise<void> | undefined;
@@ -74,6 +80,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         if (disposed) return;
         const previous = settings;
         settings = readConfiguration(vscode.workspace.getConfiguration('agentTracker'));
+        if (previous.claude.cleanupPeriodDays !== settings.claude.cleanupPeriodDays || previous.claude.dataHome !== settings.claude.dataHome) await applyClaudeCleanup();
         const changedSkills=previous.skillsEnabled!==settings.skillsEnabled;
         if (changedSkills) {
           await summary.setCapabilityCollectionEnabled(settings.skillsEnabled);
