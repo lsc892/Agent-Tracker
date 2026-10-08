@@ -96,8 +96,11 @@ export function createQuotaTooltip(
     if (!state) continue;
     const section = new vscode.MarkdownString();
     const name = provider === 'codex' ? 'Codex' : 'Claude';
+    // The server reports gpt-reserve under limitId=base_model_inference.
+    // Retain the name separately: single-bucket labels contain only the duration.
     const windows = (state.snapshot?.windows ?? []).filter(window =>
-      provider !== 'codex' || window.limitId !== 'gpt-reserve' || settings.codex?.showReserve === true);
+      provider !== 'codex' || settings.codex?.showReserve === true ||
+      window.limitId !== 'gpt-reserve' && window.limitName !== 'gpt-reserve');
     const overall = windows.filter(window => provider === 'codex' ? window.limitId === 'codex' : window.id === 'five_hour' || window.id === 'seven_day');
     const standard = overall.length ? overall : windows.filter(window => window.label === '5h' || window.label === '7d');
     const main = [...(standard.length ? standard : windows)].sort((a, b) =>

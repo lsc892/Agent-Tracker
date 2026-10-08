@@ -337,6 +337,22 @@ test('Codex prefers multi-bucket data, uses dynamic durations, seconds reset and
   assert.throws(() => parseCodexQuota({ rateLimits: { primary: { usedPercent: NaN } } }, 1), { code: 'protocol' });
 });
 
+test('Codex retains the reserve name independently of its identifier and single-bucket label', () => {
+  const reserve = { limitId: 'base_model_inference', limitName: 'gpt-reserve',
+    secondary: { usedPercent: 17, windowDurationMins: 10080 } };
+  for (const rateLimitsByLimitId of [
+    { base_model_inference: reserve },
+    { base_model_inference: reserve, codex: { primary: { usedPercent: 23, windowDurationMins: 300 } } },
+  ]) {
+    const result = parseCodexQuota({ rateLimitsByLimitId }, 1);
+    assert.equal(result.windows[0].limitId, 'base_model_inference');
+    assert.equal(result.windows[0].limitName, 'gpt-reserve');
+    assert.equal(result.windows[0].label, Object.keys(rateLimitsByLimitId).length === 1 ? '7d' : 'gpt-reserve 7d');
+  }
+  const fallback = parseCodexQuota({ rateLimits: reserve }, 1);
+  assert.equal(fallback.windows[0].limitName, 'gpt-reserve');
+});
+
 test('Codex reset credits keep the authoritative count and earliest available credit expiry', () => {
   const rateLimits = { primary: { usedPercent: 25, windowDurationMins: 300, resetsAt: 1700000000 } };
   const credit = (expiresAt: unknown, status = 'available', resetType = 'codexRateLimits') => ({ expiresAt, status, resetType });

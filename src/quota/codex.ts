@@ -275,6 +275,7 @@ export function parseCodexQuota(value: unknown, fetchedAt: number): QuotaSnapsho
     const bucket = asRecord(raw);
     if (!bucket) throw protocolError();
     const limitId = typeof bucket.limitId === 'string' ? bucket.limitId.slice(0, 100) : key.slice(0, 100);
+    const limitName = typeof bucket.limitName === 'string' && bucket.limitName ? bucket.limitName.slice(0, 100) : undefined;
     for (const windowId of ['primary', 'secondary'] as const) {
       if (bucket[windowId] == null) continue;
       const window = asRecord(bucket[windowId]);
@@ -285,9 +286,9 @@ export function parseCodexQuota(value: unknown, fetchedAt: number): QuotaSnapsho
       if (reset != null && (typeof reset !== 'number' || !Number.isFinite(reset) || Math.abs(reset) > 8.64e12)) throw protocolError();
       const duration = typeof mins === 'number' ? mins : null;
       const durationText = durationLabel(duration, windowId);
-      const name = typeof bucket.limitName === 'string' && bucket.limitName ? bucket.limitName.slice(0, 100) : limitId;
       windows.push({ id: `${limitId}:${windowId}`, limitId,
-        label: buckets.length === 1 || limitId === 'codex' ? durationText : `${name} ${durationText}`,
+        ...(limitName ? { limitName } : {}),
+        label: buckets.length === 1 || limitId === 'codex' ? durationText : `${limitName || limitId} ${durationText}`,
         usedPercent: window.usedPercent, current: window.usedPercent, maximum: 100,
         resetsAt: typeof reset === 'number' ? reset * 1000 : null, windowDurationMins: duration,
         ...(typeof bucket.rateLimitReachedType === 'string' ? { rateLimitReachedType: bucket.rateLimitReachedType.slice(0, 100) } : {}),

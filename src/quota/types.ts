@@ -10,6 +10,7 @@ export interface QuotaWindow {
   resetsAt: number | null;
   windowDurationMins: number | null;
   limitId?: string;
+  limitName?: string;
   rateLimitReachedType?: string;
 }
 

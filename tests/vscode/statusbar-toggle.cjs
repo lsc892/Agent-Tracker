@@ -228,9 +228,20 @@ async function main() {
       };
       assertDividers(rendered);
       assertPeriodSpacing(rendered);
+      const settingsPath = join(userData, 'User', 'settings.json');
+      for (const showReserve of [true, false]) {
+        const settings = JSON.parse(readFileSync(settingsPath, 'utf8'));
+        settings['agentTracker.codex.showReserve'] = showReserve;
+        await writeFile(settingsPath, JSON.stringify(settings, null, 2));
+        await until(async () => {
+          const card = await inspect();
+          return card && card.text.includes('gpt-reserve') === showReserve && card.meters.length === (showReserve ? 5 : 4);
+        }, `reserve ${showReserve ? 'appears' : 'disappears'} in the pinned card`);
+        assert.ok(await visible(), 'the quota card stays pinned when reserve visibility changes');
+      }
+      outcomes.push('Show Reserve immediately toggles the named base_model_inference bucket in the pinned card');
       const dark = await cdp.call('Page.captureScreenshot', {format:'png',clip:rendered.clip});
       await writeFile(join(resultDirectory,'quota-card-dark.png'),Buffer.from(dark.data,'base64'));
-      const settingsPath = join(userData, 'User', 'settings.json');
       const settings = JSON.parse(readFileSync(settingsPath, 'utf8'));
       settings['workbench.colorTheme'] = 'Default Light Modern';
       await writeFile(settingsPath, JSON.stringify(settings, null, 2));

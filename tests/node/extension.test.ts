@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { parseCodexQuota } from '../../src/quota/codex';
 
 type Disposable = { dispose(): void };
 type Command = string | { command: string; arguments?: unknown[] };
@@ -138,7 +139,13 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     getState(provider: string) { return { provider, snapshot: {provider,fetchedAt:0,windows:[
       {id:'five-hour',label:'5h',usedPercent:23,current:23,maximum:100,resetsAt:null,windowDurationMins:300},
       {id:'weekly',label:'7d',usedPercent:92,current:92,maximum:100,resetsAt:null,windowDurationMins:10080},
-      ...(provider === 'codex' ? [{id:'gpt-reserve:secondary',limitId:'gpt-reserve',label:'gpt-reserve 7d',usedPercent:17,current:17,maximum:100,resetsAt:Date.now()+3_600_000,windowDurationMins:10080}] : []),
+      ...(provider === 'codex' ? parseCodexQuota({ rateLimitsByLimitId: {
+        base_model_inference: { limitId: 'base_model_inference', limitName: 'gpt-reserve',
+          secondary: { usedPercent: 17, resetsAt: (Date.now()+3_600_000)/1000, windowDurationMins: 10080 } },
+        'gpt-reserve': { limitId: 'gpt-reserve', limitName: 'legacy reserve',
+          secondary: { usedPercent: 5, windowDurationMins: 10080 } },
+        review: { limitId: 'review', primary: { usedPercent: 11, windowDurationMins: 60 } },
+      } }, 0).windows : []),
     ], ...(provider === 'codex' ? { rateLimitResetCredits: { availableCount: 2, nextExpiresAt: Date.now() + (17 * 24 + 8) * 3_600_000 } } : {}) }, refreshing: false, status: 'ready', error: null, lastSuccessAt: 0, nextAllowedAt: 0 }; }
     getStates() { return this.providers.map(provider => this.getState(provider.id)); }
     async refresh(provider: string, force: boolean) { refreshes.push({ provider, force }); }
@@ -227,13 +234,16 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     assert.doesNotMatch(tooltip().value, /\| 기간 \|/);
     assert.match(tooltip().value, /rate-limit 재설정 2회 사용 가능/);
     assert.match(tooltip().value, /다음 항목이 17d 8h 후 만료됨/);
-    assert.doesNotMatch(tooltip().value, /gpt-reserve/);
+    assert.doesNotMatch(tooltip().value, /gpt\\-reserve|legacy reserve/);
+    assert.match(tooltip().value, /review 1h/, 'other additional quotas remain visible');
     configValues.set('codex.showReserve', true);
     configuration.fire({ affectsConfiguration: section => section === 'agentTracker' }); await tick();
     assert.match(tooltip().value, /gpt\\-reserve 7d/);
+    assert.match(tooltip().value, /legacy reserve 7d/);
     configValues.set('codex.showReserve', false);
     configuration.fire({ affectsConfiguration: section => section === 'agentTracker' }); await tick();
-    assert.doesNotMatch(tooltip().value, /gpt\\-reserve/);
+    assert.doesNotMatch(tooltip().value, /gpt\\-reserve|legacy reserve/);
+    assert.match(tooltip().value, /review 1h/);
     const cachedCard = tooltip().value;
     configValues.set('codex.showResetCredits', false);
     configuration.fire({ affectsConfiguration: section => section === 'agentTracker' }); await tick();

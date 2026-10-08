@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import type { QuotaState } from '../../src/quota/types';
 import { QuotaStatusBar } from '../../src/ui/statusBar';
+import { parseCodexQuota } from '../../src/quota/codex';
 
 /** Synthetic quotas for the native popup screenshot test; no live account is read. */
 export async function run(): Promise<void> {
@@ -14,8 +15,11 @@ export async function run(): Promise<void> {
           current: 0, maximum: 100, resetsAt: now + (4 * 60 + 37) * 60_000, windowDurationMins: 300 },
         { id: provider === 'claude' ? 'seven_day' : 'codex:secondary', limitId: provider, label: '7d', usedPercent: provider === 'codex' ? 86 : 14,
           current: 0, maximum: 100, resetsAt: now + 6 * 86_400_000, windowDurationMins: 10080 },
-        ...(provider === 'codex' ? [{ id: 'reserve:secondary', limitId: 'gpt-reserve', label: 'gpt-reserve 7d', usedPercent: 0,
-          current: 0, maximum: 100, resetsAt: now + 7 * 86_400_000, windowDurationMins: 10080 }] : []),
+        ...(provider === 'codex' ? parseCodexQuota({ rateLimitsByLimitId: {
+          base_model_inference: { limitId: 'base_model_inference', limitName: 'gpt-reserve',
+            secondary: { usedPercent: 0, resetsAt: (now + 7 * 86_400_000) / 1000, windowDurationMins: 10080 } },
+          codex: { primary: null, secondary: null },
+        } }, now).windows : []),
       ],
     },
   }));
