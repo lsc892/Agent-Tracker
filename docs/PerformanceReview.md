@@ -246,3 +246,9 @@ MCP server 이름과 설치 plugin 이름이 항상 같다는 보장은 없으�
 영속 DB 인덱스 비교, 실제 파싱 단계별 측정, 합성 unchanged/append의 요청·토큰 합계, 스킬 detector 최소 재현을 수행했다. 파싱 빌드의 타입 컴파일은 성공했다. 제안은 제품에 적용하지 않았고 실험 native reader의 이미지·오류·메모리 동등성 검증도 수행하지 않았다.
 
 이 조사에서 추가한 것은 문서와 측정 결과다. 기능 동작을 바꾸지 않았으므로 의사결정 일지와 설계 명세를 변경하지 않는다. 구현을 진행할 때는 해당 동작의 검증과 `npm run check`, 일지·명세 갱신이 필요하다.
+
+## 요청 제목 집계 A/B 후속 검증
+
+TEMP partial index와 기존 `roots GROUP BY`에 제목 선택을 합치는 두 로직은 재실행 가능한 `node:test`와 별도 벤치마크로 비교한다. 같은 2,000개 요청에 대해 전체 결과의 동등성을 확인하고, 생성 비용을 포함한 SQL 집계 시간·TEMP 할당·process RSS를 기록한다. 배치 구조·측정 조건·원시 기록은 [요청 제목 A/B 보고서](RequestTitleAB.md)를 참고한다. 이 비교도 제품 구현을 변경하지 않는다.
+
+사용자 선택에 따라 이후 제품에 A(TEMP partial index)를 반영했다. 선택 근거와 현재 schema/parser의 같은 실제 원본 사본으로 측정한 무인덱스 대비 집계 준비·영속 교체 transaction·전체 갱신 결과는 [실제 transaction 보고서](RequestTitleTransactions.md)에 기록한다. 앞선 후보 비교와 과거 조사 수치는 당시 조건의 기록으로 보존한다.
