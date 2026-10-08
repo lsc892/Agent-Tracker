@@ -138,6 +138,7 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     getState(provider: string) { return { provider, snapshot: {provider,fetchedAt:0,windows:[
       {id:'five-hour',label:'5h',usedPercent:23,current:23,maximum:100,resetsAt:null,windowDurationMins:300},
       {id:'weekly',label:'7d',usedPercent:92,current:92,maximum:100,resetsAt:null,windowDurationMins:10080},
+      ...(provider === 'codex' ? [{id:'gpt-reserve:secondary',limitId:'gpt-reserve',label:'gpt-reserve 7d',usedPercent:17,current:17,maximum:100,resetsAt:Date.now()+3_600_000,windowDurationMins:10080}] : []),
     ], ...(provider === 'codex' ? { rateLimitResetCredits: { availableCount: 2, nextExpiresAt: Date.now() + (17 * 24 + 8) * 3_600_000 } } : {}) }, refreshing: false, status: 'ready', error: null, lastSuccessAt: 0, nextAllowedAt: 0 }; }
     getStates() { return this.providers.map(provider => this.getState(provider.id)); }
     async refresh(provider: string, force: boolean) { refreshes.push({ provider, force }); }
@@ -226,6 +227,22 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     assert.doesNotMatch(tooltip().value, /\| 기간 \|/);
     assert.match(tooltip().value, /rate-limit 재설정 2회 사용 가능/);
     assert.match(tooltip().value, /다음 항목이 17d 8h 후 만료됨/);
+    assert.doesNotMatch(tooltip().value, /gpt-reserve/);
+    configValues.set('codex.showReserve', true);
+    configuration.fire({ affectsConfiguration: section => section === 'agentTracker' }); await tick();
+    assert.match(tooltip().value, /gpt\\-reserve 7d/);
+    configValues.set('codex.showReserve', false);
+    configuration.fire({ affectsConfiguration: section => section === 'agentTracker' }); await tick();
+    assert.doesNotMatch(tooltip().value, /gpt\\-reserve/);
+    const cachedCard = tooltip().value;
+    configValues.set('codex.showResetCredits', false);
+    configuration.fire({ affectsConfiguration: section => section === 'agentTracker' }); await tick();
+    assert.doesNotMatch(tooltip().value, /rate-limit 재설정|후 만료됨/);
+    configValues.set('codex.showResetCredits', true);
+    configuration.fire({ affectsConfiguration: section => section === 'agentTracker' }); await tick();
+    assert.equal(tooltip().value, cachedCard, 'visibility changes reuse the same snapshot');
+    assert.equal(refreshes.length, 0);
+    assert.match(cachedCard, /\| 5h .*\| wk .*\|\n\| :--- \| :--- \|\n\| <span.*초기화: —/);
     assert.equal(scans, 0);
     assert.equal(panels.length, 0);
     await click(items[1].command);

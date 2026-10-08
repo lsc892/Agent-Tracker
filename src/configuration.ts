@@ -16,7 +16,7 @@ export interface TrackerConfiguration {
   showApiCosts: boolean;
   excludeEmptyUsage: boolean;
   claude: { enabled: boolean; dataHome: string };
-  codex: { enabled: boolean; dataHome: string; executable: string; showStatusBar: boolean };
+  codex: { enabled: boolean; dataHome: string; executable: string; showStatusBar: boolean; showReserve: boolean; showResetCredits: boolean };
   roots: SourceRoot[];
   timezone: string;
   timezoneWarning?: string;
@@ -59,7 +59,9 @@ export function readConfiguration(settings: SettingsReader): TrackerConfiguratio
     showApiCosts: settings.get('usage.showApiCosts', false),
     excludeEmptyUsage: settings.get('usage.excludeEmptyUsage', true),
     claude: { enabled: enabled.claude, dataHome: claudeHome },
-    codex: { enabled: enabled.codex, dataHome: codexHome, executable: settings.get('codex.executable', 'codex'), showStatusBar: settings.get('codex.showStatusBar', true) },
+    codex: { enabled: enabled.codex, dataHome: codexHome, executable: settings.get('codex.executable', 'codex'),
+      showStatusBar: settings.get('codex.showStatusBar', true), showReserve: settings.get('codex.showReserve', false),
+      showResetCredits: settings.get('codex.showResetCredits', true) },
     roots: [
       ...(claudeRoots.length ? claudeRoots : [join(claudeHome, 'projects')]).map(path => ({ provider: 'claude' as const, path: expandPath(path), dataHome: claudeHome })),
       ...(codexRoots.length ? codexRoots : [join(codexHome, 'sessions'), join(codexHome, 'archived_sessions')]).map(path => ({ provider: 'codex' as const, path: expandPath(path), dataHome: codexHome })),

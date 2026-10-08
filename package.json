@@ -89,7 +89,7 @@
             "detailed"
           ],
           "default": "detailed",
-          "description": "상태 표시줄의 표시 방식입니다. 상세는 7일·5시간, 압축은 5시간 사용량만 표시합니다. 사용량 툴팁은 항상 모든 정보를 표시합니다."
+          "description": "상태 표시줄의 표시 방식입니다. 상세는 7일·5시간, 압축은 5시간 사용량만 표시합니다. 사용량 툴팁은 표시 대상으로 설정한 모든 기간을 표시합니다."
         },
         "agentTracker.display.colorMode": {
           "type": "string",
@@ -120,6 +120,18 @@
           "type": "boolean",
           "default": true,
           "description": "Codex 상태 표시줄을 표시합니다. 숨겨도 quota 조회는 유지합니다."
+        },
+        "agentTracker.codex.showReserve": {
+          "type": "boolean",
+          "default": false,
+          "order": 10,
+          "description": "사용량 카드에 GPT Reserve 통계를 표시합니다. Reserve는 서버가 gpt-reserve로 구분해 보고하는 별도 사용량 한도입니다. 계정에서 제공하는 경우에만 표시됩니다."
+        },
+        "agentTracker.codex.showResetCredits": {
+          "type": "boolean",
+          "default": true,
+          "order": 11,
+          "description": "사용량 카드에 Codex 사용량 리셋권의 사용 가능 횟수와 다음 만료 시간을 표시합니다. 서버가 제공한 정보가 있을 때만 표시됩니다."
         },
         "agentTracker.usage.excludeEmptyUsage": {
           "type": "boolean",

@@ -35,26 +35,42 @@ function muted(text: string): string {
   return `<span style="color:var(--vscode-descriptionForeground);">${text}</span>`;
 }
 
-function usageMeter(used: number, percentage: 'used' | 'remaining', reset: string): string {
+function usageMeter(used: number, percentage: 'used' | 'remaining', reset: string, width: number, table = false): string {
   const percent = Math.round(percentage === 'remaining' ? 100 - used : used);
   const color = used >= 80 ? '#fa3048' : used >= 50 ? '#e9a400' : '#22a06b';
   const label = `${percentage === 'remaining' ? '남음' : '사용'} ${percent}%`;
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="8" viewBox="0 0 36 8"><rect width="36" height="8" rx="4" fill="#888888" fill-opacity="0.2"/><rect width="${36 * percent / 100}" height="8" rx="4" fill="${color}"/></svg>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="8" viewBox="0 0 ${width} 8"><rect width="${width}" height="8" rx="4" fill="#888888" fill-opacity="0.2"/><rect width="${width * percent / 100}" height="8" rx="4" fill="${color}"/></svg>`;
   const image = `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
-  return `![${label}](${image}|width=36,height=8 "초기화: ${reset}") <span style="color:${color};">${percent}%</span>`;
+  return `![${label}](${image}${table ? '\\|' : '|'}width=${width},height=8 "초기화: ${reset}") <span style="color:${color};">${percent}%</span>`;
 }
 
-function appendWindow(tooltip: vscode.MarkdownString, window: QuotaWindow, percentage: 'used' | 'remaining', now: number): void {
+function appendWindow(tooltip: vscode.MarkdownString, window: QuotaWindow, percentage: 'used' | 'remaining', now: number, width: number, table = false): void {
   tooltip.appendText(window.label === '7d' ? 'wk' : window.label.replace(/[\r\n]+/g, ' '));
   tooltip.appendMarkdown(' ');
   const used = Number.isFinite(window.usedPercent) ? Math.max(0, Math.min(100, window.usedPercent)) : null;
-  tooltip.appendMarkdown(used === null ? '—' : usageMeter(used, percentage, resetText(window, now)));
+  tooltip.appendMarkdown(used === null ? '—' : usageMeter(used, percentage, resetText(window, now), width, table));
+}
+
+function resetCaption(window: QuotaWindow, now: number): string {
+  return window.resetsAt === null || !Number.isFinite(window.resetsAt) ? '초기화: —'
+    : window.resetsAt <= now ? '초기화 시각 지남 · 조회 대기' : `${countdown(window.resetsAt, now)} 후 초기화`;
+}
+
+function meterWidth(windows: readonly QuotaWindow[], now: number): number {
+  // Native Markdown hovers do not expose font metrics or allow arbitrary layout styles.
+  // Estimate full-width Korean characters separately, and keep sibling meters aligned.
+  const width = windows.reduce((width, window) => {
+    const captionWidth = Array.from(resetCaption(window, now)).reduce((total, char) => total + (char.charCodeAt(0) > 127 ? 14 : 7), 0);
+    return Math.max(width, Math.min(160, captionWidth));
+  }, 96);
+  return Math.round(width * 0.8) - 15;
 }
 
 /** Quota labels remain plain text even though the tooltip allows our command links. */
 export function createQuotaTooltip(
   states: readonly QuotaState[],
-  settings: Pick<TrackerConfiguration, 'percentage' | 'detail'> & Partial<Pick<TrackerConfiguration, 'usageEnabled'>>,
+  settings: Pick<TrackerConfiguration, 'percentage' | 'detail'> & Partial<Pick<TrackerConfiguration, 'usageEnabled'>> &
+    { codex?: Pick<TrackerConfiguration['codex'], 'showReserve' | 'showResetCredits'> },
   now = Date.now(),
 ): vscode.MarkdownString {
   const tooltip = new vscode.MarkdownString();
@@ -80,36 +96,43 @@ export function createQuotaTooltip(
     if (!state) continue;
     const section = new vscode.MarkdownString();
     const name = provider === 'codex' ? 'Codex' : 'Claude';
-    const windows = state.snapshot?.windows ?? [];
+    const windows = (state.snapshot?.windows ?? []).filter(window =>
+      provider !== 'codex' || window.limitId !== 'gpt-reserve' || settings.codex?.showReserve === true);
     const overall = windows.filter(window => provider === 'codex' ? window.limitId === 'codex' : window.id === 'five_hour' || window.id === 'seven_day');
     const standard = overall.length ? overall : windows.filter(window => window.label === '5h' || window.label === '7d');
     const main = [...(standard.length ? standard : windows)].sort((a, b) =>
       (a.windowDurationMins === 300 ? 0 : a.windowDurationMins === 10080 ? 1 : 2) - (b.windowDurationMins === 300 ? 0 : b.windowDurationMins === 10080 ? 1 : 2));
     const extra = windows.filter(window => !main.includes(window));
-    const resets = main.flatMap(window => window.resetsAt !== null && Number.isFinite(window.resetsAt) ? [window.resetsAt] : []);
-    const nextReset = resets.length ? Math.min(...resets) : null;
-    const reset = nextReset === null ? '' : nextReset <= now ? '초기화 시각 지남 · 조회 대기' : `${countdown(nextReset, now)} 후 초기화`;
-    section.appendMarkdown(`$(agent-tracker-${provider}) **${name}**${reset ? ` &nbsp;&nbsp; ${muted(reset)}` : ''}\n\n`);
+    section.appendMarkdown(`$(agent-tracker-${provider}) **${name}**\n\n`);
     if (!windows.length) {
-      section.appendMarkdown(state.refreshing ? '조회 중…\n\n' : '조회불가\n\n');
+      section.appendMarkdown(state.snapshot?.windows.length ? '표시할 사용량 항목이 없습니다.\n\n'
+        : state.refreshing ? '조회 중…\n\n' : '조회불가\n\n');
     } else {
-      for (const [index, window] of main.entries()) {
-        if (index) section.appendMarkdown(' &nbsp;&nbsp; ');
-        appendWindow(section, window, settings.percentage, now);
-      }
+      const width = meterWidth(main, now);
+      const columnGap = (index: number): string => index < main.length - 1 ? ' &nbsp;&nbsp;&nbsp;' : '';
+      section.appendMarkdown('| ' + main.map((window, index) => {
+        const cell = new vscode.MarkdownString();
+        appendWindow(cell, window, settings.percentage, now, width, true);
+        return cell.value + columnGap(index);
+      }).join(' | ') + ' |\n');
+      section.appendMarkdown('| ' + main.map(() => ':---').join(' | ') + ' |\n');
+      section.appendMarkdown('| ' + main.map((window, index) => muted(resetCaption(window, now)) + columnGap(index)).join(' | ') + ' |\n');
       for (const window of extra) {
-        section.appendMarkdown('  \n');
-        appendWindow(section, window, settings.percentage, now);
+        section.appendMarkdown('\n\n');
+        appendWindow(section, window, settings.percentage, now, meterWidth([window], now));
+        section.appendMarkdown(`  \n${muted(resetCaption(window, now))}`);
       }
       section.appendMarkdown('\n\n');
-      const credits = provider === 'codex' ? state.snapshot?.rateLimitResetCredits : undefined;
-      if (credits) {
-        section.appendMarkdown(`${muted(`<strong>rate-limit 재설정 ${credits.availableCount}회 사용 가능</strong>`)}\n\n`);
-        if (credits.nextExpiresAt !== null) {
-          const expiry = credits.nextExpiresAt <= now ? '다음 항목의 만료 시각 지남 · 조회 대기' : `다음 항목이 ${countdown(credits.nextExpiresAt, now)} 후 만료됨`;
-          section.appendMarkdown(`${muted(expiry)}\n\n`);
-        }
+    }
+    const credits = provider === 'codex' && settings.codex?.showResetCredits !== false ? state.snapshot?.rateLimitResetCredits : undefined;
+    if (credits) {
+      section.appendMarkdown(`${muted(`<strong>rate-limit 재설정 ${credits.availableCount}회 사용 가능</strong>`)}\n\n`);
+      if (credits.nextExpiresAt !== null) {
+        const expiry = credits.nextExpiresAt <= now ? '다음 항목의 만료 시각 지남 · 조회 대기' : `다음 항목이 ${countdown(credits.nextExpiresAt, now)} 후 만료됨`;
+        section.appendMarkdown(`${muted(expiry)}\n\n`);
       }
+    }
+    if (state.snapshot) {
       if (state.refreshing) section.appendMarkdown('$(sync~spin) 갱신 중…\n\n');
       if (state.status === 'stale') section.appendMarkdown('$(history) 마지막 조회 값 · 현재 사용량 조회 불가\n\n');
     }
