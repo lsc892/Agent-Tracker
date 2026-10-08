@@ -183,19 +183,28 @@
     node.append(body);
     target.append(node);
   }
+  function tableLabel(text) {
+    const node = element('span', text, 'table-label');
+    node.title = String(text);
+    return node;
+  }
+  const requestLabel = row => row.request_title || row.session_name || '제목 없음';
   function projectLabel(row) {
-    const node = element('button', row.project_name || '이름 없는 프로젝트', 'name-filter');
+    const name = row.project_name || '이름 없는 프로젝트';
+    const node = element('button', undefined, 'name-filter');
+    node.append(tableLabel(name));
     node.type = 'button';
-    node.title = row.project_key || '';
+    node.title = `${name}\n${row.project_key || ''}`;
     node.addEventListener('click', () => chooseProject(row));
     return node;
   }
   function sessionLabel(row, request = false) {
-    const node = element('button', `${request ? `요청 ${row.turn_index ?? row.root_turn_id} · ${row.request_title || row.session_name || '제목 없음'}` : `${row.project_name || '이름 없는 프로젝트'} / ${row.session_name || '이름 없는 세션'}`}`, 'name-filter');
+    const label = tableLabel(request ? requestLabel(row) : `${row.project_name || '이름 없는 프로젝트'} / ${row.session_name || '이름 없는 세션'}`);
+    const node = element('button', undefined, 'name-filter');
     node.type = 'button';
-    node.title = `${row.request_title || ''}\n${row.project_key || ''}\n세션 ID: ${row.session_id}${request ? `\n요청 ID: ${row.root_turn_id}` : ''}`;
-    if (request) node.append(element('span', row.session_name || '이름 없는 세션', 'muted session-start'));
-    if (!request) node.append(element('span', date(row.session_started_at_ms), 'muted session-start'));
+    node.title = `${label.textContent}\n${row.session_name || ''}\n${row.project_key || ''}\n세션 ID: ${row.session_id}${request ? `\n요청 ID: ${row.root_turn_id}` : ''}`;
+    label.append(element('span', request ? row.session_name || '이름 없는 세션' : date(row.session_started_at_ms), 'muted session-start'));
+    node.append(label);
     node.addEventListener('click', () => chooseSession(row));
     return node;
   }
@@ -218,7 +227,7 @@
     node.title = providerLabel(row.provider);
     const marker = svgElement('svg', { width: 8, height: 8, role: 'img', 'aria-label': providerLabel(row.provider) });
     marker.append(providerMarker(row.provider));
-    node.append(marker, element('span', `${modelLabel(row)}${suffix}`));
+    node.append(marker, suffix ? tableLabel(`${modelLabel(row)}${suffix}`) : element('span', modelLabel(row)));
     return node;
   }
   const compact = value => value == null ? '—' : new Intl.NumberFormat('ko-KR', { notation: 'compact', maximumFractionDigits: 1 }).format(value);
@@ -229,7 +238,7 @@
   }
   function chartLabel(row, mode) {
     const provider = seriesLabel(row);
-    if (mode === 'turn') return `${provider} · ${date(row.started_at_ms)} · ${row.session_name || '이름 없는 세션'} · 요청 ${row.turn_index}${row.request_title ? ` · ${row.request_title}` : ''} (${row.root_turn_id})`;
+    if (mode === 'turn') return `${provider} · ${date(row.started_at_ms)} · ${row.session_name || '이름 없는 세션'} · ${requestLabel(row)} (${row.root_turn_id})`;
     if (mode === 'calendar') return `${row.period || '시각 미상'} · ${provider}`;
     if (mode === 'total') return provider;
     return `${provider} · ${row.project_name || '이름 없는 프로젝트'}${row.session_id ? ` / ${row.session_name || '이름 없는 세션'}` : ''}`;
@@ -274,11 +283,10 @@
     const title = turn && metric === 'averageDuration' ? '요청별 소요 시간' : chartMetrics[metric];
     $('chart-title').textContent = title;
     const rows = chart.rows;
-    const combined = chart.mode === 'calendar' && rows.some(row => row.period_count > 1);
-    $('chart-scope').textContent = chart.mode === 'ranking' ? `상위 ${number(rows.length)} / 전체 ${number(chart.total)}개 · ${title} 순`
-      : turn ? `${chart.total > rows.length ? '최근 ' : ''}${number(rows.length)} / 전체 ${number(chart.total)}개 요청 · 시작 시각순`
-      : `선택한 전체 조회 범위${combined ? ' · 긴 기간은 최대 30개 구간으로 합산' : ''} · 표 페이지와 독립`;
-    if (chart.by === 'model') $('chart-scope').textContent += ' · 모델별 (상위 8개, 나머지는 제공자별 기타 모델) · 여러 모델을 쓴 요청은 각 모델에 포함';
+    const pageRange = result.rows.length ? `${number(offset + 1)}–${number(offset + result.rows.length)} / 전체 ${number(result.total)}개` : '0개';
+    $('chart-scope').textContent = `현재 표 ${pageRange} · 표 페이지와 연동`;
+    if (rows.length < result.rows.length) $('chart-scope').textContent += ` · 사용량 없는 항목 ${number(result.rows.length - rows.length)}개 제외`;
+    if (chart.by === 'model') $('chart-scope').textContent += ' · 모델별 · 여러 모델을 쓴 요청은 각 모델에 포함';
     if (!rows.length) { plot.append(element('p', '표시할 기록이 없습니다.', 'empty')); return; }
     if (metric === 'tokens') {
       const entries = tokenHeaders.map((header, index) => ({ ...header, className: `chart-series-${index}` }));
@@ -296,11 +304,12 @@
       legend.hidden = false;
     }
     const sessions = chart.mode === 'ranking' && result.groupBy === 'session';
-    const vertical = chart.mode === 'calendar' || turn || sessions;
-    const categoryKey = (row, index) => turn ? String(index) : sessions ? `${row.provider}/${row.project_key}/${row.session_id}` : row.period;
+    const projects = chart.mode === 'ranking' && result.groupBy === 'project';
+    const vertical = chart.mode === 'calendar' || turn || sessions || projects;
+    const categoryKey = (row, index) => turn ? String(index) : sessions ? `${row.provider}/${row.project_key}/${row.session_id}` : projects ? `${row.provider}/${row.project_key}` : row.period;
     const categories = vertical ? [...new Set(rows.map(categoryKey))] : [];
     const maxPeers = vertical && !turn ? Math.max(1, ...categories.map(category => rows.filter((row, index) => categoryKey(row, index) === category).length)) : 1;
-    const categoryWidth = Math.max(turn || sessions ? 164 : 128, maxPeers * 46 + 36);
+    const categoryWidth = Math.max(turn || sessions || projects ? 164 : 128, maxPeers * 46 + 36);
     const width = Math.max(plot.clientWidth || 736, 736, vertical ? 86 + categories.length * categoryWidth : 0);
     const height = vertical ? chart.by === 'model' ? 414 : 372 : 62 + rows.length * 62;
     const svg = svgElement('svg', { viewBox: `0 0 ${width} ${height}`, width, height, class: 'chart-svg', role: 'group', 'aria-label': `${title} · ${$('chart-scope').textContent}` });
@@ -329,15 +338,15 @@
         const x = left + (width - left - 16) * (index + .5) / categories.length;
         const row = rows.find((row, rowIndex) => categoryKey(row, rowIndex) === category);
         const shortened = text => text.length > 16 ? `${text.slice(0, 15)}…` : text;
-        const label = turn ? `요청 ${row.turn_index}` : sessions ? shortened(row.session_name || '이름 없는 세션') : category || '시각 미상';
-        const parts = label.split(' ~ ');
+        const label = turn ? shortened(requestLabel(row)) : sessions ? shortened(row.session_name || '이름 없는 세션') : projects ? shortened(row.project_name || '이름 없는 프로젝트') : category || '시각 미상';
+        const parts = turn ? [label] : label.split(' ~ ');
         const labelY = chart.by === 'model' ? 352 : 292;
-        svg.append(svgElement('text', { x, y: labelY, 'text-anchor': 'middle', class: 'chart-axis-label' }, parts[0]));
+        const caption = svgElement('text', { x, y: labelY, 'text-anchor': 'middle', class: 'chart-axis-label' }, parts[0]);
+        if (turn) caption.append(svgElement('title', {}, requestLabel(row)));
+        svg.append(caption);
         if (parts[1]) svg.append(svgElement('text', { x, y: labelY + 16, 'text-anchor': 'middle', class: 'chart-axis-label' }, `~ ${parts[1]}`));
         if (turn) {
-          const title = svgElement('text', { x, y: labelY + 16, 'text-anchor': 'middle', class: 'chart-axis-label' }, shortened(row.request_title || row.session_name || '제목 없음'));
-          title.append(svgElement('title', {}, row.request_title || row.session_name || '제목 없음'));
-          svg.append(title, svgElement('text', { x, y: labelY + 32, 'text-anchor': 'middle', class: 'chart-axis-label' }, row.started_at_ms == null ? '시각 미상'
+          svg.append(svgElement('text', { x, y: labelY + 16, 'text-anchor': 'middle', class: 'chart-axis-label' }, row.started_at_ms == null ? '시각 미상'
             : new Intl.DateTimeFormat('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: timezone }).format(new Date(row.started_at_ms))));
         }
         if (sessions) svg.append(svgElement('text', { x, y: labelY + 16, 'text-anchor': 'middle', class: 'chart-axis-label' }, shortened(row.project_name || '이름 없는 프로젝트')));
@@ -433,19 +442,23 @@
     const model = result.by === 'model';
     $('model-note').hidden = !model;
     const identity = (row, suffix = '') => model ? modelName(row, suffix) : `${providerLabel(row.provider)}${suffix}`;
+    const scopeLabel = row => row.period != null ? tableLabel(row.period) : row.session_id ? sessionLabel(row)
+      : row.project_key ? projectLabel(row) : tableLabel(['day', 'month'].includes(result.groupBy) ? '시각 미상' : '전체');
     const rows = result.rows;
     if (turn) {
       table($('usage-table'), [`${model ? '모델' : '제공자'} / 프로젝트`, '요청 / 세션', '시작 시각', ...tokenHeaders, '총 토큰', '소요 시간', '상태 / 품질', ...costHeaders], rows.map(row => [
-        identity(row, ` / ${row.project_name}`), sessionLabel(row, true), date(row.started_at_ms), ...tokenValues(row), number(row.total_tokens), duration(row.duration_ms), `${row.status === 'completed' ? '완료' : row.status === 'failed' ? '실패' : '진행 중'} · ${row.duration_quality}${row.quality_flags ? ` · ${row.quality_flags}` : ''}${row.last_error ? ` · 이전 값: ${row.last_error}` : ''}`, ...cost(row),
+        model ? identity(row, ` / ${row.project_name}`) : tableLabel(identity(row, ` / ${row.project_name}`)), sessionLabel(row, true), date(row.started_at_ms), ...tokenValues(row), number(row.total_tokens), duration(row.duration_ms), `${row.status === 'completed' ? '완료' : row.status === 'failed' ? '실패' : '진행 중'} · ${row.duration_quality}${row.quality_flags ? ` · ${row.quality_flags}` : ''}${row.last_error ? ` · 이전 값: ${row.last_error}` : ''}`, ...cost(row),
       ]));
     } else {
       table($('usage-table'), [model ? '모델' : '제공자', '기간 / 프로젝트 / 세션', ...tokenHeaders, '총 토큰', '완료 / 전체 요청', '평균 토큰', '평균 시간 / 표본', ...costHeaders], rows.map(row => [
-        identity(row), row.period ?? (row.session_id ? sessionLabel(row) : row.project_key ? projectLabel(row) : ['day', 'month'].includes(result.groupBy) ? '시각 미상' : '전체'), ...tokenValues(row), number(row.total_tokens), `${number(row.completed_turns)} / ${number(row.turn_count)}`, number(row.avg_tokens_per_turn), `${duration(row.avg_duration_ms)} / ${number(row.turns_with_duration)}개`, ...cost(row),
+        identity(row), scopeLabel(row), ...tokenValues(row), number(row.total_tokens), `${number(row.completed_turns)} / ${number(row.turn_count)}`, number(row.avg_tokens_per_turn), `${duration(row.avg_duration_ms)} / ${number(row.turns_with_duration)}개`, ...cost(row),
       ]));
     }
-    $('previous').disabled = offset === 0;
-    $('next').disabled = offset + rows.length >= result.total;
-    $('page-label').textContent = result.total ? `${number(offset + 1)}–${number(offset + rows.length)} / ${number(result.total)}` : '0개';
+    for (const prefix of ['', 'chart-']) {
+      $(`${prefix}previous`).disabled = offset === 0;
+      $(`${prefix}next`).disabled = offset + rows.length >= result.total;
+      $(`${prefix}page-label`).textContent = rows.length ? `${number(offset + 1)}–${number(offset + rows.length)} / ${number(result.total)}` : '0개';
+    }
     const coverage = result.coverage;
     const durationCoverage = turn ? '' : ` · 시간 품질(현재 페이지) 정확 ${number(rows.reduce((n, r) => n + (r.exact_duration_turns ?? 0), 0))} / 계산 ${number(rows.reduce((n, r) => n + (r.derived_duration_turns ?? 0), 0))} / 근사 ${number(rows.reduce((n, r) => n + (r.approximate_duration_turns ?? 0), 0))} / 미상 ${number(rows.reduce((n, r) => n + (r.missing_duration_turns ?? 0), 0))}`;
     $('coverage').textContent = `파일 ${number(coverage.files)} · 정상 ${number(coverage.done)} · 오류 ${number(coverage.error)} · 중단 ${number(coverage.interrupted)} · 이전 수치 유지 요청 ${number(coverage.stale_summaries)}${durationCoverage}`;
@@ -513,8 +526,10 @@
   });
   $('provider').addEventListener('change', () => { selectedSession = undefined; nameCaption('session', ''); closeNames(); });
   $('chart-metric').addEventListener('change', query);
-  $('previous').addEventListener('click', () => { offset = Math.max(0, offset - 100); query(); });
-  $('next').addEventListener('click', () => { offset += 100; query(); });
+  for (const prefix of ['', 'chart-']) {
+    $(`${prefix}previous`).addEventListener('click', () => { offset = Math.max(0, offset - 100); query(); });
+    $(`${prefix}next`).addEventListener('click', () => { offset += 100; query(); });
+  }
   window.addEventListener('message', event => {
     const message = event.data;
     if (!message || typeof message !== 'object') return;

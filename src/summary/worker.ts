@@ -1,5 +1,5 @@
 import { parentPort, workerData } from 'node:worker_threads';
-import { SummaryDatabase } from './db';
+import { SummaryDatabase, usageChartFromPage } from './db';
 import { refreshSummary } from './scanner';
 import { acquireRefreshLock } from './lock';
 import type { SummaryOptions, UsageQuery, SourceRoot, RefreshResult, NameQuery } from './types';
@@ -49,7 +49,7 @@ port.on('message',(message: {id?:number;method:string;payload?:unknown}) => {
           : database.queryUsage(query,query.groupBy === 'all' || !query.groupBy ? 'total' : query.groupBy,query.timezone ?? options.timezone ?? 'UTC',query,by);
           const total = query.groupBy === 'turn' ? database.queryTurnsCount(query,by)
           : database.queryUsageCount(query,query.groupBy === 'all' || !query.groupBy ? 'total' : query.groupBy,query.timezone ?? options.timezone ?? 'UTC',by);
-          const chart = query.chartMetric ? database.queryUsageChart(query, query.groupBy ?? 'all', query.timezone ?? options.timezone ?? 'UTC', query.chartMetric, query.chartBy) : undefined;
+          const chart = query.chartMetric ? usageChartFromPage(rows, total, query.groupBy ?? 'all', query.chartMetric, by, query.excludeEmptyUsage) : undefined;
           const cumulativeFilter = query.groupBy === 'day' || query.groupBy === 'month' ? {...query,unknownTime:'include' as const} : query;
           const cumulative = query.cumulativeBy ? database.queryCumulative(cumulativeFilter,query.cumulativeBy,query.cumulativeOffset) : undefined;
           const billing = query.includeCosts && query.provider && query.sessionId ? database.sessionBilling(query.provider,query.sessionId) : undefined;

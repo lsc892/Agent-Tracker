@@ -85,6 +85,8 @@ export interface CumulativeRow extends Omit<ModelUsageInput, 'model'>, CostField
 
 export interface TurnSummaryRow extends Required<Omit<TurnSummaryInput, 'model_usage' | 'capability_usage' | 'billing'>>, CostFields {
   id: number;
+  /** Eligibility for chart display, without removing a row from its table page. */
+  has_recorded_usage?: number;
   /** null means no recorded usage; an empty string means usage with an unknown model. */
   model?: string | null;
   other_models?: number;
@@ -105,8 +107,6 @@ export interface SessionReplacement {
 
 export interface SummaryFilter {
   excludeEmptyUsage?: boolean;
-  /** Internal chart scope; table rows are retained. */
-  omitEmptyUsage?: boolean;
   includeCosts?: boolean;
   provider?: Provider;
   providers?: Provider[];
@@ -134,7 +134,7 @@ export type UsageGrouping = 'total' | 'project' | 'session' | 'day' | 'month';
 export type ChartMetric = 'tokens' | 'requests' | 'averageTokens' | 'averageDuration';
 export interface UsageChart {
   by?: 'provider' | 'model';
-  rows: (UsageRow & { period_count?: number })[] | TurnSummaryRow[];
+  rows: UsageRow[] | TurnSummaryRow[];
   mode: 'calendar' | 'ranking' | 'turn' | 'total';
   metric: ChartMetric;
   total: number;
@@ -159,6 +159,9 @@ export interface UsageRow extends CostFields {
   total_tokens: number;
   turn_count: number;
   completed_turns: number;
+  /** Counts used by charts when empty usage is excluded after selecting the page. */
+  recorded_turns?: number;
+  recorded_completed_turns?: number;
   avg_tokens_per_turn: number | null;
   avg_duration_ms: number | null;
   turns_with_duration: number;

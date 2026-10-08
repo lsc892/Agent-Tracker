@@ -3,6 +3,7 @@ import { dirname } from 'node:path';
 import { DatabaseSync, type SQLInputValue, type StatementSync } from 'node:sqlite';
 import { SCHEMA_SQL, SCHEMA_VERSION, SCHEMA_LEGACY_MIGRATION_SQL, SCHEMA_CACHE_MIGRATION_SQL, SCHEMA_MODEL_SQL, SCHEMA_CAPABILITY_SQL } from './schema';
 import { calendarPeriod } from './timezone';
+import { usageChartFromPage } from './chart';
 import { estimateCost, PRICING_VERSION } from '../pricing';
 import type { NameQuery, NameResult } from '../types';
 import type {
@@ -13,6 +14,7 @@ import type {
 } from './types';
 
 export * from './types';
+export { usageChartFromPage } from './chart';
 export { periodBounds } from './timezone';
 
 const pageLimit = (limit = 100): number => {
@@ -73,6 +75,8 @@ function usageSums(exclude = false): string {
   CASE WHEN COUNT(cache_read_input_tokens) = COUNT(*) THEN SUM(cache_read_input_tokens) END AS cache_read_input_tokens,
   SUM(total_tokens) AS total_tokens, COUNT(*) AS turn_count,
   SUM(status = 'completed') AS completed_turns,
+  SUM(${RECORDED_USAGE}) AS recorded_turns,
+  SUM(status = 'completed' AND ${RECORDED_USAGE}) AS recorded_completed_turns,
   AVG(CASE WHEN ${completed} THEN total_tokens END) AS avg_tokens_per_turn,
   AVG(CASE WHEN ${completed} THEN duration_ms END) AS avg_duration_ms,
   SUM(${completed} AND duration_ms IS NOT NULL) AS turns_with_duration,
@@ -108,7 +112,6 @@ function turnValues(row: TurnSummaryInput, now: string): SQLInputValue[] {
 
 function whereClause(filter: SummaryFilter): { sql: string; values: SQLInputValue[] } {
   const clauses: string[] = [];
-  if (filter.omitEmptyUsage) clauses.push(RECORDED_USAGE);
   const values: SQLInputValue[] = [];
   if (filter.providers) {
     clauses.push(filter.providers.length ? `provider IN (${filter.providers.map(() => '?').join(',')})` : '0 = 1');
@@ -440,7 +443,7 @@ export class SummaryDatabase {
     const where = whereClause(filter);
     const after = nonnegative(page.afterId ?? 0, 'afterId');
     const offset = nonnegative(page.offset ?? 0, 'offset');
-    const rows = this.connection.prepare(`SELECT * FROM ${namedTurns(filter.includeCosts,by)} AS turn_summary WHERE ${where.sql} AND id > ? ORDER BY id${by === 'model' ? ',model' : ''} LIMIT ? OFFSET ?`)
+    const rows = this.connection.prepare(`SELECT *,${RECORDED_USAGE} AS has_recorded_usage FROM ${namedTurns(filter.includeCosts,by)} AS turn_summary WHERE ${where.sql} AND id > ? ORDER BY id${by === 'model' ? ',model' : ''} LIMIT ? OFFSET ?`)
       .all(...where.values, after, pageLimit(page.limit), offset);
     for (const row of rows) delete row.has_model;
     return rows as unknown as TurnSummaryRow[];
@@ -575,108 +578,13 @@ export class SummaryDatabase {
       .all(...prefix, ...where.values, pageLimit(page.limit), nonnegative(page.offset ?? 0, 'offset')) as unknown as UsageRow[];
   }
 
-  /** Bounded chart data is computed from the entire filter, independently of table pagination. */
-  queryUsageChart(filter: SummaryFilter, groupBy: UsageGrouping | 'all' | 'turn', timezone: string, metric: ChartMetric, by: 'provider' | 'model' = 'provider'): UsageChart {
-    if (filter.excludeEmptyUsage) filter = { ...filter, omitEmptyUsage: true };
-    if (!['tokens', 'requests', 'averageTokens', 'averageDuration'].includes(metric)) throw new RangeError('Unknown chart metric');
-    if (by === 'model') return this.queryModelChart(filter, groupBy, timezone, metric);
-    if (by !== 'provider') throw new RangeError('Unknown chart grouping');
-    if (groupBy === 'turn') {
-      const where = whereClause(filter);
-      const rows = this.connection.prepare(`SELECT * FROM ${NAMED_TURNS} AS turn_summary WHERE ${where.sql}
-        ORDER BY started_at_ms DESC, id DESC LIMIT 60`).all(...where.values) as unknown as TurnSummaryRow[];
-      rows.reverse();
-      return { rows, mode: 'turn', metric: metric === 'averageDuration' ? metric : 'tokens', total: this.queryTurnsCount(filter) };
-    }
+  /** Charts use the same page, grouping and order as the table. */
+  queryUsageChart(filter: SummaryFilter, groupBy: UsageGrouping | 'all' | 'turn', timezone: string, metric: ChartMetric,
+    by: 'provider' | 'model' = 'provider', page: OffsetPage & { afterId?: number } = {}): UsageChart {
     const grouping = groupBy === 'all' ? 'total' : groupBy;
-    const total = this.queryUsageCount(filter, grouping, timezone);
-    if (grouping !== 'day' && grouping !== 'month') {
-      return { rows: this.queryUsage(filter, grouping, timezone, { limit: 10, sortBy: metric }),
-        mode: grouping === 'total' ? 'total' : 'ranking', metric, total };
-    }
-    calendarPeriod(0, timezone, grouping);
-    const where = whereClause(filter.unknownTime === undefined ? { ...filter, unknownTime: 'include' } : filter);
-    // At most 30 chronological bins per provider. Average raw completed turns,
-    // never averages of daily averages; undated turns retain their own bin.
-    const rows = this.connection.prepare(`WITH filtered AS (
-      SELECT *, agent_tracker_period(started_at_ms, ?, ?) AS chart_period FROM ${usageTurns()} AS turn_summary WHERE ${where.sql}
-    ), periods AS (
-      SELECT chart_period, NTILE(30) OVER (ORDER BY chart_period) AS bucket
-      FROM (SELECT DISTINCT chart_period FROM filtered WHERE chart_period IS NOT NULL)
-    ), ranges AS (
-      SELECT bucket, MIN(chart_period) AS first_period, MAX(chart_period) AS last_period,
-        COUNT(*) AS period_count FROM periods GROUP BY bucket
-    ) SELECT provider, NULL AS project_key, NULL AS project_name, NULL AS session_id,
-      NULL AS session_name, NULL AS session_started_at_ms,
-      CASE WHEN first_period = last_period THEN first_period
-        ELSE first_period || ' ~ ' || last_period END AS period,
-      COALESCE(ranges.period_count, 0) AS period_count, ${usageSums(filter.excludeEmptyUsage)}
-      FROM filtered LEFT JOIN periods USING (chart_period) LEFT JOIN ranges USING (bucket)
-      GROUP BY bucket, provider ORDER BY bucket IS NULL, bucket, provider`)
-      .all(timezone, grouping, ...where.values) as unknown as UsageRow[];
-    return { rows, mode: 'calendar', metric, total };
-  }
-
-  private queryModelChart(filter: SummaryFilter, groupBy: UsageGrouping | 'all' | 'turn', timezone: string, metric: ChartMetric): UsageChart {
-    if (!['total','all','day','month','project','session','turn'].includes(groupBy)) throw new RangeError('Unknown usage grouping');
-    const calendar = groupBy === 'day' || groupBy === 'month';
-    if (calendar) calendarPeriod(0, timezone, groupBy);
-    const where = whereClause(calendar && filter.unknownTime === undefined ? {...filter,unknownTime:'include'} : filter);
-    const args: SQLInputValue[] = [...(calendar ? [timezone,groupBy] : []),...where.values];
-    // Model rows are already deduplicated per root request. Keep unknown models and unrecorded usage
-    // and combine the tail per provider, preserving tokens and unique requests.
-    const scope = `WITH model_turns AS ${modelTurns()}, filtered AS (
-      SELECT *,${calendar ? 'agent_tracker_period(started_at_ms,?,?)' : 'NULL'} AS chart_period
-      FROM model_turns AS turn_summary WHERE ${where.sql}
-    ), ranked_models AS (
-      SELECT provider,model,ROW_NUMBER() OVER (ORDER BY sum(total_tokens) DESC,provider,model) AS rank
-      FROM filtered WHERE model<>'' GROUP BY provider,model
-    ), bounded AS (
-      SELECT id,provider,project_key,session_id,root_turn_id,turn_index,request_title,started_at_ms,status,duration_ms,duration_quality,
-        max(has_model) AS has_model,
-        last_error,updated_at,chart_period,CASE WHEN rank>8 THEN '' ELSE model END AS model,
-        CASE WHEN rank>8 THEN 1 ELSE 0 END AS other_models,
-        SUM(input_tokens) AS input_tokens,SUM(output_tokens) AS output_tokens,
-        CASE WHEN count(cache_write_input_tokens)=count(*) THEN sum(cache_write_input_tokens) END AS cache_write_input_tokens,
-        CASE WHEN count(cache_read_input_tokens)=count(*) THEN sum(cache_read_input_tokens) END AS cache_read_input_tokens,
-        SUM(total_tokens) AS total_tokens
-      FROM filtered LEFT JOIN ranked_models USING(provider,model)
-      GROUP BY id,CASE WHEN rank>8 THEN '' ELSE model END,CASE WHEN rank>8 THEN 1 ELSE 0 END
-    )`;
-    if (groupBy === 'turn') {
-      const rows = this.connection.prepare(`${scope} SELECT b.*,
-        (SELECT project_name FROM projects p WHERE p.project_key=b.project_key) AS project_name,
-        (SELECT session_name FROM sessions s WHERE s.provider=b.provider AND s.session_id=b.session_id) AS session_name
-        FROM bounded b ORDER BY started_at_ms DESC,id DESC,provider,model,other_models LIMIT 60`)
-        .all(...args) as unknown as TurnSummaryRow[];
-      rows.reverse();
-      const total = (this.connection.prepare(`${scope} SELECT count(*) AS total FROM bounded`).get(...args) as {total:number}).total;
-      return {rows,mode:'turn',metric:metric === 'averageDuration' ? metric : 'tokens',total,by:'model'};
-    }
-    const project = groupBy === 'project' || groupBy === 'session';
-    const groups = ['provider','model','other_models',...(project ? ['project_key'] : []),...(groupBy === 'session' ? ['session_id'] : []),...(calendar ? ['chart_period'] : [])];
-    const total = (this.connection.prepare(`${scope} SELECT count(*) AS total FROM (
-      SELECT 1 FROM bounded GROUP BY ${groups.join(',')})`).get(...args) as {total:number}).total;
-    const periods = calendar ? `,periods AS (
-      SELECT chart_period,NTILE(30) OVER (ORDER BY chart_period) AS bucket
-      FROM (SELECT DISTINCT chart_period FROM bounded WHERE chart_period IS NOT NULL)
-    ),ranges AS (
-      SELECT bucket,MIN(chart_period) AS first_period,MAX(chart_period) AS last_period,count(*) AS period_count
-      FROM periods GROUP BY bucket)` : '';
-    const metricColumns = {tokens:'total_tokens',requests:'turn_count',averageTokens:'avg_tokens_per_turn',averageDuration:'avg_duration_ms'};
-    const rows = this.connection.prepare(`${scope}${periods} SELECT provider,model,other_models,
-      ${project ? 'project_key' : 'NULL'} AS project_key,
-      ${project ? '(SELECT project_name FROM projects p WHERE p.project_key=bounded.project_key)' : 'NULL'} AS project_name,
-      ${groupBy === 'session' ? 'session_id' : 'NULL'} AS session_id,
-      ${groupBy === 'session' ? '(SELECT session_name FROM sessions s WHERE s.provider=bounded.provider AND s.session_id=bounded.session_id)' : 'NULL'} AS session_name,
-      NULL AS session_started_at_ms,
-      ${calendar ? "CASE WHEN first_period=last_period THEN first_period ELSE first_period || ' ~ ' || last_period END" : 'NULL'} AS period,
-      ${calendar ? 'coalesce(ranges.period_count,0)' : '0'} AS period_count,${usageSums(filter.excludeEmptyUsage)}
-      FROM bounded ${calendar ? 'LEFT JOIN periods USING(chart_period) LEFT JOIN ranges USING(bucket)' : ''}
-      GROUP BY ${calendar ? 'bucket,provider,model,other_models' : groups.join(',')}
-      ORDER BY ${calendar ? 'bucket IS NULL,bucket,provider,other_models,model' : `${metricColumns[metric]} DESC,${groups.join(',')}`}
-      ${project ? 'LIMIT 10' : ''}`).all(...args) as unknown as UsageRow[];
-    return {rows,mode:calendar ? 'calendar' : project ? 'ranking' : 'total',metric,total,by:'model'};
+    const rows = grouping === 'turn' ? this.queryTurns(filter, page, by) : this.queryUsage(filter, grouping, timezone, page, by);
+    const total = grouping === 'turn' ? this.queryTurnsCount(filter, by) : this.queryUsageCount(filter, grouping, timezone, by);
+    return usageChartFromPage(rows, total, groupBy, metric, by, filter.excludeEmptyUsage);
   }
 
   diagnostics(page: KeysetPage & { afterSummaryId?: number; offset?: number; providers?: Provider[] } = {}): DiagnosticsPage {

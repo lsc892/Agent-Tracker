@@ -56,25 +56,48 @@ test('empty unknown requests stay in all table groups but are excluded from aver
   assert.equal(excluded.turns_with_duration, 2);
 });
 
-test('chart ranks the entire matching project/session scope by the selected metric', t => {
+test('excluding empty usage keeps page boundaries and includes known zero-token models', t => {
+  const zero = { input_tokens:0,output_tokens:0,total_tokens:0,cache_write_input_tokens:0,cache_read_input_tokens:0 };
+  const db = database(t, Array.from({ length:105 }, (_,index)=>turn(index, {
+    project_key:`/project-${String(index).padStart(3,'0')}`,session_id:`session-${index}`,
+    ...(index%3===0 ? zero : index%3===1 ? {...zero,model_usage:[{model:'known-zero',...zero}]} : {}),
+  })));
+  for (const by of ['provider','model'] as const) {
+    const excluded = db.queryUsageChart({excludeEmptyUsage:true},'turn','UTC','tokens',by,{limit:1});
+    assert.equal(excluded.rows.length,0,'an empty page stays empty rather than borrowing from the next page');
+    const known = db.queryUsageChart({excludeEmptyUsage:true},'turn','UTC','tokens',by,{limit:1,offset:1});
+    assert.equal(known.rows.length,1);assert.equal(known.rows[0].total_tokens,0);
+    const chart = db.queryUsageChart({excludeEmptyUsage:true},'turn','UTC','tokens',by,{offset:100});
+    assert.equal(chart.total,105);
+    assert.deepEqual(chart.rows.map(row=>(row as TurnSummaryRow).root_turn_id),['request-100','request-101','request-103','request-104']);
+    const projects = db.queryUsageChart({excludeEmptyUsage:true},'project','UTC','requests',by,{limit:1});
+    assert.equal(projects.rows.length,0,'aggregate pages also apply exclusion after paging');
+  }
+});
+
+test('project and session charts follow table pages across metrics and filters', t => {
   const rows = Array.from({ length: 130 }, (_, index) => turn(index, {
     project_key: `/project-${index}`, project_name: `Project ${index}`, session_id: `session-${index}`,
     session_name: 'Same title', input_tokens: index + 100, total_tokens: index + 150, duration_ms: (130 - index) * 1000,
   }));
   const db = database(t, rows);
-  const chart = db.queryUsageChart({}, 'session', 'UTC', 'tokens');
-  assert.equal(chart.total, 130);
-  assert.equal(chart.rows.length, 10);
-  assert.equal((chart.rows[0] as UsageRow).session_id, 'session-129');
-  assert.equal(db.queryUsage({}, 'session', 'UTC', { limit: 100 }).length, 100);
-  assert.equal((db.queryUsageChart({}, 'session', 'UTC', 'averageDuration').rows[0] as UsageRow).session_id, 'session-0');
+  for (const group of ['project', 'session'] as const) for (const offset of [0, 100]) {
+    const page = { offset, limit: 100 };
+    const selected = db.queryUsage({}, group, 'UTC', page);
+    assert.equal(selected.length, offset ? 30 : 100);
+    for (const metric of ['tokens', 'requests', 'averageTokens', 'averageDuration'] as const) {
+      const chart = db.queryUsageChart({}, group, 'UTC', metric, 'provider', page);
+      assert.equal(chart.total, 130);
+      assert.deepEqual(chart.rows, selected, 'changing metrics retains table membership and order');
+    }
+  }
   const filtered = db.queryUsageChart({ projectName: 'Project 129', providers: ['claude'] }, 'project', 'UTC', 'averageTokens');
   assert.equal(filtered.total, 1);
   assert.equal((filtered.rows[0] as UsageRow).avg_tokens_per_turn, 279);
   assert.equal(db.queryUsageChart({ providers: [] }, 'all', 'UTC', 'tokens').rows.length, 0);
 });
 
-test('model charts preserve token totals, period/project filters and unique requests in bounded other groups',t=>{
+test('model charts preserve every model, token totals and filters without tail grouping',t=>{
   const usage=(model:string,input:number)=>({model,input_tokens:input,output_tokens:0,cache_write_input_tokens:0,cache_read_input_tokens:0});
   const db=database(t,[
     turn(0,{input_tokens:300,output_tokens:0,total_tokens:300,cache_write_input_tokens:0,cache_read_input_tokens:0,model_usage:[usage('main',100),usage('helper',200)]}),
@@ -86,10 +109,10 @@ test('model charts preserve token totals, period/project filters and unique requ
     const chart=db.queryUsageChart({},group,'UTC','tokens','model');
     assert.equal(chart.by,'model');
     assert.equal(chart.rows.reduce((n,row)=>n+row.total_tokens,0),691);
-    const other=(chart.rows as UsageRow[]).filter(row=>row.other_models);
-    assert.ok(other.length>0);assert.ok(other.every(row=>row.turn_count===1),'multiple tail models in one request count once');
+    assert.ok(chart.rows.every(row=>!row.other_models));
+    assert.equal(new Set(chart.rows.map(row=>row.model).filter(model=>model?.startsWith('extra-'))).size,13);
     assert.ok((chart.rows as UsageRow[]).some(row=>row.model==='' && !row.other_models),'missing model records remain visible');
-    assert.ok(chart.rows.length<=12*31);
+    assert.deepEqual(chart.rows,db.queryUsage({},group==='all' ? 'total' : group,'UTC',{},'model'));
   }
   const filtered=db.queryUsageChart({projectKey:'/project',provider:'claude',fromMs:start,toMs:start+86400000},'project','UTC','tokens','model');
   assert.deepEqual(filtered.rows.map(row=>row.total_tokens),[200,100]);
@@ -103,10 +126,10 @@ test('model charts preserve token totals, period/project filters and unique requ
   assert.deepEqual(averages.rows.map(row=>(row as UsageRow).avg_tokens_per_turn),[200,100]);
 });
 
-test('long calendar charts preserve every token, align provider bins and weight averages by actual samples', t => {
+test('calendar charts keep exact table periods and averages without combining dates', t => {
   const rows = Array.from({ length: 90 }, (_, index) => turn(index));
   rows.push(turn(1000, { started_at_ms: start, provider: 'codex', session_id: 'codex', duration_ms: null, duration_quality: 'missing' }));
-  // The first three dates fall in the same bucket. Their counts are deliberately uneven.
+  // The first date has uneven completion counts and includes failed tokens.
   rows.push(turn(1001, { started_at_ms: start, input_tokens: 900, total_tokens: 950, duration_ms: 9000 }));
   rows.push(turn(1002, { started_at_ms: start, status: 'failed', input_tokens: 9900, total_tokens: 9950, duration_ms: null }));
   rows.push(turn(1003, { started_at_ms: null, cache_read_input_tokens: null }));
@@ -114,20 +137,19 @@ test('long calendar charts preserve every token, align provider bins and weight 
   const chart = db.queryUsageChart({}, 'day', 'Asia/Seoul', 'tokens');
   const bars = chart.rows as UsageRow[];
   assert.equal(bars.reduce((sum, row) => sum + row.total_tokens, 0), rows.reduce((sum, row) => sum + row.total_tokens, 0));
-  assert.equal(bars.length, 32, '30 Claude buckets, one Codex bucket and one undated bucket');
-  assert.equal(bars[0].period, '2026-01-01 ~ 2026-01-03');
-  assert.equal(bars[1].period, bars[0].period, 'providers share the whole bucket label even with sparse dates');
-  assert.equal(bars[0].avg_tokens_per_turn, (150 * 3 + 950) / 4);
-  assert.equal(bars[0].avg_duration_ms, (1000 * 3 + 9000) / 4);
-  assert.equal(bars[0].completed_turns, 4);
-  assert.equal(bars[0].turn_count, 5, 'failed tokens count toward totals but not averages');
-  assert.equal(bars[1].avg_duration_ms, null);
-  assert.equal(bars.at(-1)!.period, null);
-  assert.equal(bars.at(-1)!.cache_read_input_tokens, null);
+  assert.equal(bars.length, 92, '90 Claude dates, one Codex date and one undated row');
+  assert.deepEqual(bars, db.queryUsage({}, 'day', 'Asia/Seoul'));
+  const first = bars.find(row=>row.provider==='claude' && row.period==='2026-01-01')!;
+  assert.equal(first.avg_tokens_per_turn, (150 + 950) / 2);
+  assert.equal(first.avg_duration_ms, (1000 + 9000) / 2);
+  assert.equal(first.completed_turns, 2);
+  assert.equal(first.turn_count, 3, 'failed tokens count toward totals but not averages');
+  assert.equal(bars.find(row=>row.provider==='codex')!.avg_duration_ms, null);
+  assert.equal(bars.find(row=>row.period===null)!.cache_read_input_tokens, null);
   const filtered = db.queryUsageChart({ fromMs: start, toMs: start + 86400000, providers: ['claude'] }, 'day', 'Asia/Seoul', 'requests');
   assert.equal(filtered.rows.length, 2, 'dated and undated rows both obey calendar table semantics');
-  assert.equal((filtered.rows[0] as UsageRow).turn_count, 3);
-  assert.equal((filtered.rows[1] as UsageRow).unknown_time_turns, 1);
+  assert.equal((filtered.rows as UsageRow[]).find(row=>row.period!==null)!.turn_count, 3);
+  assert.equal((filtered.rows as UsageRow[]).find(row=>row.period===null)!.unknown_time_turns, 1);
 });
 
 test('model tables retain each model, request averages, unknown totals, costs and filters in every grouping', t => {
@@ -209,7 +231,7 @@ test('model queries separate unrecorded usage from unknown tokens in every group
   assert.equal(filtered.length,1);assert.equal(filtered[0].model,null);
 });
 
-test('model table pagination lists all models while chart tail groups stay bounded and independent', async t => {
+test('model table and chart pagination show the same models in every grouping', async t => {
   const directory = mkdtempSync(join(realpathSync(tmpdir()),'agent-tracker-model-table-'));
   t.after(()=>rmSync(directory,{recursive:true,force:true}));
   const path = join(directory,'summary.sqlite');
@@ -225,11 +247,12 @@ test('model table pagination lists all models while chart tail groups stay bound
       assert.equal(result.by,'model');assert.equal(result.total,105);assert.equal(result.rows.length,5,groupBy);
       assert.ok(result.rows.every(row=>row.model?.startsWith('model-') && !row.other_models));
       assert.equal(result.chart!.by,'model');
-      if (groupBy!=='turn') assert.equal(result.chart!.rows.reduce((sum,row)=>sum+row.total_tokens,0),15750);
+      assert.deepEqual(result.chart!.rows,result.rows);
+      assert.equal(result.chart!.rows.reduce((sum,row)=>sum+row.total_tokens,0),750);
     }
     const first = await client.query({groupBy:'all',chartBy:'model',chartMetric:'tokens'});
     const last = await client.query({groupBy:'all',chartBy:'model',chartMetric:'tokens',offset:100});
-    assert.equal(first.rows.length,100);assert.deepEqual(first.chart,last.chart);
+    assert.equal(first.rows.length,100);assert.deepEqual(first.chart!.rows,first.rows);assert.deepEqual(last.chart!.rows,last.rows);
     assert.equal(new Set([...first.rows,...last.rows].map(row=>row.model)).size,105);
     const provider = await client.query({groupBy:'all',chartBy:'provider'});
     assert.equal(provider.by,'provider');assert.equal(provider.total,1);assert.equal(provider.rows[0].total_tokens,15750);
@@ -246,39 +269,51 @@ test('short calendar and monthly charts retain exact periods, zeros, and empty r
   }
 });
 
-test('request charts select the latest 60 by start time and render them chronologically', t => {
-  const rows = Array.from({ length: 100 }, (_, index) => turn(index));
+test('request charts render rows 1–100, 101–200 and the final page in table order', t => {
+  const rows = Array.from({ length: 205 }, (_, index) => turn(index));
   const db = database(t, rows.reverse());
-  const chart = db.queryUsageChart({}, 'turn', 'UTC', 'averageDuration');
-  assert.equal(chart.total, 100);
-  assert.equal(chart.rows.length, 60);
-  assert.equal((chart.rows[0] as TurnSummaryRow).root_turn_id, 'request-40');
-  assert.equal((chart.rows.at(-1) as TurnSummaryRow).root_turn_id, 'request-99');
+  for (const offset of [0, 100, 200]) {
+    const chart = db.queryUsageChart({}, 'turn', 'UTC', 'averageDuration', 'provider', { offset });
+    assert.equal(chart.total, 205);
+    assert.equal(chart.rows.length, offset === 200 ? 5 : 100);
+    assert.deepEqual(chart.rows, db.queryTurns({}, { offset }));
+    assert.equal((chart.rows[0] as TurnSummaryRow).root_turn_id, `request-${204-offset}`);
+  }
   assert.equal(db.queryUsageChart({}, 'turn', 'UTC', 'requests').metric, 'tokens');
 });
 
-test('worker returns chart results independently of table limit, offset and filters', async t => {
+test('worker returns the current table page as chart data for all groupings and both bases', async t => {
   const directory = mkdtempSync(join(realpathSync(tmpdir()), 'agent-tracker-chart-'));
   t.after(() => rmSync(directory, { recursive: true, force: true }));
   const path = join(directory, 'summary.sqlite');
   const db = new SummaryDatabase(path);
-  seed(db, Array.from({ length: 120 }, (_, index) => turn(index)));
+  seed(db, Array.from({ length: 205 }, (_, index) => turn(index, {
+    project_key: `/project-${index}`, session_id: `session-${index}`, started_at_ms: start + index * 32 * 86400000,
+    model_usage: [{ model: `model-${index}`, input_tokens: 100, output_tokens: 50, cache_write_input_tokens: 20, cache_read_input_tokens: 30 }],
+  })));
   db.close();
   const client = new SummaryClient({ dbPath: path, roots: [] });
   try {
+    for (const groupBy of ['day', 'month', 'project', 'session', 'all', 'turn'] as const) {
+      for (const chartBy of ['provider', 'model'] as const) for (const offset of [0, 100, 200]) {
+        const result = await client.query({ groupBy, chartBy, timezone: 'UTC', offset, chartMetric: 'tokens' });
+        assert.equal(result.chart!.by, chartBy);
+        assert.equal(result.chart!.total, result.total);
+        assert.deepEqual(result.chart!.rows, result.rows, `${groupBy}/${chartBy}/${offset}`);
+        assert.equal(result.rows.length, groupBy === 'all' && chartBy === 'provider' ? offset ? 0 : 1 : offset === 200 ? 5 : 100);
+      }
+    }
     const result = await client.query({ groupBy: 'day', timezone: 'UTC', limit: 1, offset: 100, chartMetric: 'tokens' });
-    assert.equal(result.rows.length, 1);
-    assert.equal(result.total, 120);
-    assert.equal(result.chart!.rows.reduce((sum, row) => sum + row.total_tokens, 0), 18000);
+    assert.equal(result.rows.length, 1); assert.equal(result.chart!.rows[0].total_tokens, 150);
     assert.deepEqual((await client.query({ groupBy: 'all', providers: [], chartMetric: 'tokens' })).chart!.rows, []);
-    const models=await client.query({groupBy:'month',timezone:'UTC',limit:1,offset:100,chartMetric:'tokens',chartBy:'model'});
-    assert.equal(models.chart!.by,'model');assert.equal(models.chart!.rows.reduce((sum,row)=>sum+row.total_tokens,0),18000);
+    const filtered = await client.query({ groupBy: 'session', projectKey: '/project-204', chartBy: 'model', chartMetric: 'averageDuration' });
+    assert.equal(filtered.total, 1); assert.deepEqual(filtered.chart!.rows, filtered.rows);
   } finally { await client.dispose(); }
 });
 
 class Element {
   private text = '';
-  value = ''; disabled = false; hidden = false; title = ''; children: Element[] = [];
+  value = ''; className = ''; disabled = false; hidden = false; title = ''; children: Element[] = [];
   options = ['tokens', 'requests', 'averageTokens', 'averageDuration'].map(value => ({ value, disabled: false, textContent: '' }));
   readonly attributes = new Map<string, string>();
   readonly listeners = new Map<string, () => void>();
@@ -305,25 +340,83 @@ function ui() {
     document: { getElementById: get, createElement: (tag: string) => new Element(tag), createElementNS: (_ns: string, tag: string) => new Element(tag), querySelectorAll: () => [] },
     window: { addEventListener: (_event: string, listener: typeof receive) => { receive = listener; } },
   });
-  return { get, messages, render: (groupBy: string, mode: string, metric: string, rows: unknown[], by = 'provider') => receive!({ data: { type: 'usage', result: {
-    groupBy, by, rows, total: rows.length, coverage: {}, chart: { rows, mode, metric, total: rows.length, by },
+  return { get, messages, render: (groupBy: string, mode: string, metric: string, rows: unknown[], by = 'provider', total = rows.length) => receive!({ data: { type: 'usage', result: {
+    groupBy, by, rows, total, coverage: {}, chart: { rows, mode, metric, total, by },
   } } }) };
 }
 
-test('request axes and table show a bounded title and session charts place sessions next to each other', () => {
+test('request axes show titles and project/session charts place categories next to each other', () => {
   const view = ui();
   const rows = [turn(0, { request_title: '카드 UI 위치 수정', session_name: 'Session One' }),
     turn(1, { request_title: '<img src=x> 긴 제목', session_id: 'second', session_name: 'Session Two' })];
-  view.render('turn', 'turn', 'tokens', rows);
-  assert.match(view.get('usage-table').textContent, /요청 1 · 카드 UI 위치 수정/);
-  assert.match(view.get('usage-chart').textContent, /카드 UI 위치 수정/);
-  assert.equal(view.get('usage-table').descendants().filter(node => node.tag === 'img').length, 0);
-  view.render('session', 'ranking', 'tokens', rows);
-  const bars = view.get('usage-chart').descendants().filter(node => node.attributes.get('class') === 'chart-bar');
-  const marks = bars.map(bar => bar.children.find(node => node.attributes.get('class')?.includes('chart-segment'))!);
-  assert.notEqual(marks[0].attributes.get('x'), marks[1].attributes.get('x'), 'sessions have separate horizontal positions');
-  assert.equal(marks[0].attributes.get('width'), '36', 'session values use upright bars');
-  assert.match(view.get('usage-chart').textContent, /Session One.*Session Two/);
+  for (const by of ['provider', 'model']) {
+    view.render('turn', 'turn', 'tokens', rows.map(row=>({...row,...(by==='model' ? {model:'claude-opus-5-5'} : {})})), by);
+    for (const id of ['usage-table', 'usage-chart', 'chart-detail']) {
+      assert.match(view.get(id).textContent, /카드 UI 위치 수정/);
+      assert.doesNotMatch(view.get(id).textContent, /요청\s*\d+/);
+    }
+    assert.equal(view.get('usage-table').descendants().filter(node => node.tag === 'img').length, 0);
+    const bar = view.get('usage-chart').descendants().find(node=>node.attributes.get('class')==='chart-bar')!;
+    assert.doesNotMatch(bar.attributes.get('aria-label')!, /요청\s*\d+/);
+  }
+  for (const group of ['project', 'session']) for (const metric of ['tokens', 'requests', 'averageTokens', 'averageDuration']) {
+    view.render(group, 'ranking', metric, rows.map((row,index)=>({ ...row,project_key:`/project-${index}`,project_name:`Project ${index}`,
+      turn_count:1,avg_tokens_per_turn:150,avg_duration_ms:1000 })));
+    const bars = view.get('usage-chart').descendants().filter(node => node.attributes.get('class') === 'chart-bar');
+    const marks = bars.map(bar => bar.children.find(node => node.attributes.get('class')?.includes('chart-segment'))!);
+    assert.notEqual(marks[0].attributes.get('x'), marks[1].attributes.get('x'), `${group}/${metric}: separate horizontal positions`);
+    assert.equal(marks[0].attributes.get('width'), '36', 'values use upright bars');
+    assert.match(view.get('usage-chart').textContent, group === 'session' ? /Session One.*Session Two/ : /Project 0.*Project 1/);
+  }
+});
+
+test('chart and table pagination share page labels and offsets across every grouping', () => {
+  const view = ui();
+  for (const [group,mode] of [['day','calendar'],['month','calendar'],['project','ranking'],['session','ranking'],['all','total'],['turn','turn']]) {
+    view.get('group').value = group;
+    const first = Array.from({ length: 100 }, (_,index)=>turn(index));
+    view.render(group, mode, 'tokens', first, 'provider', 205);
+    for (const prefix of ['', 'chart-']) {
+      assert.equal(view.get(`${prefix}page-label`).textContent, '1–100 / 205');
+      assert.equal(view.get(`${prefix}previous`).disabled, true);
+      assert.equal(view.get(`${prefix}next`).disabled, false);
+    }
+    view.get('chart-next').listeners.get('click')!();
+    assert.equal(view.messages.at(-1)!.query!.offset, 100);
+    view.render(group, mode, 'tokens', Array.from({ length: 100 }, (_,index)=>turn(index+100)), 'provider', 205);
+    assert.equal(view.get('chart-page-label').textContent, '101–200 / 205');
+    assert.equal(view.get('page-label').textContent, '101–200 / 205');
+    assert.match(view.get('chart-scope').textContent, /현재 표 101–200/);
+    view.get('next').listeners.get('click')!();
+    view.render(group, mode, 'tokens', first.slice(0,5), 'provider', 205);
+    for (const prefix of ['', 'chart-']) {
+      assert.equal(view.get(`${prefix}page-label`).textContent, '201–205 / 205');
+      assert.equal(view.get(`${prefix}next`).disabled, true);
+    }
+    view.get('chart-previous').listeners.get('click')!();
+    assert.equal(view.messages.at(-1)!.query!.offset, 100);
+    view.get('previous').listeners.get('click')!();
+    assert.equal(view.messages.at(-1)!.query!.offset, 0);
+  }
+});
+
+test('period/project/session labels keep full text and filter actions inside clamped labels', () => {
+  const view = ui();
+  const longName = '매우 긴 이름 '.repeat(150);
+  const row = { ...turn(0),project_name:longName,session_name:longName,period:longName };
+  for (const group of ['day','month','project','session','turn']) {
+    view.render(group, group==='turn' ? 'turn' : 'ranking', 'tokens', [{...row,period: ['day','month'].includes(group) ? longName : null,
+      session_id: group==='project' ? null : row.session_id,project_key:['day','month'].includes(group) ? null : row.project_key}]);
+    const labels = view.get('usage-table').descendants().filter(node=>node.className==='table-label');
+    assert.ok(labels.length>0, group);
+    assert.ok(labels.some(node=>node.textContent.includes(longName)), 'clipping preserves the original text');
+    assert.ok(labels.some(node=>node.title.includes(longName)), 'full names remain available in hover text');
+    if (group==='project' || group==='session') {
+      const button = view.get('usage-table').descendants().find(node=>node.tag==='button')!;
+      button.listeners.get('click')!();
+      assert.equal((view.messages.at(-1)!.query as Record<string,unknown>).projectKey, '/project');
+    }
+  }
 });
 
 test('model charts and tables display compact model names with provider markers in every grouping', () => {

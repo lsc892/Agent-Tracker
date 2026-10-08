@@ -155,6 +155,20 @@ export async function run(): Promise<void> {
               check(document.getElementById('usage-table').textContent.includes('150'),'usage table renders total');
               check(document.getElementById('usage').hidden === false,'usage stays visible in the statistics page');
               check(message.result.chart.mode === 'calendar','calendar chart arrives from the worker');
+              check(JSON.stringify(message.result.chart.rows)===JSON.stringify(message.result.rows),'chart uses the current table page');
+              for (const prefix of ['', 'chart-']) {
+                check(document.getElementById(prefix+'previous').disabled && document.getElementById(prefix+'next').disabled,'single page disables both pagination controls');
+              }
+              check(document.getElementById('chart-page-label').textContent===document.getElementById('page-label').textContent,'chart and table page ranges match');
+              const clipped = document.querySelector('#usage-table .table-label');
+              const probe = clipped.cloneNode(true);
+              probe.textContent = '긴 이름과 프로젝트 세션 표시 검증 '.repeat(100);
+              probe.style.width = '80px';
+              clipped.parentElement.append(probe);
+              const clipStyle = getComputedStyle(probe);
+              check(clipStyle.webkitLineClamp==='5' && clipStyle.overflow==='hidden','labels clamp after five lines with ellipsis');
+              check(probe.scrollHeight>probe.clientHeight && probe.clientHeight<=parseFloat(clipStyle.lineHeight)*5+1,'long labels are visually limited to five lines');
+              probe.remove();
               const marks = [...document.querySelectorAll('#usage-chart .chart-segment')];
               check(marks.length === 4,'total tokens render as four stacked segments');
               const fills = marks.map(mark => getComputedStyle(mark).fill);
@@ -182,6 +196,11 @@ export async function run(): Promise<void> {
             } else if (phase === 'chart-groups' && message.type === 'usage' && message.result.groupBy === chartGroups[0]) {
               check(document.querySelectorAll('#usage-chart .chart-segment').length === 4,'stacked chart survives grouping '+chartGroups[0]);
               check(document.getElementById('chart-title').textContent === '총 토큰','grouped chart keeps its token metric');
+              if (['project','session'].includes(chartGroups[0])) {
+                check(document.querySelector('#usage-chart .chart-segment').getAttribute('width')==='36','project and session values use the same horizontal category layout');
+                const label = document.querySelector('#usage-table .table-label');
+                check(getComputedStyle(label).webkitLineClamp==='5','project and session cells retain the five-line limit');
+              }
               checkSegmentHover();
               chartGroups.shift();
               if (chartGroups.length) { submitGroup(chartGroups[0]); return; }
@@ -204,7 +223,7 @@ export async function run(): Promise<void> {
               phase = 'turn'; document.getElementById('group').value = 'turn'; option.click();
             } else if (phase === 'turn' && message.type === 'usage' && message.result.groupBy === 'turn') {
               check(message.result.rows.length === 1 && message.result.rows[0].root_turn_id === 'ui-turn','request group and session filter are applied');
-              check(document.getElementById('usage-table').textContent.includes('ui-turn'),'request identity is rendered');
+              check(document.querySelector('#usage-table .name-filter').title.includes('ui-turn'),'request identity is available in the name tooltip');
               check(document.getElementById('usage-table').textContent.includes('통계 화면 검증'),'session title is rendered');
               check(message.result.chart.mode === 'turn' && document.querySelectorAll('#usage-chart .chart-segment').length === 4,'request chart uses token composition');
               checkSegmentHover();
@@ -287,7 +306,7 @@ export async function run(): Promise<void> {
               check(message.result.total === 0,'date filter excludes earlier requests');
               check(document.querySelector('#usage-table .empty'),'empty state renders');
               check(document.querySelector('#usage-chart .empty') && !document.querySelector('#usage-chart .chart-segment'),'empty query clears the chart');
-              check(document.getElementById('previous').disabled && document.getElementById('next').disabled,'empty pagination is disabled');
+              for (const prefix of ['', 'chart-']) check(document.getElementById(prefix+'previous').disabled && document.getElementById(prefix+'next').disabled,'empty pagination is disabled');
               phase = 'empty-names'; document.getElementById('session-name').click();
             } else if (phase === 'empty-names' && message.type === 'names' && message.kind === 'session') {
               check(message.result.total === 1 && document.querySelectorAll('#session-list .name-option').length === 2,'names remain available outside the date filter');

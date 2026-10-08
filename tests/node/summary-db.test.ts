@@ -132,7 +132,7 @@ for (const version of [1,2]) test(`v${version} migration preserves summaries, ma
   db = new SummaryDatabase(dbPath);
   assert.deepEqual(db.connection.prepare('SELECT * FROM manifest').all(),beforeFiles);
   assert.deepEqual(db.queryTurns().map(row=>({...row})),beforeTurns.map(row=>({
-    ...row as object,session_name:null,cache_write_input_tokens:null,cache_read_input_tokens:null,
+    ...row as object,session_name:null,cache_write_input_tokens:null,cache_read_input_tokens:null,has_recorded_usage:1,
   })));
   assert.equal(db.connection.prepare('PRAGMA user_version').get()?.user_version,SCHEMA_VERSION);
   assert.deepEqual(db.connection.prepare('PRAGMA foreign_key_check').all(),[]);

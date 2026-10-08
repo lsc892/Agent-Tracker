@@ -13,7 +13,8 @@ h2 { margin: 0; font-weight: 600; font-size: 19px; }
 h3 { font-size: 15px; }
 .eyebrow { color: var(--vscode-descriptionForeground); font-size: 10px; letter-spacing: 2px; }
 .muted { color: var(--vscode-descriptionForeground); }
-.name-filter { color: var(--vscode-textLink-foreground); background: none; padding: 0; text-align: left; }
+.name-filter { color: var(--vscode-textLink-foreground); background: none; padding: 0; text-align: left; max-width: 100%; }
+.table-label { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 5; line-clamp: 5; max-width: 330px; line-height: 1.5; overflow: hidden; overflow-wrap: anywhere; white-space: normal; }
 .name-filter:hover { background: none; text-decoration: underline; }
 .session-start { display: block; margin-top: 5px; font-size: 11px; }
 .dashboard-footer { margin-top: 28px; }
