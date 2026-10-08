@@ -29,6 +29,20 @@ export function project(path: string): { projectKey: string; projectName: string
   const key = windows ? normalized.toLowerCase() : normalized;
   return { projectKey: key, projectName: basename(normalized.replace(/\\/g, '/')) || normalized };
 }
+
+/** Only a short user-facing title leaves the parser, never the full body or attachment. */
+export function requestTitle(value: unknown): string | undefined {
+  const text = typeof value === 'string' ? value : Array.isArray(value)
+    ? value.filter(item => object(item).type === 'text' || object(item).type === 'input_text')
+      .map(item => string(object(item).text) ?? '').join('\n') : '';
+  // Codex prepends editor context; prefer the explicit request when available.
+  const request = text.split(/(?:^|\n)## My request:\s*/).at(-1) ?? text;
+  const first = request.split(/[\r\n]/).map(line => line.trim())
+    .find(line => line && !line.startsWith('<') && !/^#(?:\s|$)/.test(line));
+  if (!first) return undefined;
+  const cleaned = first.replace(/[\u0000-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim();
+  return cleaned.length > 80 ? `${cleaned.slice(0, 79)}…` : cleaned || undefined;
+}
 export function claudeTokens(raw: Record<string, unknown>): TokenVector {
   validateTokens(raw);
   const cacheRead = number(raw.cache_read_input_tokens);

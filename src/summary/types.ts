@@ -109,6 +109,7 @@ export interface TurnEvent {
   kind: 'turn';
   rootId: string;
   isMain: boolean;
+  title?: string;
   startedAt?: number | null;
   completedAt?: number | null;
   lastAssistantAt?: number | null;

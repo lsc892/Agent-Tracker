@@ -191,9 +191,10 @@
     return node;
   }
   function sessionLabel(row, request = false) {
-    const node = element('button', `${request ? `${row.root_turn_id} / ` : `${row.project_name || '이름 없는 프로젝트'} / `}${row.session_name || '이름 없는 세션'}`, 'name-filter');
+    const node = element('button', `${request ? `요청 ${row.turn_index ?? row.root_turn_id} · ${row.request_title || row.session_name || '제목 없음'}` : `${row.project_name || '이름 없는 프로젝트'} / ${row.session_name || '이름 없는 세션'}`}`, 'name-filter');
     node.type = 'button';
-    node.title = `${row.project_key || ''}\n세션 ID: ${row.session_id}`;
+    node.title = `${row.request_title || ''}\n${row.project_key || ''}\n세션 ID: ${row.session_id}${request ? `\n요청 ID: ${row.root_turn_id}` : ''}`;
+    if (request) node.append(element('span', row.session_name || '이름 없는 세션', 'muted session-start'));
     if (!request) node.append(element('span', date(row.session_started_at_ms), 'muted session-start'));
     node.addEventListener('click', () => chooseSession(row));
     return node;
@@ -229,7 +230,7 @@
   }
   function chartLabel(row, mode) {
     const provider = seriesLabel(row);
-    if (mode === 'turn') return `${provider} · ${date(row.started_at_ms)} · ${row.session_name || '이름 없는 세션'} · 요청 ${row.turn_index} (${row.root_turn_id})`;
+    if (mode === 'turn') return `${provider} · ${date(row.started_at_ms)} · ${row.session_name || '이름 없는 세션'} · 요청 ${row.turn_index}${row.request_title ? ` · ${row.request_title}` : ''} (${row.root_turn_id})`;
     if (mode === 'calendar') return `${row.period || '시각 미상'} · ${provider}`;
     if (mode === 'total') return provider;
     return `${provider} · ${row.project_name || '이름 없는 프로젝트'}${row.session_id ? ` / ${row.session_name || '이름 없는 세션'}` : ''}`;
@@ -295,12 +296,14 @@
       }
       legend.hidden = false;
     }
-    const vertical = chart.mode === 'calendar' || turn;
-    const categories = vertical ? [...new Set(rows.map((row, index) => turn ? String(index) : row.period))] : [];
-    const maxPeers = vertical && !turn ? Math.max(1, ...categories.map(period => rows.filter(row => row.period === period).length)) : 1;
-    const categoryWidth = Math.max(turn ? 86 : 128, maxPeers * 46 + 36);
+    const sessions = chart.mode === 'ranking' && result.groupBy === 'session';
+    const vertical = chart.mode === 'calendar' || turn || sessions;
+    const categoryKey = (row, index) => turn ? String(index) : sessions ? `${row.provider}/${row.project_key}/${row.session_id}` : row.period;
+    const categories = vertical ? [...new Set(rows.map(categoryKey))] : [];
+    const maxPeers = vertical && !turn ? Math.max(1, ...categories.map(category => rows.filter((row, index) => categoryKey(row, index) === category).length)) : 1;
+    const categoryWidth = Math.max(turn || sessions ? 164 : 128, maxPeers * 46 + 36);
     const width = Math.max(plot.clientWidth || 736, 736, vertical ? 86 + categories.length * categoryWidth : 0);
-    const height = vertical ? chart.by === 'model' ? 382 : 340 : 62 + rows.length * 62;
+    const height = vertical ? chart.by === 'model' ? 414 : 372 : 62 + rows.length * 62;
     const svg = svgElement('svg', { viewBox: `0 0 ${width} ${height}`, width, height, class: 'chart-svg', role: 'group', 'aria-label': `${title} · ${$('chart-scope').textContent}` });
     svg.append(svgElement('title', {}, `${title} 사용량 도표`));
     const max = Math.max(1, ...rows.map(row => chartValue(row, metric, turn) ?? 0));
@@ -325,13 +328,20 @@
     if (vertical) {
       categories.forEach((category, index) => {
         const x = left + (width - left - 16) * (index + .5) / categories.length;
-        const label = turn ? `요청 ${rows[index].turn_index}` : category || '시각 미상';
+        const row = rows.find((row, rowIndex) => categoryKey(row, rowIndex) === category);
+        const shortened = text => text.length > 16 ? `${text.slice(0, 15)}…` : text;
+        const label = turn ? `요청 ${row.turn_index}` : sessions ? shortened(row.session_name || '이름 없는 세션') : category || '시각 미상';
         const parts = label.split(' ~ ');
         const labelY = chart.by === 'model' ? 352 : 292;
         svg.append(svgElement('text', { x, y: labelY, 'text-anchor': 'middle', class: 'chart-axis-label' }, parts[0]));
         if (parts[1]) svg.append(svgElement('text', { x, y: labelY + 16, 'text-anchor': 'middle', class: 'chart-axis-label' }, `~ ${parts[1]}`));
-        if (turn) svg.append(svgElement('text', { x, y: labelY + 16, 'text-anchor': 'middle', class: 'chart-axis-label' }, rows[index].started_at_ms == null ? '시각 미상'
-          : new Intl.DateTimeFormat('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: timezone }).format(new Date(rows[index].started_at_ms))));
+        if (turn) {
+          const title = svgElement('text', { x, y: labelY + 16, 'text-anchor': 'middle', class: 'chart-axis-label' }, shortened(row.request_title || row.session_name || '제목 없음'));
+          title.append(svgElement('title', {}, row.request_title || row.session_name || '제목 없음'));
+          svg.append(title, svgElement('text', { x, y: labelY + 32, 'text-anchor': 'middle', class: 'chart-axis-label' }, row.started_at_ms == null ? '시각 미상'
+            : new Intl.DateTimeFormat('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: timezone }).format(new Date(row.started_at_ms))));
+        }
+        if (sessions) svg.append(svgElement('text', { x, y: labelY + 16, 'text-anchor': 'middle', class: 'chart-axis-label' }, shortened(row.project_name || '이름 없는 프로젝트')));
       });
     }
     rows.forEach((row, index) => {
@@ -339,8 +349,8 @@
       const description = chartDescription(row, chart);
       const group = svgElement('g', { class: 'chart-bar', tabindex: 0, role: 'img', 'aria-label': row.model === undefined ? description : `${providerLabel(row.provider)} · ${description}` });
       group.append(svgElement('title', {}, description));
-      const peers = vertical && !turn ? rows.filter(peer => peer.period === row.period) : [row];
-      const categoryIndex = turn ? index : categories.indexOf(row.period);
+      const peers = vertical && !turn ? rows.filter((peer, peerIndex) => categoryKey(peer, peerIndex) === categoryKey(row, index)) : [row];
+      const categoryIndex = categories.indexOf(categoryKey(row, index));
       const center = left + (width - left - 16) * (categoryIndex + .5) / Math.max(1, categories.length);
       const x = vertical ? center + (peers.indexOf(row) - (peers.length - 1) / 2) * 46 - 18 : left;
       const y = vertical ? top + length : 58 + index * 62;

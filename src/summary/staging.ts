@@ -47,7 +47,7 @@ export class SummaryStaging {
         input INTEGER,output INTEGER,cache_read INTEGER,cache_write INTEGER,reasoning INTEGER,
         is_main INTEGER,started INTEGER,completed_at INTEGER,last_assistant INTEGER,duration INTEGER,
         duration_quality TEXT,completed INTEGER,status TEXT,status_at INTEGER,flags TEXT,byte_offset INTEGER NOT NULL,schema_kind TEXT,
-        category TEXT,name TEXT,event_key TEXT
+        category TEXT,name TEXT,event_key TEXT,request_title TEXT
       );
       CREATE INDEX temp.events_file ON events(file_id,id);
       CREATE INDEX temp.events_file_root ON events(file_id,root_id,kind);
@@ -57,8 +57,8 @@ export class SummaryStaging {
         PRIMARY KEY(file_id,root_id,flag));
     `);
     this.insertEvent = connection.prepare(`INSERT INTO events(file_id,kind,root_id,response_id,request_id,thread_id,turn_id,
-      input,output,cache_read,cache_write,reasoning,is_main,started,completed_at,last_assistant,duration,duration_quality,completed,status,status_at,flags,byte_offset,schema_kind,model,billing_mode,category,name,event_key)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
+      input,output,cache_read,cache_write,reasoning,is_main,started,completed_at,last_assistant,duration,duration_quality,completed,status,status_at,flags,byte_offset,schema_kind,model,billing_mode,category,name,event_key,
+      request_title) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
     this.insertFlag = connection.prepare('INSERT OR IGNORE INTO flags VALUES (?,?,?)');
     this.insertAffected = connection.prepare('INSERT OR IGNORE INTO affected VALUES (?,?)');
   }
@@ -98,7 +98,7 @@ export class SummaryStaging {
       turn?.duration ?? null,turn?.durationQuality ?? null,turn?.completed ? 1 : 0,
       turn?.status ?? null,turn?.statusAt ?? null,null,event.offset,event.kind === 'usage' ? event.schema ?? null : null,
       event.kind === 'usage' ? event.model ?? '' : null,event.kind === 'usage' ? event.billingMode ?? 'unknown' : null,
-      capability?.category ?? null,capability?.name ?? null,capability?.eventId ?? null);
+      capability?.category ?? null,capability?.name ?? null,capability?.eventId ?? null,turn?.title ?? null);
     if ('flags' in event) for (const flag of event.flags ?? []) this.flag(fileId,event.rootId,flag);
   }
   /** A bounded synchronous TEMP-only transaction; persistent tables and file I/O stay outside. */
@@ -280,6 +280,9 @@ export class SummaryStaging {
         FROM component_events e JOIN scan_files f ON f.id=e.file_id
         WHERE f.failed=0 AND f.removed=0 GROUP BY f.provider,f.session_id,e.root_id
       ) SELECT r.*,o.status latest_status,o.status_at latest_status_at,o.duration_quality latest_status_quality,f.project_key,f.project_name,
+        (SELECT e.request_title FROM component_events e JOIN scan_files sf ON sf.id=e.file_id
+          WHERE sf.provider=r.provider AND sf.session_id=r.session_id AND e.root_id=r.root_id
+            AND e.is_main=1 AND e.request_title IS NOT NULL ORDER BY e.id LIMIT 1) request_title,
         (SELECT CASE WHEN count(DISTINCT w.billing_mode)=1 THEN min(w.billing_mode) ELSE 'unknown' END
           FROM winners w WHERE w.provider=r.provider AND w.session_id=r.session_id AND w.root_id=r.root_id) billing,
         coalesce((SELECT sum(w.input) FROM winners w WHERE w.provider=r.provider AND w.session_id=r.session_id AND w.root_id=r.root_id),0) input_tokens,
@@ -310,7 +313,7 @@ export class SummaryStaging {
           last_assistant:number|null;completed:number;explicit_duration:number|null;lifecycle:number;file_id:number;byte_offset:number;has_main:number;
           latest_status:TurnSummaryInput['status']|null;latest_status_at:number|null;latest_status_quality:TurnSummaryInput['duration_quality']|null;
           project_key:string;project_name:string;input_tokens:number;output_tokens:number;billing:import('./db/types').BillingMode;
-          cache_read_input_tokens:number;cache_write_input_tokens:number;flags:string|null;turn_index:number};
+          cache_read_input_tokens:number;cache_write_input_tokens:number;flags:string|null;turn_index:number;request_title:string|null};
         after = row.cursor;
         let duration: number | null = null;
         let quality: TurnSummaryInput['duration_quality'] = 'missing';
@@ -329,7 +332,7 @@ export class SummaryStaging {
         if (!row.has_main) flags.add('missing-root-turn');
         const name = sessionName.get(row.provider,row.session_id,row.provider,row.session_id)?.name as string | null;
         yield { provider:row.provider,project_key:row.project_key,project_name:row.project_name,session_id:row.session_id,session_name:name,
-          root_turn_id:row.root_id,turn_index:row.turn_index,started_at_ms:row.started,completed_at_ms:completedAt,
+          root_turn_id:row.root_id,request_title:row.request_title,turn_index:row.turn_index,started_at_ms:row.started,completed_at_ms:completedAt,
           duration_ms:duration,duration_quality:quality,input_tokens:row.input_tokens,output_tokens:row.output_tokens,
           cache_read_input_tokens:row.cache_read_input_tokens,cache_write_input_tokens:row.cache_write_input_tokens,
           model_usage:this.modelUsage(row.provider,row.session_id,row.root_id),

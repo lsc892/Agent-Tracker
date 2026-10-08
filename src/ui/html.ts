@@ -24,7 +24,7 @@ export function dashboardHtml(scriptUri: string, styleUri: string, cspSource: st
 <title>Agent Tracker</title><link rel="stylesheet" href="${escapeHtml(styleUri)}"></head>
 <body><header><div><p class="eyebrow">AGENT TRACKER</p><h1>작업의 흐름을 한눈에</h1><p class="muted">Claude · Codex 요청별 사용 통계</p></div><button id="settings">설정</button></header>
 <main><p id="configuration-warning" class="stale" role="status" hidden></p><p id="error" class="error" role="alert" hidden></p>
-<section id="usage" aria-label="사용량 통계"><div class="section-title"><div><h2>사용량 통계</h2><p class="muted">사용량 통계 버튼으로 이 화면을 열 때 기록을 갱신합니다.</p></div><div class="actions"><button id="cancel-usage" hidden>취소</button></div></div>
+<section id="usage" aria-label="사용량 통계"><div class="section-title"><div><h2>사용량 통계</h2></div><div class="actions"><button id="cancel-usage" hidden>취소</button></div></div>
 <p id="usage-progress" role="status" aria-live="polite"></p>
 <div class="segmented statistics-sections" role="group" aria-label="통계 구역"><button id="section-tokens" type="button" aria-pressed="true" aria-controls="token-section">토큰</button><button id="section-skills" type="button" aria-pressed="false" aria-controls="skill-section">Skill</button></div>
 <form id="usage-filters" class="filters">

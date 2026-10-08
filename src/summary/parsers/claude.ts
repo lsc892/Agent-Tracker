@@ -1,7 +1,7 @@
 import { basename, dirname, sep } from 'node:path';
 import { SummaryError } from '../jsonl';
 import type { FileContext, ParsedIdentity, ParseSink } from '../types';
-import { billingMode, claudeTokens, displayName, number, object, project, string, timestamp } from './common';
+import { billingMode, claudeTokens, displayName, number, object, project, requestTitle, string, timestamp } from './common';
 import { toolCapabilities } from './capabilities';
 
 export class ClaudeParserAdapter {
@@ -63,7 +63,7 @@ export class ClaudeParserAdapter {
       }
     }
     if (external && rootId) this.sink.event({ kind: 'turn', rootId, isMain: this.identityValue.isMain,
-      startedAt: time, flags: explicitPrompt ? [] : ['missing-request-id'], offset });
+      startedAt: time, title: requestTitle(content), flags: explicitPrompt ? [] : ['missing-request-id'], offset });
     if (type === 'assistant' && Object.keys(object(message.usage)).length > 0) {
       const tokens = claudeTokens(object(message.usage));
       const model = displayName(message.model);

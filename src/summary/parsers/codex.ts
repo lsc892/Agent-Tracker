@@ -1,6 +1,6 @@
 import { SummaryError } from '../jsonl';
 import type { FileContext, ParsedIdentity, ParseSink, TokenVector } from '../types';
-import { billingMode, codexTokens, displayName, number, object, project, string, timestamp, tokenFlags } from './common';
+import { billingMode, codexTokens, displayName, number, object, project, requestTitle, string, timestamp, tokenFlags } from './common';
 import { toolCapabilities } from './capabilities';
 
 /** Codex lifecycle payloads use Unix seconds; row timestamps and durations keep their existing units. */
@@ -113,7 +113,7 @@ export class CodexCurrentParserAdapter {
           this.turn = this.root;
         }
         this.hasUserInTurn = true; this.currentClosed = false; this.pendingLifecycle = false;
-        if (this.root) this.sink.event({ kind: 'turn', rootId: this.root, isMain: this.identityValue.isMain, startedAt: time,
+        if (this.root) this.sink.event({ kind: 'turn', rootId: this.root, isMain: this.identityValue.isMain, startedAt: time, title: requestTitle(payload.message),
           flags: this.root.startsWith('legacy-') ? ['missing-request-id'] : [], offset });
       } else if (event === 'task_complete' || event === 'task_completed') {
         this.currentClosed = true;

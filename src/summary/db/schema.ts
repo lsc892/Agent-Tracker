@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 7;
+export const SCHEMA_VERSION = 8;
 
 export const SCHEMA_CAPABILITY_SQL = `
 CREATE TABLE IF NOT EXISTS turn_capability_usage (
@@ -58,6 +58,7 @@ CREATE TABLE IF NOT EXISTS turn_summary (
   project_key TEXT NOT NULL REFERENCES projects(project_key),
   session_id TEXT NOT NULL,
   root_turn_id TEXT NOT NULL,
+  request_title TEXT,
   turn_index INTEGER NOT NULL,
   started_at_ms INTEGER,
   completed_at_ms INTEGER,

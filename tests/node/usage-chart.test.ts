@@ -280,6 +280,22 @@ function ui() {
   } } }) };
 }
 
+test('request axes and table show a bounded title and session charts place sessions next to each other', () => {
+  const view = ui();
+  const rows = [turn(0, { request_title: '카드 UI 위치 수정', session_name: 'Session One' }),
+    turn(1, { request_title: '<img src=x> 긴 제목', session_id: 'second', session_name: 'Session Two' })];
+  view.render('turn', 'turn', 'tokens', rows);
+  assert.match(view.get('usage-table').textContent, /요청 1 · 카드 UI 위치 수정/);
+  assert.match(view.get('usage-chart').textContent, /카드 UI 위치 수정/);
+  assert.equal(view.get('usage-table').descendants().filter(node => node.tag === 'img').length, 0);
+  view.render('session', 'ranking', 'tokens', rows);
+  const bars = view.get('usage-chart').descendants().filter(node => node.attributes.get('class') === 'chart-bar');
+  const marks = bars.map(bar => bar.children.find(node => node.attributes.get('class')?.includes('chart-segment'))!);
+  assert.notEqual(marks[0].attributes.get('x'), marks[1].attributes.get('x'), 'sessions have separate horizontal positions');
+  assert.equal(marks[0].attributes.get('width'), '36', 'session values use upright bars');
+  assert.match(view.get('usage-chart').textContent, /Session One.*Session Two/);
+});
+
 test('model charts and tables display compact model names with provider markers in every grouping', () => {
   const view = ui();
   const row = {...turn(0),model:'claude-opus-5-5',period:'2026-01-01'};

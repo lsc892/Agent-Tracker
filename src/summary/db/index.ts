@@ -28,11 +28,11 @@ function nonnegative(value: number, name: string): number {
 }
 
 const TURN_INSERT = `INSERT INTO turn_summary (
-  provider, project_key, session_id, root_turn_id, turn_index,
+  provider, project_key, session_id, root_turn_id, turn_index, request_title,
   started_at_ms, completed_at_ms, duration_ms, duration_quality,
   input_tokens, output_tokens, cache_write_input_tokens, cache_read_input_tokens, total_tokens, status, quality_flags,
   diagnostic_file_id, diagnostic_offset, last_error, updated_at
-) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`;
+) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`;
 
 const COSTED_TURNS = `(SELECT t.*,c.cost_usd,coalesce(c.unknown_costs,1) AS unknown_costs,
   coalesce(c.billing_mode,'unknown') AS billing_mode FROM turn_summary t LEFT JOIN turn_costs c ON c.turn_id=t.id)`;
@@ -41,6 +41,7 @@ const MODEL_NAME = `CASE WHEN coalesce(m.model,'')='' AND coalesce(m.input_token
   THEN NULL ELSE coalesce(m.model,'') END AS model`;
 // One row per request/model; older summaries retain all reported tokens.
 const modelTurns = (costs = false): string => `(SELECT t.id,t.provider,t.project_key,t.session_id,t.root_turn_id,t.turn_index,
+  t.request_title,
   t.started_at_ms,t.completed_at_ms,t.duration_ms,t.duration_quality,t.status,t.quality_flags,
   t.diagnostic_file_id,t.diagnostic_offset,t.last_error,t.updated_at,${MODEL_NAME},
   coalesce(m.input_tokens,t.input_tokens) AS input_tokens,coalesce(m.output_tokens,t.output_tokens) AS output_tokens,
@@ -90,7 +91,7 @@ function turnValues(row: TurnSummaryInput, now: string): SQLInputValue[] {
     throw new RangeError('Cache components cannot exceed input tokens');
   }
   return [
-    row.provider, row.project_key, row.session_id, row.root_turn_id, row.turn_index,
+    row.provider, row.project_key, row.session_id, row.root_turn_id, row.turn_index, row.request_title ?? null,
     row.started_at_ms ?? null, row.completed_at_ms ?? null, row.duration_ms ?? null, row.duration_quality,
     row.input_tokens, row.output_tokens,
     row.cache_write_input_tokens === undefined ? 0 : row.cache_write_input_tokens,
@@ -190,6 +191,9 @@ export class SummaryDatabase {
           this.connection.exec(SCHEMA_CAPABILITY_SQL);
           if (!this.connection.prepare('PRAGMA table_info(manifest)').all().some(column=>column.name==='capabilities_collected')) {
             this.connection.exec('ALTER TABLE manifest ADD COLUMN capabilities_collected INTEGER NOT NULL DEFAULT 0 CHECK(capabilities_collected IN (0,1))');
+          }
+          if (!this.connection.prepare('PRAGMA table_info(turn_summary)').all().some(column=>column.name==='request_title')) {
+            this.connection.exec('ALTER TABLE turn_summary ADD COLUMN request_title TEXT');
           }
           this.connection.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
         });
@@ -619,7 +623,7 @@ export class SummaryDatabase {
       SELECT provider,model,ROW_NUMBER() OVER (ORDER BY sum(total_tokens) DESC,provider,model) AS rank
       FROM filtered WHERE model<>'' GROUP BY provider,model
     ), bounded AS (
-      SELECT id,provider,project_key,session_id,root_turn_id,turn_index,started_at_ms,status,duration_ms,duration_quality,
+      SELECT id,provider,project_key,session_id,root_turn_id,turn_index,request_title,started_at_ms,status,duration_ms,duration_quality,
         last_error,updated_at,chart_period,CASE WHEN rank>8 THEN '' ELSE model END AS model,
         CASE WHEN rank>8 THEN 1 ELSE 0 END AS other_models,
         SUM(input_tokens) AS input_tokens,SUM(output_tokens) AS output_tokens,
