@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 8;
+export const SCHEMA_VERSION = 9;
 
 export const SCHEMA_CAPABILITY_SQL = `
 CREATE TABLE IF NOT EXISTS turn_capability_usage (
@@ -59,7 +59,6 @@ CREATE TABLE IF NOT EXISTS turn_summary (
   session_id TEXT NOT NULL,
   root_turn_id TEXT NOT NULL,
   request_title TEXT,
-  turn_index INTEGER NOT NULL,
   started_at_ms INTEGER,
   completed_at_ms INTEGER,
   duration_ms INTEGER CHECK(duration_ms >= 0),
@@ -83,7 +82,7 @@ CREATE TABLE IF NOT EXISTS turn_summary (
 const TURN_SUMMARY_INDEX_SQL = `
 CREATE INDEX IF NOT EXISTS idx_summary_period ON turn_summary(started_at_ms, provider);
 CREATE INDEX IF NOT EXISTS idx_summary_project_period ON turn_summary(provider, project_key, started_at_ms);
-CREATE INDEX IF NOT EXISTS idx_summary_session ON turn_summary(provider, session_id, turn_index);
+CREATE INDEX IF NOT EXISTS idx_summary_session ON turn_summary(provider, session_id);
 `;
 
 export const SCHEMA_SQL = `
@@ -124,11 +123,11 @@ INSERT INTO projects SELECT project_key, MIN(project_name) FROM turn_summary GRO
 INSERT INTO sessions SELECT DISTINCT provider, session_id, NULL FROM turn_summary;
 ALTER TABLE turn_summary RENAME TO turn_summary_legacy;
 ${TURN_SUMMARY_SQL}
-INSERT INTO turn_summary (id, provider, project_key, session_id, root_turn_id, turn_index,
+INSERT INTO turn_summary (id, provider, project_key, session_id, root_turn_id,
   started_at_ms, completed_at_ms, duration_ms, duration_quality,
   input_tokens, output_tokens, total_tokens, status, quality_flags,
   diagnostic_file_id, diagnostic_offset, last_error, updated_at)
-SELECT id, provider, project_key, session_id, root_turn_id, turn_index,
+SELECT id, provider, project_key, session_id, root_turn_id,
   started_at_ms, completed_at_ms, duration_ms, duration_quality,
   input_tokens, output_tokens, total_tokens, status, quality_flags,
   diagnostic_file_id, diagnostic_offset, last_error, updated_at FROM turn_summary_legacy;
@@ -140,4 +139,11 @@ ${TURN_SUMMARY_INDEX_SQL}
 export const SCHEMA_CACHE_MIGRATION_SQL = `
 ALTER TABLE turn_summary ADD COLUMN cache_write_input_tokens INTEGER CHECK(cache_write_input_tokens >= 0);
 ALTER TABLE turn_summary ADD COLUMN cache_read_input_tokens INTEGER CHECK(cache_read_input_tokens >= 0);
+`;
+
+/** Drop only the unused ordinal; keep request ids and all referencing rows intact. */
+export const SCHEMA_TURN_INDEX_MIGRATION_SQL = `
+DROP INDEX IF EXISTS idx_summary_session;
+ALTER TABLE turn_summary DROP COLUMN turn_index;
+CREATE INDEX idx_summary_session ON turn_summary(provider, session_id);
 `;

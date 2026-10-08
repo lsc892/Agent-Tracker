@@ -31,7 +31,7 @@ test('v7 summaries migrate without losing tokens or session metadata', async t =
   const previous = new SummaryDatabase(path);
   previous.replaceSessions({ files: [], sessions: [{ provider: 'claude', session_id: 's' }], summaries: [{
     provider: 'claude', project_key: '/project', project_name: 'Project', session_id: 's', session_name: 'Session',
-    root_turn_id: 'r', turn_index: 1, duration_quality: 'missing', input_tokens: 10, output_tokens: 5,
+    root_turn_id: 'r', duration_quality: 'missing', input_tokens: 10, output_tokens: 5,
     total_tokens: 15, status: 'completed',
   }] });
   previous.connection.exec('ALTER TABLE turn_summary DROP COLUMN request_title; PRAGMA user_version=7');

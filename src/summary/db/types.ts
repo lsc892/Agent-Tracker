@@ -45,7 +45,6 @@ export interface TurnSummaryInput {
   root_turn_id: string;
   /** A bounded display title, never the full request body. */
   request_title?: string | null;
-  turn_index: number;
   started_at_ms?: number | null;
   completed_at_ms?: number | null;
   duration_ms?: number | null;

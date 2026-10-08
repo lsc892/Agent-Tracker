@@ -257,7 +257,7 @@ test('aborted Codex roots and descendants leave no request summary while later c
     {type:'event_msg',payload:{type:'task_complete',turn_id:'child-turn',root_turn_id:'aborted',duration_ms:500}}]));
   assert.equal((await refreshSummary(database,codexOptions)).failed,0);
   const turns=database.queryTurns();assert.equal(turns.length,1);
-  assert.equal(turns[0].root_turn_id,'next');assert.equal(turns[0].turn_index,1);assert.equal(turns[0].total_tokens,50);
+  assert.equal(turns[0].root_turn_id,'next');assert.equal(turns[0].total_tokens,50);
   const usage=database.queryUsage()[0];assert.equal(usage.turn_count,1);assert.equal(usage.total_tokens,50);
   assert.equal(usage.avg_tokens_per_turn,50);assert.equal(database.diagnostics().summaries.length,0);
 }));

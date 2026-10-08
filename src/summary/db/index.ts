@@ -1,7 +1,7 @@
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync, type SQLInputValue, type StatementSync } from 'node:sqlite';
-import { SCHEMA_SQL, SCHEMA_VERSION, SCHEMA_LEGACY_MIGRATION_SQL, SCHEMA_CACHE_MIGRATION_SQL, SCHEMA_MODEL_SQL, SCHEMA_CAPABILITY_SQL } from './schema';
+import { SCHEMA_SQL, SCHEMA_VERSION, SCHEMA_LEGACY_MIGRATION_SQL, SCHEMA_CACHE_MIGRATION_SQL, SCHEMA_MODEL_SQL, SCHEMA_CAPABILITY_SQL, SCHEMA_TURN_INDEX_MIGRATION_SQL } from './schema';
 import { calendarPeriod } from './timezone';
 import { usageChartFromPage } from './chart';
 import { estimateCost, PRICING_VERSION } from '../pricing';
@@ -30,11 +30,11 @@ function nonnegative(value: number, name: string): number {
 }
 
 const TURN_INSERT = `INSERT INTO turn_summary (
-  provider, project_key, session_id, root_turn_id, turn_index, request_title,
+  provider, project_key, session_id, root_turn_id, request_title,
   started_at_ms, completed_at_ms, duration_ms, duration_quality,
   input_tokens, output_tokens, cache_write_input_tokens, cache_read_input_tokens, total_tokens, status, quality_flags,
   diagnostic_file_id, diagnostic_offset, last_error, updated_at
-) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`;
+) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`;
 
 const COSTED_TURNS = `(SELECT t.*,c.cost_usd,coalesce(c.unknown_costs,1) AS unknown_costs,
   coalesce(c.billing_mode,'unknown') AS billing_mode FROM turn_summary t LEFT JOIN turn_costs c ON c.turn_id=t.id)`;
@@ -42,7 +42,7 @@ const COSTED_TURNS = `(SELECT t.*,c.cost_usd,coalesce(c.unknown_costs,1) AS unkn
 const MODEL_NAME = `CASE WHEN coalesce(m.model,'')='' AND coalesce(m.input_tokens+m.output_tokens,t.total_tokens)=0
   THEN NULL ELSE coalesce(m.model,'') END AS model`;
 // One row per request/model; older summaries retain all reported tokens.
-const modelTurns = (costs = false): string => `(SELECT t.id,t.provider,t.project_key,t.session_id,t.root_turn_id,t.turn_index,
+const modelTurns = (costs = false): string => `(SELECT t.id,t.provider,t.project_key,t.session_id,t.root_turn_id,
   t.request_title,coalesce(m.model,'')<>'' AS has_model,
   t.started_at_ms,t.completed_at_ms,t.duration_ms,t.duration_quality,t.status,t.quality_flags,
   t.diagnostic_file_id,t.diagnostic_offset,t.last_error,t.updated_at,${MODEL_NAME},
@@ -89,7 +89,7 @@ function usageSums(exclude = false): string {
 }
 
 function turnValues(row: TurnSummaryInput, now: string): SQLInputValue[] {
-  for (const name of ['input_tokens', 'output_tokens', 'total_tokens', 'turn_index'] as const) {
+  for (const name of ['input_tokens', 'output_tokens', 'total_tokens'] as const) {
     nonnegative(row[name], name);
   }
   if (row.duration_ms != null) nonnegative(row.duration_ms, 'duration_ms');
@@ -100,7 +100,7 @@ function turnValues(row: TurnSummaryInput, now: string): SQLInputValue[] {
     throw new RangeError('Cache components cannot exceed input tokens');
   }
   return [
-    row.provider, row.project_key, row.session_id, row.root_turn_id, row.turn_index, row.request_title ?? null,
+    row.provider, row.project_key, row.session_id, row.root_turn_id, row.request_title ?? null,
     row.started_at_ms ?? null, row.completed_at_ms ?? null, row.duration_ms ?? null, row.duration_quality,
     row.input_tokens, row.output_tokens,
     row.cache_write_input_tokens === undefined ? 0 : row.cache_write_input_tokens,
@@ -203,6 +203,9 @@ export class SummaryDatabase {
           }
           if (!this.connection.prepare('PRAGMA table_info(turn_summary)').all().some(column=>column.name==='request_title')) {
             this.connection.exec('ALTER TABLE turn_summary ADD COLUMN request_title TEXT');
+          }
+          if (this.connection.prepare('PRAGMA table_info(turn_summary)').all().some(column=>column.name==='turn_index')) {
+            this.connection.exec(SCHEMA_TURN_INDEX_MIGRATION_SQL);
           }
           this.connection.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
         });

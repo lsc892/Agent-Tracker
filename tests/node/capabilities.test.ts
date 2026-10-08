@@ -118,7 +118,7 @@ test('Codex current and legacy model counts, exec calls, descendant calls and ab
 });
 
 const summary=(root:string,project='/project',count=1):TurnSummaryInput=>({provider:'codex',project_key:project,project_name:project,
-  session_id:'s',root_turn_id:root,turn_index:1,duration_quality:'missing',status:'completed',input_tokens:1,output_tokens:1,total_tokens:2,
+  session_id:'s',root_turn_id:root,duration_quality:'missing',status:'completed',input_tokens:1,output_tokens:1,total_tokens:2,
   capability_usage:[{category:'skill',name:root,usage_count:count}],
 });
 

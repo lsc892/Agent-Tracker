@@ -11,7 +11,7 @@ import { parseDashboardMessage } from '../../src/ui/presentation';
 const start = Date.parse('2026-01-01T00:00:00Z');
 function turn(index: number, changes: Partial<TurnSummaryInput> = {}): TurnSummaryInput {
   return { provider: 'claude', project_key: '/project', project_name: 'Project', session_id: 'session', session_name: 'Session',
-    root_turn_id: `request-${index}`, turn_index: index + 1, started_at_ms: start + index * 86400000,
+    root_turn_id: `request-${index}`, started_at_ms: start + index * 86400000,
     input_tokens: 100, output_tokens: 50, cache_write_input_tokens: 20, cache_read_input_tokens: 30,
     total_tokens: 150, status: 'completed', duration_ms: 1000, duration_quality: 'exact', ...changes };
 }

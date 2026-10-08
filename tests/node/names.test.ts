@@ -107,10 +107,10 @@ test('Codex state DB names override index titles, support duplicate titles, and 
 test('names are stored once, filters escape wildcard characters, and failed replacements roll back metadata', t => {
   const db = new SummaryDatabase(':memory:');t.after(()=>db.close());
   const row: TurnSummaryInput = {provider:'claude',project_key:'/project',project_name:'100%_project',
-    session_id:'one',session_name:'100%_session',root_turn_id:'first',turn_index:1,
+    session_id:'one',session_name:'100%_session',root_turn_id:'first',
     duration_quality:'missing',input_tokens:10,output_tokens:2,total_tokens:12,status:'in_progress'};
   const replace = (summaries: TurnSummaryInput[]): void => db.replaceSessions({sessions:[{provider:'claude',session_id:'one'}],files:[],summaries});
-  replace([row,{...row,root_turn_id:'second',turn_index:2}]);
+  replace([row,{...row,root_turn_id:'second'}]);
   assert.equal(db.connection.prepare('SELECT count(*) n FROM projects').get()?.n,1);
   assert.equal(db.connection.prepare('SELECT count(*) n FROM sessions').get()?.n,1);
   assert.equal(db.queryTurnsCount({projectName:'%_',sessionName:'%_'}),2);
@@ -129,7 +129,7 @@ test('name choices page through every stored identity with stable ordering and p
   const db = new SummaryDatabase(':memory:');t.after(()=>db.close());
   const summaries: TurnSummaryInput[] = Array.from({length:125},(_,index)=>({
     provider:'codex',project_key:`/project-${index}`,project_name:'같은 프로젝트명',
-    session_id:`session-${index}`,session_name:index===124 ? null : '같은 세션명',root_turn_id:'request',turn_index:1,
+    session_id:`session-${index}`,session_name:index===124 ? null : '같은 세션명',root_turn_id:'request',
     started_at_ms:index,duration_quality:'missing',input_tokens:10,output_tokens:2,total_tokens:12,status:'in_progress',
   }));
   summaries.push({...summaries[0],provider:'claude'});

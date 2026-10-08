@@ -7,8 +7,12 @@ import { DatabaseSync } from 'node:sqlite';
 import { SummaryDatabase, periodBounds, type FileMetadata, type TurnSummaryInput } from '../../src/summary/db';
 import { SCHEMA_SQL, SCHEMA_VERSION, SCHEMA_MODEL_SQL, SCHEMA_CAPABILITY_SQL } from '../../src/summary/db/schema';
 
+const v8Schema = SCHEMA_SQL
+  .replace('  request_title TEXT,', '  request_title TEXT,\n  turn_index INTEGER NOT NULL,')
+  .replace('ON turn_summary(provider, session_id);', 'ON turn_summary(provider, session_id, turn_index);');
+
 // The pre-normalization schema stored the project label on every request.
-const legacySchema = SCHEMA_SQL
+const legacySchema = v8Schema
   .replace(SCHEMA_MODEL_SQL, '')
   .replace(SCHEMA_CAPABILITY_SQL, '')
   .replace(/CREATE TABLE IF NOT EXISTS projects[\s\S]*?WITHOUT ROWID;\s*CREATE TABLE IF NOT EXISTS sessions[\s\S]*?WITHOUT ROWID;/, '')
@@ -32,7 +36,7 @@ function metadata(index = 1, session = 'session-a', sourceRoot = '/synthetic/cla
 function turn(root = 'turn-a', override: Partial<Omit<TurnSummaryInput, 'model_usage' | 'capability_usage' | 'billing'>> = {}): Omit<TurnSummaryInput, 'model_usage' | 'capability_usage' | 'billing'> {
   return {
     provider: 'claude', project_key: '/synthetic/project-a', project_name: 'Project', session_id: 'session-a',
-    root_turn_id: root, turn_index: 1, started_at_ms: Date.parse('2026-10-03T00:00:00Z'),
+    root_turn_id: root, started_at_ms: Date.parse('2026-10-03T00:00:00Z'),
     completed_at_ms: Date.parse('2026-10-03T00:00:01Z'), duration_ms: 1000, duration_quality: 'exact',
     input_tokens: 100, output_tokens: 10, total_tokens: 110, status: 'completed',
     updated_at: '2026-10-03T00:00:02.000Z', ...override,
@@ -99,6 +103,8 @@ test('schema normalizes names and uses bounded disk staging cache', t => {
   assert.deepEqual(second.connection.prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name").all()
     .map(row => row.name), ['manifest', 'projects', 'session_billing', 'sessions', 'turn_capability_usage', 'turn_costs', 'turn_model_usage', 'turn_summary']);
   assert.equal(second.queryUsage()[0].total_tokens, 110);
+  assert.ok(second.connection.prepare('PRAGMA table_info(turn_summary)').all().every(column => column.name !== 'turn_index'));
+  assert.deepEqual(second.connection.prepare('PRAGMA index_info(idx_summary_session)').all().map(column => column.name), ['provider', 'session_id']);
   second.close();
 });
 
@@ -120,7 +126,7 @@ for (const version of [1,2]) test(`v${version} migration preserves summaries, ma
     legacy.exec(version===1 ? legacySchema.replace("'completed','in_progress','failed'","'completed','in_progress'") : legacySchema);
     legacy.exec(`PRAGMA user_version=${version}`);
     const file = {...metadata(),id:42,processing_status:'done',recorded_at:'2026-10-03T00:00:02.000Z'};
-    const summary = {...turn(),id:99,diagnostic_file_id:42,quality_flags:'duration-approximate',diagnostic_offset:12,last_error:'parse-error'};
+    const summary = {...turn(),turn_index:1,id:99,diagnostic_file_id:42,quality_flags:'duration-approximate',diagnostic_offset:12,last_error:'parse-error'};
     for (const [table,row] of [['manifest',file],['turn_summary',summary]] as const) {
       const keys = Object.keys(row);
       legacy.prepare(`INSERT INTO ${table} (${keys.join(',')}) VALUES (${keys.map(()=>'?').join(',')})`).run(...Object.values(row));
@@ -132,7 +138,8 @@ for (const version of [1,2]) test(`v${version} migration preserves summaries, ma
   db = new SummaryDatabase(dbPath);
   assert.deepEqual(db.connection.prepare('SELECT * FROM manifest').all(),beforeFiles);
   assert.deepEqual(db.queryTurns().map(row=>({...row})),beforeTurns.map(row=>({
-    ...row as object,session_name:null,cache_write_input_tokens:null,cache_read_input_tokens:null,has_recorded_usage:1,
+    ...Object.fromEntries(Object.entries(row as object).filter(([name]) => name !== 'turn_index')),
+    session_name:null,cache_write_input_tokens:null,cache_read_input_tokens:null,has_recorded_usage:1,
   })));
   assert.equal(db.connection.prepare('PRAGMA user_version').get()?.user_version,SCHEMA_VERSION);
   assert.deepEqual(db.connection.prepare('PRAGMA foreign_key_check').all(),[]);
@@ -156,7 +163,7 @@ test('migration rechecks the version after another window finishes the transitio
   });
   const legacy = new DatabaseSync(dbPath);
   legacy.exec(legacySchema);legacy.exec('PRAGMA user_version=2');
-  const row = turn();
+  const row = {...turn(),turn_index:1};
   const keys = Object.keys(row);
   legacy.prepare(`INSERT INTO turn_summary (${keys.join(',')}) VALUES (${keys.map(()=>'?').join(',')})`).run(...Object.values(row));
   legacy.close();
@@ -173,6 +180,101 @@ test('migration rechecks the version after another window finishes the transitio
     assert.equal(db.queryUsage()[0].total_tokens,110);
     assert.equal(db.connection.prepare('PRAGMA user_version').get()?.user_version,SCHEMA_VERSION);
   } finally { db.close(); }
+});
+
+test('v8 migration removes the ordinal while preserving every table and request reference', t => {
+  const parent = realpathSync(tmpdir());
+  const directory = mkdtempSync(join(parent, 'agent-tracker-db-ordinal-'));
+  const dbPath = join(directory, 'summary.sqlite');
+  let db: SummaryDatabase | undefined;
+  t.after(() => {
+    db?.close();
+    const target = resolve(directory);
+    assert.ok(target.startsWith(`${parent}${sep}`) && target.split(sep).at(-1)?.startsWith('agent-tracker-db-ordinal-'));
+    rmSync(target, { recursive: true, force: true });
+  });
+  const tables = ['manifest', 'projects', 'sessions', 'turn_summary', 'turn_model_usage', 'turn_costs', 'session_billing', 'turn_capability_usage'];
+  const snapshot = (connection: DatabaseSync) => tables.map(table => ({
+    table, rows: connection.prepare(`SELECT * FROM ${table} ORDER BY 1,2`).all().map(row =>
+      Object.fromEntries(Object.entries(row).filter(([name]) => name !== 'turn_index'))),
+  }));
+  const legacy = new DatabaseSync(dbPath);
+  let before: ReturnType<typeof snapshot>;
+  try {
+    legacy.exec(`PRAGMA foreign_keys=ON;
+      ${v8Schema}
+      PRAGMA user_version=8;
+      INSERT INTO manifest (id,provider,source_root,path,session_id,parser_version,capabilities_collected,processing_status,recorded_at)
+        VALUES (42,'claude','/synthetic','/synthetic/session.jsonl','session-a',13,1,'done','2026-10-03T00:00:02.000Z');
+      INSERT INTO projects VALUES ('/synthetic/project-a','Project');
+      INSERT INTO sessions VALUES ('claude','session-a','Session');
+      INSERT INTO turn_summary (id,provider,project_key,session_id,root_turn_id,request_title,turn_index,
+        started_at_ms,completed_at_ms,duration_ms,duration_quality,input_tokens,output_tokens,
+        cache_write_input_tokens,cache_read_input_tokens,total_tokens,status,quality_flags,
+        diagnostic_file_id,diagnostic_offset,last_error,updated_at)
+        VALUES (99,'claude','/synthetic/project-a','session-a','original-root','Stored title',17,
+          1790985600000,1790985601000,1000,'exact',100,10,30,50,110,'completed','duration-approximate',
+          42,12,'parse-error','2026-10-03T00:00:02.000Z');
+      INSERT INTO turn_model_usage VALUES (99,'claude-sonnet-4-6',100,10,30,50,0.0002475,'migration-fixture');
+      INSERT INTO turn_costs VALUES (99,'api',0.0002475,0,'migration-fixture');
+      INSERT INTO session_billing VALUES ('claude','session-a','api');
+      INSERT INTO turn_capability_usage VALUES (99,'skill','sample-skill',3),(99,'plugin','sample-plugin',2);`);
+    before = snapshot(legacy);
+  } finally { legacy.close(); }
+  db = new SummaryDatabase(dbPath);
+  assert.deepEqual(snapshot(db.connection), before);
+  assert.equal(db.connection.prepare('PRAGMA user_version').get()?.user_version, SCHEMA_VERSION);
+  assert.ok(db.connection.prepare('PRAGMA table_info(turn_summary)').all().every(column => column.name !== 'turn_index'));
+  assert.deepEqual(db.connection.prepare('PRAGMA index_info(idx_summary_session)').all().map(column => column.name), ['provider', 'session_id']);
+  assert.deepEqual(db.connection.prepare('PRAGMA foreign_key_check').all(), []);
+  assert.equal(db.queryTurns({ includeCosts: true }, { limit: 1, offset: 0 }, 'model')[0].id, 99);
+  assert.equal(db.queryUsage({ includeCosts: true })[0].cost_usd, 0.0002475);
+  assert.equal(db.queryUsage()[0].avg_duration_ms, 1000);
+  db.close(); db = new SummaryDatabase(dbPath);
+  assert.deepEqual(snapshot(db.connection), before, 'reopening does not repeat or discard migrated records');
+  const model = { model: 'claude-sonnet-4-6', input_tokens: 100, output_tokens: 10, cache_write_input_tokens: 30, cache_read_input_tokens: 50 };
+  const row: TurnSummaryInput = { ...turn('replacement', { cache_write_input_tokens: 30, cache_read_input_tokens: 50 }),
+    model_usage: [model], capability_usage: [{ category: 'skill', name: 'sample-skill', usage_count: 3 }] };
+  seed(db, [row]);
+  assert.equal(db.queryTurns()[0].root_turn_id, 'replacement');
+  assert.equal(db.queryTurns({ includeCosts: true })[0].billing_mode, 'api');
+  assert.equal(db.connection.prepare('SELECT usage_count FROM turn_capability_usage').get()?.usage_count, 3);
+  assert.deepEqual(db.connection.prepare('PRAGMA foreign_key_check').all(), []);
+});
+
+test('a failed ordinal migration rolls back the old index, version and data before retry', t => {
+  const parent = realpathSync(tmpdir());
+  const directory = mkdtempSync(join(parent, 'agent-tracker-db-ordinal-rollback-'));
+  const dbPath = join(directory, 'summary.sqlite');
+  t.after(() => {
+    const target = resolve(directory);
+    assert.ok(target.startsWith(`${parent}${sep}`) && target.split(sep).at(-1)?.startsWith('agent-tracker-db-ordinal-rollback-'));
+    rmSync(target, { recursive: true, force: true });
+  });
+  const previous = new SummaryDatabase(dbPath);
+  seed(previous);
+  previous.connection.exec(`ALTER TABLE turn_summary ADD COLUMN turn_index INTEGER NOT NULL DEFAULT 17;
+    DROP INDEX idx_summary_session;
+    CREATE INDEX idx_summary_session ON turn_summary(provider,session_id,turn_index);
+    CREATE VIEW ordinal_dependency AS SELECT turn_index FROM turn_summary;
+    PRAGMA user_version=8;`);
+  const before = previous.connection.prepare('SELECT * FROM turn_summary').all();
+  const schema = previous.connection.prepare('SELECT name,sql FROM sqlite_master ORDER BY name').all();
+  previous.close();
+  assert.throws(() => new SummaryDatabase(dbPath), /turn_index/);
+  const unchanged = new DatabaseSync(dbPath);
+  try {
+    assert.equal(unchanged.prepare('PRAGMA user_version').get()?.user_version, 8);
+    assert.deepEqual(unchanged.prepare('SELECT * FROM turn_summary').all(), before);
+    assert.deepEqual(unchanged.prepare('SELECT name,sql FROM sqlite_master ORDER BY name').all(), schema);
+    unchanged.exec('DROP VIEW ordinal_dependency');
+  } finally { unchanged.close(); }
+  const retried = new SummaryDatabase(dbPath);
+  try {
+    assert.equal(retried.queryTurns()[0].total_tokens, 110);
+    assert.equal(retried.connection.prepare('PRAGMA user_version').get()?.user_version, SCHEMA_VERSION);
+    assert.deepEqual(retried.connection.prepare('PRAGMA index_info(idx_summary_session)').all().map(column => column.name), ['provider', 'session_id']);
+  } finally { retried.close(); }
 });
 
 test('discovery and failure preserve accepted metadata and previous successful values', t => {

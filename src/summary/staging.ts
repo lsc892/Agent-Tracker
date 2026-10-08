@@ -290,8 +290,7 @@ export class SummaryStaging {
         coalesce((SELECT sum(min(w.input,w.cache_read)) FROM winners w WHERE w.provider=r.provider AND w.session_id=r.session_id AND w.root_id=r.root_id),0) cache_read_input_tokens,
         coalesce((SELECT sum(min(max(0,w.input-w.cache_read),w.cache_write)) FROM winners w WHERE w.provider=r.provider AND w.session_id=r.session_id AND w.root_id=r.root_id),0) cache_write_input_tokens,
         (SELECT group_concat(DISTINCT x.flag) FROM flags x JOIN scan_files sf ON sf.id=x.file_id
-          WHERE sf.provider=r.provider AND sf.session_id=r.session_id AND (x.root_id=r.root_id OR x.root_id='*')) flags,
-        row_number() OVER(PARTITION BY r.provider,r.session_id ORDER BY r.started IS NULL,r.started,r.root_id) turn_index
+          WHERE sf.provider=r.provider AND sf.session_id=r.session_id AND (x.root_id=r.root_id OR x.root_id='*')) flags
       FROM roots r JOIN scan_files f ON f.id=coalesce(
         (SELECT sf.id FROM scan_files sf WHERE sf.provider=r.provider AND sf.session_id=r.session_id AND sf.is_main=1 AND sf.removed=0 ORDER BY sf.id LIMIT 1),r.file_id)
       LEFT JOIN outcomes o ON o.provider=r.provider AND o.session_id=r.session_id AND o.root_id=r.root_id AND o.rank=1
@@ -313,7 +312,7 @@ export class SummaryStaging {
           last_assistant:number|null;completed:number;explicit_duration:number|null;lifecycle:number;file_id:number;byte_offset:number;has_main:number;
           latest_status:TurnSummaryInput['status']|null;latest_status_at:number|null;latest_status_quality:TurnSummaryInput['duration_quality']|null;
           project_key:string;project_name:string;input_tokens:number;output_tokens:number;billing:import('./db/types').BillingMode;
-          cache_read_input_tokens:number;cache_write_input_tokens:number;flags:string|null;turn_index:number;request_title:string|null};
+          cache_read_input_tokens:number;cache_write_input_tokens:number;flags:string|null;request_title:string|null};
         after = row.cursor;
         let duration: number | null = null;
         let quality: TurnSummaryInput['duration_quality'] = 'missing';
@@ -332,7 +331,7 @@ export class SummaryStaging {
         if (!row.has_main) flags.add('missing-root-turn');
         const name = sessionName.get(row.provider,row.session_id,row.provider,row.session_id)?.name as string | null;
         yield { provider:row.provider,project_key:row.project_key,project_name:row.project_name,session_id:row.session_id,session_name:name,
-          root_turn_id:row.root_id,request_title:row.request_title,turn_index:row.turn_index,started_at_ms:row.started,completed_at_ms:completedAt,
+          root_turn_id:row.root_id,request_title:row.request_title,started_at_ms:row.started,completed_at_ms:completedAt,
           duration_ms:duration,duration_quality:quality,input_tokens:row.input_tokens,output_tokens:row.output_tokens,
           cache_read_input_tokens:row.cache_read_input_tokens,cache_write_input_tokens:row.cache_write_input_tokens,
           model_usage:this.modelUsage(row.provider,row.session_id,row.root_id),

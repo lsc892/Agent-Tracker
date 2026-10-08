@@ -112,7 +112,7 @@ test('cost estimates charge each cache component once, match model snapshots and
 });
 
 const summary = (root: string, model: string): TurnSummaryInput => ({
-  provider:'claude',project_key:'/project',project_name:'Project',session_id:'s',root_turn_id:root,turn_index:1,
+  provider:'claude',project_key:'/project',project_name:'Project',session_id:'s',root_turn_id:root,
   duration_quality:'missing',input_tokens:100,output_tokens:10,total_tokens:110,status:'completed',
   model_usage:[{model,input_tokens:100,output_tokens:10,cache_read_input_tokens:0,cache_write_input_tokens:0}],
 });

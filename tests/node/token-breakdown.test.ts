@@ -104,6 +104,9 @@ test('v3 migration preserves totals and marks cache counts unknown until unchang
   await refreshSummary(state.database, state.options);
   state.database.connection.exec(`ALTER TABLE turn_summary DROP COLUMN cache_write_input_tokens;
     ALTER TABLE turn_summary DROP COLUMN cache_read_input_tokens;
+    ALTER TABLE turn_summary ADD COLUMN turn_index INTEGER NOT NULL DEFAULT 1;
+    DROP INDEX idx_summary_session;
+    CREATE INDEX idx_summary_session ON turn_summary(provider,session_id,turn_index);
     UPDATE manifest SET parser_version=4;
     PRAGMA user_version=3;`);
   state.database.close();
@@ -128,7 +131,7 @@ test('aggregate cache counts stay unknown when any included turn has not been re
   await refreshSummary(database, options);
   database.connection.exec('UPDATE turn_summary SET cache_write_input_tokens=NULL,cache_read_input_tokens=NULL');
   const old = database.queryTurns()[0];
-  const next: TurnSummaryInput = { ...old, root_turn_id: 'next', turn_index: 2, cache_write_input_tokens: 30, cache_read_input_tokens: 60 };
+  const next: TurnSummaryInput = { ...old, root_turn_id: 'next', cache_write_input_tokens: 30, cache_read_input_tokens: 60 };
   database.replaceSessions({ sessions: [{ provider: 'claude', session_id: 'session' }], files: [], summaries: [old, next] });
   const usage = database.queryUsage()[0];
   assert.equal(usage.total_tokens, 400);
