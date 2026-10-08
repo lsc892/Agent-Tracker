@@ -39,7 +39,9 @@
     "vscode:prepublish": "npm run build",
     "package": "vsce package --no-dependencies --allow-missing-repository --skip-license",
     "benchmark": "npm run build && node tests/benchmarks/summary.cjs",
-    "benchmark:quota": "npm run build && node tests/benchmarks/quota/benchmark.cjs"
+    "benchmark:quota": "npm run build && node tests/benchmarks/quota/benchmark.cjs",
+    "benchmark:titles": "npm run build && node tests/benchmarks/request-titles.cjs",
+    "benchmark:transactions": "npm run build && node tests/benchmarks/summary-transactions.cjs"
   },
   "contributes": {
     "commands": [

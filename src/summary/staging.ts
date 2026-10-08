@@ -225,6 +225,8 @@ export class SummaryStaging {
         CROSS JOIN events e ON e.file_id=f.id WHERE f.removed=0 AND f.failed=0;
       CREATE INDEX temp.component_events_response ON component_events(kind,response_id,request_id);
       CREATE INDEX temp.component_events_turn ON component_events(kind,thread_id,turn_id,id);
+      CREATE INDEX temp.component_request_title ON component_events(root_id,id)
+        WHERE is_main=1 AND request_title IS NOT NULL;
       DROP TABLE IF EXISTS temp.winners;
       CREATE TEMP TABLE winners AS
       WITH candidates AS (
