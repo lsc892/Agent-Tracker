@@ -26,6 +26,36 @@ function seed(db: SummaryDatabase, rows: TurnSummaryInput[]): void {
   db.replaceSessions({ sessions: sessions.values(), files: [], summaries: rows });
 }
 
+test('empty unknown requests stay in all table groups but are excluded from averages and all chart metrics', t => {
+  const db = database(t, [
+    turn(0, { input_tokens: 0, output_tokens: 0, cache_write_input_tokens: 0, cache_read_input_tokens: 0, total_tokens: 0, duration_ms: 9000 }),
+    turn(1),
+    turn(2, { input_tokens: 0, output_tokens: 0, cache_write_input_tokens: 0, cache_read_input_tokens: 0, total_tokens: 0, duration_ms: 3000,
+      model_usage: [{ model: 'known-zero', input_tokens: 0, output_tokens: 0, cache_write_input_tokens: 0, cache_read_input_tokens: 0 }] }),
+  ]);
+  for (const by of ['provider', 'model'] as const) {
+    for (const group of ['total', 'day', 'month', 'project', 'session'] as const) {
+      const full = db.queryUsage({}, group, 'UTC', {}, by);
+      const selected = db.queryUsage({ excludeEmptyUsage: true }, group, 'UTC', {}, by);
+      assert.equal(selected.length, full.length, 'table retains every group');
+      assert.equal(selected.reduce((n, r) => n + r.turn_count, 0), 3);
+      for (const metric of ['tokens', 'requests', 'averageTokens', 'averageDuration'] as const) {
+        const chart = db.queryUsageChart({ excludeEmptyUsage: true }, group, 'UTC', metric, by);
+        assert.equal(chart.rows.reduce((n, r) => n + ('turn_count' in r ? r.turn_count : 1), 0), 2);
+      }
+    }
+    assert.equal(db.queryTurns({ excludeEmptyUsage: true }, {}, by).length, 3);
+    assert.equal(db.queryUsageChart({ excludeEmptyUsage: true }, 'turn', 'UTC', 'tokens', by).rows.length, 2);
+    assert.equal(db.queryUsageChart({}, 'turn', 'UTC', 'tokens', by).rows.length, 3);
+  }
+  const included = db.queryUsage()[0];
+  const excluded = db.queryUsage({ excludeEmptyUsage: true })[0];
+  assert.equal(included.avg_tokens_per_turn, 50);
+  assert.equal(excluded.avg_tokens_per_turn, 75);
+  assert.equal(excluded.avg_duration_ms, 2000);
+  assert.equal(excluded.turns_with_duration, 2);
+});
+
 test('chart ranks the entire matching project/session scope by the selected metric', t => {
   const rows = Array.from({ length: 130 }, (_, index) => turn(index, {
     project_key: `/project-${index}`, project_name: `Project ${index}`, session_id: `session-${index}`,
@@ -319,22 +349,22 @@ test('model charts and tables display compact model names with provider markers 
     assert.doesNotMatch(view.get('usage-table').textContent,/제공자|Claude/);
   }
   view.render('all','total','tokens',[{...row,model:''}],'model');
-  assert.match(view.get('usage-table').textContent,/모델 미상/);
+  assert.match(view.get('usage-table').textContent,/미상/);
   view.render('all','total','tokens',[{...row,model:'gpt-6.1-sol'}],'model');
   assert.match(view.get('usage-table').textContent,/gpt-6\.1-sol/);
   view.render('all','total','tokens',[turn(0)],'provider');
   assert.match(view.get('usage-table').textContent,/제공자.*Claude/);
 });
 
-test('model charts and tables distinguish unrecorded usage from unknown models in every grouping', () => {
+test('model charts and tables label both unrecorded usage and unknown models as 미상 in every grouping', () => {
   const view = ui();
   const unknown = {...turn(0),model:'',period:'2026-01-01'};
   const empty = {...turn(1),model:null,input_tokens:0,output_tokens:0,total_tokens:0,cache_write_input_tokens:0,cache_read_input_tokens:0,period:'2026-01-01'};
   for (const [group,mode] of [['day','calendar'],['month','calendar'],['project','ranking'],['session','ranking'],['all','total'],['turn','turn']]) {
     view.render(group,mode,'tokens',[unknown,empty],'model');
     for (const id of ['usage-chart','usage-table']) {
-      assert.match(view.get(id).textContent,/모델 미상/);
-      assert.match(view.get(id).textContent,/사용량 기록 없음/);
+      assert.match(view.get(id).textContent,/미상/);
+      assert.doesNotMatch(view.get(id).textContent,/사용량 기록 없음|모델 미상/);
     }
   }
 });

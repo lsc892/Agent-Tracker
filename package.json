@@ -121,6 +121,12 @@
           "default": true,
           "description": "Codex 상태 표시줄을 표시합니다. 숨겨도 quota 조회는 유지합니다."
         },
+        "agentTracker.usage.excludeEmptyUsage": {
+          "type": "boolean",
+          "default": true,
+          "order": 13,
+          "description": "모델 미상이며 토큰 사용량도 없는 요청을 도표와 평균 계산에서 제외합니다. 하단 표에는 계속 표시합니다. 모델을 확인할 수 있는 0토큰 기록과 모델 미상인 실제 토큰 사용량은 포함합니다."
+        },
         "agentTracker.quota.pollingIntervalSeconds": {
           "type": "number",
           "minimum": 30,

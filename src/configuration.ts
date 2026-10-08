@@ -14,6 +14,7 @@ export interface TrackerConfiguration {
   usageEnabled: boolean;
   skillsEnabled: boolean;
   showApiCosts: boolean;
+  excludeEmptyUsage: boolean;
   claude: { enabled: boolean; dataHome: string };
   codex: { enabled: boolean; dataHome: string; executable: string; showStatusBar: boolean };
   roots: SourceRoot[];
@@ -56,6 +57,7 @@ export function readConfiguration(settings: SettingsReader): TrackerConfiguratio
     usageEnabled: settings.get('usage.enabled', true),
     skillsEnabled: settings.get('usage.skillsEnabled', true),
     showApiCosts: settings.get('usage.showApiCosts', false),
+    excludeEmptyUsage: settings.get('usage.excludeEmptyUsage', true),
     claude: { enabled: enabled.claude, dataHome: claudeHome },
     codex: { enabled: enabled.codex, dataHome: codexHome, executable: settings.get('codex.executable', 'codex'), showStatusBar: settings.get('codex.showStatusBar', true) },
     roots: [

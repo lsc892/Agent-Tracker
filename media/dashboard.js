@@ -208,8 +208,7 @@
   const providerLabel = provider => provider === 'claude' ? 'Claude' : 'Codex';
   const providerClass = provider => `chart-provider-${provider}`;
   const modelLabel = row => row.other_models ? `기타 모델 (${providerLabel(row.provider)})`
-    : row.model === null ? '사용량 기록 없음'
-      : (row.model || '모델 미상').replace(/^claude-(opus|sonnet|haiku)-(\d+)-(\d+)(?:-\d{8})?$/, '$1$2.$3');
+    : (row.model || '미상').replace(/^claude-(opus|sonnet|haiku)-(\d+)-(\d+)(?:-\d{8})?$/, '$1$2.$3');
   const seriesLabel = row => row.model !== undefined ? modelLabel(row) : providerLabel(row.provider);
   function providerMarker(provider, attributes = {}) {
     return svgElement('rect', { width: 8, height: 8, class: `provider-marker ${providerClass(provider)}`, 'aria-hidden': 'true', ...attributes });
@@ -410,7 +409,7 @@
         const page = result.capabilities[category];
         const maximum = Math.max(1, ...(page.chartRows ?? page.rows).map(row => row.usage_count));
         table($(`${category}-table`), ['제공자', '이름', '사용 횟수', '전체 비율'],
-          page.rows.map(row => [providerLabel(row.provider), row.name || '모델 미상', number(row.usage_count), capabilityRatio(row, maximum, page.totalUses)]));
+          page.rows.map(row => [providerLabel(row.provider), row.name || '미상', number(row.usage_count), capabilityRatio(row, maximum, page.totalUses)]));
         $(`${category}-total`).textContent = `전체 ${number(page.totalUses)}회`;
         $(`${category}-previous`).disabled = capabilityOffsets[category] === 0;
         $(`${category}-next`).disabled = capabilityOffsets[category] + page.rows.length >= page.total;

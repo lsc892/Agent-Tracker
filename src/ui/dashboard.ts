@@ -181,7 +181,8 @@ export class Dashboard implements vscode.Disposable {
     const version = ++this.queryVersion;
     const settings = this.dependencies.settings();
     const timezone = settings.timezone;
-    const query = { ...this.query, timezone, providers: this.providers(), includeCosts: settings.showApiCosts };
+    const query = { ...this.query, timezone, providers: this.providers(), includeCosts: settings.showApiCosts,
+      excludeEmptyUsage: settings.excludeEmptyUsage };
     if (this.fromDay) query.fromMs = periodBounds(this.fromDay, timezone).fromMs;
     if (this.toDay) query.toMs = periodBounds(this.toDay, timezone).toMs;
     if (query.fromMs !== undefined && query.toMs !== undefined && query.fromMs >= query.toMs) throw new Error('조회 시작일은 종료일보다 늦을 수 없습니다.');

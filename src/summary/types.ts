@@ -15,6 +15,7 @@ export interface UsageQuery {
   section?: 'tokens' | 'skills';
   capabilityOffsets?: Partial<Record<import('./db/types').CapabilityCategory, number>>;
   includeCosts?: boolean;
+  excludeEmptyUsage?: boolean;
   groupBy?: 'day' | 'month' | 'project' | 'session' | 'all' | 'turn';
   timezone?: string;
   fromMs?: number;

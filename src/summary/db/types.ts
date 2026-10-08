@@ -104,6 +104,9 @@ export interface SessionReplacement {
 }
 
 export interface SummaryFilter {
+  excludeEmptyUsage?: boolean;
+  /** Internal chart scope; table rows are retained. */
+  omitEmptyUsage?: boolean;
   includeCosts?: boolean;
   provider?: Provider;
   providers?: Provider[];

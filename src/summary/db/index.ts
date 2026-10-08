@@ -41,7 +41,7 @@ const MODEL_NAME = `CASE WHEN coalesce(m.model,'')='' AND coalesce(m.input_token
   THEN NULL ELSE coalesce(m.model,'') END AS model`;
 // One row per request/model; older summaries retain all reported tokens.
 const modelTurns = (costs = false): string => `(SELECT t.id,t.provider,t.project_key,t.session_id,t.root_turn_id,t.turn_index,
-  t.request_title,
+  t.request_title,coalesce(m.model,'')<>'' AS has_model,
   t.started_at_ms,t.completed_at_ms,t.duration_ms,t.duration_quality,t.status,t.quality_flags,
   t.diagnostic_file_id,t.diagnostic_offset,t.last_error,t.updated_at,${MODEL_NAME},
   coalesce(m.input_tokens,t.input_tokens) AS input_tokens,coalesce(m.output_tokens,t.output_tokens) AS output_tokens,
@@ -55,7 +55,8 @@ const modelTurns = (costs = false): string => `(SELECT t.id,t.provider,t.project
 const usageTurns = (costs = false, by: 'provider' | 'model' = 'provider'): string => {
   if (by === 'model') return modelTurns(costs);
   if (by !== 'provider') throw new RangeError('Unknown usage grouping basis');
-  return costs ? COSTED_TURNS : 'turn_summary';
+  return `(SELECT t.*,EXISTS(SELECT 1 FROM turn_model_usage m WHERE m.turn_id=t.id AND m.model<>'') AS has_model
+    FROM ${costs ? COSTED_TURNS : 'turn_summary'} t)`;
 };
 const namedTurns = (costs = false, by: 'provider' | 'model' = 'provider'): string => `(SELECT t.*, p.project_name, s.session_name FROM ${usageTurns(costs,by)} t
   JOIN projects p ON p.project_key=t.project_key
@@ -64,20 +65,24 @@ const NAMED_TURNS = namedTurns();
 const COST_SUMS = `SUM(cost_usd) AS cost_usd,SUM(unknown_costs) AS unknown_costs,
   CASE WHEN min(billing_mode)=max(billing_mode) THEN min(billing_mode) ELSE 'unknown' END AS billing_mode`;
 
-const USAGE_SUMS = `SUM(input_tokens) AS input_tokens, SUM(output_tokens) AS output_tokens,
+const RECORDED_USAGE = '(total_tokens>0 OR has_model=1)';
+function usageSums(exclude = false): string {
+  const completed = `status = 'completed'${exclude ? ` AND ${RECORDED_USAGE}` : ''}`;
+  return `SUM(input_tokens) AS input_tokens, SUM(output_tokens) AS output_tokens,
   CASE WHEN COUNT(cache_write_input_tokens) = COUNT(*) THEN SUM(cache_write_input_tokens) END AS cache_write_input_tokens,
   CASE WHEN COUNT(cache_read_input_tokens) = COUNT(*) THEN SUM(cache_read_input_tokens) END AS cache_read_input_tokens,
   SUM(total_tokens) AS total_tokens, COUNT(*) AS turn_count,
   SUM(status = 'completed') AS completed_turns,
-  AVG(CASE WHEN status = 'completed' THEN total_tokens END) AS avg_tokens_per_turn,
-  AVG(CASE WHEN status = 'completed' THEN duration_ms END) AS avg_duration_ms,
-  SUM(status = 'completed' AND duration_ms IS NOT NULL) AS turns_with_duration,
-  SUM(status = 'completed' AND duration_quality = 'exact') AS exact_duration_turns,
-  SUM(status = 'completed' AND duration_quality = 'derived') AS derived_duration_turns,
-  SUM(status = 'completed' AND duration_quality = 'approximate') AS approximate_duration_turns,
-  SUM(status = 'completed' AND duration_ms IS NULL) AS missing_duration_turns,
+  AVG(CASE WHEN ${completed} THEN total_tokens END) AS avg_tokens_per_turn,
+  AVG(CASE WHEN ${completed} THEN duration_ms END) AS avg_duration_ms,
+  SUM(${completed} AND duration_ms IS NOT NULL) AS turns_with_duration,
+  SUM(${completed} AND duration_quality = 'exact') AS exact_duration_turns,
+  SUM(${completed} AND duration_quality = 'derived') AS derived_duration_turns,
+  SUM(${completed} AND duration_quality = 'approximate') AS approximate_duration_turns,
+  SUM(${completed} AND duration_ms IS NULL) AS missing_duration_turns,
   SUM(started_at_ms IS NULL) AS unknown_time_turns,
   SUM(last_error IS NOT NULL) AS stale_turns, MAX(updated_at) AS last_successful_update`;
+}
 
 function turnValues(row: TurnSummaryInput, now: string): SQLInputValue[] {
   for (const name of ['input_tokens', 'output_tokens', 'total_tokens', 'turn_index'] as const) {
@@ -103,6 +108,7 @@ function turnValues(row: TurnSummaryInput, now: string): SQLInputValue[] {
 
 function whereClause(filter: SummaryFilter): { sql: string; values: SQLInputValue[] } {
   const clauses: string[] = [];
+  if (filter.omitEmptyUsage) clauses.push(RECORDED_USAGE);
   const values: SQLInputValue[] = [];
   if (filter.providers) {
     clauses.push(filter.providers.length ? `provider IN (${filter.providers.map(() => '?').join(',')})` : '0 = 1');
@@ -434,8 +440,10 @@ export class SummaryDatabase {
     const where = whereClause(filter);
     const after = nonnegative(page.afterId ?? 0, 'afterId');
     const offset = nonnegative(page.offset ?? 0, 'offset');
-    return this.connection.prepare(`SELECT * FROM ${namedTurns(filter.includeCosts,by)} AS turn_summary WHERE ${where.sql} AND id > ? ORDER BY id${by === 'model' ? ',model' : ''} LIMIT ? OFFSET ?`)
-      .all(...where.values, after, pageLimit(page.limit), offset) as unknown as TurnSummaryRow[];
+    const rows = this.connection.prepare(`SELECT * FROM ${namedTurns(filter.includeCosts,by)} AS turn_summary WHERE ${where.sql} AND id > ? ORDER BY id${by === 'model' ? ',model' : ''} LIMIT ? OFFSET ?`)
+      .all(...where.values, after, pageLimit(page.limit), offset);
+    for (const row of rows) delete row.has_model;
+    return rows as unknown as TurnSummaryRow[];
   }
 
   private saveTurnCost(id: SQLInputValue, mode: BillingMode): void {
@@ -561,7 +569,7 @@ export class SummaryDatabase {
       ${groupBy === 'session' ? '(SELECT session_name FROM sessions s WHERE s.provider=turn_summary.provider AND s.session_id=turn_summary.session_id)' : 'NULL'} AS session_name,
       ${groupBy === 'session' ? '(SELECT MIN(t.started_at_ms) FROM turn_summary t WHERE t.provider=turn_summary.provider AND t.session_id=turn_summary.session_id)' : 'NULL'} AS session_started_at_ms,
       ${period} AS period,
-      ${USAGE_SUMS}${filter.includeCosts ? `,${COST_SUMS}` : ''}
+      ${usageSums(filter.excludeEmptyUsage)}${filter.includeCosts ? `,${COST_SUMS}` : ''}
       FROM ${usageTurns(filter.includeCosts,by)} AS turn_summary WHERE ${where.sql}
       GROUP BY ${groups.join(', ')} ORDER BY ${order} LIMIT ? OFFSET ?`)
       .all(...prefix, ...where.values, pageLimit(page.limit), nonnegative(page.offset ?? 0, 'offset')) as unknown as UsageRow[];
@@ -569,6 +577,7 @@ export class SummaryDatabase {
 
   /** Bounded chart data is computed from the entire filter, independently of table pagination. */
   queryUsageChart(filter: SummaryFilter, groupBy: UsageGrouping | 'all' | 'turn', timezone: string, metric: ChartMetric, by: 'provider' | 'model' = 'provider'): UsageChart {
+    if (filter.excludeEmptyUsage) filter = { ...filter, omitEmptyUsage: true };
     if (!['tokens', 'requests', 'averageTokens', 'averageDuration'].includes(metric)) throw new RangeError('Unknown chart metric');
     if (by === 'model') return this.queryModelChart(filter, groupBy, timezone, metric);
     if (by !== 'provider') throw new RangeError('Unknown chart grouping');
@@ -590,7 +599,7 @@ export class SummaryDatabase {
     // At most 30 chronological bins per provider. Average raw completed turns,
     // never averages of daily averages; undated turns retain their own bin.
     const rows = this.connection.prepare(`WITH filtered AS (
-      SELECT *, agent_tracker_period(started_at_ms, ?, ?) AS chart_period FROM turn_summary WHERE ${where.sql}
+      SELECT *, agent_tracker_period(started_at_ms, ?, ?) AS chart_period FROM ${usageTurns()} AS turn_summary WHERE ${where.sql}
     ), periods AS (
       SELECT chart_period, NTILE(30) OVER (ORDER BY chart_period) AS bucket
       FROM (SELECT DISTINCT chart_period FROM filtered WHERE chart_period IS NOT NULL)
@@ -601,7 +610,7 @@ export class SummaryDatabase {
       NULL AS session_name, NULL AS session_started_at_ms,
       CASE WHEN first_period = last_period THEN first_period
         ELSE first_period || ' ~ ' || last_period END AS period,
-      COALESCE(ranges.period_count, 0) AS period_count, ${USAGE_SUMS}
+      COALESCE(ranges.period_count, 0) AS period_count, ${usageSums(filter.excludeEmptyUsage)}
       FROM filtered LEFT JOIN periods USING (chart_period) LEFT JOIN ranges USING (bucket)
       GROUP BY bucket, provider ORDER BY bucket IS NULL, bucket, provider`)
       .all(timezone, grouping, ...where.values) as unknown as UsageRow[];
@@ -624,6 +633,7 @@ export class SummaryDatabase {
       FROM filtered WHERE model<>'' GROUP BY provider,model
     ), bounded AS (
       SELECT id,provider,project_key,session_id,root_turn_id,turn_index,request_title,started_at_ms,status,duration_ms,duration_quality,
+        max(has_model) AS has_model,
         last_error,updated_at,chart_period,CASE WHEN rank>8 THEN '' ELSE model END AS model,
         CASE WHEN rank>8 THEN 1 ELSE 0 END AS other_models,
         SUM(input_tokens) AS input_tokens,SUM(output_tokens) AS output_tokens,
@@ -661,7 +671,7 @@ export class SummaryDatabase {
       ${groupBy === 'session' ? '(SELECT session_name FROM sessions s WHERE s.provider=bounded.provider AND s.session_id=bounded.session_id)' : 'NULL'} AS session_name,
       NULL AS session_started_at_ms,
       ${calendar ? "CASE WHEN first_period=last_period THEN first_period ELSE first_period || ' ~ ' || last_period END" : 'NULL'} AS period,
-      ${calendar ? 'coalesce(ranges.period_count,0)' : '0'} AS period_count,${USAGE_SUMS}
+      ${calendar ? 'coalesce(ranges.period_count,0)' : '0'} AS period_count,${usageSums(filter.excludeEmptyUsage)}
       FROM bounded ${calendar ? 'LEFT JOIN periods USING(chart_period) LEFT JOIN ranges USING(bucket)' : ''}
       GROUP BY ${calendar ? 'bucket,provider,model,other_models' : groups.join(',')}
       ORDER BY ${calendar ? 'bucket IS NULL,bucket,provider,other_models,model' : `${metricColumns[metric]} DESC,${groups.join(',')}`}
