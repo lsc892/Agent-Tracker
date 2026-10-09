@@ -23,6 +23,7 @@
 - 설치 경로 탐색 테스트는 반환값과 기대값 모두 물리 경로 기준으로 비교한다. macOS의 `/var`·`/private/var`처럼 같은 디렉터리를 가리키는 별칭은 문자열 차이만으로 실패하지 않으며, 명시적으로 선택한 설치와 잘못된 대상의 거부는 계속 검증한다.
 - 상태바 command와 Webview 이벤트 연결은 자동 검증하고, 화면 가독성과 실제 로그인·원격 quota 연동은 수동 확인한다.
 - `npm run test:vscode`는 별도 프로필에서 실제 확장을 활성화하고 합성 로그로 탭·필터·빈 상태·테마 적용을 검증한다. Linux CI는 Xvfb를 사용하며 결과 JSON과 확장 호스트 로그를 artifact로 보관한다.
+- 화면 테스트는 실행 중인 VS Code의 내장 테마 ID를 확인해 dark/light Modern·고대비 테마를 반드시 검증한다. `Dark 2026`·`Light 2026`은 해당 버전에 제공되는 경우 추가 검증하고, 테마 종류가 실제 적용된 뒤 화면을 연다.
 - 빠른 CI 실패는 릴리스 패키징을 막는다. benchmark는 별도 workflow에서 측정하고 기준 초과를 보고한다. 절대 시간 기준은 실행 환경별 측정 후 정한다.
 - 테스트 결과, benchmark 측정값과 릴리스 VSIX·npm tarball은 workflow artifact로 보관한다. `npm run package:npm`은 현재 소스의 VSIX와 분리된 설치 CLI manifest를 사용하고 tarball의 ID·버전·다섯 파일 목록을 확인한다. Windows·Linux·macOS의 verify job과 릴리스 job에서 같은 패키징 명령을 실행하며 registry 인증이나 실제 게시를 CI에 포함하지 않는다. 외부 자동 배포를 연결할 때도 동일 commit의 검증 통과를 조건으로 한다.
 

@@ -12,6 +12,26 @@ export async function run(): Promise<void> {
   const extensionRoot = resolve(__dirname, '../../..');
   const extension = vscode.extensions.getExtension('agent-tracker.agent-tracker');
   assert.ok(extension, 'Extension is discoverable by VS Code');
+  const themes = vscode.extensions.getExtension('vscode.theme-defaults')?.packageJSON.contributes.themes as
+    { id: string; uiTheme: string }[] | undefined;
+  assert.ok(themes, 'Built-in themes are discoverable');
+  const themeCase = (ids: string[], uiTheme: string, css: string, kind: vscode.ColorThemeKind) => {
+    const theme = themes.find(theme => ids.includes(theme.id) && theme.uiTheme === uiTheme);
+    assert.ok(theme, `A supported theme is available: ${ids.join(', ')}`);
+    return { name: theme.id, css, kind };
+  };
+  const darkTheme = themeCase(['Dark Modern', 'Default Dark Modern'], 'vs-dark', 'vscode-dark', vscode.ColorThemeKind.Dark);
+  const lightTheme = themeCase(['Light Modern', 'Default Light Modern'], 'vs', 'vscode-light', vscode.ColorThemeKind.Light);
+  const contrastTheme = themeCase(['Default High Contrast'], 'hc-black', 'vscode-high-contrast', vscode.ColorThemeKind.HighContrast);
+  const colorThemes = [darkTheme, lightTheme, contrastTheme];
+  for (const theme of themes) {
+    if (theme.id === 'Dark 2026') colorThemes.push({ name: theme.id, css: 'vscode-dark', kind: vscode.ColorThemeKind.Dark });
+    if (theme.id === 'Light 2026') colorThemes.push({ name: theme.id, css: 'vscode-light', kind: vscode.ColorThemeKind.Light });
+  }
+  const applyTheme = async (theme: typeof darkTheme): Promise<void> => {
+    await vscode.workspace.getConfiguration('workbench').update('colorTheme', theme.name, vscode.ConfigurationTarget.Global);
+    await until(() => vscode.window.activeColorTheme.kind === theme.kind, `theme application: ${theme.name}`);
+  };
   const htmlModule = require(join(extensionRoot, 'dist/src/ui/html')) as typeof import('../../src/ui/html');
   const protocol = require(join(extensionRoot, 'dist/src/ui/presentation')) as typeof import('../../src/ui/presentation');
   const tooltipModule = require(join(extensionRoot, 'dist/src/ui/quotaTooltip')) as typeof import('../../src/ui/quotaTooltip');
@@ -422,15 +442,14 @@ export async function run(): Promise<void> {
     await vscode.commands.executeCommand('agentTracker.refreshQuota');
     assert.equal(countFiles(), 0, 'combined quota refresh does not scan');
     assert.equal(scanCount, 0, 'combined quota refresh never invokes summary.refresh');
-    for (const theme of [{ name: 'Default Dark Modern', css: 'vscode-dark' }, { name: 'Default Light Modern', css: 'vscode-light' }]) {
+    for (const theme of [darkTheme, lightTheme]) {
       expectedTheme = theme.css;
       expectTimezoneWarning = theme.css === 'vscode-dark';
       const scansBefore: number = scanCount;
       const filesBefore = countFiles();
       await vscode.commands.executeCommand('workbench.action.closePanel');
       await vscode.workspace.getConfiguration('agentTracker').update('usage.timezone', expectTimezoneWarning ? 'Not/A_Timezone' : 'Asia/Seoul', vscode.ConfigurationTarget.Global);
-      await vscode.workspace.getConfiguration('workbench').update('colorTheme', theme.name, vscode.ConfigurationTarget.Global);
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await applyTheme(theme);
       const completed = new Promise<void>((resolveReport, reject) => {
         const timeout = setTimeout(() => reject(new Error(`Webview smoke timed out (${theme.css})`)), 30_000);
         onReport = message => {
@@ -459,11 +478,10 @@ export async function run(): Promise<void> {
       onReport = undefined;
       await vscode.commands.executeCommand('workbench.action.closeAllEditors');
     }
-    for (const theme of [{name:'Dark 2026',css:'vscode-dark'}, {name:'Light 2026',css:'vscode-light'},
-      {name:'Dark Modern',css:'vscode-dark'}, {name:'Default High Contrast',css:'vscode-high-contrast'}]) {
+    for (const theme of colorThemes) {
       expectedTheme=theme.css;
       const before:number=scanCount;
-      await vscode.workspace.getConfiguration('workbench').update('colorTheme',theme.name,vscode.ConfigurationTarget.Global);
+      await applyTheme(theme);
       await vscode.workspace.getConfiguration('agentTracker').update('display.colorMode','automatic',vscode.ConfigurationTarget.Global);
       await vscode.workspace.getConfiguration('agentTracker').update('display.customColor','#ffffff',vscode.ConfigurationTarget.Global);
       await new Promise(resolve=>setTimeout(resolve,500));
