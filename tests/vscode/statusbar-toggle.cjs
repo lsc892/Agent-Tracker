@@ -116,10 +116,62 @@ async function verifyStatusColors(cdp, settingsPath, resultDirectory, appRoot) {
   return observations;
 }
 
+async function verifyStatusLocalization(cdp, settingsPath, root, editor) {
+  const settings = JSON.parse(readFileSync(settingsPath, 'utf8'));
+  const languages = JSON.parse(readFileSync(join(root, 'localization', 'languages.json'), 'utf8'));
+  const observations = [];
+  const cardText = () => cdp.evaluate(`(() => {
+    const card=[...document.querySelectorAll('.monaco-hover')].find(node=>node.querySelector('a[data-href="command:agentTracker.openSettings"]'));
+    if(!card)return null;const rect=card.getBoundingClientRect();return rect.width&&rect.height ? card.innerText : null;
+  })()`);
+  for (const { locale } of languages) {
+    const messages = JSON.parse(readFileSync(join(root, 'localization', 'locales', `${locale}.json`), 'utf8'));
+    settings['agentTracker.language'] = locale;
+    await writeFile(settingsPath, JSON.stringify(settings));
+    // Switching languages must update the open card without dismissing it.
+    const translatedCard = await until(async () => {
+      const text = await cardText();
+      return text?.includes(messages['quota.usage']) && text.includes(messages['common.refresh'])
+        && text.includes(messages['common.settings']) && text.includes(messages['quota.statistics'].replace('$(graph) ', '')) && text;
+    }, `${locale}: pinned card uses the selected language`);
+    if (locale !== 'ko') assert.doesNotMatch(translatedCard, /[가-힣]/);
+    await cdp.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+    await cdp.call('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
+    await until(async () => !await cardText(), `${locale}: Escape closes the card`);
+    await cdp.call('Input.dispatchMouseEvent', { type: 'mouseMoved', ...editor });
+    const point = await until(() => cdp.evaluate(`(() => {
+      const label=document.querySelector('[id$="agentTracker.quota"] .statusbar-item-label');
+      if(!label?.getAttribute('aria-label')?.includes(${JSON.stringify(messages['status.toggleHint'])}))return null;
+      const rect=label.getBoundingClientRect();return {x:rect.x+rect.width/2,y:rect.y+rect.height/2};
+    })()`), `${locale}: accessible preview uses the selected language`);
+    await cdp.call('Input.dispatchMouseEvent', { type: 'mouseMoved', ...point });
+    const preview = await until(() => cdp.evaluate(`(() => {
+      const hover=[...document.querySelectorAll('.monaco-hover')].find(node=>node.innerText.includes(${JSON.stringify(messages['status.toggleHint'])}));
+      if(!hover)return null;const rect=hover.getBoundingClientRect();return rect.width&&rect.height ? hover.innerText : null;
+    })()`), `${locale}: hover shows the translated click hint`);
+    assert.ok(preview.includes('Claude:') && preview.includes('Codex:'));
+    if (locale !== 'ko') assert.doesNotMatch(preview, /[가-힣]/);
+    assert.equal(await cardText(), null, `${locale}: hover keeps the full card closed`);
+    await cdp.click(point);
+    await until(cardText, `${locale}: click opens the card`);
+    await cdp.click(point);
+    for (let attempt = 0; attempt < 5; attempt++) {
+      await sleep(100);
+      assert.equal(await cardText(), null, `${locale}: second click keeps the card closed`);
+    }
+    await cdp.click(point);
+    await until(cardText, `${locale}: click reopens the card`);
+    await cdp.call('Input.dispatchMouseEvent', { type: 'mouseMoved', ...editor });
+    observations.push({ locale, preview, card: translatedCard });
+  }
+  return observations;
+}
+
 async function main() {
   const baseline = process.argv.includes('--baseline');
   const quotaFixture = process.argv.includes('--quota-fixture');
   const statusColors = process.argv.includes('--status-colors');
+  const statusLocalization = process.argv.includes('--localization');
   const appRoot = resolveAppRoot();
   const patch = baseline || statusColors ? { appRoot, version: JSON.parse(readFileSync(join(appRoot, 'package.json'), 'utf8')).version } : operate({ check: true });
   const reportName = statusColors ? 'statusbar-colors.json' : baseline ? 'statusbar-toggle-baseline.json' : quotaFixture ? 'quota-card.json' : 'statusbar-toggle.json';
@@ -138,6 +190,7 @@ async function main() {
     // A short delay makes an accidentally retained automatic hover observable.
     'workbench.hover.delay': 100,
     'agentTracker.display.detail': 'compact',
+    'agentTracker.language': 'ko',
     'agentTracker.display.colorMode': 'automatic',
     'agentTracker.quota.refreshPolicy': 'manual',
     'agentTracker.dataHome': sandbox,
@@ -196,7 +249,7 @@ async function main() {
     }
     const editor = await cdp.evaluate(`(() => { const rect=document.querySelector('.part.editor').getBoundingClientRect();return {x:rect.x+rect.width/3,y:rect.y+100}; })()`);
     const visible = () => cdp.evaluate(`(() => {
-      const card=[...document.querySelectorAll('.monaco-hover')].find(node => node.innerText.includes('사용량 통계') && node.querySelector('a[data-href="command:agentTracker.openSettings"]'));
+      const card=[...document.querySelectorAll('.monaco-hover')].find(node => node.querySelector('a[data-href="command:agentTracker.openSettings"]'));
       if(!card)return null;const rect=card.getBoundingClientRect();return rect.width&&rect.height ? {top:rect.top,bottom:rect.bottom} : null;
     })()`);
     if (baseline) {
@@ -366,6 +419,11 @@ async function main() {
       await until(async () => Boolean(await visible()) === open, `Enter toggles ${open ? 'open' : 'closed'}`);
     }
     outcomes.push('keyboard Enter toggles the same quota UI');
+    if (statusLocalization) {
+      const observations = await verifyStatusLocalization(cdp, join(userData, 'User', 'settings.json'), root, editor);
+      await writeFile(join(resultDirectory, 'statusbar-localization.json'), JSON.stringify({ passed: true, version: patch.version, observations }, null, 2));
+      outcomes.push('six languages: translated hover hints, pinned card updates and repeated click toggles');
+    }
     await sleep(3000);
     const notificationText = await cdp.evaluate('[...document.querySelectorAll(".notification-list-item-message")].map(node=>node.innerText).join("\\n")');
     assert.doesNotMatch(notificationText, /installation appears to be corrupt|설치가 손상/iu, 'fresh startup must not show an installation corruption warning');
