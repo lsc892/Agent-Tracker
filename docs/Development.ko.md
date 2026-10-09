@@ -1,6 +1,6 @@
 # Agent Tracker 사용 및 개발 참고
 
-[프로젝트 소개](../README.ko.md) · [English](../README.md)
+[프로젝트 소개](../README.ko.md) · [English](Development.md)
 
 Claude와 Codex의 구독 사용률, 로컬 대화 기록의 요청별 토큰 사용량을 보여 주는 VS Code 확장입니다.
 

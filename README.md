@@ -105,4 +105,4 @@ All setting keys below use the `agentTracker.` prefix.
 
 Use **Agent Tracker: Delete Statistics Data** to clear aggregated statistics. Original conversation logs are preserved, and statistics are recalculated when you reopen the view.
 
-[Usage and development reference (Korean)](docs/Development.ko.md)
+[Usage and development reference](docs/Development.md)
