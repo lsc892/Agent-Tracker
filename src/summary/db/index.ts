@@ -1,7 +1,7 @@
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync, type SQLInputValue, type StatementSync } from 'node:sqlite';
-import { SCHEMA_SQL, SCHEMA_VERSION, SCHEMA_LEGACY_MIGRATION_SQL, SCHEMA_CACHE_MIGRATION_SQL, SCHEMA_MODEL_SQL, SCHEMA_CAPABILITY_SQL, SCHEMA_TURN_INDEX_MIGRATION_SQL } from './schema';
+import { SCHEMA_SQL, SCHEMA_VERSION, SCHEMA_LEGACY_MIGRATION_SQL, SCHEMA_CACHE_MIGRATION_SQL, SCHEMA_MODEL_SQL, SCHEMA_CAPABILITY_SQL, SCHEMA_TURN_INDEX_MIGRATION_SQL, manifestIdentityIndexSql } from './schema';
 import { calendarPeriod } from './timezone';
 import { usageChartFromPage } from './chart';
 import { estimateCost, PRICING_VERSION } from '../pricing';
@@ -157,6 +157,7 @@ function whereClause(filter: SummaryFilter): { sql: string; values: SQLInputValu
 export class SummaryDatabase {
   readonly connection: DatabaseSync;
   private closed = false;
+  private lastOptimizedAt: number | undefined;
   // Only fixed SQL statements from metadata/commit methods enter this cache.
   // Its size does not grow with file, session, or user-query counts.
   private readonly statements = new Map<string, StatementSync>();
@@ -207,9 +208,14 @@ export class SummaryDatabase {
           if (this.connection.prepare('PRAGMA table_info(turn_summary)').all().some(column=>column.name==='turn_index')) {
             this.connection.exec(SCHEMA_TURN_INDEX_MIGRATION_SQL);
           }
+          this.connection.exec('DROP INDEX IF EXISTS idx_summary_session;');
+          this.connection.exec(manifestIdentityIndexSql(process.platform));
           this.connection.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
         });
       }
+      // Reconcile an already-current database copied from another operating system.
+      this.connection.exec(manifestIdentityIndexSql(process.platform));
+      this.optimizeConnection(true);
       this.connection.function('agent_tracker_period', { deterministic: true }, (timestamp, timezone, unit) => {
         if (timestamp === null) return null;
         return calendarPeriod(Number(timestamp), String(timezone), unit === 'month' ? 'month' : 'day');
@@ -222,10 +228,29 @@ export class SummaryDatabase {
 
   close(): void {
     if (!this.closed) {
+      this.optimizeConnection();
       this.statements.clear();
       this.connection.close();
       this.closed = true;
     }
+  }
+
+  private optimizeConnection(onOpen = false): boolean {
+    try {
+      // Limit maintenance to persistent tables, even when scan staging exists.
+      this.connection.exec(onOpen ? 'PRAGMA main.optimize=0x10002;' : 'PRAGMA main.optimize;');
+      return true;
+    } catch {
+      // Statistics are optional; a competing writer must not fail a scan or cleanup.
+      return false;
+    }
+  }
+
+  /** Collect statistics after the first scan, then at most once per day. */
+  optimize(): void {
+    const now = Date.now();
+    if (this.lastOptimizedAt !== undefined && now - this.lastOptimizedAt < 86_400_000) return;
+    if (this.optimizeConnection()) this.lastOptimizedAt = now;
   }
 
   transaction<T>(action: () => T): T {
@@ -328,7 +353,7 @@ export class SummaryDatabase {
           throw new Error('Manifest file is outside the replacement session group');
         }
       };
-      // Row-value IN lets SQLite seek idx_summary_session for the small group;
+      // Row-value IN lets SQLite seek the request UNIQUE index by its session prefix;
       // a correlated EXISTS scans every stored turn for each replaced session.
       this.connection.exec(`INSERT OR IGNORE INTO db_replacement_projects SELECT project_key FROM turn_summary
         WHERE (provider,session_id) IN (SELECT provider,session_id FROM db_replacement_sessions)`);

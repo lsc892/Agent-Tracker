@@ -105,7 +105,7 @@ test('v3 migration preserves totals and marks cache counts unknown until unchang
   state.database.connection.exec(`ALTER TABLE turn_summary DROP COLUMN cache_write_input_tokens;
     ALTER TABLE turn_summary DROP COLUMN cache_read_input_tokens;
     ALTER TABLE turn_summary ADD COLUMN turn_index INTEGER NOT NULL DEFAULT 1;
-    DROP INDEX idx_summary_session;
+    DROP INDEX IF EXISTS idx_summary_session;
     CREATE INDEX idx_summary_session ON turn_summary(provider,session_id,turn_index);
     UPDATE manifest SET parser_version=4;
     PRAGMA user_version=3;`);

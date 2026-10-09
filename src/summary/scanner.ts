@@ -254,6 +254,7 @@ export async function refreshSummary(
     }
     check();
     database.transaction(() => applySessionNames(database.connection));
+    database.optimize();
   } catch (error) {
     result.interrupted = true;
     const code = isCancelled() ? 'interrupted' : error instanceof SummaryError ? error.code : 'source-discovery-error';

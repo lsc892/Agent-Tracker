@@ -1,4 +1,10 @@
-export const SCHEMA_VERSION = 9;
+export const SCHEMA_VERSION = 10;
+
+/** Only non-Windows discovery uses device/inode to recognize moved files. */
+export function manifestIdentityIndexSql(platform: NodeJS.Platform): string {
+  return platform === 'win32' ? 'DROP INDEX IF EXISTS idx_manifest_identity;'
+    : 'CREATE INDEX IF NOT EXISTS idx_manifest_identity ON manifest(provider, dev, inode);';
+}
 
 export const SCHEMA_CAPABILITY_SQL = `
 CREATE TABLE IF NOT EXISTS turn_capability_usage (
@@ -82,7 +88,6 @@ CREATE TABLE IF NOT EXISTS turn_summary (
 const TURN_SUMMARY_INDEX_SQL = `
 CREATE INDEX IF NOT EXISTS idx_summary_period ON turn_summary(started_at_ms, provider);
 CREATE INDEX IF NOT EXISTS idx_summary_project_period ON turn_summary(provider, project_key, started_at_ms);
-CREATE INDEX IF NOT EXISTS idx_summary_session ON turn_summary(provider, session_id);
 `;
 
 export const SCHEMA_SQL = `
@@ -106,7 +111,7 @@ CREATE TABLE IF NOT EXISTS manifest (
   last_error TEXT,
   UNIQUE(provider, path)
 );
-CREATE INDEX IF NOT EXISTS idx_manifest_identity ON manifest(provider, dev, inode);
+${manifestIdentityIndexSql(process.platform)}
 CREATE INDEX IF NOT EXISTS idx_manifest_root_id ON manifest(provider, source_root, id);
 CREATE INDEX IF NOT EXISTS idx_manifest_session ON manifest(provider, session_id, id);
 ${NAMES_SQL}
@@ -145,5 +150,4 @@ ALTER TABLE turn_summary ADD COLUMN cache_read_input_tokens INTEGER CHECK(cache_
 export const SCHEMA_TURN_INDEX_MIGRATION_SQL = `
 DROP INDEX IF EXISTS idx_summary_session;
 ALTER TABLE turn_summary DROP COLUMN turn_index;
-CREATE INDEX idx_summary_session ON turn_summary(provider, session_id);
 `;

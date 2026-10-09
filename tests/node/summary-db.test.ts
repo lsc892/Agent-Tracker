@@ -5,9 +5,12 @@ import { join, resolve, sep } from 'node:path';
 import { test, type TestContext } from 'node:test';
 import { DatabaseSync } from 'node:sqlite';
 import { SummaryDatabase, periodBounds, type FileMetadata, type TurnSummaryInput } from '../../src/summary/db';
-import { SCHEMA_SQL, SCHEMA_VERSION, SCHEMA_MODEL_SQL, SCHEMA_CAPABILITY_SQL } from '../../src/summary/db/schema';
+import { SCHEMA_SQL, SCHEMA_VERSION, SCHEMA_MODEL_SQL, SCHEMA_CAPABILITY_SQL, manifestIdentityIndexSql } from '../../src/summary/db/schema';
 
-const v8Schema = SCHEMA_SQL
+const v9Schema = `${SCHEMA_SQL}
+CREATE INDEX idx_summary_session ON turn_summary(provider, session_id);
+CREATE INDEX IF NOT EXISTS idx_manifest_identity ON manifest(provider, dev, inode);`;
+const v8Schema = v9Schema
   .replace('  request_title TEXT,', '  request_title TEXT,\n  turn_index INTEGER NOT NULL,')
   .replace('ON turn_summary(provider, session_id);', 'ON turn_summary(provider, session_id, turn_index);');
 
@@ -97,15 +100,77 @@ test('schema normalizes names and uses bounded disk staging cache', t => {
   assert.equal(first.connection.prepare('PRAGMA cache_size').get()?.cache_size, -4096);
   assert.equal(first.connection.prepare('PRAGMA temp.cache_size').get()?.cache_size, -4096);
   assert.equal(first.connection.prepare('PRAGMA journal_mode').get()?.journal_mode, 'wal');
+  first.connection.exec(manifestIdentityIndexSql(process.platform === 'win32' ? 'linux' : 'win32'));
   first.close();
   const second = new SummaryDatabase(dbPath);
   t.after(() => second.close());
-  assert.deepEqual(second.connection.prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name").all()
+  assert.deepEqual(second.connection.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all()
     .map(row => row.name), ['manifest', 'projects', 'session_billing', 'sessions', 'turn_capability_usage', 'turn_costs', 'turn_model_usage', 'turn_summary']);
   assert.equal(second.queryUsage()[0].total_tokens, 110);
   assert.ok(second.connection.prepare('PRAGMA table_info(turn_summary)').all().every(column => column.name !== 'turn_index'));
-  assert.deepEqual(second.connection.prepare('PRAGMA index_info(idx_summary_session)').all().map(column => column.name), ['provider', 'session_id']);
+  assert.deepEqual(second.connection.prepare('PRAGMA index_info(idx_summary_session)').all(), []);
+  assert.equal(second.connection.prepare('PRAGMA index_info(idx_manifest_identity)').all().length, process.platform === 'win32' ? 0 : 3);
   second.close();
+});
+
+test('identity indexes follow the discovery platform without changing stored metadata', t => {
+  const db = database(t);
+  const id = seed(db);
+  const before = db.findManifest('claude', metadata().path);
+  for (const platform of ['linux', 'win32', 'darwin', 'win32'] as const) {
+    db.connection.exec(manifestIdentityIndexSql(platform));
+    assert.equal(db.connection.prepare('PRAGMA index_info(idx_manifest_identity)').all().length, platform === 'win32' ? 0 : 3);
+    assert.equal(db.findIdentity('claude', '10', '1')[0].id, id);
+    assert.deepEqual(db.findManifest('claude', metadata().path), before);
+  }
+});
+
+test('session lookup and replacement retain the UNIQUE index and id pagination', t => {
+  const db = database(t);
+  seed(db, Array.from({ length: 125 }, (_, index) => turn(`root-${125-index}`)));
+  const first = db.queryTurns({ provider: 'claude', sessionId: 'session-a' }, { limit: 100 });
+  const second = db.queryTurns({ provider: 'claude', sessionId: 'session-a' }, { limit: 100, afterId: first.at(-1)!.id });
+  assert.equal(first.length, 100);
+  assert.equal(second.length, 25);
+  assert.equal(new Set([...first, ...second].map(row => row.id)).size, 125);
+  assert.deepEqual([...first, ...second].map(row => row.root_turn_id), Array.from({ length: 125 }, (_, index) => `root-${125-index}`));
+  const plan = db.connection.prepare('EXPLAIN QUERY PLAN SELECT id FROM turn_summary WHERE provider=? AND session_id=?')
+    .all('claude', 'session-a').map(row => row.detail).join('\n');
+  assert.match(plan, /USING COVERING INDEX sqlite_autoindex_turn_summary_1/);
+  const duplicate = db.connection.prepare('SELECT * FROM turn_summary LIMIT 1').get()!;
+  delete duplicate.id;
+  const columns = Object.keys(duplicate);
+  assert.throws(() => db.connection.prepare(`INSERT INTO turn_summary (${columns.join(',')}) VALUES (${columns.map(() => '?').join(',')})`)
+    .run(...Object.values(duplicate)), /UNIQUE constraint/);
+  db.setSessionBilling('claude', 'session-a', 'subscription');
+  assert.equal(db.queryTurns({ includeCosts: true }, { limit: 100, afterId: first.at(-1)!.id }).at(-1)?.billing_mode, 'subscription');
+  seed(db, [turn('replacement')]);
+  assert.equal(db.queryTurnsCount(), 1);
+  assert.equal(db.queryUsage()[0].avg_tokens_per_turn, 110);
+});
+
+test('statistics maintenance retries failures and refreshes after a day without changing usage', t => {
+  let now = Date.parse('2026-10-09T00:00:00Z');
+  t.mock.method(Date, 'now', () => now);
+  const db = database(t);
+  seed(db, Array.from({ length: 20 }, (_, index) => turn(`root-${index}`)));
+  const usage = db.queryUsage();
+  db.connection.exec('PRAGMA query_only=ON;');
+  assert.doesNotThrow(() => db.optimize());
+  assert.deepEqual(db.queryUsage(), usage);
+  db.connection.exec('PRAGMA query_only=OFF;');
+  db.optimize();
+  const statistic = () => db.connection.prepare("SELECT stat FROM sqlite_stat1 WHERE idx='idx_summary_project_period'").get()?.stat;
+  const initial = statistic();
+  assert.match(String(initial), /^20 /);
+  seed(db, Array.from({ length: 240 }, (_, index) => turn(`root-${index}`)));
+  db.optimize();
+  assert.equal(statistic(), initial, 'same-day scans do not repeat maintenance');
+  now += 86_400_000;
+  db.optimize();
+  assert.match(String(statistic()), /^240 /);
+  assert.equal(db.queryUsage()[0].avg_tokens_per_turn, 110);
+  assert.equal(db.queryUsage()[0].turn_count, 240);
 });
 
 for (const version of [1,2]) test(`v${version} migration preserves summaries, manifest references and indexes while permitting failed requests`, t => {
@@ -143,8 +208,8 @@ for (const version of [1,2]) test(`v${version} migration preserves summaries, ma
   })));
   assert.equal(db.connection.prepare('PRAGMA user_version').get()?.user_version,SCHEMA_VERSION);
   assert.deepEqual(db.connection.prepare('PRAGMA foreign_key_check').all(),[]);
-  assert.deepEqual(db.connection.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all().map(row=>row.name),['manifest','projects','session_billing','sessions','turn_capability_usage','turn_costs','turn_model_usage','turn_summary']);
-  assert.equal(db.connection.prepare("SELECT count(*) count FROM sqlite_master WHERE type='index' AND name LIKE 'idx_summary_%'").get()?.count,3);
+  assert.deepEqual(db.connection.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all().map(row=>row.name),['manifest','projects','session_billing','sessions','turn_capability_usage','turn_costs','turn_model_usage','turn_summary']);
+  assert.equal(db.connection.prepare("SELECT count(*) count FROM sqlite_master WHERE type='index' AND name LIKE 'idx_summary_%'").get()?.count,2);
   db.connection.exec("UPDATE turn_summary SET status='failed'");
   assert.equal(db.queryUsage()[0].total_tokens,110);assert.equal(db.queryUsage()[0].completed_turns,0);
   assert.equal(db.queryUsage()[0].avg_duration_ms,null);
@@ -182,7 +247,7 @@ test('migration rechecks the version after another window finishes the transitio
   } finally { db.close(); }
 });
 
-test('v8 migration removes the ordinal while preserving every table and request reference', t => {
+for (const version of [8,9]) test(`v${version} migration removes redundant indexes while preserving every table and request reference`, t => {
   const parent = realpathSync(tmpdir());
   const directory = mkdtempSync(join(parent, 'agent-tracker-db-ordinal-'));
   const dbPath = join(directory, 'summary.sqlite');
@@ -202,17 +267,17 @@ test('v8 migration removes the ordinal while preserving every table and request 
   let before: ReturnType<typeof snapshot>;
   try {
     legacy.exec(`PRAGMA foreign_keys=ON;
-      ${v8Schema}
-      PRAGMA user_version=8;
+      ${version === 8 ? v8Schema : v9Schema}
+      PRAGMA user_version=${version};
       INSERT INTO manifest (id,provider,source_root,path,session_id,parser_version,capabilities_collected,processing_status,recorded_at)
         VALUES (42,'claude','/synthetic','/synthetic/session.jsonl','session-a',13,1,'done','2026-10-03T00:00:02.000Z');
       INSERT INTO projects VALUES ('/synthetic/project-a','Project');
       INSERT INTO sessions VALUES ('claude','session-a','Session');
-      INSERT INTO turn_summary (id,provider,project_key,session_id,root_turn_id,request_title,turn_index,
+      INSERT INTO turn_summary (id,provider,project_key,session_id,root_turn_id,request_title,${version === 8 ? 'turn_index,' : ''}
         started_at_ms,completed_at_ms,duration_ms,duration_quality,input_tokens,output_tokens,
         cache_write_input_tokens,cache_read_input_tokens,total_tokens,status,quality_flags,
         diagnostic_file_id,diagnostic_offset,last_error,updated_at)
-        VALUES (99,'claude','/synthetic/project-a','session-a','original-root','Stored title',17,
+        VALUES (99,'claude','/synthetic/project-a','session-a','original-root','Stored title',${version === 8 ? '17,' : ''}
           1790985600000,1790985601000,1000,'exact',100,10,30,50,110,'completed','duration-approximate',
           42,12,'parse-error','2026-10-03T00:00:02.000Z');
       INSERT INTO turn_model_usage VALUES (99,'claude-sonnet-4-6',100,10,30,50,0.0002475,'migration-fixture');
@@ -225,7 +290,8 @@ test('v8 migration removes the ordinal while preserving every table and request 
   assert.deepEqual(snapshot(db.connection), before);
   assert.equal(db.connection.prepare('PRAGMA user_version').get()?.user_version, SCHEMA_VERSION);
   assert.ok(db.connection.prepare('PRAGMA table_info(turn_summary)').all().every(column => column.name !== 'turn_index'));
-  assert.deepEqual(db.connection.prepare('PRAGMA index_info(idx_summary_session)').all().map(column => column.name), ['provider', 'session_id']);
+  assert.deepEqual(db.connection.prepare('PRAGMA index_info(idx_summary_session)').all(), []);
+  assert.equal(db.connection.prepare('PRAGMA index_info(idx_manifest_identity)').all().length, process.platform === 'win32' ? 0 : 3);
   assert.deepEqual(db.connection.prepare('PRAGMA foreign_key_check').all(), []);
   assert.equal(db.queryTurns({ includeCosts: true }, { limit: 1, offset: 0 }, 'model')[0].id, 99);
   assert.equal(db.queryUsage({ includeCosts: true })[0].cost_usd, 0.0002475);
@@ -254,10 +320,11 @@ test('a failed ordinal migration rolls back the old index, version and data befo
   const previous = new SummaryDatabase(dbPath);
   seed(previous);
   previous.connection.exec(`ALTER TABLE turn_summary ADD COLUMN turn_index INTEGER NOT NULL DEFAULT 17;
-    DROP INDEX idx_summary_session;
+    DROP INDEX IF EXISTS idx_summary_session;
     CREATE INDEX idx_summary_session ON turn_summary(provider,session_id,turn_index);
     CREATE VIEW ordinal_dependency AS SELECT turn_index FROM turn_summary;
     PRAGMA user_version=8;`);
+  previous.connection.exec('PRAGMA main.optimize;');
   const before = previous.connection.prepare('SELECT * FROM turn_summary').all();
   const schema = previous.connection.prepare('SELECT name,sql FROM sqlite_master ORDER BY name').all();
   previous.close();
@@ -273,7 +340,7 @@ test('a failed ordinal migration rolls back the old index, version and data befo
   try {
     assert.equal(retried.queryTurns()[0].total_tokens, 110);
     assert.equal(retried.connection.prepare('PRAGMA user_version').get()?.user_version, SCHEMA_VERSION);
-    assert.deepEqual(retried.connection.prepare('PRAGMA index_info(idx_summary_session)').all().map(column => column.name), ['provider', 'session_id']);
+    assert.deepEqual(retried.connection.prepare('PRAGMA index_info(idx_summary_session)').all(), []);
   } finally { retried.close(); }
 });
 
