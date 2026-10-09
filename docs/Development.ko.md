@@ -26,7 +26,7 @@ npm run build
 
 오른쪽 새로고침 버튼과 툴팁 상단의 새로고침 링크는 추적 중인 제공자의 현재 quota만 조회합니다. 조회 중인 링크는 갱신 상태 문구로 바뀝니다. 제공자별 새로고침·확장 관리 링크는 제공하지 않습니다. 툴팁 상단의 새로고침은 제목과 같은 행의 오른쪽에 표시합니다. 로고 SVG와 상태줄·툴팁용 아이콘 폰트는 `resource/icon`에 포함됩니다.
 
-VSIX를 만들려면 다음 명령을 사용합니다. 생성된 `agent-tracker-0.1.0.vsix`를 VS Code의 **Extensions: Install from VSIX...**로 설치합니다.
+VSIX를 만들려면 다음 명령을 사용합니다. 생성된 `agent-tracker-0.1.1.vsix`를 VS Code의 **Extensions: Install from VSIX...**로 설치합니다.
 
 ```sh
 npm run package
@@ -34,7 +34,7 @@ npm run package
 
 ### npm 배포와 npx 설치
 
-별도 npm 설치 패키지 `agent-tracker-vscode`는 VSIX를 포함하고 VS Code CLI로 설치한 뒤 확장 ID·버전을 확인합니다. **npm에 게시된 뒤** 사용자는 다음 명령으로 설치하거나 업데이트할 수 있습니다. Node.js 22.15 이상과 PATH에 등록된 VS Code `code` 명령이 필요합니다.
+별도 npm 설치 패키지 `agent-tracker-vscode`는 VSIX를 포함하고 VS Code CLI로 설치한 뒤 확장 ID·버전을 확인합니다. 사용자는 다음 명령으로 설치하거나 업데이트할 수 있습니다. Node.js 22.15 이상과 PATH에 등록된 VS Code `code` 명령이 필요합니다.
 
 ```sh
 npx agent-tracker-vscode@latest
@@ -51,13 +51,13 @@ npm ci
 npm run check
 npm run package:npm
 npm login --registry https://registry.npmjs.org --auth-type=web
-npm publish ./artifacts/npm/agent-tracker-vscode-0.1.0.tgz --access public
+npm publish ./artifacts/npm/agent-tracker-vscode-0.1.1.tgz --access public
 ```
 
 `package:npm`은 현재 소스로 VSIX를 다시 만들고, CLI·확장 metadata·VSIX·README·manifest 다섯 파일만 담은 `artifacts/npm/agent-tracker-vscode-<버전>.tgz`를 생성합니다. 실제 npm 게시는 별도 명령이며 이후 배포는 확장 버전을 올린 뒤 같은 절차를 반복합니다. npm 계정의 인증·게시 권한이 필요하며 계정 설정에 따라 2FA를 완료합니다. 로컬 tarball의 npx 실행은 게시 전에 다음과 같이 확인할 수 있습니다.
 
 ```sh
-npx --yes --package ./artifacts/npm/agent-tracker-vscode-0.1.0.tgz agent-tracker-vscode --help
+npx --yes --package ./artifacts/npm/agent-tracker-vscode-0.1.1.tgz agent-tracker-vscode --help
 ```
 
 npm 설치는 기존 Claude/Codex 로그인과 선택적 workbench 패치를 별도로 설정하는 기존 확장 설치 흐름을 따릅니다. 설치 CLI는 workbench 패치를 실행하지 않습니다.

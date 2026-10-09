@@ -37,8 +37,6 @@ Ouvrez **Statistiques d'utilisation** depuis la carte ou lancez **Agent Tracker 
 
 Nécessite Node.js **22.15 ou ultérieur**, VS Code **1.101 ou ultérieur** et la commande `code` disponible dans le terminal. Connectez-vous d'abord via Claude Code ou la CLI Codex.
 
-> Les commandes npm ci-dessous seront disponibles une fois le paquet `agent-tracker-vscode` publié sur npm.
-
 ```sh
 npx agent-tracker-vscode@latest
 ```

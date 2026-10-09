@@ -37,8 +37,6 @@
 
 需要 Node.js **22.15 及以上**、VS Code **1.101 及以上**，且终端中可以运行 `code` 命令。请先通过 Claude Code 或 Codex CLI 登录。
 
-> 以下 npm 命令需在 `agent-tracker-vscode` 包发布到 npm 后使用。
-
 ```sh
 npx agent-tracker-vscode@latest
 ```

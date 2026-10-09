@@ -37,8 +37,6 @@ Claude·Codex의 현재 사용량과 리셋까지 남은 시간을 확인하고,
 
 Node.js **22.15 이상**, VS Code **1.101 이상**, 터미널에서 실행 가능한 `code` 명령이 필요합니다. Claude Code·Codex CLI에서 먼저 로그인하세요.
 
-> 아래 npm 명령은 `agent-tracker-vscode` 패키지가 npm에 게시된 후 사용할 수 있습니다.
-
 ```sh
 npx agent-tracker-vscode@latest
 ```

@@ -14,7 +14,7 @@ the installed extension ID and version. Reload an open VS Code window with
 **Developer: Reload Window**, then run **Agent Tracker: Open Dashboard**.
 
 Run the same command with `@latest` to update. Install a specific version with
-`npx agent-tracker-vscode@0.1.0`.
+`npx agent-tracker-vscode@0.1.1`.
 
 ```sh
 npx agent-tracker-vscode --help

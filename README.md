@@ -37,8 +37,6 @@ Open **Usage statistics** from the card or run **Agent Tracker: Open Usage Stati
 
 Requires Node.js **22.15+**, VS Code **1.101+**, and the `code` command available in your terminal. Sign in through Claude Code or the Codex CLI first.
 
-> The npm commands below will be available once `agent-tracker-vscode` is published to npm.
-
 ```sh
 npx agent-tracker-vscode@latest
 ```

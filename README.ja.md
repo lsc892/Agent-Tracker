@@ -37,8 +37,6 @@ Claude・Codex の現在の使用量とリセットまでの時間を表示し�
 
 Node.js **22.15 以降**、VS Code **1.101 以降**、ターミナルで実行できる `code` コマンドが必要です。先に Claude Code または Codex CLI でログインしてください。
 
-> 以下の npm コマンドは、`agent-tracker-vscode` パッケージが npm に公開された後に利用できます。
-
 ```sh
 npx agent-tracker-vscode@latest
 ```

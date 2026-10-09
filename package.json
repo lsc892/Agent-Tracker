@@ -3,7 +3,7 @@
   "displayName": "Agent Tracker",
   "icon": "resource/icon/AgentTracker_Icon.png",
   "description": "%manifest.description%",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "agent-tracker",
   "repository": {
     "type": "git",
