@@ -240,6 +240,11 @@
     if (turn) return metric === 'averageDuration' ? row.duration_ms : row.total_tokens;
     return row[({ tokens: 'total_tokens', requests: 'turn_count', averageTokens: 'avg_tokens_per_turn', averageDuration: 'avg_duration_ms' })[metric]];
   }
+  function unknownPriority(row, mode) {
+    const model = row.model !== undefined && !row.model;
+    const time = mode === 'calendar' ? row.period == null : mode === 'turn' && row.started_at_ms == null;
+    return Number(model) + 2 * Number(time);
+  }
   function chartLabel(row, mode) {
     const provider = seriesLabel(row);
     if (mode === 'turn') return `${provider} · ${date(row.started_at_ms)} · ${row.session_name || t('dashboard.unnamedSession')} · ${requestLabel(row)} (${row.root_turn_id})`;
@@ -286,7 +291,7 @@
     }
     const title = turn && metric === 'averageDuration' ? t('dashboard.requestDuration') : chartMetrics[metric];
     $('chart-title').textContent = title;
-    const rows = chart.rows;
+    const rows = [...chart.rows].sort((a, b) => unknownPriority(a, chart.mode) - unknownPriority(b, chart.mode));
     const pageRange = result.rows.length ? t('dashboard.pageRange', { value0: number(offset + 1), value1: number(offset + result.rows.length), value2: number(result.total) }) : t('dashboard.zeroItems');
     $('chart-scope').textContent = t('dashboard.chartScope', { value0: pageRange });
     if (rows.length < result.rows.length) $('chart-scope').textContent += t('dashboard.emptyExcludedSuffix', { value0: number(result.rows.length - rows.length) });
@@ -312,6 +317,7 @@
     const vertical = chart.mode === 'calendar' || turn || sessions || projects;
     const categoryKey = (row, index) => turn ? String(index) : sessions ? `${row.provider}/${row.project_key}/${row.session_id}` : projects ? `${row.provider}/${row.project_key}` : row.period;
     const categories = vertical ? [...new Set(rows.map(categoryKey))] : [];
+    if (chart.mode === 'calendar') categories.sort((a, b) => Number(a == null) - Number(b == null));
     const maxPeers = vertical && !turn ? Math.max(1, ...categories.map(category => rows.filter((row, index) => categoryKey(row, index) === category).length)) : 1;
     const categoryWidth = Math.max(turn || sessions || projects ? 164 : 128, maxPeers * 46 + 36);
     const width = Math.max(plot.clientWidth || 736, 736, vertical ? 86 + categories.length * categoryWidth : 0);
@@ -420,7 +426,7 @@
     if (result.capabilities) {
       for (const category of capabilityCategories) {
         const page = result.capabilities[category];
-        const maximum = Math.max(1, ...(page.chartRows ?? page.rows).map(row => row.usage_count));
+        const maximum = Math.max(1, page.maxUses ?? Math.max(0, ...(page.chartRows ?? page.rows).map(row => row.usage_count)));
         table($(`${category}-table`), [t('common.provider'), t('common.name'), t('dashboard.usageCount'), t('dashboard.overallRatio')],
           page.rows.map(row => [providerLabel(row.provider), row.name || t('dashboard.unknownModel'), number(row.usage_count), capabilityRatio(row, maximum, page.totalUses)]));
         $(`${category}-total`).textContent = t('dashboard.totalUses', { value0: number(page.totalUses) });

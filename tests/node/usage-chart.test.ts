@@ -64,14 +64,20 @@ test('excluding empty usage keeps page boundaries and includes known zero-token 
     ...(index%3===0 ? zero : index%3===1 ? {...zero,model_usage:[{model:'known-zero',...zero}]} : {}),
   })));
   for (const by of ['provider','model'] as const) {
-    const excluded = db.queryUsageChart({excludeEmptyUsage:true},'turn','UTC','tokens',by,{limit:1});
+    const tableRows = db.queryUsageChart({},'turn','UTC','tokens',by,{limit:1000}).rows as TurnSummaryRow[];
+    const emptyOffset = tableRows.findIndex(row=>row.root_turn_id==='request-0');
+    const knownOffset = tableRows.findIndex(row=>row.root_turn_id==='request-1');
+    const excluded = db.queryUsageChart({excludeEmptyUsage:true},'turn','UTC','tokens',by,{limit:1,offset:emptyOffset});
     assert.equal(excluded.rows.length,0,'an empty page stays empty rather than borrowing from the next page');
-    const known = db.queryUsageChart({excludeEmptyUsage:true},'turn','UTC','tokens',by,{limit:1,offset:1});
+    const known = db.queryUsageChart({excludeEmptyUsage:true},'turn','UTC','tokens',by,{limit:1,offset:knownOffset});
     assert.equal(known.rows.length,1);assert.equal(known.rows[0].total_tokens,0);
     const chart = db.queryUsageChart({excludeEmptyUsage:true},'turn','UTC','tokens',by,{offset:100});
     assert.equal(chart.total,105);
-    assert.deepEqual(chart.rows.map(row=>(row as TurnSummaryRow).root_turn_id),['request-100','request-101','request-103','request-104']);
-    const projects = db.queryUsageChart({excludeEmptyUsage:true},'project','UTC','requests',by,{limit:1});
+    const expectedIds = tableRows.slice(100).filter(row=>Number(row.root_turn_id.split('-')[1])%3!==0).map(row=>row.root_turn_id);
+    assert.deepEqual(chart.rows.map(row=>(row as TurnSummaryRow).root_turn_id),expectedIds);
+    const projectRows = db.queryUsage({},'project','UTC',{limit:1000},by);
+    const projectOffset = projectRows.findIndex(row=>row.project_key==='/project-000');
+    const projects = db.queryUsageChart({excludeEmptyUsage:true},'project','UTC','requests',by,{limit:1,offset:projectOffset});
     assert.equal(projects.rows.length,0,'aggregate pages also apply exclusion after paging');
   }
 });

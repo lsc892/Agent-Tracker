@@ -45,7 +45,7 @@ port.on('message',(message: {id?:number;method:string;payload?:unknown}) => {
           }
         } else {
           const by = query.chartBy ?? 'provider';
-          const rows = query.groupBy === 'turn' ? database.queryTurns(query,query,by)
+          const rows = query.groupBy === 'turn' ? database.queryTurns(query,{...query,unknownLast:true},by)
           : database.queryUsage(query,query.groupBy === 'all' || !query.groupBy ? 'total' : query.groupBy,query.timezone ?? options.timezone ?? 'UTC',query,by);
           const total = query.groupBy === 'turn' ? database.queryTurnsCount(query,by)
           : database.queryUsageCount(query,query.groupBy === 'all' || !query.groupBy ? 'total' : query.groupBy,query.timezone ?? options.timezone ?? 'UTC',by);

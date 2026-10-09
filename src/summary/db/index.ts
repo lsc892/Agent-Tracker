@@ -29,6 +29,12 @@ function nonnegative(value: number, name: string): number {
   return value;
 }
 
+function unknownOrder(by: 'provider' | 'model', time?: string): string {
+  const flags = [...(time ? [time] : []), ...(by === 'model' ? ["coalesce(model,'')=''"] : [])];
+  if (!flags.length) return '';
+  return `${flags.length > 1 ? `(${flags.join(' OR ')}), ` : ''}${flags.join(', ')}, `;
+}
+
 const TURN_INSERT = `INSERT INTO turn_summary (
   provider, project_key, session_id, root_turn_id, request_title,
   started_at_ms, completed_at_ms, duration_ms, duration_quality,
@@ -467,11 +473,13 @@ export class SummaryDatabase {
     return { rows, total };
   }
 
-  queryTurns(filter: SummaryFilter = {}, page: KeysetPage & { offset?: number } = {}, by: 'provider' | 'model' = 'provider'): TurnSummaryRow[] {
+  queryTurns(filter: SummaryFilter = {}, page: KeysetPage & { offset?: number; unknownLast?: boolean } = {}, by: 'provider' | 'model' = 'provider'): TurnSummaryRow[] {
+    if (page.unknownLast && page.afterId !== undefined) throw new RangeError('Unknown-last request pages require offsets');
     const where = whereClause(filter);
     const after = nonnegative(page.afterId ?? 0, 'afterId');
     const offset = nonnegative(page.offset ?? 0, 'offset');
-    const rows = this.connection.prepare(`SELECT *,${RECORDED_USAGE} AS has_recorded_usage FROM ${namedTurns(filter.includeCosts,by)} AS turn_summary WHERE ${where.sql} AND id > ? ORDER BY id${by === 'model' ? ',model' : ''} LIMIT ? OFFSET ?`)
+    const order = page.unknownLast ? unknownOrder(by, 'started_at_ms IS NULL') : '';
+    const rows = this.connection.prepare(`SELECT *,${RECORDED_USAGE} AS has_recorded_usage FROM ${namedTurns(filter.includeCosts,by)} AS turn_summary WHERE ${where.sql} AND id > ? ORDER BY ${order}id${by === 'model' ? ',model' : ''} LIMIT ? OFFSET ?`)
       .all(...where.values, after, pageLimit(page.limit), offset);
     for (const row of rows) delete row.has_model;
     return rows as unknown as TurnSummaryRow[];
@@ -523,11 +531,11 @@ export class SummaryDatabase {
     const source = `(SELECT t.*,u.category,u.name,u.usage_count FROM turn_summary t
       JOIN turn_capability_usage u ON u.turn_id=t.id) AS turn_summary`;
     const scope = `${where.sql} AND category=?`;
-    const counts = this.connection.prepare(`SELECT count(*) AS total,coalesce(sum(uses),0) AS totalUses FROM (
+    const counts = this.connection.prepare(`SELECT count(*) AS total,coalesce(sum(uses),0) AS totalUses,coalesce(max(uses),0) AS maxUses FROM (
       SELECT sum(usage_count) AS uses FROM ${source} WHERE ${scope} GROUP BY provider,name)`)
-      .get(...where.values,category) as {total:number;totalUses:number};
+      .get(...where.values,category) as {total:number;totalUses:number;maxUses:number};
     const ranking = this.connection.prepare(`SELECT provider,category,name,sum(usage_count) AS usage_count
-      FROM ${source} WHERE ${scope} GROUP BY provider,name ORDER BY usage_count DESC,provider,name LIMIT ? OFFSET ?`);
+      FROM ${source} WHERE ${scope} GROUP BY provider,name ORDER BY name='',usage_count DESC,provider,name LIMIT ? OFFSET ?`);
     const pageOffset = nonnegative(offset,'offset');
     const rows = ranking.all(...where.values,category,100,pageOffset) as unknown as CapabilityRow[];
     const chartRows = pageOffset === 0 ? rows.slice(0,20)
@@ -556,7 +564,7 @@ export class SummaryDatabase {
       CASE WHEN count(cache_write_input_tokens)=count(*) THEN sum(cache_write_input_tokens) END AS cache_write_input_tokens,
       CASE WHEN count(cache_read_input_tokens)=count(*) THEN sum(cache_read_input_tokens) END AS cache_read_input_tokens,
       sum(input_tokens+output_tokens) AS total_tokens${filter.includeCosts ? `,${COST_SUMS}` : ''} FROM ${source} WHERE ${where.sql}
-      GROUP BY provider,model ORDER BY total_tokens DESC,provider,model LIMIT 100 OFFSET ?`)
+      GROUP BY provider,model ORDER BY ${unknownOrder('model')}total_tokens DESC,provider,model LIMIT 100 OFFSET ?`)
       .all(...where.values,nonnegative(offset,'offset')) as unknown as CumulativeRow[];
     return { rows, total, by };
   }
@@ -602,7 +610,7 @@ export class SummaryDatabase {
       ${period} AS period,
       ${usageSums(filter.excludeEmptyUsage)}${filter.includeCosts ? `,${COST_SUMS}` : ''}
       FROM ${usageTurns(filter.includeCosts,by)} AS turn_summary WHERE ${where.sql}
-      GROUP BY ${groups.join(', ')} ORDER BY ${order} LIMIT ? OFFSET ?`)
+      GROUP BY ${groups.join(', ')} ORDER BY ${unknownOrder(by, calendar ? 'period IS NULL' : undefined)}${order} LIMIT ? OFFSET ?`)
       .all(...prefix, ...where.values, pageLimit(page.limit), nonnegative(page.offset ?? 0, 'offset')) as unknown as UsageRow[];
   }
 
@@ -610,7 +618,7 @@ export class SummaryDatabase {
   queryUsageChart(filter: SummaryFilter, groupBy: UsageGrouping | 'all' | 'turn', timezone: string, metric: ChartMetric,
     by: 'provider' | 'model' = 'provider', page: OffsetPage & { afterId?: number } = {}): UsageChart {
     const grouping = groupBy === 'all' ? 'total' : groupBy;
-    const rows = grouping === 'turn' ? this.queryTurns(filter, page, by) : this.queryUsage(filter, grouping, timezone, page, by);
+    const rows = grouping === 'turn' ? this.queryTurns(filter, { ...page, unknownLast: page.afterId === undefined }, by) : this.queryUsage(filter, grouping, timezone, page, by);
     const total = grouping === 'turn' ? this.queryTurnsCount(filter, by) : this.queryUsageCount(filter, grouping, timezone, by);
     return usageChartFromPage(rows, total, groupBy, metric, by, filter.excludeEmptyUsage);
   }

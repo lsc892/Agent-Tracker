@@ -5,7 +5,7 @@ export type BillingMode = 'subscription' | 'api' | 'unknown';
 export type CapabilityCategory = 'skill' | 'subagent' | 'plugin' | 'model';
 export interface CapabilityUsageInput { category: CapabilityCategory; name: string; usage_count: number }
 export interface CapabilityRow extends CapabilityUsageInput { provider: Provider; percentage: number }
-export interface CapabilityPage { rows: CapabilityRow[]; chartRows: CapabilityRow[]; total: number; totalUses: number }
+export interface CapabilityPage { rows: CapabilityRow[]; chartRows: CapabilityRow[]; total: number; totalUses: number; maxUses: number }
 export interface CostFields {
   cost_usd?: number | null;
   unknown_costs?: number;

@@ -85,5 +85,5 @@ test('Codex empty snapshots do not add model uses or an empty model to real requ
   assert.equal(turns.find(row => row.model === '')!.total_tokens, 25);
   const models = db.queryCapabilities({}, 'model');
   assert.equal(models.totalUses, 2);
-  assert.deepEqual(models.rows.map(row => [row.name, row.usage_count, row.percentage]), [['', 1, 50], ['gpt-6.1-sol', 1, 50]]);
+  assert.deepEqual(models.rows.map(row => [row.name, row.usage_count, row.percentage]), [['gpt-6.1-sol', 1, 50], ['', 1, 50]]);
 });

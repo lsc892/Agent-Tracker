@@ -584,9 +584,9 @@ test('configured timezone changes day and month groups without rewriting stored 
   ]);
   const before = db.queryTurns();
   const seoul = db.queryUsage({}, 'day', 'Asia/Seoul');
-  assert.deepEqual(seoul.map(row => row.period), [null, '2026-09-30', '2026-10-01']);
-  assert.deepEqual(db.queryUsage({}, 'month', 'Asia/Seoul').map(row => row.period), [null, '2026-09', '2026-10']);
-  assert.deepEqual(db.queryUsage({}, 'day', 'UTC').map(row => row.period), [null, '2026-09-30']);
+  assert.deepEqual(seoul.map(row => row.period), ['2026-09-30', '2026-10-01', null]);
+  assert.deepEqual(db.queryUsage({}, 'month', 'Asia/Seoul').map(row => row.period), ['2026-09', '2026-10', null]);
+  assert.deepEqual(db.queryUsage({}, 'day', 'UTC').map(row => row.period), ['2026-09-30', null]);
   assert.equal(db.queryUsageCount({}, 'day', 'Asia/Seoul'), 3);
   assert.deepEqual(db.queryTurns(), before);
   const range = periodBounds('2026-10', 'Asia/Seoul');
@@ -609,10 +609,11 @@ test('date-filtered calendar pages retain a separately counted unknown-time grou
   for (const grouping of ['day', 'month'] as const) {
     const rows = db.queryUsage(filter, grouping, 'Asia/Seoul');
     assert.equal(rows.length, 2);
-    assert.equal(rows[0].period, null);
-    assert.equal(rows[0].unknown_time_turns, 1);
-    assert.equal(rows[0].total_tokens, 110);
-    assert.equal(rows[1].turn_count, 1);
+    assert.notEqual(rows[0].period, null);
+    assert.equal(rows[1].period, null);
+    assert.equal(rows[1].unknown_time_turns, 1);
+    assert.equal(rows[1].total_tokens, 110);
+    assert.equal(rows[0].turn_count, 1);
     assert.equal(db.queryUsageCount(filter, grouping, 'Asia/Seoul'), 2);
     assert.equal(db.queryUsage(filter, grouping, 'Asia/Seoul', { limit: 1, offset: 1 })[0].period, rows[1].period);
     assert.equal(db.queryUsageCount({ ...filter, unknownTime: 'exclude' }, grouping, 'Asia/Seoul'), 1);
