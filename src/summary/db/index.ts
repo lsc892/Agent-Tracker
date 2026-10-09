@@ -76,6 +76,8 @@ const COST_SUMS = `SUM(cost_usd) AS cost_usd,SUM(unknown_costs) AS unknown_costs
 const RECORDED_USAGE = '(total_tokens>0 OR has_model=1)';
 function usageSums(exclude = false): string {
   const completed = `status = 'completed'${exclude ? ` AND ${RECORDED_USAGE}` : ''}`;
+  const averageCache = (column: string): string => `CASE WHEN COUNT(CASE WHEN ${completed} THEN ${column} END) = SUM(${completed})
+    THEN AVG(CASE WHEN ${completed} THEN ${column} END) END AS avg_${column}`;
   return `SUM(input_tokens) AS input_tokens, SUM(output_tokens) AS output_tokens,
   CASE WHEN COUNT(cache_write_input_tokens) = COUNT(*) THEN SUM(cache_write_input_tokens) END AS cache_write_input_tokens,
   CASE WHEN COUNT(cache_read_input_tokens) = COUNT(*) THEN SUM(cache_read_input_tokens) END AS cache_read_input_tokens,
@@ -84,6 +86,10 @@ function usageSums(exclude = false): string {
   SUM(${RECORDED_USAGE}) AS recorded_turns,
   SUM(status = 'completed' AND ${RECORDED_USAGE}) AS recorded_completed_turns,
   AVG(CASE WHEN ${completed} THEN total_tokens END) AS avg_tokens_per_turn,
+  AVG(CASE WHEN ${completed} THEN input_tokens END) AS avg_input_tokens,
+  AVG(CASE WHEN ${completed} THEN output_tokens END) AS avg_output_tokens,
+  ${averageCache('cache_write_input_tokens')},
+  ${averageCache('cache_read_input_tokens')},
   AVG(CASE WHEN ${completed} THEN duration_ms END) AS avg_duration_ms,
   SUM(${completed} AND duration_ms IS NOT NULL) AS turns_with_duration,
   SUM(${completed} AND duration_quality = 'exact') AS exact_duration_turns,

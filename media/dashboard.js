@@ -252,18 +252,25 @@
     if (mode === 'total') return provider;
     return `${provider} · ${row.project_name || t('dashboard.unnamedProject')}${row.session_id ? ` / ${row.session_name || t('dashboard.unnamedSession')}` : ''}`;
   }
-  function chartSegments(row) {
-    if (row.cache_write_input_tokens == null || row.cache_read_input_tokens == null) return [{ value: row.total_tokens, className: 'chart-unknown', label: t('dashboard.unknownTokenTotal') }];
-    return [Math.max(0, row.input_tokens - row.cache_write_input_tokens - row.cache_read_input_tokens), row.output_tokens,
-      row.cache_write_input_tokens, row.cache_read_input_tokens].map((value, index) => ({ value, className: `chart-series-${index}`, label: tokenHeaders[index].label }));
+  function chartSegments(row, metric) {
+    const average = metric === 'averageTokens';
+    const input = average ? row.avg_input_tokens : row.input_tokens;
+    const output = average ? row.avg_output_tokens : row.output_tokens;
+    const write = average ? row.avg_cache_write_input_tokens : row.cache_write_input_tokens;
+    const read = average ? row.avg_cache_read_input_tokens : row.cache_read_input_tokens;
+    if (write == null || read == null) return [{ value: average ? row.avg_tokens_per_turn : row.total_tokens, className: 'chart-unknown',
+      label: average ? `${t('dashboard.averageTokens')} (${t('dashboard.unknownBreakdown')})` : t('dashboard.unknownTokenTotal') }];
+    return [Math.max(0, input - write - read), output, write, read]
+      .map((value, index) => ({ value, className: `chart-series-${index}`, label: tokenHeaders[index].label }));
   }
   function chartDescription(row, chart) {
     const turn = chart.mode === 'turn';
     const value = chartValue(row, chart.metric, turn);
     let detail = `${chartLabel(row, chart.mode)} · ${chart.metric === 'averageDuration' ? duration(value) : `${number(value)} ${chart.metric === 'requests' ? t('dashboard.items') : t('common.tokens')}`}`;
-    if (chart.metric === 'tokens') {
-      detail += row.cache_write_input_tokens == null || row.cache_read_input_tokens == null ? t('dashboard.unknownBreakdownSuffix')
-        : ` · ${tokenHeaders.map((header, index) => `${header.label} ${tokenValues(row)[index]}`).join(' / ')}`;
+    if (['tokens', 'averageTokens'].includes(chart.metric) && value != null) {
+      const segments = chartSegments(row, chart.metric);
+      detail += segments[0].className === 'chart-unknown' ? t('dashboard.unknownBreakdownSuffix')
+        : ` · ${segments.map(segment => `${segment.label} ${number(segment.value)}`).join(' / ')}`;
     }
     if (chart.metric === 'requests') detail += t('dashboard.completedCountSuffix', { value0: number(row.completed_turns) });
     if (chart.metric === 'averageDuration' && !turn) detail += t('dashboard.timeSampleSuffix', { value0: number(row.turns_with_duration) });
@@ -284,6 +291,7 @@
     if (!chart) return;
     const turn = chart.mode === 'turn';
     const metric = chart.metric;
+    const tokenMetric = ['tokens', 'averageTokens'].includes(metric);
     $('chart-metric').value = metric;
     for (const option of $('chart-metric').options) {
       option.disabled = turn && ['requests', 'averageTokens'].includes(option.value);
@@ -297,9 +305,9 @@
     if (rows.length < result.rows.length) $('chart-scope').textContent += t('dashboard.emptyExcludedSuffix', { value0: number(result.rows.length - rows.length) });
     if (chart.by === 'model') $('chart-scope').textContent += t('dashboard.modelScopeSuffix');
     if (!rows.length) { plot.append(element('p', t('common.noRecords'), 'empty')); return; }
-    if (metric === 'tokens') {
+    if (tokenMetric) {
       const entries = tokenHeaders.map((header, index) => ({ ...header, className: `chart-series-${index}` }));
-      if (rows.some(row => row.cache_write_input_tokens == null || row.cache_read_input_tokens == null)) {
+      if (rows.some(row => chartValue(row, metric, turn) != null && chartSegments(row, metric)[0].className === 'chart-unknown')) {
         entries.push({ label: t('dashboard.unknownBreakdown'), get title() { return t('dashboard.unknownBreakdownHelp'); }, className: 'chart-unknown' });
       }
       for (const entry of entries) {
@@ -375,14 +383,14 @@
       const barSize = vertical ? 36 : 22;
       group.append(svgElement('rect', { x: vertical ? x - 4 : x, y: vertical ? top : y - 20,
         width: vertical ? barSize + 8 : width, height: vertical ? length + 32 : 52, class: 'chart-hit' }));
-      const segments = metric === 'tokens' ? chartSegments(row) : [{ value, className: 'chart-measure' }];
+      const segments = tokenMetric ? chartSegments(row, metric) : [{ value, className: 'chart-measure' }];
       let consumed = 0;
       for (const segment of segments) {
         if (segment.value == null || segment.value <= 0) continue;
         const size = segment.value / maximum * length;
         const mark = svgElement('rect', { x: vertical ? x : x + consumed, y: vertical ? y - consumed - size : y,
           width: vertical ? barSize : size, height: vertical ? size : barSize, class: `chart-segment ${segment.className}` });
-        if (metric === 'tokens') {
+        if (tokenMetric) {
           const detail = t('dashboard.tokenChartDetail', { value0: chartLabel(row, chart.mode), value1: segment.label, value2: number(segment.value) });
           mark.append(svgElement('title', {}, detail));
           mark.setAttribute('aria-label', detail);

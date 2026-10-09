@@ -82,6 +82,57 @@ test('excluding empty usage keeps page boundaries and includes known zero-token 
   }
 });
 
+test('average token components share the completed-request sample and empty-usage policy', t => {
+  const db = database(t, [
+    turn(0, { input_tokens: 101, output_tokens: 51, cache_write_input_tokens: 21, total_tokens: 152 }),
+    turn(1, { started_at_ms: start, input_tokens: 202, output_tokens: 100, cache_write_input_tokens: 42, cache_read_input_tokens: 60, total_tokens: 302 }),
+    turn(2, { started_at_ms: start, status: 'failed', input_tokens: 9999, total_tokens: 10049, cache_read_input_tokens: null }),
+    turn(3, { started_at_ms: start, status: 'in_progress', input_tokens: 8888, total_tokens: 8938, cache_write_input_tokens: null }),
+    turn(4, { started_at_ms: start, input_tokens: 0, output_tokens: 0, cache_write_input_tokens: 0, cache_read_input_tokens: 0, total_tokens: 0 }),
+  ]);
+  for (const group of ['total', 'day', 'month', 'project', 'session'] as const) for (const excludeEmptyUsage of [false, true]) {
+    const row = db.queryUsage({ excludeEmptyUsage }, group, 'UTC')[0];
+    const samples = excludeEmptyUsage ? 2 : 3;
+    assert.equal(row.avg_tokens_per_turn, 454 / samples, `${group}/${excludeEmptyUsage}`);
+    assert.equal(row.avg_input_tokens, 303 / samples);
+    assert.equal(row.avg_output_tokens, 151 / samples);
+    assert.equal(row.avg_cache_write_input_tokens, 63 / samples);
+    assert.equal(row.avg_cache_read_input_tokens, 90 / samples);
+    assert.equal(row.cache_write_input_tokens, null, 'unknown unfinished cache counts only affect totals');
+    assert.equal(row.cache_read_input_tokens, null);
+  }
+  const dbWithoutCompleted = database(t, [turn(0, { status: 'failed' })]);
+  for (const by of ['provider', 'model'] as const) {
+    const row = dbWithoutCompleted.queryUsage({}, 'total', 'UTC', {}, by)[0];
+    for (const value of [row.avg_tokens_per_turn, row.avg_input_tokens, row.avg_output_tokens, row.avg_cache_write_input_tokens, row.avg_cache_read_input_tokens]) {
+      assert.equal(value, null, 'no completed requests have no average components');
+    }
+  }
+});
+
+test('model averages preserve each model sample and keep incomplete cache averages unknown', t => {
+  const db = database(t, [
+    turn(0, { input_tokens: 300, output_tokens: 150, total_tokens: 450, cache_write_input_tokens: 60, cache_read_input_tokens: 90,
+      model_usage: [
+        { model: 'main', input_tokens: 100, output_tokens: 50, cache_write_input_tokens: 20, cache_read_input_tokens: 30 },
+        { model: 'helper', input_tokens: 200, output_tokens: 100, cache_write_input_tokens: 40, cache_read_input_tokens: 60 },
+      ] }),
+    turn(1, { cache_write_input_tokens: null, cache_read_input_tokens: null,
+      model_usage: [{ model: 'main', input_tokens: 100, output_tokens: 50, cache_write_input_tokens: null, cache_read_input_tokens: null }] }),
+    turn(2, { status: 'failed', cache_write_input_tokens: null, cache_read_input_tokens: null,
+      model_usage: [{ model: 'helper', input_tokens: 100, output_tokens: 50, cache_write_input_tokens: null, cache_read_input_tokens: null }] }),
+  ]);
+  for (const excludeEmptyUsage of [false, true]) {
+    const rows = db.queryUsage({ excludeEmptyUsage }, 'total', 'UTC', {}, 'model');
+    const main = rows.find(row => row.model === 'main')!;
+    const helper = rows.find(row => row.model === 'helper')!;
+    assert.deepEqual([main.avg_input_tokens, main.avg_output_tokens, main.avg_cache_write_input_tokens, main.avg_cache_read_input_tokens], [100, 50, null, null]);
+    assert.deepEqual([helper.avg_input_tokens, helper.avg_output_tokens, helper.avg_cache_write_input_tokens, helper.avg_cache_read_input_tokens], [200, 100, 40, 60]);
+    assert.equal(main.avg_tokens_per_turn, 150);
+    assert.equal(helper.avg_tokens_per_turn, 300);
+  }
+});
+
 test('project and session charts follow table pages across metrics and filters', t => {
   const rows = Array.from({ length: 130 }, (_, index) => turn(index, {
     project_key: `/project-${index}`, project_name: `Project ${index}`, session_id: `session-${index}`,
@@ -368,7 +419,7 @@ test('request axes show titles and project/session charts place categories next 
   }
   for (const group of ['project', 'session']) for (const metric of ['tokens', 'requests', 'averageTokens', 'averageDuration']) {
     view.render(group, 'ranking', metric, rows.map((row,index)=>({ ...row,project_key:`/project-${index}`,project_name:`Project ${index}`,
-      turn_count:1,avg_tokens_per_turn:150,avg_duration_ms:1000 })));
+      turn_count:1,avg_tokens_per_turn:150,avg_input_tokens:100,avg_output_tokens:50,avg_cache_write_input_tokens:20,avg_cache_read_input_tokens:30,avg_duration_ms:1000 })));
     const bars = view.get('usage-chart').descendants().filter(node => node.attributes.get('class') === 'chart-bar');
     const marks = bars.map(bar => bar.children.find(node => node.attributes.get('class')?.includes('chart-segment'))!);
     assert.notEqual(marks[0].attributes.get('x'), marks[1].attributes.get('x'), `${group}/${metric}: separate horizontal positions`);
@@ -524,20 +575,77 @@ test('unknown compositions keep total bars neutral while zero components remain 
   assert.equal(legend.children.length, 0, 'empty results clear the previous composition legend');
 });
 
+test('average token charts stack completed components and show the legend across provider/model groupings', t => {
+  const view = ui();
+  const db = database(t, [
+    turn(0, { input_tokens: 101, output_tokens: 51, cache_write_input_tokens: 21, total_tokens: 152 }),
+    turn(1, { started_at_ms: start, input_tokens: 202, output_tokens: 100, cache_write_input_tokens: 42, cache_read_input_tokens: 60, total_tokens: 302 }),
+    turn(2, { started_at_ms: start, status: 'failed', input_tokens: 9999, total_tokens: 10049, cache_read_input_tokens: null }),
+  ]);
+  for (const by of ['provider', 'model'] as const) for (const [group, mode] of [
+    ['day', 'calendar'], ['month', 'calendar'], ['project', 'ranking'], ['session', 'ranking'], ['all', 'total'],
+  ] as const) {
+    const chart = db.queryUsageChart({}, group, 'UTC', 'averageTokens', by);
+    view.render(group, mode, chart.metric, chart.rows, by);
+    const legend = view.get('chart-legend');
+    assert.equal(legend.hidden, false);
+    assert.deepEqual(legend.children.map(item => item.textContent), ['Input', 'Output', 'Cache Write', 'Cache Read']);
+    const marks = view.get('usage-chart').descendants().filter(node => node.attributes.get('class')?.includes('chart-segment'));
+    assert.deepEqual(marks.map(mark => mark.attributes.get('class')), [0, 1, 2, 3].map(index => `chart-segment chart-series-${index}`));
+    const size = mode === 'total' ? 'width' : 'height';
+    const length = mode === 'total' ? 640 : 224;
+    for (const [index, value] of [75, 75.5, 31.5, 45].entries()) {
+      assert.equal(Number(marks[index].attributes.get(size)), value / 300 * length, `${group}/${by}: component uses the completed sample`);
+      marks[index].listeners.get('mouseenter')!();
+      assert.ok(view.get('chart-detail').textContent.endsWith(`${legend.children[index].textContent}: ${value} 토큰`));
+      marks[index].listeners.get('mouseleave')!();
+      assert.match(view.get('chart-detail').textContent, /227 토큰 · Input 75 \/ Output 75\.5 \/ Cache Write 31\.5 \/ Cache Read 45 · 완료 요청 2개/);
+    }
+  }
+});
+
+test('average charts distinguish unknown composition, zero averages and no completed sample', t => {
+  const view = ui();
+  const db = database(t, [
+    turn(0, { project_key: '/unknown', cache_read_input_tokens: null }),
+    turn(1, { project_key: '/zero', input_tokens: 0, output_tokens: 0, total_tokens: 0, cache_write_input_tokens: 0, cache_read_input_tokens: 0 }),
+    turn(2, { project_key: '/unfinished', status: 'in_progress' }),
+  ]);
+  const chart = db.queryUsageChart({}, 'project', 'UTC', 'averageTokens');
+  view.render('project', 'ranking', chart.metric, chart.rows);
+  const marks = view.get('usage-chart').descendants().filter(node => node.attributes.get('class')?.includes('chart-segment'));
+  assert.equal(marks.length, 1, 'zero averages and missing samples produce no positive segments');
+  assert.equal(marks[0].attributes.get('class'), 'chart-segment chart-unknown');
+  assert.equal(view.get('chart-legend').children.at(-1)?.textContent, '구성 미확인');
+  marks[0].listeners.get('mouseenter')!();
+  assert.match(view.get('chart-detail').textContent, /평균 토큰 \(구성 미확인\): 150 토큰/);
+  const bars = view.get('usage-chart').descendants().filter(node => node.attributes.get('class') === 'chart-bar');
+  assert.match(bars[0].attributes.get('aria-label')!, /— 토큰 · 완료 요청 0개/);
+  assert.doesNotMatch(bars[0].attributes.get('aria-label')!, /구성 미확인|Input/);
+  assert.match(bars.at(-1)!.attributes.get('aria-label')!, /0 토큰 · Input 0 \/ Output 0 \/ Cache Write 0 \/ Cache Read 0/);
+  view.render('project', 'ranking', 'averageTokens', [chart.rows[0]]);
+  assert.equal(view.get('chart-legend').children.length, 4, 'no completed sample does not add an unknown swatch');
+  view.render('project', 'ranking', 'averageTokens', []);
+  assert.equal(view.get('chart-legend').hidden, true);
+  assert.equal(view.get('chart-legend').children.length, 0);
+});
+
 test('monthly and project comparisons use the same token-component colors for both providers',()=>{
   const view=ui();
-  const rows=[turn(0,{provider:'codex'}),turn(1,{provider:'claude'})].map(row=>({...row,period:'2026-01',turn_count:1,avg_tokens_per_turn:150,avg_duration_ms:1000}));
+  const rows=[turn(0,{provider:'codex'}),turn(1,{provider:'claude'})].map(row=>({...row,period:'2026-01',turn_count:1,avg_tokens_per_turn:150,
+    avg_input_tokens:100,avg_output_tokens:50,avg_cache_write_input_tokens:20,avg_cache_read_input_tokens:30,avg_duration_ms:1000}));
   for (const [group,mode] of [['month','calendar'],['project','ranking']]) for (const metric of ['tokens','requests','averageTokens','averageDuration']) {
     view.render(group,mode,metric,rows);
     const bars=view.get('usage-chart').descendants().filter(node=>node.attributes.get('class')==='chart-bar');
     for (const bar of bars) {
       const marks=bar.descendants().filter(node=>node.attributes.get('class')?.includes('chart-segment'));
-      assert.deepEqual(marks.map(mark=>mark.attributes.get('class')),metric==='tokens'
+      assert.deepEqual(marks.map(mark=>mark.attributes.get('class')),['tokens','averageTokens'].includes(metric)
         ? [0,1,2,3].map(index=>`chart-segment chart-series-${index}`) : ['chart-segment chart-measure']);
     }
     const legend = view.get('chart-legend');
-    assert.equal(legend.hidden, metric !== 'tokens');
-    assert.equal(legend.children.length, metric === 'tokens' ? 4 : 0, 'non-token metrics clear the token legend');
+    const tokenMetric = ['tokens','averageTokens'].includes(metric);
+    assert.equal(legend.hidden, !tokenMetric);
+    assert.equal(legend.children.length, tokenMetric ? 4 : 0, 'duration and request metrics clear the token legend');
   }
   const css=readFileSync(join(__dirname,'../../../media/dashboard.css'),'utf8');
   for (const [index,color] of ['blue','orange','purple','green'].entries()) assert.match(css,new RegExp(`\\.chart-series-${index}\\s*\\{[^}]*--vscode-charts-${color}`));

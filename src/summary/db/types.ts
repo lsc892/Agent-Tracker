@@ -162,6 +162,12 @@ export interface UsageRow extends CostFields {
   recorded_turns?: number;
   recorded_completed_turns?: number;
   avg_tokens_per_turn: number | null;
+  /** Same completed-request sample as avg_tokens_per_turn; input includes caches. */
+  avg_input_tokens: number | null;
+  avg_output_tokens: number | null;
+  /** null if any sampled request has an unknown cache component, or no samples exist. */
+  avg_cache_write_input_tokens: number | null;
+  avg_cache_read_input_tokens: number | null;
   avg_duration_ms: number | null;
   turns_with_duration: number;
   exact_duration_turns: number;
