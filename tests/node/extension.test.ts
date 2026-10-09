@@ -1,0 +1,456 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { parseCodexQuota } from '../../src/quota/codex';
+
+type Disposable = { dispose(): void };
+type Command = string | { command: string; arguments?: unknown[] };
+type StatusItem = Disposable & {
+  id: string; alignment: number; priority: number; text?: string; color?: string;
+  tooltip?: string | import('vscode').MarkdownString;
+  accessibilityInformation?: { label: string; role?: string };
+  command?: Command; visible: boolean; disposed: boolean; show(): void; hide(): void;
+};
+
+function event<T>() {
+  const listeners = new Set<(value: T) => void>();
+  return {
+    subscribe: (listener: (value: T) => void): Disposable => {
+      listeners.add(listener);
+      return { dispose: () => { listeners.delete(listener); } };
+    },
+    fire: (value: T): void => { for (const listener of listeners) listener(value); },
+    size: (): number => listeners.size,
+  };
+}
+
+function mockWebview() {
+  const incoming = event<unknown>();
+  const messages: Record<string, unknown>[] = [];
+  return {
+    html: '', options: {}, cspSource: 'local:', messages,
+    asWebviewUri: (value: unknown) => value,
+    postMessage: async (message: Record<string, unknown>) => { messages.push(message); return true; },
+    onDidReceiveMessage: incoming.subscribe, receive: incoming.fire, listenerCount: incoming.size,
+  };
+}
+
+test('quota controls never scan summaries; usage entry alone refreshes usage and management commands stay bounded', async () => {
+  const storage = await mkdtemp(join(tmpdir(), 'tracker-extension-test-'));
+  const Module = require('node:module') as { _load(request: string, parent: unknown, isMain: boolean): unknown };
+  const original = Module._load;
+  const commands = new Map<string, (...args: unknown[]) => unknown>();
+  const externalCommands: { command: string; arguments: unknown[] }[] = [];
+  const items: StatusItem[] = [];
+  const refreshes: { provider: string; force: boolean }[] = [];
+  const configValues = new Map<string, unknown>([['claude.showStatusBar', false]]);
+  const configUpdates: { key: string; value: unknown; target: number }[] = [];
+  const configuration = event<{ affectsConfiguration(section: string): boolean }>();
+  const themes = event<{ kind: number }>();
+  const focus = event<{ focused: boolean }>();
+  const errors: string[] = [];
+  const subscriptions: Disposable[] = [];
+  const panels: { webview: ReturnType<typeof mockWebview>; revealCount: number; disposed: boolean; dispose(): void }[] = [];
+  let scans = 0;
+  let queries = 0;
+  let diagnostics = 0;
+  let initializations = 0;
+  let quotaDisposals = 0;
+  let summaryDisposals = 0;
+  let cancellations = 0;
+  let clears = 0;
+  let releaseScan: (() => void) | undefined;
+  let deferScan = false;
+  let lastRoots: import('../../src/summary/types').SourceRoot[] = [];
+  let lastQuery: import('../../src/summary/types').UsageQuery = {};
+  let lastNameQuery: import('../../src/summary/types').NameQuery | undefined;
+  const billingChanges: {provider:string;sessionId:string;mode:string}[] = [];
+  let lastDiagnosticsPage: { offset?: number; providers?: string[] } | undefined;
+  const policies: string[] = [];
+  const collectionSwitches: boolean[] = [];
+  const pollingIntervals: number[] = [];
+  const uri = (fsPath: string): { fsPath: string; toString(): string } => ({ fsPath, toString: () => fsPath });
+  const disposable: Disposable = { dispose() {} };
+  const activeColorTheme = { kind: 2 };
+  class MarkdownString {
+    value = '';
+    appendMarkdown(value: string) { this.value += value; return this; }
+    appendText(value: string) { this.value += value.replace(/[\\`*_{}[\]()#+\-.!<>|]/g, '\\$&'); return this; }
+  }
+  const vscode = {
+    MarkdownString,
+    Uri: { joinPath: (base: { fsPath: string }, ...segments: string[]) => uri(join(base.fsPath, ...segments)) },
+    StatusBarAlignment: { Right: 2 }, ViewColumn: { Active: -1 },
+    ColorThemeKind: { Light: 1, Dark: 2, HighContrast: 3, HighContrastLight: 4 }, ConfigurationTarget: { Global: 1 },
+    workspace: {
+      getConfiguration: () => ({
+        get: (key: string, fallback: unknown) => configValues.get(key) ?? fallback,
+        update: async (key: string, value: unknown, target: number) => {
+          configUpdates.push({ key, value, target });
+          configValues.set(key, value);
+          configuration.fire({ affectsConfiguration: section => section === 'agentTracker' });
+        },
+      }),
+      onDidChangeConfiguration: configuration.subscribe,
+    },
+    commands: {
+      registerCommand: (name: string, fn: (...args: unknown[]) => unknown) => {
+        commands.set(name, fn);
+        return { dispose: () => { commands.delete(name); } };
+      },
+      executeCommand: async (name: string, ...args: unknown[]) => {
+        if (commands.has(name)) return commands.get(name)!(...args);
+        externalCommands.push({ command: name, arguments: args });
+      },
+    },
+    window: {
+      state: { focused: true }, activeColorTheme,
+      onDidChangeWindowState: focus.subscribe, onDidChangeActiveColorTheme: themes.subscribe,
+      showErrorMessage: (message: string) => { errors.push(message); },
+      showInformationMessage: () => {},
+      createStatusBarItem: (id: string, alignment: number, priority: number) => {
+        const item: StatusItem = { id, alignment, priority, visible: false, disposed: false,
+          show() { this.visible = true; }, hide() { this.visible = false; }, dispose() { this.disposed = true; } };
+        items.push(item);
+        return item;
+      },
+      createWebviewPanel: () => {
+        const disposed = event<void>();
+        const panel = {
+          webview: mockWebview(), revealCount: 0, disposed: false, onDidDispose: disposed.subscribe,
+          reveal() { this.revealCount++; },
+          dispose() { if (!this.disposed) { this.disposed = true; disposed.fire(); } },
+        };
+        panels.push(panel);
+        return panel;
+      },
+    },
+  };
+  class FakeQuota {
+    constructor(private readonly providers: { id: string }[], options: {refreshPolicy: string; pollingSeconds: number}) {
+      policies.push(options.refreshPolicy); pollingIntervals.push(options.pollingSeconds);
+    }
+    start() {} setFocused() {} subscribe() { return disposable; }
+    setPollingInterval(seconds: number) { pollingIntervals.push(seconds); }
+    setRefreshPolicy(policy: string) { policies.push(policy); }
+    async dispose() { quotaDisposals++; }
+    getState(provider: string) { return { provider, snapshot: {provider,fetchedAt:0,windows:[
+      {id:'five-hour',label:'5h',usedPercent:23,current:23,maximum:100,resetsAt:null,windowDurationMins:300},
+      {id:'weekly',label:'7d',usedPercent:92,current:92,maximum:100,resetsAt:null,windowDurationMins:10080},
+      ...(provider === 'codex' ? parseCodexQuota({ rateLimitsByLimitId: {
+        base_model_inference: { limitId: 'base_model_inference', limitName: 'gpt-reserve',
+          secondary: { usedPercent: 17, resetsAt: (Date.now()+3_600_000)/1000, windowDurationMins: 10080 } },
+        'gpt-reserve': { limitId: 'gpt-reserve', limitName: 'legacy reserve',
+          secondary: { usedPercent: 5, windowDurationMins: 10080 } },
+        review: { limitId: 'review', primary: { usedPercent: 11, windowDurationMins: 60 } },
+      } }, 0).windows : []),
+    ], ...(provider === 'codex' ? { rateLimitResetCredits: { availableCount: 2, nextExpiresAt: Date.now() + (17 * 24 + 8) * 3_600_000 } } : {}) }, refreshing: false, status: 'ready', error: null, lastSuccessAt: 0, nextAllowedAt: 0 }; }
+    getStates() { return this.providers.map(provider => this.getState(provider.id)); }
+    async refresh(provider: string, force: boolean) { refreshes.push({ provider, force }); }
+  }
+  class FakeSummary {
+    async setCapabilityCollectionEnabled(enabled:boolean) {collectionSwitches.push(enabled);await this.cancelRefresh();}
+    async initialize() { initializations++; }
+    async refresh(options: {roots: typeof lastRoots}) {
+      scans++; lastRoots = options.roots;
+      if (deferScan) await new Promise<void>(resolve => { releaseScan = resolve; });
+      return { discovered: 0, parsed: 0, reused: 0, failed: 0, bodyBytes: 0 };
+    }
+    async query(query: typeof lastQuery) { queries++; lastQuery = query; return { rows: [], total: 0, coverage: {} }; }
+    async queryNames(query: NonNullable<typeof lastNameQuery>) { lastNameQuery = query; return { rows: [], total: 0 }; }
+    async setSessionBilling(provider: string, sessionId: string, mode: string) { billingChanges.push({provider,sessionId,mode}); }
+    async diagnostics(page: NonNullable<typeof lastDiagnosticsPage>) { diagnostics++; lastDiagnosticsPage = page; return { files: [], summaries: [], counts: {} }; }
+    subscribe() { return () => {}; } cancel() {} async dispose() { summaryDisposals++; }
+    async cancelRefresh() { cancellations++; releaseScan?.(); releaseScan = undefined; }
+    async clearData() { clears++; await this.cancelRefresh(); }
+  }
+  Module._load = function(request, parent, isMain) {
+    if (request === 'vscode') return vscode;
+    if (request === './quota') return { QuotaService: FakeQuota, ClaudeQuotaProvider: class { id = 'claude'; }, CodexQuotaProvider: class { id = 'codex'; } };
+    if (request === './summary/client') return { SummaryClient: FakeSummary };
+    return original.call(this, request, parent, isMain);
+  };
+  let extension: typeof import('../../src/extension') | undefined;
+  const tick = (): Promise<void> => new Promise(resolve => setImmediate(resolve));
+  const update = async (key: string, value: unknown): Promise<void> => {
+    await vscode.workspace.getConfiguration().update(key, value, 1);
+    await tick();
+  };
+  const click = async (command: Command | undefined): Promise<void> => {
+    assert.ok(command);
+    await vscode.commands.executeCommand(typeof command === 'string' ? command : command.command,
+      ...(typeof command === 'string' ? [] : command.arguments ?? []));
+    await tick();
+  };
+  const tooltip = (): import('vscode').MarkdownString => {
+    assert.ok(items[0].tooltip instanceof MarkdownString);
+    return items[0].tooltip as import('vscode').MarkdownString;
+  };
+  const cardAction = async (id: string, argument?: string): Promise<void> => {
+    const links = [
+      ...tooltip().value.matchAll(/\]\(command:([^)?]+)(?:\?([^)]*))?\)/g),
+      ...tooltip().value.matchAll(/<a href="command:([^"?]+)(?:\?([^"]*))?"/g),
+    ];
+    const link = links.find(value => value[1] === id && (!argument || JSON.parse(decodeURIComponent(value[2]))[0] === argument));
+    assert.ok(link, `the card exposes ${id} with ${argument ?? 'no argument'}`);
+    const trusted = tooltip().isTrusted;
+    assert.ok(trusted && typeof trusted === 'object' && trusted.enabledCommands.includes(id));
+    await click({ command: id, arguments: link[2] ? JSON.parse(decodeURIComponent(link[2])) : [] });
+  };
+  try {
+    extension = require('../../src/extension') as typeof import('../../src/extension');
+    await extension.activate({ globalStorageUri: uri(storage), extensionUri: uri(process.cwd()), subscriptions } as unknown as import('vscode').ExtensionContext);
+    assert.deepEqual(pollingIntervals, [900]);
+    assert.equal(initializations, 1);
+    assert.equal(scans, 0);
+    assert.equal(panels.length, 0);
+    assert.deepEqual(items.map(item => item.id), ['agentTracker.quota', 'agentTracker.refreshQuota']);
+    assert.ok(items[0].priority > items[1].priority, 'the refresh button is right of the combined quota button');
+    assert.match(items[0].text!, /\$\(agent-tracker-claude\).*\$\(agent-tracker-codex\)/);
+    assert.equal(items[0].text!.match(/7일/g)?.length,2);
+    assert.equal(items[0].text!.match(/5시간/g)?.length,2);
+    assert.equal(items[0].color, 'inherit', 'automatic inherits the theme status bar foreground');
+    activeColorTheme.kind = 1; themes.fire(activeColorTheme);
+    assert.equal(items[0].color, 'inherit');
+    for (const [mode,expected] of [['white','#ffffff'],['black','#000000'],['custom','#aabbccdd'],['automatic','inherit']] as const) {
+      configValues.set('display.customColor','#abcd');configValues.set('display.colorMode',mode);
+      configuration.fire({affectsConfiguration:section=>section==='agentTracker'});await tick();
+      assert.equal(items[0].color,expected);assert.equal(items[1].color,expected);
+    }
+    assert.equal(scans,0,'changing colors does not scan transcripts');assert.equal(refreshes.length,0,'changing colors does not query quota');
+
+    assert.equal(items[0].command, 'agentTracker.toggleQuotaTooltip', 'the renderer uses this command to toggle the native card');
+    assert.equal(items[0].accessibilityInformation?.label, 'Claude: 5시간 - 77% 남음\nCodex: 5시간 - 77% 남음\n클릭하여 열기/닫기');
+    await click(items[0].command);
+    assert.deepEqual(externalCommands.at(-1), { command: 'workbench.action.showHover', arguments: [] }, 'an unpatched renderer can still open the focused hover');
+    assert.equal(commands.has('agentTracker.toggleQuota'), false);
+    assert.equal(tooltip().supportThemeIcons, true);
+    assert.match(tooltip().value, /<h3>사용량<\/h3>/);
+    assert.equal(tooltip().value.match(/wk !\[/g)?.length, 2);
+    assert.equal(tooltip().value.match(/5h !\[/g)?.length, 2);
+    assert.equal(tooltip().supportHtml, true);
+    assert.doesNotMatch(tooltip().value, /\| 기간 \|/);
+    assert.match(tooltip().value, /rate-limit 재설정 2회 사용 가능/);
+    assert.match(tooltip().value, /다음 항목이 17d 8h 후 만료됨/);
+    assert.doesNotMatch(tooltip().value, /gpt\\-reserve|legacy reserve/);
+    assert.match(tooltip().value, /review 1h/, 'other additional quotas remain visible');
+    configValues.set('codex.showReserve', true);
+    configuration.fire({ affectsConfiguration: section => section === 'agentTracker' }); await tick();
+    assert.match(tooltip().value, /gpt\\-reserve 7d/);
+    assert.match(tooltip().value, /legacy reserve 7d/);
+    configValues.set('codex.showReserve', false);
+    configuration.fire({ affectsConfiguration: section => section === 'agentTracker' }); await tick();
+    assert.doesNotMatch(tooltip().value, /gpt\\-reserve|legacy reserve/);
+    assert.match(tooltip().value, /review 1h/);
+    const cachedCard = tooltip().value;
+    configValues.set('codex.showResetCredits', false);
+    configuration.fire({ affectsConfiguration: section => section === 'agentTracker' }); await tick();
+    assert.doesNotMatch(tooltip().value, /rate-limit 재설정|후 만료됨/);
+    configValues.set('codex.showResetCredits', true);
+    configuration.fire({ affectsConfiguration: section => section === 'agentTracker' }); await tick();
+    assert.equal(tooltip().value, cachedCard, 'visibility changes reuse the same snapshot');
+    assert.equal(refreshes.length, 0);
+    assert.match(cachedCard, /\| 5h .*\| wk .*\|\n\| :--- \| :--- \|\n\| <span.*초기화: —/);
+    assert.equal(scans, 0);
+    assert.equal(panels.length, 0);
+    await click(items[1].command);
+    assert.deepEqual(refreshes, [{ provider: 'claude', force: true }, { provider: 'codex', force: true }]);
+    await cardAction('agentTracker.refreshQuota');
+    assert.equal(refreshes.length, 4);
+    assert.equal(scans, 0);
+
+    await cardAction('agentTracker.openSettings');
+    assert.deepEqual(externalCommands.at(-1), {command: 'workbench.action.openSettings', arguments: ['@ext:agent-tracker.agent-tracker']});
+    assert.equal(scans, 0, 'opening settings does not scan transcripts');
+    assert.equal(refreshes.length, 4, 'opening settings does not query quota');
+    assert.equal(panels.length, 0, 'settings open in VS Code without creating a webview');
+    assert.ok(tooltip().value.indexOf('command:agentTracker.openSettings') > tooltip().value.indexOf('command:agentTracker.openUsage'));
+    assert.doesNotMatch(tooltip().value, /manageProvider|refreshClaude|refreshCodex|확장 관리/);
+    for (const id of ['agentTracker.manageProvider', 'agentTracker.refreshClaude', 'agentTracker.refreshCodex']) assert.equal(commands.has(id), false);
+    await cardAction('agentTracker.setStatusBarDetail', 'compact');
+    assert.deepEqual(configUpdates, [{ key: 'display.detail', value: 'compact', target: 1 }]);
+    assert.doesNotMatch(items[0].text!,/7일|92%/);
+    assert.equal(items[0].text!.match(/5시간/g)?.length,2);
+    assert.equal(tooltip().value.match(/wk !\[/g)?.length, 2, 'compact status still shows every window in the hover');
+    await cardAction('agentTracker.setStatusBarDetail', 'detailed');
+    assert.equal(items[0].text!.match(/7일/g)?.length, 2);
+    const commandCount = externalCommands.length;
+    for (const detail of ['unsafe', undefined, {}]) {
+      await click({ command: 'agentTracker.setStatusBarDetail', arguments: [detail] });
+    }
+    assert.equal(externalCommands.length, commandCount);
+    assert.equal(configUpdates.length, 2);
+    assert.equal(refreshes.length, 4);
+    assert.equal(scans, 0);
+
+    await cardAction('agentTracker.openUsage');
+    assert.equal(panels.length, 1);
+    assert.equal(scans, 0, 'summary starts only when the usage webview is ready');
+    const dashboard = panels[0].webview;
+    dashboard.receive({ type: 'ready' }); await tick();
+    assert.equal(scans, 1);
+    assert.ok(dashboard.messages.some(message => message.type === 'state'));
+    assert.equal(diagnostics, 0, 'statistics alone does not load diagnostic logs');
+    assert.ok(!dashboard.messages.some(message => message.type === 'diagnostics'));
+    dashboard.receive({ type: 'ready' }); await tick();
+    assert.equal(scans, 1, 'duplicate ready messages do not start another summary');
+    dashboard.receive({type:'queryUsage',query:{groupBy:'all',provider:'claude',sessionId:'chosen',includeCosts:true,chartBy:'model'}});await tick();
+    assert.equal(lastQuery.includeCosts,false,'webview cannot override the extension cost setting');assert.equal(lastQuery.chartBy,'model');
+    await update('usage.showApiCosts',true);await tick();
+    assert.equal(lastQuery.includeCosts,true);assert.ok(dashboard.messages.some(message=>message.type==='state' && message.showApiCosts===true));
+    await update('usage.showApiCosts',false);await tick();
+    assert.equal(lastQuery.includeCosts,false);
+    dashboard.receive({type:'setSessionBilling',provider:'claude',sessionId:'other',mode:'api'});await tick();
+    assert.equal(billingChanges.length,0,'billing changes must match the selected session');
+    dashboard.receive({type:'setSessionBilling',provider:'claude',sessionId:'chosen',mode:'subscription'});await tick();
+    assert.deepEqual(billingChanges,[{provider:'claude',sessionId:'chosen',mode:'subscription'}]);
+    assert.equal(scans,1,'billing, chart grouping and cost settings query the DB without transcript scans');
+    dashboard.receive({ type: 'openDiagnostics' }); await tick();
+    assert.equal(panels.length, 2, 'the footer link creates a separate diagnostic webview');
+    const diagnosticPanel = panels[1];
+    assert.match(diagnosticPanel.webview.html, /<h1><span data-i18n="diagnostics.heading">데이터 확인<\/span><\/h1>/);
+    assert.doesNotMatch(diagnosticPanel.webview.html, /id="usage-table"/);
+    diagnosticPanel.webview.receive({ type: 'ready' }); await tick();
+    assert.equal(diagnostics, 1);
+    assert.ok(diagnosticPanel.webview.messages.some(message => message.type === 'diagnostics' && message.offset === 0));
+    diagnosticPanel.webview.receive({ type: 'ready' }); await tick();
+    assert.equal(diagnostics, 1, 'duplicate ready messages do not reload diagnostics');
+    dashboard.receive({ type: 'openDiagnostics' }); await tick();
+    assert.equal(panels.length, 2, 'repeated diagnostic clicks reuse the diagnostic webview');
+    assert.ok(diagnosticPanel.revealCount > 0);
+    assert.equal(diagnostics, 2);
+    const queriesBeforeDiagnostics = queries;
+    diagnosticPanel.webview.receive({ type: 'queryUsage', query: { groupBy: 'month' } });
+    dashboard.receive({ type: 'diagnostics', offset: 100 }); await tick();
+    assert.equal(queries, queriesBeforeDiagnostics, 'diagnostic webview cannot query usage');
+    assert.equal(diagnostics, 2, 'diagnostic requests from the usage webview are ignored');
+    diagnosticPanel.webview.receive({ type: 'diagnostics', offset: 100 }); await tick();
+    assert.equal(diagnostics, 3);
+    assert.deepEqual(lastDiagnosticsPage, { limit: 100, offset: 100, providers: ['claude', 'codex'] });
+    dashboard.receive({ type: 'queryUsage', query: { groupBy: 'month' } }); await tick();
+    assert.ok(queries >= 2, 'usage filters read cached summary rows');
+    dashboard.receive({type:'queryNames',requestId:7,query:{kind:'session',provider:'codex',projectKey:'/project',offset:100,providers:[]}}); await tick();
+    assert.deepEqual(lastNameQuery,{kind:'session',provider:'codex',projectKey:'/project',offset:100,limit:100,providers:['claude','codex']});
+    assert.ok(dashboard.messages.some(message=>message.type==='names' && message.requestId===7));
+    assert.equal(scans, 1);
+    for (const message of [{ type: 'refreshUsage' }, { type: 'refreshQuota', provider: 'claude' }, { type: 'tab', tab: 'quota' }, { type: 'tab', tab: 'diagnostics' }]) dashboard.receive(message);
+    await tick();
+    assert.equal(scans, 1);
+    assert.equal(diagnostics, 3, 'obsolete tab messages cannot reload diagnostics');
+    assert.equal(refreshes.length, 4);
+    await click('agentTracker.openUsage');
+    assert.equal(scans, 2, 'explicit entry into usage refreshes its summary');
+    assert.equal(diagnostics, 4, 'summary refresh updates the open diagnostic webview');
+    assert.equal(lastDiagnosticsPage?.offset, 0, 'entry resets diagnostics to the first page');
+    assert.equal(panels.length, 2);
+    assert.ok(panels[0].revealCount > 0);
+    await click(items[1].command);
+    assert.equal(refreshes.length, 6);
+    assert.equal(scans, 2, 'quota refresh does not scan even while statistics are open');
+    assert.equal(scans, 2);
+    assert.equal(externalCommands.some(value => /quotaView\.focus|closePanel/.test(value.command)), false, 'quota actions never open or close the terminal panel');
+    await click({ command: 'agentTracker.openDashboard', arguments: [{ tab: 'quota' }] });
+    assert.equal(panels.length, 2, 'legacy quota navigation cannot create a statistics panel');
+    assert.equal(scans, 2);
+    assert.deepEqual(errors, []);
+
+    await update('quota.pollingIntervalSeconds', 120);
+    assert.deepEqual(pollingIntervals, [900, 120]);
+    assert.equal(quotaDisposals, 0, 'common interval changes apply without recreating providers');
+    assert.equal(scans, 2, 'common quota interval changes never scan transcripts');
+    await update('quota.refreshPolicy', 'manual');
+    assert.equal(policies.at(-1), 'manual');
+    await update('claude.enabled', false);
+    assert.equal(pollingIntervals.at(-1), 120, 'recreated providers retain the common interval');
+    assert.equal(panels[0].disposed, true);
+    assert.equal(diagnosticPanel.disposed, true, 'provider changes close diagnostic and usage webviews together');
+    assert.doesNotMatch(items[0].text!, /claude/);
+    assert.doesNotMatch(tooltip().value, /Claude/);
+    assert.doesNotMatch(items[0].accessibilityInformation!.label, /Claude/);
+    const refreshCount = refreshes.length;
+    await click('agentTracker.refreshQuota');
+    assert.deepEqual(refreshes.slice(refreshCount), [{provider: 'codex', force: true}]);
+    await click('agentTracker.openUsage');
+    panels.at(-1)!.webview.receive({type: 'ready'}); await tick();
+    assert.ok(lastRoots.length > 0 && lastRoots.every(root => root.provider === 'codex'));
+    assert.deepEqual(lastQuery.providers, ['codex']);
+
+    deferScan = true;
+    await click('agentTracker.openUsage');
+    const scansBeforeDisable = scans;
+    const queriesBeforeDisable = queries;
+    await update('usage.enabled', false);
+    assert.ok(cancellations >= 2);
+    assert.equal(panels.at(-1)!.disposed, true);
+    assert.equal(queries, queriesBeforeDisable, 'cancelled scan must not query after statistics are disabled');
+    assert.doesNotMatch(tooltip().value, /command:agentTracker.openUsage/);
+    assert.match(tooltip().value, /사용량 통계 \(꺼짐\)/);
+    await click('agentTracker.openUsage');
+    assert.equal(panels.length, 3);
+    assert.equal(scans, scansBeforeDisable);
+    assert.equal(externalCommands.at(-1)?.command, 'workbench.action.openSettings');
+    await click('agentTracker.clearUsageData');
+    assert.equal(clears, 1, 'derived data can be cleared even when statistics are disabled');
+    assert.equal(scans, scansBeforeDisable);
+    deferScan = false;
+    await update('usage.enabled', true);
+    await click('agentTracker.openUsage');
+    panels.at(-1)!.webview.receive({type: 'ready'}); await tick();
+    assert.equal(scans, scansBeforeDisable + 1);
+    await update('codex.enabled', false);
+    assert.ok(items.every(item => !item.visible));
+    await update('quota.pollingIntervalSeconds', 60);
+    assert.equal(pollingIntervals.at(-1), 60, 'common interval can change with both providers disabled');
+    const noProviders = refreshes.length;
+    await click('agentTracker.refreshQuota');
+    assert.equal(refreshes.length, noProviders);
+    await update('claude.enabled', true);
+    assert.equal(pollingIntervals.at(-1), 60);
+    assert.equal(items[0].visible, true);
+    assert.match(items[0].text!, /claude/);
+    assert.doesNotMatch(items[0].text!, /codex/);
+    deferScan = true;
+    await click('agentTracker.openUsage');
+    const closingPanel = panels.at(-1)!;
+    closingPanel.webview.receive({type: 'ready'}); await tick();
+    const scansBeforeReopen = scans;
+    closingPanel.dispose();
+    await click('agentTracker.openUsage');
+    const reopened = panels.at(-1)!.webview;
+    reopened.receive({type: 'ready'}); await tick();
+    releaseScan?.(); releaseScan = undefined; await tick();
+    assert.equal(scans, scansBeforeReopen, 'reopening while a scan runs shares that scan');
+    assert.ok(reopened.messages.some(message => message.type === 'usage'));
+    assert.equal(reopened.messages.filter(message => message.type === 'busy').at(-1)?.busy, false);
+    deferScan = false;
+    const beforeSkillSwitch=scans,quotaBeforeSkillSwitch=refreshes.length;
+    await update('usage.skillsEnabled',false);
+    assert.equal(scans,beforeSkillSwitch,'turning Skill off does not rescan');
+    assert.equal(reopened.messages.filter(message=>message.type==='state').at(-1)?.capabilitiesEnabled,false);
+    await update('usage.skillsEnabled',true);await tick();
+    assert.equal(scans,beforeSkillSwitch+1,'turning Skill on backfills while the statistics page is open');
+    assert.deepEqual(collectionSwitches,[false,true]);assert.equal(refreshes.length,quotaBeforeSkillSwitch);
+    assert.deepEqual(errors, []);
+
+    await extension.deactivate();
+    for (const subscription of subscriptions) subscription.dispose();
+    assert.equal(quotaDisposals, 4);
+    assert.equal(summaryDisposals, 1);
+    assert.equal(panels[0].disposed, true);
+    assert.ok(items.every(item => item.disposed));
+    assert.equal(themes.size(), 0);
+
+    configValues.set('usage.enabled', false);
+    await extension.activate({ globalStorageUri: uri(storage), extensionUri: uri(process.cwd()), subscriptions } as unknown as import('vscode').ExtensionContext);
+    assert.equal(initializations, 1, 'disabled statistics do not start the worker on activation');
+    await click('agentTracker.openUsage');
+    assert.equal(scans, beforeSkillSwitch+1);
+  } finally {
+    await extension?.deactivate();
+    for (const subscription of subscriptions) subscription.dispose();
+    Module._load = original;
+    await rm(storage, { recursive: true, force: true });
+  }
+});

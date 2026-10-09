@@ -1,0 +1,17 @@
+{
+  "name": "agent-tracker-vscode",
+  "description": "Install the Agent Tracker VS Code extension for Claude and Codex usage tracking.",
+  "bin": {
+    "agent-tracker-vscode": "bin/cli.cjs"
+  },
+  "files": [
+    "bin/cli.cjs",
+    "extension.json",
+    "extension.vsix"
+  ],
+  "keywords": ["vscode", "claude", "codex", "quota", "usage"],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
+}

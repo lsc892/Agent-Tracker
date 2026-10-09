@@ -1,0 +1,426 @@
+{
+  "name": "agent-tracker",
+  "displayName": "Agent Tracker",
+  "icon": "resource/icon/AgentTracker_Icon.png",
+  "description": "%manifest.description%",
+  "version": "0.1.0",
+  "publisher": "agent-tracker",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lsc892/Agent-Tracker.git"
+  },
+  "private": true,
+  "license": "UNLICENSED",
+  "engines": {
+    "vscode": "^1.101.0",
+    "node": ">=22.15.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "extensionKind": [
+    "workspace"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/src/extension.js",
+  "scripts": {
+    "build": "node tools/localization.cjs && tsc -p tsconfig.json",
+    "typecheck": "node tools/localization.cjs --check && tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src tests tools --max-warnings 0",
+    "test": "npm run build && node tests/runners/run-tests.cjs",
+    "test:vscode": "npm run build && node tests/runners/test-vscode.cjs",
+    "test:quota:live": "npm run build && node tools/quota/live-qa.cjs --real",
+    "test:toggle": "npm run build && node tests/vscode/statusbar-toggle.cjs",
+    "patch:vscode": "node tools/vscode/statusbar-toggle.cjs",
+    "restore:vscode": "node tools/vscode/statusbar-toggle.cjs --restore",
+    "check": "npm run typecheck && npm run lint && npm test",
+    "watch": "tsc -p tsconfig.json --watch",
+    "vscode:prepublish": "npm run build",
+    "package": "node tools/package.cjs",
+    "package:npm": "node tools/npm/package.cjs",
+    "benchmark": "npm run build && node tests/benchmarks/summary.cjs",
+    "benchmark:quota": "npm run build && node tests/benchmarks/quota/benchmark.cjs",
+    "benchmark:titles": "npm run build && node tests/benchmarks/request-titles.cjs",
+    "benchmark:transactions": "npm run build && node tests/benchmarks/summary-transactions.cjs",
+    "localization:sync": "node tools/localization.cjs",
+    "localization:check": "node tools/localization.cjs --check"
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "agentTracker.openDashboard",
+        "title": "%manifest.openDashboard%"
+      },
+      {
+        "command": "agentTracker.openUsage",
+        "title": "%manifest.openUsage%"
+      },
+      {
+        "command": "agentTracker.refreshQuota",
+        "title": "%status.refreshName%",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "agentTracker.openSettings",
+        "title": "%manifest.openSettings%",
+        "icon": "$(settings-gear)"
+      },
+      {
+        "command": "agentTracker.configureStatusColor",
+        "title": "%manifest.configureColor%"
+      },
+      {
+        "command": "agentTracker.clearUsageData",
+        "title": "%manifest.clearData%"
+      }
+    ],
+    "configuration": [
+      {
+        "id": "agentTracker.localization",
+        "title": "%manifest.languageCategory%",
+        "order": 0,
+        "properties": {
+          "agentTracker.language": {
+            "type": "string",
+            "default": "auto",
+            "scope": "window",
+            "enum": [
+              "auto",
+              "ko",
+              "en",
+              "zh",
+              "ja",
+              "es",
+              "fr"
+            ],
+            "enumItemLabels": [
+              "%manifest.languageAuto%",
+              "한국어",
+              "English",
+              "中文（简体）",
+              "日本語",
+              "Español",
+              "Français"
+            ],
+            "markdownDescription": "%manifest.languageDescription%"
+          }
+        }
+      },
+      {
+        "id": "agentTracker.tracking",
+        "title": "%manifest.tracking%",
+        "order": 1,
+        "properties": {
+          "agentTracker.claude.enabled": {
+            "type": "boolean",
+            "default": true,
+            "order": 1,
+            "description": "%manifest.claudeEnabled%"
+          },
+          "agentTracker.codex.enabled": {
+            "type": "boolean",
+            "default": true,
+            "order": 2,
+            "description": "%manifest.codexEnabled%"
+          },
+          "agentTracker.quota.refreshPolicy": {
+            "type": "string",
+            "enum": [
+              "automatic",
+              "manual"
+            ],
+            "default": "automatic",
+            "order": 3,
+            "enumItemLabels": [
+              "%manifest.automaticRefresh%",
+              "%manifest.manualRefresh%"
+            ],
+            "enumDescriptions": [
+              "%manifest.automaticRefreshHelp%",
+              "%manifest.manualRefreshHelp%"
+            ],
+            "markdownDescription": "%manifest.refreshPolicy%"
+          },
+          "agentTracker.quota.pollingIntervalSeconds": {
+            "type": "number",
+            "minimum": 30,
+            "default": 900,
+            "order": 4,
+            "markdownDescription": "%manifest.pollingInterval%"
+          }
+        }
+      },
+      {
+        "id": "agentTracker.statusBar",
+        "title": "%manifest.statusBar%",
+        "order": 2,
+        "properties": {
+          "agentTracker.codex.showStatusBar": {
+            "type": "boolean",
+            "default": true,
+            "description": "%manifest.codexStatusBar%",
+            "order": 1
+          },
+          "agentTracker.display.percentage": {
+            "type": "string",
+            "enum": [
+              "used",
+              "remaining"
+            ],
+            "default": "used",
+            "enumItemLabels": [
+              "%manifest.percentageUsed%",
+              "%manifest.percentageRemaining%"
+            ],
+            "description": "%manifest.percentage%",
+            "order": 2
+          },
+          "agentTracker.display.detail": {
+            "type": "string",
+            "enum": [
+              "compact",
+              "detailed"
+            ],
+            "default": "detailed",
+            "enumItemLabels": [
+              "%manifest.detailCompact%",
+              "%manifest.detailDetailed%"
+            ],
+            "description": "%manifest.detail%",
+            "order": 3
+          },
+          "agentTracker.display.colorMode": {
+            "type": "string",
+            "enum": [
+              "automatic",
+              "white",
+              "black",
+              "custom"
+            ],
+            "enumItemLabels": [
+              "%common.automatic%",
+              "%color.white%",
+              "%color.black%",
+              "%color.custom%"
+            ],
+            "enumDescriptions": [
+              "%manifest.automaticColor%",
+              "%manifest.whiteColor%",
+              "%manifest.blackColor%",
+              "%manifest.customColor%"
+            ],
+            "default": "automatic",
+            "scope": "window",
+            "order": 4,
+            "markdownDescription": "%manifest.colorMode%"
+          },
+          "agentTracker.display.customColor": {
+            "type": "string",
+            "default": "#ffffff",
+            "format": "color-hex",
+            "pattern": "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$",
+            "patternErrorMessage": "%manifest.invalidHex%",
+            "scope": "window",
+            "order": 5,
+            "markdownDescription": "%manifest.hexColor%"
+          }
+        }
+      },
+      {
+        "id": "agentTracker.quotaDetails",
+        "title": "%manifest.quotaCard%",
+        "order": 3,
+        "properties": {
+          "agentTracker.codex.showReserve": {
+            "type": "boolean",
+            "default": false,
+            "order": 1,
+            "description": "%manifest.showReserve%"
+          },
+          "agentTracker.codex.showResetCredits": {
+            "type": "boolean",
+            "default": true,
+            "order": 2,
+            "description": "%manifest.showResetCredits%"
+          }
+        }
+      },
+      {
+        "id": "agentTracker.statistics",
+        "title": "%dashboard.usageStatistics%",
+        "order": 4,
+        "properties": {
+          "agentTracker.usage.enabled": {
+            "type": "boolean",
+            "default": true,
+            "order": 1,
+            "markdownDescription": "%manifest.usageEnabled%"
+          },
+          "agentTracker.usage.skillsEnabled": {
+            "type": "boolean",
+            "default": true,
+            "order": 2,
+            "markdownDescription": "%manifest.skillsEnabled%"
+          },
+          "agentTracker.usage.showApiCosts": {
+            "type": "boolean",
+            "default": false,
+            "order": 3,
+            "description": "%manifest.showApiCosts%"
+          },
+          "agentTracker.usage.excludeEmptyUsage": {
+            "type": "boolean",
+            "default": true,
+            "order": 4,
+            "description": "%manifest.excludeEmpty%"
+          },
+          "agentTracker.usage.timezone": {
+            "type": "string",
+            "default": "",
+            "description": "%manifest.timezone%",
+            "order": 5
+          }
+        }
+      },
+      {
+        "id": "agentTracker.data",
+        "title": "%manifest.data%",
+        "order": 5,
+        "properties": {
+          "agentTracker.dataHome": {
+            "type": "string",
+            "default": "~",
+            "scope": "machine",
+            "markdownDescription": "%manifest.dataHome%",
+            "order": 1
+          },
+          "agentTracker.claude.cleanupPeriodDays": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "default": null,
+            "scope": "machine",
+            "order": 2,
+            "markdownDescription": "%manifest.cleanupDays%"
+          },
+          "agentTracker.codex.executable": {
+            "type": "string",
+            "default": "codex",
+            "scope": "machine",
+            "description": "%manifest.codexExecutable%",
+            "order": 3
+          }
+        }
+      }
+    ],
+    "icons": {
+      "agent-tracker-codex": {
+        "description": "Codex logo",
+        "default": {
+          "fontPath": "./resource/icon/agent-tracker.woff",
+          "fontCharacter": "\\e001"
+        }
+      },
+      "agent-tracker-claude": {
+        "description": "Claude logo",
+        "default": {
+          "fontPath": "./resource/icon/agent-tracker.woff",
+          "fontCharacter": "\\e002"
+        }
+      },
+      "agent-tracker-quota-0": {
+        "description": "0% remaining quota",
+        "default": {
+          "fontPath": "./resource/icon/agent-tracker.woff",
+          "fontCharacter": "\\e010"
+        }
+      },
+      "agent-tracker-quota-1": {
+        "description": "10% remaining quota",
+        "default": {
+          "fontPath": "./resource/icon/agent-tracker.woff",
+          "fontCharacter": "\\e011"
+        }
+      },
+      "agent-tracker-quota-2": {
+        "description": "20% remaining quota",
+        "default": {
+          "fontPath": "./resource/icon/agent-tracker.woff",
+          "fontCharacter": "\\e012"
+        }
+      },
+      "agent-tracker-quota-3": {
+        "description": "30% remaining quota",
+        "default": {
+          "fontPath": "./resource/icon/agent-tracker.woff",
+          "fontCharacter": "\\e013"
+        }
+      },
+      "agent-tracker-quota-4": {
+        "description": "40% remaining quota",
+        "default": {
+          "fontPath": "./resource/icon/agent-tracker.woff",
+          "fontCharacter": "\\e014"
+        }
+      },
+      "agent-tracker-quota-5": {
+        "description": "50% remaining quota",
+        "default": {
+          "fontPath": "./resource/icon/agent-tracker.woff",
+          "fontCharacter": "\\e015"
+        }
+      },
+      "agent-tracker-quota-6": {
+        "description": "60% remaining quota",
+        "default": {
+          "fontPath": "./resource/icon/agent-tracker.woff",
+          "fontCharacter": "\\e016"
+        }
+      },
+      "agent-tracker-quota-7": {
+        "description": "70% remaining quota",
+        "default": {
+          "fontPath": "./resource/icon/agent-tracker.woff",
+          "fontCharacter": "\\e017"
+        }
+      },
+      "agent-tracker-quota-8": {
+        "description": "80% remaining quota",
+        "default": {
+          "fontPath": "./resource/icon/agent-tracker.woff",
+          "fontCharacter": "\\e018"
+        }
+      },
+      "agent-tracker-quota-9": {
+        "description": "90% remaining quota",
+        "default": {
+          "fontPath": "./resource/icon/agent-tracker.woff",
+          "fontCharacter": "\\e019"
+        }
+      },
+      "agent-tracker-quota-10": {
+        "description": "100% remaining quota",
+        "default": {
+          "fontPath": "./resource/icon/agent-tracker.woff",
+          "fontCharacter": "\\e01a"
+        }
+      }
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "@types/vscode": "1.101.0",
+    "@vscode/test-electron": "^3.1.0",
+    "@vscode/vsce": "^4.0.0",
+    "eslint": "^9.39.0",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.46.0"
+  },
+  "dependencies": {
+    "i18next": "^26.4.2"
+  }
+}

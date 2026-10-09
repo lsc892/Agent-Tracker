@@ -1,0 +1,3866 @@
+{
+  "measuredDate": "2026-10-08",
+  "timezone": "Asia/Seoul",
+  "scope": "Analysis only. Original DB read-only; mutations isolated. No transcript contents exported.",
+  "indexing": {
+    "snapshot": {
+      "schemaVersion": 7,
+      "parserVersion": 12,
+      "files": 236,
+      "jsonlBytes": 254130581,
+      "databaseBytes": 868352,
+      "turnRows": 766
+    },
+    "representativeQueries": {
+      "node": "v24.19.0",
+      "sqlite": "3.53.3",
+      "method": "snapshot read-only backup, warm reads: median of 11 blocks * 250 queries; writes: 11 committed WAL FULL transactions, all other existing indices held fixed; update: 11 rollback trials excludes COMMIT",
+      "baselineStorage": [
+        {
+          "name": "idx_manifest_identity",
+          "bytes": 16384,
+          "payload": 9063
+        },
+        {
+          "name": "idx_manifest_root_id",
+          "bytes": 16384,
+          "payload": 10204
+        },
+        {
+          "name": "idx_manifest_session",
+          "bytes": 16384,
+          "payload": 11604
+        },
+        {
+          "name": "idx_summary_period",
+          "bytes": 20480,
+          "payload": 12938
+        },
+        {
+          "name": "idx_summary_project_period",
+          "bytes": 65536,
+          "payload": 51107
+        },
+        {
+          "name": "idx_summary_session",
+          "bytes": 49152,
+          "payload": 37353
+        },
+        {
+          "name": "manifest",
+          "bytes": 94208,
+          "payload": 74160
+        },
+        {
+          "name": "projects",
+          "bytes": 4096,
+          "payload": 1162
+        },
+        {
+          "name": "session_billing",
+          "bytes": 4096,
+          "payload": 0
+        },
+        {
+          "name": "sessions",
+          "bytes": 86016,
+          "payload": 55778
+        },
+        {
+          "name": "sqlite_autoindex_manifest_1",
+          "bytes": 40960,
+          "payload": 29484
+        },
+        {
+          "name": "sqlite_autoindex_turn_summary_1",
+          "bytes": 86016,
+          "payload": 64160
+        },
+        {
+          "name": "sqlite_schema",
+          "bytes": 12288,
+          "payload": 4803
+        },
+        {
+          "name": "turn_capability_usage",
+          "bytes": 36864,
+          "payload": 23337
+        },
+        {
+          "name": "turn_costs",
+          "bytes": 40960,
+          "payload": 28347
+        },
+        {
+          "name": "turn_model_usage",
+          "bytes": 57344,
+          "payload": 41157
+        },
+        {
+          "name": "turn_summary",
+          "bytes": 188416,
+          "payload": 168716
+        }
+      ],
+      "results": [
+        {
+          "name": "idx_manifest_identity",
+          "type": "existing",
+          "table": "manifest",
+          "sql": "CREATE INDEX idx_manifest_identity ON manifest(provider, dev, inode)",
+          "query": "identity",
+          "querySql": "SELECT * FROM manifest WHERE provider=? AND dev=? AND inode=? LIMIT 2",
+          "indexBytes": 16384,
+          "indexPayload": 9063,
+          "createMs": 0,
+          "withoutPlan": [
+            "SEARCH manifest USING INDEX idx_manifest_session (provider=?)"
+          ],
+          "withPlan": [
+            "SEARCH manifest USING INDEX idx_manifest_identity (provider=? AND dev=? AND inode=?)"
+          ],
+          "withoutRead": {
+            "medianMs": 0.016063600000000008,
+            "minMs": 0.013537599999999997,
+            "maxMs": 0.02264119999999997,
+            "samplesMs": [
+              0.016063600000000008,
+              0.01581279999999998,
+              0.01642240000000004,
+              0.01364919999999995,
+              0.013594799999999964,
+              0.02264119999999997,
+              0.02103199999999998,
+              0.013537599999999997,
+              0.013572400000000016,
+              0.017151999999999987,
+              0.0179452
+            ]
+          },
+          "withRead": {
+            "medianMs": 0.015087599999999953,
+            "minMs": 0.013600000000000024,
+            "maxMs": 0.020230800000000045,
+            "samplesMs": [
+              0.015920000000000017,
+              0.013958400000000041,
+              0.01831560000000002,
+              0.015087599999999953,
+              0.014379599999999982,
+              0.014939200000000027,
+              0.015756799999999998,
+              0.017031200000000014,
+              0.013855599999999982,
+              0.013600000000000024,
+              0.020230800000000045
+            ]
+          },
+          "withoutWrite": {
+            "insertRows": 236,
+            "insertTransactionMs": 3.399099999999976,
+            "insertSamplesMs": [
+              4.403199999999998,
+              4.406700000000001,
+              3.2656000000000063,
+              3.4472000000000094,
+              3.47139999999996,
+              3.670599999999979,
+              3.399099999999976,
+              3.112799999999993,
+              3.0849000000000046,
+              3.1987000000000307,
+              3.1701000000000477
+            ],
+            "updateRows": 236,
+            "updateExecutionMs": 0.7150000000000318,
+            "updateSamplesMs": [
+              0.8623000000000047,
+              0.7150000000000318,
+              0.7246999999999844,
+              0.7014000000000351,
+              0.7010999999999967,
+              0.7055000000000291,
+              0.7118000000000393,
+              0.7041000000000395,
+              1.1458999999999833,
+              0.9634999999999536,
+              0.9011999999999034
+            ]
+          },
+          "withWrite": {
+            "insertRows": 236,
+            "insertTransactionMs": 5.106400000000008,
+            "insertSamplesMs": [
+              5.299199999999928,
+              4.1778000000000475,
+              4.550299999999993,
+              4.425899999999956,
+              5.109300000000076,
+              7.566900000000032,
+              6.657000000000039,
+              6.578100000000063,
+              5.106400000000008,
+              4.2146999999999935,
+              4.795000000000073
+            ],
+            "updateRows": 236,
+            "updateExecutionMs": 1.4287000000001626,
+            "updateSamplesMs": [
+              1.2505000000001019,
+              2.3473999999998796,
+              2.6239000000000487,
+              2.800999999999931,
+              2.835499999999911,
+              2.0946000000001277,
+              1.289199999999937,
+              1.2898000000000138,
+              1.4287000000001626,
+              1.043999999999869,
+              1.089100000000144
+            ]
+          }
+        },
+        {
+          "name": "idx_manifest_root_id",
+          "type": "existing",
+          "table": "manifest",
+          "sql": "CREATE INDEX idx_manifest_root_id ON manifest(provider, source_root, id)",
+          "query": "root",
+          "querySql": "SELECT * FROM manifest WHERE provider=? AND source_root=? AND (last_seen_scan_id IS NULL OR last_seen_scan_id<>?) AND id>? ORDER BY id LIMIT 100",
+          "indexBytes": 16384,
+          "indexPayload": 10204,
+          "createMs": 0,
+          "withoutPlan": [
+            "SEARCH manifest USING INDEX sqlite_autoindex_manifest_1 (provider=?)",
+            "USE TEMP B-TREE FOR ORDER BY"
+          ],
+          "withPlan": [
+            "SEARCH manifest USING INDEX idx_manifest_root_id (provider=? AND source_root=? AND id>?)"
+          ],
+          "withoutRead": {
+            "medianMs": 0.0863108000000002,
+            "minMs": 0.0631848,
+            "maxMs": 0.10795240000000013,
+            "samplesMs": [
+              0.10795240000000013,
+              0.07895280000000003,
+              0.0863108000000002,
+              0.09088240000000042,
+              0.09242319999999928,
+              0.0631848,
+              0.06926199999999971,
+              0.07278240000000005,
+              0.09739120000000002,
+              0.08446119999999974,
+              0.10678159999999934
+            ]
+          },
+          "withRead": {
+            "medianMs": 0.06074719999999979,
+            "minMs": 0.053152000000000046,
+            "maxMs": 0.09501440000000003,
+            "samplesMs": [
+              0.0647471999999998,
+              0.055512399999999615,
+              0.05486879999999928,
+              0.06074719999999979,
+              0.0649427999999998,
+              0.0618743999999997,
+              0.05652199999999993,
+              0.05647839999999996,
+              0.053152000000000046,
+              0.06451880000000074,
+              0.09501440000000003
+            ]
+          },
+          "withoutWrite": {
+            "insertRows": 236,
+            "insertTransactionMs": 3.56269999999995,
+            "insertSamplesMs": [
+              4.074299999999994,
+              5.507900000000063,
+              5.134600000000091,
+              3.8740999999999985,
+              3.0074999999999363,
+              4.317399999999907,
+              3.3356999999998607,
+              3.560999999999922,
+              3.519700000000057,
+              3.56269999999995,
+              3.0393000000001393
+            ],
+            "updateRows": 236,
+            "updateExecutionMs": 0.7944999999999709,
+            "updateSamplesMs": [
+              1.0902000000000953,
+              0.9208000000000993,
+              0.9114999999999327,
+              0.9012000000000171,
+              0.7944999999999709,
+              0.7571000000000367,
+              0.7371999999998025,
+              0.733199999999897,
+              0.7217000000000553,
+              0.738700000000108,
+              0.856899999999996
+            ]
+          },
+          "withWrite": {
+            "insertRows": 236,
+            "insertTransactionMs": 4.277000000000044,
+            "insertSamplesMs": [
+              4.443899999999985,
+              4.419300000000021,
+              4.283300000000054,
+              4.349199999999655,
+              4.277000000000044,
+              3.61850000000004,
+              3.8369000000002416,
+              4.258100000000013,
+              3.985200000000077,
+              4.413900000000012,
+              4.0034999999998035
+            ],
+            "updateRows": 236,
+            "updateExecutionMs": 1.0891999999998916,
+            "updateSamplesMs": [
+              1.2065999999999804,
+              1.1122000000000298,
+              1.422099999999773,
+              2.179700000000139,
+              1.0709999999999127,
+              1.0833999999999833,
+              1.0700999999999112,
+              1.064300000000003,
+              1.1080000000001746,
+              1.0891999999998916,
+              1.0650000000000546
+            ]
+          }
+        },
+        {
+          "name": "idx_manifest_session",
+          "type": "existing",
+          "table": "manifest",
+          "sql": "CREATE INDEX idx_manifest_session ON manifest(provider, session_id, id)",
+          "query": "manifest_session",
+          "querySql": "SELECT * FROM manifest WHERE provider=? AND session_id=? AND id>? ORDER BY id LIMIT 100",
+          "indexBytes": 16384,
+          "indexPayload": 11604,
+          "createMs": 0,
+          "withoutPlan": [
+            "SEARCH manifest USING INDEX sqlite_autoindex_manifest_1 (provider=?)",
+            "USE TEMP B-TREE FOR ORDER BY"
+          ],
+          "withPlan": [
+            "SEARCH manifest USING INDEX idx_manifest_session (provider=? AND session_id=? AND id>?)"
+          ],
+          "withoutRead": {
+            "medianMs": 0.0216903999999995,
+            "minMs": 0.01859319999999934,
+            "maxMs": 0.033979999999999566,
+            "samplesMs": [
+              0.01859319999999934,
+              0.018624400000000606,
+              0.022735599999999977,
+              0.0216903999999995,
+              0.021614400000000387,
+              0.02167280000000028,
+              0.02159400000000096,
+              0.026703599999998915,
+              0.02950800000000163,
+              0.033979999999999566,
+              0.023148400000000038
+            ]
+          },
+          "withRead": {
+            "medianMs": 0.014073199999998906,
+            "minMs": 0.013181599999999889,
+            "maxMs": 0.015365999999999986,
+            "samplesMs": [
+              0.015343200000001162,
+              0.01386239999999998,
+              0.015365999999999986,
+              0.014580800000001545,
+              0.013435600000000705,
+              0.014639600000000428,
+              0.013370399999999791,
+              0.014665200000001278,
+              0.013181599999999889,
+              0.013490799999999581,
+              0.014073199999998906
+            ]
+          },
+          "withoutWrite": {
+            "insertRows": 236,
+            "insertTransactionMs": 3.457300000000032,
+            "insertSamplesMs": [
+              4.162499999999909,
+              3.5943999999999505,
+              3.457300000000032,
+              3.059400000000096,
+              4.10570000000007,
+              3.376499999999851,
+              3.03650000000016,
+              3.001600000000053,
+              3.4403000000002066,
+              3.5252999999997883,
+              3.817399999999907
+            ],
+            "updateRows": 236,
+            "updateExecutionMs": 0.5967000000000553,
+            "updateSamplesMs": [
+              0.7149999999996908,
+              0.5869999999999891,
+              0.5850999999997839,
+              0.5841999999997824,
+              0.593000000000302,
+              0.5984999999996035,
+              0.5967000000000553,
+              0.7163000000000466,
+              0.603099999999813,
+              0.5936000000001513,
+              0.7560000000003129
+            ]
+          },
+          "withWrite": {
+            "insertRows": 236,
+            "insertTransactionMs": 3.601599999999962,
+            "insertSamplesMs": [
+              5.517699999999877,
+              4.05370000000039,
+              4.714400000000296,
+              3.7554000000000087,
+              3.601599999999962,
+              3.861200000000281,
+              3.531300000000101,
+              3.5753999999997177,
+              3.479400000000169,
+              3.346299999999701,
+              3.4281999999998334
+            ],
+            "updateRows": 236,
+            "updateExecutionMs": 1.2865999999999076,
+            "updateSamplesMs": [
+              0.9364000000000487,
+              0.9054999999998472,
+              1.2877000000003136,
+              1.5525000000002365,
+              0.9425000000001091,
+              0.8088999999999942,
+              1.2865999999999076,
+              1.455199999999877,
+              1.2166000000001986,
+              1.5018999999997504,
+              1.665400000000318
+            ]
+          }
+        },
+        {
+          "name": "idx_summary_period",
+          "type": "existing",
+          "table": "turn_summary",
+          "sql": "CREATE INDEX idx_summary_period ON turn_summary(started_at_ms, provider)",
+          "query": "period",
+          "querySql": "SELECT provider,sum(total_tokens) total_tokens,count(*) n FROM turn_summary WHERE started_at_ms>=? AND started_at_ms<? GROUP BY provider",
+          "indexBytes": 20480,
+          "indexPayload": 12938,
+          "createMs": 0,
+          "withoutPlan": [
+            "SCAN turn_summary USING INDEX idx_summary_project_period"
+          ],
+          "withPlan": [
+            "SEARCH turn_summary USING INDEX idx_summary_period (started_at_ms>? AND started_at_ms<?)",
+            "USE TEMP B-TREE FOR GROUP BY"
+          ],
+          "withoutRead": {
+            "medianMs": 0.12211200000000098,
+            "minMs": 0.09103479999999944,
+            "maxMs": 0.1561288000000004,
+            "samplesMs": [
+              0.13417720000000008,
+              0.11005000000000109,
+              0.12211200000000098,
+              0.10109599999999955,
+              0.14302000000000042,
+              0.11554640000000109,
+              0.11628719999999884,
+              0.1561288000000004,
+              0.14969720000000053,
+              0.09103479999999944,
+              0.1444444000000003
+            ]
+          },
+          "withRead": {
+            "medianMs": 0.11651640000000044,
+            "minMs": 0.08432439999999951,
+            "maxMs": 0.1405648000000001,
+            "samplesMs": [
+              0.10386080000000038,
+              0.08432439999999951,
+              0.10572199999999975,
+              0.09446199999999953,
+              0.10147760000000017,
+              0.1276899999999987,
+              0.1391959999999999,
+              0.11651640000000044,
+              0.1405648000000001,
+              0.1281335999999992,
+              0.1261904000000013
+            ]
+          },
+          "withoutWrite": {
+            "insertRows": 500,
+            "insertTransactionMs": 9.35740000000078,
+            "insertSamplesMs": [
+              11.268800000000738,
+              13.046900000000278,
+              8.951199999999517,
+              8.72860000000037,
+              8.087199999999939,
+              10.100599999999758,
+              8.208700000000135,
+              10.174399999999878,
+              11.826799999999821,
+              8.713999999999942,
+              9.35740000000078
+            ],
+            "updateRows": 766,
+            "updateExecutionMs": 2.6492000000007465,
+            "updateSamplesMs": [
+              2.7138999999997395,
+              2.6192000000000917,
+              2.22400000000016,
+              2.2140000000008513,
+              2.6492000000007465,
+              2.7388999999993757,
+              2.754399999999805,
+              2.803100000000086,
+              3.0950000000002547,
+              2.2367000000003827,
+              2.2595000000001164
+            ]
+          },
+          "withWrite": {
+            "insertRows": 500,
+            "insertTransactionMs": 10.28690000000006,
+            "insertSamplesMs": [
+              11.193900000000212,
+              9.313699999999699,
+              10.058399999999892,
+              10.28690000000006,
+              10.17279999999937,
+              10.099900000000162,
+              8.92280000000028,
+              15.495500000000902,
+              12.056899999999587,
+              12.249099999999999,
+              10.5020999999997
+            ],
+            "updateRows": 766,
+            "updateExecutionMs": 3.8302999999996246,
+            "updateSamplesMs": [
+              5.483299999999872,
+              4.112499999999272,
+              2.697700000000623,
+              2.8179000000000087,
+              5.1031999999995605,
+              3.9331999999994878,
+              3.4903999999996813,
+              3.6226999999998952,
+              3.7199000000000524,
+              6.123199999999997,
+              3.8302999999996246
+            ]
+          }
+        },
+        {
+          "name": "idx_summary_project_period",
+          "type": "existing",
+          "table": "turn_summary",
+          "sql": "CREATE INDEX idx_summary_project_period ON turn_summary(provider, project_key, started_at_ms)",
+          "query": "project_period",
+          "querySql": "SELECT sum(total_tokens),count(*) FROM turn_summary WHERE provider=? AND project_key=? AND started_at_ms>=? AND started_at_ms<?",
+          "indexBytes": 65536,
+          "indexPayload": 51107,
+          "createMs": 0,
+          "withoutPlan": [
+            "SEARCH turn_summary USING INDEX idx_summary_session (provider=?)"
+          ],
+          "withPlan": [
+            "SEARCH turn_summary USING INDEX idx_summary_project_period (provider=? AND project_key=? AND started_at_ms>? AND started_at_ms<?)"
+          ],
+          "withoutRead": {
+            "medianMs": 0.14392239999999948,
+            "minMs": 0.1155051999999996,
+            "maxMs": 0.18252880000000005,
+            "samplesMs": [
+              0.18252880000000005,
+              0.14392239999999948,
+              0.14977759999999762,
+              0.1412059999999983,
+              0.1155051999999996,
+              0.15034319999999934,
+              0.1427908000000025,
+              0.16170439999999872,
+              0.17084560000000057,
+              0.12558760000000257,
+              0.13982760000000052
+            ]
+          },
+          "withRead": {
+            "medianMs": 0.03818319999999949,
+            "minMs": 0.020998800000001212,
+            "maxMs": 0.08597520000000076,
+            "samplesMs": [
+              0.023,
+              0.02572280000000319,
+              0.02373319999999876,
+              0.021134799999999815,
+              0.020998800000001212,
+              0.03818319999999949,
+              0.044513999999999214,
+              0.08597520000000076,
+              0.06629999999999928,
+              0.04867239999999947,
+              0.04499120000000039
+            ]
+          },
+          "withoutWrite": {
+            "insertRows": 500,
+            "insertTransactionMs": 13.765400000000227,
+            "insertSamplesMs": [
+              14.642300000000432,
+              12.995499999999993,
+              17.03189999999995,
+              13.765400000000227,
+              15.749399999999696,
+              17.174199999999473,
+              16.558799999999792,
+              13.076399999999921,
+              12.227000000000771,
+              12.35400000000027,
+              9.107299999999668
+            ],
+            "updateRows": 766,
+            "updateExecutionMs": 2.186700000000201,
+            "updateSamplesMs": [
+              2.186700000000201,
+              2.2344999999995707,
+              2.3759000000000015,
+              2.079299999999421,
+              2.2156999999997424,
+              2.311700000000201,
+              1.7862999999997555,
+              1.6660999999994601,
+              1.6628000000000611,
+              1.671900000000278,
+              3.2150999999994383
+            ]
+          },
+          "withWrite": {
+            "insertRows": 500,
+            "insertTransactionMs": 10.116799999999785,
+            "insertSamplesMs": [
+              11.98779999999988,
+              10.24119999999948,
+              10.116799999999785,
+              10.067000000000007,
+              10.13630000000012,
+              9.255999999999403,
+              9.409700000000157,
+              10.535399999999754,
+              10.168999999999869,
+              8.99619999999959,
+              9.603299999999763
+            ],
+            "updateRows": 766,
+            "updateExecutionMs": 3.323099999999613,
+            "updateSamplesMs": [
+              3.323099999999613,
+              3.0937999999996464,
+              4.02559999999994,
+              3.1370999999999185,
+              3.07300000000032,
+              3.1148999999995794,
+              3.111399999999776,
+              3.8580999999994674,
+              4.116699999999582,
+              3.9502000000002226,
+              4.019499999999425
+            ]
+          }
+        },
+        {
+          "name": "idx_summary_session",
+          "type": "existing",
+          "table": "turn_summary",
+          "sql": "CREATE INDEX idx_summary_session ON turn_summary(provider, session_id, turn_index)",
+          "query": "session",
+          "querySql": "SELECT id FROM turn_summary WHERE provider=? AND session_id=? AND id>? ORDER BY id LIMIT 100",
+          "indexBytes": 49152,
+          "indexPayload": 37353,
+          "createMs": 0,
+          "withoutPlan": [
+            "SEARCH turn_summary USING COVERING INDEX sqlite_autoindex_turn_summary_1 (provider=? AND session_id=?)",
+            "USE TEMP B-TREE FOR ORDER BY"
+          ],
+          "withPlan": [
+            "SEARCH turn_summary USING COVERING INDEX idx_summary_session (provider=? AND session_id=?)",
+            "USE TEMP B-TREE FOR ORDER BY"
+          ],
+          "withoutRead": {
+            "medianMs": 0.03131399999999849,
+            "minMs": 0.029468000000000757,
+            "maxMs": 0.042157999999999446,
+            "samplesMs": [
+              0.042157999999999446,
+              0.030814399999999294,
+              0.029907200000001466,
+              0.03131399999999849,
+              0.03448519999999917,
+              0.03030200000000332,
+              0.03796559999999954,
+              0.041168799999999464,
+              0.029468000000000757,
+              0.0312567999999992,
+              0.03180359999999928
+            ]
+          },
+          "withRead": {
+            "medianMs": 0.04210479999999734,
+            "minMs": 0.03266760000000068,
+            "maxMs": 0.04743119999999908,
+            "samplesMs": [
+              0.033625599999999395,
+              0.0389435999999987,
+              0.0436275999999998,
+              0.043349200000000566,
+              0.04417959999999948,
+              0.04315400000000227,
+              0.04743119999999908,
+              0.04210479999999734,
+              0.03352479999999923,
+              0.03266760000000068,
+              0.03533879999999772
+            ]
+          },
+          "withoutWrite": {
+            "insertRows": 500,
+            "insertTransactionMs": 8.828099999999722,
+            "insertSamplesMs": [
+              9.633899999999812,
+              9.0608000000002,
+              9.003000000000611,
+              8.828099999999722,
+              9.000900000000001,
+              9.321899999999914,
+              8.53439999999955,
+              7.986499999999978,
+              8.401700000000346,
+              8.311200000000099,
+              8.436300000000301
+            ],
+            "updateRows": 766,
+            "updateExecutionMs": 3.4736000000002605,
+            "updateSamplesMs": [
+              3.4459999999999127,
+              3.499499999999898,
+              3.512900000000627,
+              3.4587000000001353,
+              3.4086999999999534,
+              3.483799999999974,
+              3.0708000000004176,
+              3.4439000000002125,
+              3.4736000000002605,
+              3.4977000000008047,
+              3.5468999999993684
+            ]
+          },
+          "withWrite": {
+            "insertRows": 500,
+            "insertTransactionMs": 9.896999999999935,
+            "insertSamplesMs": [
+              12.258100000000013,
+              9.85149999999976,
+              10.136499999999614,
+              9.896999999999935,
+              9.970499999999447,
+              9.029700000000048,
+              8.322900000000118,
+              9.442700000000514,
+              10.576900000000023,
+              9.899499999999534,
+              8.72059999999965
+            ],
+            "updateRows": 766,
+            "updateExecutionMs": 3.1197000000001935,
+            "updateSamplesMs": [
+              4.099899999999252,
+              4.047899999999572,
+              3.4940999999998894,
+              2.6853000000000975,
+              2.620299999999588,
+              2.6234999999996944,
+              2.61200000000008,
+              2.623700000000099,
+              3.1197000000001935,
+              3.341699999999946,
+              3.2076999999999316
+            ]
+          }
+        },
+        {
+          "name": "audit_provider_time",
+          "type": "candidate",
+          "table": "turn_summary",
+          "sql": "CREATE INDEX audit_provider_time ON turn_summary(provider,started_at_ms DESC,id DESC)",
+          "query": "provider_recent",
+          "querySql": "SELECT * FROM turn_summary WHERE provider=? ORDER BY started_at_ms DESC,id DESC LIMIT 60",
+          "indexBytes": 24576,
+          "indexPayload": 15236,
+          "createMs": 1.6334999999999127,
+          "withoutPlan": [
+            "SEARCH turn_summary USING INDEX idx_summary_session (provider=?)",
+            "USE TEMP B-TREE FOR ORDER BY"
+          ],
+          "withPlan": [
+            "SEARCH turn_summary USING INDEX audit_provider_time (provider=?)"
+          ],
+          "withoutRead": {
+            "medianMs": 1.7220112000000007,
+            "minMs": 1.6471932000000016,
+            "maxMs": 2.1579000000000015,
+            "samplesMs": [
+              1.6932567999999992,
+              1.7369219999999987,
+              1.7220112000000007,
+              1.7228364000000038,
+              1.6524328000000024,
+              1.8537599999999947,
+              1.685109199999999,
+              1.715227199999994,
+              1.8683856000000014,
+              1.6471932000000016,
+              2.1579000000000015
+            ]
+          },
+          "withRead": {
+            "medianMs": 0.20168239999999787,
+            "minMs": 0.1919435999999987,
+            "maxMs": 0.23290000000000147,
+            "samplesMs": [
+              0.22893320000000678,
+              0.23290000000000147,
+              0.20478160000000206,
+              0.19880840000000172,
+              0.19748799999999755,
+              0.19221719999999914,
+              0.19359719999999653,
+              0.22954920000000129,
+              0.20168239999999787,
+              0.1919435999999987,
+              0.21341919999999664
+            ]
+          },
+          "withoutWrite": {
+            "insertRows": 500,
+            "insertTransactionMs": 9.951199999999517,
+            "insertSamplesMs": [
+              12.475499999998647,
+              9.951199999999517,
+              9.949100000001636,
+              9.156600000000253,
+              9.007299999999304,
+              9.837199999999939,
+              10.187099999999191,
+              10.652599999999438,
+              10.275299999999334,
+              9.803599999999278,
+              10.014400000000023
+            ],
+            "updateRows": 766,
+            "updateExecutionMs": 3.3228999999992084,
+            "updateSamplesMs": [
+              4.545200000000477,
+              3.220000000001164,
+              3.540899999999965,
+              3.8563999999987573,
+              3.862600000000384,
+              3.3228999999992084,
+              3.1260000000002037,
+              3.113600000000588,
+              3.114400000000387,
+              3.139900000000125,
+              3.5486999999993714
+            ]
+          },
+          "withWrite": {
+            "insertRows": 500,
+            "insertTransactionMs": 11.622800000001007,
+            "insertSamplesMs": [
+              13.476399999999558,
+              11.748300000001109,
+              11.622800000001007,
+              11.275399999998626,
+              10.113600000000588,
+              11.059799999999086,
+              12.274400000000242,
+              11.21060000000034,
+              12.277500000000146,
+              11.85740000000078,
+              9.792500000001382
+            ],
+            "updateRows": 766,
+            "updateExecutionMs": 3.8070999999999913,
+            "updateSamplesMs": [
+              4.526799999999639,
+              4.572000000000116,
+              4.527599999999438,
+              5.405500000000757,
+              3.8070999999999913,
+              3.6561000000001513,
+              3.6406999999999243,
+              3.6479999999992287,
+              3.915100000000166,
+              3.7721999999994296,
+              3.6635000000005675
+            ]
+          }
+        },
+        {
+          "name": "audit_project_time",
+          "type": "candidate",
+          "table": "turn_summary",
+          "sql": "CREATE INDEX audit_project_time ON turn_summary(project_key,started_at_ms)",
+          "query": "project_any_provider",
+          "querySql": "SELECT provider,sum(total_tokens) FROM turn_summary WHERE project_key=? AND started_at_ms>=? AND started_at_ms<? GROUP BY provider",
+          "indexBytes": 53248,
+          "indexPayload": 46481,
+          "createMs": 2.076100000000224,
+          "withoutPlan": [
+            "SEARCH turn_summary USING INDEX idx_summary_period (started_at_ms>? AND started_at_ms<?)",
+            "USE TEMP B-TREE FOR GROUP BY"
+          ],
+          "withPlan": [
+            "SEARCH turn_summary USING INDEX audit_project_time (project_key=? AND started_at_ms>? AND started_at_ms<?)",
+            "USE TEMP B-TREE FOR GROUP BY"
+          ],
+          "withoutRead": {
+            "medianMs": 0.07977440000000206,
+            "minMs": 0.06360199999999895,
+            "maxMs": 0.11684760000000097,
+            "samplesMs": [
+              0.06552279999999883,
+              0.07977440000000206,
+              0.07059079999999812,
+              0.06691479999999865,
+              0.09621160000000237,
+              0.0701872000000003,
+              0.09176640000000043,
+              0.06360199999999895,
+              0.09091560000000026,
+              0.11684760000000097,
+              0.11089319999999861
+            ]
+          },
+          "withRead": {
+            "medianMs": 0.05236600000000181,
+            "minMs": 0.03419080000000395,
+            "maxMs": 0.08578199999999925,
+            "samplesMs": [
+              0.04086479999999574,
+              0.03924199999999837,
+              0.05236600000000181,
+              0.05648240000000078,
+              0.055900000000001455,
+              0.047847999999998135,
+              0.04351239999999962,
+              0.03419080000000395,
+              0.07199560000000202,
+              0.08578199999999925,
+              0.06428760000000329
+            ]
+          },
+          "withoutWrite": {
+            "insertRows": 500,
+            "insertTransactionMs": 10.484700000000885,
+            "insertSamplesMs": [
+              14.357500000000073,
+              8.777200000000448,
+              14.095200000001569,
+              11.585399999999936,
+              8.775700000000143,
+              9.708300000000236,
+              10.370899999999892,
+              8.684699999999793,
+              10.548200000001088,
+              13.40730000000076,
+              10.484700000000885
+            ],
+            "updateRows": 766,
+            "updateExecutionMs": 4.204299999999421,
+            "updateSamplesMs": [
+              3.2960999999995693,
+              3.272899999999936,
+              3.3972000000012486,
+              3.668099999998958,
+              4.526400000000649,
+              4.206600000001345,
+              4.183500000001004,
+              4.204299999999421,
+              4.6445999999996275,
+              5.683800000000701,
+              6.484600000001592
+            ]
+          },
+          "withWrite": {
+            "insertRows": 500,
+            "insertTransactionMs": 11.59310000000005,
+            "insertSamplesMs": [
+              13.985399999999572,
+              11.90480000000025,
+              11.59310000000005,
+              10.961499999999432,
+              11.865999999999985,
+              11.251200000000608,
+              11.781999999999243,
+              10.401300000001356,
+              10.592800000000352,
+              12.424600000000282,
+              10.118800000000192
+            ],
+            "updateRows": 766,
+            "updateExecutionMs": 4.66610000000037,
+            "updateSamplesMs": [
+              4.66610000000037,
+              4.795499999998356,
+              4.71559999999954,
+              5.028199999998833,
+              5.755600000000413,
+              4.646300000000338,
+              5.006999999999607,
+              4.224599999999555,
+              4.1895999999997,
+              4.188799999999901,
+              4.283499999999549
+            ]
+          }
+        },
+        {
+          "name": "audit_capability_category",
+          "type": "candidate",
+          "table": "turn_capability_usage",
+          "sql": "CREATE INDEX audit_capability_category ON turn_capability_usage(category,name,turn_id,usage_count)",
+          "query": "capability",
+          "querySql": "SELECT t.provider,u.category,u.name,sum(u.usage_count) usage_count FROM turn_summary t JOIN turn_capability_usage u ON u.turn_id=t.id WHERE u.category=? GROUP BY t.provider,u.name ORDER BY usage_count DESC,t.provider,u.name LIMIT 100",
+          "indexBytes": 32768,
+          "indexPayload": 23337,
+          "createMs": 1.6496999999999389,
+          "withoutPlan": [
+            "SCAN u",
+            "SEARCH t USING INTEGER PRIMARY KEY (rowid=?)",
+            "USE TEMP B-TREE FOR GROUP BY",
+            "USE TEMP B-TREE FOR ORDER BY"
+          ],
+          "withPlan": [
+            "SEARCH u USING COVERING INDEX audit_capability_category (category=?)",
+            "SEARCH t USING INTEGER PRIMARY KEY (rowid=?)",
+            "USE TEMP B-TREE FOR GROUP BY",
+            "USE TEMP B-TREE FOR ORDER BY"
+          ],
+          "withoutRead": {
+            "medianMs": 0.22724319999999715,
+            "minMs": 0.20501920000000246,
+            "maxMs": 0.27520640000000274,
+            "samplesMs": [
+              0.21884440000000177,
+              0.22521959999999672,
+              0.2303599999999933,
+              0.27520640000000274,
+              0.22724319999999715,
+              0.2213787999999986,
+              0.25084399999999735,
+              0.22882839999999852,
+              0.2372103999999963,
+              0.20501920000000246,
+              0.22363160000000062
+            ]
+          },
+          "withRead": {
+            "medianMs": 0.15690600000000268,
+            "minMs": 0.14065639999999985,
+            "maxMs": 0.17989160000000265,
+            "samplesMs": [
+              0.15224920000000566,
+              0.1514340000000011,
+              0.1797396000000008,
+              0.15017319999999745,
+              0.17989160000000265,
+              0.14905199999999605,
+              0.17530879999999888,
+              0.16325359999999636,
+              0.14065639999999985,
+              0.15694839999999385,
+              0.15690600000000268
+            ]
+          },
+          "withoutWrite": {
+            "insertRows": 500,
+            "insertTransactionMs": 3.1301000000003114,
+            "insertSamplesMs": [
+              5.272300000000541,
+              3.1977999999999156,
+              3.0370999999995547,
+              3.1301000000003114,
+              5.00170000000071,
+              3.0877999999993335,
+              5.020000000000437,
+              2.9825000000000728,
+              3.068599999998696,
+              3.602999999999156,
+              3.0565000000005966
+            ],
+            "updateRows": 923,
+            "updateExecutionMs": 1.9491000000016356,
+            "updateSamplesMs": [
+              1.6335999999992055,
+              1.9491000000016356,
+              1.9207000000005792,
+              1.9791999999997643,
+              2.13169999999991,
+              1.923399999999674,
+              1.9210000000002765,
+              1.9104000000006636,
+              3.115400000000591,
+              2.673000000000684,
+              3.0394999999989523
+            ]
+          },
+          "withWrite": {
+            "insertRows": 500,
+            "insertTransactionMs": 4.278000000000247,
+            "insertSamplesMs": [
+              7.068699999999808,
+              7.52219999999943,
+              3.7774000000008527,
+              4.899199999999837,
+              4.190700000001016,
+              4.313899999999194,
+              3.6995999999999185,
+              4.278000000000247,
+              3.7075999999997293,
+              4.015300000000934,
+              4.286900000000969
+            ],
+            "updateRows": 923,
+            "updateExecutionMs": 3.2237999999997555,
+            "updateSamplesMs": [
+              3.355999999999767,
+              3.2497999999995955,
+              3.0846999999994296,
+              3.3131000000012136,
+              4.607900000000882,
+              3.18080000000009,
+              3.1022999999986496,
+              3.1181999999989785,
+              3.2237999999997555,
+              3.225400000001173,
+              3.102100000000064
+            ]
+          }
+        },
+        {
+          "name": "audit_model",
+          "type": "candidate",
+          "table": "turn_model_usage",
+          "sql": "CREATE INDEX audit_model ON turn_model_usage(model,turn_id)",
+          "query": "model",
+          "querySql": "SELECT t.provider,m.model,sum(m.input_tokens+m.output_tokens) total_tokens FROM turn_summary t LEFT JOIN turn_model_usage m ON m.turn_id=t.id GROUP BY t.provider,m.model ORDER BY total_tokens DESC,t.provider,m.model LIMIT 100",
+          "indexBytes": 20480,
+          "indexPayload": 10803,
+          "createMs": 1.5002999999996973,
+          "withoutPlan": [
+            "SCAN t USING COVERING INDEX idx_summary_session",
+            "SEARCH m USING PRIMARY KEY (turn_id=?) LEFT-JOIN",
+            "USE TEMP B-TREE FOR GROUP BY",
+            "USE TEMP B-TREE FOR ORDER BY"
+          ],
+          "withPlan": [
+            "SCAN t USING COVERING INDEX idx_summary_session",
+            "SEARCH m USING PRIMARY KEY (turn_id=?) LEFT-JOIN",
+            "USE TEMP B-TREE FOR GROUP BY",
+            "USE TEMP B-TREE FOR ORDER BY"
+          ],
+          "withoutRead": {
+            "medianMs": 0.5992592000000004,
+            "minMs": 0.5484703999999984,
+            "maxMs": 0.7478775999999925,
+            "samplesMs": [
+              0.5731947999999975,
+              0.6415336000000025,
+              0.5662843999999968,
+              0.586531600000002,
+              0.5992592000000004,
+              0.5484703999999984,
+              0.6054691999999996,
+              0.6150127999999968,
+              0.5590731999999989,
+              0.7478775999999925,
+              0.7344423999999999
+            ]
+          },
+          "withRead": {
+            "medianMs": 0.5852559999999939,
+            "minMs": 0.5110636000000086,
+            "maxMs": 0.6276876000000048,
+            "samplesMs": [
+              0.5745752000000066,
+              0.6204660000000003,
+              0.5601923999999999,
+              0.6037623999999924,
+              0.5507248000000109,
+              0.5852559999999939,
+              0.5110636000000086,
+              0.6276876000000048,
+              0.6215939999999973,
+              0.5683163999999961,
+              0.617666000000012
+            ]
+          },
+          "withoutWrite": {
+            "insertRows": 500,
+            "insertTransactionMs": 2.8919000000023516,
+            "insertSamplesMs": [
+              4.566900000001624,
+              1.9697999999989406,
+              1.92960000000312,
+              3.0502999999989697,
+              1.6540999999997439,
+              2.9792000000015832,
+              2.8840000000018335,
+              3.0231999999996333,
+              2.2923999999984517,
+              3.096300000001065,
+              2.8919000000023516
+            ],
+            "updateRows": 667,
+            "updateExecutionMs": 2.8440000000009604,
+            "updateSamplesMs": [
+              1.9742000000005646,
+              1.860000000000582,
+              2.144400000001042,
+              2.9288000000015018,
+              3.003499999998894,
+              3.060299999997369,
+              2.8994000000020606,
+              1.4611000000004424,
+              1.9807000000000698,
+              2.8440000000009604,
+              3.0010999999976775
+            ]
+          },
+          "withWrite": {
+            "insertRows": 500,
+            "insertTransactionMs": 2.776799999999639,
+            "insertSamplesMs": [
+              5.234200000002602,
+              2.4279999999998836,
+              2.2996000000021013,
+              2.419099999999162,
+              2.3922999999995227,
+              3.3559000000022934,
+              3.897899999999936,
+              2.776799999999639,
+              3.258399999998801,
+              3.1561000000001513,
+              2.41110000000117
+            ],
+            "updateRows": 667,
+            "updateExecutionMs": 2.69629999999961,
+            "updateSamplesMs": [
+              2.7687999999980093,
+              2.5288000000000466,
+              2.501699999997072,
+              2.50090000000273,
+              2.6435999999994237,
+              4.84230000000025,
+              4.349899999997433,
+              4.401400000002468,
+              4.389800000000832,
+              2.69629999999961,
+              2.061200000000099
+            ]
+          },
+          "extra": {
+            "name": "model_filter",
+            "sql": "SELECT sum(input_tokens+output_tokens) FROM turn_model_usage WHERE model=?",
+            "withoutPlan": [
+              "SCAN turn_model_usage"
+            ],
+            "withPlan": [
+              "SEARCH turn_model_usage USING INDEX audit_model (model=?)"
+            ],
+            "withoutRead": {
+              "medianMs": 0.07961279999998806,
+              "minMs": 0.05105760000000009,
+              "maxMs": 0.133299199999994,
+              "samplesMs": [
+                0.07994920000000275,
+                0.11170640000001003,
+                0.0758064000000013,
+                0.05967840000000433,
+                0.0728463999999949,
+                0.05105760000000009,
+                0.07961279999998806,
+                0.133299199999994,
+                0.11805160000000614,
+                0.110761599999998,
+                0.0761996000000072
+              ]
+            },
+            "withRead": {
+              "medianMs": 0.15260439999999653,
+              "minMs": 0.12905800000000453,
+              "maxMs": 0.18923399999999674,
+              "samplesMs": [
+                0.13885120000000462,
+                0.14181000000001223,
+                0.13177479999999922,
+                0.1646527999999962,
+                0.1407835999999952,
+                0.12905800000000453,
+                0.1607091999999975,
+                0.18818679999999585,
+                0.168203600000008,
+                0.15260439999999653,
+                0.18923399999999674
+              ]
+            }
+          }
+        },
+        {
+          "name": "audit_session_id",
+          "type": "replacement",
+          "table": "turn_summary",
+          "sql": "CREATE INDEX audit_session_id ON turn_summary(provider,session_id)",
+          "query": "session",
+          "querySql": "SELECT id FROM turn_summary WHERE provider=? AND session_id=? AND id>? ORDER BY id LIMIT 100",
+          "indexBytes": 45056,
+          "indexPayload": 36032,
+          "createMs": 2.072700000000623,
+          "withoutPlan": [
+            "SEARCH turn_summary USING COVERING INDEX idx_summary_session (provider=? AND session_id=?)",
+            "USE TEMP B-TREE FOR ORDER BY"
+          ],
+          "withPlan": [
+            "SEARCH turn_summary USING COVERING INDEX audit_session_id (provider=? AND session_id=? AND rowid>?)"
+          ],
+          "withoutRead": {
+            "medianMs": 0.042397200000006706,
+            "minMs": 0.0333295999999973,
+            "maxMs": 0.05919999999999709,
+            "samplesMs": [
+              0.05020920000001206,
+              0.040144800000009126,
+              0.04093400000000838,
+              0.042397200000006706,
+              0.05857479999998759,
+              0.05919999999999709,
+              0.0532448000000004,
+              0.04456960000000254,
+              0.03835839999999734,
+              0.03617440000000351,
+              0.0333295999999973
+            ]
+          },
+          "withRead": {
+            "medianMs": 0.026342000000004192,
+            "minMs": 0.021767600000006496,
+            "maxMs": 0.04731640000001062,
+            "samplesMs": [
+              0.021767600000006496,
+              0.02554320000000007,
+              0.030067600000009406,
+              0.03618399999999383,
+              0.02192239999999583,
+              0.026342000000004192,
+              0.03596760000000358,
+              0.030282399999996414,
+              0.04731640000001062,
+              0.021904399999999442,
+              0.02221799999999348
+            ]
+          },
+          "withoutWrite": {
+            "insertRows": 500,
+            "insertTransactionMs": 10.55880000000252,
+            "insertSamplesMs": [
+              13.544299999997747,
+              14.85320000000138,
+              10.55880000000252,
+              9.03610000000117,
+              9.008200000000215,
+              10.099999999998545,
+              38.94599999999991,
+              12.365200000000186,
+              8.552599999999074,
+              9.166300000000774,
+              11.678499999998166
+            ],
+            "updateRows": 766,
+            "updateExecutionMs": 3.2677999999978056,
+            "updateSamplesMs": [
+              2.9623000000028696,
+              2.6779999999998836,
+              3.4891999999999825,
+              3.2677999999978056,
+              3.290500000002794,
+              2.768000000000029,
+              2.704299999997602,
+              2.977200000001176,
+              4.002899999999499,
+              3.301400000000285,
+              3.424300000002404
+            ]
+          },
+          "withWrite": {
+            "insertRows": 500,
+            "insertTransactionMs": 10.469900000000052,
+            "insertSamplesMs": [
+              13.890400000000227,
+              10.214799999997922,
+              11.408100000000559,
+              10.626299999999901,
+              10.547900000001391,
+              10.500599999999395,
+              10.469900000000052,
+              10.142500000001746,
+              9.537599999999657,
+              9.84740000000238,
+              9.960800000000745
+            ],
+            "updateRows": 766,
+            "updateExecutionMs": 3.6622000000024855,
+            "updateSamplesMs": [
+              3.441100000000006,
+              3.6622000000024855,
+              4.013300000002346,
+              7.272800000002462,
+              3.1674000000020897,
+              3.1863999999986845,
+              4.983400000000984,
+              3.563300000001618,
+              3.4398000000001048,
+              4.243900000001304,
+              6.24909999999727
+            ]
+          }
+        }
+      ]
+    },
+    "pairedInserts": {
+      "method": "21 paired AB/BA trials per index after 4 warmup pairs, FULL WAL fsync committed INSERT batches, all other existing indices fixed; paired delta ms=with-without",
+      "results": [
+        {
+          "name": "idx_manifest_identity",
+          "type": "existing",
+          "table": "manifest",
+          "rows": 236,
+          "withoutMs": 3.298000000000002,
+          "withMs": 3.619199999999978,
+          "pairedDeltaMs": 0.19690000000002783,
+          "pairedDeltaP10Ms": -0.5226999999999862,
+          "pairedDeltaP90Ms": 0.8369999999997617,
+          "indexBytes": 24576,
+          "pairs": [
+            {
+              "withoutMs": 3.1329999999999814,
+              "withMs": 3.98599999999999,
+              "deltaMs": 0.8530000000000086
+            },
+            {
+              "withoutMs": 4.231200000000001,
+              "withMs": 3.553299999999979,
+              "deltaMs": -0.6779000000000224
+            },
+            {
+              "withoutMs": 2.8777999999999793,
+              "withMs": 5.661300000000097,
+              "deltaMs": 2.7835000000001173
+            },
+            {
+              "withoutMs": 3.671799999999962,
+              "withMs": 4.38799999999992,
+              "deltaMs": 0.716199999999958
+            },
+            {
+              "withoutMs": 4.058300000000031,
+              "withMs": 3.8460000000000036,
+              "deltaMs": -0.21230000000002747
+            },
+            {
+              "withoutMs": 3.42229999999995,
+              "withMs": 3.619199999999978,
+              "deltaMs": 0.19690000000002783
+            },
+            {
+              "withoutMs": 3.2713999999999714,
+              "withMs": 3.4388999999999896,
+              "deltaMs": 0.1675000000000182
+            },
+            {
+              "withoutMs": 3.0652999999999793,
+              "withMs": 3.744299999999953,
+              "deltaMs": 0.6789999999999736
+            },
+            {
+              "withoutMs": 2.8258999999999332,
+              "withMs": 3.6295000000000073,
+              "deltaMs": 0.803600000000074
+            },
+            {
+              "withoutMs": 3.8951999999999316,
+              "withMs": 3.3724999999999454,
+              "deltaMs": -0.5226999999999862
+            },
+            {
+              "withoutMs": 3.6046000000001186,
+              "withMs": 3.531500000000051,
+              "deltaMs": -0.07310000000006767
+            },
+            {
+              "withoutMs": 3.2656999999999243,
+              "withMs": 3.2041999999999007,
+              "deltaMs": -0.06150000000002365
+            },
+            {
+              "withoutMs": 4.036399999999958,
+              "withMs": 3.159400000000005,
+              "deltaMs": -0.8769999999999527
+            },
+            {
+              "withoutMs": 3.4647999999999683,
+              "withMs": 3.1421000000000276,
+              "deltaMs": -0.3226999999999407
+            },
+            {
+              "withoutMs": 2.8079999999999927,
+              "withMs": 3.608299999999872,
+              "deltaMs": 0.8002999999998792
+            },
+            {
+              "withoutMs": 3.5336999999999534,
+              "withMs": 3.5926999999999225,
+              "deltaMs": 0.05899999999996908
+            },
+            {
+              "withoutMs": 3.4324000000001433,
+              "withMs": 3.7954999999999472,
+              "deltaMs": 0.3630999999998039
+            },
+            {
+              "withoutMs": 3.298000000000002,
+              "withMs": 3.4312999999999647,
+              "deltaMs": 0.1332999999999629
+            },
+            {
+              "withoutMs": 2.8116999999999734,
+              "withMs": 3.64650000000006,
+              "deltaMs": 0.8348000000000866
+            },
+            {
+              "withoutMs": 3.05580000000009,
+              "withMs": 3.892799999999852,
+              "deltaMs": 0.8369999999997617
+            },
+            {
+              "withoutMs": 3.2363000000000284,
+              "withMs": 3.8037000000001626,
+              "deltaMs": 0.5674000000001342
+            }
+          ]
+        },
+        {
+          "name": "idx_manifest_root_id",
+          "type": "existing",
+          "table": "manifest",
+          "rows": 236,
+          "withoutMs": 3.3234999999999673,
+          "withMs": 4.012499999999818,
+          "pairedDeltaMs": 0.5914000000002488,
+          "pairedDeltaP10Ms": 0.2770999999997912,
+          "pairedDeltaP90Ms": 0.9303999999997359,
+          "indexBytes": 16384,
+          "pairs": [
+            {
+              "withoutMs": 3.88779999999997,
+              "withMs": 4.167699999999968,
+              "deltaMs": 0.2798999999999978
+            },
+            {
+              "withoutMs": 3.8069000000000415,
+              "withMs": 4.083999999999833,
+              "deltaMs": 0.2770999999997912
+            },
+            {
+              "withoutMs": 3.8378999999999905,
+              "withMs": 4.5216999999997824,
+              "deltaMs": 0.6837999999997919
+            },
+            {
+              "withoutMs": 3.1368999999999687,
+              "withMs": 3.7283000000002176,
+              "deltaMs": 0.5914000000002488
+            },
+            {
+              "withoutMs": 3.4387000000001535,
+              "withMs": 3.8377999999997883,
+              "deltaMs": 0.39909999999963475
+            },
+            {
+              "withoutMs": 3.2851000000000568,
+              "withMs": 4.055299999999988,
+              "deltaMs": 0.7701999999999316
+            },
+            {
+              "withoutMs": 3.567199999999957,
+              "withMs": 4.1534999999998945,
+              "deltaMs": 0.5862999999999374
+            },
+            {
+              "withoutMs": 3.214300000000094,
+              "withMs": 3.7881999999999607,
+              "deltaMs": 0.5738999999998668
+            },
+            {
+              "withoutMs": 3.5276999999996406,
+              "withMs": 4.196999999999662,
+              "deltaMs": 0.6693000000000211
+            },
+            {
+              "withoutMs": 3.353900000000067,
+              "withMs": 4.242300000000341,
+              "deltaMs": 0.8884000000002743
+            },
+            {
+              "withoutMs": 3.27159999999958,
+              "withMs": 3.8546000000001186,
+              "deltaMs": 0.5830000000005384
+            },
+            {
+              "withoutMs": 3.6275000000000546,
+              "withMs": 3.993199999999888,
+              "deltaMs": 0.3656999999998334
+            },
+            {
+              "withoutMs": 3.3769999999999527,
+              "withMs": 3.6473000000000866,
+              "deltaMs": 0.2703000000001339
+            },
+            {
+              "withoutMs": 3.239900000000034,
+              "withMs": 4.058399999999892,
+              "deltaMs": 0.8184999999998581
+            },
+            {
+              "withoutMs": 3.2069000000001324,
+              "withMs": 4.417699999999968,
+              "deltaMs": 1.2107999999998356
+            },
+            {
+              "withoutMs": 3.209700000000339,
+              "withMs": 3.8647000000000844,
+              "deltaMs": 0.6549999999997453
+            },
+            {
+              "withoutMs": 4.103099999999813,
+              "withMs": 3.98929999999973,
+              "deltaMs": -0.11380000000008295
+            },
+            {
+              "withoutMs": 3.1288000000004104,
+              "withMs": 4.012499999999818,
+              "deltaMs": 0.8836999999994077
+            },
+            {
+              "withoutMs": 3.3234999999999673,
+              "withMs": 4.680299999999988,
+              "deltaMs": 1.356800000000021
+            },
+            {
+              "withoutMs": 3.0452000000000226,
+              "withMs": 3.9755999999997584,
+              "deltaMs": 0.9303999999997359
+            },
+            {
+              "withoutMs": 2.999000000000251,
+              "withMs": 3.4762000000000626,
+              "deltaMs": 0.47719999999981155
+            }
+          ]
+        },
+        {
+          "name": "idx_manifest_session",
+          "type": "existing",
+          "table": "manifest",
+          "rows": 236,
+          "withoutMs": 3.4179000000003725,
+          "withMs": 3.9002000000000407,
+          "pairedDeltaMs": 0.5028000000002066,
+          "pairedDeltaP10Ms": 0.013500000000021828,
+          "pairedDeltaP90Ms": 0.8955999999998312,
+          "indexBytes": 28672,
+          "pairs": [
+            {
+              "withoutMs": 3.9020000000000437,
+              "withMs": 4.1512000000002445,
+              "deltaMs": 0.24920000000020082
+            },
+            {
+              "withoutMs": 3.279199999999946,
+              "withMs": 3.6149999999997817,
+              "deltaMs": 0.33579999999983556
+            },
+            {
+              "withoutMs": 3.3819000000003143,
+              "withMs": 4.140799999999217,
+              "deltaMs": 0.7588999999989028
+            },
+            {
+              "withoutMs": 3.4861000000000786,
+              "withMs": 4.07969999999932,
+              "deltaMs": 0.5935999999992418
+            },
+            {
+              "withoutMs": 3.528900000000249,
+              "withMs": 4.891099999999824,
+              "deltaMs": 1.362199999999575
+            },
+            {
+              "withoutMs": 3.493199999999888,
+              "withMs": 4.346099999999751,
+              "deltaMs": 0.8528999999998632
+            },
+            {
+              "withoutMs": 3.607100000000173,
+              "withMs": 3.5491000000001804,
+              "deltaMs": -0.057999999999992724
+            },
+            {
+              "withoutMs": 3.3994000000002416,
+              "withMs": 3.775499999999738,
+              "deltaMs": 0.3760999999994965
+            },
+            {
+              "withoutMs": 4.057800000000498,
+              "withMs": 4.176199999999881,
+              "deltaMs": 0.118399999999383
+            },
+            {
+              "withoutMs": 3.4179000000003725,
+              "withMs": 4.5646999999999025,
+              "deltaMs": 1.14679999999953
+            },
+            {
+              "withoutMs": 3.1358999999993102,
+              "withMs": 3.9440999999997075,
+              "deltaMs": 0.8082000000003973
+            },
+            {
+              "withoutMs": 3.4302999999999884,
+              "withMs": 3.269999999999527,
+              "deltaMs": -0.1603000000004613
+            },
+            {
+              "withoutMs": 2.9820999999992637,
+              "withMs": 3.3177000000005137,
+              "deltaMs": 0.33560000000125
+            },
+            {
+              "withoutMs": 3.748500000000604,
+              "withMs": 4.053600000000188,
+              "deltaMs": 0.3050999999995838
+            },
+            {
+              "withoutMs": 3.0534000000006927,
+              "withMs": 3.588999999999942,
+              "deltaMs": 0.5355999999992491
+            },
+            {
+              "withoutMs": 3.545900000000074,
+              "withMs": 3.559400000000096,
+              "deltaMs": 0.013500000000021828
+            },
+            {
+              "withoutMs": 3.098399999999856,
+              "withMs": 3.6012000000000626,
+              "deltaMs": 0.5028000000002066
+            },
+            {
+              "withoutMs": 3.590499999999338,
+              "withMs": 3.6283000000003085,
+              "deltaMs": 0.03780000000097061
+            },
+            {
+              "withoutMs": 3.2938999999996668,
+              "withMs": 3.8616000000001804,
+              "deltaMs": 0.5677000000005137
+            },
+            {
+              "withoutMs": 3.256199999999808,
+              "withMs": 4.151799999999639,
+              "deltaMs": 0.8955999999998312
+            },
+            {
+              "withoutMs": 3.135200000000623,
+              "withMs": 3.9002000000000407,
+              "deltaMs": 0.7649999999994179
+            }
+          ]
+        },
+        {
+          "name": "idx_summary_period",
+          "type": "existing",
+          "table": "turn_summary",
+          "rows": 500,
+          "withoutMs": 9.454200000000128,
+          "withMs": 10.094200000000455,
+          "pairedDeltaMs": 0.5268000000005486,
+          "pairedDeltaP10Ms": -0.5263000000004467,
+          "pairedDeltaP90Ms": 1.7831999999998516,
+          "indexBytes": 36864,
+          "pairs": [
+            {
+              "withoutMs": 9.19840000000022,
+              "withMs": 10.529899999999543,
+              "deltaMs": 1.3314999999993233
+            },
+            {
+              "withoutMs": 9.341300000000047,
+              "withMs": 11.418700000000172,
+              "deltaMs": 2.077400000000125
+            },
+            {
+              "withoutMs": 8.86620000000039,
+              "withMs": 9.456000000000131,
+              "deltaMs": 0.589799999999741
+            },
+            {
+              "withoutMs": 9.835599999999431,
+              "withMs": 10.180000000000291,
+              "deltaMs": 0.34440000000086
+            },
+            {
+              "withoutMs": 9.672499999999673,
+              "withMs": 10.76510000000053,
+              "deltaMs": 1.092600000000857
+            },
+            {
+              "withoutMs": 9.367400000000089,
+              "withMs": 10.744599999999991,
+              "deltaMs": 1.3771999999999025
+            },
+            {
+              "withoutMs": 10.08010000000013,
+              "withMs": 8.463799999999537,
+              "deltaMs": -1.6163000000005923
+            },
+            {
+              "withoutMs": 9.318000000000211,
+              "withMs": 10.114000000000487,
+              "deltaMs": 0.7960000000002765
+            },
+            {
+              "withoutMs": 9.90980000000036,
+              "withMs": 10.094200000000455,
+              "deltaMs": 0.18440000000009604
+            },
+            {
+              "withoutMs": 8.364900000000489,
+              "withMs": 10.14810000000034,
+              "deltaMs": 1.7831999999998516
+            },
+            {
+              "withoutMs": 10.525099999999838,
+              "withMs": 8.995299999999588,
+              "deltaMs": -1.5298000000002503
+            },
+            {
+              "withoutMs": 9.052799999999479,
+              "withMs": 10.218800000000556,
+              "deltaMs": 1.1660000000010768
+            },
+            {
+              "withoutMs": 9.072700000000623,
+              "withMs": 9.408400000000256,
+              "deltaMs": 0.3356999999996333
+            },
+            {
+              "withoutMs": 9.561599999999999,
+              "withMs": 10.088400000000547,
+              "deltaMs": 0.5268000000005486
+            },
+            {
+              "withoutMs": 10.002800000000207,
+              "withMs": 10.99330000000009,
+              "deltaMs": 0.9904999999998836
+            },
+            {
+              "withoutMs": 9.641399999999521,
+              "withMs": 9.458700000000135,
+              "deltaMs": -0.1826999999993859
+            },
+            {
+              "withoutMs": 9.815300000000207,
+              "withMs": 9.71810000000005,
+              "deltaMs": -0.09720000000015716
+            },
+            {
+              "withoutMs": 9.454200000000128,
+              "withMs": 9.844000000000051,
+              "deltaMs": 0.3897999999999229
+            },
+            {
+              "withoutMs": 9.229200000000674,
+              "withMs": 11.419600000000173,
+              "deltaMs": 2.1903999999994994
+            },
+            {
+              "withoutMs": 9.285899999999856,
+              "withMs": 9.218400000000656,
+              "deltaMs": -0.06749999999919964
+            },
+            {
+              "withoutMs": 10.157600000000457,
+              "withMs": 9.63130000000001,
+              "deltaMs": -0.5263000000004467
+            }
+          ]
+        },
+        {
+          "name": "idx_summary_project_period",
+          "type": "existing",
+          "table": "turn_summary",
+          "rows": 500,
+          "withoutMs": 8.876599999999598,
+          "withMs": 9.987800000000789,
+          "pairedDeltaMs": 1.227100000000064,
+          "pairedDeltaP10Ms": -0.27149999999983265,
+          "pairedDeltaP90Ms": 2.3659999999999854,
+          "indexBytes": 106496,
+          "pairs": [
+            {
+              "withoutMs": 8.893699999999626,
+              "withMs": 10.56750000000011,
+              "deltaMs": 1.6738000000004831
+            },
+            {
+              "withoutMs": 8.698199999999815,
+              "withMs": 9.670500000000175,
+              "deltaMs": 0.9723000000003594
+            },
+            {
+              "withoutMs": 8.739800000000287,
+              "withMs": 9.96690000000035,
+              "deltaMs": 1.227100000000064
+            },
+            {
+              "withoutMs": 8.739599999999882,
+              "withMs": 10.244700000000194,
+              "deltaMs": 1.5051000000003114
+            },
+            {
+              "withoutMs": 8.713799999999537,
+              "withMs": 10.345600000000559,
+              "deltaMs": 1.6318000000010215
+            },
+            {
+              "withoutMs": 8.618899999999485,
+              "withMs": 10.98489999999947,
+              "deltaMs": 2.3659999999999854
+            },
+            {
+              "withoutMs": 9.813000000000102,
+              "withMs": 9.987800000000789,
+              "deltaMs": 0.17480000000068685
+            },
+            {
+              "withoutMs": 9.725400000000263,
+              "withMs": 10.773600000000442,
+              "deltaMs": 1.048200000000179
+            },
+            {
+              "withoutMs": 8.876599999999598,
+              "withMs": 13.344599999999446,
+              "deltaMs": 4.467999999999847
+            },
+            {
+              "withoutMs": 9.702400000000125,
+              "withMs": 9.678800000000592,
+              "deltaMs": -0.023599999999532884
+            },
+            {
+              "withoutMs": 9.318900000000212,
+              "withMs": 8.53309999999965,
+              "deltaMs": -0.7858000000005632
+            },
+            {
+              "withoutMs": 8.075699999999415,
+              "withMs": 10.908000000000357,
+              "deltaMs": 2.8323000000009415
+            },
+            {
+              "withoutMs": 10.213600000000042,
+              "withMs": 11.248599999999897,
+              "deltaMs": 1.0349999999998545
+            },
+            {
+              "withoutMs": 9.733400000000074,
+              "withMs": 9.893699999999626,
+              "deltaMs": 0.1602999999995518
+            },
+            {
+              "withoutMs": 9.14469999999983,
+              "withMs": 11.386900000000423,
+              "deltaMs": 2.2422000000005937
+            },
+            {
+              "withoutMs": 8.666400000000067,
+              "withMs": 10.280299999999443,
+              "deltaMs": 1.6138999999993757
+            },
+            {
+              "withoutMs": 7.877300000000105,
+              "withMs": 9.76720000000023,
+              "deltaMs": 1.8899000000001251
+            },
+            {
+              "withoutMs": 8.127200000000812,
+              "withMs": 9.910899999999856,
+              "deltaMs": 1.783699999999044
+            },
+            {
+              "withoutMs": 8.47649999999976,
+              "withMs": 9.362699999999677,
+              "deltaMs": 0.886199999999917
+            },
+            {
+              "withoutMs": 9.70219999999972,
+              "withMs": 9.430699999999888,
+              "deltaMs": -0.27149999999983265
+            },
+            {
+              "withoutMs": 10.288800000000265,
+              "withMs": 9.603699999999662,
+              "deltaMs": -0.6851000000006024
+            }
+          ]
+        },
+        {
+          "name": "idx_summary_session",
+          "type": "existing",
+          "table": "turn_summary",
+          "rows": 500,
+          "withoutMs": 9.54529999999977,
+          "withMs": 10.191199999999299,
+          "pairedDeltaMs": 0.7431999999989785,
+          "pairedDeltaP10Ms": -0.21110000000044238,
+          "pairedDeltaP90Ms": 1.25840000000062,
+          "indexBytes": 77824,
+          "pairs": [
+            {
+              "withoutMs": 10.36659999999938,
+              "withMs": 10.933600000000297,
+              "deltaMs": 0.5670000000009168
+            },
+            {
+              "withoutMs": 9.550599999999577,
+              "withMs": 10.809000000000196,
+              "deltaMs": 1.25840000000062
+            },
+            {
+              "withoutMs": 9.256599999999708,
+              "withMs": 10.366899999999987,
+              "deltaMs": 1.1103000000002794
+            },
+            {
+              "withoutMs": 8.947199999999611,
+              "withMs": 10.13629999999921,
+              "deltaMs": 1.1890999999995984
+            },
+            {
+              "withoutMs": 9.380999999999403,
+              "withMs": 9.814500000000407,
+              "deltaMs": 0.4335000000010041
+            },
+            {
+              "withoutMs": 8.974299999999857,
+              "withMs": 10.033599999999751,
+              "deltaMs": 1.0592999999998938
+            },
+            {
+              "withoutMs": 10.318499999999403,
+              "withMs": 11.398600000000442,
+              "deltaMs": 1.080100000001039
+            },
+            {
+              "withoutMs": 9.893500000000131,
+              "withMs": 10.136900000000423,
+              "deltaMs": 0.2434000000002925
+            },
+            {
+              "withoutMs": 9.54529999999977,
+              "withMs": 10.279499999999643,
+              "deltaMs": 0.7341999999998734
+            },
+            {
+              "withoutMs": 8.669499999999971,
+              "withMs": 10.336599999999635,
+              "deltaMs": 1.6670999999996639
+            },
+            {
+              "withoutMs": 8.968399999999747,
+              "withMs": 9.55999999999949,
+              "deltaMs": 0.5915999999997439
+            },
+            {
+              "withoutMs": 9.571200000000317,
+              "withMs": 10.430000000000291,
+              "deltaMs": 0.8587999999999738
+            },
+            {
+              "withoutMs": 8.442399999999907,
+              "withMs": 9.197400000000926,
+              "deltaMs": 0.7550000000010186
+            },
+            {
+              "withoutMs": 9.689700000000812,
+              "withMs": 9.677799999999479,
+              "deltaMs": -0.011900000001332955
+            },
+            {
+              "withoutMs": 9.17070000000058,
+              "withMs": 9.43500000000131,
+              "deltaMs": 0.2643000000007305
+            },
+            {
+              "withoutMs": 9.564899999999398,
+              "withMs": 10.310299999999188,
+              "deltaMs": 0.7453999999997905
+            },
+            {
+              "withoutMs": 9.623400000000402,
+              "withMs": 9.41229999999996,
+              "deltaMs": -0.21110000000044238
+            },
+            {
+              "withoutMs": 8.989600000000792,
+              "withMs": 11.154500000000553,
+              "deltaMs": 2.1648999999997613
+            },
+            {
+              "withoutMs": 9.904500000000553,
+              "withMs": 10.647699999999531,
+              "deltaMs": 0.7431999999989785
+            },
+            {
+              "withoutMs": 9.212800000001153,
+              "withMs": 8.657199999999648,
+              "deltaMs": -0.5556000000015047
+            },
+            {
+              "withoutMs": 10.487800000000789,
+              "withMs": 10.191199999999299,
+              "deltaMs": -0.2966000000014901
+            }
+          ]
+        },
+        {
+          "name": "audit_provider_time",
+          "type": "candidate",
+          "table": "turn_summary",
+          "rows": 500,
+          "withoutMs": 10.14600000000064,
+          "withMs": 10.892499999999927,
+          "pairedDeltaMs": 0.9429999999974825,
+          "pairedDeltaP10Ms": -0.781699999999546,
+          "pairedDeltaP90Ms": 2.22229999999945,
+          "indexBytes": 32768,
+          "pairs": [
+            {
+              "withoutMs": 10.8174999999992,
+              "withMs": 9.234599999999773,
+              "deltaMs": -1.5828999999994267
+            },
+            {
+              "withoutMs": 11.98320000000058,
+              "withMs": 11.237500000001091,
+              "deltaMs": -0.7456999999994878
+            },
+            {
+              "withoutMs": 9.550999999999476,
+              "withMs": 10.724099999999453,
+              "deltaMs": 1.1730999999999767
+            },
+            {
+              "withoutMs": 9.46270000000004,
+              "withMs": 11.68499999999949,
+              "deltaMs": 2.22229999999945
+            },
+            {
+              "withoutMs": 9.490999999999985,
+              "withMs": 12.196899999999005,
+              "deltaMs": 2.705899999999019
+            },
+            {
+              "withoutMs": 10.506800000001022,
+              "withMs": 10.42029999999977,
+              "deltaMs": -0.08650000000125146
+            },
+            {
+              "withoutMs": 10.34100000000035,
+              "withMs": 9.559300000000803,
+              "deltaMs": -0.781699999999546
+            },
+            {
+              "withoutMs": 10.14600000000064,
+              "withMs": 11.510699999998906,
+              "deltaMs": 1.3646999999982654
+            },
+            {
+              "withoutMs": 9.67619999999988,
+              "withMs": 11.810599999998885,
+              "deltaMs": 2.1343999999990046
+            },
+            {
+              "withoutMs": 10.610200000000987,
+              "withMs": 11.55319999999847,
+              "deltaMs": 0.9429999999974825
+            },
+            {
+              "withoutMs": 9.926900000000387,
+              "withMs": 11.023199999999633,
+              "deltaMs": 1.0962999999992462
+            },
+            {
+              "withoutMs": 8.942600000000311,
+              "withMs": 10.637700000001132,
+              "deltaMs": 1.6951000000008207
+            },
+            {
+              "withoutMs": 9.008599999999205,
+              "withMs": 11.071799999999712,
+              "deltaMs": 2.0632000000005064
+            },
+            {
+              "withoutMs": 10.134500000000116,
+              "withMs": 10.539800000000469,
+              "deltaMs": 0.40530000000035216
+            },
+            {
+              "withoutMs": 9.030700000001161,
+              "withMs": 9.885800000000017,
+              "deltaMs": 0.8550999999988562
+            },
+            {
+              "withoutMs": 10.206000000000131,
+              "withMs": 24.17410000000018,
+              "deltaMs": 13.96810000000005
+            },
+            {
+              "withoutMs": 10.29910000000018,
+              "withMs": 9.609699999999066,
+              "deltaMs": -0.6894000000011147
+            },
+            {
+              "withoutMs": 9.768899999999121,
+              "withMs": 11.566600000000108,
+              "deltaMs": 1.7977000000009866
+            },
+            {
+              "withoutMs": 10.647500000000946,
+              "withMs": 9.51130000000012,
+              "deltaMs": -1.1362000000008265
+            },
+            {
+              "withoutMs": 10.725300000000061,
+              "withMs": 10.360000000000582,
+              "deltaMs": -0.36529999999947904
+            },
+            {
+              "withoutMs": 10.287800000000061,
+              "withMs": 10.892499999999927,
+              "deltaMs": 0.6046999999998661
+            }
+          ]
+        },
+        {
+          "name": "audit_project_time",
+          "type": "candidate",
+          "table": "turn_summary",
+          "rows": 500,
+          "withoutMs": 10.24829999999929,
+          "withMs": 10.941800000000512,
+          "pairedDeltaMs": 0.9531000000006316,
+          "pairedDeltaP10Ms": -0.34280000000035216,
+          "pairedDeltaP90Ms": 2.3479000000006636,
+          "indexBytes": 98304,
+          "pairs": [
+            {
+              "withoutMs": 10.395999999998821,
+              "withMs": 12.346400000000358,
+              "deltaMs": 1.9504000000015367
+            },
+            {
+              "withoutMs": 8.875700000000506,
+              "withMs": 11.22440000000097,
+              "deltaMs": 2.3487000000004628
+            },
+            {
+              "withoutMs": 8.743900000001304,
+              "withMs": 10.941800000000512,
+              "deltaMs": 2.1978999999992084
+            },
+            {
+              "withoutMs": 9.902799999999843,
+              "withMs": 10.855900000000474,
+              "deltaMs": 0.9531000000006316
+            },
+            {
+              "withoutMs": 10.207099999999627,
+              "withMs": 10.600399999999354,
+              "deltaMs": 0.3932999999997264
+            },
+            {
+              "withoutMs": 10.823300000000017,
+              "withMs": 11.08640000000014,
+              "deltaMs": 0.26310000000012224
+            },
+            {
+              "withoutMs": 10.600500000000466,
+              "withMs": 11.78900000000067,
+              "deltaMs": 1.1885000000002037
+            },
+            {
+              "withoutMs": 10.866699999998673,
+              "withMs": 10.884500000000116,
+              "deltaMs": 0.01780000000144355
+            },
+            {
+              "withoutMs": 11.061600000000908,
+              "withMs": 10.718800000000556,
+              "deltaMs": -0.34280000000035216
+            },
+            {
+              "withoutMs": 9.930899999999383,
+              "withMs": 11.521199999999226,
+              "deltaMs": 1.5902999999998428
+            },
+            {
+              "withoutMs": 9.452699999999822,
+              "withMs": 11.800600000000486,
+              "deltaMs": 2.3479000000006636
+            },
+            {
+              "withoutMs": 10.196500000000015,
+              "withMs": 11.287800000000061,
+              "deltaMs": 1.0913000000000466
+            },
+            {
+              "withoutMs": 10.16820000000007,
+              "withMs": 21.892800000001444,
+              "deltaMs": 11.724600000001374
+            },
+            {
+              "withoutMs": 10.54870000000119,
+              "withMs": 10.21600000000035,
+              "deltaMs": -0.3327000000008411
+            },
+            {
+              "withoutMs": 10.03769999999895,
+              "withMs": 10.871999999999389,
+              "deltaMs": 0.8343000000004395
+            },
+            {
+              "withoutMs": 10.493000000000393,
+              "withMs": 12.484800000000178,
+              "deltaMs": 1.9917999999997846
+            },
+            {
+              "withoutMs": 10.171200000000681,
+              "withMs": 10.900700000000143,
+              "deltaMs": 0.7294999999994616
+            },
+            {
+              "withoutMs": 10.473799999999756,
+              "withMs": 10.082000000000335,
+              "deltaMs": -0.39179999999942083
+            },
+            {
+              "withoutMs": 11.087999999999738,
+              "withMs": 9.39259999999922,
+              "deltaMs": -1.695400000000518
+            },
+            {
+              "withoutMs": 10.431399999999485,
+              "withMs": 10.757599999999002,
+              "deltaMs": 0.3261999999995169
+            },
+            {
+              "withoutMs": 10.24829999999929,
+              "withMs": 12.32890000000043,
+              "deltaMs": 2.080600000001141
+            }
+          ]
+        },
+        {
+          "name": "audit_capability_category",
+          "type": "candidate",
+          "table": "turn_capability_usage",
+          "rows": 500,
+          "withoutMs": 3.03650000000016,
+          "withMs": 3.8671999999987747,
+          "pairedDeltaMs": 0.8326000000015483,
+          "pairedDeltaP10Ms": 0.2577000000001135,
+          "pairedDeltaP90Ms": 1.3170000000009168,
+          "indexBytes": 36864,
+          "pairs": [
+            {
+              "withoutMs": 2.639499999999316,
+              "withMs": 3.4232000000010885,
+              "deltaMs": 0.7837000000017724
+            },
+            {
+              "withoutMs": 2.753099999999904,
+              "withMs": 3.856499999999869,
+              "deltaMs": 1.103399999999965
+            },
+            {
+              "withoutMs": 2.6959999999999127,
+              "withMs": 4.041699999999764,
+              "deltaMs": 1.3456999999998516
+            },
+            {
+              "withoutMs": 3.2631000000001222,
+              "withMs": 4.307499999998981,
+              "deltaMs": 1.0443999999988591
+            },
+            {
+              "withoutMs": 3.3858999999993102,
+              "withMs": 4.301100000000588,
+              "deltaMs": 0.9152000000012777
+            },
+            {
+              "withoutMs": 2.5938999999998487,
+              "withMs": 3.3083999999998923,
+              "deltaMs": 0.7145000000000437
+            },
+            {
+              "withoutMs": 3.2813999999998487,
+              "withMs": 3.339700000000448,
+              "deltaMs": 0.05830000000059954
+            },
+            {
+              "withoutMs": 3.378099999999904,
+              "withMs": 3.6484999999993306,
+              "deltaMs": 0.27039999999942665
+            },
+            {
+              "withoutMs": 3.3145000000004075,
+              "withMs": 4.214300000001458,
+              "deltaMs": 0.8998000000010506
+            },
+            {
+              "withoutMs": 3.494800000000396,
+              "withMs": 4.151800000001458,
+              "deltaMs": 0.6570000000010623
+            },
+            {
+              "withoutMs": 3.554500000000189,
+              "withMs": 3.728900000000067,
+              "deltaMs": 0.17439999999987776
+            },
+            {
+              "withoutMs": 3.4320999999999913,
+              "withMs": 4.26470000000154,
+              "deltaMs": 0.8326000000015483
+            },
+            {
+              "withoutMs": 3.6063000000012835,
+              "withMs": 4.030500000000757,
+              "deltaMs": 0.4241999999994732
+            },
+            {
+              "withoutMs": 2.7214999999996508,
+              "withMs": 3.3596999999990658,
+              "deltaMs": 0.638199999999415
+            },
+            {
+              "withoutMs": 2.75669999999991,
+              "withMs": 4.0737000000008265,
+              "deltaMs": 1.3170000000009168
+            },
+            {
+              "withoutMs": 2.5701000000008207,
+              "withMs": 4.4394999999985885,
+              "deltaMs": 1.8693999999977677
+            },
+            {
+              "withoutMs": 2.6152000000001863,
+              "withMs": 3.8671999999987747,
+              "deltaMs": 1.2519999999985885
+            },
+            {
+              "withoutMs": 2.8618999999998778,
+              "withMs": 3.4184000000004744,
+              "deltaMs": 0.5565000000005966
+            },
+            {
+              "withoutMs": 2.625800000001618,
+              "withMs": 3.5954000000001543,
+              "deltaMs": 0.9695999999985361
+            },
+            {
+              "withoutMs": 3.03650000000016,
+              "withMs": 3.2942000000002736,
+              "deltaMs": 0.2577000000001135
+            },
+            {
+              "withoutMs": 3.3431999999993423,
+              "withMs": 4.5671000000002095,
+              "deltaMs": 1.2239000000008673
+            }
+          ]
+        },
+        {
+          "name": "audit_model",
+          "type": "candidate",
+          "table": "turn_model_usage",
+          "rows": 500,
+          "withoutMs": 1.6433999999990192,
+          "withMs": 2.085800000000745,
+          "pairedDeltaMs": 0.5182000000004336,
+          "pairedDeltaP10Ms": 0.2199000000000524,
+          "pairedDeltaP90Ms": 1.0825000000004366,
+          "indexBytes": 20480,
+          "pairs": [
+            {
+              "withoutMs": 1.4323000000003958,
+              "withMs": 2.0197000000007392,
+              "deltaMs": 0.5874000000003434
+            },
+            {
+              "withoutMs": 2.085799999998926,
+              "withMs": 1.9817000000002736,
+              "deltaMs": -0.10409999999865249
+            },
+            {
+              "withoutMs": 1.8094999999993888,
+              "withMs": 2.4742000000005646,
+              "deltaMs": 0.6647000000011758
+            },
+            {
+              "withoutMs": 1.5390999999999622,
+              "withMs": 2.6216000000003987,
+              "deltaMs": 1.0825000000004366
+            },
+            {
+              "withoutMs": 1.510999999998603,
+              "withMs": 2.0291999999990367,
+              "deltaMs": 0.5182000000004336
+            },
+            {
+              "withoutMs": 1.8351000000002387,
+              "withMs": 2.055000000000291,
+              "deltaMs": 0.2199000000000524
+            },
+            {
+              "withoutMs": 1.7860000000000582,
+              "withMs": 2.016799999999421,
+              "deltaMs": 0.23079999999936263
+            },
+            {
+              "withoutMs": 1.531699999999546,
+              "withMs": 2.0518000000010943,
+              "deltaMs": 0.5201000000015483
+            },
+            {
+              "withoutMs": 1.6433999999990192,
+              "withMs": 7.925999999999476,
+              "deltaMs": 6.282600000000457
+            },
+            {
+              "withoutMs": 1.5866000000005442,
+              "withMs": 5.720600000000559,
+              "deltaMs": 4.1340000000000146
+            },
+            {
+              "withoutMs": 1.4817999999995664,
+              "withMs": 2.2327000000004773,
+              "deltaMs": 0.750900000000911
+            },
+            {
+              "withoutMs": 1.7190000000009604,
+              "withMs": 2.1770999999989726,
+              "deltaMs": 0.4580999999980122
+            },
+            {
+              "withoutMs": 1.7127999999993335,
+              "withMs": 2.022900000001755,
+              "deltaMs": 0.31010000000242144
+            },
+            {
+              "withoutMs": 1.5776999999998225,
+              "withMs": 2.0033999999996013,
+              "deltaMs": 0.4256999999997788
+            },
+            {
+              "withoutMs": 1.5766999999996187,
+              "withMs": 2.0371999999988475,
+              "deltaMs": 0.46049999999922875
+            },
+            {
+              "withoutMs": 2.0288999999993393,
+              "withMs": 2.3944999999985157,
+              "deltaMs": 0.36559999999917636
+            },
+            {
+              "withoutMs": 1.5914999999986321,
+              "withMs": 2.2343000000000757,
+              "deltaMs": 0.6428000000014435
+            },
+            {
+              "withoutMs": 1.9050999999999476,
+              "withMs": 2.636899999999514,
+              "deltaMs": 0.7317999999995664
+            },
+            {
+              "withoutMs": 1.9424999999991996,
+              "withMs": 2.033100000000559,
+              "deltaMs": 0.09060000000135915
+            },
+            {
+              "withoutMs": 1.8058000000000902,
+              "withMs": 2.085800000000745,
+              "deltaMs": 0.28000000000065484
+            },
+            {
+              "withoutMs": 1.5455999999994674,
+              "withMs": 2.4897000000000844,
+              "deltaMs": 0.944100000000617
+            }
+          ]
+        },
+        {
+          "name": "audit_session_id",
+          "type": "replacement",
+          "table": "turn_summary",
+          "rows": 500,
+          "withoutMs": 10.035499999999956,
+          "withMs": 9.967999999998938,
+          "pairedDeltaMs": 0.11500000000160071,
+          "pairedDeltaP10Ms": -1.1898000000019238,
+          "pairedDeltaP90Ms": 0.7892000000010739,
+          "indexBytes": 73728,
+          "pairs": [
+            {
+              "withoutMs": 10.1974999999984,
+              "withMs": 10.047899999999572,
+              "deltaMs": -0.14959999999882712
+            },
+            {
+              "withoutMs": 10.53900000000067,
+              "withMs": 10.287800000000061,
+              "deltaMs": -0.25120000000060827
+            },
+            {
+              "withoutMs": 10.15560000000005,
+              "withMs": 9.892700000000332,
+              "deltaMs": -0.2628999999997177
+            },
+            {
+              "withoutMs": 9.12079999999878,
+              "withMs": 9.909999999999854,
+              "deltaMs": 0.7892000000010739
+            },
+            {
+              "withoutMs": 9.53899999999885,
+              "withMs": 9.654000000000451,
+              "deltaMs": 0.11500000000160071
+            },
+            {
+              "withoutMs": 11.506000000001222,
+              "withMs": 9.999599999999191,
+              "deltaMs": -1.5064000000020314
+            },
+            {
+              "withoutMs": 8.829399999998714,
+              "withMs": 10.13459999999941,
+              "deltaMs": 1.3052000000006956
+            },
+            {
+              "withoutMs": 9.448599999999715,
+              "withMs": 9.612100000000282,
+              "deltaMs": 0.16350000000056752
+            },
+            {
+              "withoutMs": 10.035499999999956,
+              "withMs": 9.904699999999139,
+              "deltaMs": -0.13080000000081782
+            },
+            {
+              "withoutMs": 8.875,
+              "withMs": 9.223599999999351,
+              "deltaMs": 0.348599999999351
+            },
+            {
+              "withoutMs": 9.819900000000416,
+              "withMs": 10.372799999999188,
+              "deltaMs": 0.5528999999987718
+            },
+            {
+              "withoutMs": 8.551899999998568,
+              "withMs": 10.477399999999761,
+              "deltaMs": 1.9255000000011933
+            },
+            {
+              "withoutMs": 9.530899999999747,
+              "withMs": 9.832900000001246,
+              "deltaMs": 0.30200000000149885
+            },
+            {
+              "withoutMs": 11.115700000000288,
+              "withMs": 10.334800000000541,
+              "deltaMs": -0.7808999999997468
+            },
+            {
+              "withoutMs": 10.90060000000085,
+              "withMs": 10.970499999999447,
+              "deltaMs": 0.0698999999985972
+            },
+            {
+              "withoutMs": 9.545799999999872,
+              "withMs": 9.750299999999697,
+              "deltaMs": 0.20449999999982538
+            },
+            {
+              "withoutMs": 9.780399999999645,
+              "withMs": 10.417099999998754,
+              "deltaMs": 0.6366999999991094
+            },
+            {
+              "withoutMs": 10.460700000001452,
+              "withMs": 9.005100000000311,
+              "deltaMs": -1.4556000000011409
+            },
+            {
+              "withoutMs": 10.665500000000975,
+              "withMs": 9.475699999999051,
+              "deltaMs": -1.1898000000019238
+            },
+            {
+              "withoutMs": 10.106200000000172,
+              "withMs": 10.253199999999197,
+              "deltaMs": 0.14699999999902502
+            },
+            {
+              "withoutMs": 10.037899999999354,
+              "withMs": 9.967999999998938,
+              "deltaMs": -0.06990000000041618
+            }
+          ]
+        },
+        {
+          "name": "audit_provider_time_minimal",
+          "type": "candidate",
+          "table": "turn_summary",
+          "rows": 500,
+          "withoutMs": 9.990099999999074,
+          "withMs": 11.058100000000195,
+          "pairedDeltaMs": 0.5946999999996478,
+          "pairedDeltaP10Ms": -1.0179000000007363,
+          "pairedDeltaP90Ms": 3.7653000000009342,
+          "indexBytes": 32768,
+          "pairs": [
+            {
+              "withoutMs": 9.07380000000012,
+              "withMs": 9.719199999999546,
+              "deltaMs": 0.6453999999994267
+            },
+            {
+              "withoutMs": 13.885299999999916,
+              "withMs": 11.749800000001414,
+              "deltaMs": -2.135499999998501
+            },
+            {
+              "withoutMs": 9.990099999999074,
+              "withMs": 13.755400000000009,
+              "deltaMs": 3.7653000000009342
+            },
+            {
+              "withoutMs": 14.177299999999377,
+              "withMs": 11.113100000000486,
+              "deltaMs": -3.064199999998891
+            },
+            {
+              "withoutMs": 12.186800000001313,
+              "withMs": 12.626699999998891,
+              "deltaMs": 0.43989999999757856
+            },
+            {
+              "withoutMs": 9.918900000000576,
+              "withMs": 13.950300000000425,
+              "deltaMs": 4.031399999999849
+            },
+            {
+              "withoutMs": 10.463299999999435,
+              "withMs": 11.460699999999633,
+              "deltaMs": 0.9974000000001979
+            },
+            {
+              "withoutMs": 8.787599999999657,
+              "withMs": 10.762399999999616,
+              "deltaMs": 1.9747999999999593
+            },
+            {
+              "withoutMs": 9.377200000000812,
+              "withMs": 10.954600000000937,
+              "deltaMs": 1.5774000000001251
+            },
+            {
+              "withoutMs": 10.40899999999965,
+              "withMs": 10.796299999999974,
+              "deltaMs": 0.38730000000032305
+            },
+            {
+              "withoutMs": 9.97950000000128,
+              "withMs": 9.920200000000477,
+              "deltaMs": -0.059300000000803266
+            },
+            {
+              "withoutMs": 10.064699999998993,
+              "withMs": 11.058100000000195,
+              "deltaMs": 0.993400000001202
+            },
+            {
+              "withoutMs": 10.742500000000291,
+              "withMs": 9.724599999999555,
+              "deltaMs": -1.0179000000007363
+            },
+            {
+              "withoutMs": 11.559699999999793,
+              "withMs": 12.01090000000113,
+              "deltaMs": 0.45120000000133587
+            },
+            {
+              "withoutMs": 9.078499999999622,
+              "withMs": 9.352699999999459,
+              "deltaMs": 0.274199999999837
+            },
+            {
+              "withoutMs": 9.44880000000012,
+              "withMs": 10.043499999999767,
+              "deltaMs": 0.5946999999996478
+            },
+            {
+              "withoutMs": 10.034700000000157,
+              "withMs": 12.553900000000795,
+              "deltaMs": 2.5192000000006374
+            },
+            {
+              "withoutMs": 9.472700000000259,
+              "withMs": 13.584199999999328,
+              "deltaMs": 4.111499999999069
+            },
+            {
+              "withoutMs": 10.055099999999584,
+              "withMs": 10.352000000000771,
+              "deltaMs": 0.29690000000118744
+            },
+            {
+              "withoutMs": 9.597300000001269,
+              "withMs": 11.771199999999226,
+              "deltaMs": 2.173899999997957
+            },
+            {
+              "withoutMs": 9.540399999999863,
+              "withMs": 9.956700000000637,
+              "deltaMs": 0.41630000000077416
+            }
+          ]
+        }
+      ]
+    },
+    "actualChart": {
+      "method": "Actual queryUsageChart({provider},turn,Asia/Seoul,tokens), captured source files transpiled to isolated directory. 11 blocks x 100 method calls after 20 warmups. Includes named project/session JOINs and count query, excludes worker IPC/UI.",
+      "sourceHashes": [
+        {
+          "file": "summary/db/index.ts",
+          "sha256": "ea967bb1c5abf0749fcf7afc96ee7a9d18f0df83d3cba4df2b257589d84fc27d"
+        },
+        {
+          "file": "summary/db/schema.ts",
+          "sha256": "681dc8830fc72d4e7396c0b9507a59d818333b62672b18b6d5a066b7188970e8"
+        },
+        {
+          "file": "summary/db/types.ts",
+          "sha256": "044958d9083aad393e7e80abcc77cdacd52b61e406a0f5f69ad518e531531be1"
+        },
+        {
+          "file": "summary/db/timezone.ts",
+          "sha256": "0cde7023f9e0e0d6fd58cfb598ae29ea96456326482d7abdb28170ea5a886290"
+        },
+        {
+          "file": "summary/pricing.ts",
+          "sha256": "e3c3dc6fa6b6a2eb33c243ff4d85f6685aa59b047db49af9ea9dceb3563ec503"
+        }
+      ],
+      "results": [
+        {
+          "name": "baseline",
+          "medianMs": 3.5065059999999995,
+          "minMs": 3.394907000000003,
+          "maxMs": 3.824706000000001,
+          "samplesMs": [
+            3.693242,
+            3.454389,
+            3.4410220000000002,
+            3.5728150000000003,
+            3.5814680000000023,
+            3.474724000000001,
+            3.394907000000003,
+            3.824706000000001,
+            3.489512999999997,
+            3.7519169999999984,
+            3.5065059999999995
+          ],
+          "rows": 60,
+          "total": 736,
+          "captured": [
+            {
+              "sql": "SELECT * FROM (SELECT t.*, p.project_name, s.session_name FROM (SELECT t.*,EXISTS(SELECT 1 FROM turn_model_usage m WHERE m.turn_id=t.id AND m.model<>'') AS has_model\n    FROM turn_summary t) t\n  JOIN projects p ON p.project_key=t.project_key\n  JOIN sessions s ON s.provider=t.provider AND s.session_id=t.session_id) AS turn_summary WHERE provider = ?\n        ORDER BY started_at_ms DESC, id DESC LIMIT 60",
+              "plan": [
+                "SEARCH t USING INDEX idx_summary_session (provider=?)",
+                "SEARCH s USING PRIMARY KEY (provider=? AND session_id=?)",
+                "SEARCH p USING PRIMARY KEY (project_key=?)",
+                "CORRELATED SCALAR SUBQUERY 1",
+                "SEARCH m USING PRIMARY KEY (turn_id=?)",
+                "USE TEMP B-TREE FOR ORDER BY"
+              ]
+            },
+            {
+              "sql": "SELECT COUNT(*) AS count FROM (SELECT t.*,EXISTS(SELECT 1 FROM turn_model_usage m WHERE m.turn_id=t.id AND m.model<>'') AS has_model\n    FROM turn_summary t) AS turn_summary WHERE provider = ?",
+              "plan": [
+                "SEARCH t USING COVERING INDEX idx_summary_session (provider=?)"
+              ]
+            }
+          ],
+          "indexStorage": []
+        },
+        {
+          "name": "provider_time",
+          "medianMs": 0.5621959999999945,
+          "minMs": 0.542586999999994,
+          "maxMs": 0.5926320000000033,
+          "samplesMs": [
+            0.5451929999999993,
+            0.5904399999999987,
+            0.5613650000000052,
+            0.542586999999994,
+            0.5807989999999973,
+            0.5545589999999992,
+            0.5621959999999945,
+            0.5926320000000033,
+            0.5774330000000009,
+            0.5554470000000038,
+            0.5877340000000004
+          ],
+          "rows": 60,
+          "total": 736,
+          "captured": [
+            {
+              "sql": "SELECT * FROM (SELECT t.*, p.project_name, s.session_name FROM (SELECT t.*,EXISTS(SELECT 1 FROM turn_model_usage m WHERE m.turn_id=t.id AND m.model<>'') AS has_model\n    FROM turn_summary t) t\n  JOIN projects p ON p.project_key=t.project_key\n  JOIN sessions s ON s.provider=t.provider AND s.session_id=t.session_id) AS turn_summary WHERE provider = ?\n        ORDER BY started_at_ms DESC, id DESC LIMIT 60",
+              "plan": [
+                "SEARCH t USING INDEX audit_provider_time (provider=?)",
+                "SEARCH s USING PRIMARY KEY (provider=? AND session_id=?)",
+                "SEARCH p USING PRIMARY KEY (project_key=?)",
+                "CORRELATED SCALAR SUBQUERY 1",
+                "SEARCH m USING PRIMARY KEY (turn_id=?)"
+              ]
+            },
+            {
+              "sql": "SELECT COUNT(*) AS count FROM (SELECT t.*,EXISTS(SELECT 1 FROM turn_model_usage m WHERE m.turn_id=t.id AND m.model<>'') AS has_model\n    FROM turn_summary t) AS turn_summary WHERE provider = ?",
+              "plan": [
+                "SEARCH t USING COVERING INDEX audit_provider_time (provider=?)"
+              ]
+            }
+          ],
+          "indexStorage": [
+            {
+              "name": "audit_provider_time",
+              "bytes": 24576
+            }
+          ]
+        },
+        {
+          "name": "provider_time_minimal",
+          "medianMs": 0.5809609999999975,
+          "minMs": 0.5249449999999979,
+          "maxMs": 0.6146079999999984,
+          "samplesMs": [
+            0.5871770000000015,
+            0.6146079999999984,
+            0.5474380000000019,
+            0.5641669999999976,
+            0.5817709999999988,
+            0.6030379999999969,
+            0.5368940000000021,
+            0.5249449999999979,
+            0.5844950000000062,
+            0.5809609999999975,
+            0.5419390000000022
+          ],
+          "rows": 60,
+          "total": 736,
+          "captured": [
+            {
+              "sql": "SELECT * FROM (SELECT t.*, p.project_name, s.session_name FROM (SELECT t.*,EXISTS(SELECT 1 FROM turn_model_usage m WHERE m.turn_id=t.id AND m.model<>'') AS has_model\n    FROM turn_summary t) t\n  JOIN projects p ON p.project_key=t.project_key\n  JOIN sessions s ON s.provider=t.provider AND s.session_id=t.session_id) AS turn_summary WHERE provider = ?\n        ORDER BY started_at_ms DESC, id DESC LIMIT 60",
+              "plan": [
+                "SEARCH t USING INDEX audit_provider_time_minimal (provider=?)",
+                "SEARCH s USING PRIMARY KEY (provider=? AND session_id=?)",
+                "SEARCH p USING PRIMARY KEY (project_key=?)",
+                "CORRELATED SCALAR SUBQUERY 1",
+                "SEARCH m USING PRIMARY KEY (turn_id=?)"
+              ]
+            },
+            {
+              "sql": "SELECT COUNT(*) AS count FROM (SELECT t.*,EXISTS(SELECT 1 FROM turn_model_usage m WHERE m.turn_id=t.id AND m.model<>'') AS has_model\n    FROM turn_summary t) AS turn_summary WHERE provider = ?",
+              "plan": [
+                "SEARCH t USING COVERING INDEX audit_provider_time_minimal (provider=?)"
+              ]
+            }
+          ],
+          "indexStorage": [
+            {
+              "name": "audit_provider_time_minimal",
+              "bytes": 20480
+            }
+          ]
+        },
+        {
+          "name": "analyzed_baseline",
+          "medianMs": 3.1879970000000046,
+          "minMs": 2.8835660000000005,
+          "maxMs": 3.4678000000000067,
+          "samplesMs": [
+            3.294452999999994,
+            3.1916280000000006,
+            3.0239540000000034,
+            2.8835660000000005,
+            3.1879970000000046,
+            3.3990350000000036,
+            3.1721659999999976,
+            3.4678000000000067,
+            3.110715999999993,
+            3.169200000000001,
+            3.2670150000000104
+          ],
+          "rows": 60,
+          "total": 736,
+          "captured": [
+            {
+              "sql": "SELECT * FROM (SELECT t.*, p.project_name, s.session_name FROM (SELECT t.*,EXISTS(SELECT 1 FROM turn_model_usage m WHERE m.turn_id=t.id AND m.model<>'') AS has_model\n    FROM turn_summary t) t\n  JOIN projects p ON p.project_key=t.project_key\n  JOIN sessions s ON s.provider=t.provider AND s.session_id=t.session_id) AS turn_summary WHERE provider = ?\n        ORDER BY started_at_ms DESC, id DESC LIMIT 60",
+              "plan": [
+                "SEARCH s USING PRIMARY KEY (provider=?)",
+                "SEARCH t USING INDEX idx_summary_session (provider=? AND session_id=?)",
+                "SEARCH p USING PRIMARY KEY (project_key=?)",
+                "CORRELATED SCALAR SUBQUERY 1",
+                "SEARCH m USING PRIMARY KEY (turn_id=?)",
+                "USE TEMP B-TREE FOR ORDER BY"
+              ]
+            },
+            {
+              "sql": "SELECT COUNT(*) AS count FROM (SELECT t.*,EXISTS(SELECT 1 FROM turn_model_usage m WHERE m.turn_id=t.id AND m.model<>'') AS has_model\n    FROM turn_summary t) AS turn_summary WHERE provider = ?",
+              "plan": [
+                "SEARCH t USING COVERING INDEX idx_summary_session (provider=?)"
+              ]
+            }
+          ],
+          "indexStorage": []
+        }
+      ]
+    }
+  },
+  "parsing": {
+    "actual": {
+      "measuredDateSeoul": "2026-10-08",
+      "node": "v24.19.0",
+      "platform": "win32",
+      "cpuModel": "Intel(R) Core(TM) i5-8250U CPU @ 1.60GHz",
+      "logicalCpus": 8,
+      "parserVersion": 13,
+      "schemaVersion": 8,
+      "buildFrozen": true,
+      "all": {
+        "files": 243,
+        "bytes": 257655457,
+        "providers": {
+          "claude": {
+            "files": 16,
+            "bytes": 18370173
+          },
+          "codex": {
+            "files": 227,
+            "bytes": 239285284
+          }
+        }
+      },
+      "sample": {
+        "selection": "200 evenly spaced quantiles sorted by byte size",
+        "files": 200,
+        "bytes": 215755703,
+        "rows": 53711,
+        "providerFiles": {
+          "claude": 14,
+          "codex": 186
+        },
+        "eventCounts": {
+          "turn": 2924,
+          "usage": 9882,
+          "check": 2191,
+          "capability": 393
+        }
+      },
+      "trials": [
+        {
+          "name": "raw-read-0",
+          "wallMs": 1936.4689,
+          "cpuMs": 500
+        },
+        {
+          "name": "decode-noop-0",
+          "wallMs": 5694.6675,
+          "cpuMs": 5781
+        },
+        {
+          "name": "decode-adapter-0",
+          "wallMs": 8480.993,
+          "cpuMs": 8078
+        },
+        {
+          "name": "native-split-noop-0",
+          "wallMs": 1550.4366,
+          "cpuMs": 1453
+        },
+        {
+          "name": "native-split-adapter-0",
+          "wallMs": 1988.8265,
+          "cpuMs": 1984
+        },
+        {
+          "name": "raw-read-1",
+          "wallMs": 315.4779,
+          "cpuMs": 344
+        },
+        {
+          "name": "decode-noop-1",
+          "wallMs": 4560.5001,
+          "cpuMs": 4657
+        },
+        {
+          "name": "decode-adapter-1",
+          "wallMs": 5835.9798,
+          "cpuMs": 5968
+        },
+        {
+          "name": "native-split-noop-1",
+          "wallMs": 1353.6274,
+          "cpuMs": 1391
+        },
+        {
+          "name": "native-split-adapter-1",
+          "wallMs": 2185.9932,
+          "cpuMs": 2125
+        },
+        {
+          "name": "raw-read-2",
+          "wallMs": 376.0102,
+          "cpuMs": 375
+        },
+        {
+          "name": "decode-noop-2",
+          "wallMs": 6597.5624,
+          "cpuMs": 6641
+        },
+        {
+          "name": "decode-adapter-2",
+          "wallMs": 6755.6043,
+          "cpuMs": 6952
+        },
+        {
+          "name": "native-split-noop-2",
+          "wallMs": 1443.4964,
+          "cpuMs": 1407
+        },
+        {
+          "name": "native-split-adapter-2",
+          "wallMs": 3060.9677,
+          "cpuMs": 3046
+        }
+      ],
+      "instrumented": [
+        {
+          "name": "decode-noop",
+          "wallMs": 7130.2379,
+          "cpuMs": 7516,
+          "parseCalls": 53711,
+          "parseMs": 1001.9747,
+          "adapterMs": 0
+        },
+        {
+          "name": "decode-adapter",
+          "wallMs": 5925.9874,
+          "cpuMs": 6173,
+          "parseCalls": 61160,
+          "parseMs": 1013.9622,
+          "adapterMs": 782.5278
+        },
+        {
+          "name": "decode-adapter-capabilities-off",
+          "wallMs": 5091.221,
+          "cpuMs": 5234,
+          "parseCalls": 53711,
+          "parseMs": 655.8707,
+          "adapterMs": 119.2175
+        }
+      ],
+      "full": [
+        {
+          "scenario": "initial",
+          "wallMs": 13237.2638,
+          "cpuMs": 12937,
+          "discovered": 243,
+          "parsed": 243,
+          "reused": 0,
+          "failed": 0,
+          "bodyBytes": 257947040,
+          "phasesMs": {
+            "scanning": 104.939,
+            "parsing": 9818.8616,
+            "committing": 3308.9095
+          },
+          "counters": {
+            "batchEvents": {
+              "calls": 4068,
+              "ms": 8103.3169
+            },
+            "readJsonl": {
+              "calls": 244,
+              "ms": 8930.9698
+            },
+            "resolveLineage": {
+              "calls": 1,
+              "ms": 10.7843
+            },
+            "excludeVerifiedPrefixes": {
+              "calls": 1,
+              "ms": 466.3014
+            },
+            "prepareSummaries": {
+              "calls": 222,
+              "ms": 1759.2866
+            },
+            "replaceSessions": {
+              "calls": 222,
+              "ms": 898.7978
+            },
+            "finishComponent": {
+              "calls": 222,
+              "ms": 512.6233
+            }
+          }
+        },
+        {
+          "scenario": "live-source-second-refresh",
+          "wallMs": 269.3526,
+          "cpuMs": 250,
+          "discovered": 243,
+          "parsed": 6,
+          "reused": 237,
+          "failed": 0,
+          "bodyBytes": 3018493,
+          "phasesMs": {
+            "scanning": 91.7747,
+            "parsing": 138.9472,
+            "committing": 31.6037
+          }
+        },
+        {
+          "scenario": "largest-file-forced-reparse",
+          "wallMs": 615.1121,
+          "cpuMs": 578,
+          "discovered": 243,
+          "parsed": 1,
+          "reused": 242,
+          "failed": 0,
+          "bodyBytes": 15565998,
+          "phasesMs": {
+            "scanning": 90.2032,
+            "parsing": 482.3085,
+            "committing": 34.617
+          }
+        }
+      ],
+      "limits": [
+        "Sources continued to append during measurement; paths, bodies, session identifiers and titles are excluded.",
+        "Three trials, same process, warm cache after first read; CPU frequency, garbage collection and other desktop work were uncontrolled.",
+        "Prototype native newline splitter is not production-ready: inline-image discard and associated validation behavior were not preserved and semantic event hashes were not compared. Row/event-kind counts match only.",
+        "Timing counters are nested: batchEvents includes scanning, JSON.parse, adapter logic and SQLite insertion; do not sum nested counters.",
+        "Main measurements completed successfully; the original report's final row-count query used incorrect table names and was corrected afterward. This report preserves measured stdout values, no rerun.",
+        "The second real-source refresh was not unchanged: six files changed while the chat and subagents were active."
+      ],
+      "mediansMs": {
+        "raw-read": 376.0102,
+        "decode-noop": 5694.6675,
+        "decode-adapter": 6755.6043,
+        "native-split-noop": 1443.4964,
+        "native-split-adapter": 2185.9932
+      }
+    },
+    "syntheticReuseAndAppend": {
+      "node": "v24.19.0",
+      "parserVersion": 13,
+      "files": 201,
+      "largeOriginalTurns": 2000,
+      "measurements": [
+        {
+          "scenario": "initial",
+          "wallMs": 6739.848400000001,
+          "cpuMs": 6470,
+          "appendBytes": 0,
+          "largeFileBytes": 796670,
+          "discovered": 201,
+          "parsed": 201,
+          "reused": 0,
+          "failed": 0,
+          "bodyBytes": 876940,
+          "turns": 2200,
+          "tokens": 770000
+        },
+        {
+          "scenario": "unchanged",
+          "wallMs": 54.97069999999985,
+          "cpuMs": 93,
+          "appendBytes": 0,
+          "largeFileBytes": 796670,
+          "discovered": 201,
+          "parsed": 0,
+          "reused": 201,
+          "failed": 0,
+          "bodyBytes": 0,
+          "turns": 2200,
+          "tokens": 770000
+        },
+        {
+          "scenario": "append",
+          "wallMs": 3323.8684999999996,
+          "cpuMs": 3359,
+          "appendBytes": 400,
+          "largeFileBytes": 797070,
+          "discovered": 201,
+          "parsed": 1,
+          "reused": 200,
+          "failed": 0,
+          "bodyBytes": 797070,
+          "turns": 2201,
+          "tokens": 770350
+        }
+      ]
+    },
+    "temporaryRootIndex": {
+      "node": "v24.19.0",
+      "parserVersion": 13,
+      "files": 1,
+      "turns": 2000,
+      "sourceBytes": 796670,
+      "indexAdded": "TEMP component_events(root_id,is_main,id)",
+      "measurements": [
+        {
+          "scenario": "warmup",
+          "indexed": false,
+          "wallMs": 3652.6515,
+          "cpuMs": 3657,
+          "discovered": 1,
+          "parsed": 1,
+          "reused": 0,
+          "failed": 0,
+          "bodyBytes": 796670,
+          "turns": 2000,
+          "tokens": 700000,
+          "phasesMs": {
+            "scanning": 5.058000000000021,
+            "parsing": 141.3429,
+            "committing": 3501.754
+          },
+          "timersMs": {
+            "batchEvents": 132.19560000000007,
+            "excludeVerifiedPrefixes": 0.9694000000000074,
+            "prepareSummaries": 2966.6701,
+            "replaceSessions": 506.77840000000015
+          },
+          "requestTitlePlan": [
+            "SCAN e USING INDEX component_events_turn",
+            "SEARCH sf USING COVERING INDEX scan_session (provider=? AND session_id=? AND id=? AND rowid=?)",
+            "USE TEMP B-TREE FOR ORDER BY"
+          ]
+        },
+        {
+          "scenario": "baseline-1",
+          "indexed": false,
+          "wallMs": 3320.4692,
+          "cpuMs": 3266,
+          "discovered": 1,
+          "parsed": 1,
+          "reused": 0,
+          "failed": 0,
+          "bodyBytes": 796670,
+          "turns": 2000,
+          "tokens": 700000,
+          "phasesMs": {
+            "scanning": 2.2256999999999607,
+            "parsing": 123.3725000000004,
+            "committing": 3190.3843999999995
+          },
+          "timersMs": {
+            "batchEvents": 112.83410000000003,
+            "excludeVerifiedPrefixes": 0.5976999999998043,
+            "prepareSummaries": 2712.1141999999995,
+            "replaceSessions": 454.89949999999953
+          },
+          "requestTitlePlan": [
+            "SCAN e USING INDEX component_events_turn",
+            "SEARCH sf USING COVERING INDEX scan_session (provider=? AND session_id=? AND id=? AND rowid=?)",
+            "USE TEMP B-TREE FOR ORDER BY"
+          ]
+        },
+        {
+          "scenario": "indexed-1",
+          "indexed": true,
+          "wallMs": 765.9265000000005,
+          "cpuMs": 735,
+          "discovered": 1,
+          "parsed": 1,
+          "reused": 0,
+          "failed": 0,
+          "bodyBytes": 796670,
+          "turns": 2000,
+          "tokens": 700000,
+          "phasesMs": {
+            "scanning": 2.3406999999997424,
+            "parsing": 103.73270000000048,
+            "committing": 655.3559999999998
+          },
+          "timersMs": {
+            "batchEvents": 96.71790000000055,
+            "excludeVerifiedPrefixes": 0.5655000000006112,
+            "prepareSummaries": 102.67339999999967,
+            "replaceSessions": 517.3651
+          },
+          "requestTitlePlan": [
+            "SEARCH e USING INDEX audit_component_root (root_id=? AND is_main=?)",
+            "SEARCH sf USING COVERING INDEX scan_session (provider=? AND session_id=? AND id=? AND rowid=?)"
+          ]
+        },
+        {
+          "scenario": "indexed-2",
+          "indexed": true,
+          "wallMs": 807.9940999999999,
+          "cpuMs": 812,
+          "discovered": 1,
+          "parsed": 1,
+          "reused": 0,
+          "failed": 0,
+          "bodyBytes": 796670,
+          "turns": 2000,
+          "tokens": 700000,
+          "phasesMs": {
+            "scanning": 2.0976999999993495,
+            "parsing": 126.70410000000084,
+            "committing": 672.6124999999993
+          },
+          "timersMs": {
+            "batchEvents": 106.08789999999863,
+            "excludeVerifiedPrefixes": 0.657799999999952,
+            "prepareSummaries": 182.36039999999866,
+            "replaceSessions": 467.1810999999998
+          },
+          "requestTitlePlan": [
+            "SEARCH e USING INDEX audit_component_root (root_id=? AND is_main=?)",
+            "SEARCH sf USING COVERING INDEX scan_session (provider=? AND session_id=? AND id=? AND rowid=?)"
+          ]
+        },
+        {
+          "scenario": "baseline-2",
+          "indexed": false,
+          "wallMs": 3196.2201000000005,
+          "cpuMs": 3219,
+          "discovered": 1,
+          "parsed": 1,
+          "reused": 0,
+          "failed": 0,
+          "bodyBytes": 796670,
+          "turns": 2000,
+          "tokens": 700000,
+          "phasesMs": {
+            "scanning": 2.5200999999997293,
+            "parsing": 111.58669999999984,
+            "committing": 3076.558500000001
+          },
+          "timersMs": {
+            "batchEvents": 96.41139999999905,
+            "excludeVerifiedPrefixes": 0.5709999999999127,
+            "prepareSummaries": 2608.931200000001,
+            "replaceSessions": 442.9971000000005
+          },
+          "requestTitlePlan": [
+            "SCAN e USING INDEX component_events_turn",
+            "SEARCH sf USING COVERING INDEX scan_session (provider=? AND session_id=? AND id=? AND rowid=?)",
+            "USE TEMP B-TREE FOR ORDER BY"
+          ]
+        },
+        {
+          "scenario": "baseline-3",
+          "indexed": false,
+          "wallMs": 3833.3014999999996,
+          "cpuMs": 3719,
+          "discovered": 1,
+          "parsed": 1,
+          "reused": 0,
+          "failed": 0,
+          "bodyBytes": 796670,
+          "turns": 2000,
+          "tokens": 700000,
+          "phasesMs": {
+            "scanning": 2.510099999999511,
+            "parsing": 107.95310000000063,
+            "committing": 3712.2909999999993
+          },
+          "timersMs": {
+            "batchEvents": 91.01609999999528,
+            "excludeVerifiedPrefixes": 0.6913000000004104,
+            "prepareSummaries": 3099.3364999999994,
+            "replaceSessions": 578.206900000001
+          },
+          "requestTitlePlan": [
+            "SCAN e USING INDEX component_events_turn",
+            "SEARCH sf USING COVERING INDEX scan_session (provider=? AND session_id=? AND id=? AND rowid=?)",
+            "USE TEMP B-TREE FOR ORDER BY"
+          ]
+        },
+        {
+          "scenario": "indexed-3",
+          "indexed": true,
+          "wallMs": 855.3266000000003,
+          "cpuMs": 812,
+          "discovered": 1,
+          "parsed": 1,
+          "reused": 0,
+          "failed": 0,
+          "bodyBytes": 796670,
+          "turns": 2000,
+          "tokens": 700000,
+          "phasesMs": {
+            "scanning": 2.186700000000201,
+            "parsing": 103.84610000000066,
+            "committing": 743.5634000000009
+          },
+          "timersMs": {
+            "batchEvents": 86.96150000000489,
+            "excludeVerifiedPrefixes": 0.58009999999922,
+            "prepareSummaries": 163.38970000000154,
+            "replaceSessions": 557.4901999999984
+          },
+          "requestTitlePlan": [
+            "SEARCH e USING INDEX audit_component_root (root_id=? AND is_main=?)",
+            "SEARCH sf USING COVERING INDEX scan_session (provider=? AND session_id=? AND id=? AND rowid=?)"
+          ]
+        }
+      ]
+    },
+    "partialTemporaryIndex": {
+      "node": "v24.19.0",
+      "parserVersion": 13,
+      "files": 1,
+      "turns": 2000,
+      "sourceBytes": 796670,
+      "indexAdded": "TEMP component_events(root_id,is_main,id)",
+      "partialCandidate": "TEMP component_events(root_id,id) WHERE is_main=1 AND request_title IS NOT NULL",
+      "measurements": [
+        {
+          "scenario": "indexed-warmup",
+          "indexed": true,
+          "partial": false,
+          "indexBytes": 135168,
+          "indexRows": 6000,
+          "wallMs": 844.4274,
+          "cpuMs": 812,
+          "discovered": 1,
+          "parsed": 1,
+          "reused": 0,
+          "failed": 0,
+          "bodyBytes": 796670,
+          "turns": 2000,
+          "tokens": 700000,
+          "phasesMs": {
+            "scanning": 3.395700000000005,
+            "parsing": 157.4771,
+            "committing": 678.0542
+          },
+          "timersMs": {
+            "batchEvents": 148.8220999999999,
+            "excludeVerifiedPrefixes": 0.8237000000000023,
+            "indexBuild": 2.0358999999999696,
+            "prepareSummaries": 182.8511,
+            "replaceSessions": 470.6762
+          },
+          "requestTitlePlan": [
+            "SEARCH e USING INDEX audit_component_root (root_id=? AND is_main=?)",
+            "SEARCH sf USING COVERING INDEX scan_session (provider=? AND session_id=? AND id=? AND rowid=?)"
+          ]
+        },
+        {
+          "scenario": "indexed-1",
+          "indexed": true,
+          "partial": false,
+          "indexBytes": 135168,
+          "indexRows": 6000,
+          "wallMs": 700.3207,
+          "cpuMs": 719,
+          "discovered": 1,
+          "parsed": 1,
+          "reused": 0,
+          "failed": 0,
+          "bodyBytes": 796670,
+          "turns": 2000,
+          "tokens": 700000,
+          "phasesMs": {
+            "scanning": 2.5160999999999376,
+            "parsing": 113.81729999999993,
+            "committing": 573.9245000000001
+          },
+          "timersMs": {
+            "batchEvents": 100.52540000000022,
+            "excludeVerifiedPrefixes": 0.6252999999999247,
+            "indexBuild": 2.2109999999997854,
+            "prepareSummaries": 104.19179999999983,
+            "replaceSessions": 447.3659
+          },
+          "requestTitlePlan": [
+            "SEARCH e USING INDEX audit_component_root (root_id=? AND is_main=?)",
+            "SEARCH sf USING COVERING INDEX scan_session (provider=? AND session_id=? AND id=? AND rowid=?)"
+          ]
+        },
+        {
+          "scenario": "partial-1",
+          "indexed": true,
+          "partial": true,
+          "indexBytes": 45056,
+          "indexRows": 2000,
+          "wallMs": 680.3223,
+          "cpuMs": 657,
+          "discovered": 1,
+          "parsed": 1,
+          "reused": 0,
+          "failed": 0,
+          "bodyBytes": 796670,
+          "turns": 2000,
+          "tokens": 700000,
+          "phasesMs": {
+            "scanning": 2.548999999999978,
+            "parsing": 111.09820000000013,
+            "committing": 560.9815000000001
+          },
+          "timersMs": {
+            "batchEvents": 95.41509999999994,
+            "excludeVerifiedPrefixes": 0.581899999999905,
+            "indexBuild": 1.1659000000001924,
+            "prepareSummaries": 91.03539999999998,
+            "replaceSessions": 446.9853999999998
+          },
+          "requestTitlePlan": [
+            "SEARCH e USING INDEX audit_component_root (root_id=?)",
+            "SEARCH sf USING COVERING INDEX scan_session (provider=? AND session_id=? AND id=? AND rowid=?)"
+          ]
+        },
+        {
+          "scenario": "partial-2",
+          "indexed": true,
+          "partial": true,
+          "indexBytes": 45056,
+          "indexRows": 2000,
+          "wallMs": 693.7772999999997,
+          "cpuMs": 750,
+          "discovered": 1,
+          "parsed": 1,
+          "reused": 0,
+          "failed": 0,
+          "bodyBytes": 796670,
+          "turns": 2000,
+          "tokens": 700000,
+          "phasesMs": {
+            "scanning": 9.640699999999924,
+            "parsing": 108.4648000000002,
+            "committing": 570.002
+          },
+          "timersMs": {
+            "batchEvents": 100.67430000000013,
+            "excludeVerifiedPrefixes": 0.591899999999896,
+            "indexBuild": 1.155999999999949,
+            "prepareSummaries": 102.23029999999972,
+            "replaceSessions": 445.24029999999993
+          },
+          "requestTitlePlan": [
+            "SEARCH e USING INDEX audit_component_root (root_id=?)",
+            "SEARCH sf USING COVERING INDEX scan_session (provider=? AND session_id=? AND id=? AND rowid=?)"
+          ]
+        },
+        {
+          "scenario": "indexed-2",
+          "indexed": true,
+          "partial": false,
+          "indexBytes": 135168,
+          "indexRows": 6000,
+          "wallMs": 703.8573999999999,
+          "cpuMs": 687,
+          "discovered": 1,
+          "parsed": 1,
+          "reused": 0,
+          "failed": 0,
+          "bodyBytes": 796670,
+          "turns": 2000,
+          "tokens": 700000,
+          "phasesMs": {
+            "scanning": 2.991700000000037,
+            "parsing": 103.46360000000004,
+            "committing": 587.3962000000001
+          },
+          "timersMs": {
+            "batchEvents": 89.60640000000058,
+            "excludeVerifiedPrefixes": 0.6320999999998094,
+            "indexBuild": 2.613499999999931,
+            "prepareSummaries": 110.04190000000017,
+            "replaceSessions": 455.31290000000035
+          },
+          "requestTitlePlan": [
+            "SEARCH e USING INDEX audit_component_root (root_id=? AND is_main=?)",
+            "SEARCH sf USING COVERING INDEX scan_session (provider=? AND session_id=? AND id=? AND rowid=?)"
+          ]
+        },
+        {
+          "scenario": "indexed-3",
+          "indexed": true,
+          "partial": false,
+          "indexBytes": 135168,
+          "indexRows": 6000,
+          "wallMs": 690.4936000000002,
+          "cpuMs": 749,
+          "discovered": 1,
+          "parsed": 1,
+          "reused": 0,
+          "failed": 0,
+          "bodyBytes": 796670,
+          "turns": 2000,
+          "tokens": 700000,
+          "phasesMs": {
+            "scanning": 2.928100000000086,
+            "parsing": 109.42300000000023,
+            "committing": 573.0777999999996
+          },
+          "timersMs": {
+            "batchEvents": 91.14770000000044,
+            "excludeVerifiedPrefixes": 0.9809000000000196,
+            "indexBuild": 1.835399999999936,
+            "prepareSummaries": 104.58249999999998,
+            "replaceSessions": 445.5155999999997
+          },
+          "requestTitlePlan": [
+            "SEARCH e USING INDEX audit_component_root (root_id=? AND is_main=?)",
+            "SEARCH sf USING COVERING INDEX scan_session (provider=? AND session_id=? AND id=? AND rowid=?)"
+          ]
+        },
+        {
+          "scenario": "partial-3",
+          "indexed": true,
+          "partial": true,
+          "indexBytes": 45056,
+          "indexRows": 2000,
+          "wallMs": 703.8254000000006,
+          "cpuMs": 798,
+          "discovered": 1,
+          "parsed": 1,
+          "reused": 0,
+          "failed": 0,
+          "bodyBytes": 796670,
+          "turns": 2000,
+          "tokens": 700000,
+          "phasesMs": {
+            "scanning": 2.9939000000003944,
+            "parsing": 115.32870000000003,
+            "committing": 580.1224000000002
+          },
+          "timersMs": {
+            "batchEvents": 90.26389999999901,
+            "excludeVerifiedPrefixes": 0.5726999999997133,
+            "indexBuild": 1.7039000000004307,
+            "prepareSummaries": 112.29299999999967,
+            "replaceSessions": 444.2025999999996
+          },
+          "requestTitlePlan": [
+            "SEARCH e USING INDEX audit_component_root (root_id=?)",
+            "SEARCH sf USING COVERING INDEX scan_session (provider=? AND session_id=? AND id=? AND rowid=?)"
+          ]
+        }
+      ]
+    }
+  },
+  "capabilities": {
+    "snapshotCounts": {
+      "claude": {
+        "skill": 9,
+        "subagent": 5,
+        "plugin": 0,
+        "model": 726
+      },
+      "codex": {
+        "skill": 252,
+        "subagent": 108,
+        "plugin": 21,
+        "model": 6957
+      }
+    },
+    "collectionFiles": 236,
+    "allCollected": 1,
+    "detectorReproductions": [
+      {
+        "scenario": "independent cat and echo",
+        "detectedSkillCount": 1,
+        "issue": "path is not read by cat"
+      },
+      {
+        "scenario": "variable path",
+        "detectedSkillCount": 0,
+        "issue": "dynamic value not supported"
+      },
+      {
+        "scenario": "3 repetitions in static loop",
+        "detectedSkillCount": 1,
+        "issue": "static callsite count"
+      },
+      {
+        "scenario": "spawn_agent task/model only",
+        "detectedSubagentName": "default"
+      }
+    ]
+  }
+}

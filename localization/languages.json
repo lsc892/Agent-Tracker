@@ -1,0 +1,8 @@
+[
+  { "locale": "ko", "label": "한국어", "vscodeLocales": ["ko"] },
+  { "locale": "en", "label": "English", "vscodeLocales": ["en"] },
+  { "locale": "zh", "label": "中文（简体）", "vscodeLocales": ["zh-cn", "zh"] },
+  { "locale": "ja", "label": "日本語", "vscodeLocales": ["ja"] },
+  { "locale": "es", "label": "Español", "vscodeLocales": ["es"] },
+  { "locale": "fr", "label": "Français", "vscodeLocales": ["fr"] }
+]

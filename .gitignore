@@ -1,0 +1,16 @@
+node_modules/
+dist/
+artifacts/
+*.vsix
+*.sqlite*
+*.db*
+coverage/
+tests/results/
+tests/.cache/
+
+# Legacy test output and caches retained in existing checkouts.
+test-results/
+benchmark-results/
+.vscode-test/
+media/i18next.js
+media/i18next.LICENSE.txt

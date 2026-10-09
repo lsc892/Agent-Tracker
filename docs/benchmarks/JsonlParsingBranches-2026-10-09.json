@@ -1,0 +1,1047 @@
+{
+  "recordedAtSeoul": "2026-10-09 15:32:32",
+  "node": "v24.19.0",
+  "platform": "win32",
+  "arch": "x64",
+  "pairs": 3,
+  "originalBranchPreserved": "dev",
+  "previousMeasurement": {
+    "path": "docs/benchmarks/JsonlReaderTradeoff.json",
+    "sha256": "93856c0fd093652dfe9b24c12c57aae8ea4e1c50d22d9d2edc60af4504758e93",
+    "preserved": true
+  },
+  "inputManifestSha256": "cf3cf8e549b1cf13038f513ea312a2f32c8c4717037ab7d3da853db6f2aa2708",
+  "branches": {
+    "before": {
+      "branch": "bench/jsonl-parse-before-20261009",
+      "commit": "3f5b49b3fefd32847399e9042c9fe9ca8ddcab24",
+      "sourceSha256": "c69c613c8526d1eb4e240083dbaa9a359526458585185c918b9ccbe67da0ad64",
+      "canonicalSourceSha256": "b20457c64727e7b51bd45208ec7d82faaeb37d6de1f6b592ffc00017276b5cd6",
+      "moduleSha256": "091c9bb6b46dc71e136957d0fa394d7caa565178d75999a73d0ad5e9b877feb3",
+      "readerStatus": ""
+    },
+    "after": {
+      "branch": "bench/jsonl-parse-after-20261009",
+      "commit": "3f5b49b3fefd32847399e9042c9fe9ca8ddcab24",
+      "sourceSha256": "79b4b32b12945f1f518e04c72a2bf75d6cca1cdc2c8e2d813f578127adf03250",
+      "canonicalSourceSha256": "c21a6c629015b495cc63031ffbed4080ad3d3797eb0ffa73a9042e86ce8e91de",
+      "moduleSha256": "1474fe5c7eb2befc89eb47ee47aff2a85da7440ea24456e787de2b419fa169f4",
+      "readerStatus": "M src/summary/jsonl.ts"
+    }
+  },
+  "harnessSha256": "261e923f0169fe4424757bbeae34df4dedcf23e6d301386908aa2e9602342717",
+  "method": "Both real branch builds, identical frozen JSONL Buffers loaded and hash-checked before timing. fs/promises.open returns RAM-only handles; no disk IO in readJsonl. Primary metric sums synchronous processBatch parseRows intervals: LF/string/image processing, UTF-8 decode, JSON.parse and schema/row-count checks. Excludes RAM feed copy/await, reader initialization, adapter, SQLite, hash and memory sampling. One full warm-up and explicit GC before each timing run. Small case repeats 500 times; others once. Fresh processes, sequential alternating pairs. JSON.parse and retained-byte tracing are separate one-pass diagnostics; residual includes timer/byte-count overhead. Memory uses another one-pass run without hash; preloaded corpus is O(N) benchmark overhead, not product parser space. Existing I/O-inclusive measurements preserved byte-for-byte.",
+  "complexity": {
+    "sourceBytes": "N",
+    "retainedJsonBytes": "B",
+    "maxRetainedLineBytes": "L",
+    "chunkBytes": 65536,
+    "maxLineBudgetBytes": 4194304,
+    "beforeTime": "O(N+B)",
+    "afterTime": "O(N+B)",
+    "parserSpaceBoth": "O(C+min(L,K)) excluding row objects",
+    "benchmarkInputSpace": "O(N), RAM preload outside parser metric"
+  },
+  "cases": [
+    {
+      "name": "small",
+      "input": "synthetic",
+      "rows": 40,
+      "sourceBytes": 14300,
+      "retainedJsonBytes": 14260,
+      "maxRetainedLineBytes": 421,
+      "sourceFileCount": 2,
+      "inputSha256": "49464182336567012d1234327a04810fe6417ce23a26718c7a1b1b8eac398932",
+      "beforeMs": 0.4217447999999983,
+      "afterMs": 0.12419860000000077,
+      "speedup": 3.3957290983955994,
+      "improvementPercent": 70.55124331112054,
+      "correctness": {
+        "before": {
+          "rows": 40,
+          "batches": 2,
+          "bytes": 14300,
+          "partialFiles": 0,
+          "parsingMs": 3.9213000000000022,
+          "iterations": 1,
+          "perCorpusParsingMs": 3.9213000000000022,
+          "inMemoryPipelineMs": 5.3416,
+          "throughputMiBPerSecond": 3.477811624871692,
+          "timedFileIO": false,
+          "digest": "8f3a35373ba916c8d1131d9a74e082d148b6c5d8886f71edd16282a062384e21"
+        },
+        "after": {
+          "rows": 40,
+          "batches": 2,
+          "bytes": 14300,
+          "partialFiles": 0,
+          "parsingMs": 1.5370999999999952,
+          "iterations": 1,
+          "perCorpusParsingMs": 1.5370999999999952,
+          "inMemoryPipelineMs": 2.642399999999995,
+          "throughputMiBPerSecond": 8.872254716420153,
+          "timedFileIO": false,
+          "digest": "8f3a35373ba916c8d1131d9a74e082d148b6c5d8886f71edd16282a062384e21"
+        }
+      },
+      "trace": {
+        "before": {
+          "rows": 40,
+          "batches": 2,
+          "bytes": 14300,
+          "partialFiles": 0,
+          "parsingMs": 2.6049999999999898,
+          "iterations": 1,
+          "perCorpusParsingMs": 2.6049999999999898,
+          "inMemoryPipelineMs": 3.441600000000008,
+          "throughputMiBPerSecond": 5.2351411610784755,
+          "timedFileIO": false,
+          "jsonParseMs": 0.18890000000000384,
+          "jsonParseCalls": 40,
+          "retainedJsonBytes": 14260,
+          "maxRetainedLineBytes": 421,
+          "preprocessingAndInstrumentationMs": 2.416099999999986
+        },
+        "after": {
+          "rows": 40,
+          "batches": 2,
+          "bytes": 14300,
+          "partialFiles": 0,
+          "parsingMs": 0.6401000000000039,
+          "iterations": 1,
+          "perCorpusParsingMs": 0.6401000000000039,
+          "inMemoryPipelineMs": 1.3614000000000033,
+          "throughputMiBPerSecond": 21.305331549147464,
+          "timedFileIO": false,
+          "jsonParseMs": 0.13989999999991198,
+          "jsonParseCalls": 40,
+          "retainedJsonBytes": 14260,
+          "maxRetainedLineBytes": 421,
+          "preprocessingAndInstrumentationMs": 0.5002000000000919
+        }
+      },
+      "memory": {
+        "before": {
+          "rows": 40,
+          "batches": 2,
+          "bytes": 14300,
+          "partialFiles": 0,
+          "parsingMs": 4.083300000000008,
+          "iterations": 1,
+          "perCorpusParsingMs": 4.083300000000008,
+          "inMemoryPipelineMs": 5.076899999999995,
+          "throughputMiBPerSecond": 3.3398336454851094,
+          "timedFileIO": false,
+          "inputBufferBytes": 14300,
+          "memoryBefore": {
+            "rss": 40718336,
+            "heapTotal": 10477568,
+            "heapUsed": 5419720,
+            "external": 2700710,
+            "arrayBuffers": 157918
+          },
+          "observedPeaks": {
+            "rss": 42549248,
+            "heapTotal": 10477568,
+            "heapUsed": 5614072,
+            "external": 2567974,
+            "arrayBuffers": 223454
+          },
+          "endpoint": {
+            "rss": 42708992,
+            "heapTotal": 10477568,
+            "heapUsed": 5621192,
+            "external": 2567974,
+            "arrayBuffers": 223454
+          },
+          "peakDelta": {
+            "rss": 1830912,
+            "heapTotal": 0,
+            "heapUsed": 194352,
+            "external": 0,
+            "arrayBuffers": 65536
+          },
+          "nativeMaxRssKiB": 41776
+        },
+        "after": {
+          "rows": 40,
+          "batches": 2,
+          "bytes": 14300,
+          "partialFiles": 0,
+          "parsingMs": 0.493700000000004,
+          "iterations": 1,
+          "perCorpusParsingMs": 0.493700000000004,
+          "inMemoryPipelineMs": 1.2048000000000059,
+          "throughputMiBPerSecond": 27.62313697510485,
+          "timedFileIO": false,
+          "inputBufferBytes": 14300,
+          "memoryBefore": {
+            "rss": 40636416,
+            "heapTotal": 10477568,
+            "heapUsed": 5423600,
+            "external": 2706430,
+            "arrayBuffers": 157918
+          },
+          "observedPeaks": {
+            "rss": 40738816,
+            "heapTotal": 10739712,
+            "heapUsed": 5540952,
+            "external": 2502438,
+            "arrayBuffers": 157918
+          },
+          "endpoint": {
+            "rss": 40738816,
+            "heapTotal": 10739712,
+            "heapUsed": 5544272,
+            "external": 2502438,
+            "arrayBuffers": 157918
+          },
+          "peakDelta": {
+            "rss": 102400,
+            "heapTotal": 262144,
+            "heapUsed": 117352,
+            "external": 0,
+            "arrayBuffers": 0
+          },
+          "nativeMaxRssKiB": 39980
+        }
+      },
+      "runs": [
+        {
+          "pair": 0,
+          "variant": "before",
+          "rows": 20000,
+          "batches": 1000,
+          "bytes": 7150000,
+          "partialFiles": 0,
+          "parsingMs": 248.4401999999993,
+          "iterations": 500,
+          "perCorpusParsingMs": 0.4968803999999986,
+          "inMemoryPipelineMs": 265.7726,
+          "throughputMiBPerSecond": 27.446328582510827,
+          "timedFileIO": false
+        },
+        {
+          "pair": 0,
+          "variant": "after",
+          "rows": 20000,
+          "batches": 1000,
+          "bytes": 7150000,
+          "partialFiles": 0,
+          "parsingMs": 57.51820000000049,
+          "iterations": 500,
+          "perCorpusParsingMs": 0.11503640000000098,
+          "inMemoryPipelineMs": 68.4139,
+          "throughputMiBPerSecond": 118.5498044498025,
+          "timedFileIO": false
+        },
+        {
+          "pair": 1,
+          "variant": "after",
+          "rows": 20000,
+          "batches": 1000,
+          "bytes": 7150000,
+          "partialFiles": 0,
+          "parsingMs": 62.09930000000038,
+          "iterations": 500,
+          "perCorpusParsingMs": 0.12419860000000077,
+          "inMemoryPipelineMs": 74.38,
+          "throughputMiBPerSecond": 109.80431924843991,
+          "timedFileIO": false
+        },
+        {
+          "pair": 1,
+          "variant": "before",
+          "rows": 20000,
+          "batches": 1000,
+          "bytes": 7150000,
+          "partialFiles": 0,
+          "parsingMs": 206.7324999999999,
+          "iterations": 500,
+          "perCorpusParsingMs": 0.4134649999999998,
+          "inMemoryPipelineMs": 221.05,
+          "throughputMiBPerSecond": 32.98354812283841,
+          "timedFileIO": false
+        },
+        {
+          "pair": 2,
+          "variant": "before",
+          "rows": 20000,
+          "batches": 1000,
+          "bytes": 7150000,
+          "partialFiles": 0,
+          "parsingMs": 210.87239999999915,
+          "iterations": 500,
+          "perCorpusParsingMs": 0.4217447999999983,
+          "inMemoryPipelineMs": 226.70440000000002,
+          "throughputMiBPerSecond": 32.3360068093535,
+          "timedFileIO": false
+        },
+        {
+          "pair": 2,
+          "variant": "after",
+          "rows": 20000,
+          "batches": 1000,
+          "bytes": 7150000,
+          "partialFiles": 0,
+          "parsingMs": 68.39910000000035,
+          "iterations": 500,
+          "perCorpusParsingMs": 0.1367982000000007,
+          "inMemoryPipelineMs": 82.4713,
+          "throughputMiBPerSecond": 99.69095152282198,
+          "timedFileIO": false
+        }
+      ]
+    },
+    {
+      "name": "large",
+      "input": "synthetic",
+      "rows": 8000,
+      "sourceBytes": 18251200,
+      "retainedJsonBytes": 18243200,
+      "maxRetainedLineBytes": 4266,
+      "sourceFileCount": 200,
+      "inputSha256": "93ceecac4971e24e52f7c9b521703560ed2281a8bfbe7001a81cf6f716a2f83e",
+      "beforeMs": 398.79809999999895,
+      "afterMs": 71.34230000000008,
+      "speedup": 5.589924911307857,
+      "improvementPercent": 82.1106720418176,
+      "correctness": {
+        "before": {
+          "rows": 8000,
+          "batches": 400,
+          "bytes": 18251200,
+          "partialFiles": 0,
+          "parsingMs": 592.5571999999986,
+          "iterations": 1,
+          "perCorpusParsingMs": 592.5571999999986,
+          "inMemoryPipelineMs": 613.5315,
+          "throughputMiBPerSecond": 29.373874258204594,
+          "timedFileIO": false,
+          "digest": "ec8052c40dfafdb882b23f9b3b08c30e236086e84dd9189d4259f8909027449a"
+        },
+        "after": {
+          "rows": 8000,
+          "batches": 400,
+          "bytes": 18251200,
+          "partialFiles": 0,
+          "parsingMs": 185.16440000000074,
+          "iterations": 1,
+          "perCorpusParsingMs": 185.16440000000074,
+          "inMemoryPipelineMs": 194.45600000000002,
+          "throughputMiBPerSecond": 94.00133440117907,
+          "timedFileIO": false,
+          "digest": "ec8052c40dfafdb882b23f9b3b08c30e236086e84dd9189d4259f8909027449a"
+        }
+      },
+      "trace": {
+        "before": {
+          "rows": 8000,
+          "batches": 400,
+          "bytes": 18251200,
+          "partialFiles": 0,
+          "parsingMs": 459.45899999999943,
+          "iterations": 1,
+          "perCorpusParsingMs": 459.45899999999943,
+          "inMemoryPipelineMs": 477.61269999999996,
+          "throughputMiBPerSecond": 37.883033488502285,
+          "timedFileIO": false,
+          "jsonParseMs": 44.71830000000091,
+          "jsonParseCalls": 8000,
+          "retainedJsonBytes": 18243200,
+          "maxRetainedLineBytes": 4266,
+          "preprocessingAndInstrumentationMs": 414.7406999999985
+        },
+        "after": {
+          "rows": 8000,
+          "batches": 400,
+          "bytes": 18251200,
+          "partialFiles": 0,
+          "parsingMs": 84.44920000000127,
+          "iterations": 1,
+          "perCorpusParsingMs": 84.44920000000127,
+          "inMemoryPipelineMs": 93.29430000000002,
+          "throughputMiBPerSecond": 206.1085325094079,
+          "timedFileIO": false,
+          "jsonParseMs": 35.82179999999994,
+          "jsonParseCalls": 8000,
+          "retainedJsonBytes": 18243200,
+          "maxRetainedLineBytes": 4266,
+          "preprocessingAndInstrumentationMs": 48.62740000000133
+        }
+      },
+      "memory": {
+        "before": {
+          "rows": 8000,
+          "batches": 400,
+          "bytes": 18251200,
+          "partialFiles": 0,
+          "parsingMs": 405.0307000000002,
+          "iterations": 1,
+          "perCorpusParsingMs": 405.0307000000002,
+          "inMemoryPipelineMs": 426.5419,
+          "throughputMiBPerSecond": 42.97378120619929,
+          "timedFileIO": false,
+          "inputBufferBytes": 18251200,
+          "memoryBefore": {
+            "rss": 60948480,
+            "heapTotal": 11001856,
+            "heapUsed": 5532912,
+            "external": 20766790,
+            "arrayBuffers": 18394818
+          },
+          "observedPeaks": {
+            "rss": 71077888,
+            "heapTotal": 11001856,
+            "heapUsed": 7977240,
+            "external": 28538122,
+            "arrayBuffers": 26193602
+          },
+          "endpoint": {
+            "rss": 67485696,
+            "heapTotal": 11001856,
+            "heapUsed": 6444784,
+            "external": 22836490,
+            "arrayBuffers": 20491970
+          },
+          "peakDelta": {
+            "rss": 10129408,
+            "heapTotal": 0,
+            "heapUsed": 2444328,
+            "external": 7771332,
+            "arrayBuffers": 7798784
+          },
+          "nativeMaxRssKiB": 69548
+        },
+        "after": {
+          "rows": 8000,
+          "batches": 400,
+          "bytes": 18251200,
+          "partialFiles": 0,
+          "parsingMs": 68.31369999999998,
+          "iterations": 1,
+          "perCorpusParsingMs": 68.31369999999998,
+          "inMemoryPipelineMs": 82.17700000000002,
+          "throughputMiBPerSecond": 254.7907767196588,
+          "timedFileIO": false,
+          "inputBufferBytes": 18251200,
+          "memoryBefore": {
+            "rss": 60989440,
+            "heapTotal": 11001856,
+            "heapUsed": 5536560,
+            "external": 20767414,
+            "arrayBuffers": 18394818
+          },
+          "observedPeaks": {
+            "rss": 67383296,
+            "heapTotal": 11001856,
+            "heapUsed": 7966464,
+            "external": 22574346,
+            "arrayBuffers": 20229826
+          },
+          "endpoint": {
+            "rss": 67383296,
+            "heapTotal": 11001856,
+            "heapUsed": 6911920,
+            "external": 22246666,
+            "arrayBuffers": 19902146
+          },
+          "peakDelta": {
+            "rss": 6393856,
+            "heapTotal": 0,
+            "heapUsed": 2429904,
+            "external": 1806932,
+            "arrayBuffers": 1835008
+          },
+          "nativeMaxRssKiB": 65812
+        }
+      },
+      "runs": [
+        {
+          "pair": 0,
+          "variant": "before",
+          "rows": 8000,
+          "batches": 400,
+          "bytes": 18251200,
+          "partialFiles": 0,
+          "parsingMs": 398.79809999999895,
+          "iterations": 1,
+          "perCorpusParsingMs": 398.79809999999895,
+          "inMemoryPipelineMs": 415.37209999999993,
+          "throughputMiBPerSecond": 43.64539521024247,
+          "timedFileIO": false
+        },
+        {
+          "pair": 0,
+          "variant": "after",
+          "rows": 8000,
+          "batches": 400,
+          "bytes": 18251200,
+          "partialFiles": 0,
+          "parsingMs": 71.34230000000008,
+          "iterations": 1,
+          "perCorpusParsingMs": 71.34230000000008,
+          "inMemoryPipelineMs": 78.60070000000002,
+          "throughputMiBPerSecond": 243.97448194961098,
+          "timedFileIO": false
+        },
+        {
+          "pair": 1,
+          "variant": "after",
+          "rows": 8000,
+          "batches": 400,
+          "bytes": 18251200,
+          "partialFiles": 0,
+          "parsingMs": 54.76850000000081,
+          "iterations": 1,
+          "perCorpusParsingMs": 54.76850000000081,
+          "inMemoryPipelineMs": 59.692399999999964,
+          "throughputMiBPerSecond": 317.804955103636,
+          "timedFileIO": false
+        },
+        {
+          "pair": 1,
+          "variant": "before",
+          "rows": 8000,
+          "batches": 400,
+          "bytes": 18251200,
+          "partialFiles": 0,
+          "parsingMs": 370.54070000000104,
+          "iterations": 1,
+          "perCorpusParsingMs": 370.54070000000104,
+          "inMemoryPipelineMs": 385.87350000000004,
+          "throughputMiBPerSecond": 46.97378906984766,
+          "timedFileIO": false
+        },
+        {
+          "pair": 2,
+          "variant": "before",
+          "rows": 8000,
+          "batches": 400,
+          "bytes": 18251200,
+          "partialFiles": 0,
+          "parsingMs": 458.19050000000016,
+          "iterations": 1,
+          "perCorpusParsingMs": 458.19050000000016,
+          "inMemoryPipelineMs": 477.6459,
+          "throughputMiBPerSecond": 37.98791263370529,
+          "timedFileIO": false
+        },
+        {
+          "pair": 2,
+          "variant": "after",
+          "rows": 8000,
+          "batches": 400,
+          "bytes": 18251200,
+          "partialFiles": 0,
+          "parsingMs": 172.26909999999998,
+          "iterations": 1,
+          "perCorpusParsingMs": 172.26909999999998,
+          "inMemoryPipelineMs": 193.47179999999992,
+          "throughputMiBPerSecond": 101.03785695515766,
+          "timedFileIO": false
+        }
+      ]
+    },
+    {
+      "name": "image",
+      "input": "synthetic",
+      "rows": 2,
+      "sourceBytes": 33554543,
+      "retainedJsonBytes": 109,
+      "maxRetainedLineBytes": 77,
+      "sourceFileCount": 1,
+      "inputSha256": "e28c5da93ac346d121420edf18beff7c54f9021bfa85978b9fe2d8731350651c",
+      "beforeMs": 354.8628,
+      "afterMs": 35.343299999999715,
+      "speedup": 10.040454626478084,
+      "improvementPercent": 90.04029162820117,
+      "correctness": {
+        "before": {
+          "rows": 2,
+          "batches": 513,
+          "bytes": 33554543,
+          "partialFiles": 0,
+          "parsingMs": 345.88070000000016,
+          "iterations": 1,
+          "perCorpusParsingMs": 345.88070000000016,
+          "inMemoryPipelineMs": 355.6749,
+          "throughputMiBPerSecond": 92.5177549884949,
+          "timedFileIO": false,
+          "digest": "936d8f40ca7761e3b0754e6a45d8590d86823f3757be7818c314f4f432dd4303"
+        },
+        "after": {
+          "rows": 2,
+          "batches": 513,
+          "bytes": 33554543,
+          "partialFiles": 0,
+          "parsingMs": 36.49590000000026,
+          "iterations": 1,
+          "perCorpusParsingMs": 36.49590000000026,
+          "inMemoryPipelineMs": 42.907100000000014,
+          "throughputMiBPerSecond": 876.8137203863693,
+          "timedFileIO": false,
+          "digest": "936d8f40ca7761e3b0754e6a45d8590d86823f3757be7818c314f4f432dd4303"
+        }
+      },
+      "trace": {
+        "before": {
+          "rows": 2,
+          "batches": 513,
+          "bytes": 33554543,
+          "partialFiles": 0,
+          "parsingMs": 349.89700000000147,
+          "iterations": 1,
+          "perCorpusParsingMs": 349.89700000000147,
+          "inMemoryPipelineMs": 360.57599999999996,
+          "throughputMiBPerSecond": 91.45578801146905,
+          "timedFileIO": false,
+          "jsonParseMs": 0.030900000000087857,
+          "jsonParseCalls": 2,
+          "retainedJsonBytes": 109,
+          "maxRetainedLineBytes": 77,
+          "preprocessingAndInstrumentationMs": 349.8661000000014
+        },
+        "after": {
+          "rows": 2,
+          "batches": 513,
+          "bytes": 33554543,
+          "partialFiles": 0,
+          "parsingMs": 44.331599999999696,
+          "iterations": 1,
+          "perCorpusParsingMs": 44.331599999999696,
+          "inMemoryPipelineMs": 51.511300000000006,
+          "throughputMiBPerSecond": 721.8351211742716,
+          "timedFileIO": false,
+          "jsonParseMs": 0.04359999999999786,
+          "jsonParseCalls": 2,
+          "retainedJsonBytes": 109,
+          "maxRetainedLineBytes": 77,
+          "preprocessingAndInstrumentationMs": 44.2879999999997
+        }
+      },
+      "memory": {
+        "before": {
+          "rows": 2,
+          "batches": 513,
+          "bytes": 33554543,
+          "partialFiles": 0,
+          "parsingMs": 425.43160000000114,
+          "iterations": 1,
+          "perCorpusParsingMs": 425.43160000000114,
+          "inMemoryPipelineMs": 452.4724,
+          "throughputMiBPerSecond": 75.2179806527043,
+          "timedFileIO": false,
+          "inputBufferBytes": 33554543,
+          "memoryBefore": {
+            "rss": 75087872,
+            "heapTotal": 10739712,
+            "heapUsed": 5425240,
+            "external": 36043445,
+            "arrayBuffers": 33698161
+          },
+          "observedPeaks": {
+            "rss": 80035840,
+            "heapTotal": 11001856,
+            "heapUsed": 7640304,
+            "external": 36108217,
+            "arrayBuffers": 33763697
+          },
+          "endpoint": {
+            "rss": 80044032,
+            "heapTotal": 11001856,
+            "heapUsed": 5597728,
+            "external": 36108217,
+            "arrayBuffers": 33763697
+          },
+          "peakDelta": {
+            "rss": 4947968,
+            "heapTotal": 262144,
+            "heapUsed": 2215064,
+            "external": 64772,
+            "arrayBuffers": 65536
+          },
+          "nativeMaxRssKiB": 78348
+        },
+        "after": {
+          "rows": 2,
+          "batches": 513,
+          "bytes": 33554543,
+          "partialFiles": 0,
+          "parsingMs": 43.1398999999997,
+          "iterations": 1,
+          "perCorpusParsingMs": 43.1398999999997,
+          "inMemoryPipelineMs": 56.0471,
+          "throughputMiBPerSecond": 741.7751514919911,
+          "timedFileIO": false,
+          "inputBufferBytes": 33554543,
+          "memoryBefore": {
+            "rss": 75112448,
+            "heapTotal": 10739712,
+            "heapUsed": 5429192,
+            "external": 36046149,
+            "arrayBuffers": 33698161
+          },
+          "observedPeaks": {
+            "rss": 77893632,
+            "heapTotal": 11001856,
+            "heapUsed": 7606040,
+            "external": 36108217,
+            "arrayBuffers": 33763697
+          },
+          "endpoint": {
+            "rss": 77549568,
+            "heapTotal": 11001856,
+            "heapUsed": 6329880,
+            "external": 36108217,
+            "arrayBuffers": 33763697
+          },
+          "peakDelta": {
+            "rss": 2781184,
+            "heapTotal": 262144,
+            "heapUsed": 2176848,
+            "external": 62068,
+            "arrayBuffers": 65536
+          },
+          "nativeMaxRssKiB": 76076
+        }
+      },
+      "runs": [
+        {
+          "pair": 0,
+          "variant": "before",
+          "rows": 2,
+          "batches": 513,
+          "bytes": 33554543,
+          "partialFiles": 0,
+          "parsingMs": 354.8628,
+          "iterations": 1,
+          "perCorpusParsingMs": 354.8628,
+          "inMemoryPipelineMs": 362.88070000000005,
+          "throughputMiBPerSecond": 90.17599437824738,
+          "timedFileIO": false
+        },
+        {
+          "pair": 0,
+          "variant": "after",
+          "rows": 2,
+          "batches": 513,
+          "bytes": 33554543,
+          "partialFiles": 0,
+          "parsingMs": 35.68159999999929,
+          "iterations": 1,
+          "perCorpusParsingMs": 35.68159999999929,
+          "inMemoryPipelineMs": 40.618300000000005,
+          "throughputMiBPerSecond": 896.8237371039908,
+          "timedFileIO": false
+        },
+        {
+          "pair": 1,
+          "variant": "after",
+          "rows": 2,
+          "batches": 513,
+          "bytes": 33554543,
+          "partialFiles": 0,
+          "parsingMs": 35.343299999999715,
+          "iterations": 1,
+          "perCorpusParsingMs": 35.343299999999715,
+          "inMemoryPipelineMs": 40.48289999999997,
+          "throughputMiBPerSecond": 905.4079799523355,
+          "timedFileIO": false
+        },
+        {
+          "pair": 1,
+          "variant": "before",
+          "rows": 2,
+          "batches": 513,
+          "bytes": 33554543,
+          "partialFiles": 0,
+          "parsingMs": 362.3874000000018,
+          "iterations": 1,
+          "perCorpusParsingMs": 362.3874000000018,
+          "inMemoryPipelineMs": 370.10670000000005,
+          "throughputMiBPerSecond": 88.30358301047156,
+          "timedFileIO": false
+        },
+        {
+          "pair": 2,
+          "variant": "before",
+          "rows": 2,
+          "batches": 513,
+          "bytes": 33554543,
+          "partialFiles": 0,
+          "parsingMs": 348.37269999999853,
+          "iterations": 1,
+          "perCorpusParsingMs": 348.37269999999853,
+          "inMemoryPipelineMs": 355.5476,
+          "throughputMiBPerSecond": 91.85595156523246,
+          "timedFileIO": false
+        },
+        {
+          "pair": 2,
+          "variant": "after",
+          "rows": 2,
+          "batches": 513,
+          "bytes": 33554543,
+          "partialFiles": 0,
+          "parsingMs": 31.857100000000685,
+          "iterations": 1,
+          "perCorpusParsingMs": 31.857100000000685,
+          "inMemoryPipelineMs": 36.29859999999999,
+          "throughputMiBPerSecond": 1004.4889791553039,
+          "timedFileIO": false
+        }
+      ]
+    },
+    {
+      "name": "real-200",
+      "input": "real-frozen",
+      "rows": 53271,
+      "sourceBytes": 208617531,
+      "retainedJsonBytes": 204542380,
+      "maxRetainedLineBytes": 1268923,
+      "sourceFileCount": 200,
+      "inputSha256": "bd41ef7ba5e18309015bfd0d83837ba0a98ad2d6dea224d2dbed47b7a4989f63",
+      "beforeMs": 4941.028499999957,
+      "afterMs": 1718.5155000000095,
+      "speedup": 2.8751724962619942,
+      "improvementPercent": 65.21947809044161,
+      "correctness": {
+        "before": {
+          "rows": 53271,
+          "batches": 3286,
+          "bytes": 208617531,
+          "partialFiles": 0,
+          "parsingMs": 6282.566999999986,
+          "iterations": 1,
+          "perCorpusParsingMs": 6282.566999999986,
+          "inMemoryPipelineMs": 6348.116499999999,
+          "throughputMiBPerSecond": 31.667498534720778,
+          "timedFileIO": false,
+          "digest": "c6ca5446c64e6ec9f04be826d69a7d4a818b27c2036297cfbf875af5575c738b"
+        },
+        "after": {
+          "rows": 53271,
+          "batches": 3286,
+          "bytes": 208617531,
+          "partialFiles": 0,
+          "parsingMs": 3262.373399999992,
+          "iterations": 1,
+          "perCorpusParsingMs": 3262.373399999992,
+          "inMemoryPipelineMs": 3314.6277999999993,
+          "throughputMiBPerSecond": 60.98418447955257,
+          "timedFileIO": false,
+          "digest": "c6ca5446c64e6ec9f04be826d69a7d4a818b27c2036297cfbf875af5575c738b"
+        }
+      },
+      "trace": {
+        "before": {
+          "rows": 53271,
+          "batches": 3286,
+          "bytes": 208617531,
+          "partialFiles": 0,
+          "parsingMs": 4721.686499999967,
+          "iterations": 1,
+          "perCorpusParsingMs": 4721.686499999967,
+          "inMemoryPipelineMs": 4772.7807999999995,
+          "throughputMiBPerSecond": 42.13604212536899,
+          "timedFileIO": false,
+          "jsonParseMs": 680.7965000000664,
+          "jsonParseCalls": 53271,
+          "retainedJsonBytes": 204542380,
+          "maxRetainedLineBytes": 1268923,
+          "preprocessingAndInstrumentationMs": 4040.8899999999007
+        },
+        "after": {
+          "rows": 53271,
+          "batches": 3286,
+          "bytes": 208617531,
+          "partialFiles": 0,
+          "parsingMs": 1802.5140000000074,
+          "iterations": 1,
+          "perCorpusParsingMs": 1802.5140000000074,
+          "inMemoryPipelineMs": 1834.1759000000002,
+          "throughputMiBPerSecond": 110.37538752363857,
+          "timedFileIO": false,
+          "jsonParseMs": 592.5029999999944,
+          "jsonParseCalls": 53271,
+          "retainedJsonBytes": 204542380,
+          "maxRetainedLineBytes": 1268923,
+          "preprocessingAndInstrumentationMs": 1210.0110000000132
+        }
+      },
+      "memory": {
+        "before": {
+          "rows": 53271,
+          "batches": 3286,
+          "bytes": 208617531,
+          "partialFiles": 0,
+          "parsingMs": 4474.883099999989,
+          "iterations": 1,
+          "perCorpusParsingMs": 4474.883099999989,
+          "inMemoryPipelineMs": 4570.548199999999,
+          "throughputMiBPerSecond": 44.45997287991393,
+          "timedFileIO": false,
+          "inputBufferBytes": 208617531,
+          "memoryBefore": {
+            "rss": 251547648,
+            "heapTotal": 11001856,
+            "heapUsed": 5531840,
+            "external": 211112077,
+            "arrayBuffers": 208761149
+          },
+          "observedPeaks": {
+            "rss": 313671680,
+            "heapTotal": 33452032,
+            "heapUsed": 22593744,
+            "external": 256584347,
+            "arrayBuffers": 250966101
+          },
+          "endpoint": {
+            "rss": 296579072,
+            "heapTotal": 27426816,
+            "heapUsed": 11548160,
+            "external": 222031062,
+            "arrayBuffers": 217152318
+          },
+          "peakDelta": {
+            "rss": 62124032,
+            "heapTotal": 22450176,
+            "heapUsed": 17061904,
+            "external": 45472270,
+            "arrayBuffers": 42204952
+          },
+          "nativeMaxRssKiB": 308564
+        },
+        "after": {
+          "rows": 53271,
+          "batches": 3286,
+          "bytes": 208617531,
+          "partialFiles": 0,
+          "parsingMs": 1776.5036999999927,
+          "iterations": 1,
+          "perCorpusParsingMs": 1776.5036999999927,
+          "inMemoryPipelineMs": 1852.6758,
+          "throughputMiBPerSecond": 111.99142521728803,
+          "timedFileIO": false,
+          "inputBufferBytes": 208617531,
+          "memoryBefore": {
+            "rss": 251617280,
+            "heapTotal": 11001856,
+            "heapUsed": 5536112,
+            "external": 211112077,
+            "arrayBuffers": 208761149
+          },
+          "observedPeaks": {
+            "rss": 296488960,
+            "heapTotal": 32522240,
+            "heapUsed": 22854112,
+            "external": 225719706,
+            "arrayBuffers": 218681348
+          },
+          "endpoint": {
+            "rss": 285556736,
+            "heapTotal": 26521600,
+            "heapUsed": 13293552,
+            "external": 219610596,
+            "arrayBuffers": 212637774
+          },
+          "peakDelta": {
+            "rss": 44871680,
+            "heapTotal": 21520384,
+            "heapUsed": 17318000,
+            "external": 14607629,
+            "arrayBuffers": 9920199
+          },
+          "nativeMaxRssKiB": 289544
+        }
+      },
+      "runs": [
+        {
+          "pair": 0,
+          "variant": "before",
+          "rows": 53271,
+          "batches": 3286,
+          "bytes": 208617531,
+          "partialFiles": 0,
+          "parsingMs": 4419.692099999953,
+          "iterations": 1,
+          "perCorpusParsingMs": 4419.692099999953,
+          "inMemoryPipelineMs": 4478.9383,
+          "throughputMiBPerSecond": 45.01516774591307,
+          "timedFileIO": false
+        },
+        {
+          "pair": 0,
+          "variant": "after",
+          "rows": 53271,
+          "batches": 3286,
+          "bytes": 208617531,
+          "partialFiles": 0,
+          "parsingMs": 1718.5155000000095,
+          "iterations": 1,
+          "perCorpusParsingMs": 1718.5155000000095,
+          "inMemoryPipelineMs": 1760.9774000000002,
+          "throughputMiBPerSecond": 115.77037348035765,
+          "timedFileIO": false
+        },
+        {
+          "pair": 1,
+          "variant": "after",
+          "rows": 53271,
+          "batches": 3286,
+          "bytes": 208617531,
+          "partialFiles": 0,
+          "parsingMs": 1824.037199999998,
+          "iterations": 1,
+          "perCorpusParsingMs": 1824.037199999998,
+          "inMemoryPipelineMs": 1876.4707999999996,
+          "throughputMiBPerSecond": 109.07298451302687,
+          "timedFileIO": false
+        },
+        {
+          "pair": 1,
+          "variant": "before",
+          "rows": 53271,
+          "batches": 3286,
+          "bytes": 208617531,
+          "partialFiles": 0,
+          "parsingMs": 5681.257099999957,
+          "iterations": 1,
+          "perCorpusParsingMs": 5681.257099999957,
+          "inMemoryPipelineMs": 5779.9738,
+          "throughputMiBPerSecond": 35.01921806474595,
+          "timedFileIO": false
+        },
+        {
+          "pair": 2,
+          "variant": "before",
+          "rows": 53271,
+          "batches": 3286,
+          "bytes": 208617531,
+          "partialFiles": 0,
+          "parsingMs": 4941.028499999957,
+          "iterations": 1,
+          "perCorpusParsingMs": 4941.028499999957,
+          "inMemoryPipelineMs": 5011.442599999999,
+          "throughputMiBPerSecond": 40.26554011311338,
+          "timedFileIO": false
+        },
+        {
+          "pair": 2,
+          "variant": "after",
+          "rows": 53271,
+          "batches": 3286,
+          "bytes": 208617531,
+          "partialFiles": 0,
+          "parsingMs": 1712.3771000000038,
+          "iterations": 1,
+          "perCorpusParsingMs": 1712.3771000000038,
+          "inMemoryPipelineMs": 1748.7603999999997,
+          "throughputMiBPerSecond": 116.1853783648381,
+          "timedFileIO": false
+        }
+      ]
+    }
+  ]
+}
