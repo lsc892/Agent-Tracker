@@ -1,3 +1,5 @@
+// Frozen product reader from 3f5b49b3 for differential boundary/error tests.
+// Keep this independent of the candidate; it is never imported by production code.
 import { open } from 'node:fs/promises';
 
 export class SummaryError extends Error {
@@ -21,55 +23,8 @@ class JsonlLine {
     this.block = Buffer.allocUnsafe(Math.min(1024, maxBytes));
   }
 
-  append(chunk: Buffer, start: number, end: number): void {
-    this.bytes += end - start;
-    // Cache the next delimiter: searching the entire remaining chunk for an absent
-    // backslash again for every string would make quote-heavy input quadratic.
-    const search = chunk.subarray(0, end);
-    const find = (byte: number, from: number): number => {
-      const found = search.indexOf(byte, from);
-      return found < 0 || found > end ? end : found;
-    };
-    let quote = find(34, start);
-    let escape = find(92, start);
-    let index = start;
-    while (index < end) {
-      if (this.probe !== undefined || this.escaped || this.unicode) {
-        this.appendByte(chunk[index++]);
-        continue;
-      }
-      if (quote < index) quote = find(34, index);
-      if (escape < index) escape = find(92, index);
-      const boundary = this.inString ? Math.min(quote, escape) : quote;
-      if (boundary > index) {
-        if (this.image) {
-          // Discard without retaining Base64; JSON.parse cannot check these bytes.
-          if (/[\x00-\x1f]/.test(chunk.toString('latin1', index, boundary))) throw new SummaryError('parse-error', this.offset);
-        } else this.retain(chunk, index, boundary);
-        index = boundary;
-      } else this.appendByte(chunk[index++]);
-    }
-  }
-
-  private retain(chunk: Buffer, start: number, end: number): void {
-    if (end - start > this.maxBytes - this.length) throw new SummaryError('line-byte-budget-exceeded', this.offset);
-    while (start < end) {
-      if (this.used === this.block.length) this.nextBlock();
-      const count = Math.min(end - start, this.block.length - this.used);
-      chunk.copy(this.block, this.used, start, start + count);
-      start += count;
-      this.used += count;
-      this.length += count;
-    }
-  }
-
-  private nextBlock(): void {
-    this.blocks.push(this.block);
-    this.block = Buffer.allocUnsafe(Math.min(64 * 1024, this.maxBytes - this.length));
-    this.used = 0;
-  }
-
-  private appendByte(byte: number): void {
+  append(byte: number): void {
+    this.bytes++;
     let retain = true;
     if (this.inString) {
       if (this.image) {
@@ -103,14 +58,17 @@ class JsonlLine {
     } else if (byte === 34) { this.inString = true; this.probe = ''; }
     if (!retain) return;
     if (this.length >= this.maxBytes) throw new SummaryError('line-byte-budget-exceeded', this.offset);
-    if (this.used === this.block.length) this.nextBlock();
+    if (this.used === this.block.length) {
+      this.blocks.push(this.block);
+      this.block = Buffer.allocUnsafe(Math.min(64 * 1024, this.maxBytes - this.length));
+      this.used = 0;
+    }
     this.block[this.used++] = byte;
     this.length++;
   }
 
   text(): string {
-    const tail = this.block.subarray(0, this.used);
-    return (this.blocks.length ? Buffer.concat([...this.blocks, tail], this.length) : tail).toString('utf8').trim();
+    return Buffer.concat([...this.blocks, this.block.subarray(0, this.used)], this.length).toString('utf8').trim();
   }
 }
 
@@ -127,7 +85,7 @@ export async function readJsonl(
   if (!Number.isSafeInteger(maxLine) || maxLine < 1) throw new RangeError('maxLineBytes must be a positive integer');
   const file = await open(path, 'r');
   const chunk = Buffer.allocUnsafe(Math.min(64 * 1024, Math.max(1, size)));
-  let line: JsonlLine | undefined;
+  let line = new JsonlLine(maxLine, 0);
   let read = 0;
   let lineOffset = 0;
   let rows = 0;
@@ -140,25 +98,9 @@ export async function readJsonl(
       options.onBytes?.(bytesRead);
       let stopped = false;
       const parseRows = (): void => {
-        let index = 0;
-        while (index < bytesRead) {
-          const newline = chunk.indexOf(10, index);
-          const end = newline < 0 || newline >= bytesRead ? bytesRead : newline;
-          let text: string | undefined;
-          let sourceBytes = end - index;
-          if (!line && end < bytesRead && sourceBytes <= maxLine) {
-            const candidate = chunk.toString('utf8', index, end).trim();
-            // Absence proves there is no image to sanitize. JSON.parse still checks
-            // every JSON string/escape; escaped image prefixes were never stripped.
-            if (!/data:image\//i.test(candidate)) text = candidate;
-          }
-          if (text === undefined) {
-            line ??= new JsonlLine(maxLine, lineOffset);
-            line.append(chunk, index, end);
-            if (end === bytesRead) break;
-            text = line.text();
-            sourceBytes = line.bytes;
-          }
+        for (let index = 0; index < bytesRead; index++) {
+          if (chunk[index] !== 10) { line.append(chunk[index]); continue; }
+          const text = line.text();
           if (text) {
             let row: unknown;
             try { row = JSON.parse(text); } catch { throw new SummaryError('parse-error', lineOffset); }
@@ -166,14 +108,13 @@ export async function readJsonl(
             rows++;
             if (onRow(row as Record<string, unknown>, lineOffset) === false) { stopped = true; return; }
           }
-          lineOffset += sourceBytes + 1;
-          line = undefined;
-          index = end + 1;
+          lineOffset += line.bytes + 1;
+          line = new JsonlLine(maxLine, lineOffset);
         }
       };
       if (options.processBatch) options.processBatch(parseRows); else parseRows();
       if (stopped) return {partialLine:false,bytes:read,rows};
     }
-    return { partialLine: (line?.bytes ?? 0) > 0, bytes: read, rows };
+    return { partialLine: line.bytes > 0, bytes: read, rows };
   } finally { await file.close(); }
 }
