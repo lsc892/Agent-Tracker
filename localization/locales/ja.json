@@ -321,5 +321,9 @@
   "duration.daysHours": "{value0}日 {value1}時間",
   "duration.hoursMinutes": "{value0}時間 {value1}分",
   "duration.minutes": "{value0}分",
-  "common.skillSection": "スキル"
+  "common.skillSection": "スキル",
+  "manifest.percentageUsed": "使用率",
+  "manifest.percentageRemaining": "残りの割合",
+  "manifest.detailCompact": "コンパクト",
+  "manifest.detailDetailed": "詳細"
 }

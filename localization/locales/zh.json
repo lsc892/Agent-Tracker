@@ -321,5 +321,9 @@
   "duration.daysHours": "{value0}天 {value1}小时",
   "duration.hoursMinutes": "{value0}小时 {value1}分钟",
   "duration.minutes": "{value0}分钟",
-  "common.skillSection": "技能"
+  "common.skillSection": "技能",
+  "manifest.percentageUsed": "已用",
+  "manifest.percentageRemaining": "剩余",
+  "manifest.detailCompact": "简洁",
+  "manifest.detailDetailed": "详细"
 }

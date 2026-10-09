@@ -51,7 +51,9 @@ for (const language of languages) {
     return [key, catalog[key]];
   }));
   for (const alias of new Set([language.locale, ...language.vscodeLocales])) write(`localization/package.nls.${alias}.json`, manifest);
-  if (language.locale === 'ko') write('localization/package.nls.json', manifest);
+  // VS Code treats the base manifest catalog as the default (English) UI.
+  // Runtime strings still use the Korean source catalog and fallback.
+  if (language.locale === 'en') write('localization/package.nls.json', manifest);
 }
 function files(dir) {
   return fs.readdirSync(path.join(root, dir), {withFileTypes: true}).flatMap(item => item.isDirectory()

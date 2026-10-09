@@ -321,5 +321,9 @@
   "duration.daysHours": "{value0}d {value1}h",
   "duration.hoursMinutes": "{value0}h {value1}m",
   "duration.minutes": "{value0}m",
-  "common.skillSection": "Skill"
+  "common.skillSection": "Skill",
+  "manifest.percentageUsed": "사용률",
+  "manifest.percentageRemaining": "남은 비율",
+  "manifest.detailCompact": "압축",
+  "manifest.detailDetailed": "상세"
 }

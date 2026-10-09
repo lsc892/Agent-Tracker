@@ -321,5 +321,9 @@
   "duration.daysHours": "{value0} j {value1} h",
   "duration.hoursMinutes": "{value0} h {value1} min",
   "duration.minutes": "{value0} min",
-  "common.skillSection": "Skills"
+  "common.skillSection": "Skills",
+  "manifest.percentageUsed": "Utilisé",
+  "manifest.percentageRemaining": "Restant",
+  "manifest.detailCompact": "Compact",
+  "manifest.detailDetailed": "Détaillé"
 }

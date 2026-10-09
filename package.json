@@ -169,6 +169,10 @@
               "remaining"
             ],
             "default": "used",
+            "enumItemLabels": [
+              "%manifest.percentageUsed%",
+              "%manifest.percentageRemaining%"
+            ],
             "description": "%manifest.percentage%",
             "order": 2
           },
@@ -179,6 +183,10 @@
               "detailed"
             ],
             "default": "detailed",
+            "enumItemLabels": [
+              "%manifest.detailCompact%",
+              "%manifest.detailDetailed%"
+            ],
             "description": "%manifest.detail%",
             "order": 3
           },

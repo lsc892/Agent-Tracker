@@ -35,7 +35,11 @@ HTML·SVG·명령 링크는 코드에서 구성하고 번역에는 문구와 `{v
 
 상태 표시줄·quota 카드·안내와 열린 통계·데이터 확인·색상 화면은 언어 변경에 따라 다시 표시한다. 숫자·날짜·USD 형식도 선택한 언어를 따른다. 로그의 프로젝트·세션·요청 이름과 진단 코드·원본 오류는 번역하지 않는다. 언어 변경은 서버 조회나 원본 재스캔을 발생시키지 않는다. quota 오류에는 키를 보존하여 과거 오류도 현재 언어로 표시한다.
 
-명령 팔레트와 VS Code 설정 카테고리·설명은 VS Code가 manifest 로딩 때 번역하므로 **VS Code 표시 언어**를 따른다. 확장 언어 설정으로 이 정적 UI를 다시 번역할 수 없다. 기본 `package.nls.json`도 한국어여서 지원하지 않는 언어에서 한국어 설명을 사용한다.
+Agent Tracker의 ‘설정 열기’는 `workbench.action.openSettings`로 VS Code Settings의 확장 설정을 연다. 별도의 전체 설정 Webview 없이 기존 사용자·작업공간 설정과 입력 제약·초기화 동작을 사용한다. 기존 색상 선택 Webview는 설정의 색상 선택 링크로 연다.
+
+명령 팔레트와 **VS Code Settings**의 카테고리·설명·선택지는 VS Code가 manifest 로딩 때 번역하므로 VS Code 표시 언어를 따른다. 확장 Language 설정과 독립적이다. `package.nls.json`은 영어로 생성하고 한국어는 `package.nls.ko.json`으로 제공한다. 지원하지 않는 VS Code 언어의 정적 문구는 영어로 fallback하며 실행 중 확장 문구의 한국어 원문·fallback은 유지한다. 별도의 언어별 VSIX나 설치된 manifest의 런타임 수정을 사용하지 않는다.
+
+`npm run check`는 여섯 언어의 설정 manifest 번역·영어 기본 카탈로그·설정 열기 경로도 검증한다. 실제 VS Code의 manifest 로딩과 기본 Settings 열기는 `npm run build` 뒤 `node tests/runners/test-native-settings.cjs en`으로 확인한다. 설치된 한국어 언어팩이 있는 Windows 환경에서는 `en ko`로 두 표시 언어를 대조할 수 있다. 격리 프로필에서 두 제공자의 추적을 끄고 확장 Language를 VS Code와 다른 언어로 지정하여 두 언어 기준의 독립성을 확인하며 실계정 quota는 조회하지 않는다.
 
 ## 새 기능과 언어 추가
 
