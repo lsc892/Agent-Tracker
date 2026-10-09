@@ -476,12 +476,12 @@ export async function run(): Promise<void> {
         };
       });
       await vscode.commands.executeCommand('agentTracker.configureStatusColor');await completed;onReport=undefined;
-      await until(()=>statusColors.length===2 && statusColors.every(color=>color===undefined),'automatic restores both status item colors');
+      await until(()=>statusColors.length===2 && statusColors.every(color=>color==='inherit'),'automatic restores theme inheritance for both status items');
       assert.equal(vscode.workspace.getConfiguration('agentTracker').get('display.customColor'),'#12345680','native picker and opacity persist');
       assert.equal(scanCount,before,'color settings never scan transcripts');
       await vscode.commands.executeCommand('workbench.action.closeAllEditors');
     }
-    for (const color of ['#ffffff','#000000','#aabbccdd','#12345680','<automatic>']) assert.ok(observedColors.has(color),'live status items receive '+color);
+    for (const color of ['#ffffff','#000000','#aabbccdd','#12345680','inherit']) assert.ok(observedColors.has(color),'live status items receive '+color);
     const scansBeforeSettings = scanCount;
     const config = vscode.workspace.getConfiguration('agentTracker');
     const sourcePath = join(process.env.AGENT_TRACKER_TEST_ROOT!, 'claude', 'projects', 'session.jsonl');

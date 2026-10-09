@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { writeFile } from 'node:fs/promises';
 import type { QuotaState } from '../../src/quota/types';
 import { QuotaStatusBar } from '../../src/ui/statusBar';
 import { parseCodexQuota } from '../../src/quota/codex';
@@ -29,6 +30,7 @@ export async function run(): Promise<void> {
   const config = vscode.workspace.getConfiguration('agentTracker');
   await config.update('display.detail', 'detailed', vscode.ConfigurationTarget.Global);
   await config.update('display.detail', 'compact', vscode.ConfigurationTarget.Global);
+  if (process.env.AGENT_TRACKER_QUOTA_FIXTURE_READY) await writeFile(process.env.AGENT_TRACKER_QUOTA_FIXTURE_READY, 'ready');
   // The CDP driver owns the isolated host lifetime and closes it after its assertions.
   await new Promise<void>(() => {});
 }

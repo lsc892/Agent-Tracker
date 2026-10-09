@@ -211,10 +211,10 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     assert.match(items[0].text!, /\$\(agent-tracker-claude\).*\$\(agent-tracker-codex\)/);
     assert.equal(items[0].text!.match(/7일/g)?.length,2);
     assert.equal(items[0].text!.match(/5시간/g)?.length,2);
-    assert.equal(items[0].color, undefined, 'automatic inherits the theme status bar foreground');
+    assert.equal(items[0].color, 'inherit', 'automatic inherits the theme status bar foreground');
     activeColorTheme.kind = 1; themes.fire(activeColorTheme);
-    assert.equal(items[0].color, undefined);
-    for (const [mode,expected] of [['white','#ffffff'],['black','#000000'],['custom','#aabbccdd'],['automatic',undefined]] as const) {
+    assert.equal(items[0].color, 'inherit');
+    for (const [mode,expected] of [['white','#ffffff'],['black','#000000'],['custom','#aabbccdd'],['automatic','inherit']] as const) {
       configValues.set('display.customColor','#abcd');configValues.set('display.colorMode',mode);
       configuration.fire({affectsConfiguration:section=>section==='agentTracker'});await tick();
       assert.equal(items[0].color,expected);assert.equal(items[1].color,expected);

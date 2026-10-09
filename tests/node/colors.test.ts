@@ -11,9 +11,9 @@ test('status colors inherit theme defaults, accept short and alpha HEX codes and
   assert.equal(normalizeHexColor(' #AbC '),'#aabbcc');assert.equal(normalizeHexColor('#abcd'),'#aabbccdd');
   assert.equal(normalizeHexColor('#AaBbCcDd'),'#aabbccdd');
   for (const value of ['#12','#12345','#1234567','red','var(--x)','";color:red',null,12]) assert.equal(normalizeHexColor(value),undefined);
-  assert.equal(statusForeground('automatic','#fff'),undefined);
+  assert.equal(statusForeground('automatic','#fff'),'inherit');
   assert.equal(statusForeground('white',undefined),'#ffffff');assert.equal(statusForeground('black','#fff'),'#000000');
-  assert.equal(statusForeground('custom','#1234'),'#11223344');assert.equal(statusForeground('custom','bad'),undefined);
+  assert.equal(statusForeground('custom','#1234'),'#11223344');assert.equal(statusForeground('custom','bad'),'inherit');
   assert.equal(colorMode('invalid'),'automatic');
   const settings=readConfiguration({get:<T>(key:string,fallback:T)=>({'display.colorMode':'custom','display.customColor':'#abc'} as Record<string,unknown>)[key] as T ?? fallback});
   assert.equal(settings.colorMode,'custom');assert.equal(settings.customColor,'#aabbcc');

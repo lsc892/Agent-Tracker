@@ -23,7 +23,9 @@ export function normalizeHexColor(value: unknown): string | undefined {
   return color.length <= 5 ? '#'+[...color.slice(1)].map(character=>character+character).join('') : color;
 }
 
-export function statusForeground(mode: StatusColorMode, custom: string | undefined): string | undefined {
-  // Undefined lets VS Code resolve its normal, no-folder, debugging and theme overrides.
-  return mode === 'white' ? '#ffffff' : mode === 'black' ? '#000000' : mode === 'custom' ? normalizeHexColor(custom) : undefined;
+export function statusForeground(mode: StatusColorMode, custom: string | undefined): string {
+  // VS Code writes this value to the label's inline CSS. Explicit inheritance
+  // follows the status bar's normal, no-folder and debugging foreground, even
+  // when a label rule (such as hover) would otherwise supply a different color.
+  return mode === 'white' ? '#ffffff' : mode === 'black' ? '#000000' : mode === 'custom' ? normalizeHexColor(custom) ?? 'inherit' : 'inherit';
 }

@@ -47,12 +47,81 @@ class Cdp {
   }
 }
 
+async function verifyStatusColors(cdp, settingsPath, resultDirectory, appRoot) {
+  const settings = JSON.parse(readFileSync(settingsPath, 'utf8'));
+  const themeDirectory=join(appRoot,'extensions','theme-defaults');
+  const themes=JSON.parse(readFileSync(join(themeDirectory,'package.json'),'utf8')).contributes.themes;
+  const observations = [];
+  const inspect = () => cdp.evaluate(`(() => {
+    const bar=document.querySelector('.part.statusbar');
+    const labels=['agentTracker.quota','agentTracker.refreshQuota'].map(id=>document.querySelector('[id$="'+id+'"] .statusbar-item-label'));
+    if(!bar || labels.some(label=>!label))return null;
+    return {editorBackground:getComputedStyle(document.querySelector('.monaco-workbench')).getPropertyValue('--vscode-editor-background').trim().toLowerCase(),foreground:getComputedStyle(bar).color,
+      labels:labels.map(label=>({css:label.style.color,color:getComputedStyle(label).color,
+        icons:[...label.querySelectorAll('.codicon')].map(icon=>getComputedStyle(icon).color)}))};
+  })()`);
+  const save = () => writeFile(settingsPath, JSON.stringify(settings));
+  const matches = (view, css, color) => view && view.labels.every(label=>(css==='fixed' ? Boolean(label.css) && label.css!=='inherit' : label.css===css) && label.color===(color ?? view.foreground) && label.icons.every(icon=>icon===label.color));
+  const check = async (description, css, color) => {
+    let view;
+    try { view=await until(async()=>{const view=await inspect();return matches(view,css,color) && view;},description); }
+    catch (error) { throw new Error(error.message+': '+JSON.stringify(await inspect())); }
+    observations.push({description,...view});
+    return view;
+  };
+  for (const theme of ['Dark 2026','Light 2026','Dark Modern','Default High Contrast']) {
+    settings['workbench.colorTheme']=theme;
+    settings['agentTracker.display.colorMode']='automatic';
+    settings['agentTracker.display.customColor']='#ffffff';
+    delete settings['workbench.colorCustomizations'];
+    await save();
+    const themeSource=JSON.parse(readFileSync(join(themeDirectory,themes.find(value=>value.id===theme).path),'utf8'));
+    await until(async()=>{const view=await inspect();return view?.editorBackground===themeSource.colors['editor.background'].toLowerCase();},'theme switches to '+theme);
+    await check(theme+': automatic label and icon colors match the status bar','inherit');
+    const point=await cdp.evaluate(`(() => {const rect=document.querySelector('[id$="agentTracker.quota"] .statusbar-item-label').getBoundingClientRect();return {x:rect.x+rect.width/2,y:rect.y+rect.height/2};})()`);
+    await cdp.call('Input.dispatchMouseEvent',{type:'mouseMoved',...point});
+    await check(theme+': automatic retains the theme foreground on hover','inherit');
+    await cdp.call('Input.dispatchMouseEvent',{type:'mouseMoved',x:300,y:100});
+    for (const [mode,hex,color] of [['white','#ffffff','rgb(255, 255, 255)'],['black','#000000','rgb(0, 0, 0)'],['custom','#12345680','rgba(18, 52, 86, 0.5)']]) {
+      settings['agentTracker.display.colorMode']=mode;
+      settings['agentTracker.display.customColor']=hex;
+      await save();
+      await check(theme+': '+mode+' fixes label and icon colors','fixed',color);
+    }
+  }
+  settings['agentTracker.display.colorMode']='automatic';
+  settings['workbench.colorCustomizations']={'statusBar.foreground':'#91a2b3','statusBar.noFolderForeground':'#b3a291'};
+  await save();
+  const overridden=await check('automatic follows the no-folder theme override','inherit','rgb(179, 162, 145)');
+  assert.equal(overridden.foreground,'rgb(179, 162, 145)');
+  settings['agentTracker.display.colorMode']='custom';
+  settings['agentTracker.display.customColor']='#123456';
+  await save();
+  await check('custom overrides the workbench foreground','rgb(18, 52, 86)','rgb(18, 52, 86)');
+  settings['workbench.colorTheme']='Light 2026';
+  settings['workbench.colorCustomizations']={'statusBar.foreground':'#abcdef','statusBar.noFolderForeground':'#abcdef'};
+  await save();
+  await until(async()=>{const view=await inspect();return view?.foreground==='rgb(171, 205, 239)';},'workbench foreground changes while custom remains selected');
+  await check('custom remains fixed across theme and color customization changes','rgb(18, 52, 86)','rgb(18, 52, 86)');
+  settings['agentTracker.display.colorMode']='automatic';
+  await save();
+  await check('switching back to automatic restores the current theme color','inherit','rgb(171, 205, 239)');
+  settings['agentTracker.display.colorMode']='custom';
+  settings['agentTracker.display.customColor']='invalid';
+  await save();
+  await check('invalid custom color falls back to theme inheritance','inherit','rgb(171, 205, 239)');
+  const screenshot=await cdp.call('Page.captureScreenshot',{format:'png'});
+  await writeFile(join(resultDirectory,'statusbar-colors.png'),Buffer.from(screenshot.data,'base64'));
+  return observations;
+}
+
 async function main() {
   const baseline = process.argv.includes('--baseline');
   const quotaFixture = process.argv.includes('--quota-fixture');
+  const statusColors = process.argv.includes('--status-colors');
   const appRoot = resolveAppRoot();
-  const patch = baseline ? { appRoot, version: JSON.parse(readFileSync(join(appRoot, 'package.json'), 'utf8')).version } : operate({ check: true });
-  const reportName = baseline ? 'statusbar-toggle-baseline.json' : quotaFixture ? 'quota-card.json' : 'statusbar-toggle.json';
+  const patch = baseline || statusColors ? { appRoot, version: JSON.parse(readFileSync(join(appRoot, 'package.json'), 'utf8')).version } : operate({ check: true });
+  const reportName = statusColors ? 'statusbar-colors.json' : baseline ? 'statusbar-toggle-baseline.json' : quotaFixture ? 'quota-card.json' : 'statusbar-toggle.json';
   const root = resolve(__dirname, '../..');
   const resultDirectory = join(root, 'tests', 'results');
   await mkdir(resultDirectory, { recursive: true });
@@ -68,6 +137,7 @@ async function main() {
     // A short delay makes an accidentally retained automatic hover observable.
     'workbench.hover.delay': 100,
     'agentTracker.display.detail': 'compact',
+    'agentTracker.display.colorMode': 'automatic',
     'agentTracker.quota.refreshPolicy': 'manual',
     'agentTracker.claude.dataHome': join(sandbox, 'claude'),
     'agentTracker.codex.dataHome': join(sandbox, 'codex'),
@@ -83,6 +153,7 @@ async function main() {
   const port = server.address().port;
   await new Promise(resolve => server.close(resolve));
   const environment = { ...process.env };
+  if (quotaFixture) environment.AGENT_TRACKER_QUOTA_FIXTURE_READY = join(sandbox, 'quota-fixture-ready');
   delete environment.ELECTRON_RUN_AS_NODE; delete environment.VSCODE_IPC_HOOK_CLI;
   const child = spawn(executable, ['--user-data-dir', userData, '--extensions-dir', join(sandbox, 'extensions'),
     ...(quotaFixture ? ['--extensionTestsPath', join(root, 'dist/tests/fixtures/quotaCardFixture.js')] : []),
@@ -116,6 +187,13 @@ async function main() {
       const element = [...document.querySelectorAll('.statusbar-item')].find(node => node.id.endsWith('agentTracker.quota'))?.querySelector('.statusbar-item-label');
       if (!element) return null; const rect = element.getBoundingClientRect(); return rect.width ? {x:rect.x+rect.width/2,y:rect.y+rect.height/2,top:rect.top} : null;
     })()`), 'quota status item');
+    if (statusColors) {
+      if (quotaFixture) await until(()=>existsSync(environment.AGENT_TRACKER_QUOTA_FIXTURE_READY),'quota fixture finishes its initial settings updates');
+      const observations=await verifyStatusColors(cdp,join(userData,'User','settings.json'),resultDirectory,appRoot);
+      await writeFile(join(resultDirectory,reportName),JSON.stringify({passed:true,version:patch.version,observations},null,2));
+      console.log('Native statusbar colors passed:',observations.map(view=>view.description).join('; '));
+      return;
+    }
     const editor = await cdp.evaluate(`(() => { const rect=document.querySelector('.part.editor').getBoundingClientRect();return {x:rect.x+rect.width/3,y:rect.y+100}; })()`);
     const visible = () => cdp.evaluate(`(() => {
       const card=[...document.querySelectorAll('.monaco-hover')].find(node => node.innerText.includes('사용량 통계') && node.querySelector('a[data-href="command:agentTracker.openSettings"]'));
