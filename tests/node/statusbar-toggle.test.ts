@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
 import { runInNewContext } from 'node:vm';
 
 const patcher = require('../../../tools/vscode/statusbar-toggle.cjs') as {
@@ -219,7 +219,8 @@ test('installation discovery follows the selected CLI and refuses an invalid exp
     writeFileSync(join(app, 'product.json'), '{}');
     const cli = join(bin, 'code-insiders.cmd');
     writeFileSync(cli, '"%~dp0..\\selected-version\\resources\\app\\out\\cli.js"');
-    assert.equal(patcher.resolveAppRoot({ cli }), resolve(app));
+    // Discovery returns the physical installation path, including macOS /var aliases.
+    assert.equal(patcher.resolveAppRoot({ cli }), realpathSync(app));
     assert.throws(() => patcher.resolveAppRoot({ executable: join(files.root, 'missing.exe') }), /설치를 찾지/);
   } finally { files.dispose(); }
 });

@@ -20,6 +20,7 @@
 - CI는 합성·비식별 JSONL fixture와 mock quota 응답을 사용한다. 실제 계정 credential과 개인 대화 로그를 요구하지 않는다.
 - timer와 시각은 제어 가능한 clock으로 검증한다. App Server는 대체 process로 응답·오류·timeout·취소와 종료 처리를 검증한다.
 - parser·SQLite·Extension Host 통합 테스트는 지원 운영체제에 맞춰 실행한다. Windows 경로·파일 identity와 Linux/macOS 동작, SQLite native module의 로딩·패키징을 검증한다.
+- 설치 경로 탐색 테스트는 반환값과 기대값 모두 물리 경로 기준으로 비교한다. macOS의 `/var`·`/private/var`처럼 같은 디렉터리를 가리키는 별칭은 문자열 차이만으로 실패하지 않으며, 명시적으로 선택한 설치와 잘못된 대상의 거부는 계속 검증한다.
 - 상태바 command와 Webview 이벤트 연결은 자동 검증하고, 화면 가독성과 실제 로그인·원격 quota 연동은 수동 확인한다.
 - `npm run test:vscode`는 별도 프로필에서 실제 확장을 활성화하고 합성 로그로 탭·필터·빈 상태·테마 적용을 검증한다. Linux CI는 Xvfb를 사용하며 결과 JSON과 확장 호스트 로그를 artifact로 보관한다.
 - 빠른 CI 실패는 릴리스 패키징을 막는다. benchmark는 별도 workflow에서 측정하고 기준 초과를 보고한다. 절대 시간 기준은 실행 환경별 측정 후 정한다.
