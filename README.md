@@ -43,6 +43,8 @@ npm run restore:vscode         # 원본 복원
 
 확장과 같은 환경의 CLI 로그인 정보를 사용합니다. Claude Code 또는 Codex CLI에서 먼저 로그인하세요. Codex API key 계정은 ChatGPT 구독 quota 대상으로 표시하지 않습니다.
 
+**데이터 및 로그 → Data Home**에서 공통 상위 폴더 하나를 전역으로 지정합니다. 예를 들어 `D:\AgentData`를 입력하면 Claude는 `D:\AgentData\.claude`, Codex는 `D:\AgentData\.codex`를 사용합니다. 기본값 `~`는 사용자 홈이며 빈 값도 같은 위치를 사용합니다. 사용자 설정에서 지정한 경로를 모든 작업공간에 적용하며, WSL·SSH·컨테이너에서는 해당 환경의 사용자 설정에 경로를 지정합니다. 구독 사용량 조회·로그 수집·세션 제목·Claude 로그 보존 기간이 모두 같은 경로를 따릅니다. 별도 데이터 홈·로그 루트 설정 네 개와 `CLAUDE_CONFIG_DIR`·`CODEX_HOME` 환경 변수는 확장의 데이터 위치를 변경하지 않습니다. 기존 원본 로그를 이동하거나 삭제하지 않습니다.
+
 | 설정 | 기본값 |
 |---|---|
 | `agentTracker.claude.enabled` / `agentTracker.codex.enabled` | 각 제공자 추적 켜짐 |
@@ -54,11 +56,8 @@ npm run restore:vscode         # 원본 복원
 | `agentTracker.claude.cleanupPeriodDays` | `null`(기존 Claude 설정 유지); 1 이상의 보존 일수 입력 |
 | `agentTracker.codex.showReserve` | GPT Reserve 표시 꺼짐 |
 | `agentTracker.codex.showResetCredits` | 사용량 리셋권 표시 켜짐 |
-| `agentTracker.claude.dataHome` | `CLAUDE_CONFIG_DIR` 또는 `~/.claude` |
-| `agentTracker.codex.dataHome` | `CODEX_HOME` 또는 `~/.codex` |
+| `agentTracker.dataHome` | `~`; 그 아래의 `.claude`와 `.codex` 사용 |
 | `agentTracker.codex.executable` | PATH의 `codex` |
-| `agentTracker.usage.claudeRoots` | Claude 홈의 `projects` |
-| `agentTracker.usage.codexRoots` | Codex 홈의 `sessions`, `archived_sessions` |
 | `agentTracker.usage.timezone` | 시스템 시간대; 예: `Asia/Seoul` |
 | `agentTracker.quota.pollingIntervalSeconds` | Claude·Codex 공통 900초, 최소 30초 |
 | `agentTracker.codex.showStatusBar` | Codex 상태 표시줄 표시 |

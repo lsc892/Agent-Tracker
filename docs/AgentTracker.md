@@ -189,6 +189,20 @@ manual refresh
 
 Codex quota는 `codex app-server`를 실행하고 `initialize` → `initialized` handshake 뒤 `account/read`와 `account/rateLimits/read`를 호출하여 조회한다. 응답에서 현재 사용량, 최대 사용량과 초기화 시각을 추출해 표시한다. 구체적인 process 생명주기와 응답 처리 규칙은 3.2를 따른다.
 
+### 3.7 VS Code 설정 구역
+
+Agent Tracker의 VS Code 설정은 다음 순서의 소제목과 목차 하위 구역으로 나눈다. 각 구역과 항목에 `order`를 지정하여 사용 여부·표시 방식부터 세부 값으로 이어지도록 배치한다.
+
+| 구역 | 설정 항목 |
+|---|---|
+| 추적 및 갱신 | Claude·Codex 추적, 구독 사용량 갱신 정책, 자동 갱신 간격 |
+| 상태 표시줄 | Codex 표시 여부, 사용률·남은 비율, 상세·압축 표시, 색상 모드, 사용자 지정 색상 |
+| 사용량 카드 | Codex GPT Reserve, 사용량 리셋권 표시 |
+| 사용량 통계 | 통계 사용 여부, Skill 집계, API 추정 비용, 빈 사용량 제외, 시간대 |
+| 데이터 및 로그 | 공통 상위 데이터 홈, Claude 로그 보존 기간, Codex CLI 실행 파일 |
+
+`package.json`의 `contributes.configuration`을 다섯 카테고리의 배열로 등록한다. 설정은 총 19개이며 데이터 위치는 `agentTracker.dataHome` 하나로 지정한다. 나머지 설정의 키·기본값·scope·입력 제약은 유지한다. 카드와 명령 팔레트의 설정 열기는 같은 확장 설정 화면으로 연결한다. [VS Code 설정 카테고리와 정렬 규칙](https://code.visualstudio.com/api/references/contribution-points#contributesconfiguration)
+
 ## 4. 기능 2: 일·월·프로젝트·세션 총량과 turn 평균
 
 ### 4.1 lazy 갱신 정책
@@ -199,15 +213,17 @@ extension 시작과 상태 표시줄 quota 갱신은 과거 누계 갱신을 실
 
 ### 4.2 데이터 위치
 
-기본 후보:
+`agentTracker.dataHome`은 Claude·Codex의 공통 상위 폴더이며 기본값은 `~`(사용자 홈)다. 빈 값도 사용자 홈으로 해석하고 `~/...`는 홈 아래의 폴더로 확장한다. 상대 경로는 작업공간과 무관하게 사용자 홈 기준으로 해석한다. `machine` scope의 사용자·원격 사용자 설정으로 전역 지정하며 작업공간·폴더 설정은 적용하지 않는다. 기기별 경로이므로 Settings Sync 대상에서도 제외한다. [VS Code 설정 scope](https://code.visualstudio.com/api/references/contribution-points#scope)
+
+선택한 상위 폴더 아래에서 다음 경로만 사용한다.
 
 ```text
-Claude: ~/.claude/projects/**/*.jsonl
-Codex:  ~/.codex/sessions/**/*.jsonl
-        ~/.codex/archived_sessions/**/*.jsonl
+Claude: <dataHome>/.claude/projects/**/*.jsonl
+Codex:  <dataHome>/.codex/sessions/**/*.jsonl
+        <dataHome>/.codex/archived_sessions/**/*.jsonl
 ```
 
-환경 변수와 사용자 설정으로 root를 변경할 수 있게 한다. symlink directory, credential/config 파일, JSONL이 아닌 파일은 읽지 않는다.
+Claude credential·로그 보존 설정은 `<dataHome>/.claude`, Codex App Server의 `CODEX_HOME`·세션 제목 metadata는 `<dataHome>/.codex`를 사용한다. 기존 `claude.dataHome`·`codex.dataHome`·`usage.claudeRoots`·`usage.codexRoots` 설정은 등록·사용하지 않고 환경 변수 `CLAUDE_CONFIG_DIR`·`CODEX_HOME`도 확장의 경로를 덮어쓰지 않는다. 경로를 바꾸면 quota provider를 재생성하고 진행 중인 통계 수집과 열린 통계·진단 창을 정리하며 다음 통계 진입에서 새 로그 경로를 수집한다. 기존 원본과 통계 계산 데이터는 자동 이동·삭제하지 않는다. 로그 수집에서는 symlink directory, credential/config 파일, JSONL이 아닌 파일을 읽지 않는다.
 
 ### 4.3 manifest
 
