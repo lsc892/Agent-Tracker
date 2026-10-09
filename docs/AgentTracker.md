@@ -42,6 +42,14 @@ Codex sessions/**/*.jsonl ──┘                              │
 
 확장 대표 아이콘은 `package.json`의 `icon`에 지정한 `resource/icon/AgentTracker_Icon.png`를 사용한다. 같은 PNG를 VSIX에 포함해 VS Code 확장 목록과 상세 화면에 표시한다.
 
+### 2.1 npm 설치 패키지
+
+공개 npm 패키지 `agent-tracker-vscode`는 `npx agent-tracker-vscode@latest`로 실행하는 별도 설치 CLI다. 확장의 ID는 `agent-tracker.agent-tracker`로 유지하며 루트 manifest는 npm 직접 게시를 막는 `private: true`를 유지한다. npm 이름·실행 명령·포함 파일은 `tools/npm/manifest.json`에서 관리하고 버전·라이선스·저장소·Node 요구 버전은 확장 manifest에서 가져온다.
+
+설치 패키지에는 CLI·확장 metadata·같은 버전의 완성된 VSIX·README·npm manifest만 포함한다. 실행 시 metadata의 확장 ID·버전, VSIX SHA-256과 최소 VS Code 버전을 확인한 뒤 VS Code CLI의 `--install-extension ... --force`로 설치한다. 같은 프로필·디렉터리 선택으로 설치 목록을 조회해 ID·버전이 일치해야 성공으로 보고한다. `--code`로 CLI를 선택하고 `--profile`, `--extensions-dir`, `--user-data-dir`로 설치 대상을 지정할 수 있다. Windows에서는 공식 launcher의 실행 파일·CLI script 경로를 읽어 shell 없이 실행하며 기존·버전별 설치 경로를 지원한다.
+
+npm 패키지는 `npm run package:npm`으로 현재 소스를 다시 빌드·VSIX 패키징한 뒤 `artifacts/npm/`에 만든다. 설치 CLI는 소스 빌드·Claude/Codex 인증·workbench 패치를 실행하지 않는다. `--profile`로 지정한 프로필은 VS Code에 미리 존재해야 하며 없으면 CLI의 실패를 보고한다. 열린 VS Code 창의 새로고침은 사용자가 수행하며 npm 게시는 패키지 생성과 별도 단계다. 릴리스 workflow는 검증된 VSIX와 npm tarball을 artifact로 보관하고 자동 게시하지 않는다.
+
 ## 3. 기능 1: 실시간 quota 표시
 
 ### 3.1 Claude

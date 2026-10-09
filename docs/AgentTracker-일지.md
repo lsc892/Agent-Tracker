@@ -4,6 +4,7 @@
 
 ## 현재 설계 결정 요약
 
+- **npm 설치 CLI**: `agent-tracker-vscode` npm 패키지에 같은 버전의 완성된 VSIX를 포함해 npx로 실행하면 VS Code CLI로 설치하고 확장 ID·버전을 확인한다. 확장 ID와 루트 private manifest는 유지하고 npm manifest를 분리한다. 근거: 사용자가 npx 설치를 선택했으며 기존 `agent-tracker` npm 이름은 다른 프로젝트가 사용한다. 소스 빌드와 인증·workbench 패치는 설치 CLI에 포함하지 않는다.
 - **미상 표시 우선순위**: 모든 통계 조회는 선택한 필터·조회 단위를 유지하고 모델·시각 미상 행을 후순위로 정렬한 뒤 페이지를 나눈다. 도표는 기존 날짜·프로젝트·세션 묶음 안에서 미상 모델을 마지막으로 배치하고 시각 미상 기간·미상 모델만 있는 묶음은 뒤에 둔다. Skill의 미상 모델도 후순위이며 최다 사용 횟수는 필터 전체에서 조회한다. 근거: 미상이 확인된 항목 사이에 끼지 않게 하면서 선택 조건·집계·비율 기준을 보존한다.
 - **JSONL reader**: 64 KiB chunk에서 native LF 탐색을 사용하고 완성된 일반 줄은 직접 JSON.parse한다. 이미지 후보·chunk에 걸친 줄은 문자열 상태와 줄 예산을 유지하며 따옴표·역슬래시 위치를 캐시해 연속 구간을 복사한다. 이미지 본문은 chunk 내 escape·control 검증 후 폐기하고 원본 byte offset·부분 줄·취소 처리를 유지한다. 근거: 시간 O(N)·제한된 보조 공간을 유지하면서 byte별 JS 작업과 Buffer 복사를 줄이며, 경계 상태 처리와 chunk 크기의 임시 문자열 비용을 감수한다.
 - **요청 제목 탐색**: component 집계 시 제목이 있는 메인 이벤트만 `(root_id,id)` TEMP partial index로 찾고 첫 제목 선택과 100행 단위 읽기를 유지한다. 인덱스는 component 재생성·staging 종료 시 제거한다. 근거: 개인용·간헐적 갱신에서 사용자가 갱신 중 메모리를 우선하며 영속 인덱스 유지 비용을 피하는 방향을 선택했다. FILE TEMP도 page cache를 사용하므로 process 메모리 상한을 보장하지 않는다.
@@ -42,6 +43,15 @@
 - **개인정보 경계**: SQLite에는 식별자, 표시 이름, 숫자, 시각과 품질 정보 및 최대 80자의 요청 제목을 보존하며 전체 prompt·response·tool 본문은 저장하지 않는다. 세션 제목은 원본 metadata에서만 가져온다. 근거: 읽을 수 있는 이름을 제공하면서 분석에 불필요한 대화 본문과 credential을 장기 저장하지 않는다.
 
 ---
+
+## 2026-10-10 — 사용자·Codex
+
+### 완성된 VSIX를 포함한 별도 npm 패키지로 npx 설치 제공
+
+- **의사결정**: 사용자는 npm 배포 후 npx로 VS Code 확장을 설치하는 방식을 선택했다. 에이전트는 이미 사용 중인 `agent-tracker` 이름을 피하는 `agent-tracker-vscode`를 제안했고 사용자의 계속 진행 지시에 따라 적용했다. 확장 ID는 유지하고 공개 npm용 manifest·CLI를 분리하며, 같은 버전의 VSIX를 포함한다. CLI는 최소 VS Code 버전·metadata·VSIX SHA-256을 확인하고 선택한 CLI·프로필·디렉터리에 설치한 뒤 설치 목록의 ID·버전을 대조한다.
+- **근거**: npx 사용자가 저장소나 개발 의존성을 받지 않고 확장을 설치하도록 한다. 루트 private manifest는 보존하며 npm 포함 파일을 다섯 개로 제한한다. Windows launcher의 runtime 경로를 읽어 shell 없이 실행하므로 버전별 VS Code 설치 구조와 공백·특수문자가 있는 인수를 지원한다. VSIX 포함으로 npm 용량은 증가하지만 설치 시 별도의 artifact 다운로드가 필요 없다.
+- **결과**: npm 게시 후 `npx agent-tracker-vscode@latest`로 설치·업데이트하고 프로필과 다른 VS Code CLI를 선택할 수 있다. 도움말·버전 조회는 VS Code 없이 실행한다. 기존 Claude/Codex 로그인과 선택적 workbench 패치는 별도로 유지하며 열린 창의 새로고침은 사용자에게 안내한다.
+- **검증**: 타입 검사·린트·253개 테스트를 통과했다. CLI의 인수 전달·도움말·버전 조회, VSIX 누락·변경·ID/버전 불일치, 구형 VS Code·process 실패·설치 목록 불일치와 Windows 기존·버전별 launcher를 확인했다. Windows의 별도 확장·사용자 데이터 디렉터리에서 로컬 tarball과 공개 registry의 `agent-tracker-vscode@0.1.0`을 각각 npx로 설치해 ID·버전 대조가 성공했으며 존재하지 않는 프로필은 실패해 안내를 실제 동작에 맞췄다. VSIX runtime과 개발·과거 테스트 결과 제외, npm의 다섯 파일 목록을 확인했다. Linux·macOS 실제 설치는 수행하지 않았다.
 
 ## 2026-10-09 — 사용자·Codex
 

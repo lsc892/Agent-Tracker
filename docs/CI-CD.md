@@ -1,6 +1,6 @@
 # Agent Tracker CI/CD 계획
 
-> 상태: extension 코드·로컬 검증 명령과 CI/benchmark/VSIX artifact workflow 구현. 실제 계정·화면·원격 환경 검증은 릴리스 전 수행한다.
+> 상태: extension 코드·로컬 검증 명령과 CI/benchmark/VSIX·npm tarball artifact workflow 구현. 실제 계정·화면·원격 환경 검증은 릴리스 전 수행한다.
 > 기준 문서: [Agent Tracker 설계 명세](./AgentTracker.md)
 
 상세 테스트 목록은 이 문서에서 관리하고, 각 기능 구현과 함께 테스트 코드를 작성한다. CI는 작성된 테스트를 자동 실행하며, CD는 검증을 통과한 버전의 패키징과 배포를 담당한다.
@@ -11,7 +11,7 @@
 |---|---|
 | PR 및 기본 브랜치 push | 타입 검사·lint·빌드, parser fixture 회귀 테스트, manifest·SQLite 통합 테스트, quota 갱신·process 종료, 최소 지원·stable VS Code의 실제 light/dark Webview 테스트 |
 | 정기 실행 및 수동 실행 | 대량 파일·큰 session benchmark, 메모리·buffer·대기열 한도와 처리 시간 측정 |
-| 릴리스 버전 tag | 해당 commit의 CI 통과 확인 후 VSIX 패키징과 artifact 보관. 외부 배포는 배포 대상 결정 후 연결 |
+| 릴리스 버전 tag | 해당 commit의 CI 통과 확인 후 VSIX·npx 설치용 npm tarball 생성과 artifact 보관. npm 공개 게시는 수동 수행 |
 | 릴리스 전 수동 확인 | 실제 CLI 로그인·실시간 quota 조회, 실행 환경별 인증·data home, light/dark 화면의 가독성 |
 
 ## CI 구성 원칙
@@ -23,7 +23,7 @@
 - 상태바 command와 Webview 이벤트 연결은 자동 검증하고, 화면 가독성과 실제 로그인·원격 quota 연동은 수동 확인한다.
 - `npm run test:vscode`는 별도 프로필에서 실제 확장을 활성화하고 합성 로그로 탭·필터·빈 상태·테마 적용을 검증한다. Linux CI는 Xvfb를 사용하며 결과 JSON과 확장 호스트 로그를 artifact로 보관한다.
 - 빠른 CI 실패는 릴리스 패키징을 막는다. benchmark는 별도 workflow에서 측정하고 기준 초과를 보고한다. 절대 시간 기준은 실행 환경별 측정 후 정한다.
-- 테스트 결과, benchmark 측정값과 릴리스 VSIX는 workflow artifact로 보관한다. 외부 배포를 연결할 때도 동일 commit의 검증 통과를 조건으로 한다.
+- 테스트 결과, benchmark 측정값과 릴리스 VSIX·npm tarball은 workflow artifact로 보관한다. `npm run package:npm`은 현재 소스의 VSIX와 분리된 설치 CLI manifest를 사용하고 tarball의 ID·버전·다섯 파일 목록을 확인한다. Windows·Linux·macOS의 verify job과 릴리스 job에서 같은 패키징 명령을 실행하며 registry 인증이나 실제 게시를 CI에 포함하지 않는다. 외부 자동 배포를 연결할 때도 동일 commit의 검증 통과를 조건으로 한다.
 
 ## 상세 검증 항목
 

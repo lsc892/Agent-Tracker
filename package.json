@@ -39,6 +39,7 @@
     "watch": "tsc -p tsconfig.json --watch",
     "vscode:prepublish": "npm run build",
     "package": "node tools/package.cjs",
+    "package:npm": "node tools/npm/package.cjs",
     "benchmark": "npm run build && node tests/benchmarks/summary.cjs",
     "benchmark:quota": "npm run build && node tests/benchmarks/quota/benchmark.cjs",
     "benchmark:titles": "npm run build && node tests/benchmarks/request-titles.cjs",

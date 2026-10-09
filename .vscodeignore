@@ -13,6 +13,7 @@ benchmark-results/**
 coverage/**
 AGENTS.md
 tools/**
+artifacts/**
 dist/tests/**
 dist/.localization-manifest.json
 **/*.map
