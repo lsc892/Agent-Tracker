@@ -160,7 +160,7 @@ manual refresh
 
 ### 3.5 카드 내용과 설정
 
-상태 표시줄 전경색은 확장 설정의 `agentTracker.display.colorMode`에서 자동(`automatic`, 기본)·흰색(`white`)·검은색(`black`)·사용자 지정(`custom`)을 선택한다. 자동은 `StatusBarItem.color`를 지정하지 않아 현재 테마의 상태 표시줄 색상과 `workbench.colorCustomizations`, 작업공간의 기본 색상을 상속한다. 밝음/어두움만 보고 순백·검정을 지정하지 않으므로 2026 Dark의 기본 회색, 밝은 테마, 고대비·디버깅·폴더 없는 창의 색상도 VS Code가 결정한다. 로고·잔량 막대·문자는 하나의 항목이므로 같은 전경색을 사용하며 새로고침 버튼에도 같은 모드를 적용한다. [StatusBarItem API](https://code.visualstudio.com/api/references/vscode-api#StatusBarItem), [상태표시줄 테마 색상](https://code.visualstudio.com/api/references/theme-color#status-bar-colors)
+상태 표시줄 전경색은 확장 설정의 `agentTracker.display.colorMode`에서 자동(`automatic`, 기본)·흰색(`white`)·검은색(`black`)·사용자 지정(`custom`)을 선택한다. 자동은 `StatusBarItem.color`에 CSS 값 `inherit`를 지정해 현재 테마의 상태 표시줄 색상과 `workbench.colorCustomizations`, 작업공간의 기본 색상을 상속한다. VS Code는 이 값을 항목 label의 인라인 `style.color`에 반영하므로 마우스를 올렸을 때도 상태 표시줄의 전경색을 유지한다. 밝음/어두움만 보고 순백·검정을 지정하지 않으므로 2026 Dark의 기본 회색, 밝은 테마, 고대비·디버깅·폴더 없는 창의 색상도 VS Code가 결정한다. 흰색·검은색·사용자 지정은 검증한 HEX를 인라인 CSS 색상으로 고정하므로 테마가 바뀌어도 선택한 색상과 투명도를 유지한다. 로고·잔량 막대·문자는 하나의 항목이므로 같은 전경색을 사용하며 새로고침 버튼에도 같은 모드를 적용한다. [StatusBarItem API](https://code.visualstudio.com/api/references/vscode-api#StatusBarItem), [상태표시줄 테마 색상](https://code.visualstudio.com/api/references/theme-color#status-bar-colors), [VS Code의 인라인 색상 반영 구현](https://github.com/microsoft/vscode/blob/main/src/vs/workbench/browser/parts/statusbar/statusbarItem.ts)
 
 `agentTracker.display.customColor`는 `#RGB`·`#RGBA`·`#RRGGBB`·`#RRGGBBAA`를 받으며 짧은 값을 확장하고 투명도를 유지한다. 기본값은 `#ffffff`이고 사용자 지정 모드에서만 사용한다. 잘못된 HEX나 알 수 없는 모드는 테마 기본 색상으로 처리한다. 두 설정은 window scope로 사용자·작업공간에 저장하고 VS Code의 작업공간 우선순위를 따른다.
 
@@ -283,7 +283,7 @@ response별 증분 상태를 영속화하지 않으므로 append도 tail만 더�
 **처리 절차**:
 
 1. 디렉터리를 iterator로 순회하고 metadata 발견·manifest 조회·방문 기록은 최대 n개씩 처리한다. 초기 n은 256이며 byte 예산에 먼저 도달하면 더 작은 묶음으로 처리한다.
-2. session의 원본 파일 목록과 staging 결과도 page 단위로 읽는다. 파일 본문은 스트리밍으로 읽고 parser/row buffer에 byte 한도를 둔다. `data:image/...;base64,` 문자열은 헤더와 JSON 경계만 보존하고 이미지 본문은 버린다. 기본 4MiB 줄 예산은 보존하는 JSON에 적용하며, 오류 위치는 원래 파일의 byte offset을 사용한다. 버리는 문자열의 escape·제어 문자도 검증하고 newline 없는 마지막 줄은 보류한다.
+2. session의 원본 파일 목록과 staging 결과도 page 단위로 읽는다. 파일 본문은 64 KiB씩 읽고 native LF 탐색으로 줄을 나눈다. 한 chunk에서 완성되고 줄 예산 이내이며 대소문자 구분 없는 `data:image/` 후보가 없는 줄은 바로 JSON.parse로 넘긴다. 이미지 후보·chunk에 걸친 줄은 문자열 상태를 유지하며 따옴표·역슬래시 위치를 캐시하고 연속 영역을 예산 내 block으로 복사한다. `data:image/...;base64,` 문자열은 헤더와 JSON 경계만 보존하고 이미지 본문은 버린다. 기본 4MiB 줄 예산은 보존하는 JSON에 적용하며, 오류 위치는 원래 파일의 byte offset을 사용한다. 버리는 문자열의 escape·제어 문자도 검증하고 newline 없는 마지막 줄은 보류한다.
 3. 변경·삭제·session 귀속 목록, response 중복 제거와 agent 연결, turn 합산 결과는 임시 디스크 staging에 기록한다.
 4. 다음 묶음은 현재 묶음의 처리가 진행된 만큼만 받아 대기열이 무제한으로 늘어나지 않도록 한다.
 5. 파일 읽기·파싱·집계가 끝난 뒤 결과 반영에만 write transaction을 사용한다. 한 session의 결과를 여러 묶음으로 읽어 쓰더라도 COMMIT은 그 반영 단위가 완성됐을 때 수행한다.
@@ -846,6 +846,8 @@ SQLite 자체보다 주의할 부분은 VS Code extension 배포 방식이다.
 - 정확도: 같은 계정의 서버 quota와 JSONL 관측값의 값·시각을 비교한다. 과거 token 집계는 full rebuild와 증분 결과를 비교하며 이를 서버 quota 일치 검증으로 대신하지 않는다.
 
 SQLite 사용 자체가 고정 메모리를 보장하지 않는다. worker의 discovery 목록·중복 검증 작업량·DB page cache도 측정하고, corpus 전체를 host에 반환하지 않도록 batch/page 경계를 지킨다.
+
+JSONL reader는 바이트별 JS 처리 대신 일반 줄의 직접 파싱과 연속 Buffer 구간 처리를 사용한다. 읽은 원본 byte N에 대한 시간 O(N), chunk C와 보관 줄 한도 K에 대한 reader 보조 공간 O(C + min(L,K))는 유지한다. 이미지 검사에는 C 이내의 임시 Latin-1 문자열을 사용하며, row 객체·adapter·DB 메모리는 별도다. 파싱의 규모는 JSONL 행 수·원본/보관 byte·최대 줄 크기로 비교한다. 동일한 RAM 입력으로 I/O·adapter·DB를 제외한 적용 전후 브랜치 측정은 [파싱 전용 보고서](JsonlParsingBranches-2026-10-09.md)에 둔다. 이전 reader+adapter 및 전체 갱신 측정은 [기존 트레이드오프 보고서](JsonlReaderTradeoff.md)에 원본 그대로 보존한다. parser version과 집계 결과를 유지하므로 이 최적화만으로 정상 파일 전체를 강제 재파싱하지 않는다.
 
 ## 11. 검증 및 시뮬레이션
 

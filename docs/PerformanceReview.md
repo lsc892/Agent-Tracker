@@ -93,6 +93,8 @@ DB에는 JSONL 원문 전체가 들어가지 않는다. 파일 메타데이터, 
 
 ## 2. JSONL 파싱
 
+> 이 절은 2026-10-08의 구현과 실험을 기록한다. 2026-10-09 제품 reader에 일반 줄 직접 파싱·연속 Buffer 처리와 기존 보호 조건을 함께 적용했다. 최종 소스의 JSONL 행 수·바이트 기준 파싱 비교는 I/O를 제외한 [적용 전후 브랜치 보고서](JsonlParsingBranches-2026-10-09.md)를 따른다. 이전 I/O 포함 측정은 [JSONL reader 트레이드오프 보고서](JsonlReaderTradeoff.md)에 그대로 보존한다.
+
 ### 현재 실행 구조
 
 ```mermaid
