@@ -49,6 +49,17 @@
     return node;
   }
   function query(resetCapabilities = true) {
+    for (const id of ['from-day', 'to-day']) {
+      const input = $(id);
+      const picker = $(`${id}-picker`);
+      picker.value = input.value;
+      if (input.value && (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(input.value) || picker.value !== input.value)) {
+        $('error').textContent = t('dashboard.invalidDate');
+        $('error').hidden = false;
+        input.focus();
+        return;
+      }
+    }
     if (resetCapabilities) for (const category of capabilityCategories) capabilityOffsets[category] = 0;
     $('token-section').hidden = section !== 'tokens';
     $('skill-section').hidden = section !== 'skills';
@@ -513,9 +524,13 @@
   $('settings').addEventListener('click', () => send({ type: 'settings' }));
   $('cancel-usage').addEventListener('click', () => send({ type: 'cancelUsage' }));
   $('usage-filters').addEventListener('submit', event => { event.preventDefault(); offset = 0; query(); });
+  for (const id of ['from-day', 'to-day']) {
+    $(id).addEventListener('input', () => { $(`${id}-picker`).value = $(id).value; });
+    $(`${id}-picker`).addEventListener('change', () => { $(id).value = $(`${id}-picker`).value; });
+  }
   $('reset-filters').addEventListener('click', () => {
     closeNames(); selectedProject = undefined; selectedSession = undefined;
-    for (const id of ['provider', 'from-day', 'to-day']) $(id).value = '';
+    for (const id of ['provider', 'from-day', 'to-day', 'from-day-picker', 'to-day-picker']) $(id).value = '';
     $('group').value = 'day'; $('chart-metric').value = 'tokens';
     nameCaption('project', ''); nameCaption('session', '');
     offset = 0; chartBy = 'provider'; section = 'tokens'; query();

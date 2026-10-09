@@ -235,6 +235,7 @@
   "dashboard.byModel": "모델별",
   "dashboard.fromDate": "시작일",
   "dashboard.toDate": "종료일",
+  "dashboard.invalidDate": "year-month-day 형식으로 유효한 날짜를 입력하세요. 예: 2026-10-09",
   "dashboard.projectName": "프로젝트명",
   "dashboard.sessionName": "세션명",
   "common.query": "조회",

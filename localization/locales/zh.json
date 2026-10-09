@@ -235,6 +235,7 @@
   "dashboard.byModel": "按模型",
   "dashboard.fromDate": "开始日期",
   "dashboard.toDate": "结束日期",
+  "dashboard.invalidDate": "请输入 year-month-day 格式的有效日期，例如 2026-10-09。",
   "dashboard.projectName": "项目名称",
   "dashboard.sessionName": "会话名称",
   "common.query": "查询",

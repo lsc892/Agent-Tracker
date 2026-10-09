@@ -37,6 +37,12 @@ h3 { font-size: 15px; }
 .name-option[aria-pressed=true] .muted { color: inherit; }
 .name-options > p { margin: 0; padding: 10px 12px; }
 input, select { border: 1px solid var(--vscode-input-border, transparent); color: var(--vscode-input-foreground); background: var(--vscode-input-background); padding: 7px 9px; border-radius: 3px; max-width: 200px; }
+.date-filter { display: flex; flex-direction: column; gap: 6px; }
+.date-input { display: flex; width: 200px; }
+.date-input > input[type=text] { min-width: 0; flex: 1; border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.date-input > input[type=date] { flex: 0 0 30px; width: 30px; padding: 7px 5px; border-top-left-radius: 0; border-bottom-left-radius: 0; cursor: pointer; }
+.date-input > input[type=date]::-webkit-datetime-edit { display: none; }
+.date-input > input[type=date]::-webkit-calendar-picker-indicator { margin: 0; padding: 0; cursor: pointer; }
 .table-wrap { overflow-x: auto; border: 1px solid var(--vscode-panel-border); border-radius: 5px; }
 .usage-chart { margin: 24px 0 28px; }
 .filter-toggle { display: flex; flex-direction: column; gap: 6px; color: var(--vscode-descriptionForeground); font-size: 12px; }

@@ -235,6 +235,7 @@
   "dashboard.byModel": "Por modelo",
   "dashboard.fromDate": "Fecha inicial",
   "dashboard.toDate": "Fecha final",
+  "dashboard.invalidDate": "Introduce una fecha válida en formato year-month-day, por ejemplo 2026-10-09.",
   "dashboard.projectName": "Nombre del proyecto",
   "dashboard.sessionName": "Nombre de la sesión",
   "common.query": "Ver",

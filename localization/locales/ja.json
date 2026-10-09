@@ -235,6 +235,7 @@
   "dashboard.byModel": "モデル別",
   "dashboard.fromDate": "開始日",
   "dashboard.toDate": "終了日",
+  "dashboard.invalidDate": "year-month-day 形式で有効な日付を入力してください。例: 2026-10-09",
   "dashboard.projectName": "プロジェクト名",
   "dashboard.sessionName": "セッション名",
   "common.query": "表示",
