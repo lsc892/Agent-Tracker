@@ -40,6 +40,8 @@ Codex sessions/**/*.jsonl ──┘                              │
 
 현재 quota는 서버 조회 결과를 사용하고, 과거 token 통계는 manifest에서 변경 session을 찾아 요청·모델·비용 집계를 함께 갱신한다.
 
+확장 대표 아이콘은 `package.json`의 `icon`에 지정한 `resource/icon/AgentTracker_Icon.png`를 사용한다. 같은 PNG를 VSIX에 포함해 VS Code 확장 목록과 상세 화면에 표시한다.
+
 ## 3. 기능 1: 실시간 quota 표시
 
 ### 3.1 Claude
