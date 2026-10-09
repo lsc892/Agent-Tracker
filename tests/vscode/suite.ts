@@ -435,6 +435,8 @@ export async function run(): Promise<void> {
     const databasePath = join(userData, 'User', 'globalStorage', 'agent-tracker.agent-tracker', 'agent-tracker.sqlite');
     await until(() => existsSync(databasePath), 'schema initialization');
     database = new DatabaseSync(databasePath, { readOnly: true });
+    // The file exists before the worker finishes its initial WAL/schema transaction.
+    database.exec('PRAGMA busy_timeout=5000');
     const countFiles = (): number => (database!.prepare('SELECT count(*) n FROM manifest').get() as { n: number }).n;
     await until(() => Boolean(database!.prepare("SELECT 1 FROM sqlite_master WHERE name='manifest'").get()), 'schema creation');
     assert.equal(countFiles(), 0, 'activation does not scan');
