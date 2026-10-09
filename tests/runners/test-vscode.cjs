@@ -10,7 +10,7 @@ async function main() {
   await mkdir(testHome, { recursive: true });
   const sandbox = await mkdtemp(join(testHome, 'profile-'));
   const userData = join(sandbox, 'user-data');
-  const source = join(sandbox, 'claude', 'projects');
+  const source = join(sandbox, '.claude', 'projects');
   await mkdir(join(userData, 'User'), { recursive: true });
   await mkdir(source, { recursive: true });
   const fixture = [
@@ -26,8 +26,7 @@ async function main() {
     'workbench.startupEditor': 'none', 'workbench.colorTheme': 'Default Dark Modern',
     'security.workspace.trust.enabled': false, 'telemetry.telemetryLevel': 'off',
     'extensions.autoCheckUpdates': false, 'update.mode': 'none',
-    'agentTracker.claude.dataHome': join(sandbox, 'claude'),
-    'agentTracker.codex.dataHome': join(sandbox, 'codex'),
+    'agentTracker.dataHome': sandbox,
     'agentTracker.codex.executable': join(sandbox, 'codex-not-installed.exe'),
     'agentTracker.usage.timezone': 'Asia/Seoul',
   }, null, 2));

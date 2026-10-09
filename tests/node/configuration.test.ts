@@ -1,10 +1,50 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import { readConfiguration, type SettingsReader } from '../../src/configuration';
 
 function settings(values: Record<string, unknown>): SettingsReader {
   return { get<T>(key: string, fallback: T): T { return (key in values ? values[key] : fallback) as T; } };
 }
+
+test('one shared data home defaults to the user home and expands home-relative paths', () => {
+  for (const value of [undefined, '', '  ', '~', ' ~ ']) {
+    const config = readConfiguration(settings(value === undefined ? {} : { dataHome: value }));
+    assert.equal(config.dataHome, homedir());
+    assert.equal(config.claude.dataHome, join(homedir(), '.claude'));
+    assert.equal(config.codex.dataHome, join(homedir(), '.codex'));
+  }
+  assert.equal(readConfiguration(settings({ dataHome: ' ~/tracker-data ' })).dataHome, join(homedir(), 'tracker-data'));
+  assert.equal(readConfiguration(settings({ dataHome: 'tracker-data' })).dataHome, join(homedir(), 'tracker-data'));
+});
+
+test('only the shared data home controls credentials, metadata and both providers log roots', () => {
+  const original = { claude: process.env.CLAUDE_CONFIG_DIR, codex: process.env.CODEX_HOME };
+  const base = join(homedir(), 'tracker-data');
+  try {
+    process.env.CLAUDE_CONFIG_DIR = join(base, 'env-claude');
+    process.env.CODEX_HOME = join(base, 'env-codex');
+    for (const selected of ['~', base]) {
+      const config = readConfiguration(settings({
+        dataHome: selected,
+        'claude.dataHome': join(base, 'old-claude'), 'codex.dataHome': join(base, 'old-codex'),
+        'usage.claudeRoots': [join(base, 'old-projects')], 'usage.codexRoots': [join(base, 'old-sessions')],
+      }));
+      const expected = selected === '~' ? homedir() : base;
+      assert.deepEqual(config.roots.map(root => root.path), [
+        join(expected, '.claude', 'projects'), join(expected, '.codex', 'sessions'), join(expected, '.codex', 'archived_sessions'),
+      ]);
+      assert.ok(config.roots.every(root => root.dataHome === config[root.provider].dataHome));
+      assert.equal(config.claude.dataHome, join(expected, '.claude'));
+      assert.equal(config.codex.dataHome, join(expected, '.codex'));
+    }
+  } finally {
+    for (const [key, value] of [['CLAUDE_CONFIG_DIR', original.claude], ['CODEX_HOME', original.codex]] as const) {
+      if (value === undefined) delete process.env[key]; else process.env[key] = value;
+    }
+  }
+});
 
 test('quota polling uses one common interval setting', () => {
   assert.equal(readConfiguration(settings({})).pollingSeconds, 900);

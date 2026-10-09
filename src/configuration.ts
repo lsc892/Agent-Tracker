@@ -5,6 +5,7 @@ import { colorMode, normalizeHexColor, type StatusColorMode } from './ui/colors'
 
 export interface SettingsReader { get<T>(key: string, fallback: T): T }
 export interface TrackerConfiguration {
+  dataHome: string;
   percentage: 'used' | 'remaining';
   detail: 'compact' | 'detailed';
   colorMode: StatusColorMode;
@@ -23,14 +24,13 @@ export interface TrackerConfiguration {
 }
 
 export function expandPath(value: string): string {
-  return resolve(value === '~' ? homedir() : /^~[/\\]/.test(value) ? join(homedir(), value.slice(2)) : value);
+  return resolve(homedir(), value === '~' ? homedir() : /^~[/\\]/.test(value) ? join(homedir(), value.slice(2)) : value);
 }
 
 export function readConfiguration(settings: SettingsReader): TrackerConfiguration {
-  const claudeHome = expandPath(settings.get('claude.dataHome', '') || process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude'));
-  const codexHome = expandPath(settings.get('codex.dataHome', '') || process.env.CODEX_HOME || join(homedir(), '.codex'));
-  const claudeRoots = settings.get<string[]>('usage.claudeRoots', []);
-  const codexRoots = settings.get<string[]>('usage.codexRoots', []);
+  const dataHome = expandPath(settings.get('dataHome', '~').trim() || '~');
+  const claudeHome = join(dataHome, '.claude');
+  const codexHome = join(dataHome, '.codex');
   const enabled = { claude: settings.get('claude.enabled', true), codex: settings.get('codex.enabled', true) };
   const cleanup = settings.get<unknown>('claude.cleanupPeriodDays', null);
   let timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
@@ -49,6 +49,7 @@ export function readConfiguration(settings: SettingsReader): TrackerConfiguratio
     }
   }
   return {
+    dataHome,
     percentage: settings.get('display.percentage', 'used'),
     detail: settings.get('display.detail', 'detailed'),
     colorMode: colorMode(settings.get<unknown>('display.colorMode', 'automatic')),
@@ -65,8 +66,8 @@ export function readConfiguration(settings: SettingsReader): TrackerConfiguratio
       showStatusBar: settings.get('codex.showStatusBar', true), showReserve: settings.get('codex.showReserve', false),
       showResetCredits: settings.get('codex.showResetCredits', true) },
     roots: [
-      ...(claudeRoots.length ? claudeRoots : [join(claudeHome, 'projects')]).map(path => ({ provider: 'claude' as const, path: expandPath(path), dataHome: claudeHome })),
-      ...(codexRoots.length ? codexRoots : [join(codexHome, 'sessions'), join(codexHome, 'archived_sessions')]).map(path => ({ provider: 'codex' as const, path: expandPath(path), dataHome: codexHome })),
+      { provider: 'claude' as const, path: join(claudeHome, 'projects'), dataHome: claudeHome },
+      ...['sessions', 'archived_sessions'].map(directory => ({ provider: 'codex' as const, path: join(codexHome, directory), dataHome: codexHome })),
     ].filter(root => enabled[root.provider]),
     timezone, timezoneWarning,
   };

@@ -139,8 +139,7 @@ async function main() {
     'agentTracker.display.detail': 'compact',
     'agentTracker.display.colorMode': 'automatic',
     'agentTracker.quota.refreshPolicy': 'manual',
-    'agentTracker.claude.dataHome': join(sandbox, 'claude'),
-    'agentTracker.codex.dataHome': join(sandbox, 'codex'),
+    'agentTracker.dataHome': sandbox,
     'agentTracker.codex.executable': join(sandbox, 'codex-not-installed.exe'),
   }));
   const candidates = [process.env.VSCODE_EXECUTABLE,
