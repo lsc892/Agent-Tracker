@@ -36,7 +36,8 @@
 - 새 CLI credential을 직접 발급하거나 인증 내용을 쓰지 않습니다. Codex는 account 조회만 수행하고 thread/turn이나 모델 호출을 만들지 않습니다.
 - Webview 동적 문자열은 `textContent`로 렌더링하고 nonce CSP와 message allowlist를 사용합니다. 프로젝트·세션 filter나 기간 변경은 JSONL 재집계를 일으키지 않습니다.
 - 사용자가 제외한 루트는 삭제 판정에서 제외합니다. 같은 논리 세션의 일부가 그 루트에 남아 있으면 재집계에 필요한 원본을 함께 읽으며, 읽을 수 없으면 세션의 이전 수치를 보존합니다.
-- 이벤트 삽입은 JSONL 64 KiB chunk마다 동기 TEMP transaction으로 묶고 고정 SQL의 prepared statement를 재사용합니다. 파일 읽기는 transaction 밖에서 수행하며, TEMP 처리 중 다른 연결의 영속 DB 쓰기를 막지 않는지 검증했습니다. 세션 교체 시 삭제는 `(provider, session_id)` index를 사용합니다.
+- 이벤트 삽입은 JSONL 64 KiB chunk마다 동기 TEMP transaction으로 묶고 고정 SQL의 prepared statement를 재사용합니다. 파일 읽기는 transaction 밖에서 수행하며, TEMP 처리 중 다른 연결의 영속 DB 쓰기를 막지 않는지 검증했습니다. 세션 교체 시 삭제는 요청 UNIQUE 인덱스 `(provider, session_id, root_turn_id)`의 앞 두 키를 사용합니다. schema v10은 별도 세션 인덱스와 Windows에서 미사용인 identity 인덱스를 제거하고 날짜·프로젝트 및 manifest 루트·세션 인덱스를 유지합니다.
+- 조회 계획용 통계는 DB 열기, 첫 스캔 완료, 이후 24시간 이상 지난 스캔 완료, 연결 종료에서 `PRAGMA main.optimize`로 수집하며 열기에는 `0x10002`를 지정합니다. TEMP 파싱 테이블을 분석하지 않으며 유지보수 실패는 스캔·종료에 영향을 주지 않습니다.
 - 갱신 직렬화에는 `${dbPath}.refresh-lock.sqlite`의 `BEGIN EXCLUSIVE`를 사용합니다. 이 파일에는 테이블·데이터가 없고 실제 통계 DB의 쓰기 transaction과 분리됩니다. `busy_timeout=0`과 취소 가능한 비동기 대기를 사용하며 연결 종료·worker 종료·process 종료 시 해제됩니다. 기존 JSON owner 파일 방식의 빈 파일 잔류와 stale lock 삭제 경쟁을 없앴고, 이전 `.lock` 파일은 읽거나 삭제하지 않습니다. 새 잠금 파일은 재사용을 위해 남깁니다.
 
 ## 오류 처리 보완

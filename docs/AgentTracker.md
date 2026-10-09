@@ -587,7 +587,7 @@ CREATE TABLE manifest (
 );
 
 CREATE INDEX idx_manifest_identity
-  ON manifest(provider, dev, inode);                         -- 전체 적재 없이 이동 후보 조회
+  ON manifest(provider, dev, inode);                         -- Windows 제외: 전체 적재 없이 이동 후보 조회
 
 CREATE INDEX idx_manifest_root_id
   ON manifest(provider, source_root, id);                    -- 루트별 미방문 파일을 id 순서로 조회
@@ -642,15 +642,17 @@ CREATE INDEX idx_summary_period
 CREATE INDEX idx_summary_project_period
   ON turn_summary(provider, project_key, started_at_ms);     -- 특정 provider·프로젝트의 날짜·월별 집계 조회
 
-CREATE INDEX idx_summary_session
-  ON turn_summary(provider, session_id);                     -- 특정 provider·세션 조회와 session 교체; 요청 표 정렬은 id 기준
 ```
+
+조회 인덱스는 날짜 범위와 provider·프로젝트·날짜 범위를 유지한다. 세션 조회·교체는 `UNIQUE(provider, session_id, root_turn_id)`의 앞 두 키를 사용하고 별도 `idx_summary_session`은 두지 않는다. 세션으로 좁힌 요청의 `id`순 페이지 조회에는 임시 정렬이 추가될 수 있지만, 주 사용처인 평균·프로젝트·월간 집계를 위해 중복 인덱스의 저장·쓰기 비용을 유지하지 않는다. 전체 이력의 평균·월별 집계는 대상 요청을 읽어 계산하며 평균용 인덱스·캐시·사전 집계는 추가하지 않는다. manifest의 루트·세션 인덱스는 증분 수집에 유지하고, 이동 탐지에 사용하는 identity 인덱스는 Windows에서 제거하며 Linux·macOS에서는 유지한다.
+
+SQLite 조회 계획용 통계는 DB 열기에서 `PRAGMA main.optimize=0x10002`, 첫 스캔 완료와 이후 24시간 이상 지난 스캔 완료 및 연결 종료에서 `PRAGMA main.optimize`로 수집한다. `main`만 지정하여 TEMP 파싱 테이블은 분석하지 않는다. 새 인덱스 생성·기존 인덱스 정리 뒤에도 열기 시 통계 수집이 적용되며, 다른 운영체제에서 복사한 같은 schema version의 DB도 열 때 identity 인덱스를 현재 플랫폼에 맞춘다. 통계 수집은 선택적 유지보수여서 실패가 스캔·연결 정리를 실패시키지 않고 다음 실행 시점에 다시 시도한다. `PRAGMA optimize`는 평균 결과 캐시가 아니라 필요한 `ANALYZE`를 선택하는 SQLite 기능이다. [SQLite 권고](https://www.sqlite.org/lang_analyze.html).
 
 표시 이름은 projects·sessions에만 저장한다. 이름에는 UNIQUE 제약을 두지 않는다. 이름이 같은 프로젝트는 project_key로, 같은 프로젝트 안의 같은 세션명도 (provider, session_id)로 구분한다. 조회 시 이름을 연결하고 집계 기준은 기존 ID를 유지한다. 이름을 찾지 못하면 ‘이름 없는 세션’으로 표시한다. 원본 제목을 사용하며 첫 prompt를 제목으로 복사하지 않는다.
 
 Claude는 main JSONL의 custom-title을 ai-title보다 우선한다. Codex는 읽기 전용 state_N.sqlite의 threads.name/title을 session_index.jsonl의 thread_name보다 우선하고 session_meta 제목을 보완 경로로 사용한다. metadata는 디스크 TEMP에 묶음 처리하며 통계 화면 진입 시 제목만 바뀐 세션도 갱신한다. metadata를 읽을 수 없으면 기존 제목을 유지한다. 프로젝트명·세션명 필터는 클릭해 이름 목록을 열고 스크롤해 선택하는 방식으로 제공하며, 선택 즉시 표·도표를 ID와 제공자로 정확히 조회한다. 목록이나 세션별 행에는 프로젝트명과 세션 시작 시각을 함께 표시하고 tooltip으로 전체 경로·ID를 확인한다.
 
-schema v1·v2는 기존 이름을 projects로 옮기고 요청 ID·통계·manifest 참조를 보존한 채 전환한다. 세션 제목은 다음 scan에서 채운다. 이름 metadata와 summary 교체는 같은 transaction에 반영하며, 참조하는 summary가 없어진 이름 행은 정리한다. `root_turn_id`는 요청 식별자다. schema v9는 화면 표시·집계·페이지 정렬에 쓰지 않는 `turn_index` 컬럼과 순번 생성·저장 코드를 제거하고 세션 인덱스를 (provider, session_id)로 둔다. 기존 DB를 열 때 하나의 transaction에서 해당 컬럼만 제거하여 요청 ID·제목·시각·토큰·진단 참조와 모델·비용·Skill 횟수를 보존한다. 실패하면 컬럼·인덱스·schema version까지 원상 복구하며 이 전환 자체로 원본을 다시 스캔하지 않는다. 사용자 요청별 표는 DB 행 `id`순이고 모델별은 같은 요청 안에서 `model`순을 추가한다. 논리 session에 속하는 모든 파일을 읽어야 재집계할 수 있으므로 summary를 파일 하나의 자식 row로 두거나 삭제 cascade하지 않는다.
+schema v1·v2는 기존 이름을 projects로 옮기고 요청 ID·통계·manifest 참조를 보존한 채 전환한다. 세션 제목은 다음 scan에서 채운다. 이름 metadata와 summary 교체는 같은 transaction에 반영하며, 참조하는 summary가 없어진 이름 행은 정리한다. `root_turn_id`는 요청 식별자다. schema v9에서 미사용 `turn_index` 컬럼과 순번 생성·저장 코드를 제거했으며, 현재 schema v10은 별도 세션 인덱스를 제거하고 Windows의 identity 인덱스도 제거한다. 기존 DB를 열 때 하나의 transaction에서 필요한 컬럼·인덱스만 정리하여 요청 ID·제목·시각·토큰·진단 참조와 모델·비용·Skill 횟수를 보존한다. 실패하면 컬럼·인덱스·schema version까지 원상 복구하며 이 전환 자체로 원본을 다시 스캔하지 않는다. 사용자 요청별 표는 DB 행 `id`순이고 모델별은 같은 요청 안에서 `model`순을 추가한다. 논리 session에 속하는 모든 파일을 읽어야 재집계할 수 있으므로 summary를 파일 하나의 자식 row로 두거나 삭제 cascade하지 않는다.
 
 ### 8.1 사용자에게 보여 줄 turn summary
 
