@@ -1,24 +1,25 @@
 (() => {
   'use strict';
+  const t = (key, values) => globalThis.agentTrackerI18n.t(key, values);
   const vscode = acquireVsCodeApi();
   const $ = id => document.getElementById(id);
   const send = message => vscode.postMessage(message);
-  const number = value => value === null || value === undefined ? '—' : new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 1 }).format(value);
-  const duration = value => value === null || value === undefined ? '—' : value < 1000 ? `${number(value)} ms` : `${number(value / 1000)}초`;
+  const number = value => value === null || value === undefined ? '—' : new Intl.NumberFormat(globalThis.agentTrackerI18n.language, { maximumFractionDigits: 1 }).format(value);
+  const duration = value => value === null || value === undefined ? '—' : value < 1000 ? `${number(value)} ms` : t('dashboard.seconds', { value0: number(value / 1000) });
   const tokenHeaders = [
-    { label: 'Input', title: '캐시 읽기·쓰기를 제외한 입력 토큰' },
-    { label: 'Output', title: '생성한 출력 토큰' },
-    { label: 'Cache Write', title: '새 캐시를 생성하며 기록한 입력 토큰' },
-    { label: 'Cache Read', title: '기존 캐시에서 재사용한 입력 토큰' },
+    { get label() { return t('common.input'); }, get title() { return t('dashboard.inputHelp'); } },
+    { get label() { return t('common.output'); }, get title() { return t('dashboard.outputHelp'); } },
+    { get label() { return t('common.cacheWrite'); }, get title() { return t('dashboard.cacheWriteHelp'); } },
+    { get label() { return t('common.cacheRead'); }, get title() { return t('dashboard.cacheReadHelp'); } },
   ];
   const tokenValues = row => [
     number(row.input_tokens == null || row.cache_write_input_tokens == null || row.cache_read_input_tokens == null
       ? null : Math.max(0, row.input_tokens - row.cache_write_input_tokens - row.cache_read_input_tokens)),
     number(row.output_tokens), number(row.cache_write_input_tokens), number(row.cache_read_input_tokens),
   ];
-  const chartMetrics = { tokens: '총 토큰', requests: '요청 수', averageTokens: '평균 토큰', averageDuration: '평균 시간' };
+  const chartMetrics = { get tokens() { return t('dashboard.totalTokens'); }, get requests() { return t('dashboard.requests'); }, get averageTokens() { return t('dashboard.averageTokens'); }, get averageDuration() { return t('dashboard.averageTime'); } };
   let timezone;
-  const date = value => value === null || value === undefined ? '알 수 없음' : new Intl.DateTimeFormat('ko-KR', { dateStyle: 'short', timeStyle: 'medium', timeZone: timezone }).format(new Date(value));
+  const date = value => value === null || value === undefined ? t('common.unknown') : new Intl.DateTimeFormat(globalThis.agentTrackerI18n.language, { dateStyle: 'short', timeStyle: 'medium', timeZone: timezone }).format(new Date(value));
   let offset = 0;
   let chartBy = 'provider';
   let showCosts = false;
@@ -27,6 +28,9 @@
   const capabilityCategories = ['skill', 'subagent', 'plugin', 'model'];
   const capabilityOffsets = { skill: 0, subagent: 0, plugin: 0, model: 0 };
   let latestUsage;
+  let latestProgress;
+  let latestRefreshResult;
+  let busy = false;
   let selectedProject;
   let selectedSession;
   let openNameKind;
@@ -75,7 +79,7 @@
     vscode.setState({ section, group: $('group').value, chartMetric: $('chart-metric').value, chartBy });
   }
   function nameCaption(kind, text, title = '') {
-    $(`${kind}-name`).textContent = text || (kind === 'project' ? '전체 프로젝트' : '전체 세션');
+    $(`${kind}-name`).textContent = text || (kind === 'project' ? t('dashboard.allProjects') : t('dashboard.allSessions'));
     $(`${kind}-name`).title = title;
   }
   function closeNames(focus = false) {
@@ -92,7 +96,7 @@
   function chooseProject(row) {
     selectedProject = row?.project_key;
     selectedSession = undefined;
-    nameCaption('project', row ? row.project_name || '이름 없는 프로젝트' : '', row?.project_key);
+    nameCaption('project', row ? row.project_name || t('dashboard.unnamedProject') : '', row?.project_key);
     nameCaption('session', '');
     closeNames(true); offset = 0; query();
   }
@@ -100,10 +104,10 @@
     selectedSession = row?.session_id;
     if (row) {
       selectedProject = row.project_key;
-      nameCaption('project', row.project_name || '이름 없는 프로젝트', row.project_key);
+      nameCaption('project', row.project_name || t('dashboard.unnamedProject'), row.project_key);
       $('provider').value = row.provider;
     }
-    nameCaption('session', row ? row.session_name || '이름 없는 세션' : '', row ? `세션 ID: ${row.session_id}` : '');
+    nameCaption('session', row ? row.session_name || t('dashboard.unnamedSession') : '', row ? t('dashboard.sessionId', { value0: row.session_id }) : '');
     closeNames(true); offset = 0; query();
   }
   function loadNames(kind) {
@@ -113,19 +117,19 @@
     if ($('provider').value) request.provider = $('provider').value;
     if (kind === 'session' && selectedProject) request.projectKey = selectedProject;
     page.pending = ++nameRequestId;
-    $(`${kind}-list-status`).textContent = '목록을 불러오는 중…';
+    $(`${kind}-list-status`).textContent = t('dashboard.loadingNames');
     send({ type: 'queryNames', query: request, requestId: page.pending });
   }
   function nameOption(kind, row) {
-    const title = kind === 'project' ? row?.project_name || '이름 없는 프로젝트' : row?.session_name || '이름 없는 세션';
-    const node = element('button', row ? title : kind === 'project' ? '전체 프로젝트' : '전체 세션', 'name-option');
+    const title = kind === 'project' ? row?.project_name || t('dashboard.unnamedProject') : row?.session_name || t('dashboard.unnamedSession');
+    const node = element('button', row ? title : kind === 'project' ? t('dashboard.allProjects') : t('dashboard.allSessions'), 'name-option');
     node.type = 'button';
     const selected = row ? kind === 'project' ? selectedProject === row.project_key
       : selectedProject === row.project_key && selectedSession === row.session_id && $('provider').value === row.provider
       : kind === 'project' ? !selectedProject : !selectedSession;
     node.setAttribute('aria-pressed', String(selected));
     if (row) {
-      node.title = `${row.project_key}${row.session_id ? `\n세션 ID: ${row.session_id}` : ''}`;
+      node.title = `${row.project_key}${row.session_id ? t('dashboard.sessionIdLine', { value0: row.session_id }) : ''}`;
       node.append(element('span', kind === 'project' ? row.project_key
         : `${providerLabel(row.provider)} · ${row.project_name} · ${date(row.session_started_at_ms)}`, 'muted'));
     }
@@ -151,13 +155,13 @@
     for (const row of message.result.rows) $(`${kind}-list`).append(nameOption(kind, row));
     page.loaded += message.result.rows.length;
     page.total = message.result.total;
-    $(`${kind}-list-status`).textContent = page.total ? `${number(page.loaded)} / ${number(page.total)}개${page.loaded < page.total ? ' · 아래로 스크롤하면 계속 표시합니다.' : ''}` : '선택할 기록이 없습니다.';
+    $(`${kind}-list-status`).textContent = page.total ? t('dashboard.nameCount', { value0: number(page.loaded), value1: number(page.total), value2: page.loaded < page.total ? t('dashboard.scrollMore') : '' }) : t('dashboard.noNames');
     const list = $(`${kind}-options`);
     if (message.result.rows.length && page.loaded < page.total && list.scrollHeight <= list.clientHeight) loadNames(kind);
   }
   function table(target, headers, rows) {
     target.replaceChildren();
-    if (!rows.length) { target.append(element('p', '표시할 기록이 없습니다.', 'empty')); return; }
+    if (!rows.length) { target.append(element('p', t('common.noRecords'), 'empty')); return; }
     const node = element('table');
     const head = element('thead');
     const tr = element('tr');
@@ -188,9 +192,9 @@
     node.title = String(text);
     return node;
   }
-  const requestLabel = row => row.request_title || row.session_name || '제목 없음';
+  const requestLabel = row => row.request_title || row.session_name || t('dashboard.untitled');
   function projectLabel(row) {
-    const name = row.project_name || '이름 없는 프로젝트';
+    const name = row.project_name || t('dashboard.unnamedProject');
     const node = element('button', undefined, 'name-filter');
     node.append(tableLabel(name));
     node.type = 'button';
@@ -199,11 +203,11 @@
     return node;
   }
   function sessionLabel(row, request = false) {
-    const label = tableLabel(request ? requestLabel(row) : `${row.project_name || '이름 없는 프로젝트'} / ${row.session_name || '이름 없는 세션'}`);
+    const label = tableLabel(request ? requestLabel(row) : `${row.project_name || t('dashboard.unnamedProject')} / ${row.session_name || t('dashboard.unnamedSession')}`);
     const node = element('button', undefined, 'name-filter');
     node.type = 'button';
-    node.title = `${label.textContent}\n${row.session_name || ''}\n${row.project_key || ''}\n세션 ID: ${row.session_id}${request ? `\n요청 ID: ${row.root_turn_id}` : ''}`;
-    label.append(element('span', request ? row.session_name || '이름 없는 세션' : date(row.session_started_at_ms), 'muted session-start'));
+    node.title = t('dashboard.sessionDetails', { value0: label.textContent, value1: row.session_name || '', value2: row.project_key || '', value3: row.session_id, value4: request ? t('dashboard.requestIdLine', { value0: row.root_turn_id }) : '' });
+    label.append(element('span', request ? row.session_name || t('dashboard.unnamedSession') : date(row.session_started_at_ms), 'muted session-start'));
     node.append(label);
     node.addEventListener('click', () => chooseSession(row));
     return node;
@@ -216,8 +220,8 @@
   }
   const providerLabel = provider => provider === 'claude' ? 'Claude' : 'Codex';
   const providerClass = provider => `chart-provider-${provider}`;
-  const modelLabel = row => row.other_models ? `기타 모델 (${providerLabel(row.provider)})`
-    : (row.model || '미상').replace(/^claude-(opus|sonnet|haiku)-(\d+)-(\d+)(?:-\d{8})?$/, '$1$2.$3');
+  const modelLabel = row => row.other_models ? t('dashboard.otherModels', { value0: providerLabel(row.provider) })
+    : (row.model || t('dashboard.unknownModel')).replace(/^claude-(opus|sonnet|haiku)-(\d+)-(\d+)(?:-\d{8})?$/, '$1$2.$3');
   const seriesLabel = row => row.model !== undefined ? modelLabel(row) : providerLabel(row.provider);
   function providerMarker(provider, attributes = {}) {
     return svgElement('rect', { width: 8, height: 8, class: `provider-marker ${providerClass(provider)}`, 'aria-hidden': 'true', ...attributes });
@@ -230,38 +234,38 @@
     node.append(marker, suffix ? tableLabel(`${modelLabel(row)}${suffix}`) : element('span', modelLabel(row)));
     return node;
   }
-  const compact = value => value == null ? '—' : new Intl.NumberFormat('ko-KR', { notation: 'compact', maximumFractionDigits: 1 }).format(value);
-  const compactDuration = value => value == null || value < 1000 ? duration(value) : `${compact(value / 1000)}초`;
+  const compact = value => value == null ? '—' : new Intl.NumberFormat(globalThis.agentTrackerI18n.language, { notation: 'compact', maximumFractionDigits: 1 }).format(value);
+  const compactDuration = value => value == null || value < 1000 ? duration(value) : t('dashboard.seconds', { value0: compact(value / 1000) });
   function chartValue(row, metric, turn) {
     if (turn) return metric === 'averageDuration' ? row.duration_ms : row.total_tokens;
     return row[({ tokens: 'total_tokens', requests: 'turn_count', averageTokens: 'avg_tokens_per_turn', averageDuration: 'avg_duration_ms' })[metric]];
   }
   function chartLabel(row, mode) {
     const provider = seriesLabel(row);
-    if (mode === 'turn') return `${provider} · ${date(row.started_at_ms)} · ${row.session_name || '이름 없는 세션'} · ${requestLabel(row)} (${row.root_turn_id})`;
-    if (mode === 'calendar') return `${row.period || '시각 미상'} · ${provider}`;
+    if (mode === 'turn') return `${provider} · ${date(row.started_at_ms)} · ${row.session_name || t('dashboard.unnamedSession')} · ${requestLabel(row)} (${row.root_turn_id})`;
+    if (mode === 'calendar') return `${row.period || t('dashboard.unknownTime')} · ${provider}`;
     if (mode === 'total') return provider;
-    return `${provider} · ${row.project_name || '이름 없는 프로젝트'}${row.session_id ? ` / ${row.session_name || '이름 없는 세션'}` : ''}`;
+    return `${provider} · ${row.project_name || t('dashboard.unnamedProject')}${row.session_id ? ` / ${row.session_name || t('dashboard.unnamedSession')}` : ''}`;
   }
   function chartSegments(row) {
-    if (row.cache_write_input_tokens == null || row.cache_read_input_tokens == null) return [{ value: row.total_tokens, className: 'chart-unknown', label: '총 토큰 (구성 미확인)' }];
+    if (row.cache_write_input_tokens == null || row.cache_read_input_tokens == null) return [{ value: row.total_tokens, className: 'chart-unknown', label: t('dashboard.unknownTokenTotal') }];
     return [Math.max(0, row.input_tokens - row.cache_write_input_tokens - row.cache_read_input_tokens), row.output_tokens,
       row.cache_write_input_tokens, row.cache_read_input_tokens].map((value, index) => ({ value, className: `chart-series-${index}`, label: tokenHeaders[index].label }));
   }
   function chartDescription(row, chart) {
     const turn = chart.mode === 'turn';
     const value = chartValue(row, chart.metric, turn);
-    let detail = `${chartLabel(row, chart.mode)} · ${chart.metric === 'averageDuration' ? duration(value) : `${number(value)} ${chart.metric === 'requests' ? '개' : '토큰'}`}`;
+    let detail = `${chartLabel(row, chart.mode)} · ${chart.metric === 'averageDuration' ? duration(value) : `${number(value)} ${chart.metric === 'requests' ? t('dashboard.items') : t('common.tokens')}`}`;
     if (chart.metric === 'tokens') {
-      detail += row.cache_write_input_tokens == null || row.cache_read_input_tokens == null ? ' · 구성 미확인'
+      detail += row.cache_write_input_tokens == null || row.cache_read_input_tokens == null ? t('dashboard.unknownBreakdownSuffix')
         : ` · ${tokenHeaders.map((header, index) => `${header.label} ${tokenValues(row)[index]}`).join(' / ')}`;
     }
-    if (chart.metric === 'requests') detail += ` · 완료 ${number(row.completed_turns)}개`;
-    if (chart.metric === 'averageDuration' && !turn) detail += ` · 시간 표본 ${number(row.turns_with_duration)}개`;
-    if (chart.metric === 'averageTokens') detail += ` · 완료 요청 ${number(row.completed_turns)}개`;
-    if (chart.mode === 'ranking' && row.session_id) detail += ` · 세션 ID: ${row.session_id}`;
-    if (turn) detail += ` · ${row.status === 'completed' ? '완료' : row.status === 'failed' ? '실패' : '진행 중'} · ${row.duration_quality}`;
-    if (chart.by === 'model' && chart.metric === 'averageDuration') detail += ' · 해당 모델을 포함한 요청 전체의 시간';
+    if (chart.metric === 'requests') detail += t('dashboard.completedCountSuffix', { value0: number(row.completed_turns) });
+    if (chart.metric === 'averageDuration' && !turn) detail += t('dashboard.timeSampleSuffix', { value0: number(row.turns_with_duration) });
+    if (chart.metric === 'averageTokens') detail += t('dashboard.completedRequestsSuffix', { value0: number(row.completed_turns) });
+    if (chart.mode === 'ranking' && row.session_id) detail += t('dashboard.sessionIdSuffix', { value0: row.session_id });
+    if (turn) detail += ` · ${row.status === 'completed' ? t('common.completed') : row.status === 'failed' ? t('common.failed') : t('common.inProgress')} · ${row.duration_quality}`;
+    if (chart.by === 'model' && chart.metric === 'averageDuration') detail += t('dashboard.modelTimeSuffix');
     return detail;
   }
   function renderChart(result) {
@@ -278,20 +282,20 @@
     $('chart-metric').value = metric;
     for (const option of $('chart-metric').options) {
       option.disabled = turn && ['requests', 'averageTokens'].includes(option.value);
-      if (option.value === 'averageDuration') option.textContent = turn ? '소요 시간' : '평균 시간';
+      if (option.value === 'averageDuration') option.textContent = turn ? t('dashboard.duration') : t('dashboard.averageTime');
     }
-    const title = turn && metric === 'averageDuration' ? '요청별 소요 시간' : chartMetrics[metric];
+    const title = turn && metric === 'averageDuration' ? t('dashboard.requestDuration') : chartMetrics[metric];
     $('chart-title').textContent = title;
     const rows = chart.rows;
-    const pageRange = result.rows.length ? `${number(offset + 1)}–${number(offset + result.rows.length)} / 전체 ${number(result.total)}개` : '0개';
-    $('chart-scope').textContent = `현재 표 ${pageRange} · 표 페이지와 연동`;
-    if (rows.length < result.rows.length) $('chart-scope').textContent += ` · 사용량 없는 항목 ${number(result.rows.length - rows.length)}개 제외`;
-    if (chart.by === 'model') $('chart-scope').textContent += ' · 모델별 · 여러 모델을 쓴 요청은 각 모델에 포함';
-    if (!rows.length) { plot.append(element('p', '표시할 기록이 없습니다.', 'empty')); return; }
+    const pageRange = result.rows.length ? t('dashboard.pageRange', { value0: number(offset + 1), value1: number(offset + result.rows.length), value2: number(result.total) }) : t('dashboard.zeroItems');
+    $('chart-scope').textContent = t('dashboard.chartScope', { value0: pageRange });
+    if (rows.length < result.rows.length) $('chart-scope').textContent += t('dashboard.emptyExcludedSuffix', { value0: number(result.rows.length - rows.length) });
+    if (chart.by === 'model') $('chart-scope').textContent += t('dashboard.modelScopeSuffix');
+    if (!rows.length) { plot.append(element('p', t('common.noRecords'), 'empty')); return; }
     if (metric === 'tokens') {
       const entries = tokenHeaders.map((header, index) => ({ ...header, className: `chart-series-${index}` }));
       if (rows.some(row => row.cache_write_input_tokens == null || row.cache_read_input_tokens == null)) {
-        entries.push({ label: '구성 미확인', title: '토큰 구성을 확인할 수 없는 총 토큰', className: 'chart-unknown' });
+        entries.push({ label: t('dashboard.unknownBreakdown'), get title() { return t('dashboard.unknownBreakdownHelp'); }, className: 'chart-unknown' });
       }
       for (const entry of entries) {
         const item = element('li');
@@ -313,14 +317,14 @@
     const width = Math.max(plot.clientWidth || 736, 736, vertical ? 86 + categories.length * categoryWidth : 0);
     const height = vertical ? chart.by === 'model' ? 414 : 372 : 62 + rows.length * 62;
     const svg = svgElement('svg', { viewBox: `0 0 ${width} ${height}`, width, height, class: 'chart-svg', role: 'group', 'aria-label': `${title} · ${$('chart-scope').textContent}` });
-    svg.append(svgElement('title', {}, `${title} 사용량 도표`));
+    svg.append(svgElement('title', {}, t('dashboard.chartTitle', { value0: title })));
     const max = Math.max(1, ...rows.map(row => chartValue(row, metric, turn) ?? 0));
     const maximum = max === 1 ? 1 : Math.ceil(max / (10 ** Math.floor(Math.log10(max)))) * (10 ** Math.floor(Math.log10(max)));
     const left = vertical ? 70 : 0;
     const top = vertical ? 28 : 26;
     const length = vertical ? 224 : width - 96;
     const tick = value => metric === 'averageDuration' ? compactDuration(value) : compact(value);
-    svg.append(svgElement('text', { x: left, y: 14, class: 'chart-axis-label' }, metric === 'averageDuration' ? '시간' : metric === 'requests' ? '요청 수 (개)' : '토큰'));
+    svg.append(svgElement('text', { x: left, y: 14, class: 'chart-axis-label' }, metric === 'averageDuration' ? t('dashboard.time') : metric === 'requests' ? t('dashboard.requestCountAxis') : t('common.tokens')));
     for (let index = 0; index <= 4; index++) {
       const ratio = index / 4;
       if (vertical) {
@@ -338,7 +342,7 @@
         const x = left + (width - left - 16) * (index + .5) / categories.length;
         const row = rows.find((row, rowIndex) => categoryKey(row, rowIndex) === category);
         const shortened = text => text.length > 16 ? `${text.slice(0, 15)}…` : text;
-        const label = turn ? shortened(requestLabel(row)) : sessions ? shortened(row.session_name || '이름 없는 세션') : projects ? shortened(row.project_name || '이름 없는 프로젝트') : category || '시각 미상';
+        const label = turn ? shortened(requestLabel(row)) : sessions ? shortened(row.session_name || t('dashboard.unnamedSession')) : projects ? shortened(row.project_name || t('dashboard.unnamedProject')) : category || t('dashboard.unknownTime');
         const parts = turn ? [label] : label.split(' ~ ');
         const labelY = chart.by === 'model' ? 352 : 292;
         const caption = svgElement('text', { x, y: labelY, 'text-anchor': 'middle', class: 'chart-axis-label' }, parts[0]);
@@ -346,10 +350,10 @@
         svg.append(caption);
         if (parts[1]) svg.append(svgElement('text', { x, y: labelY + 16, 'text-anchor': 'middle', class: 'chart-axis-label' }, `~ ${parts[1]}`));
         if (turn) {
-          svg.append(svgElement('text', { x, y: labelY + 16, 'text-anchor': 'middle', class: 'chart-axis-label' }, row.started_at_ms == null ? '시각 미상'
-            : new Intl.DateTimeFormat('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: timezone }).format(new Date(row.started_at_ms))));
+          svg.append(svgElement('text', { x, y: labelY + 16, 'text-anchor': 'middle', class: 'chart-axis-label' }, row.started_at_ms == null ? t('dashboard.unknownTime')
+            : new Intl.DateTimeFormat(globalThis.agentTrackerI18n.language, { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: timezone }).format(new Date(row.started_at_ms))));
         }
-        if (sessions) svg.append(svgElement('text', { x, y: labelY + 16, 'text-anchor': 'middle', class: 'chart-axis-label' }, shortened(row.project_name || '이름 없는 프로젝트')));
+        if (sessions) svg.append(svgElement('text', { x, y: labelY + 16, 'text-anchor': 'middle', class: 'chart-axis-label' }, shortened(row.project_name || t('dashboard.unnamedProject'))));
       });
     }
     rows.forEach((row, index) => {
@@ -373,7 +377,7 @@
         const mark = svgElement('rect', { x: vertical ? x : x + consumed, y: vertical ? y - consumed - size : y,
           width: vertical ? barSize : size, height: vertical ? size : barSize, class: `chart-segment ${segment.className}` });
         if (metric === 'tokens') {
-          const detail = `${chartLabel(row, chart.mode)} · ${segment.label}: ${number(segment.value)} 토큰`;
+          const detail = t('dashboard.tokenChartDetail', { value0: chartLabel(row, chart.mode), value1: segment.label, value2: number(segment.value) });
           mark.append(svgElement('title', {}, detail));
           mark.setAttribute('aria-label', detail);
           mark.addEventListener('mouseenter', () => { $('chart-detail').textContent = detail; });
@@ -417,22 +421,22 @@
       for (const category of capabilityCategories) {
         const page = result.capabilities[category];
         const maximum = Math.max(1, ...(page.chartRows ?? page.rows).map(row => row.usage_count));
-        table($(`${category}-table`), ['제공자', '이름', '사용 횟수', '전체 비율'],
-          page.rows.map(row => [providerLabel(row.provider), row.name || '미상', number(row.usage_count), capabilityRatio(row, maximum, page.totalUses)]));
-        $(`${category}-total`).textContent = `전체 ${number(page.totalUses)}회`;
+        table($(`${category}-table`), [t('common.provider'), t('common.name'), t('dashboard.usageCount'), t('dashboard.overallRatio')],
+          page.rows.map(row => [providerLabel(row.provider), row.name || t('dashboard.unknownModel'), number(row.usage_count), capabilityRatio(row, maximum, page.totalUses)]));
+        $(`${category}-total`).textContent = t('dashboard.totalUses', { value0: number(page.totalUses) });
         $(`${category}-previous`).disabled = capabilityOffsets[category] === 0;
         $(`${category}-next`).disabled = capabilityOffsets[category] + page.rows.length >= page.total;
-        $(`${category}-page`).textContent = page.total ? `${number(capabilityOffsets[category] + 1)}–${number(capabilityOffsets[category] + page.rows.length)} / ${number(page.total)}` : '0개';
+        $(`${category}-page`).textContent = page.total ? `${number(capabilityOffsets[category] + 1)}–${number(capabilityOffsets[category] + page.rows.length)} / ${number(page.total)}` : t('dashboard.zeroItems');
       }
       return;
     }
     renderChart(result);
-    const costHeaders = showCosts ? ['API 추정 비용 (USD)'] : [];
+    const costHeaders = showCosts ? [t('dashboard.estimatedApiCost')] : [];
     const cost = row => {
       if (!showCosts) return [];
-      const value = row.billing_mode === 'subscription' ? '0원 (구독)' : row.cost_usd == null ? '—'
-        : new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 4, maximumFractionDigits: 6 }).format(row.cost_usd);
-      return [`${value}${row.unknown_costs ? ` · 미확인 ${number(row.unknown_costs)}건` : ''}`];
+      const value = row.billing_mode === 'subscription' ? t('dashboard.subscriptionZero') : row.cost_usd == null ? '—'
+        : new Intl.NumberFormat(globalThis.agentTrackerI18n.language, { style: 'currency', currency: 'USD', minimumFractionDigits: 4, maximumFractionDigits: 6 }).format(row.cost_usd);
+      return [`${value}${row.unknown_costs ? t('dashboard.unknownCostsSuffix', { value0: number(row.unknown_costs) }) : ''}`];
     };
     if (result.billing && selectedSession && showCosts) {
       $('billing-mode').value = result.billing;
@@ -443,25 +447,25 @@
     $('model-note').hidden = !model;
     const identity = (row, suffix = '') => model ? modelName(row, suffix) : `${providerLabel(row.provider)}${suffix}`;
     const scopeLabel = row => row.period != null ? tableLabel(row.period) : row.session_id ? sessionLabel(row)
-      : row.project_key ? projectLabel(row) : tableLabel(['day', 'month'].includes(result.groupBy) ? '시각 미상' : '전체');
+      : row.project_key ? projectLabel(row) : tableLabel(['day', 'month'].includes(result.groupBy) ? t('dashboard.unknownTime') : t('common.all'));
     const rows = result.rows;
     if (turn) {
-      table($('usage-table'), [`${model ? '모델' : '제공자'} / 프로젝트`, '요청 / 세션', '시작 시각', ...tokenHeaders, '총 토큰', '소요 시간', '상태 / 품질', ...costHeaders], rows.map(row => [
-        model ? identity(row, ` / ${row.project_name}`) : tableLabel(identity(row, ` / ${row.project_name}`)), sessionLabel(row, true), date(row.started_at_ms), ...tokenValues(row), number(row.total_tokens), duration(row.duration_ms), `${row.status === 'completed' ? '완료' : row.status === 'failed' ? '실패' : '진행 중'} · ${row.duration_quality}${row.quality_flags ? ` · ${row.quality_flags}` : ''}${row.last_error ? ` · 이전 값: ${row.last_error}` : ''}`, ...cost(row),
+      table($('usage-table'), [t('dashboard.projectHeader', { value0: model ? t('common.model') : t('common.provider') }), t('dashboard.requestSessionHeader'), t('dashboard.startTime'), ...tokenHeaders, t('dashboard.totalTokens'), t('dashboard.duration'), t('dashboard.statusQuality'), ...costHeaders], rows.map(row => [
+        model ? identity(row, ` / ${row.project_name}`) : tableLabel(identity(row, ` / ${row.project_name}`)), sessionLabel(row, true), date(row.started_at_ms), ...tokenValues(row), number(row.total_tokens), duration(row.duration_ms), `${row.status === 'completed' ? t('common.completed') : row.status === 'failed' ? t('common.failed') : t('common.inProgress')} · ${row.duration_quality}${row.quality_flags ? ` · ${row.quality_flags}` : ''}${row.last_error ? t('dashboard.previousValueSuffix', { value0: row.last_error }) : ''}`, ...cost(row),
       ]));
     } else {
-      table($('usage-table'), [model ? '모델' : '제공자', '기간 / 프로젝트 / 세션', ...tokenHeaders, '총 토큰', '완료 / 전체 요청', '평균 토큰', '평균 시간 / 표본', ...costHeaders], rows.map(row => [
-        identity(row), scopeLabel(row), ...tokenValues(row), number(row.total_tokens), `${number(row.completed_turns)} / ${number(row.turn_count)}`, number(row.avg_tokens_per_turn), `${duration(row.avg_duration_ms)} / ${number(row.turns_with_duration)}개`, ...cost(row),
+      table($('usage-table'), [model ? t('common.model') : t('common.provider'), t('dashboard.periodProjectSession'), ...tokenHeaders, t('dashboard.totalTokens'), t('dashboard.completedTotal'), t('dashboard.averageTokens'), t('dashboard.averageTimeSamples'), ...costHeaders], rows.map(row => [
+        identity(row), scopeLabel(row), ...tokenValues(row), number(row.total_tokens), `${number(row.completed_turns)} / ${number(row.turn_count)}`, number(row.avg_tokens_per_turn), t('dashboard.timeSamples', { value0: duration(row.avg_duration_ms), value1: number(row.turns_with_duration) }), ...cost(row),
       ]));
     }
     for (const prefix of ['', 'chart-']) {
       $(`${prefix}previous`).disabled = offset === 0;
       $(`${prefix}next`).disabled = offset + rows.length >= result.total;
-      $(`${prefix}page-label`).textContent = rows.length ? `${number(offset + 1)}–${number(offset + rows.length)} / ${number(result.total)}` : '0개';
+      $(`${prefix}page-label`).textContent = rows.length ? `${number(offset + 1)}–${number(offset + rows.length)} / ${number(result.total)}` : t('dashboard.zeroItems');
     }
     const coverage = result.coverage;
-    const durationCoverage = turn ? '' : ` · 시간 품질(현재 페이지) 정확 ${number(rows.reduce((n, r) => n + (r.exact_duration_turns ?? 0), 0))} / 계산 ${number(rows.reduce((n, r) => n + (r.derived_duration_turns ?? 0), 0))} / 근사 ${number(rows.reduce((n, r) => n + (r.approximate_duration_turns ?? 0), 0))} / 미상 ${number(rows.reduce((n, r) => n + (r.missing_duration_turns ?? 0), 0))}`;
-    $('coverage').textContent = `파일 ${number(coverage.files)} · 정상 ${number(coverage.done)} · 오류 ${number(coverage.error)} · 중단 ${number(coverage.interrupted)} · 이전 수치 유지 요청 ${number(coverage.stale_summaries)}${durationCoverage}`;
+    const durationCoverage = turn ? '' : t('dashboard.timeQualitySuffix', { value0: number(rows.reduce((n, r) => n + (r.exact_duration_turns ?? 0), 0)), value1: number(rows.reduce((n, r) => n + (r.derived_duration_turns ?? 0), 0)), value2: number(rows.reduce((n, r) => n + (r.approximate_duration_turns ?? 0), 0)), value3: number(rows.reduce((n, r) => n + (r.missing_duration_turns ?? 0), 0)) });
+    $('coverage').textContent = t('dashboard.coverage', { value0: number(coverage.files), value1: number(coverage.done), value2: number(coverage.error), value3: number(coverage.interrupted), value4: number(coverage.stale_summaries), value5: durationCoverage });
   }
   function setCapabilitiesEnabled(enabled) {
     capabilitiesEnabled = enabled;
@@ -473,13 +477,22 @@
   }
   function capabilityRatio(row, maximum, totalUses) {
     const node = element('div', undefined, 'capability-ratio');
-    const detail = `${number(row.percentage)}% · 전체 ${number(totalUses)}회 중 ${number(row.usage_count)}회 · 최다 사용 대비 ${number(row.usage_count / maximum * 100)}%`;
+    const detail = t('dashboard.ratioDetail', { value0: number(row.percentage), value1: number(totalUses), value2: number(row.usage_count), value3: number(row.usage_count / maximum * 100) });
     const bar = svgElement('svg', { viewBox: '0 0 160 12', width: 160, height: 12, role: 'img', 'aria-label': detail });
     bar.append(svgElement('title', {}, detail),
       svgElement('rect', { width: 160, height: 12, rx: 3, class: 'capability-ratio-track' }),
       svgElement('rect', { width: Math.min(160, row.usage_count / maximum * 160), height: 12, rx: 3, class: providerClass(row.provider) }));
     node.append(bar, element('span', `${number(row.percentage)}%`));
     return node;
+  }
+  function renderProgress() {
+    if (latestRefreshResult) {
+      const r = latestRefreshResult;
+      $('usage-progress').textContent = t('dashboard.refreshResult', { value0: r.interrupted ? t('common.interrupted') : r.failed ? t('dashboard.partialFailure') : t('dashboard.updated'), value1: number(r.discovered), value2: number(r.parsed), value3: number(r.reused), value4: number(r.failed), value5: number(r.bodyBytes), value6: r.error ? t('dashboard.reasonSuffix', { value0: r.error }) : '' });
+    } else if (latestProgress) {
+      const p = latestProgress;
+      $('usage-progress').textContent = t('dashboard.progress', { value0: ({ scanning: t('dashboard.scanning'), parsing: t('dashboard.parsing'), committing: t('dashboard.committing'), complete: t('common.completed') })[p.phase] ?? p.phase, value1: number(p.discovered), value2: number(p.parsed), value3: number(p.failed) });
+    } else if (busy) $('usage-progress').textContent = t('dashboard.updating');
   }
   $('skill-settings').addEventListener('click', () => send({ type: 'settings' }));
   $('open-diagnostics').addEventListener('click', event => { event.preventDefault(); send({ type: 'openDiagnostics' }); });
@@ -535,13 +548,17 @@
     if (!message || typeof message !== 'object') return;
     switch (message.type) {
       case 'state':
+        if (globalThis.updateAgentTrackerLocale?.(message.localization)) {
+          if (!selectedProject) nameCaption('project', '');
+          if (!selectedSession) nameCaption('session', '');
+        }
         if (typeof message.showApiCosts === 'boolean') { showCosts = message.showApiCosts; updateCostControls(); }
         if (typeof message.capabilitiesEnabled === 'boolean') {
           if (latestUsage?.capabilitiesEnabled !== undefined && latestUsage.capabilitiesEnabled !== message.capabilitiesEnabled) latestUsage = undefined;
           setCapabilitiesEnabled(message.capabilitiesEnabled);
         }
         timezone = message.timezone;
-        $('timezone').textContent = `집계 시간대: ${timezone}`;
+        $('timezone').textContent = t('dashboard.timezone', { value0: timezone });
         $('configuration-warning').textContent = message.timezoneWarning ?? '';
         $('configuration-warning').hidden = !message.timezoneWarning;
         if (Array.isArray(message.providers)) {
@@ -550,12 +567,13 @@
           if ($('provider').selectedOptions[0]?.disabled) { $('provider').value = ''; selectedSession = undefined; nameCaption('session', ''); offset = 0; query(); }
         }
         if (latestUsage) renderUsage(latestUsage);
+        renderProgress();
         break;
       case 'usage': $('error').hidden = true; renderUsage(message.result); break;
       case 'names': renderNames(message); break;
-      case 'busy': $('cancel-usage').hidden = !message.busy; if (message.busy) $('usage-progress').textContent = '기록을 갱신하고 있습니다…'; break;
-      case 'progress': { const p = message.progress; $('usage-progress').textContent = `${({ scanning: '파일 확인', parsing: '요청 집계', committing: '통계 저장', complete: '완료' })[p.phase] ?? p.phase} · 발견 ${number(p.discovered)} · 읽음 ${number(p.parsed)} · 실패 ${number(p.failed)}`; break; }
-      case 'refreshResult': { closeNames(); const r = message.result; $('usage-progress').textContent = `${r.interrupted ? '중단됨' : r.failed ? '일부 실패 · 이전 정상 통계를 유지했습니다' : '갱신 완료'} · 발견 ${number(r.discovered)} · 읽음 ${number(r.parsed)} · 재사용 ${number(r.reused)} · 실패 ${number(r.failed)} · 읽은 데이터 ${number(r.bodyBytes)} bytes${r.error ? ` · 원인: ${r.error}` : ''}`; break; }
+      case 'busy': busy = message.busy; $('cancel-usage').hidden = !busy; if (busy) { latestProgress = undefined; latestRefreshResult = undefined; } renderProgress(); break;
+      case 'progress': latestProgress = message.progress; latestRefreshResult = undefined; renderProgress(); break;
+      case 'refreshResult': closeNames(); latestRefreshResult = message.result; renderProgress(); break;
       case 'error': $('error').textContent = message.message; $('error').hidden = false; $('billing-mode').disabled = !selectedSession; break;
     }
   });

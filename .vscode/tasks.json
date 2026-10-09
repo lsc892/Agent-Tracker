@@ -1,4 +1,15 @@
 {
   "version": "2.0.0",
-  "tasks": [{ "type": "npm", "script": "build", "group": "build", "problemMatcher": "$tsc" }]
+  "tasks": [
+    { "type": "npm", "script": "build", "group": "build", "problemMatcher": "$tsc" },
+    {
+      "label": "prepare localized extension", "type": "process", "command": "node",
+      "args": ["tools/localization-manifest.cjs", "--prepare"],
+      "dependsOn": "npm: build", "problemMatcher": []
+    },
+    {
+      "label": "restore localization manifest", "type": "process", "command": "node",
+      "args": ["tools/localization-manifest.cjs", "--restore"], "problemMatcher": []
+    }
+  ]
 }

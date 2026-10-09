@@ -1,3 +1,4 @@
+import { createTranslator } from '../../src/localization';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -52,7 +53,7 @@ test('request table renders API failures separately from completed and running r
   };
   getElement('group').value = 'turn';
   let receive: ((event: {data:unknown})=>void) | undefined;
-  new Script(readFileSync(join(__dirname,'../../../media/dashboard.js'),'utf8')).runInNewContext({
+  new Script(readFileSync(join(__dirname,'../../../media/dashboard.js'),'utf8')).runInNewContext({ agentTrackerI18n: createTranslator('ko'),
     acquireVsCodeApi:()=>({getState:()=>undefined,setState:()=>undefined,postMessage:()=>undefined}),
     document:{getElementById:getElement,createElement:()=>new Element(),querySelectorAll:()=>[]},
     window:{addEventListener:(_name:string,listener:typeof receive)=>{receive=listener;}},

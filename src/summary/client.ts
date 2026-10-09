@@ -1,3 +1,4 @@
+import { t, type TranslationKey } from '../localization';
 import { Worker } from 'node:worker_threads';
 import { join } from 'node:path';
 import type { SummaryOptions, SummaryProgress, RefreshResult, UsageQuery, UsageResult, DiagnosticsResult, SourceRoot, NameQuery, NameResult } from './types';
@@ -93,11 +94,11 @@ export class SummaryClient {
     if (!this.worker) {
       const worker = new Worker(this.options.workerPath ?? join(__dirname,'worker.js'),{workerData:this.options});
       this.worker = worker;
-      worker.on('message',(message: {id?:number;result?:unknown;error?:string;progress?:SummaryProgress}) => {
+      worker.on('message',(message: {id?:number;result?:unknown;error?:string;errorKey?:TranslationKey;progress?:SummaryProgress}) => {
         if (message.progress) { for (const listener of this.listeners) { try { listener(message.progress); } catch { /* Observers cannot break the worker. */ } } return; }
         if (message.id === undefined) return;
         const pending = this.pending.get(message.id);this.pending.delete(message.id);
-        if (message.error) pending?.reject(new Error(message.error)); else pending?.resolve(message.result);
+        if (message.errorKey || message.error) pending?.reject(new Error(message.errorKey ? t(message.errorKey) : message.error)); else pending?.resolve(message.result);
       });
       worker.on('error',() => { this.rejectAll(new Error('Summary worker failed. Node.js 22.15+ with node:sqlite is required.')); });
       worker.on('exit',() => {

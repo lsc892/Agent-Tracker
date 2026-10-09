@@ -70,7 +70,7 @@ export async function run(): Promise<void> {
   const inlineScript = (html: string, file: string, nonce: string, driver: string, extraBridge = ''): string => {
     const script = readFileSync(join(extensionRoot, 'media', file), 'utf8')
       .replace('const vscode = acquireVsCodeApi();', `const vscode = acquireVsCodeApi();${bridge}${extraBridge}`);
-    return html.replace(/<script nonce="[^"]+" src="[^"]+"><\/script>/,
+    return html.replace(new RegExp(`<script nonce="[^"]+" src="[^"]*${file.replaceAll('.', '\\.')}"><\\/script>`),
       () => `<script nonce="${nonce}">${script}</script><script nonce="${nonce}">${driver}</script>`);
   };
   htmlModule.colorSettingsHtml = (...args: Parameters<typeof originalColorHtml>) => {
@@ -530,6 +530,61 @@ export async function run(): Promise<void> {
     await until(() => Boolean(database!.prepare("SELECT 1 FROM manifest WHERE path=? AND processing_status='done'").get(alternateSource)), 'statistics collect only the new data home');
     assert.equal(countFiles(), 1);
     outcomes.push('one global data home supplies both providers, statistics and Claude retention; duplicate path settings are removed');
+    // A fresh driver observes the production scripts during live language changes.
+    await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+    htmlModule.dashboardHtml = (...args: Parameters<typeof originalHtml>) => inlineScript(originalHtml(...args), 'dashboard.js', args[3], `(() => {
+      let locale;
+      window.addEventListener('message', event => {
+        const message = event.data;
+        if (message.type === 'state') locale = message.localization?.locale;
+        if (message.type !== 'usage' || !locale || !message.result.rows.length) return;
+        try {
+          const engine = globalThis.agentTrackerI18n;
+          const check = (condition, detail) => { if (!condition) throw new Error(detail); };
+          check(document.documentElement.lang === locale, 'document language updates');
+          check(document.querySelector('h1').textContent === engine.t('dashboard.heading'), 'heading updates');
+          check(document.getElementById('settings').textContent === engine.t('common.settings'), 'settings label updates');
+          check(document.getElementById('project-name').textContent === engine.t('dashboard.allProjects'), 'unselected project label updates');
+          check(document.querySelector('#usage-table th').textContent === engine.t('common.provider'), 'dynamic table headings update');
+          check(document.getElementById('usage-table').textContent.includes(engine.t('common.input')), 'token terminology updates');
+          check(document.getElementById('usage-table').textContent.includes('통계 화면 검증'), 'session content is preserved');
+          check(Object.values(engine.store.data).filter(namespaces => namespaces.translation).length === 1, 'previous catalogs are released');
+          window.dispatchEvent(new CustomEvent('tracker-smoke-report', {detail:{type:'smoke-report',stage:'usage',theme:'localization',ok:true,detail:'locale:'+locale}}));
+        } catch (error) {
+          window.dispatchEvent(new CustomEvent('tracker-smoke-report', {detail:{type:'smoke-report',stage:'usage',theme:'localization',ok:false,detail:error.message}}));
+        }
+      });
+      document.getElementById('group').value = 'session';
+      document.getElementById('usage-filters').requestSubmit();
+    })();`);
+    const localization = require(join(extensionRoot,'dist/src/localization')) as typeof import('../../src/localization');
+    const openLanguageView = vscode.commands.executeCommand('agentTracker.openUsage');
+    const waitLocale = (expected: string): Promise<void> => new Promise((resolveLocale, reject) => {
+      const timeout = setTimeout(() => reject(new Error('Language switch timed out: '+expected)), 15_000);
+      onReport = message => {
+        if (message.theme !== 'localization') return;
+        if (!message.ok) { clearTimeout(timeout);reject(new Error(message.detail));return; }
+        if (message.detail === 'locale:'+expected) {clearTimeout(timeout);resolveLocale();}
+      };
+    });
+    const initialLanguage = waitLocale('ko');
+    await openLanguageView; await initialLanguage;
+    const scansBeforeLanguages: number = scanCount;
+    for (const language of localization.languages) {
+      if (language.locale === 'ko') continue;
+      const completed = waitLocale(language.locale);
+      await config.update('language', language.locale, vscode.ConfigurationTarget.Global);
+      await completed;
+      assert.equal(localization.getLocale(), language.locale);
+      assert.match(currentTooltip!.value, new RegExp(localization.t('quota.usage')));
+      assert.equal(scanCount, scansBeforeLanguages, 'language changes do not rescan source logs');
+    }
+    const automatic = waitLocale(localization.resolveLocale('auto',vscode.env.language));
+    await config.update('language', 'auto', vscode.ConfigurationTarget.Global);await automatic;
+    assert.equal(localization.getLocale(),localization.resolveLocale('auto',vscode.env.language));
+    assert.equal(readFileSync(sourcePath,'utf8'),originalSource);
+    onReport = undefined;
+    outcomes.push('six UI languages and VS Code auto detection: live headings, tables, token terminology, source names and bounded catalogs');
     const reportDirectory = join(extensionRoot, 'tests', 'results');
     await mkdir(reportDirectory, { recursive: true });
     await writeFile(join(reportDirectory, 'vscode-smoke.json'), JSON.stringify({ version: vscode.version, node: process.versions.node, passed: true, outcomes }, null, 2));

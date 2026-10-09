@@ -28,7 +28,7 @@ export class CodexQuotaProvider implements QuotaProvider {
   constructor(private readonly options: CodexQuotaProviderOptions = {}) {}
 
   read(context: QuotaReadContext): Promise<QuotaSnapshot> {
-    if (this.disposed) return Promise.reject(new QuotaError('cancelled', 'Codex quota 조회가 종료되었습니다.'));
+    if (this.disposed) return Promise.reject(new QuotaError('cancelled', { key: 'quota.codexClosed' }));
     const promise = this.readOnce(context);
     this.reads.add(promise);
     void promise.finally(() => this.reads.delete(promise)).catch(() => {});
@@ -76,9 +76,9 @@ export class CodexQuotaProvider implements QuotaProvider {
       const accountResult = asRecord(await session.request('account/read', { refreshToken: false }));
       this.phase('account-read', child.pid, performance.now() - startedAt);
       const account = asRecord(accountResult?.account);
-      if (!account) throw new QuotaError('authentication', 'Codex CLI에서 ChatGPT 계정으로 로그인해 주세요.');
+      if (!account) throw new QuotaError('authentication', { key: 'quota.codexLoginRequired' });
       if (account.type !== 'chatgpt' && account.type !== 'chatgptAuthTokens') {
-        throw new QuotaError('unsupported-account', '현재 Codex 인증 방식에는 ChatGPT 구독 quota가 없습니다.');
+        throw new QuotaError('unsupported-account', { key: 'quota.codexUnsupportedAccount' });
       }
       canNotify = true;
       const result = await session.request('account/rateLimits/read');
@@ -90,10 +90,10 @@ export class CodexQuotaProvider implements QuotaProvider {
       if (signal.aborted) throw cancelled();
       return snapshot;
     } catch (error) {
-      if (timedOut) throw new QuotaError('timeout', 'Codex quota 조회 시간이 초과되었습니다.');
+      if (timedOut) throw new QuotaError('timeout', { key: 'quota.codexTimeout' });
       if (signal.aborted) throw cancelled();
       if (error instanceof QuotaError) throw error;
-      throw new QuotaError('process', 'Codex CLI를 실행하지 못했습니다. 실행 파일 설정과 설치 상태를 확인해 주세요.');
+      throw new QuotaError('process', { key: 'quota.codexLaunchFailed' });
     } finally {
       if (timeout) clearTimeout(timeout);
       canNotify = false;
@@ -135,14 +135,14 @@ class RpcSession {
       child.once('close', (code, exitSignal) => {
         this.closed = true;
         if (!this.closing || (code !== 0 && exitSignal === null)) {
-          this.fail(new QuotaError('process', 'Codex App Server가 예기치 않게 종료되었습니다.'));
+          this.fail(new QuotaError('process', { key: 'quota.codexServerExited' }));
         }
         resolve();
       });
     });
-    child.on('error', () => this.fail(new QuotaError('process', 'Codex App Server를 시작하지 못했습니다. 실행 파일을 확인해 주세요.')));
-    child.stdin.on('error', () => this.fail(new QuotaError('process', 'Codex App Server 통신이 종료되었습니다.')));
-    child.stdout.on('error', () => this.fail(new QuotaError('process', 'Codex App Server 응답을 읽지 못했습니다.')));
+    child.on('error', () => this.fail(new QuotaError('process', { key: 'quota.codexServerStartFailed' })));
+    child.stdin.on('error', () => this.fail(new QuotaError('process', { key: 'quota.codexCommunicationClosed' })));
+    child.stdout.on('error', () => this.fail(new QuotaError('process', { key: 'quota.codexReadFailed' })));
     child.stderr.on('error', () => {});
     // Drain stderr without retaining arbitrary CLI diagnostics (which can contain secrets).
     child.stderr.resume();
@@ -154,7 +154,7 @@ class RpcSession {
 
   request(method: string, params?: unknown): Promise<unknown> {
     if (this.failure) return Promise.reject(this.failure);
-    if (this.closed || this.closing) return Promise.reject(new QuotaError('process', 'Codex App Server 연결이 종료되었습니다.'));
+    if (this.closed || this.closing) return Promise.reject(new QuotaError('process', { key: 'quota.codexConnectionClosed' }));
     const id = this.nextId++;
     return new Promise((resolve, reject) => {
       this.pending.set(id, { resolve, reject });
@@ -183,7 +183,7 @@ class RpcSession {
         if (!(await this.waitExit(this.graceMs))) {
           this.child.kill('SIGKILL');
           if (!(await this.waitExit(Math.max(1000, this.graceMs)))) {
-            throw new QuotaError('process', 'Codex App Server 종료를 확인하지 못했습니다.');
+            throw new QuotaError('process', { key: 'quota.codexStopFailed' });
           }
         }
       }
@@ -242,16 +242,16 @@ class RpcSession {
     if (error) {
       const data = asRecord(error.data);
       const status = data?.statusCode ?? data?.status ?? error.code;
-      if (status === 429) pending.reject(new QuotaError('rate-limit', 'Codex quota 조회가 제한되었습니다. 잠시 후 다시 시도합니다.'));
-      else if (status === 401 || status === 403) pending.reject(new QuotaError('authentication', 'Codex CLI에서 다시 로그인해 주세요.'));
-      else pending.reject(new QuotaError('protocol', 'Codex App Server가 quota 요청을 처리하지 못했습니다. CLI 버전과 로그인을 확인해 주세요.'));
+      if (status === 429) pending.reject(new QuotaError('rate-limit', { key: 'quota.codexRateLimited' }));
+      else if (status === 401 || status === 403) pending.reject(new QuotaError('authentication', { key: 'quota.codexSignInAgain' }));
+      else pending.reject(new QuotaError('protocol', { key: 'quota.codexRequestFailed' }));
     } else if ('result' in message) pending.resolve(message.result);
     else pending.reject(protocolError());
   }
 
   private write(message: unknown): void {
     try { this.child.stdin.write(`${JSON.stringify(message)}\n`); }
-    catch { this.fail(new QuotaError('process', 'Codex App Server에 요청을 보내지 못했습니다.')); }
+    catch { this.fail(new QuotaError('process', { key: 'quota.codexSendFailed' })); }
   }
   private fail(error: QuotaError): void {
     this.failure ??= error;
@@ -296,7 +296,7 @@ export function parseCodexQuota(value: unknown, fetchedAt: number): QuotaSnapsho
       if (windows.length > 100) throw protocolError();
     }
   }
-  if (windows.length === 0) throw new QuotaError('unavailable', 'Codex 구독 quota window 정보를 사용할 수 없습니다.');
+  if (windows.length === 0) throw new QuotaError('unavailable', { key: 'quota.codexUnavailable' });
   const rateLimitResetCredits = parseResetCredits(result.rateLimitResetCredits);
   return { provider: 'codex', fetchedAt, windows, ...(rateLimitResetCredits ? { rateLimitResetCredits } : {}) };
 }
@@ -320,8 +320,8 @@ function parseResetCredits(value: unknown): QuotaSnapshot['rateLimitResetCredits
   return { availableCount: count, nextExpiresAt };
 }
 
-function protocolError(): QuotaError { return new QuotaError('protocol', 'Codex quota 응답 형식을 지원하지 않습니다. CLI 업데이트를 확인해 주세요.'); }
-function cancelled(): QuotaError { return new QuotaError('cancelled', 'Codex quota 조회가 취소되었습니다.'); }
+function protocolError(): QuotaError { return new QuotaError('protocol', { key: 'quota.codexUnsupportedResponse' }); }
+function cancelled(): QuotaError { return new QuotaError('cancelled', { key: 'quota.codexCancelled' }); }
 
 /** Resolve npm's Windows .cmd shim to its native executable without spawning a shell. */
 export async function resolveCodexExecutable(command: string, env: NodeJS.ProcessEnv = process.env): Promise<string> {
@@ -333,7 +333,7 @@ export async function resolveCodexExecutable(command: string, env: NodeJS.Proces
     if (!(await exists(candidate))) continue;
     if (!/\.(cmd|ps1)$/i.test(candidate)) return candidate;
     if (!/^codex\.(cmd|ps1)$/i.test(basename(candidate))) {
-      throw new QuotaError('process', 'Codex 실행 파일에는 .exe 경로를 지정해 주세요.');
+      throw new QuotaError('process', { key: 'quota.codexExeRequired' });
     }
     const bin = dirname(await realpath(candidate));
     const arch = process.arch === 'arm64' ? 'arm64' : 'x64';
@@ -346,7 +346,7 @@ export async function resolveCodexExecutable(command: string, env: NodeJS.Proces
     ];
     for (const native of nativeCandidates) if (await exists(native)) return native;
   }
-  throw new QuotaError('process', 'Codex CLI 실행 파일을 찾지 못했습니다. Codex를 설치하거나 .exe 경로를 설정해 주세요.');
+  throw new QuotaError('process', { key: 'quota.codexExeMissing' });
 }
 
 async function exists(path: string): Promise<boolean> { try { await access(path); return true; } catch { return false; } }

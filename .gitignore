@@ -11,3 +11,5 @@ tests/.cache/
 test-results/
 benchmark-results/
 .vscode-test/
+media/i18next.js
+media/i18next.LICENSE.txt

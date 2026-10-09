@@ -32,7 +32,7 @@ export class ClaudeCliCredentials implements ClaudeCredentialSource {
       if (metadata.size > 1_048_576 || !metadata.isFile()) throw new Error('Invalid credential file');
       serialized = await readFile(path, { encoding: 'utf8', signal });
     } catch {
-      if (signal.aborted) throw new QuotaError('cancelled', 'Claude quota 조회가 취소되었습니다.');
+      if (signal.aborted) throw new QuotaError('cancelled', { key: 'quota.claudeCancelled' });
       // macOS Claude Code normally stores credentials in the login keychain.
       if (process.platform === 'darwin' && this.dataHome === join(homedir(), '.claude')) {
         try {
@@ -50,7 +50,7 @@ export class ClaudeCliCredentials implements ClaudeCredentialSource {
       if (typeof token === 'string' && token.length > 0 && token.length <= 16_384 && !/[\r\n]/.test(token)) return token;
     } catch { /* Never expose JSON parse errors from credentials. */ }
     finally { serialized = undefined; }
-    throw new QuotaError('authentication', 'Claude Code에서 로그인한 뒤 다시 조회해 주세요.');
+    throw new QuotaError('authentication', { key: 'quota.claudeLoginRequired' });
   }
 }
 
@@ -93,25 +93,25 @@ export class ClaudeQuotaProvider implements QuotaProvider {
           // A failed body stream must not erase the status needed for auth/retry policy.
           await response.body?.cancel().catch(() => {});
           if (attempt === 0) continue;
-          throw new QuotaError('authentication', 'Claude Code 로그인 정보가 만료되었습니다. 다시 로그인해 주세요.');
+          throw new QuotaError('authentication', { key: 'quota.claudeLoginExpired' });
         }
         if (!response.ok) {
           await response.body?.cancel().catch(() => {});
-          if (response.status === 429) throw new QuotaError('rate-limit', 'Claude quota 조회가 제한되었습니다. 잠시 후 다시 시도합니다.',
+          if (response.status === 429) throw new QuotaError('rate-limit', { key: 'quota.claudeRateLimited' },
             parseRetryAfter(response.headers.get('retry-after'), this.now()));
-          if (response.status === 403) throw new QuotaError('authentication', 'Claude Code 구독 로그인과 quota 접근 권한을 확인해 주세요.');
-          throw new QuotaError('network', `Claude quota 서버 조회에 실패했습니다 (HTTP ${response.status}).`);
+          if (response.status === 403) throw new QuotaError('authentication', { key: 'quota.claudeAccessDenied' });
+          throw new QuotaError('network', { key: 'quota.claudeHttpFailed', values: { value0: response.status } });
         }
         const body = await readBoundedJson(response);
         signal.throwIfAborted();
         return parseClaudeQuota(body, this.now());
       }
-      throw new QuotaError('authentication', 'Claude Code에서 다시 로그인해 주세요.');
+      throw new QuotaError('authentication', { key: 'quota.claudeSignInAgain' });
     } catch (error) {
-      if (timedOut) throw new QuotaError('timeout', 'Claude quota 조회 시간이 초과되었습니다.');
-      if (signal.aborted) throw new QuotaError('cancelled', 'Claude quota 조회가 취소되었습니다.');
+      if (timedOut) throw new QuotaError('timeout', { key: 'quota.claudeTimeout' });
+      if (signal.aborted) throw new QuotaError('cancelled', { key: 'quota.claudeCancelled' });
       if (error instanceof QuotaError) throw error;
-      throw new QuotaError('network', 'Claude quota에 연결하지 못했습니다. 네트워크와 Claude Code 로그인을 확인해 주세요.');
+      throw new QuotaError('network', { key: 'quota.claudeNetworkFailed' });
     } finally {
       clearTimeout(timeout);
       this.active.delete(controller);
@@ -131,31 +131,31 @@ export function parseRetryAfter(value: string | null, now: number): number | und
 
 export function parseClaudeQuota(value: unknown, fetchedAt: number): QuotaSnapshot {
   const data = asRecord(value);
-  if (!data) throw new QuotaError('protocol', 'Claude quota 응답 형식을 지원하지 않습니다.');
+  if (!data) throw new QuotaError('protocol', { key: 'quota.claudeUnsupportedResponse' });
   const windows: QuotaWindow[] = [];
   for (const [id, raw] of Object.entries(data)) {
     const window = asRecord(raw);
     if (!window || window.utilization == null) continue;
     const used = window.utilization;
     if (typeof used !== 'number' || !Number.isFinite(used) || used < 0) {
-      throw new QuotaError('protocol', 'Claude quota 사용률 형식이 올바르지 않습니다.');
+      throw new QuotaError('protocol', { key: 'quota.claudeInvalidPercentage' });
     }
     const reset = window.resets_at;
     const resetsAt = typeof reset === 'string' ? Date.parse(reset) : null;
     if ((reset != null && typeof reset !== 'string') || (resetsAt !== null && !Number.isFinite(resetsAt))) {
-      throw new QuotaError('protocol', 'Claude quota 초기화 시각이 올바르지 않습니다.');
+      throw new QuotaError('protocol', { key: 'quota.claudeInvalidReset' });
     }
     const minutes = id.startsWith('five_hour') ? 300 : id.startsWith('seven_day') ? 10_080 : null;
     const label = id.replace(/^five_hour/, '5h').replace(/^seven_day/, '7d').replaceAll('_', ' ').slice(0, 100);
     windows.push({ id: id.slice(0, 100), label, usedPercent: used, current: used, maximum: 100, resetsAt, windowDurationMins: minutes });
-    if (windows.length > 100) throw new QuotaError('protocol', 'Claude quota window 수가 허용 범위를 초과했습니다.');
+    if (windows.length > 100) throw new QuotaError('protocol', { key: 'quota.claudeTooManyWindows' });
   }
-  if (windows.length === 0) throw new QuotaError('unavailable', 'Claude 구독 quota 정보를 사용할 수 없습니다.');
+  if (windows.length === 0) throw new QuotaError('unavailable', { key: 'quota.claudeUnavailable' });
   return { provider: 'claude', fetchedAt, windows };
 }
 
 async function readBoundedJson(response: Response): Promise<unknown> {
-  if (!response.body) throw new QuotaError('protocol', 'Claude quota 응답이 비어 있습니다.');
+  if (!response.body) throw new QuotaError('protocol', { key: 'quota.claudeEmptyResponse' });
   const reader = response.body.getReader();
   let bytes = 0;
   const chunks: Uint8Array[] = [];
@@ -164,11 +164,11 @@ async function readBoundedJson(response: Response): Promise<unknown> {
       const part = await reader.read();
       if (part.done) break;
       bytes += part.value.byteLength;
-      if (bytes > 1_048_576) throw new QuotaError('protocol', 'Claude quota 응답 크기가 허용 범위를 초과했습니다.');
+      if (bytes > 1_048_576) throw new QuotaError('protocol', { key: 'quota.claudeResponseTooLarge' });
       chunks.push(part.value);
     }
     try { return JSON.parse(Buffer.concat(chunks).toString('utf8')); }
-    catch { throw new QuotaError('protocol', 'Claude quota 응답이 올바른 JSON이 아닙니다.'); }
+    catch { throw new QuotaError('protocol', { key: 'quota.claudeInvalidJson' }); }
   } finally {
     try { await reader.cancel(); } catch { /* Preserve the safe error above. */ }
     reader.releaseLock();

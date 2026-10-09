@@ -1,3 +1,4 @@
+import { createTranslator } from '../../src/localization';
 import test, { type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
@@ -335,7 +336,7 @@ function ui() {
   get('group').value = 'day'; get('chart-metric').value = 'tokens';
   let receive: ((event: { data: unknown }) => void) | undefined;
   const messages: { type: string; query?: { chartMetric?: string; offset?: number } }[] = [];
-  new Script(readFileSync(join(__dirname, '../../../media/dashboard.js'), 'utf8')).runInNewContext({
+  new Script(readFileSync(join(__dirname, '../../../media/dashboard.js'), 'utf8')).runInNewContext({ agentTrackerI18n: createTranslator('ko'),
     acquireVsCodeApi: () => ({ getState: () => undefined, setState: () => undefined, postMessage: (value: typeof messages[number]) => messages.push(value) }),
     document: { getElementById: get, createElement: (tag: string) => new Element(tag), createElementNS: (_ns: string, tag: string) => new Element(tag), querySelectorAll: () => [] },
     window: { addEventListener: (_event: string, listener: typeof receive) => { receive = listener; } },

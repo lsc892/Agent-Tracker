@@ -1,3 +1,4 @@
+import { createTranslator } from '../../src/localization';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -44,7 +45,7 @@ test('color swatch, short HEX and opacity stay synchronized, with validation and
   const elements=new Map<string,Element>();
   const get=(id:string):Element=>{if(!elements.has(id)) elements.set(id,new Element());return elements.get(id)!;};
   const messages:Record<string,unknown>[]=[];let receive:((event:{data:unknown})=>void)|undefined;
-  new Script(readFileSync(join(__dirname,'../../../media/color-settings.js'),'utf8')).runInNewContext({
+  new Script(readFileSync(join(__dirname,'../../../media/color-settings.js'),'utf8')).runInNewContext({ agentTrackerI18n: createTranslator('ko'),
     acquireVsCodeApi:()=>({postMessage:(message:Record<string,unknown>)=>messages.push(message)}),
     document:{getElementById:get},window:{addEventListener:(_type:string,listener:typeof receive)=>{receive=listener;}},
   });

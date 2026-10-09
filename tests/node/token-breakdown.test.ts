@@ -1,3 +1,4 @@
+import { createTranslator } from '../../src/localization';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, appendFile, rm, realpath } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -170,7 +171,7 @@ test('all dashboard groups render four named token columns with unknown and zero
     return elements.get(id)!;
   };
   let receive: ((event: { data: unknown }) => void) | undefined;
-  new Script(readFileSync(join(__dirname, '../../../media/dashboard.js'), 'utf8')).runInNewContext({
+  new Script(readFileSync(join(__dirname, '../../../media/dashboard.js'), 'utf8')).runInNewContext({ agentTrackerI18n: createTranslator('ko'),
     acquireVsCodeApi: () => ({ getState: () => undefined, setState: () => undefined, postMessage: () => undefined }),
     document: { getElementById: getElement, createElement: () => new Element(), querySelectorAll: () => [] },
     window: { addEventListener: (_name: string, listener: typeof receive) => { receive = listener; } },

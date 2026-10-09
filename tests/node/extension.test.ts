@@ -307,7 +307,7 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     dashboard.receive({ type: 'openDiagnostics' }); await tick();
     assert.equal(panels.length, 2, 'the footer link creates a separate diagnostic webview');
     const diagnosticPanel = panels[1];
-    assert.match(diagnosticPanel.webview.html, /<h1>데이터 확인<\/h1>/);
+    assert.match(diagnosticPanel.webview.html, /<h1><span data-i18n="diagnostics.heading">데이터 확인<\/span><\/h1>/);
     assert.doesNotMatch(diagnosticPanel.webview.html, /id="usage-table"/);
     diagnosticPanel.webview.receive({ type: 'ready' }); await tick();
     assert.equal(diagnostics, 1);

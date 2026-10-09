@@ -1,3 +1,4 @@
+import { createTranslator, resolveLocale } from './localization';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import type { SourceRoot } from './summary/types';
@@ -5,6 +6,8 @@ import { colorMode, normalizeHexColor, type StatusColorMode } from './ui/colors'
 
 export interface SettingsReader { get<T>(key: string, fallback: T): T }
 export interface TrackerConfiguration {
+  language: string;
+  locale: string;
   dataHome: string;
   percentage: 'used' | 'remaining';
   detail: 'compact' | 'detailed';
@@ -27,7 +30,9 @@ export function expandPath(value: string): string {
   return resolve(homedir(), value === '~' ? homedir() : /^~[/\\]/.test(value) ? join(homedir(), value.slice(2)) : value);
 }
 
-export function readConfiguration(settings: SettingsReader): TrackerConfiguration {
+export function readConfiguration(settings: SettingsReader, editorLanguage = 'ko'): TrackerConfiguration {
+  const language = settings.get('language', 'auto');
+  const locale = resolveLocale(language, editorLanguage);
   const dataHome = expandPath(settings.get('dataHome', '~').trim() || '~');
   const claudeHome = join(dataHome, '.claude');
   const codexHome = join(dataHome, '.codex');
@@ -45,10 +50,11 @@ export function readConfiguration(settings: SettingsReader): TrackerConfiguratio
         timezone = selected;
       }
     } catch {
-      timezoneWarning = `시간대 설정을 해석할 수 없어 시스템 시간대(${timezone})를 사용합니다. agentTracker.usage.timezone 설정을 확인해 주세요.`;
+      timezoneWarning = String(createTranslator(locale).t('configuration.invalidTimezone', { value0: timezone }));
     }
   }
   return {
+    language, locale,
     dataHome,
     percentage: settings.get('display.percentage', 'used'),
     detail: settings.get('display.detail', 'detailed'),

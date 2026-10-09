@@ -1,3 +1,4 @@
+import { localizationBundle, t } from '../localization';
 import { randomBytes } from 'node:crypto';
 import * as vscode from 'vscode';
 import { readConfiguration } from '../configuration';
@@ -15,7 +16,7 @@ export class ColorSettings implements vscode.Disposable {
   open(): void {
     if (this.panel) { this.panel.reveal(vscode.ViewColumn.Active);this.update();return; }
     const media=vscode.Uri.joinPath(this.extensionUri,'media');
-    const panel=vscode.window.createWebviewPanel('agentTracker.colorSettings','Agent Tracker 색상',vscode.ViewColumn.Active,{
+    const panel=vscode.window.createWebviewPanel('agentTracker.colorSettings',t('color.title'),vscode.ViewColumn.Active,{
       enableScripts:true,retainContextWhenHidden:true,localResourceRoots:[media],
     });
     this.panel=panel;
@@ -29,23 +30,24 @@ export class ColorSettings implements vscode.Disposable {
       const message=parseColorSettingsMessage(raw);
       if (!message) return;
       if (message.type==='ready') {this.ready=true;this.update();}
-      else if (this.ready && !this.saving) void this.save(message).catch(()=>this.post({type:'error',message:'색상 설정을 저장하지 못했습니다. 다시 적용해 주세요.'}));
+      else if (this.ready && !this.saving) void this.save(message).catch(()=>this.post({type:'error',message:t('color.saveFailed')}));
     });
   }
 
   update(): void {
+    if (this.panel) this.panel.title = t('color.title');
     if (!this.ready || !this.panel || this.saving) return;
     const config=vscode.workspace.getConfiguration('agentTracker');
     const settings=readConfiguration(config);
     const scopes=['display.colorMode','display.customColor'].map(key=>config.inspect(key));
     const hasWorkspace=Boolean(vscode.workspace.workspaceFolders?.length);
     const target:ColorTarget=scopes.some(scope=>scope?.workspaceValue!==undefined) ? 'workspace' : 'user';
-    this.post({type:'state',mode:settings.colorMode,color:settings.customColor ?? '#ffffff',hasWorkspace,target});
+    this.post({type:'state',localization:localizationBundle(),mode:settings.colorMode,color:settings.customColor ?? '#ffffff',hasWorkspace,target});
   }
 
   private async save(value:{mode:StatusColorMode;color:string;target:ColorTarget}):Promise<void> {
     if (value.target!=='user' && !vscode.workspace.workspaceFolders?.length) {
-      this.post({type:'error',message:'작업공간에 저장하려면 폴더나 작업공간을 먼저 열어 주세요.'});return;
+      this.post({type:'error',message:t('color.workspaceRequired')});return;
     }
     this.saving=true;
     const panel=this.panel;

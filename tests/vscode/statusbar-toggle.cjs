@@ -5,6 +5,7 @@ const { join, resolve } = require('node:path');
 const { spawn } = require('node:child_process');
 const { createServer } = require('node:net');
 const { operate, checksum, resolveAppRoot } = require('../../tools/vscode/statusbar-toggle.cjs');
+const { withLocalizedManifest } = require('../../tools/localization-manifest.cjs');
 
 const sleep = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
 async function until(probe, description, timeout = 15000) {
@@ -381,4 +382,4 @@ async function main() {
     if (!exited) child.kill();
   }
 }
-main().catch(error => { console.error(error); process.exitCode = 1; });
+withLocalizedManifest(resolve(__dirname, '../..'), main).catch(error => { console.error(error); process.exitCode = 1; });

@@ -1,3 +1,4 @@
+import { setLocale, t } from './localization';
 import * as vscode from 'vscode';
 import { join } from 'node:path';
 import { mkdir } from 'node:fs/promises';
@@ -12,10 +13,11 @@ import { setClaudeCleanupPeriod } from './claudeSettings';
 let shutdown: (() => Promise<void>) | undefined;
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
-  let settings = readConfiguration(vscode.workspace.getConfiguration('agentTracker'));
+  let settings = readConfiguration(vscode.workspace.getConfiguration('agentTracker'), vscode.env?.language ?? 'ko');
+  setLocale(settings.locale);
   const applyClaudeCleanup = async (): Promise<void> => {
     try { await setClaudeCleanupPeriod(settings.claude.dataHome, settings.claude.cleanupPeriodDays); }
-    catch { void vscode.window.showErrorMessage('Claude 로그 보존 기간을 적용하지 못했습니다. Claude 데이터 홈의 settings.json과 쓰기 권한을 확인해 주세요. 기존 파일은 유지됩니다.'); }
+    catch { void vscode.window.showErrorMessage(t('extension.cleanupFailed')); }
   };
   await applyClaudeCleanup();
   let disposed = false;
@@ -63,9 +65,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         dashboard.close();
         try {
           await summary.clearData();
-          void vscode.window.showInformationMessage('통계 계산 데이터를 삭제했습니다. 다음에 사용량 통계를 열면 원본 로그에서 다시 계산합니다.');
+          void vscode.window.showInformationMessage(t('extension.dataCleared'));
         } catch {
-          void vscode.window.showErrorMessage('통계 계산 데이터를 삭제하지 못했습니다. 다른 창의 통계 처리가 끝난 뒤 다시 시도해 주세요.');
+          void vscode.window.showErrorMessage(t('extension.clearFailed'));
         }
       })().finally(() => { clearingData = undefined; });
       return clearingData;
@@ -79,7 +81,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       configurationQueue = configurationQueue.then(async () => {
         if (disposed) return;
         const previous = settings;
-        settings = readConfiguration(vscode.workspace.getConfiguration('agentTracker'));
+        settings = readConfiguration(vscode.workspace.getConfiguration('agentTracker'), vscode.env?.language ?? 'ko');
+        setLocale(settings.locale);
         if (previous.claude.cleanupPeriodDays !== settings.claude.cleanupPeriodDays || previous.claude.dataHome !== settings.claude.dataHome) await applyClaudeCleanup();
         const changedSkills=previous.skillsEnabled!==settings.skillsEnabled;
         if (changedSkills) {
@@ -107,7 +110,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         render();
         colorSettings.update();
         dashboard.configurationChanged(changedSkills && settings.skillsEnabled);
-      }).catch(() => { void vscode.window.showErrorMessage('Agent Tracker 설정을 적용하지 못했습니다. 설정 값을 확인해 주세요.'); });
+      }).catch(() => { void vscode.window.showErrorMessage(t('extension.configurationFailed')); });
     }),
   );
   shutdown = async () => {

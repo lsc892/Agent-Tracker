@@ -6,6 +6,7 @@
     "request": "launch",
     "args": ["--extensionDevelopmentPath=${workspaceFolder}"],
     "outFiles": ["${workspaceFolder}/dist/**/*.js"],
-    "preLaunchTask": "npm: build"
+    "preLaunchTask": "prepare localized extension",
+    "postDebugTask": "restore localization manifest"
   }]
 }

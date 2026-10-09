@@ -1,3 +1,4 @@
+import { createTranslator } from '../../src/localization';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -35,7 +36,7 @@ function view(saved?: Record<string,unknown>) {
   let receive: ((event:{data:unknown})=>void) | undefined;
   let state: unknown;
   get('group').value='session';
-  new Script(readFileSync(join(__dirname,'../../../media/dashboard.js'),'utf8')).runInNewContext({
+  new Script(readFileSync(join(__dirname,'../../../media/dashboard.js'),'utf8')).runInNewContext({ agentTrackerI18n: createTranslator('ko'),
     acquireVsCodeApi:()=>({getState:()=>saved,setState:(value:unknown)=>{state=value;},postMessage:(message:typeof messages[number])=>messages.push(message)}),
     document:{getElementById:(id:string)=>id.startsWith('skill-chart') ? null : get(id),createElement:(tag:string)=>new Element(tag),createElementNS:(_namespace:string,tag:string)=>new Element(tag),querySelectorAll:()=>[]},
     window:{addEventListener:(event:string,listener:typeof receive)=>{if (event==='message') receive=listener;}},
@@ -277,5 +278,5 @@ test('name list requests are bounded and statistics accept only selected IDs at 
   const html = dashboardHtml('script','style','local:','nonce');
   assert.match(html,/id="project-name" type="button"/);assert.match(html,/id="session-name" type="button"/);
   assert.match(html,/aria-controls="project-options"/);
-  assert.doesNotMatch(html,/이름으로 검색|프로젝트 ID|세션 ID/);
+  assert.doesNotMatch(html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/g,''),/이름으로 검색|프로젝트 ID|세션 ID/);
 });

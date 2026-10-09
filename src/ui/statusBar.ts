@@ -1,3 +1,4 @@
+import { t } from '../localization';
 import * as vscode from 'vscode';
 import type { TrackerConfiguration } from '../configuration';
 import type { QuotaState } from '../quota/types';
@@ -16,12 +17,12 @@ export class QuotaStatusBar implements vscode.Disposable {
   private latest: { states: readonly QuotaState[]; settings: StatusSettings } | undefined;
 
   constructor() {
-    this.quota.name = 'Agent Tracker: 사용량';
+    this.quota.name = t('status.name');
     this.quota.command = 'agentTracker.toggleQuotaTooltip';
-    this.refresh.name = 'Agent Tracker: 현재 사용량 새로고침';
+    this.refresh.name = t('status.refreshName');
     this.refresh.command = 'agentTracker.refreshQuota';
-    this.refresh.tooltip = '현재 Claude/Codex 사용량 새로고침';
-    this.refresh.accessibilityInformation = { label: 'Claude와 Codex 현재 사용량 새로고침', role: 'button' };
+    this.refresh.tooltip = t('status.refreshTooltip');
+    this.refresh.accessibilityInformation = { label: t('status.refreshAccessible'), role: 'button' };
     // Relative reset times advance without starting provider reads or summary scans.
     this.clock = setInterval(() => {
       if (this.latest) this.update(this.latest.states, this.latest.settings);
@@ -30,6 +31,10 @@ export class QuotaStatusBar implements vscode.Disposable {
   }
 
   update(states: readonly QuotaState[], settings: StatusSettings): void {
+    this.quota.name = t('status.name');
+    this.refresh.name = t('status.refreshName');
+    this.refresh.tooltip = t('status.refreshTooltip');
+    this.refresh.accessibilityInformation = { label: t('status.refreshAccessible'), role: 'button' };
     this.latest = { states, settings };
     const color = statusForeground(settings.colorMode, settings.customColor);
     this.quota.color = color;

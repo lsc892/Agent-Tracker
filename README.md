@@ -7,6 +7,7 @@ Claude와 Codex의 구독 사용률, 로컬 대화 기록의 요청별 토큰 �
 - **Skill 통계**: 프로젝트·기간별 스킬·서브에이전트·플러그인·모델의 사용 횟수와 전체 대비 비율을 표시하고, 모든 표의 비율을 최다 사용 항목 기준의 상대 막대로 비교
 - **API 비용**: 구독 사용은 0원, 충전 API는 모델·토큰별 추정 USD 비용을 저장해 확장 설정에서 표시 여부 선택
 - **데이터 확인**: 통계 화면 맨 아래의 링크로 별도 Webview를 열어 파일 처리 상태, 오류 위치, 품질 경고·이전 정상 통계를 유지한 요청 표시
+- **표시 언어**: VS Code 언어 자동 선택 또는 한국어·영어·중국어 간체·일본어·스페인어·프랑스어 지정
 
 ## 실행
 
@@ -39,6 +40,10 @@ npm run restore:vscode         # 원본 복원
 
 패치는 원본과 무결성 정보를 백업하고 Agent Tracker의 해당 클릭 명령만 내부 토글 객체로 연결합니다. 자동 호버는 짧은 요약을 표시하고 클릭은 전체 카드를 표시합니다. 카드가 열린 동안에는 요약 호버를 차단하며 다른 항목의 호버는 유지합니다. 이전 v1·v2 패치는 원본 백업을 유지하며 v3으로 갱신합니다. VS Code 1.140.0에서 실제 호버와 클릭을 검증했습니다. VS Code 업데이트 뒤에는 패치를 다시 적용해야 하며, 지원하지 않는 내부 구조이면 적용을 중단합니다. Windows 기본 설치는 환경 변수와 현재 CLI에서 찾으며, 다른 설치는 `--cli <code.cmd 경로>`, `--executable <실행 파일>` 또는 `--app-root <resources/app 경로>`로 지정합니다. 패치가 없는 환경에서는 VS Code의 기본 마우스 호버와 클릭 열기 경로를 사용하므로 클릭으로 닫기는 지원하지 않습니다.
 
+## 표시 언어
+
+확장 설정의 **언어 → Language**에서 표시 언어를 지정합니다. 기본은 VS Code 표시 언어를 따르고, 한국어·영어·중국어 간체·일본어·스페인어·프랑스어를 지원합니다. 열린 화면과 상태 표시줄은 변경에 즉시 반영되며 지원하지 않는 언어와 누락된 번역은 한국어를 사용합니다. 명령 팔레트와 VS Code 설정 설명은 VS Code 표시 언어를 따릅니다. 구조·추가 방법은 [로컬라이징 문서](docs/research/Localization.md)에 있습니다.
+
 ## 로그인과 경로
 
 확장과 같은 환경의 CLI 로그인 정보를 사용합니다. Claude Code 또는 Codex CLI에서 먼저 로그인하세요. Codex API key 계정은 ChatGPT 구독 quota 대상으로 표시하지 않습니다.
@@ -47,6 +52,7 @@ npm run restore:vscode         # 원본 복원
 
 | 설정 | 기본값 |
 |---|---|
+| `agentTracker.language` | `auto`; VS Code 표시 언어를 따르며 지원하지 않는 언어는 한국어 |
 | `agentTracker.claude.enabled` / `agentTracker.codex.enabled` | 각 제공자 추적 켜짐 |
 | `agentTracker.quota.refreshPolicy` | `automatic`; 수동 새로고침만 사용하려면 `manual` |
 | `agentTracker.usage.enabled` | 사용량 통계 켜짐 |

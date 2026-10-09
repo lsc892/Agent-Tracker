@@ -195,13 +195,20 @@ Agent Tracker의 VS Code 설정은 다음 순서의 소제목과 목차 하위 �
 
 | 구역 | 설정 항목 |
 |---|---|
+| 언어 | VS Code 언어 자동 선택, 한국어·영어·중국어 간체·일본어·스페인어·프랑스어 지정 |
 | 추적 및 갱신 | Claude·Codex 추적, 구독 사용량 갱신 정책, 자동 갱신 간격 |
 | 상태 표시줄 | Codex 표시 여부, 사용률·남은 비율, 상세·압축 표시, 색상 모드, 사용자 지정 색상 |
 | 사용량 카드 | Codex GPT Reserve, 사용량 리셋권 표시 |
 | 사용량 통계 | 통계 사용 여부, Skill 집계, API 추정 비용, 빈 사용량 제외, 시간대 |
 | 데이터 및 로그 | 공통 상위 데이터 홈, Claude 로그 보존 기간, Codex CLI 실행 파일 |
 
-`package.json`의 `contributes.configuration`을 다섯 카테고리의 배열로 등록한다. 설정은 총 19개이며 데이터 위치는 `agentTracker.dataHome` 하나로 지정한다. 나머지 설정의 키·기본값·scope·입력 제약은 유지한다. 카드와 명령 팔레트의 설정 열기는 같은 확장 설정 화면으로 연결한다. [VS Code 설정 카테고리와 정렬 규칙](https://code.visualstudio.com/api/references/contribution-points#contributesconfiguration)
+`package.json`의 `contributes.configuration`을 여섯 카테고리의 배열로 등록한다. 설정은 총 20개이며 데이터 위치는 `agentTracker.dataHome` 하나로 지정한다. 나머지 설정의 키·기본값·scope·입력 제약은 유지한다. 카드와 명령 팔레트의 설정 열기는 같은 확장 설정 화면으로 연결한다. [VS Code 설정 카테고리와 정렬 규칙](https://code.visualstudio.com/api/references/contribution-points#contributesconfiguration)
+
+### 3.8 표시 언어와 번역 리소스
+
+`agentTracker.language`는 기본 `auto`로 VS Code 표시 언어를 따르며 여섯 언어를 명시적으로 지정할 수 있다. 명시적 언어·VS Code 표시 언어·한국어 fallback 순서로 결정한다. 한국어 JSON을 원문과 번역 키의 기준으로 둔다. 상태 표시줄·카드·안내와 열린 통계·데이터 확인·색상 화면을 현재 언어로 다시 표시한다. 숫자·날짜도 언어를 따르며 집계 시간대·원본 이름·진단 코드는 보존한다. 언어 전환은 서버 조회나 원본 재집계를 유발하지 않는다.
+
+기능별 키를 가진 언어별 JSON과 공통 i18next 계층을 사용한다. 언어 목록·번역 원본·`package.nls` 생성물은 루트의 `localization/`에 모으고 `localization/languages.json`에서 설정 선택지·manifest 번역·패키지 리소스를 생성한다. 실행용 JSON은 `dist/localization/`에서 읽는다. VS Code가 요구하는 루트의 `package.nls*.json`은 패키징·VS Code 테스트·F5 디버깅 동안만 복사하고 작업 뒤 원래 상태로 복원한다. 번역 키·변수·누락과 화면 코드의 한국어 문자열을 검사한다. 명령 팔레트·VS Code 설정 설명은 VS Code 표시 언어를 따르며 확장 언어 설정으로 바뀌지 않는다. 추가 절차와 구현 근거는 [로컬라이징 문서](./research/Localization.md)에 기록한다.
 
 ## 4. 기능 2: 일·월·프로젝트·세션 총량과 turn 평균
 

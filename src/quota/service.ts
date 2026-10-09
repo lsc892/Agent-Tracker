@@ -130,7 +130,7 @@ export class QuotaService {
     return { provider, snapshot, refreshing: entry.running !== null,
       status: snapshot ? (entry.error ? 'stale' : 'ready') : (entry.running ? 'loading' : 'unavailable'),
       lastSuccessAt: entry.lastSuccessAt,
-      error: entry.error ? { code: entry.error.code, message: entry.error.message } : null,
+      error: entry.error ? { code: entry.error.code, message: entry.error.message, translation: entry.error.translation } : null,
       nextAllowedAt: entry.nextAllowedAt };
   }
 
@@ -164,7 +164,7 @@ export class QuotaService {
       if (!this.disposed) this.accept(entry, snapshot);
     } catch (error) {
       if (this.disposed) return;
-      entry.error = error instanceof QuotaError ? error : new QuotaError('unavailable', 'Quota 조회에 실패했습니다. 다시 시도해 주세요.');
+      entry.error = error instanceof QuotaError ? error : new QuotaError('unavailable', { key: 'quota.lookupFailed' });
       entry.failures += 1;
       const backoff = Math.min(900_000, 30_000 * 2 ** Math.min(10, entry.failures - 1));
       entry.nextAllowedAt = this.clock.now() + Math.max(backoff, entry.error.retryAfterMs ?? 0);

@@ -70,6 +70,6 @@ port.on('message',(message: {id?:number;method:string;payload?:unknown}) => {
       else if (message.method === 'dispose') { database.close();database=undefined; }
       else throw new Error('Unknown summary operation');
       port.postMessage({id:message.id,result});
-    } catch { port.postMessage({id:message.id,error:'작업에 실패했습니다. 데이터 확인 화면과 원본 경로 설정을 확인해 주세요.'}); }
+    } catch { port.postMessage({id:message.id,errorKey:'dashboard.workerFailed'}); }
   });
 });

@@ -1,3 +1,5 @@
+import { t, type LocalizedMessage } from '../localization';
+
 export type QuotaProviderId = 'claude' | 'codex';
 
 /** All timestamps crossing the provider boundary are Unix milliseconds. */
@@ -26,12 +28,14 @@ export type QuotaErrorCode = 'authentication' | 'unsupported-account' | 'rate-li
 
 /** Messages are controlled by us, never copied from credential, HTTP, or RPC bodies. */
 export class QuotaError extends Error {
+  readonly translation?: LocalizedMessage;
   constructor(
     public readonly code: QuotaErrorCode,
-    message: string,
+    message: string | LocalizedMessage,
     public readonly retryAfterMs?: number,
   ) {
-    super(message);
+    super(typeof message === 'string' ? message : t(message.key, message.values));
+    if (typeof message !== 'string') this.translation = message;
     this.name = 'QuotaError';
   }
 }
@@ -53,7 +57,7 @@ export interface QuotaState {
   status: 'loading' | 'ready' | 'stale' | 'unavailable';
   refreshing: boolean;
   lastSuccessAt: number | null;
-  error: { code: QuotaErrorCode; message: string } | null;
+  error: { code: QuotaErrorCode; message: string; translation?: LocalizedMessage } | null;
   nextAllowedAt: number;
 }
 

@@ -5,9 +5,11 @@
 .vscode/**
 node_modules/**
 src/**
+localization/**
 tests/**
 tools/**
 dist/tests/**
+dist/.localization-manifest.json
 **/*.map
 docs/**
 tsconfig.json

@@ -1,3 +1,4 @@
+import { localizationBundle, t } from '../localization';
 import { randomBytes } from 'node:crypto';
 import * as vscode from 'vscode';
 import type { TrackerConfiguration } from '../configuration';
@@ -32,7 +33,7 @@ export class Dashboard implements vscode.Disposable {
 
   open(): void {
     if (!this.dependencies.settings().usageEnabled) {
-      void vscode.window.showInformationMessage('사용량 통계가 꺼져 있습니다. Agent Tracker 설정에서 켤 수 있습니다.');
+      void vscode.window.showInformationMessage(t('dashboard.disabled'));
       void vscode.commands.executeCommand('agentTracker.openSettings');
       return;
     }
@@ -59,7 +60,8 @@ export class Dashboard implements vscode.Disposable {
 
   update(): void {
     const settings = this.dependencies.settings();
-    const message = { type: 'state', timezone: settings.timezone, timezoneWarning: settings.timezoneWarning, providers: this.providers(),capabilitiesEnabled:settings.skillsEnabled,showApiCosts:settings.showApiCosts };
+    const message = { type: 'state', localization: localizationBundle(), timezone: settings.timezone, timezoneWarning: settings.timezoneWarning, providers: this.providers(),capabilitiesEnabled:settings.skillsEnabled,showApiCosts:settings.showApiCosts };
+    if (this.diagnosticsPanel) this.diagnosticsPanel.title = t('diagnostics.title');
     this.post(message);
     this.postDiagnostics(message);
   }
@@ -100,7 +102,7 @@ export class Dashboard implements vscode.Disposable {
           const result = await this.dependencies.summary.queryNames({ ...message.query, providers: this.providers() });
           if (this.panel === panel) this.post({ type: 'names', kind: message.query.kind, requestId: message.requestId, offset: message.query.offset, result });
         } catch {
-          if (this.panel === panel) this.post({ type: 'names', kind: message.query.kind, requestId: message.requestId, error: '이름 목록을 불러오지 못했습니다. 다시 열어 주세요.' });
+          if (this.panel === panel) this.post({ type: 'names', kind: message.query.kind, requestId: message.requestId, error: t('dashboard.namesFailed') });
         }
         break;
       }
@@ -115,7 +117,7 @@ export class Dashboard implements vscode.Disposable {
       return;
     }
     const media = vscode.Uri.joinPath(this.dependencies.extensionUri, 'media');
-    const panel = vscode.window.createWebviewPanel('agentTracker.diagnostics', 'Agent Tracker 데이터 확인', vscode.ViewColumn.Active, {
+    const panel = vscode.window.createWebviewPanel('agentTracker.diagnostics', t('diagnostics.title'), vscode.ViewColumn.Active, {
       enableScripts: true, retainContextWhenHidden: true, localResourceRoots: [media],
     });
     this.diagnosticsPanel = panel;
@@ -185,7 +187,7 @@ export class Dashboard implements vscode.Disposable {
       excludeEmptyUsage: settings.excludeEmptyUsage };
     if (this.fromDay) query.fromMs = periodBounds(this.fromDay, timezone).fromMs;
     if (this.toDay) query.toMs = periodBounds(this.toDay, timezone).toMs;
-    if (query.fromMs !== undefined && query.toMs !== undefined && query.fromMs >= query.toMs) throw new Error('조회 시작일은 종료일보다 늦을 수 없습니다.');
+    if (query.fromMs !== undefined && query.toMs !== undefined && query.fromMs >= query.toMs) throw new Error(t('dashboard.invalidDateRange'));
     const result = await this.dependencies.summary.query(query);
     if (version === this.queryVersion) this.post({ type: 'usage', result: { ...result, groupBy: this.query.groupBy } });
   }
@@ -194,7 +196,7 @@ export class Dashboard implements vscode.Disposable {
     if (!this.diagnosticsReady || !this.dependencies.settings().usageEnabled) return;
     const version = ++this.diagnosticsVersion;
     const settings = this.dependencies.settings();
-    this.postDiagnostics({ type: 'state', timezone: settings.timezone, timezoneWarning: settings.timezoneWarning });
+    this.postDiagnostics({ type: 'state', localization: localizationBundle(), timezone: settings.timezone, timezoneWarning: settings.timezoneWarning });
     const result = await this.dependencies.summary.diagnostics({ limit: 100, offset, providers: this.providers() });
     if (version === this.diagnosticsVersion) this.postDiagnostics({ type: 'diagnostics', result, offset });
   }
@@ -210,7 +212,7 @@ export class Dashboard implements vscode.Disposable {
     return (['claude', 'codex'] as const).filter(provider => settings[provider].enabled);
   }
   private error(error: unknown, diagnostics = false): void {
-    const message = error instanceof Error ? error.message : '작업에 실패했습니다. 데이터 확인 화면에서 처리 상태를 확인해 주세요.';
+    const message = error instanceof Error ? error.message : t('dashboard.operationFailed');
     if (diagnostics) this.postDiagnostics({ type: 'error', message });
     else this.post({ type: 'error', message });
   }

@@ -1,5 +1,6 @@
 (() => {
   'use strict';
+  const t = (key, values) => globalThis.agentTrackerI18n.t(key, values);
   const vscode = acquireVsCodeApi();
   const $ = id => document.getElementById(id);
   let busy = false;
@@ -16,7 +17,7 @@
     if (foreground) $('color-preview').style.setProperty('--tracker-status-color', foreground);
     else $('color-preview').style.removeProperty('--tracker-status-color');
     $('color-apply').disabled = busy || mode === 'custom' && !color;
-    $('color-status').textContent = mode === 'custom' && !color ? 'HEX 색상을 #abc 또는 #aabbcc 형식으로 입력하세요.' : '';
+    $('color-status').textContent = mode === 'custom' && !color ? t('color.invalidHex') : '';
   }
   function syncInputs() {
     const color = normalized($('color-hex').value);
@@ -43,12 +44,13 @@
     event.preventDefault();
     const color = normalized($('color-hex').value) || ($('color-mode').value !== 'custom' ? lastValidColor : undefined);
     if (busy || !color) return;
-    busy = true;preview();$('color-status').textContent = '색상 설정을 저장하는 중…';
+    busy = true;preview();$('color-status').textContent = t('color.saving');
     vscode.postMessage({type:'save',mode:$('color-mode').value,color,target:$('color-target').value});
   });
   window.addEventListener('message', event => {
     const message = event.data;
     if (message.type === 'state') {
+      globalThis.updateAgentTrackerLocale?.(message.localization);
       $('color-mode').value = message.mode;
       $('color-hex').value = message.color;
       $('color-target').value = message.target;
@@ -57,7 +59,7 @@
       syncInputs();
     } else if (message.type === 'saved' || message.type === 'error') {
       busy = false;preview();
-      $('color-status').textContent = message.type === 'saved' ? '색상 설정을 적용했습니다.' : message.message;
+      $('color-status').textContent = message.type === 'saved' ? t('color.saved') : message.message;
     }
   });
   vscode.postMessage({type:'ready'});
