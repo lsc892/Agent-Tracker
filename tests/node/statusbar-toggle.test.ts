@@ -45,14 +45,15 @@ test('native toggle mapping preserves object identity and is limited to the Agen
   const result = patcher.patchSource(source);
   const context = rendererContext();
   runInNewContext(result.patched, context);
-  const entry = { extensionId: 'agent-tracker.agent-tracker', command: { id: patcher.command, title: '' } };
+  const entry = { extensionId: 'AgentTracker.agent-tracker', command: { id: patcher.command, title: '' } };
   const item = new context.Item(); item.update(entry);
   assert.equal(item.entry.command, context.nativeToggle);
   assert.notEqual(entry.command, context.nativeToggle, 'mapping does not mutate the incoming entry');
   for (const other of [
     { extensionId: 'another.extension', command: { id: patcher.command } },
-    { extensionId: 'agent-tracker.agent-tracker', command: { id: 'another.command' } },
-    { extensionId: 'agent-tracker.agent-tracker', command: undefined },
+    { extensionId: 'agent-tracker.agent-tracker', command: { id: patcher.command } },
+    { extensionId: 'AgentTracker.agent-tracker', command: { id: 'another.command' } },
+    { extensionId: 'AgentTracker.agent-tracker', command: undefined },
   ]) { item.update(other); assert.equal(item.entry, other); }
   assert.equal(patcher.patchSource(result.patched).alreadyPatched, true);
   assert.equal(patcher.patchSource(result.patched).patched, result.patched);
@@ -69,7 +70,7 @@ test('the preview uses plain text, the clicked card retains Markdown, and pinned
   const delegate = { delay: 100, placement: 'element', showHover: (options: { content: unknown }, focus?: boolean) => { shown.push({ content: options.content, focus }); } };
   item.hoverDelegate = delegate;
   item.hoverService = { getStickyHover: () => pinned ? {} : undefined };
-  const entry = { extensionId: 'agent-tracker.agent-tracker', command: { id: patcher.command }, ariaLabel: 'Claude: 조회 불가\nCodex: 5시간 - 83% 남음, 재설정까지 3h 10m\n클릭하여 열기/닫기' };
+  const entry = { extensionId: 'AgentTracker.agent-tracker', command: { id: patcher.command }, ariaLabel: 'Claude: 조회 불가\nCodex: 5시간 - 83% 남음, 재설정까지 3h 10m\n클릭하여 열기/닫기' };
   item.update(entry); item.update(entry);
   assert.equal(item.disposables.length, 1, 'updates do not register duplicate capture filters');
   assert.notEqual(item.hoverDelegate, delegate, 'the shared delegate is not modified');
@@ -115,14 +116,15 @@ test('the preview uses plain text, the clicked card retains Markdown, and pinned
   assert.equal(context.styles.length, 1, 'quota updates install only one divider stylesheet per document');
 });
 
-for (const version of [1, 2, 3]) test(`v${version} upgrades while retaining the original restore backups`, () => {
+for (const version of [1, 2, 3, 4]) test(`previous publisher v${version} upgrades while retaining the original restore backups`, () => {
   const files = fixture();
   try {
     const anchor = 'update(e){';
     // Exact historical v2 payload: automatic activation was always suppressed.
     const clickOnly = version === 1 ? '' : `if(!this._agentTrackerClickOnly){this._agentTrackerClickOnly=true;const stop=event=>{if(this.entry?.extensionId==="agent-tracker.agent-tracker"&&this.entry?.command===nativeToggle)event.stopImmediatePropagation();};for(const type of ["mouseover","focus"])this.container.addEventListener(type,stop,{capture:true});this._register({dispose:()=>{for(const type of ["mouseover","focus"])this.container.removeEventListener(type,stop,{capture:true});}});}`;
-    const old = version === 3
-      ? patcher.patchSource(source).patched.replace(':statusbar-toggle:v4*/', ':statusbar-toggle:v3*/')
+    const previousPublisher = patcher.patchSource(source).patched.replaceAll('AgentTracker.agent-tracker', 'agent-tracker.agent-tracker');
+    const old = version === 4 ? previousPublisher : version === 3
+      ? previousPublisher.replace(':statusbar-toggle:v4*/', ':statusbar-toggle:v3*/')
         .replace(/\(function configureQuotaDividers\(item\) \{[\s\S]*?\}\)\(this\);/, '')
       : source.replace(anchor, `${anchor}/*agent-tracker:statusbar-toggle:v${version}*/if(e.extensionId==="agent-tracker.agent-tracker"&&e.command?.id==="${patcher.command}"){e={...e,command:nativeToggle};${clickOnly}}/*agent-tracker:statusbar-toggle:end*/`);
     const oldProduct = JSON.stringify({ checksums: { 'vs/workbench/workbench.desktop.main.js': patcher.checksum(old), unrelated: 'unchanged' } });

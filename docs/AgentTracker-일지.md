@@ -4,7 +4,8 @@
 
 ## 현재 설계 결정 요약
 
-- **npm 설치 CLI**: `agent-tracker-vscode` npm 패키지에 같은 버전의 완성된 VSIX를 포함해 npx로 실행하면 VS Code CLI로 설치하고 확장 ID·버전을 확인한다. 확장 ID와 루트 private manifest는 유지하고 npm manifest를 분리한다. 근거: 사용자가 npx 설치를 선택했으며 기존 `agent-tracker` npm 이름은 다른 프로젝트가 사용한다. 소스 빌드와 인증·workbench 패치는 설치 CLI에 포함하지 않는다.
+- **Marketplace 게시자**: 사용자가 만든 `AgentTracker` 게시자에 맞춰 확장 ID를 `AgentTracker.agent-tracker`로 사용한다. 설정 열기·npm 설치 검증·선택적 workbench 패치도 같은 ID를 따른다. 이전 게시자의 v1~v4 패치는 검증 후 새 ID로 갱신하며 복원 백업을 보존한다. 근거: 게시자 ID와 VSIX manifest가 일치해야 업로드할 수 있다. 기존 설치의 통계 DB·세션 과금 방식은 자동 이전하지 않는다.
+- **npm 설치 CLI**: `agent-tracker-vscode` npm 패키지에 같은 버전의 완성된 VSIX를 포함해 npx로 실행하면 VS Code CLI로 설치하고 `AgentTracker.agent-tracker` ID·버전을 확인한다. 루트 private manifest를 유지하고 npm manifest를 분리한다. 근거: 사용자가 npx 설치를 선택했으며 기존 `agent-tracker` npm 이름은 다른 프로젝트가 사용한다. 소스 빌드와 인증·workbench 패치는 설치 CLI에 포함하지 않는다.
 - **미상 표시 우선순위**: 모든 통계 조회는 선택한 필터·조회 단위를 유지하고 모델·시각 미상 행을 후순위로 정렬한 뒤 페이지를 나눈다. 도표는 기존 날짜·프로젝트·세션 묶음 안에서 미상 모델을 마지막으로 배치하고 시각 미상 기간·미상 모델만 있는 묶음은 뒤에 둔다. Skill의 미상 모델도 후순위이며 최다 사용 횟수는 필터 전체에서 조회한다. 근거: 미상이 확인된 항목 사이에 끼지 않게 하면서 선택 조건·집계·비율 기준을 보존한다.
 - **JSONL reader**: 64 KiB chunk에서 native LF 탐색을 사용하고 완성된 일반 줄은 직접 JSON.parse한다. 이미지 후보·chunk에 걸친 줄은 문자열 상태와 줄 예산을 유지하며 따옴표·역슬래시 위치를 캐시해 연속 구간을 복사한다. 이미지 본문은 chunk 내 escape·control 검증 후 폐기하고 원본 byte offset·부분 줄·취소 처리를 유지한다. 근거: 시간 O(N)·제한된 보조 공간을 유지하면서 byte별 JS 작업과 Buffer 복사를 줄이며, 경계 상태 처리와 chunk 크기의 임시 문자열 비용을 감수한다.
 - **요청 제목 탐색**: component 집계 시 제목이 있는 메인 이벤트만 `(root_id,id)` TEMP partial index로 찾고 첫 제목 선택과 100행 단위 읽기를 유지한다. 인덱스는 component 재생성·staging 종료 시 제거한다. 근거: 개인용·간헐적 갱신에서 사용자가 갱신 중 메모리를 우선하며 영속 인덱스 유지 비용을 피하는 방향을 선택했다. FILE TEMP도 page cache를 사용하므로 process 메모리 상한을 보장하지 않는다.
@@ -45,6 +46,13 @@
 ---
 
 ## 2026-10-10 — 사용자·Codex
+
+### Marketplace 게시자 AgentTracker에 맞춰 확장 식별자를 변경
+
+- **의사결정**: 사용자는 Marketplace 업로드 오류에 표시된 `AgentTracker` 게시자 ID에 맞춰 다시 빌드하도록 요청했다. Codex는 manifest의 publisher와 설정 필터·npm 설치 도구·실제 VS Code 검증·README의 확장 ID를 `AgentTracker.agent-tracker`로 통일한다. 표시 이름·명령·설정 키는 유지하고 선택적 workbench 패치의 이전 게시자 v1~v4 갱신·백업 복원도 지원한다.
+- **근거**: VSIX의 publisher가 업로드 대상 게시자 ID와 일치해야 한다. manifest만 바꾸면 설정 열기·설치 검증·선택적 클릭 토글이 이전 ID를 참조하므로 같은 변경에 포함한다. 과거 패치는 정확한 기존 코드·백업 hash 검증을 유지해 갱신한다.
+- **결과**: 새 패키지는 `AgentTracker.agent-tracker`로 등록된다. 기존 `agent-tracker.agent-tracker`와는 별개의 확장이므로 통계 DB·세션 과금 방식의 자동 이전은 포함하지 않으며 원본 대화 로그에서 통계를 다시 집계할 수 있다. 현재 설계 요약·명세를 새 식별자에 맞췄다.
+- **검증**: `npm run check`의 타입 검사·린트·254개 테스트와 실제 VS Code 1.141.0의 격리 프로필 실행 검증을 통과했다. 새 ID의 설정 열기·통계 DB·여섯 언어 화면과 이전 게시자 v1~v4 패치의 갱신·백업 복원을 확인했다. VSIX의 확장 manifest·게시 metadata가 모두 `AgentTracker`를 사용하고 실행 파일의 설정 필터도 새 ID와 일치했다. 실제 Marketplace 업로드는 수행하지 않았다.
 
 ### 완성된 VSIX를 포함한 별도 npm 패키지로 npx 설치 제공
 

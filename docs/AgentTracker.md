@@ -42,9 +42,11 @@ Codex sessions/**/*.jsonl ──┘                              │
 
 확장 대표 아이콘은 `package.json`의 `icon`에 지정한 `resource/icon/AgentTracker_Icon.png`를 사용한다. 같은 PNG를 VSIX에 포함해 VS Code 확장 목록과 상세 화면에 표시한다.
 
+Marketplace 게시자는 `AgentTracker`이며 확장 ID는 `AgentTracker.agent-tracker`다. 표시 이름은 `Agent Tracker`, 명령·설정 키의 `agentTracker` 접두사는 유지한다. 기존 `agent-tracker.agent-tracker` 설치와는 별개로 등록되며 기존 확장의 통계 DB·세션별 과금 방식 변경을 자동 이전하지 않는다. 원본 대화 로그는 같은 데이터 위치에서 다시 집계할 수 있다. 선택적 workbench 패치 도구는 이전 게시자의 v1~v4 패치를 검증해 새 ID의 패치로 갱신하고 기존 복원 백업을 보존한다.
+
 ### 2.1 npm 설치 패키지
 
-공개 npm 패키지 `agent-tracker-vscode`는 `npx agent-tracker-vscode@latest`로 실행하는 별도 설치 CLI다. 확장의 ID는 `agent-tracker.agent-tracker`로 유지하며 루트 manifest는 npm 직접 게시를 막는 `private: true`를 유지한다. npm 이름·실행 명령·포함 파일은 `tools/npm/manifest.json`에서 관리하고 버전·라이선스·저장소·Node 요구 버전은 확장 manifest에서 가져온다.
+공개 npm 패키지 `agent-tracker-vscode`는 `npx agent-tracker-vscode@latest`로 실행하는 별도 설치 CLI다. 확장의 ID는 `AgentTracker.agent-tracker`를 사용하며 루트 manifest는 npm 직접 게시를 막는 `private: true`를 유지한다. npm 이름·실행 명령·포함 파일은 `tools/npm/manifest.json`에서 관리하고 버전·라이선스·저장소·Node 요구 버전은 확장 manifest에서 가져온다.
 
 설치 패키지에는 CLI·확장 metadata·같은 버전의 완성된 VSIX·README·npm manifest만 포함한다. 실행 시 metadata의 확장 ID·버전, VSIX SHA-256과 최소 VS Code 버전을 확인한 뒤 VS Code CLI의 `--install-extension ... --force`로 설치한다. 같은 프로필·디렉터리 선택으로 설치 목록을 조회해 ID·버전이 일치해야 성공으로 보고한다. `--code`로 CLI를 선택하고 `--profile`, `--extensions-dir`, `--user-data-dir`로 설치 대상을 지정할 수 있다. Windows에서는 공식 launcher의 실행 파일·CLI script 경로를 읽어 shell 없이 실행하며 기존·버전별 설치 경로를 지원한다.
 
@@ -212,7 +214,7 @@ Agent Tracker의 VS Code 설정은 다음 순서의 소제목과 목차 하위 �
 | 사용량 통계 | 통계 사용 여부, Skill 집계, API 추정 비용, 빈 사용량 제외, 시간대 |
 | 데이터 및 로그 | 공통 상위 데이터 홈, Claude 로그 보존 기간, Codex CLI 실행 파일 |
 
-`package.json`의 `contributes.configuration`을 여섯 카테고리의 배열로 등록한다. 설정은 총 20개이며 데이터 위치는 `agentTracker.dataHome` 하나로 지정한다. 카드·통계 화면·명령 팔레트의 설정 열기는 `@ext:agent-tracker.agent-tracker`로 필터링한 VS Code Settings를 연다. 카테고리·설명·선택지는 VS Code의 현재 표시 언어로 번역하며 비율의 사용률·남은 비율과 표시 방식의 압축·상세 선택지도 번역한다. 별도의 전체 설정 Webview는 제공하지 않는다. 설정 키·기본값·scope·입력 제약과 VS Code의 사용자·작업공간 저장 및 초기화 동작을 유지한다. 설정 화면을 여는 것만으로 quota 조회·원본 재집계를 실행하지 않는다. [VS Code 설정 카테고리와 정렬 규칙](https://code.visualstudio.com/api/references/contribution-points#contributesconfiguration)
+`package.json`의 `contributes.configuration`을 여섯 카테고리의 배열로 등록한다. 설정은 총 20개이며 데이터 위치는 `agentTracker.dataHome` 하나로 지정한다. 카드·통계 화면·명령 팔레트의 설정 열기는 `@ext:AgentTracker.agent-tracker`로 필터링한 VS Code Settings를 연다. 카테고리·설명·선택지는 VS Code의 현재 표시 언어로 번역하며 비율의 사용률·남은 비율과 표시 방식의 압축·상세 선택지도 번역한다. 별도의 전체 설정 Webview는 제공하지 않는다. 설정 키·기본값·scope·입력 제약과 VS Code의 사용자·작업공간 저장 및 초기화 동작을 유지한다. 설정 화면을 여는 것만으로 quota 조회·원본 재집계를 실행하지 않는다. [VS Code 설정 카테고리와 정렬 규칙](https://code.visualstudio.com/api/references/contribution-points#contributesconfiguration)
 
 ### 3.8 표시 언어와 번역 리소스
 

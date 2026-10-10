@@ -9,7 +9,7 @@ export async function run(): Promise<void> {
   const root = resolve(__dirname, '../../..');
   const language = process.env.AGENT_TRACKER_TEST_EDITOR_LANGUAGE!;
   assert.equal(vscode.env.language, language, 'the actual VS Code display language must match the scenario');
-  const extension = vscode.extensions.getExtension('agent-tracker.agent-tracker')!;
+  const extension = vscode.extensions.getExtension('AgentTracker.agent-tracker')!;
   assert.ok(extension);
   const raw = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
   const messages = JSON.parse(readFileSync(join(root, `localization/package.nls.${language}.json`), 'utf8')) as Record<string,string>;

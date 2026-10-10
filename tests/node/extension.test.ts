@@ -262,7 +262,7 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     assert.equal(scans, 0);
 
     await cardAction('agentTracker.openSettings');
-    assert.deepEqual(externalCommands.at(-1), {command: 'workbench.action.openSettings', arguments: ['@ext:agent-tracker.agent-tracker']});
+    assert.deepEqual(externalCommands.at(-1), {command: 'workbench.action.openSettings', arguments: ['@ext:AgentTracker.agent-tracker']});
     assert.equal(scans, 0, 'opening settings does not scan transcripts');
     assert.equal(refreshes.length, 4, 'opening settings does not query quota');
     assert.equal(panels.length, 0, 'settings open in VS Code without creating a webview');

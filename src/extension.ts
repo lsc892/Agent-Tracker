@@ -56,7 +56,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       if (detail !== 'compact' && detail !== 'detailed') return;
       await vscode.workspace.getConfiguration('agentTracker').update('display.detail', detail, vscode.ConfigurationTarget.Global);
     }),
-    vscode.commands.registerCommand('agentTracker.openSettings', () => vscode.commands.executeCommand('workbench.action.openSettings', '@ext:agent-tracker.agent-tracker')),
+    vscode.commands.registerCommand('agentTracker.openSettings', () => vscode.commands.executeCommand('workbench.action.openSettings', '@ext:AgentTracker.agent-tracker')),
     vscode.commands.registerCommand('agentTracker.configureStatusColor', () => colorSettings.open()),
     vscode.commands.registerCommand('agentTracker.clearUsageData', () => {
       clearingData ??= (async () => {

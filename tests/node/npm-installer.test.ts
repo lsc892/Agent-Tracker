@@ -32,7 +32,7 @@ function fixture(t: TestContext) {
   writeFileSync(join(root, 'package.json'), JSON.stringify({ name: 'agent-tracker-vscode', version: '0.1.0' }));
   writeFileSync(join(root, 'extension.vsix'), vsix);
   writeFileSync(join(root, 'extension.json'), JSON.stringify({
-    id: 'agent-tracker.agent-tracker', version: '0.1.0', vscode: '^1.101.0',
+    id: 'AgentTracker.agent-tracker', version: '0.1.0', vscode: '^1.101.0',
     sha256: createHash('sha256').update(vsix).digest('hex'),
   }));
   return root;
@@ -49,7 +49,7 @@ test('npm installer installs the bundled VSIX and verifies the same extension ve
     platform: 'linux', log: message => messages.push(message),
     spawnSync(file, args, options) {
       calls.push({ file, args, options });
-      return { status: 0, stdout: calls.length === 1 ? '1.141.0\ncommit\nx64\n' : 'other.extension@1.0.0\nagent-tracker.agent-tracker@0.1.0\n' };
+      return { status: 0, stdout: calls.length === 1 ? '1.141.0\ncommit\nx64\n' : 'other.extension@1.0.0\nAgentTracker.agent-tracker@0.1.0\n' };
     },
   });
   assert.deepEqual(calls.map(call => call.args), [
@@ -58,7 +58,7 @@ test('npm installer installs the bundled VSIX and verifies the same extension ve
   ]);
   assert.ok(calls.every(call => call.file === process.execPath && !call.options.shell));
   assert.equal(calls[1].options.stdio, 'inherit');
-  assert.ok(messages.includes('Installed and verified: agent-tracker.agent-tracker@0.1.0'));
+  assert.ok(messages.includes('Installed and verified: AgentTracker.agent-tracker@0.1.0'));
 });
 
 test('npm installer help and version work without VS Code or a bundled VSIX', t => {
@@ -108,7 +108,7 @@ test('npm installer stops on an old VS Code, command failure, interrupted comman
   }
   let calls = 0;
   assert.throws(() => run(root, ['--code', process.execPath], {
-    platform: 'linux', log() {}, spawnSync() { calls++; return { status: 0, stdout: calls === 1 ? '1.101.0' : 'agent-tracker.agent-tracker@0.0.9' }; },
+    platform: 'linux', log() {}, spawnSync() { calls++; return { status: 0, stdout: calls === 1 ? '1.101.0' : 'AgentTracker.agent-tracker@0.0.9' }; },
   }), /did not report the expected/);
   assert.equal(calls, 3);
 });

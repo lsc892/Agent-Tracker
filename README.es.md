@@ -63,7 +63,7 @@ Para cerrar la tarjeta haciendo clic de nuevo en el elemento de la barra de esta
 Selecciona **Agent Tracker → Desinstalar** en la vista de extensiones de VS Code o ejecuta:
 
 ```sh
-code --uninstall-extension agent-tracker.agent-tracker
+code --uninstall-extension AgentTracker.agent-tracker
 ```
 
 Si instalaste en un perfil específico, añade `--profile "Work"` al comando de desinstalación. Para eliminar también el paquete de npm instalado globalmente:
@@ -76,7 +76,7 @@ El paquete de npm y la extensión de VS Code se desinstalan por separado.
 
 ## Ajustes de la extensión en VS Code
 
-Haz clic en **Ajustes** en la tarjeta o busca `@ext:agent-tracker.agent-tracker` en los ajustes de VS Code.
+Haz clic en **Ajustes** en la tarjeta o busca `@ext:AgentTracker.agent-tracker` en los ajustes de VS Code.
 Todas las claves siguientes llevan el prefijo `agentTracker.`.
 
 | Ajuste | Valor predeterminado | Descripción |

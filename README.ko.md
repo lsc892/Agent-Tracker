@@ -63,7 +63,7 @@ npx agent-tracker-vscode@latest --profile "Work"
 VS Code 확장 목록에서 **Agent Tracker → 제거**를 선택하거나 다음 명령을 실행합니다.
 
 ```sh
-code --uninstall-extension agent-tracker.agent-tracker
+code --uninstall-extension AgentTracker.agent-tracker
 ```
 
 특정 프로필에 설치했다면 삭제 명령에도 `--profile "Work"`를 붙입니다. npm 전역 설치 패키지도 제거하려면 다음을 실행합니다.
@@ -76,7 +76,7 @@ npm 패키지 삭제와 VS Code 확장 삭제는 별도입니다.
 
 ## VS Code 확장 설정
 
-카드의 **설정**을 클릭하거나 VS Code 설정에서 `@ext:agent-tracker.agent-tracker`를 검색합니다.
+카드의 **설정**을 클릭하거나 VS Code 설정에서 `@ext:AgentTracker.agent-tracker`를 검색합니다.
 아래 설정 키에는 모두 `agentTracker.` 접두사가 붙습니다.
 
 | 설정 | 기본값 | 설명 |

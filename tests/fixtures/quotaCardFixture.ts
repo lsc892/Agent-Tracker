@@ -26,7 +26,7 @@ export async function run(): Promise<void> {
   }));
   const update = QuotaStatusBar.prototype.update;
   QuotaStatusBar.prototype.update = function (_states, settings) { update.call(this, states, settings); };
-  await vscode.extensions.getExtension('agent-tracker.agent-tracker')!.activate();
+  await vscode.extensions.getExtension('AgentTracker.agent-tracker')!.activate();
   const config = vscode.workspace.getConfiguration('agentTracker');
   await config.update('display.detail', 'detailed', vscode.ConfigurationTarget.Global);
   await config.update('display.detail', 'compact', vscode.ConfigurationTarget.Global);

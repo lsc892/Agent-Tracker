@@ -63,7 +63,7 @@ npx agent-tracker-vscode@latest --profile "Work"
 VS Code の拡張機能一覧から **Agent Tracker → アンインストール** を選ぶか、次を実行します。
 
 ```sh
-code --uninstall-extension agent-tracker.agent-tracker
+code --uninstall-extension AgentTracker.agent-tracker
 ```
 
 特定のプロファイルにインストールした場合は、削除コマンドにも `--profile "Work"` を付けます。グローバルにインストールした npm パッケージも削除する場合は、次を実行します。
@@ -76,7 +76,7 @@ npm パッケージと VS Code 拡張機能はそれぞれアンインストー�
 
 ## VS Code 拡張機能の設定
 
-カードの **設定** をクリックするか、VS Code の設定で `@ext:agent-tracker.agent-tracker` を検索します。
+カードの **設定** をクリックするか、VS Code の設定で `@ext:AgentTracker.agent-tracker` を検索します。
 以下の設定キーにはすべて `agentTracker.` 接頭辞が付きます。
 
 | 設定 | 既定値 | 説明 |

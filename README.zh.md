@@ -63,7 +63,7 @@ npx agent-tracker-vscode@latest --profile "Work"
 在 VS Code 扩展列表中选择 **Agent Tracker → 卸载**，或运行：
 
 ```sh
-code --uninstall-extension agent-tracker.agent-tracker
+code --uninstall-extension AgentTracker.agent-tracker
 ```
 
 如果安装时指定了配置文件，请在卸载命令中也添加 `--profile "Work"`。如需同时删除全局安装的 npm 包，请运行：
@@ -76,7 +76,7 @@ npm 包和 VS Code 扩展需要分别卸载。
 
 ## VS Code 扩展设置
 
-点击卡片中的 **设置**，或在 VS Code 设置中搜索 `@ext:agent-tracker.agent-tracker`。
+点击卡片中的 **设置**，或在 VS Code 设置中搜索 `@ext:AgentTracker.agent-tracker`。
 以下设置键均以 `agentTracker.` 为前缀。
 
 | 设置 | 默认值 | 说明 |

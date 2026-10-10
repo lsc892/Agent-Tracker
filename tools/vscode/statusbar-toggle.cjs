@@ -4,7 +4,7 @@ const { createHash } = require('node:crypto');
 const { spawnSync } = require('node:child_process');
 
 const command = 'agentTracker.toggleQuotaTooltip';
-const extensionId = 'agent-tracker.agent-tracker';
+const extensionId = 'AgentTracker.agent-tracker';
 const checksumKey = 'vs/workbench/workbench.desktop.main.js';
 const begin = '/*agent-tracker:statusbar-toggle:v4*/';
 const previewBegin = '/*agent-tracker:statusbar-toggle:v3*/';
@@ -70,21 +70,26 @@ function patchSource(source) {
   const target = targets[0], argument = target[1];
   const context = original.slice(target.index, target.index + 6000);
   if (!context.includes('getStickyHover(this.container)') || !context.includes('commandPointerListener')) throw new Error('내장 클릭 토글 구현이 예상과 다릅니다.');
-  const condition = `${argument}.extensionId===${JSON.stringify(extensionId)}&&${argument}.command?.id===${JSON.stringify(command)}`;
-  const mapping = `${argument}={...${argument},command:${symbols[0][1]}};`;
-  // Keep the exact v2 injection to safely recognize upgrades and restore backups.
-  const clickOnly = `if(!this._agentTrackerClickOnly){this._agentTrackerClickOnly=true;const stop=event=>{if(this.entry?.extensionId===${JSON.stringify(extensionId)}&&this.entry?.command===${symbols[0][1]})event.stopImmediatePropagation();};for(const type of ["mouseover","focus"])this.container.addEventListener(type,stop,{capture:true});this._register({dispose:()=>{for(const type of ["mouseover","focus"])this.container.removeEventListener(type,stop,{capture:true});}});}`;
   const configureSource = configureQuotaHover.toString().replace(/\r\n/g, '\n');
   const dividerSource = configureQuotaDividers.toString().replace(/\r\n/g, '\n');
-  const previewInjection = `if(${condition}){(${configureSource})(this,${argument}.ariaLabel??${argument}.name??"");${mapping}}else{this._agentTrackerSummary=undefined;}`;
-  const injection = `${begin}if(${condition}){(${configureSource})(this,${argument}.ariaLabel??${argument}.name??"");${mapping}(${dividerSource})(this);}else{this._agentTrackerSummary=undefined;}${end}`;
   const position = target.index + target[0].length;
-  const patched = original.slice(0, position) + injection + original.slice(position);
-  const legacy = original.slice(0, position) + `${legacyBegin}if(${condition}){${mapping}}${end}` + original.slice(position);
-  const clickOnlySource = original.slice(0, position) + `${clickOnlyBegin}if(${condition}){${mapping}${clickOnly}}${end}` + original.slice(position);
-  const preview = original.slice(0, position) + `${previewBegin}${previewInjection}${end}` + original.slice(position);
-  if (![original, patched, legacy, clickOnlySource, preview].includes(source)) throw new Error('기존 토글 패치가 예상 코드와 다릅니다. 자동으로 덮어쓰지 않습니다.');
-  return { original, patched, alreadyPatched: source === patched, upgradeRequired: source === legacy || source === clickOnlySource || source === preview };
+  const variants = id => {
+    const condition = `${argument}.extensionId===${JSON.stringify(id)}&&${argument}.command?.id===${JSON.stringify(command)}`;
+    const mapping = `${argument}={...${argument},command:${symbols[0][1]}};`;
+    // Preserve exact historical payloads, including the previous publisher ID.
+    const clickOnly = `if(!this._agentTrackerClickOnly){this._agentTrackerClickOnly=true;const stop=event=>{if(this.entry?.extensionId===${JSON.stringify(id)}&&this.entry?.command===${symbols[0][1]})event.stopImmediatePropagation();};for(const type of ["mouseover","focus"])this.container.addEventListener(type,stop,{capture:true});this._register({dispose:()=>{for(const type of ["mouseover","focus"])this.container.removeEventListener(type,stop,{capture:true});}});}`;
+    const previewInjection = `if(${condition}){(${configureSource})(this,${argument}.ariaLabel??${argument}.name??"");${mapping}}else{this._agentTrackerSummary=undefined;}`;
+    return [
+      `${begin}if(${condition}){(${configureSource})(this,${argument}.ariaLabel??${argument}.name??"");${mapping}(${dividerSource})(this);}else{this._agentTrackerSummary=undefined;}${end}`,
+      `${legacyBegin}if(${condition}){${mapping}}${end}`,
+      `${clickOnlyBegin}if(${condition}){${mapping}${clickOnly}}${end}`,
+      `${previewBegin}${previewInjection}${end}`,
+    ].map(injection => original.slice(0, position) + injection + original.slice(position));
+  };
+  const [patched, ...older] = variants(extensionId);
+  const previousPublisher = variants('agent-tracker.agent-tracker');
+  if (![original, patched, ...older, ...previousPublisher].includes(source)) throw new Error('기존 토글 패치가 예상 코드와 다릅니다. 자동으로 덮어쓰지 않습니다.');
+  return { original, patched, alreadyPatched: source === patched, upgradeRequired: source !== original && source !== patched };
 }
 
 function appRootFromInstallation(root, launcher = join(root, 'bin', 'code.cmd')) {
