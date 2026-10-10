@@ -20,7 +20,7 @@ function prepareInstaller(root, destination, vsix) {
   };
   mkdirSync(join(destination, 'bin'), { recursive: true });
   copyFileSync(join(root, 'tools/npm/cli.cjs'), join(destination, 'bin/cli.cjs'));
-  copyFileSync(join(root, 'tools/npm/README.md'), join(destination, 'README.md'));
+  copyFileSync(join(root, 'README.md'), join(destination, 'README.md'));
   copyFileSync(vsix, join(destination, 'extension.vsix'));
   writeFileSync(join(destination, 'package.json'), JSON.stringify(manifest, null, 2) + '\n');
   writeFileSync(join(destination, 'extension.json'), JSON.stringify(metadata, null, 2) + '\n');

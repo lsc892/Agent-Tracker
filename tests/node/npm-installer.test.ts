@@ -156,5 +156,10 @@ test('npm package uses a separate public manifest with the extension version and
   assert.equal(metadata.version, source.version);
   assert.equal(metadata.id, `${source.publisher}.${source.name}`);
   assert.ok(existsSync(join(destination, 'extension.vsix')));
+  const readme = readFileSync(join(destination, 'README.md'), 'utf8');
+  assert.equal(readme, readFileSync(join(workspace, 'README.md'), 'utf8'));
+  for (const [, url] of readme.matchAll(/(?:\]\(|href=")([^\s)"]+)/g)) {
+    assert.match(url, /^https:\/\//, `README link must work on npm: ${url}`);
+  }
   assert.match(readFileSync(join(destination, packaged.bin['agent-tracker-vscode']), 'utf8'), /^#!\/usr\/bin\/env node\r?\n/);
 });

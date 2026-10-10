@@ -26,7 +26,7 @@ The card displays colored bars and usage percentages for `5h` and `wk` side by s
 
 The refresh button on the right and the refresh link at the top of the tooltip query only the current quota of tracked providers. While a query is running, the link is replaced by refresh status text. There are no separate refresh or extension management links for individual providers. The tooltip's refresh action appears on the right of the title row. Logo SVGs and the icon font used in the status bar and tooltip are included in `resource/icon`.
 
-Use the following command to create a VSIX. Install the resulting `agent-tracker-0.1.1.vsix` through **Extensions: Install from VSIX...** in VS Code.
+Use the following command to create a VSIX. Install the resulting `agent-tracker-0.1.2.vsix` through **Extensions: Install from VSIX...** in VS Code.
 
 ```sh
 npm run package
@@ -51,13 +51,13 @@ npm ci
 npm run check
 npm run package:npm
 npm login --registry https://registry.npmjs.org --auth-type=web
-npm publish ./artifacts/npm/agent-tracker-vscode-0.1.1.tgz --access public
+npm publish ./artifacts/npm/agent-tracker-vscode-0.1.2.tgz --access public
 ```
 
-`package:npm` rebuilds the VSIX from the current source and creates `artifacts/npm/agent-tracker-vscode-<version>.tgz` containing exactly five files: the CLI, extension metadata, VSIX, README, and manifest. Publishing to npm is a separate command. For subsequent releases, increment the extension version and repeat the same steps. An authenticated npm account with publishing permission is required; complete 2FA if your account settings require it. Before publishing, you can check npx execution from the local tarball as follows:
+`package:npm` rebuilds the VSIX from the current source and creates `artifacts/npm/agent-tracker-vscode-<version>.tgz` containing exactly five files: the CLI, extension metadata, VSIX, README, and manifest. The package uses the root `README.md`, whose image and documentation URLs also work on npm. Publishing to npm is a separate command. For subsequent releases, increment the extension version and repeat the same steps. An authenticated npm account with publishing permission is required; complete 2FA if your account settings require it. Before publishing, you can check npx execution from the local tarball as follows:
 
 ```sh
-npx --yes --package ./artifacts/npm/agent-tracker-vscode-0.1.1.tgz agent-tracker-vscode --help
+npx --yes --package ./artifacts/npm/agent-tracker-vscode-0.1.2.tgz agent-tracker-vscode --help
 ```
 
 Installation through npm follows the existing extension setup process: configure Claude/Codex CLI logins and the optional workbench patch separately. The installer CLI does not apply the workbench patch.

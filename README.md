@@ -1,10 +1,10 @@
 <p align="center">
-  <strong><a href="README.md">English</a></strong> |
-  <a href="README.ko.md">한국어</a> |
-  <a href="README.zh.md">简体中文</a> |
-  <a href="README.ja.md">日本語</a> |
-  <a href="README.es.md">Español</a> |
-  <a href="README.fr.md">Français</a>
+  <strong><a href="https://github.com/lsc892/Agent-Tracker/blob/main/README.md">English</a></strong> |
+  <a href="https://github.com/lsc892/Agent-Tracker/blob/main/README.ko.md">한국어</a> |
+  <a href="https://github.com/lsc892/Agent-Tracker/blob/main/README.zh.md">简体中文</a> |
+  <a href="https://github.com/lsc892/Agent-Tracker/blob/main/README.ja.md">日本語</a> |
+  <a href="https://github.com/lsc892/Agent-Tracker/blob/main/README.es.md">Español</a> |
+  <a href="https://github.com/lsc892/Agent-Tracker/blob/main/README.fr.md">Français</a>
 </p>
 
 # Agent Tracker
@@ -19,7 +19,7 @@ A VS Code extension that shows current Claude and Codex usage and time until res
 - **Details card** — Click to open a card with 5-hour and weekly usage, reset times, and available Codex usage resets.
 - **Automatic and manual refresh** — Usage refreshes every 15 minutes by default. Use the refresh button for an immediate update.
 
-![Status bar and usage details card](resource/readme/at-1.png)
+![Status bar and usage details card](https://raw.githubusercontent.com/lsc892/Agent-Tracker/main/resource/readme/at-1.png)
 
 ### Compare tokens and time by conversation, period, and model
 
@@ -27,7 +27,7 @@ A VS Code extension that shows current Claude and Codex usage and time until res
 - **Usage history** — See usage counts and proportions for skills, plugins, subagents, and models.
 - **Improve your workflow** — Compare average tokens and time per request before and after changing models or adopting skills and plugins to refine how you use agents.
 
-![Average tokens by model and skill usage statistics](resource/readme/at-2.png)
+![Average tokens by model and skill usage statistics](https://raw.githubusercontent.com/lsc892/Agent-Tracker/main/resource/readme/at-2.png)
 
 Open **Usage statistics** from the card or run **Agent Tracker: Open Usage Statistics** from the Command Palette. Statistics are calculated from local conversation logs when you open the view.
 
@@ -56,7 +56,7 @@ To install into a specific profile, provide the name of a profile you have alrea
 npx agent-tracker-vscode@latest --profile "Work"
 ```
 
-Clicking the card's status bar item again to close it requires the optional [local VS Code patch (Korean)](docs/research/StatusBarPopup.md).
+Clicking the card's status bar item again to close it requires the optional [local VS Code patch (Korean)](https://github.com/lsc892/Agent-Tracker/blob/main/docs/research/StatusBarPopup.md).
 
 ### Uninstall
 
@@ -103,4 +103,4 @@ All setting keys below use the `agentTracker.` prefix.
 
 Use **Agent Tracker: Delete Statistics Data** to clear aggregated statistics. Original conversation logs are preserved, and statistics are recalculated when you reopen the view.
 
-[Usage and development reference](docs/Development.md)
+[Usage and development reference](https://github.com/lsc892/Agent-Tracker/blob/main/docs/Development.md)
