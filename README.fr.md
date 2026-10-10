@@ -19,7 +19,9 @@ Une extension VS Code qui affiche l'utilisation actuelle de Claude et Codex et l
 - **Carte détaillée** — Cliquez pour afficher l'utilisation sur 5 heures et sur une semaine, les échéances de réinitialisation et les réinitialisations d'utilisation disponibles pour Codex.
 - **Actualisation automatique et manuelle** — L'utilisation est consultée toutes les 15 minutes par défaut. Le bouton d'actualisation permet de la consulter immédiatement.
 
-![Barre d'état et carte détaillée de l'utilisation](resource/readme/at-1.png)
+<p align="center">
+  <img src="resource/readme/at-1.png" alt="Barre d&#39;&#233;tat et carte d&#233;taill&#233;e de l&#39;utilisation">
+</p>
 
 ### Comparez les tokens et le temps par conversation, période et modèle
 
@@ -27,7 +29,9 @@ Une extension VS Code qui affiche l'utilisation actuelle de Claude et Codex et l
 - **Historique d'utilisation** — Consultez le nombre d'utilisations et les proportions des skills, plugins, sous-agents et modèles.
 - **Améliorez vos méthodes de travail** — Comparez la moyenne de tokens et de temps par requête avant et après un changement de modèle ou l'ajout de skills et de plugins pour ajuster votre utilisation des agents.
 
-![Moyenne de tokens par modèle et statistiques d'utilisation des skills](resource/readme/at-2.png)
+<p align="center">
+  <img src="resource/readme/at-2.png" alt="Moyenne de tokens par mod&#232;le et statistiques d&#39;utilisation des skills">
+</p>
 
 Ouvrez **Statistiques d'utilisation** depuis la carte ou lancez **Agent Tracker : Ouvrir les statistiques d'utilisation** depuis la palette de commandes. Les statistiques sont calculées à partir des journaux locaux de conversation à l'ouverture de la vue.
 

@@ -19,7 +19,9 @@ A VS Code extension that shows current Claude and Codex usage and time until res
 - **Details card** — Click to open a card with 5-hour and weekly usage, reset times, and available Codex usage resets.
 - **Automatic and manual refresh** — Usage refreshes every 15 minutes by default. Use the refresh button for an immediate update.
 
-![Status bar and usage details card](https://raw.githubusercontent.com/lsc892/Agent-Tracker/main/resource/readme/at-1.png)
+<p align="center">
+  <img src="https://raw.githubusercontent.com/lsc892/Agent-Tracker/main/resource/readme/at-1.png" alt="Status bar and usage details card">
+</p>
 
 ### Compare tokens and time by conversation, period, and model
 
@@ -27,7 +29,9 @@ A VS Code extension that shows current Claude and Codex usage and time until res
 - **Usage history** — See usage counts and proportions for skills, plugins, subagents, and models.
 - **Improve your workflow** — Compare average tokens and time per request before and after changing models or adopting skills and plugins to refine how you use agents.
 
-![Average tokens by model and skill usage statistics](https://raw.githubusercontent.com/lsc892/Agent-Tracker/main/resource/readme/at-2.png)
+<p align="center">
+  <img src="https://raw.githubusercontent.com/lsc892/Agent-Tracker/main/resource/readme/at-2.png" alt="Average tokens by model and skill usage statistics">
+</p>
 
 Open **Usage statistics** from the card or run **Agent Tracker: Open Usage Statistics** from the Command Palette. Statistics are calculated from local conversation logs when you open the view.
 
