@@ -673,6 +673,10 @@ CREATE INDEX idx_summary_project_period
 
 조회 인덱스는 날짜 범위와 provider·프로젝트·날짜 범위를 유지한다. 세션 조회·교체는 `UNIQUE(provider, session_id, root_turn_id)`의 앞 두 키를 사용하고 별도 `idx_summary_session`은 두지 않는다. 세션으로 좁힌 요청의 `id`순 페이지 조회에는 임시 정렬이 추가될 수 있지만, 주 사용처인 평균·프로젝트·월간 집계를 위해 중복 인덱스의 저장·쓰기 비용을 유지하지 않는다. 전체 이력의 평균·월별 집계는 대상 요청을 읽어 계산하며 평균용 인덱스·캐시·사전 집계는 추가하지 않는다. manifest의 루트·세션 인덱스는 증분 수집에 유지하고, 이동 탐지에 사용하는 identity 인덱스는 Windows에서 제거하며 Linux·macOS에서는 유지한다.
 
+DB 모듈은 변경 이유별로 책임을 나눈다. `src/summary/db/index.ts`의 `SummaryDatabase`는 기존 worker·scanner API를 구성요소에 연결하는 facade다. `connection.ts`의 `SqliteSession`이 연결·PRAGMA·statement cache·transaction·optimize·close를 소유하고, `migrations.ts`는 schema 버전별 갱신을 처리한다. `manifest.ts`는 파일 발견·방문·진단·iterator, `sessions.ts`는 요청·모델·capability와 정상 metadata의 원자적 세션 교체, `billing.ts`는 비용 분류·재계산을 맡는다. 모든 구성요소는 하나의 `SqliteSession`을 공유하며 세션 교체 중 비용 반영도 같은 transaction에서 실행한다.
+
+`reader.ts`는 조회 실행·페이지·결과 변환, `queries.ts`는 SQL 생성, `validation.ts`는 공통 수치·페이지 검증을 맡는다. 목록과 개수 조회는 같은 날짜·필터·그룹 정의를 사용하고, 요청별·모델 누계 조회는 같은 모델 토큰 fallback·비용 표현식을 사용한다. SQL의 구조와 바인딩 값을 함께 반환하고 페이지 값은 조회 실행 계층이 검증해 뒤에 바인딩한다. 집계 표본·NULL·미상 정렬 규칙은 SQL 생성 계층에 명시하며 기존 조회·인덱스 구조를 유지한다.
+
 SQLite 조회 계획용 통계는 DB 열기에서 `PRAGMA main.optimize=0x10002`, 첫 스캔 완료와 이후 24시간 이상 지난 스캔 완료 및 연결 종료에서 `PRAGMA main.optimize`로 수집한다. `main`만 지정하여 TEMP 파싱 테이블은 분석하지 않는다. 새 인덱스 생성·기존 인덱스 정리 뒤에도 열기 시 통계 수집이 적용되며, 다른 운영체제에서 복사한 같은 schema version의 DB도 열 때 identity 인덱스를 현재 플랫폼에 맞춘다. 통계 수집은 선택적 유지보수여서 실패가 스캔·연결 정리를 실패시키지 않고 다음 실행 시점에 다시 시도한다. `PRAGMA optimize`는 평균 결과 캐시가 아니라 필요한 `ANALYZE`를 선택하는 SQLite 기능이다. [SQLite 권고](https://www.sqlite.org/lang_analyze.html).
 
 표시 이름은 projects·sessions에만 저장한다. 이름에는 UNIQUE 제약을 두지 않는다. 이름이 같은 프로젝트는 project_key로, 같은 프로젝트 안의 같은 세션명도 (provider, session_id)로 구분한다. 조회 시 이름을 연결하고 집계 기준은 기존 ID를 유지한다. 이름을 찾지 못하면 ‘이름 없는 세션’으로 표시한다. 원본 제목을 사용하며 첫 prompt를 제목으로 복사하지 않는다.

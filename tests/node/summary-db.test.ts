@@ -5,6 +5,7 @@ import { join, resolve, sep } from 'node:path';
 import { test, type TestContext } from 'node:test';
 import { DatabaseSync } from 'node:sqlite';
 import { SummaryDatabase, periodBounds, type FileMetadata, type TurnSummaryInput } from '../../src/summary/db';
+import { SqliteSession } from '../../src/summary/db/connection';
 import { SCHEMA_SQL, SCHEMA_VERSION, SCHEMA_MODEL_SQL, SCHEMA_CAPABILITY_SQL, manifestIdentityIndexSql } from '../../src/summary/db/schema';
 
 const v9Schema = `${SCHEMA_SQL}
@@ -232,14 +233,19 @@ test('migration rechecks the version after another window finishes the transitio
   const keys = Object.keys(row);
   legacy.prepare(`INSERT INTO turn_summary (${keys.join(',')}) VALUES (${keys.map(()=>'?').join(',')})`).run(...Object.values(row));
   legacy.close();
-  class WaitingDatabase extends SummaryDatabase {
+  let raceInjected = false;
+  class WaitingSession extends SqliteSession {
     override transaction<T>(action: ()=>T): T {
       // Simulate the other opener committing after our initial version read, before our lock is acquired.
       const other = new SummaryDatabase(dbPath);other.close();
+      raceInjected = true;
       return super.transaction(action);
     }
   }
-  const db = new WaitingDatabase(dbPath);
+  const session = new WaitingSession(dbPath);
+  session.close();
+  assert.equal(raceInjected, true, 'the competing opener runs during migration');
+  const db = new SummaryDatabase(dbPath);
   try {
     assert.equal(db.queryTurns()[0].project_name,'Project');
     assert.equal(db.queryUsage()[0].total_tokens,110);
