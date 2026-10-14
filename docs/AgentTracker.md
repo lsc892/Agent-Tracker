@@ -359,6 +359,8 @@ response별 증분 상태를 영속화하지 않으므로 append도 tail만 더�
 
 JSONL은 provider 소유 형식이며 안정적인 공통 schema가 아니다. 먼저 `ClaudeParserAdapter`, `CodexCurrentParserAdapter`, `CodexLegacyParserAdapter`로 해석한 뒤 공통 row로 정규화한다.
 
+각 adapter의 `row()`는 행의 입력을 타입이 있는 context로 묶고 의미별 private 메서드에 전달한다. Claude는 metadata·요청 식별·도구 사용량·assistant 사용량과 상태·system 종료 신호 순서로 처리하고, Codex는 record type과 lifecycle event별로 분배한다. 세션·요청·누적 토큰 상태는 adapter가 소유하며 context에는 현재 행의 입력과 필요한 참조만 둔다. 형식별 보호조건과 이벤트 방출 순서·오류 offset은 각 처리 단계에서 보존한다.
+
 여기서 공통 row와 agent 연결 정보는 재집계 중의 임시 자료다. 영속 결과는 사용자 요청 summary뿐이다. 복제·resume·archive 파일은 provider metadata와 검증된 parent/fork 관계로 같은 논리 session에 묶어 중복을 비교한다. session이나 부모 요청 귀속을 확인할 수 없는 파일은 임의로 새 사용자 요청으로 세지 않고 manifest 오류와 coverage로 표시한다.
 
 ### 5.1 Claude

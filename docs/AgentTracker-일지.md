@@ -32,13 +32,24 @@
 - **갱신 단위**: manifest 발견·비교는 최대 n개씩, 재집계와 summary 교체는 영향 session 단위로 수행한다. 중복 제거·agent 연결은 임시 디스크 staging에서 처리한다. 근거: candidate를 영속화하지 않아 구조가 단순해지는 대신 append도 해당 session 원본 전체를 다시 읽어야 한다.
 - **파일 조회·삭제·이동 판정**: 파일은 (provider, path)로 조회하고 source_root로 삭제 범위를 제한하며, 신뢰 가능한 dev/inode로 이동을 판단한다. 근거: 순회한 루트의 미방문 파일만 삭제하고 경로가 바뀐 파일의 동일성을 확인한다.
 - **삭제 판정과 수동 재실행**: 전체 순회 성공 후 이번 실행에서만 미방문 파일을 삭제 대상으로 판단하고 summary 교체와 함께 삭제한다. 오류·중단 후 자동 재시도 없이 다음 화면 진입·수동 새로 고침에서 새로 조사한다. 근거: 삭제 상태나 재처리 대기열을 영속화하지 않아도 transaction으로 기존 통계와 metadata를 보존할 수 있다.
-- **provider별 parser**: Claude와 Codex에 하나의 중복 제거 공식을 강제하지 않고, provider와 log version에 맞는 adapter에서 공통 turn schema로 변환한다. 근거: Claude의 response duplicate와 Codex의 response/cumulative snapshot은 발생 원인과 식별자가 다르다.
+- **provider별 parser**: provider와 log version에 맞는 adapter에서 공통 turn schema로 변환한다. `row()`는 행별 typed context를 의미별 private 메서드에 전달하고 세션·요청·누적 토큰 상태는 adapter가 소유한다. 근거: Claude의 response duplicate와 Codex의 response/cumulative snapshot은 발생 원인과 식별자가 다르므로 각 보호조건을 보존하면서 처리 흐름과 상태 소유권을 드러낸다.
 - **turn 식별과 평균의 분모**: Claude는 `promptId`, Codex는 `root_turn_id`를 우선하고 (provider, session_id, root_turn_id)당 summary 한 행을 둔다. 별도 turn_index 순번은 생성·저장하지 않으며 요청 표는 미상 여부를 먼저 정렬하고 같은 우선순위 안에서 DB 행 id순으로 표시한다. 근거: subagent·tool result를 독립 사용자 요청으로 세면 turn 평균이 잘못되고, 요청 식별·집계·정렬에 쓰지 않는 순번을 보존할 필요가 없다.
 - **subagent 귀속**: 파싱 중 main과 subagent의 token을 사용자 요청에 합산하고 시간은 main/root 값 하나만 summary에 저장한다. 근거: token 합산에는 agent 구분이 필요하지만 agent별 영속 row와 자체 시간은 현재 조회에 필요하지 않다.
 - **token 정규화**: parser 내부에서 cache·reasoning component를 정규화한 뒤 요청 summary와 모델별 행에 input/output/cache write/cache read를 저장한다. 근거: provider별 포함 관계로 인한 이중 집계를 막고 모델별 누계·비용에서도 동일한 토큰 합계를 유지하며 reasoning은 output에 포함한다.
 - **평균과 디버깅**: 평균 token·시간은 완료 요청을 대상으로 하고 누락 duration은 분모에서 제외한다. manifest 진단은 상태·처리 위치·기록 시각·오류 네 column, summary는 문제 원본 정보로 제한한다. 통계 화면 맨 아래의 ‘데이터 확인’ 링크로 별도 Webview를 열며, 창 열기·다시 조회·페이지 이동은 DB만 읽는다. 품질 경고만으로 요청을 통계에서 제외하지 않고 갱신 실패 시 이전 정상 수치를 유지한다. 근거: 필요할 때 별도 창에서 최근 처리 상태를 확인하며 자동 복구용 cursor와 전체 처리 이력은 관리하지 않는다.
 - **메모리 경계**: Extension Host에는 최신 quota snapshot, refresh 상태와 사용량·데이터 확인 Webview마다 현재 page·제한된 도표 결과·이름 목록 한 묶음만 유지하고 worker는 n개 파일 metadata와 byte 예산 내 parser/row buffer를 관리한다. Webview는 열린 이름 목록의 metadata만 누적하고 닫으면 해제한다. 근거: 전체 경로·manifest·본문·집계 map의 적재를 피하되 한 줄 크기와 DB cache·임시 작업은 별도로 제한해야 한다.
 - **개인정보 경계**: SQLite에는 식별자, 표시 이름, 숫자, 시각과 품질 정보 및 최대 80자의 요청 제목을 보존하며 전체 prompt·response·tool 본문은 저장하지 않는다. 세션 제목은 원본 metadata에서만 가져온다. 근거: 읽을 수 있는 이름을 제공하면서 분석에 불필요한 대화 본문과 credential을 장기 저장하지 않는다.
+
+---
+
+## 2026-10-14 — 사용자·Codex
+
+### Claude·Codex 파서는 행별 context와 의미별 private 처리 단계로 분리
+
+- **의사결정**: 사용자는 파서의 많은 if 분기를 검사 의미별 private 메서드와 context 전달 방식으로 정리하도록 요청했다. Codex는 TypeScript interface로 행별 입력을 묶고 Claude는 순서별 처리 단계, Codex는 record·lifecycle 종류별 처리 메서드로 나눴다. 기존 형식 대응과 보호조건은 유지한다.
+- **근거**: API 오류·stop hook·current/legacy·fork·rootless subagent·누적 토큰 차감은 실제 형식과 중복 방지를 위한 조건이다. 이를 삭제하는 대신 호출 흐름에서 검사 목적을 드러내며, 행별 context 객체 하나와 메서드 호출이 추가되는 비용을 감수한다. 장기 상태를 context에 복제하지 않아 상태 소유권을 유지한다.
+- **결과**: 외부 사용자 요청·모델 사용량·도구 사용량·완료 상태의 해석과 이벤트 순서·오류 offset을 보존하면서 `row()`에서 처리 흐름을 확인할 수 있다. 별도 범용 parser framework는 추가하지 않는다.
+- **검증**: 타입 검사·린트·기존 회귀 테스트가 통과했다. 266개 합성 시나리오·1,633개 입력행의 이벤트·행별 identity·오류 대조 결과가 원본과 동일했다.
 
 ---
 
