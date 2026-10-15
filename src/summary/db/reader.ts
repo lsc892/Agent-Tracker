@@ -10,10 +10,26 @@ import {
   buildTurnsCountQuery, buildTurnsQuery, buildUsageCountQuery, buildUsageQuery,
 } from './queries';
 import { nonnegative, pageLimit } from './validation';
+import { buildRollupUsageQueries } from './rollup-queries';
+import type { QuerySql, UsageBasis } from './queries';
 
-/** Executes read queries and maps their results; it never owns a connection or writes usage. */
+/** Executes read queries on the shared connection, including maintained daily usage projections. */
 export class SummaryReader {
   constructor(private readonly database: SqliteSession) {}
+
+  private usageQueries<T>(filter: SummaryFilter, groupBy: UsageGrouping, timezone: string | undefined,
+    by: UsageBasis, sortBy: ChartMetric | undefined, action: (queries: { rows: QuerySql; count: QuerySql }) => T): T {
+    const raw = (zone: string): { rows: QuerySql; count: QuerySql } => ({
+      rows: buildUsageQuery(filter, groupBy, zone, by, sortBy),
+      count: buildUsageCountQuery(filter, groupBy, zone, by),
+    });
+    const candidate = timezone === undefined ? undefined : buildRollupUsageQueries(filter, groupBy, timezone, by, sortBy);
+    if (filter.includeCosts || timezone !== undefined && !candidate) return action(raw(timezone ?? 'UTC'));
+    return this.database.rollups.read(timezone, (ready, selected) => {
+      const queries = candidate ?? buildRollupUsageQueries(filter, groupBy, selected, by, sortBy);
+      return action(ready && queries ? queries : raw(selected));
+    });
+  }
 
   /** Name choices cover all stored usage, independently of dates and the table page. */
   queryNames(query: NameQuery): NameResult {
@@ -59,6 +75,20 @@ export class SummaryReader {
 
   queryCumulative(filter: SummaryFilter, by: 'provider' | 'model', offset = 0): { rows: CumulativeRow[]; total: number; by: 'provider' | 'model' } {
     if (by !== 'provider' && by !== 'model') throw new RangeError('Unknown cumulative grouping');
+    if (!filter.includeCosts) {
+      // Non-calendar cumulative totals reuse the active timezone, avoiding a UTC/local rebuild cycle.
+      return this.usageQueries(filter, 'total', undefined, by, by === 'model' ? 'tokens' : undefined, queries => {
+        const total = (this.database.connection.prepare(queries.count.sql).get(...queries.count.values) as { count: number }).count;
+        const usage = this.database.connection.prepare(queries.rows.sql)
+          .all(...queries.rows.values, 100, by === 'model' ? nonnegative(offset, 'offset') : 0) as unknown as UsageRow[];
+        const rows: CumulativeRow[] = by === 'provider' ? usage.map(row => ({ ...row, model: '' }))
+          : usage.map(row => ({ provider: row.provider, model: row.model ?? null,
+            input_tokens: row.input_tokens, output_tokens: row.output_tokens,
+            cache_write_input_tokens: row.cache_write_input_tokens, cache_read_input_tokens: row.cache_read_input_tokens,
+            total_tokens: row.total_tokens }));
+        return { rows, total, by };
+      });
+    }
     if (by === 'provider') {
       return { rows: this.queryUsage(filter).map(row => ({ ...row, model: '' })), total: this.queryUsageCount(filter), by };
     }
@@ -71,22 +101,29 @@ export class SummaryReader {
   }
 
   queryUsageCount(filter: SummaryFilter = {}, groupBy: UsageGrouping = 'total', timezone = 'UTC', by: 'provider' | 'model' = 'provider'): number {
-    const query = buildUsageCountQuery(filter, groupBy, timezone, by);
-    return (this.database.connection.prepare(query.sql).get(...query.values) as { count: number }).count;
+    return this.usageQueries(filter, groupBy, timezone, by, undefined, ({ count }) =>
+      (this.database.connection.prepare(count.sql).get(...count.values) as { count: number }).count);
   }
 
   queryUsage(filter: SummaryFilter = {}, groupBy: UsageGrouping = 'total', timezone = 'UTC', page: OffsetPage & { sortBy?: ChartMetric } = {}, by: 'provider' | 'model' = 'provider'): UsageRow[] {
-    const query = buildUsageQuery(filter, groupBy, timezone, by, page.sortBy);
-    return this.database.connection.prepare(query.sql)
-      .all(...query.values, pageLimit(page.limit), nonnegative(page.offset ?? 0, 'offset')) as unknown as UsageRow[];
+    return this.usageQueries(filter, groupBy, timezone, by, page.sortBy, ({ rows }) => this.database.connection.prepare(rows.sql)
+      .all(...rows.values, pageLimit(page.limit), nonnegative(page.offset ?? 0, 'offset')) as unknown as UsageRow[]);
   }
 
   /** Charts use the same page, grouping and order as the table. */
   queryUsageChart(filter: SummaryFilter, groupBy: UsageGrouping | 'all' | 'turn', timezone: string, metric: ChartMetric,
-    by: 'provider' | 'model' = 'provider', page: OffsetPage & { afterId?: number } = {}): UsageChart {
+    by: 'provider' | 'model' = 'provider', page: OffsetPage & { afterId?: number; sortBy?: ChartMetric } = {}): UsageChart {
     const grouping = groupBy === 'all' ? 'total' : groupBy;
-    const rows = grouping === 'turn' ? this.queryTurns(filter, { ...page, unknownLast: page.afterId === undefined }, by) : this.queryUsage(filter, grouping, timezone, page, by);
-    const total = grouping === 'turn' ? this.queryTurnsCount(filter, by) : this.queryUsageCount(filter, grouping, timezone, by);
+    if (grouping !== 'turn') {
+      return this.usageQueries(filter, grouping, timezone, by, page.sortBy, queries => {
+        const rows = this.database.connection.prepare(queries.rows.sql)
+          .all(...queries.rows.values, pageLimit(page.limit), nonnegative(page.offset ?? 0, 'offset')) as unknown as UsageRow[];
+        const total = (this.database.connection.prepare(queries.count.sql).get(...queries.count.values) as { count: number }).count;
+        return usageChartFromPage(rows, total, groupBy, metric, by, filter.excludeEmptyUsage);
+      });
+    }
+    const rows = this.queryTurns(filter, { ...page, unknownLast: page.afterId === undefined }, by);
+    const total = this.queryTurnsCount(filter, by);
     return usageChartFromPage(rows, total, groupBy, metric, by, filter.excludeEmptyUsage);
   }
 

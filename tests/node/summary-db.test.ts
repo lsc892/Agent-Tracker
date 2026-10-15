@@ -6,11 +6,13 @@ import { test, type TestContext } from 'node:test';
 import { DatabaseSync } from 'node:sqlite';
 import { SummaryDatabase, periodBounds, type FileMetadata, type TurnSummaryInput } from '../../src/summary/db';
 import { SqliteSession } from '../../src/summary/db/connection';
-import { SCHEMA_SQL, SCHEMA_VERSION, SCHEMA_MODEL_SQL, SCHEMA_CAPABILITY_SQL, manifestIdentityIndexSql } from '../../src/summary/db/schema';
+import { SCHEMA_SQL, SCHEMA_VERSION, SCHEMA_MODEL_SQL, SCHEMA_CAPABILITY_SQL, SCHEMA_ROLLUP_SQL, manifestIdentityIndexSql } from '../../src/summary/db/schema';
 
-const v9Schema = `${SCHEMA_SQL}
+const v9Schema = `${SCHEMA_SQL.replace(SCHEMA_ROLLUP_SQL, '')}
 CREATE INDEX idx_summary_session ON turn_summary(provider, session_id);
 CREATE INDEX IF NOT EXISTS idx_manifest_identity ON manifest(provider, dev, inode);`;
+const summaryTables = ['manifest', 'projects', 'session_billing', 'sessions', 'turn_capability_usage',
+  'turn_costs', 'turn_model_usage', 'turn_summary', 'usage_model_daily', 'usage_request_daily', 'usage_rollup_meta'];
 const v8Schema = v9Schema
   .replace('  request_title TEXT,', '  request_title TEXT,\n  turn_index INTEGER NOT NULL,')
   .replace('ON turn_summary(provider, session_id);', 'ON turn_summary(provider, session_id, turn_index);');
@@ -106,7 +108,7 @@ test('schema normalizes names and uses bounded disk staging cache', t => {
   const second = new SummaryDatabase(dbPath);
   t.after(() => second.close());
   assert.deepEqual(second.connection.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all()
-    .map(row => row.name), ['manifest', 'projects', 'session_billing', 'sessions', 'turn_capability_usage', 'turn_costs', 'turn_model_usage', 'turn_summary']);
+    .map(row => row.name), summaryTables);
   assert.equal(second.queryUsage()[0].total_tokens, 110);
   assert.ok(second.connection.prepare('PRAGMA table_info(turn_summary)').all().every(column => column.name !== 'turn_index'));
   assert.deepEqual(second.connection.prepare('PRAGMA index_info(idx_summary_session)').all(), []);
@@ -209,7 +211,7 @@ for (const version of [1,2]) test(`v${version} migration preserves summaries, ma
   })));
   assert.equal(db.connection.prepare('PRAGMA user_version').get()?.user_version,SCHEMA_VERSION);
   assert.deepEqual(db.connection.prepare('PRAGMA foreign_key_check').all(),[]);
-  assert.deepEqual(db.connection.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all().map(row=>row.name),['manifest','projects','session_billing','sessions','turn_capability_usage','turn_costs','turn_model_usage','turn_summary']);
+  assert.deepEqual(db.connection.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all().map(row=>row.name),summaryTables);
   assert.equal(db.connection.prepare("SELECT count(*) count FROM sqlite_master WHERE type='index' AND name LIKE 'idx_summary_%'").get()?.count,2);
   db.connection.exec("UPDATE turn_summary SET status='failed'");
   assert.equal(db.queryUsage()[0].total_tokens,110);assert.equal(db.queryUsage()[0].completed_turns,0);

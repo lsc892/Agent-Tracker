@@ -71,6 +71,8 @@ test('rebuild merges ProjectFarm model rows and persists bounded titles through 
   db.connection.prepare('INSERT INTO projects VALUES (?,?)').run('C:\\Work\\ProjectFarm', 'ProjectFarm');
   db.connection.prepare('UPDATE turn_summary SET project_key=? WHERE session_id=?').run('C:\\Work\\ProjectFarm', 'a');
   db.connection.exec('UPDATE manifest SET parser_version=12');
+  // This direct SQL fixture simulates a historical database before maintained rollups existed.
+  db.connection.exec('DELETE FROM usage_rollup_meta; DELETE FROM usage_request_daily; DELETE FROM usage_model_daily;');
   assert.equal(db.queryUsage({}, 'project', 'UTC', {}, 'model').length, 2, 'old case-sensitive keys reproduce the duplicate');
   assert.equal((await refreshSummary(db, options)).parsed, 2);
   assert.equal(db.queryUsage({}, 'project', 'UTC', {}, 'model').length, 1);

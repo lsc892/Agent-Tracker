@@ -65,7 +65,7 @@ function modelTurns(costs: boolean): string {
   ${costs ? 'LEFT JOIN turn_costs c ON c.turn_id = t.id' : ''})`;
 }
 
-function usageTurns(costs = false, by: UsageBasis = 'provider'): string {
+export function usageTurns(costs = false, by: UsageBasis = 'provider'): string {
   if (by === 'model') return modelTurns(costs);
   if (by !== 'provider') throw new RangeError('Unknown usage grouping basis');
 

@@ -671,11 +671,25 @@ CREATE INDEX idx_summary_project_period
 
 ```
 
-조회 인덱스는 날짜 범위와 provider·프로젝트·날짜 범위를 유지한다. 세션 조회·교체는 `UNIQUE(provider, session_id, root_turn_id)`의 앞 두 키를 사용하고 별도 `idx_summary_session`은 두지 않는다. 세션으로 좁힌 요청의 `id`순 페이지 조회에는 임시 정렬이 추가될 수 있지만, 주 사용처인 평균·프로젝트·월간 집계를 위해 중복 인덱스의 저장·쓰기 비용을 유지하지 않는다. 전체 이력의 평균·월별 집계는 대상 요청을 읽어 계산하며 평균용 인덱스·캐시·사전 집계는 추가하지 않는다. manifest의 루트·세션 인덱스는 증분 수집에 유지하고, 이동 탐지에 사용하는 identity 인덱스는 Windows에서 제거하며 Linux·macOS에서는 유지한다.
+조회 인덱스는 날짜 범위와 provider·프로젝트·날짜 범위를 유지한다. 세션 조회·교체는 `UNIQUE(provider, session_id, root_turn_id)`의 앞 두 키를 사용하고 별도 `idx_summary_session`은 두지 않는다. 세션으로 좁힌 요청의 `id`순 페이지 조회에는 임시 정렬이 추가될 수 있다. 비용 미포함 전체·프로젝트·세션·일·월 집계와 누계는 아래의 일별 rollup을 사용하고, 요청별 상세·비용 포함 조회는 기존 요청·모델 SQL을 사용한다. 결과 캐시는 추가하지 않는다. manifest의 루트·세션 인덱스는 증분 수집에 유지하고, 이동 탐지에 사용하는 identity 인덱스는 Windows에서 제거하며 Linux·macOS에서는 유지한다.
+
+schema v11은 원본 요청·모델 행을 보존하면서 다음 파생 표를 추가한다.
+
+| 표 | 저장 단위와 내용 | 인덱스 |
+| --- | --- | --- |
+| `usage_request_daily` | provider·프로젝트·세션·현지 일별 요청 상태 | PK(provider, session_id, project_key, local_day), (local_day, provider), (provider, project_key, local_day) |
+| `usage_model_daily` | 같은 단위에 모델별 상태 추가. NULL 모델과 빈 모델명은 서로 다른 model_key로 저장 | 요청 표와 같은 PK에 model_key 추가, 같은 두 보조 인덱스 |
+| `usage_rollup_meta` | singleton=1, 현재 시간대, 집계 형식 버전 | singleton PK |
+
+상태에는 전체 토큰 합계·건수와 완료 표본 및 사용량이 기록된 완료 표본의 합계·건수를 따로 저장한다. cache의 알려진 표본 수, duration의 유효 표본 합계·건수, 품질·미상 시각·오류 건수와 최종 갱신 시각도 보존한다. 평균은 `SUM(완료 표본 합계) / SUM(같은 표본 건수)`로 계산하며 일별 평균을 단순 평균하지 않는다. 다중 모델 turn은 각 모델에 한 번씩 포함하므로 모델 건수를 합쳐 전체 요청 수로 사용하지 않는다. 미상 시각은 빈 local_day, 이름은 projects·sessions를 조회해 최신 값을 사용한다.
+
+DB당 선택한 시간대 하나의 집계만 유지한다. 처음 집계할 때 저장된 facts로 구축하고 시간대가 바뀌면 같은 두 표를 하나의 transaction에서 다시 구축한다. 완전한 현지 날짜는 rollup, 경계 날짜의 일부 시간은 원본 SQL로 집계해 중복 없이 병합한다. DST의 23·25시간 날짜도 현지 경계를 따른다. 누계는 활성 시간대를 재사용해 UTC와 설정 시간대 사이의 반복 구축을 피한다. 범위 역전·지원 캘린더 밖의 시각·비용 포함은 기존 SQL로 처리하며, `isTransaction`이 없는 Node 22.15도 기존 SQL을 사용한다.
+
+이미 구축된 집계는 세션 교체·삭제·프로젝트 이동 시 영향받은 세션만 기존 facts 교체 transaction 안에서 다시 계산한다. 파일 오류 진단으로 `last_error`가 바뀔 때도 같은 transaction에서 해당 세션의 오류 건수를 갱신하고 초기화는 facts와 집계를 함께 지운다. warm 조회는 deferred read transaction에서 시간대 확인과 집계 조회를 같은 snapshot으로 처리한다. 구축은 writer transaction에서 재확인한 뒤 수행하며, 호출자가 연 transaction에서 시간대가 다르면 raw SQL을 사용한다.
 
 DB 모듈은 변경 이유별로 책임을 나눈다. `src/summary/db/index.ts`의 `SummaryDatabase`는 기존 worker·scanner API를 구성요소에 연결하는 facade다. `connection.ts`의 `SqliteSession`이 연결·PRAGMA·statement cache·transaction·optimize·close를 소유하고, `migrations.ts`는 schema 버전별 갱신을 처리한다. `manifest.ts`는 파일 발견·방문·진단·iterator, `sessions.ts`는 요청·모델·capability와 정상 metadata의 원자적 세션 교체, `billing.ts`는 비용 분류·재계산을 맡는다. 모든 구성요소는 하나의 `SqliteSession`을 공유하며 세션 교체 중 비용 반영도 같은 transaction에서 실행한다.
 
-`reader.ts`는 조회 실행·페이지·결과 변환, `queries.ts`는 SQL 생성, `validation.ts`는 공통 수치·페이지 검증을 맡는다. 목록과 개수 조회는 같은 날짜·필터·그룹 정의를 사용하고, 요청별·모델 누계 조회는 같은 모델 토큰 fallback·비용 표현식을 사용한다. SQL의 구조와 바인딩 값을 함께 반환하고 페이지 값은 조회 실행 계층이 검증해 뒤에 바인딩한다. 집계 표본·NULL·미상 정렬 규칙은 SQL 생성 계층에 명시하며 기존 조회·인덱스 구조를 유지한다.
+`reader.ts`는 조회 실행·페이지·결과 변환과 rollup/raw 경로 선택, `queries.ts`는 기존 facts SQL 생성, `validation.ts`는 공통 수치·페이지 검증을 맡는다. `rollup-state.ts`는 병합 가능한 상태와 schema, `rollup-queries.ts`는 일별 상태·raw 경계의 SQL, `rollups.ts`는 구축·세션별 갱신·조회 snapshot을 맡는다. 목록과 개수는 같은 필터·그룹 정의를 사용하고 모델 해석은 공통 facts 표현식을 재사용한다. SQL 구조와 바인딩을 함께 반환하며 시간대·기간·ID는 SQL 문자열에 삽입하지 않는다. 집계 표본·NULL·미상 정렬과 기존 원본 인덱스를 보존한다.
 
 SQLite 조회 계획용 통계는 DB 열기에서 `PRAGMA main.optimize=0x10002`, 첫 스캔 완료와 이후 24시간 이상 지난 스캔 완료 및 연결 종료에서 `PRAGMA main.optimize`로 수집한다. `main`만 지정하여 TEMP 파싱 테이블은 분석하지 않는다. 새 인덱스 생성·기존 인덱스 정리 뒤에도 열기 시 통계 수집이 적용되며, 다른 운영체제에서 복사한 같은 schema version의 DB도 열 때 identity 인덱스를 현재 플랫폼에 맞춘다. 통계 수집은 선택적 유지보수여서 실패가 스캔·연결 정리를 실패시키지 않고 다음 실행 시점에 다시 시도한다. `PRAGMA optimize`는 평균 결과 캐시가 아니라 필요한 `ANALYZE`를 선택하는 SQLite 기능이다. [SQLite 권고](https://www.sqlite.org/lang_analyze.html).
 
@@ -683,7 +697,7 @@ SQLite 조회 계획용 통계는 DB 열기에서 `PRAGMA main.optimize=0x10002`
 
 Claude는 main JSONL의 custom-title을 ai-title보다 우선한다. Codex는 읽기 전용 state_N.sqlite의 threads.name/title을 session_index.jsonl의 thread_name보다 우선하고 session_meta 제목을 보완 경로로 사용한다. metadata는 디스크 TEMP에 묶음 처리하며 통계 화면 진입 시 제목만 바뀐 세션도 갱신한다. metadata를 읽을 수 없으면 기존 제목을 유지한다. 프로젝트명·세션명 필터는 클릭해 이름 목록을 열고 스크롤해 선택하는 방식으로 제공하며, 선택 즉시 표·도표를 ID와 제공자로 정확히 조회한다. 목록이나 세션별 행에는 프로젝트명과 세션 시작 시각을 함께 표시하고 tooltip으로 전체 경로·ID를 확인한다.
 
-schema v1·v2는 기존 이름을 projects로 옮기고 요청 ID·통계·manifest 참조를 보존한 채 전환한다. 세션 제목은 다음 scan에서 채운다. 이름 metadata와 summary 교체는 같은 transaction에 반영하며, 참조하는 summary가 없어진 이름 행은 정리한다. `root_turn_id`는 요청 식별자다. schema v9에서 미사용 `turn_index` 컬럼과 순번 생성·저장 코드를 제거했으며, 현재 schema v10은 별도 세션 인덱스를 제거하고 Windows의 identity 인덱스도 제거한다. 기존 DB를 열 때 하나의 transaction에서 필요한 컬럼·인덱스만 정리하여 요청 ID·제목·시각·토큰·진단 참조와 모델·비용·Skill 횟수를 보존한다. 실패하면 컬럼·인덱스·schema version까지 원상 복구하며 이 전환 자체로 원본을 다시 스캔하지 않는다. 사용자 요청별 표는 DB 행 `id`순이고 모델별은 같은 요청 안에서 `model`순을 추가한다. 논리 session에 속하는 모든 파일을 읽어야 재집계할 수 있으므로 summary를 파일 하나의 자식 row로 두거나 삭제 cascade하지 않는다.
+schema v1·v2는 기존 이름을 projects로 옮기고 요청 ID·통계·manifest 참조를 보존한 채 전환한다. 세션 제목은 다음 scan에서 채운다. 이름 metadata와 summary 교체는 같은 transaction에 반영하며, 참조하는 summary가 없어진 이름 행은 정리한다. `root_turn_id`는 요청 식별자다. schema v9에서 미사용 `turn_index` 컬럼과 순번 생성·저장 코드를 제거했고 v10은 별도 세션 인덱스와 Windows의 identity 인덱스를 제거했다. 현재 v11은 빈 rollup 표·인덱스만 추가하고 실제 구축은 첫 집계 조회 때 수행한다. 기존 DB의 요청 ID·제목·시각·토큰·진단 참조와 모델·비용·Skill 횟수를 보존하며 migration 실패 시 schema version까지 원복한다. 이 전환 자체로 원본 로그를 다시 스캔하지 않는다. 사용자 요청별 표는 DB 행 `id`순이고 모델별은 같은 요청 안에서 `model`순을 추가한다. 논리 session에 속하는 모든 파일을 읽어야 재집계할 수 있으므로 summary를 파일 하나의 자식 row로 두거나 삭제 cascade하지 않는다.
 
 ### 8.1 사용자에게 보여 줄 turn summary
 
@@ -800,7 +814,7 @@ schema version 2는 기존 `turn_summary`의 행·id·manifest 참조를 보존�
 
 도표는 기존 필터와 집계 기준을 공유하고 `총 토큰 / 평균 토큰 / 평균 시간 / 요청 수` 순서로 지표를 선택한다. 요청 수는 완료·진행 중·실패 요청을 합친 전체 요청 수이며 완료 수를 상세 정보에 함께 표시한다. 평균 토큰은 완료 요청 수, 평균 시간은 유효한 시간을 가진 완료 요청 수를 표본으로 사용한다. 사용자 요청별 조회에서는 `총 토큰 / 소요 시간`만 선택하고 각 요청의 개별 값을 표시한다.
 
-평균 토큰의 input/output/cache 평균은 합계 평균과 같은 완료 요청 표본에서 SQL로 계산하며 빈 사용량 제외 설정도 동일하게 적용한다. 캐시 구성은 표본 중 한 요청이라도 미확인 값이 있으면 해당 평균을 null로 보존해 막대 전체를 회색으로 표시한다. 진행 중·실패 요청의 미확인 구성은 평균에 영향을 주지 않는다. 완료 표본이 없으면 평균을 ‘—’로 표시하고 막대를 그리지 않으며, 확인된 0토큰 평균은 0으로 표시한다. 새 DB 열이나 원본 재집계 없이 저장된 요청·모델 행을 사용한다.
+평균 토큰의 input/output/cache 평균은 합계 평균과 같은 완료 요청 표본에서 SQL로 계산하며 빈 사용량 제외 설정도 동일하게 적용한다. 캐시 구성은 표본 중 한 요청이라도 미확인 값이 있으면 해당 평균을 null로 보존해 막대 전체를 회색으로 표시한다. 진행 중·실패 요청의 미확인 구성은 평균에 영향을 주지 않는다. 완료 표본이 없으면 평균을 ‘—’로 표시하고 막대를 그리지 않으며, 확인된 0토큰 평균은 0으로 표시한다. 집계 조회는 일별 상태의 합계·건수를 병합하고 fallback은 저장된 요청·모델 행을 사용하며 원본 로그를 다시 읽지 않는다.
 
 조회 단위에 따라 다음 모양과 범위를 사용한다.
 
@@ -852,6 +866,8 @@ Extension Host 메모리에 유지하는 값:
 파일 수를 `F`, 한 파일의 metadata 크기를 `S`, 순회 상태 크기를 `D`, 처리 중인 JSONL 한 줄 크기를 `L`, row buffer 예산을 `R`, DB cache 예산을 `C`라고 하면 작업 메모리의 관리 대상은 `n × S + D + L + R + C`다. 파일 수가 늘어도 전체 manifest 때문에 `F × S`만큼 증가하지 않도록 한다. `n`만 제한해도 한 줄이나 DB cache는 커질 수 있으므로 큰 JSONL 줄 처리 방식과 SQLite cache·임시 작업의 메모리도 별도로 측정·제한한다.
 
 SQLite query는 기간과 project/session filter를 먼저 적용하고 turn_summary는 page 단위로 가져온다. 기본 page size는 100으로 한다.
+
+집계 조회의 주 입력은 요청 facts `K`행에서 선택된 일별 상태 `r`행과 부분 날짜의 raw 입력 `B`행으로 줄어든다. 범위 탐색·주 순회 모델은 `O(log N + K)`에서 `O(log R + r + B)`로 바뀌지만 GROUP BY·정렬 비용은 별도로 남는다. 추가 영속 공간은 실제 요청·모델 일별 조합 수 `O(R + Rm)`이다. 세션·날짜·모델 조합이 매 turn마다 달라지면 집계 행 수도 facts와 비슷해져 최악의 선형 비용은 유지된다. 최초 구축·시간대 변경에는 전체 재집계, 세션 변경에는 해당 세션 재집계와 추가 인덱스·WAL 비용이 생긴다. 소량·좁은 기간은 고정 경계 계산 비용으로 느려질 수 있으며 자동 임계값·결과 캐시는 추가하지 않았다. 실제 제품 경로의 전후 시간·공간·transaction 비교는 [SQL 측정 보고서](benchmarks/SqlExplainBenchmark-2026-10-15.md)에 둔다.
 
 요청 제목은 component 재집계 때 `component_events(root_id,id) WHERE is_main=1 AND request_title IS NOT NULL` TEMP partial index로 탐색한다. provider·session 조건을 유지하며 가장 먼저 기록된 메인 제목을 선택한다. 인덱스는 component 테이블 재생성·staging 종료 시 사라지고 영속 DB에는 추가하지 않는다. 별도 JS 제목 Map을 만들지 않으며 준비된 요청도 100행씩 읽는다. `prepareSummaries`는 영속 교체 transaction 전에 실행하고 실제 `replaceSessions`의 BEGIN IMMEDIATE/COMMIT 구간과 별도로 측정한다. FILE TEMP는 page cache를 사용하므로 전체 process 메모리의 고정 상한으로 해석하지 않는다. 제목 탐색의 복잡도 모델과 실제 고정 원본의 구현 전후 transaction 기록은 [측정 보고서](RequestTitleTransactions.md)에 둔다.
 

@@ -3,12 +3,14 @@ import { dirname } from 'node:path';
 import { DatabaseSync, type StatementSync } from 'node:sqlite';
 import { migrateSchema } from './migrations';
 import { calendarPeriod } from './timezone';
+import { UsageRollupStore } from './rollups';
 
 export type SqliteSessionOptions = string | { databasePath: string; cacheKiB?: number };
 
 /** Owns the SQLite connection shared by all summary readers and stores. */
 export class SqliteSession {
   readonly connection: DatabaseSync;
+  readonly rollups: UsageRollupStore;
   private closed = false;
   private lastOptimizedAt: number | undefined;
   // Cache only fixed statements, so its size is independent of files, sessions and user queries.
@@ -36,6 +38,7 @@ export class SqliteSession {
         if (timestamp === null) return null;
         return calendarPeriod(Number(timestamp), String(timezone), unit === 'month' ? 'month' : 'day');
       });
+      this.rollups = new UsageRollupStore(this);
     } catch (error) {
       this.connection.close();
       throw error;

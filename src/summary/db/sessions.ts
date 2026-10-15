@@ -40,7 +40,10 @@ export class SessionStore {
 
   /** Removes only derived statistics; transcript sources and lock files are untouched. */
   clearData(): void {
-    this.database.transaction(() => this.database.connection.exec('DELETE FROM turn_summary; DELETE FROM manifest; DELETE FROM sessions; DELETE FROM projects;'));
+    this.database.transaction(() => {
+      this.database.rollups.clear();
+      this.database.connection.exec('DELETE FROM turn_summary; DELETE FROM manifest; DELETE FROM sessions; DELETE FROM projects;');
+    });
   }
 
   /** Stage outside this call; this transaction only installs a complete session group. */
@@ -142,6 +145,7 @@ export class SessionStore {
         if (previous) requireSession(previous.provider, previous.session_id);
         remove.run(id);
       }
+      this.database.rollups.refreshChangedSessions();
       this.database.connection.exec(`DELETE FROM sessions WHERE (provider,session_id) IN (SELECT provider,session_id FROM db_replacement_sessions)
         AND NOT EXISTS(SELECT 1 FROM turn_summary t WHERE t.provider=sessions.provider AND t.session_id=sessions.session_id);
         DELETE FROM projects WHERE project_key IN (SELECT project_key FROM db_replacement_projects)

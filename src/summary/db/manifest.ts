@@ -42,6 +42,7 @@ export class ManifestStore {
         this.database.statement(`UPDATE turn_summary SET diagnostic_file_id = ?, diagnostic_offset = ?, last_error = ?
           WHERE provider = ? AND session_id = ?`)
           .run(id, offset, error ?? status, file.provider, file.session_id);
+        if (file.session_id !== null) this.database.rollups.refreshSession(file.provider as Provider, file.session_id as string);
       }
     });
   }
