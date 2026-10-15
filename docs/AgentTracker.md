@@ -158,7 +158,7 @@ manual refresh
 
 클릭 명령은 `agentTracker.toggleQuotaTooltip`이다. `tools/vscode/statusbar-toggle.cjs`가 Agent Tracker의 이 명령만 내부 `ToggleTooltipCommand` 객체로 변환한다. 공개 API의 기능은 아니므로 확장 설치·활성화와 패치 적용을 구분한다. 원본 백업과 복원 명령을 제공하며 VS Code 업데이트 뒤 재적용한다. 패치가 없는 설치에서는 기본 호버와 클릭 열기 경로를 사용한다.
 
-`src/ui/quotaTooltip.ts`가 현재 snapshot으로 카드 내용을 만든다. 외부 label과 오류 메시지는 `appendText`로 이스케이프하고, 명령 링크는 필요한 명령만 `isTrusted.enabledCommands`에 허용한다. 위치와 스타일은 VS Code 기본 툴팁을 따른다. API 근거와 구현 상세는 [StatusBarPopup.md](StatusBarPopup.md)에 정리한다.
+`src/ui/quotaTooltip.ts`가 현재 snapshot으로 카드 내용을 만든다. 외부 label과 오류 메시지는 `appendText`로 이스케이프하고, 명령 링크는 필요한 명령만 `isTrusted.enabledCommands`에 허용한다. 위치와 스타일은 VS Code 기본 툴팁을 따른다. API 근거와 구현 상세는 [StatusBarPopup.md](research/StatusBarPopup.md)에 정리한다.
 
 ### 3.5 카드 내용과 설정
 
@@ -884,7 +884,7 @@ SQLite 자체보다 주의할 부분은 VS Code extension 배포 방식이다.
 
 SQLite 사용 자체가 고정 메모리를 보장하지 않는다. worker의 discovery 목록·중복 검증 작업량·DB page cache도 측정하고, corpus 전체를 host에 반환하지 않도록 batch/page 경계를 지킨다.
 
-JSONL reader는 바이트별 JS 처리 대신 일반 줄의 직접 파싱과 연속 Buffer 구간 처리를 사용한다. 읽은 원본 byte N에 대한 시간 O(N), chunk C와 보관 줄 한도 K에 대한 reader 보조 공간 O(C + min(L,K))는 유지한다. 이미지 검사에는 C 이내의 임시 Latin-1 문자열을 사용하며, row 객체·adapter·DB 메모리는 별도다. 파싱의 규모는 JSONL 행 수·원본/보관 byte·최대 줄 크기로 비교한다. 동일한 RAM 입력으로 I/O·adapter·DB를 제외한 적용 전후 브랜치 측정은 [파싱 전용 보고서](JsonlParsingBranches-2026-10-09.md)에 둔다. 이전 reader+adapter 및 전체 갱신 측정은 [기존 트레이드오프 보고서](JsonlReaderTradeoff.md)에 원본 그대로 보존한다. parser version과 집계 결과를 유지하므로 이 최적화만으로 정상 파일 전체를 강제 재파싱하지 않는다.
+JSONL reader는 바이트별 JS 처리 대신 일반 줄의 직접 파싱과 연속 Buffer 구간 처리를 사용한다. 읽은 원본 byte N에 대한 시간 O(N), chunk C와 보관 줄 한도 K에 대한 reader 보조 공간 O(C + min(L,K))는 유지한다. 이미지 검사에는 C 이내의 임시 Latin-1 문자열을 사용하며, row 객체·adapter·DB 메모리는 별도다. 파싱의 규모는 JSONL 행 수·원본/보관 byte·최대 줄 크기로 비교한다. 동일한 RAM 입력으로 I/O·adapter·DB를 제외한 적용 전후 브랜치 측정은 [파싱 전용 보고서](JsonlParsingBranches-2026-10-09.md)에 둔다. 이전 reader+adapter 및 전체 갱신 측정은 [기존 트레이드오프 보고서](benchmarks/JsonlReaderTradeoff.json)에 원본 그대로 보존한다. parser version과 집계 결과를 유지하므로 이 최적화만으로 정상 파일 전체를 강제 재파싱하지 않는다.
 
 ## 11. 검증 및 시뮬레이션
 
