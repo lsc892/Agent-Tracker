@@ -15,7 +15,7 @@ export const PARSER_VERSION = 13;
 const componentPredicate = `EXISTS(SELECT 1 FROM component c WHERE c.provider=scan_files.provider
   AND (c.session_id=scan_files.session_id OR c.session_id=scan_files.old_session))`;
 
-async function* walk(directory: string, signal?: AbortSignal): AsyncGenerator<string> {
+async function* walk(directory: string, signal?: AbortSignal, compressed = false): AsyncGenerator<string> {
   if (signal?.aborted) throw new SummaryError('interrupted');
   const rootStat = await lstat(directory);
   if (rootStat.isSymbolicLink() || !rootStat.isDirectory()) throw new SummaryError('source-root-not-directory');
@@ -24,8 +24,9 @@ async function* walk(directory: string, signal?: AbortSignal): AsyncGenerator<st
     if (signal?.aborted) throw new SummaryError('interrupted');
     if (item.isSymbolicLink()) continue;
     const path = join(directory,item.name);
-    if (item.isDirectory()) yield* walk(path,signal);
-    else if (item.isFile() && item.name.toLowerCase().endsWith('.jsonl')) yield path;
+    if (item.isDirectory()) yield* walk(path,signal,compressed);
+    else if (item.isFile() && (item.name.toLowerCase().endsWith('.jsonl')
+      || compressed && item.name.toLowerCase().endsWith('.jsonl.zst'))) yield path;
   }
 }
 
@@ -129,7 +130,7 @@ export async function refreshSummary(
     };
     for (const root of roots) {
       try {
-        for await (const path of walk(root.path,signal)) {
+        for await (const path of walk(root.path,signal,root.provider === 'codex')) {
           check();
           const stat = await lstat(path);
           if (!stat.isFile() || stat.isSymbolicLink()) continue;

@@ -8,6 +8,7 @@ import { PARSER_VERSION, refreshSummary } from '../../src/summary/scanner';
 import { SummaryClient } from '../../src/summary/client';
 import type { SummaryOptions } from '../../src/summary/types';
 import { acquireRefreshLock } from '../../src/summary/lock';
+import { constants, zstdCompressSync } from 'node:zlib';
 
 const jsonl = (rows: unknown[]): string => rows.map(row => JSON.stringify(row)).join('\n') + '\n';
 const user = (root = 'prompt-one', session = 'session-one') => ({type:'user',sessionId:session,promptId:root,cwd:'/workspace/project',timestamp:'2026-10-01T00:00:00Z',message:{content:'synthetic prompt'}});
@@ -244,6 +245,43 @@ const codexStart = (turn:string,root=turn) => ({type:'event_msg',timestamp:'2026
 const currentUsage = (thread:string,turn:string,root:string,input:number) => ({type:'token_usage_record',payload:{thread_id:thread,turn_id:turn,root_turn_id:root,response_id:`r-${thread}`,usage:{input_tokens:input,output_tokens:0}}});
 const legacyUsage = (input:number) => ({type:'event_msg',payload:{type:'token_count',info:{total_token_usage:{input_tokens:input,output_tokens:0},last_token_usage:{input_tokens:input,output_tokens:0}}}});
 const rootlessStart = (turn:string) => ({type:'event_msg',timestamp:'2026-10-01T00:00:00Z',payload:{type:'task_started',turn_id:turn}});
+
+test('Codex compression transitions and simultaneous copies preserve totals and reuse unchanged compressed sources',async () => fixture(async (database,options,root) => {
+  const codexOptions={...options,roots:[{provider:'codex' as const,path:root}]};
+  const plain=join(root,'main.jsonl'),compressed=plain+'.zst';
+  const source=jsonl([codexMeta('main'),codexStart('root'),currentUsage('main','root','root',100)]);
+  const encoded=zstdCompressSync(Buffer.from(source));
+  await writeFile(plain,source);
+  await refreshSummary(database,codexOptions);
+  await writeFile(compressed,encoded);
+  const overlap=await refreshSummary(database,codexOptions);
+  assert.equal(overlap.failed,0);assert.equal(overlap.discovered,2);
+  assert.equal(database.queryTurns().length,1);assert.equal(database.queryTurns()[0].total_tokens,100);
+  await unlink(plain);
+  const transition=await refreshSummary(database,codexOptions);
+  assert.equal(transition.failed,0);assert.equal(transition.discovered,1);
+  assert.equal(database.queryTurns()[0].total_tokens,100);
+  assert.equal(database.findManifest('codex',plain),undefined);
+  assert.equal(database.findManifest('codex',compressed)?.size_bytes,encoded.length);
+  const warm=await refreshSummary(database,codexOptions);
+  assert.equal(warm.parsed,0);assert.equal(warm.reused,1);assert.equal(warm.bodyBytes,0);
+  assert.deepEqual(await readFile(compressed),encoded);
+}));
+
+test('compressed Codex parents are reread for new descendants and corrupt refreshes preserve accepted usage',async () => fixture(async (database,options,root) => {
+  const codexOptions={...options,roots:[{provider:'codex' as const,path:root}]};
+  const parent=join(root,'main.jsonl.zst');
+  const encoded=zstdCompressSync(Buffer.from(jsonl([codexMeta('main'),codexStart('root'),currentUsage('main','root','root',100)])),
+    {params:{[constants.ZSTD_c_checksumFlag]:1}});
+  await writeFile(parent,encoded);await refreshSummary(database,codexOptions);
+  await writeFile(join(root,'child.jsonl'),jsonl([codexMeta('child','main'),codexStart('child-turn','root'),currentUsage('child','child-turn','root',40)]));
+  const expanded=await refreshSummary(database,codexOptions);
+  assert.equal(expanded.failed,0);assert.equal(database.queryTurns()[0].total_tokens,140);
+  await writeFile(parent,encoded.subarray(0,encoded.length-1));
+  const broken=await refreshSummary(database,codexOptions);
+  assert.ok(broken.failed>0);assert.equal(database.queryTurns()[0].total_tokens,140);
+  assert.equal(database.findManifest('codex',parent)?.last_error,'decompression-error');
+}));
 
 test('aborted Codex roots and descendants leave no request summary while later cumulative deltas stay correct',async () => fixture(async (database,options,root) => {
   const codexOptions={...options,roots:[{provider:'codex' as const,path:root}]};

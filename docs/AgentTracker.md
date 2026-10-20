@@ -239,10 +239,14 @@ extension 시작과 상태 표시줄 quota 갱신은 과거 누계 갱신을 실
 ```text
 Claude: <dataHome>/.claude/projects/**/*.jsonl
 Codex:  <dataHome>/.codex/sessions/**/*.jsonl
+        <dataHome>/.codex/sessions/**/*.jsonl.zst
         <dataHome>/.codex/archived_sessions/**/*.jsonl
+        <dataHome>/.codex/archived_sessions/**/*.jsonl.zst
 ```
 
-Claude credential·로그 보존 설정은 `<dataHome>/.claude`, Codex App Server의 `CODEX_HOME`·세션 제목 metadata는 `<dataHome>/.codex`를 사용한다. 기존 `claude.dataHome`·`codex.dataHome`·`usage.claudeRoots`·`usage.codexRoots` 설정은 등록·사용하지 않고 환경 변수 `CLAUDE_CONFIG_DIR`·`CODEX_HOME`도 확장의 경로를 덮어쓰지 않는다. 경로를 바꾸면 quota provider를 재생성하고 진행 중인 통계 수집과 열린 통계·진단 창을 정리하며 다음 통계 진입에서 새 로그 경로를 수집한다. 기존 원본과 통계 계산 데이터는 자동 이동·삭제하지 않는다. 로그 수집에서는 symlink directory, credential/config 파일, JSONL이 아닌 파일을 읽지 않는다.
+Codex가 보관용으로 압축한 `.jsonl.zst`도 같은 로그로 수집한다. 압축 원본은 읽기 전용으로 유지하고 Node의 Zstd 스트림에서 작은 chunk씩 해제해 기존 JSONL parser에 전달한다. 해제한 원문 파일이나 전체 원문 buffer를 만들지 않으며 일반 집계와 같은 SQLite facts·임시 staging만 사용한다. 압축 입력·해제 출력에 backpressure를 적용하고 decoder history window는 최대 128 MiB로 제한한다. 표준 frame·block 길이를 확인해 이어 붙인 frame·skippable metadata를 처리하며 잘린 frame·checksum 오류는 `decompression-error`로 표시하고 해당 session의 이전 정상 통계를 보존한다. JSON 줄·이미지 예산과 취소 처리를 유지한다. manifest의 크기·수정 시각과 읽은 byte 수는 압축 원본 기준이고 JSON 파싱 위치는 해제한 JSONL의 byte offset이다. 일반·압축 복사본이 함께 있거나 압축으로 경로가 바뀌어도 기존 session·response 중복 제거를 적용한다. 수집 범위만 확장하므로 parser version을 올리거나 변경 없는 일반 로그를 강제 재파싱하지 않는다. [Node Zstd 스트림](https://nodejs.org/download/release/v22.15.0/docs/api/zlib.html#zlibcreatezstddecompressoptions), [Zstandard frame 형식](https://www.rfc-editor.org/rfc/rfc8878.html#section-3.1.1).
+
+Claude credential·로그 보존 설정은 `<dataHome>/.claude`, Codex App Server의 `CODEX_HOME`·세션 제목 metadata는 `<dataHome>/.codex`를 사용한다. 기존 `claude.dataHome`·`codex.dataHome`·`usage.claudeRoots`·`usage.codexRoots` 설정은 등록·사용하지 않고 환경 변수 `CLAUDE_CONFIG_DIR`·`CODEX_HOME`도 확장의 경로를 덮어쓰지 않는다. 경로를 바꾸면 quota provider를 재생성하고 진행 중인 통계 수집과 열린 통계·진단 창을 정리하며 다음 통계 진입에서 새 로그 경로를 수집한다. 기존 원본과 통계 계산 데이터는 자동 이동·삭제하지 않는다. 로그 수집에서는 symlink directory, credential/config 파일과 지원 대상 이외의 파일을 읽지 않는다.
 
 ### 4.3 manifest
 

@@ -1,4 +1,5 @@
 import { open } from 'node:fs/promises';
+import { zstdChunks, ZstdError } from './zstd';
 
 export class SummaryError extends Error {
   constructor(public readonly code: string, public readonly offset = 0) { super(code); }
@@ -114,7 +115,7 @@ class JsonlLine {
   }
 }
 
-/** Reads only the observed snapshot; the line budget excludes discarded image bodies. */
+/** Reads the observed snapshot, streaming .jsonl.zst in memory. Row offsets refer to decoded JSONL. */
 export async function readJsonl(
   path: string,
   size: number,
@@ -131,13 +132,22 @@ export async function readJsonl(
   let read = 0;
   let lineOffset = 0;
   let rows = 0;
-  try {
+  const compressed = path.toLowerCase().endsWith('.jsonl.zst');
+  const chunks = async function* (): AsyncGenerator<Buffer> {
     while (read < size) {
       if (options.signal?.aborted || options.isCancelled?.()) throw new SummaryError('interrupted', read);
       const { bytesRead } = await file.read(chunk, 0, Math.min(chunk.length, size - read), read);
       if (!bytesRead) throw new SummaryError('file-truncated-during-read', read);
       read += bytesRead;
       options.onBytes?.(bytesRead);
+      // The decoder can prefetch; it must not see a buffer overwritten by the next file read.
+      yield compressed ? Buffer.from(chunk.subarray(0, bytesRead)) : chunk.subarray(0, bytesRead);
+    }
+  };
+  try {
+    for await (const chunk of compressed ? zstdChunks(chunks()) : chunks()) {
+      if (options.signal?.aborted || options.isCancelled?.()) throw new SummaryError('interrupted', read);
+      const bytesRead = chunk.length;
       let stopped = false;
       const parseRows = (): void => {
         let index = 0;
@@ -175,5 +185,8 @@ export async function readJsonl(
       if (stopped) return {partialLine:false,bytes:read,rows};
     }
     return { partialLine: (line?.bytes ?? 0) > 0, bytes: read, rows };
+  } catch (error) {
+    if (error instanceof ZstdError) throw new SummaryError('decompression-error', lineOffset);
+    throw error;
   } finally { await file.close(); }
 }
