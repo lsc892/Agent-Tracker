@@ -44,6 +44,9 @@
     "benchmark:quota": "npm run build && node tests/benchmarks/quota/benchmark.cjs",
     "benchmark:titles": "npm run build && node tests/benchmarks/request-titles.cjs",
     "benchmark:transactions": "npm run build && node tests/benchmarks/summary-transactions.cjs",
+    "benchmark:sql": "npm run build && node tests/benchmarks/sql-explain.cjs",
+    "benchmark:sql:rollup": "npm run build && node tests/benchmarks/sql-rollup.cjs",
+    "benchmark:sql:rollup:product": "npm run build && node tests/benchmarks/sql-rollup-product.cjs",
     "localization:sync": "node tools/localization.cjs",
     "localization:check": "node tools/localization.cjs --check"
   },

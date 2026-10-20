@@ -1,4 +1,7 @@
-export const SCHEMA_VERSION = 10;
+import { SCHEMA_ROLLUP_SQL } from './rollup-state';
+
+export { SCHEMA_ROLLUP_SQL } from './rollup-state';
+export const SCHEMA_VERSION = 11;
 
 /** Only non-Windows discovery uses device/inode to recognize moved files. */
 export function manifestIdentityIndexSql(platform: NodeJS.Platform): string {
@@ -119,6 +122,7 @@ ${TURN_SUMMARY_SQL}
 ${TURN_SUMMARY_INDEX_SQL}
 ${SCHEMA_MODEL_SQL}
 ${SCHEMA_CAPABILITY_SQL}
+${SCHEMA_ROLLUP_SQL}
 `;
 
 /** Both v1 and v2 stored project names on every turn. Preserve ids, statistics and diagnostics. */
