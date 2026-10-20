@@ -68,8 +68,8 @@ input, select { border: 1px solid var(--vscode-input-border, transparent); color
 .chart-measure { fill: var(--vscode-charts-blue, var(--vscode-terminal-ansiBlue)); }
 .chart-provider-codex { fill: var(--vscode-charts-blue, #3794ff); }
 .chart-provider-claude { fill: #d97757; }
-.model-name { display: inline-flex; align-items: baseline; gap: 6px; }
-.model-name svg { flex-shrink: 0; }
+.series-name { display: inline-flex; align-items: baseline; gap: 6px; }
+.series-name svg { flex-shrink: 0; }
 .capability-ratio { display: flex; align-items: center; gap: 10px; min-width: 200px; }
 .capability-ratio svg { width: 160px; height: 12px; flex-shrink: 0; }
 .capability-ratio-track { fill: var(--vscode-panel-border, #808080); fill-opacity: .4; }

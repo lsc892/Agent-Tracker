@@ -55,7 +55,7 @@ test('request table renders API failures separately from completed and running r
   let receive: ((event: {data:unknown})=>void) | undefined;
   new Script(readFileSync(join(__dirname,'../../../media/dashboard.js'),'utf8')).runInNewContext({ agentTrackerI18n: createTranslator('ko'),
     acquireVsCodeApi:()=>({getState:()=>undefined,setState:()=>undefined,postMessage:()=>undefined}),
-    document:{getElementById:getElement,createElement:()=>new Element(),querySelectorAll:()=>[]},
+    document:{getElementById:getElement,createElement:()=>new Element(),createElementNS:()=>new Element(),querySelectorAll:()=>[]},
     window:{addEventListener:(_name:string,listener:typeof receive)=>{receive=listener;}},
   });
   assert.ok(receive);

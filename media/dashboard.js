@@ -237,12 +237,13 @@
   function providerMarker(provider, attributes = {}) {
     return svgElement('rect', { width: 8, height: 8, class: `provider-marker ${providerClass(provider)}`, 'aria-hidden': 'true', ...attributes });
   }
-  function modelName(row, suffix = '') {
-    const node = element('span', undefined, 'model-name');
+  function seriesName(row, model, suffix = '') {
+    const node = element('span', undefined, 'series-name');
+    const label = model ? modelLabel(row) : providerLabel(row.provider);
     node.title = providerLabel(row.provider);
     const marker = svgElement('svg', { width: 8, height: 8, role: 'img', 'aria-label': providerLabel(row.provider) });
     marker.append(providerMarker(row.provider));
-    node.append(marker, suffix ? tableLabel(`${modelLabel(row)}${suffix}`) : element('span', modelLabel(row)));
+    node.append(marker, suffix ? tableLabel(`${label}${suffix}`) : element('span', label));
     return node;
   }
   const compact = value => value == null ? '—' : new Intl.NumberFormat(globalThis.agentTrackerI18n.language, { notation: 'compact', maximumFractionDigits: 1 }).format(value);
@@ -338,7 +339,8 @@
     const categories = vertical ? [...new Set(rows.map(categoryKey))] : [];
     if (chart.mode === 'calendar') categories.sort((a, b) => Number(a == null) - Number(b == null));
     const maxPeers = vertical && !turn ? Math.max(1, ...categories.map(category => rows.filter((row, index) => categoryKey(row, index) === category).length)) : 1;
-    const categoryWidth = Math.max(turn || sessions || projects ? 164 : 128, maxPeers * 46 + 36);
+    const peerWidth = chart.by === 'model' ? 46 : 60;
+    const categoryWidth = Math.max(turn || sessions || projects ? 164 : 128, maxPeers * peerWidth + 36);
     const width = Math.max(plot.clientWidth || 736, 736, vertical ? 86 + categories.length * categoryWidth : 0);
     const height = vertical ? chart.by === 'model' ? 414 : 372 : 62 + rows.length * 62;
     const svg = svgElement('svg', { viewBox: `0 0 ${width} ${height}`, width, height, class: 'chart-svg', role: 'group', 'aria-label': `${title} · ${$('chart-scope').textContent}` });
@@ -389,7 +391,7 @@
       const peers = vertical && !turn ? rows.filter((peer, peerIndex) => categoryKey(peer, peerIndex) === categoryKey(row, index)) : [row];
       const categoryIndex = categories.indexOf(categoryKey(row, index));
       const center = left + (width - left - 16) * (categoryIndex + .5) / Math.max(1, categories.length);
-      const x = vertical ? center + (peers.indexOf(row) - (peers.length - 1) / 2) * 46 - 18 : left;
+      const x = vertical ? center + (peers.indexOf(row) - (peers.length - 1) / 2) * peerWidth - 18 : left;
       const y = vertical ? top + length : 58 + index * 62;
       const barSize = vertical ? 36 : 22;
       group.append(svgElement('rect', { x: vertical ? x - 4 : x, y: vertical ? top : y - 20,
@@ -422,12 +424,13 @@
           name.append(providerMarker(row.provider, { x: 0, y: -8 }),
             svgElement('text', { x: 14, y: 0, 'text-anchor': 'start', class: 'chart-provider' }, label.length > 18 ? `${label.slice(0,17)}…` : label));
           group.append(name);
-        } else group.append(svgElement('text', { x: x + barSize / 2, y: 274, 'text-anchor': 'middle', class: 'chart-provider' }, providerLabel(row.provider)));
+        } else group.append(providerMarker(row.provider, { x: x + barSize / 2 - 26, y: 266 }),
+          svgElement('text', { x: x + barSize / 2 + 7, y: 274, 'text-anchor': 'middle', class: 'chart-provider' }, providerLabel(row.provider)));
       }
       else {
         const label = chartLabel(row, chart.mode);
-        if (row.model !== undefined) group.append(providerMarker(row.provider, { x, y: y - 14 }));
-        group.append(svgElement('text', { x: x + (row.model === undefined ? 0 : 14), y: y - 6, class: 'chart-label' }, label.length > 48 ? `${label.slice(0, 47)}…` : label));
+        group.append(providerMarker(row.provider, { x, y: y - 14 }));
+        group.append(svgElement('text', { x: x + 14, y: y - 6, class: 'chart-label' }, label.length > 48 ? `${label.slice(0, 47)}…` : label));
       }
       const showDetail = () => { $('chart-detail').textContent = description; };
       group.addEventListener('mouseenter', showDetail);
@@ -470,17 +473,16 @@
     const turn = result.groupBy === 'turn';
     const model = result.by === 'model';
     $('model-note').hidden = !model;
-    const identity = (row, suffix = '') => model ? modelName(row, suffix) : `${providerLabel(row.provider)}${suffix}`;
     const scopeLabel = row => row.period != null ? tableLabel(row.period) : row.session_id ? sessionLabel(row)
       : row.project_key ? projectLabel(row) : tableLabel(['day', 'month'].includes(result.groupBy) ? t('dashboard.unknownTime') : t('common.all'));
     const rows = result.rows;
     if (turn) {
       table($('usage-table'), [t('dashboard.projectHeader', { value0: model ? t('common.model') : t('common.provider') }), t('dashboard.requestSessionHeader'), t('dashboard.startTime'), ...tokenHeaders, t('dashboard.totalTokens'), t('dashboard.duration'), t('dashboard.statusQuality'), ...costHeaders], rows.map(row => [
-        model ? identity(row, ` / ${row.project_name}`) : tableLabel(identity(row, ` / ${row.project_name}`)), sessionLabel(row, true), date(row.started_at_ms), ...tokenValues(row), number(row.total_tokens), duration(row.duration_ms), `${row.status === 'completed' ? t('common.completed') : row.status === 'failed' ? t('common.failed') : t('common.inProgress')} · ${row.duration_quality}${row.quality_flags ? ` · ${row.quality_flags}` : ''}${row.last_error ? t('dashboard.previousValueSuffix', { value0: row.last_error }) : ''}`, ...cost(row),
+        seriesName(row, model, ` / ${row.project_name}`), sessionLabel(row, true), date(row.started_at_ms), ...tokenValues(row), number(row.total_tokens), duration(row.duration_ms), `${row.status === 'completed' ? t('common.completed') : row.status === 'failed' ? t('common.failed') : t('common.inProgress')} · ${row.duration_quality}${row.quality_flags ? ` · ${row.quality_flags}` : ''}${row.last_error ? t('dashboard.previousValueSuffix', { value0: row.last_error }) : ''}`, ...cost(row),
       ]));
     } else {
       table($('usage-table'), [model ? t('common.model') : t('common.provider'), t('dashboard.periodProjectSession'), ...tokenHeaders, t('dashboard.totalTokens'), t('dashboard.completedTotal'), t('dashboard.averageTokens'), t('dashboard.averageTimeSamples'), ...costHeaders], rows.map(row => [
-        identity(row), scopeLabel(row), ...tokenValues(row), number(row.total_tokens), `${number(row.completed_turns)} / ${number(row.turn_count)}`, number(row.avg_tokens_per_turn), t('dashboard.timeSamples', { value0: duration(row.avg_duration_ms), value1: number(row.turns_with_duration) }), ...cost(row),
+        seriesName(row, model), scopeLabel(row), ...tokenValues(row), number(row.total_tokens), `${number(row.completed_turns)} / ${number(row.turn_count)}`, number(row.avg_tokens_per_turn), t('dashboard.timeSamples', { value0: duration(row.avg_duration_ms), value1: number(row.turns_with_duration) }), ...cost(row),
       ]));
     }
     for (const prefix of ['', 'chart-']) {
