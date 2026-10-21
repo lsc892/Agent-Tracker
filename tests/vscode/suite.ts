@@ -10,7 +10,7 @@ interface SmokeReport { type: 'smoke-report'; ok: boolean; detail: string; stage
 /** Runs in a real Extension Development Host; the ordinary node:test suite skips this file. */
 export async function run(): Promise<void> {
   const extensionRoot = resolve(__dirname, '../../..');
-  const extension = vscode.extensions.getExtension('agent-tracker.agent-tracker');
+  const extension = vscode.extensions.getExtension('AgentTracker.agent-tracker');
   assert.ok(extension, 'Extension is discoverable by VS Code');
   const themes = vscode.extensions.getExtension('vscode.theme-defaults')?.packageJSON.contributes.themes as
     { id: string; uiTheme: string }[] | undefined;
@@ -432,7 +432,7 @@ export async function run(): Promise<void> {
     assert.match(unavailable.value.replace(/&nbsp;/g, ' '), /CLI에서 로그인하세요/);
     outcomes.push('native Markdown hover: all windows, remaining percentages, reset countdown, stale/loading/error states, escaped labels');
     const userData = process.env.AGENT_TRACKER_TEST_USER_DATA!;
-    const databasePath = join(userData, 'User', 'globalStorage', 'agent-tracker.agent-tracker', 'agent-tracker.sqlite');
+    const databasePath = join(userData, 'User', 'globalStorage', extension.id.toLowerCase(), 'agent-tracker.sqlite');
     await until(() => existsSync(databasePath), 'schema initialization');
     database = new DatabaseSync(databasePath, { readOnly: true });
     // The file exists before the worker finishes its initial WAL/schema transaction.

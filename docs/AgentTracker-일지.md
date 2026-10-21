@@ -4,8 +4,9 @@
 
 ## 현재 설계 결정 요약
 
+- **확장 식별자**: Marketplace 게시자 ID `AgentTracker`와 확장 이름 `agent-tracker`로 `AgentTracker.agent-tracker`를 사용한다. VSIX·npm 설치 metadata와 검증·설정 필터·상태 표시줄 패치를 같은 ID로 맞추고, 이전 게시자 ID의 workbench 패치는 기존 백업을 보존하며 새 ID로 갱신할 수 있게 한다. 근거: 사용자가 등록한 Marketplace 식별자와 배포 파일의 식별자를 일치시킨다.
 - **통계 표 정렬**: 토큰 통계의 모델/제공자·기간·입출력·캐시·합계·요청 수·평균·비용 헤더를 누르면 내림차순부터 오름차순으로 전환한다. 현재 선택한 열에만 방향 화살표를 표시하고 결과 갱신 시 현재 화면 위치와 표·도표의 가로 스크롤을 보존한다. 기본과 초기화는 최신 기간·요청 시작 시각순이며 프로젝트는 이름, 세션은 시작 시각을 사용한다. 숫자는 반올림 전 실제 표시 값, Input은 캐시 제외 값으로 비교하고 모델은 로컬 공식 출시일 목록과 snapshot 날짜를 사용한다. 출시일 미등록 모델은 뒤에서 숫자 버전을 구분하는 이름순으로 정렬하며 미상 값은 양방향 모두 마지막에 둔다. 정렬 후 100행씩 나누고 변경 시 첫 페이지로 돌아간다. 근거: 원하는 기준으로 전체 이력을 비교하면서 기존 미상 우선순위·집계·도표 페이지와 읽던 위치를 보존한다.
-- **npm 설치 CLI**: `agent-tracker-vscode` npm 패키지에 같은 버전의 완성된 VSIX를 포함해 npx로 실행하면 VS Code CLI로 설치하고 확장 ID·버전을 확인한다. 확장 ID와 루트 private manifest는 유지하고 npm manifest를 분리한다. 근거: 사용자가 npx 설치를 선택했으며 기존 `agent-tracker` npm 이름은 다른 프로젝트가 사용한다. 소스 빌드와 인증·workbench 패치는 설치 CLI에 포함하지 않는다.
+- **npm 설치 CLI**: `agent-tracker-vscode` npm 패키지에 같은 버전의 완성된 VSIX를 포함해 npx로 실행하면 VS Code CLI로 설치하고 확장 ID·버전을 확인한다. 확장 ID는 `AgentTracker.agent-tracker`를 사용하고 루트 private manifest를 유지하며 npm manifest를 분리한다. 근거: 사용자가 npx 설치를 선택했으며 기존 `agent-tracker` npm 이름은 다른 프로젝트가 사용한다. 소스 빌드와 인증·workbench 패치는 설치 CLI에 포함하지 않는다.
 - **SQLite 책임과 수명**: `db/index.ts`는 기존 API의 facade로 두고 연결·마이그레이션·manifest·세션 저장·비용 분류·집계 유지·조회 실행·SQL 생성을 별도 구성요소가 맡는다. 하나의 연결·statement cache·transaction 소유자를 공유하며 세션 교체·비용·rollup 반영은 원자적으로 처리한다. 근거: 변경 이유가 다른 로직을 분리하면서 DB 수명·일관성 경계를 유지한다.
 - **미상 표시 우선순위**: 모든 통계 조회는 선택한 필터·조회 단위를 유지하고 모델·시각 미상 행을 후순위로 정렬한 뒤 페이지를 나눈다. 도표는 기존 날짜·프로젝트·세션 묶음 안에서 미상 모델을 마지막으로 배치하고 시각 미상 기간·미상 모델만 있는 묶음은 뒤에 둔다. Skill의 미상 모델도 후순위이며 최다 사용 횟수는 필터 전체에서 조회한다. 근거: 미상이 확인된 항목 사이에 끼지 않게 하면서 선택 조건·집계·비율 기준을 보존한다.
 - **JSONL reader**: Codex의 일반 JSONL과 `.jsonl.zst`를 수집하며 압축 원본을 유지한 채 Zstd 스트림으로 읽고 해제 파일·전체 원문 buffer를 만들지 않는다. frame 길이·checksum과 이어 붙인 frame을 확인하고 decoder history window는 최대 128 MiB로 제한한다. 64 KiB chunk에서 native LF 탐색을 사용하고 완성된 일반 줄은 직접 JSON.parse한다. 이미지 후보·chunk에 걸친 줄은 문자열 상태와 줄 예산을 유지하며 따옴표·역슬래시 위치를 캐시해 연속 구간을 복사한다. 이미지 본문은 chunk 내 escape·control 검증 후 폐기하고 해제한 JSONL의 byte offset·부분 줄·취소 처리를 유지한다. 근거: 자동 압축된 과거 이력을 포함하면서 원본 디스크 사용량을 늘리지 않고 시간 O(N)·제한된 보조 공간을 유지한다. 압축 해제 CPU·decoder window와 경계 처리 비용을 감수한다.
@@ -48,6 +49,13 @@
 ---
 
 ## 2026-10-21 — 사용자·Codex
+
+### Marketplace 게시자 ID를 AgentTracker로 맞춰 확장 식별자 통일
+
+- **의사결정**: 사용자는 빌드 결과의 식별자를 `AgentTracker.agent-tracker`로 지정했다. Codex는 manifest의 publisher를 `AgentTracker`로 바꾸고 확장 이름·표시명·버전은 유지했다. npm 설치 도구의 ID 검증·설정 화면 필터·상태 표시줄 패치·사용 안내도 같은 식별자로 맞췄다. 이전 게시자 ID로 적용된 workbench 패치는 정확한 기존 코드만 인식해 복원 백업을 보존하며 갱신하도록 선택했다.
+- **근거**: Marketplace에 등록한 게시자 ID와 VSIX 내부 식별자가 같아야 하며, manifest만 바꾸면 기존 ID를 검사하는 설치 도구와 화면 연결이 맞지 않는다.
+- **결과**: 이후 패키징은 `AgentTracker.agent-tracker`를 사용한다. npm 패키지 이름 `agent-tracker-vscode`와 VSIX 파일명 `agent-tracker-0.1.0.vsix`는 유지한다. 기존 ID로 설치된 확장과 저장 데이터의 자동 이전은 추가하지 않는다.
+- **검증**: `npm run check`의 타입 검사·린트·300개 테스트를 통과했다. 새 ID의 설정 열기·npm 설치 metadata와 대소문자를 구분하지 않는 설치 확인, 이전 게시자 ID의 v1~v4 상태 표시줄 패치 갱신·복원을 확인했다. 생성한 VSIX의 package.json·VSIX manifest가 `AgentTracker.agent-tracker@0.1.0`으로 일치하고 포함된 설정 필터도 새 ID를 사용하는지 확인했다. 실제 VS Code 설치·화면 검증은 수행하지 않았다.
 
 ### 선택한 정렬 열에만 화살표를 표시하고 조회 갱신 시 스크롤 위치 유지
 

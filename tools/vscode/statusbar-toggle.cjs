@@ -4,7 +4,7 @@ const { createHash } = require('node:crypto');
 const { spawnSync } = require('node:child_process');
 
 const command = 'agentTracker.toggleQuotaTooltip';
-const extensionId = 'agent-tracker.agent-tracker';
+const extensionId = 'AgentTracker.agent-tracker';
 const checksumKey = 'vs/workbench/workbench.desktop.main.js';
 const begin = '/*agent-tracker:statusbar-toggle:v4*/';
 const previewBegin = '/*agent-tracker:statusbar-toggle:v3*/';
@@ -83,8 +83,11 @@ function patchSource(source) {
   const legacy = original.slice(0, position) + `${legacyBegin}if(${condition}){${mapping}}${end}` + original.slice(position);
   const clickOnlySource = original.slice(0, position) + `${clickOnlyBegin}if(${condition}){${mapping}${clickOnly}}${end}` + original.slice(position);
   const preview = original.slice(0, position) + `${previewBegin}${previewInjection}${end}` + original.slice(position);
-  if (![original, patched, legacy, clickOnlySource, preview].includes(source)) throw new Error('기존 토글 패치가 예상 코드와 다릅니다. 자동으로 덮어쓰지 않습니다.');
-  return { original, patched, alreadyPatched: source === patched, upgradeRequired: source === legacy || source === clickOnlySource || source === preview };
+  // Recognize exact historical payloads so a publisher change retains restore backups.
+  const previousPublisher = [patched, legacy, clickOnlySource, preview].map(value =>
+    value.replaceAll(JSON.stringify(extensionId), JSON.stringify('agent-tracker.agent-tracker')));
+  if (![original, patched, legacy, clickOnlySource, preview, ...previousPublisher].includes(source)) throw new Error('기존 토글 패치가 예상 코드와 다릅니다. 자동으로 덮어쓰지 않습니다.');
+  return { original, patched, alreadyPatched: source === patched, upgradeRequired: source !== original && source !== patched };
 }
 
 function appRootFromInstallation(root, launcher = join(root, 'bin', 'code.cmd')) {

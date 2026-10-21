@@ -96,7 +96,7 @@ Install the bundled Agent Tracker VSIX into VS Code.
   if (options.version) { log(manifest.version); return; }
 
   const metadata = JSON.parse(readFileSync(join(packageRoot, 'extension.json'), 'utf8'));
-  if (metadata.id !== 'agent-tracker.agent-tracker' || metadata.version !== manifest.version) throw new Error('The bundled extension identity or version does not match the installer.');
+  if (metadata.id !== 'AgentTracker.agent-tracker' || metadata.version !== manifest.version) throw new Error('The bundled extension identity or version does not match the installer.');
   const vsix = join(packageRoot, 'extension.vsix');
   if (!existsSync(vsix)) throw new Error('The bundled extension.vsix is missing. Reinstall the npm package.');
   if (createHash('sha256').update(readFileSync(vsix)).digest('hex') !== metadata.sha256) throw new Error('The bundled VSIX checksum does not match. Reinstall the npm package.');

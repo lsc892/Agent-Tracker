@@ -84,7 +84,7 @@ VS Code 자체의 사용량 카드에는 DOM으로 만든 대시보드가 사용
 ## 내장 클릭 토글에 연결하는 알고리즘
 
 1. 현재 VS Code 설치의 workbench bundle에서 `statusBar.entry.toggleTooltip` 객체와 `StatusbarEntryItem.update` 처리 지점을 찾는다. 변수 이름은 현재 bundle에서 구하며 고정하지 않는다. 중복되거나 예상한 pointer·sticky hover 처리가 없으면 중단한다.
-2. `update(entry)` 시작에 `entry.extensionId === 'agent-tracker.agent-tracker'`이고 `entry.command.id === 'agentTracker.toggleQuotaTooltip'`인 경우만 명령 객체를 내부 `ToggleTooltipCommand`로 바꾸는 코드를 삽입한다. 입력 객체는 복사하므로 원래 entry는 변경하지 않는다.
+2. `update(entry)` 시작에 `entry.extensionId === 'AgentTracker.agent-tracker'`이고 `entry.command.id === 'agentTracker.toggleQuotaTooltip'`인 경우만 명령 객체를 내부 `ToggleTooltipCommand`로 바꾸는 코드를 삽입한다. 입력 객체는 복사하므로 원래 entry는 변경하지 않는다.
 3. 항목별 hover delegate를 만들어 자동 표시(`focus=false`)에는 접근성 label의 plain text 요약을, 클릭·키보드 표시(`focus=true`)에는 원래 Markdown 카드를 전달한다. 다른 항목과 공유하는 원본 delegate는 변경하지 않고 hover 지연과 해제 처리는 그대로 위임한다. 카드가 열린 상태에서는 `mouseover`·`focus` capture listener와 delegate 양쪽에서 요약 표시를 막는다. listener는 한 번만 등록하고 항목 해제 시 제거한다. [자동 호버 소스][hover-service]
 4. VS Code의 기존 pointerdown·click 처리는 그대로 실행된다. pointerdown에서 기존 sticky hover 여부를 기록하므로 mousedown의 기본 닫기 처리 뒤에도 두 번째 클릭을 닫기로 판단할 수 있다. 열기는 `hover.show(true)`를 사용해 마우스를 옮겨도 유지한다. [내장 처리 소스][statusbar-item]
 5. 다른 확장·명령과 quota 데이터 조회는 이 변환을 거치지 않는다. 닫기·외부 클릭·Esc의 상태 처리는 VS Code가 맡는다.

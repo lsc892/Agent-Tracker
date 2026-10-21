@@ -7,7 +7,7 @@ const { dirname, join, resolve } = require('node:path');
 function prepareInstaller(root, destination, vsix) {
   const extension = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
   const template = JSON.parse(readFileSync(join(root, 'tools/npm/manifest.json'), 'utf8'));
-  if (extension.name !== 'agent-tracker' || extension.publisher !== 'agent-tracker') throw new Error('Unexpected Agent Tracker extension identity.');
+  if (extension.name !== 'agent-tracker' || extension.publisher !== 'AgentTracker') throw new Error('Unexpected Agent Tracker extension identity.');
   if (!/^\d+\.\d+\.\d+(?:-[A-Za-z0-9.-]+)?$/.test(extension.version)) throw new Error('Invalid extension version.');
   const manifest = {
     ...template, version: extension.version, license: extension.license,
