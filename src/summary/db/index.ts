@@ -3,7 +3,7 @@ import type { NameQuery, NameResult } from '../types';
 import type {
   BillingMode, CapabilityCategory, CapabilityPage, ChartMetric, CumulativeRow, DiagnosticsPage, FileMetadata,
   KeysetPage, ManifestRow, OffsetPage, ProcessingStatus, Provider, SessionReplacement, SummaryFilter,
-  TurnSummaryRow, UsageChart, UsageGrouping, UsageRow,
+  TurnSummaryRow, UsageChart, UsageGrouping, UsageRow, UsageSort,
 } from './types';
 import { SqliteSession, type SqliteSessionOptions } from './connection';
 import { ManifestStore } from './manifest';
@@ -85,7 +85,7 @@ export class SummaryDatabase {
     return this.reader.queryNames(query);
   }
 
-  queryTurns(filter: SummaryFilter = {}, page: KeysetPage & { offset?: number; unknownLast?: boolean } = {}, by: 'provider' | 'model' = 'provider'): TurnSummaryRow[] {
+  queryTurns(filter: SummaryFilter = {}, page: KeysetPage & { offset?: number; unknownLast?: boolean; tableSort?: UsageSort } = {}, by: 'provider' | 'model' = 'provider'): TurnSummaryRow[] {
     return this.reader.queryTurns(filter, page, by);
   }
 
@@ -113,12 +113,12 @@ export class SummaryDatabase {
     return this.reader.queryUsageCount(filter, groupBy, timezone, by);
   }
 
-  queryUsage(filter: SummaryFilter = {}, groupBy: UsageGrouping = 'total', timezone = 'UTC', page: OffsetPage & { sortBy?: ChartMetric } = {}, by: 'provider' | 'model' = 'provider'): UsageRow[] {
+  queryUsage(filter: SummaryFilter = {}, groupBy: UsageGrouping = 'total', timezone = 'UTC', page: OffsetPage & { sortBy?: ChartMetric; tableSort?: UsageSort } = {}, by: 'provider' | 'model' = 'provider'): UsageRow[] {
     return this.reader.queryUsage(filter, groupBy, timezone, page, by);
   }
 
   queryUsageChart(filter: SummaryFilter, groupBy: UsageGrouping | 'all' | 'turn', timezone: string, metric: ChartMetric,
-    by: 'provider' | 'model' = 'provider', page: OffsetPage & { afterId?: number } = {}): UsageChart {
+    by: 'provider' | 'model' = 'provider', page: OffsetPage & { afterId?: number; tableSort?: UsageSort } = {}): UsageChart {
     return this.reader.queryUsageChart(filter, groupBy, timezone, metric, by, page);
   }
 

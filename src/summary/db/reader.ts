@@ -1,7 +1,7 @@
 import type { NameQuery, NameResult } from '../types';
 import type {
   CapabilityCategory, CapabilityPage, CapabilityRow, ChartMetric, CumulativeRow, DiagnosticsPage,
-  KeysetPage, ManifestRow, OffsetPage, Provider, SummaryFilter, TurnSummaryRow, UsageChart, UsageGrouping, UsageRow,
+  KeysetPage, ManifestRow, OffsetPage, Provider, SummaryFilter, TurnSummaryRow, UsageChart, UsageGrouping, UsageRow, UsageSort,
 } from './types';
 import { SqliteSession } from './connection';
 import { usageChartFromPage } from './chart';
@@ -18,15 +18,15 @@ export class SummaryReader {
   constructor(private readonly database: SqliteSession) {}
 
   private usageQueries<T>(filter: SummaryFilter, groupBy: UsageGrouping, timezone: string | undefined,
-    by: UsageBasis, sortBy: ChartMetric | undefined, action: (queries: { rows: QuerySql; count: QuerySql }) => T): T {
+    by: UsageBasis, sortBy: ChartMetric | undefined, action: (queries: { rows: QuerySql; count: QuerySql }) => T, tableSort?: UsageSort): T {
     const raw = (zone: string): { rows: QuerySql; count: QuerySql } => ({
-      rows: buildUsageQuery(filter, groupBy, zone, by, sortBy),
+      rows: buildUsageQuery(filter, groupBy, zone, by, sortBy, tableSort),
       count: buildUsageCountQuery(filter, groupBy, zone, by),
     });
-    const candidate = timezone === undefined ? undefined : buildRollupUsageQueries(filter, groupBy, timezone, by, sortBy);
+    const candidate = timezone === undefined ? undefined : buildRollupUsageQueries(filter, groupBy, timezone, by, sortBy, tableSort);
     if (filter.includeCosts || timezone !== undefined && !candidate) return action(raw(timezone ?? 'UTC'));
     return this.database.rollups.read(timezone, (ready, selected) => {
-      const queries = candidate ?? buildRollupUsageQueries(filter, groupBy, selected, by, sortBy);
+      const queries = candidate ?? buildRollupUsageQueries(filter, groupBy, selected, by, sortBy, tableSort);
       return action(ready && queries ? queries : raw(selected));
     });
   }
@@ -41,12 +41,12 @@ export class SummaryReader {
     return { rows, total };
   }
 
-  queryTurns(filter: SummaryFilter = {}, page: KeysetPage & { offset?: number; unknownLast?: boolean } = {}, by: 'provider' | 'model' = 'provider'): TurnSummaryRow[] {
-    if (page.unknownLast && page.afterId !== undefined) throw new RangeError('Unknown-last request pages require offsets');
+  queryTurns(filter: SummaryFilter = {}, page: KeysetPage & { offset?: number; unknownLast?: boolean; tableSort?: UsageSort } = {}, by: 'provider' | 'model' = 'provider'): TurnSummaryRow[] {
+    if ((page.unknownLast || page.tableSort) && page.afterId !== undefined) throw new RangeError('Sorted request pages require offsets');
     const where = buildQueryFilter(filter);
     const after = nonnegative(page.afterId ?? 0, 'afterId');
     const offset = nonnegative(page.offset ?? 0, 'offset');
-    const query = buildTurnsQuery(where, filter.includeCosts, by, page.unknownLast);
+    const query = buildTurnsQuery(where, filter.includeCosts, by, page.unknownLast, page.tableSort);
     const rows = this.database.connection.prepare(query.sql)
       .all(...query.values, after, pageLimit(page.limit), offset);
     for (const row of rows) delete row.has_model;
@@ -105,14 +105,14 @@ export class SummaryReader {
       (this.database.connection.prepare(count.sql).get(...count.values) as { count: number }).count);
   }
 
-  queryUsage(filter: SummaryFilter = {}, groupBy: UsageGrouping = 'total', timezone = 'UTC', page: OffsetPage & { sortBy?: ChartMetric } = {}, by: 'provider' | 'model' = 'provider'): UsageRow[] {
+  queryUsage(filter: SummaryFilter = {}, groupBy: UsageGrouping = 'total', timezone = 'UTC', page: OffsetPage & { sortBy?: ChartMetric; tableSort?: UsageSort } = {}, by: 'provider' | 'model' = 'provider'): UsageRow[] {
     return this.usageQueries(filter, groupBy, timezone, by, page.sortBy, ({ rows }) => this.database.connection.prepare(rows.sql)
-      .all(...rows.values, pageLimit(page.limit), nonnegative(page.offset ?? 0, 'offset')) as unknown as UsageRow[]);
+      .all(...rows.values, pageLimit(page.limit), nonnegative(page.offset ?? 0, 'offset')) as unknown as UsageRow[], page.tableSort);
   }
 
   /** Charts use the same page, grouping and order as the table. */
   queryUsageChart(filter: SummaryFilter, groupBy: UsageGrouping | 'all' | 'turn', timezone: string, metric: ChartMetric,
-    by: 'provider' | 'model' = 'provider', page: OffsetPage & { afterId?: number; sortBy?: ChartMetric } = {}): UsageChart {
+    by: 'provider' | 'model' = 'provider', page: OffsetPage & { afterId?: number; sortBy?: ChartMetric; tableSort?: UsageSort } = {}): UsageChart {
     const grouping = groupBy === 'all' ? 'total' : groupBy;
     if (grouping !== 'turn') {
       return this.usageQueries(filter, grouping, timezone, by, page.sortBy, queries => {
@@ -120,7 +120,7 @@ export class SummaryReader {
           .all(...queries.rows.values, pageLimit(page.limit), nonnegative(page.offset ?? 0, 'offset')) as unknown as UsageRow[];
         const total = (this.database.connection.prepare(queries.count.sql).get(...queries.count.values) as { count: number }).count;
         return usageChartFromPage(rows, total, groupBy, metric, by, filter.excludeEmptyUsage);
-      });
+      }, page.tableSort);
     }
     const rows = this.queryTurns(filter, { ...page, unknownLast: page.afterId === undefined }, by);
     const total = this.queryTurnsCount(filter, by);

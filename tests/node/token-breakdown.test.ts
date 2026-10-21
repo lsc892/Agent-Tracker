@@ -188,7 +188,7 @@ test('all dashboard groups render four named token columns with unknown and zero
     const table = getElement('usage-table').children[0];
     const start = groupBy === 'turn' ? 3 : 2;
     const headers = table.children[0].children[0].children.slice(start, start + 4);
-    assert.deepEqual(headers.map(cell => cell.textContent), ['Input', 'Output', 'Cache Write', 'Cache Read']);
+    assert.deepEqual(headers.map(cell => cell.children[0].children[0].textContent), ['Input', 'Output', 'Cache Write', 'Cache Read']);
     assert.ok(headers.every(cell => cell.title.length > 0));
     const values = table.children[1].children.map(tr => tr.children.slice(start, start + 5).map(cell => cell.textContent));
     assert.deepEqual(values, [

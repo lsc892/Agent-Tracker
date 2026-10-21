@@ -44,6 +44,10 @@ input, select { border: 1px solid var(--vscode-input-border, transparent); color
 .date-input > input[type=date]::-webkit-datetime-edit { display: none; }
 .date-input > input[type=date]::-webkit-calendar-picker-indicator { margin: 0; padding: 0; cursor: pointer; }
 .table-wrap { overflow-x: auto; border: 1px solid var(--vscode-panel-border); border-radius: 5px; }
+.table-sort { display: inline-flex; align-items: center; gap: 6px; padding: 3px 0; color: inherit; background: transparent; font-weight: inherit; text-align: left; white-space: nowrap; }
+.table-sort:hover { color: var(--vscode-textLink-foreground); background: transparent; }
+.sort-indicator { color: var(--vscode-descriptionForeground); }
+th[aria-sort=ascending] .sort-indicator, th[aria-sort=descending] .sort-indicator { color: var(--vscode-textLink-foreground); }
 .usage-chart { margin: 24px 0 28px; }
 .filter-toggle { display: flex; flex-direction: column; gap: 6px; color: var(--vscode-descriptionForeground); font-size: 12px; }
 .segmented { display: flex; gap: 4px; }

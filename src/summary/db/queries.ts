@@ -1,6 +1,7 @@
 import type { SQLInputValue } from 'node:sqlite';
+import { usageTableOrder } from './sorting';
 import type { NameQuery } from '../types';
-import type { ChartMetric, SummaryFilter, UsageGrouping } from './types';
+import type { ChartMetric, SummaryFilter, UsageGrouping, UsageSort } from './types';
 import { calendarPeriod } from './timezone';
 
 export type UsageBasis = 'provider' | 'model';
@@ -214,19 +215,20 @@ function usageDimensions(scope: UsageScope, by: UsageBasis): string[] {
 }
 
 export function buildUsageQuery(filter: SummaryFilter, groupBy: UsageGrouping, timezone: string,
-  by: UsageBasis, sortBy?: ChartMetric): QuerySql {
+  by: UsageBasis, sortBy?: ChartMetric, tableSort?: UsageSort): QuerySql {
   const scope = usageScope(filter, groupBy, timezone, by);
   const groups = scope.groups.join(', ');
   const metrics = { tokens: 'total_tokens', requests: 'turn_count', averageTokens: 'avg_tokens_per_turn', averageDuration: 'avg_duration_ms' };
   const order = sortBy ? `${metrics[sortBy]} DESC, ${groups}` : groups;
   return {
-    sql: `SELECT
+    sql: `${tableSort ? 'SELECT * FROM (' : ''}SELECT
       ${usageDimensions(scope, by).join(',\n      ')},
       ${usageSums(filter.excludeEmptyUsage)}${filter.includeCosts ? `, ${COST_SUMS}` : ''}
     FROM ${usageTurns(filter.includeCosts, by)} AS turn_summary
     WHERE ${scope.where}
     GROUP BY ${groups}
-    ORDER BY ${unknownOrder(by, scope.calendar ? 'period IS NULL' : undefined)}${order}
+    ${tableSort ? `) ORDER BY ${usageTableOrder(tableSort, groupBy, by === 'model', filter.includeCosts)}`
+      : `ORDER BY ${unknownOrder(by, scope.calendar ? 'period IS NULL' : undefined)}${order}`}
     LIMIT ? OFFSET ?`,
     values: scope.values,
   };
@@ -245,13 +247,13 @@ export function buildUsageCountQuery(filter: SummaryFilter, groupBy: UsageGroupi
   };
 }
 
-export function buildTurnsQuery(where: QuerySql, includeCosts: boolean | undefined, by: UsageBasis, unknownLast = false): QuerySql {
+export function buildTurnsQuery(where: QuerySql, includeCosts: boolean | undefined, by: UsageBasis, unknownLast = false, tableSort?: UsageSort): QuerySql {
   const order = unknownLast ? unknownOrder(by, 'started_at_ms IS NULL') : '';
   return {
     sql: `SELECT *, ${RECORDED_USAGE} AS has_recorded_usage
       FROM ${namedTurns(includeCosts, by)} AS turn_summary
       WHERE ${where.sql} AND id > ?
-      ORDER BY ${order}id${by === 'model' ? ', model' : ''}
+      ORDER BY ${tableSort ? usageTableOrder(tableSort, 'turn', by === 'model', includeCosts) : `${order}id${by === 'model' ? ', model' : ''}`}
       LIMIT ? OFFSET ?`,
     values: where.values,
   };

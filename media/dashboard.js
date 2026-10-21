@@ -22,6 +22,7 @@
   const date = value => value === null || value === undefined ? t('common.unknown') : new Intl.DateTimeFormat(globalThis.agentTrackerI18n.language, { dateStyle: 'short', timeStyle: 'medium', timeZone: timezone }).format(new Date(value));
   let offset = 0;
   let chartBy = 'provider';
+  let tableSort = { key: 'period', direction: 'desc' };
   let showCosts = false;
   let section = 'tokens';
   let capabilitiesEnabled = true;
@@ -66,7 +67,7 @@
     $('group-control').hidden = section !== 'tokens';
     $('chart-by-control').hidden = section !== 'tokens';
     for (const name of ['tokens', 'skills']) $(`section-${name}`).setAttribute('aria-pressed', String(section === name));
-    const request = { section, groupBy: $('group').value, offset, chartBy };
+    const request = { section, groupBy: $('group').value, offset, chartBy, tableSort: { ...tableSort } };
     if (section === 'skills') request.capabilityOffsets = { ...capabilityOffsets };
     const metric = $('chart-metric').value || 'tokens';
     request.chartMetric = request.groupBy === 'turn' && metric !== 'averageDuration' ? 'tokens' : metric;
@@ -170,16 +171,37 @@
     const list = $(`${kind}-options`);
     if (message.result.rows.length && page.loaded < page.total && list.scrollHeight <= list.clientHeight) loadNames(kind);
   }
-  function table(target, headers, rows) {
+  function table(target, headers, rows, sortKeys = []) {
     target.replaceChildren();
     if (!rows.length) { target.append(element('p', t('common.noRecords'), 'empty')); return; }
     const node = element('table');
     const head = element('thead');
     const tr = element('tr');
-    for (const header of headers) {
-      const cell = element('th', typeof header === 'string' ? header : header.label);
+    for (const [index, header] of headers.entries()) {
+      const label = typeof header === 'string' ? header : header.label;
+      const key = sortKeys[index];
+      const cell = element('th', key ? undefined : label);
       cell.setAttribute('scope', 'col');
       if (typeof header !== 'string') cell.title = header.title;
+      if (key) {
+        const active = tableSort.key === key;
+        cell.setAttribute('aria-sort', active ? tableSort.direction === 'asc' ? 'ascending' : 'descending' : 'none');
+        const button = element('button', undefined, 'table-sort');
+        button.type = 'button';
+        button.setAttribute('data-sort-key', key);
+        button.append(element('span', label));
+        if (active) {
+          const indicator = element('span', tableSort.direction === 'asc' ? '↑' : '↓', 'sort-indicator');
+          indicator.setAttribute('aria-hidden', 'true');
+          button.append(indicator);
+        }
+        button.addEventListener('click', () => {
+          tableSort = { key, direction: tableSort.key === key && tableSort.direction === 'desc' ? 'asc' : 'desc' };
+          offset = 0;
+          query();
+        });
+        cell.append(button);
+      }
       tr.append(cell);
     }
     head.append(tr);
@@ -476,14 +498,16 @@
     const scopeLabel = row => row.period != null ? tableLabel(row.period) : row.session_id ? sessionLabel(row)
       : row.project_key ? projectLabel(row) : tableLabel(['day', 'month'].includes(result.groupBy) ? t('dashboard.unknownTime') : t('common.all'));
     const rows = result.rows;
+    const tokenSortKeys = ['input', 'output', 'cacheWrite', 'cacheRead', 'tokens'];
+    const costSortKeys = showCosts ? ['cost'] : [];
     if (turn) {
       table($('usage-table'), [t('dashboard.projectHeader', { value0: model ? t('common.model') : t('common.provider') }), t('dashboard.requestSessionHeader'), t('dashboard.startTime'), ...tokenHeaders, t('dashboard.totalTokens'), t('dashboard.duration'), t('dashboard.statusQuality'), ...costHeaders], rows.map(row => [
         seriesName(row, model, ` / ${row.project_name}`), sessionLabel(row, true), date(row.started_at_ms), ...tokenValues(row), number(row.total_tokens), duration(row.duration_ms), `${row.status === 'completed' ? t('common.completed') : row.status === 'failed' ? t('common.failed') : t('common.inProgress')} · ${row.duration_quality}${row.quality_flags ? ` · ${row.quality_flags}` : ''}${row.last_error ? t('dashboard.previousValueSuffix', { value0: row.last_error }) : ''}`, ...cost(row),
-      ]));
+      ]), ['model', undefined, 'period', ...tokenSortKeys, 'averageDuration', undefined, ...costSortKeys]);
     } else {
       table($('usage-table'), [model ? t('common.model') : t('common.provider'), t('dashboard.periodProjectSession'), ...tokenHeaders, t('dashboard.totalTokens'), t('dashboard.completedTotal'), t('dashboard.averageTokens'), t('dashboard.averageTimeSamples'), ...costHeaders], rows.map(row => [
         seriesName(row, model), scopeLabel(row), ...tokenValues(row), number(row.total_tokens), `${number(row.completed_turns)} / ${number(row.turn_count)}`, number(row.avg_tokens_per_turn), t('dashboard.timeSamples', { value0: duration(row.avg_duration_ms), value1: number(row.turns_with_duration) }), ...cost(row),
-      ]));
+      ]), ['model', 'period', ...tokenSortKeys, 'requests', 'averageTokens', 'averageDuration', ...costSortKeys]);
     }
     for (const prefix of ['', 'chart-']) {
       $(`${prefix}previous`).disabled = offset === 0;
@@ -535,7 +559,7 @@
     for (const id of ['provider', 'from-day', 'to-day', 'from-day-picker', 'to-day-picker']) $(id).value = '';
     $('group').value = 'day'; $('chart-metric').value = 'tokens';
     nameCaption('project', ''); nameCaption('session', '');
-    offset = 0; chartBy = 'provider'; section = 'tokens'; query();
+    offset = 0; chartBy = 'provider'; tableSort = { key: 'period', direction: 'desc' }; section = 'tokens'; query();
   });
   for (const name of ['tokens', 'skills']) $(`section-${name}`).addEventListener('click', () => {
     section = name; closeNames(); query();

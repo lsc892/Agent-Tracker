@@ -29,6 +29,7 @@ export interface UsageQuery {
   sessionName?: string;
   limit?: number;
   offset?: number;
+  tableSort?: import('./db/types').UsageSort;
   afterId?: number;
   chartMetric?: import('./db/types').ChartMetric;
   chartBy?: 'provider' | 'model';

@@ -134,6 +134,12 @@ export interface OffsetPage {
 
 export type UsageGrouping = 'total' | 'project' | 'session' | 'day' | 'month';
 export type ChartMetric = 'tokens' | 'requests' | 'averageTokens' | 'averageDuration';
+export const USAGE_SORT_KEYS = ['model', 'period', 'input', 'output', 'cacheWrite', 'cacheRead', 'tokens',
+  'requests', 'averageTokens', 'averageDuration', 'cost'] as const;
+export interface UsageSort {
+  key: typeof USAGE_SORT_KEYS[number];
+  direction: 'asc' | 'desc';
+}
 export interface UsageChart {
   by?: 'provider' | 'model';
   rows: UsageRow[] | TurnSummaryRow[];

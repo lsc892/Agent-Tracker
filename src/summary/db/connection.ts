@@ -4,6 +4,7 @@ import { DatabaseSync, type StatementSync } from 'node:sqlite';
 import { migrateSchema } from './migrations';
 import { calendarPeriod } from './timezone';
 import { UsageRollupStore } from './rollups';
+import { modelOrderKey, modelRelease } from '../modelOrder';
 
 export type SqliteSessionOptions = string | { databasePath: string; cacheKiB?: number };
 
@@ -39,6 +40,8 @@ export class SqliteSession {
         return calendarPeriod(Number(timestamp), String(timezone), unit === 'month' ? 'month' : 'day');
       });
       this.rollups = new UsageRollupStore(this);
+      this.connection.function('agent_tracker_model_release', { deterministic: true }, model => modelRelease(String(model ?? '')));
+      this.connection.function('agent_tracker_model_key', { deterministic: true }, model => modelOrderKey(String(model ?? '')));
     } catch (error) {
       this.connection.close();
       throw error;

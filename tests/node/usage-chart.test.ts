@@ -8,6 +8,9 @@ import { Script } from 'node:vm';
 import { SummaryDatabase, type TurnSummaryInput, type UsageRow, type TurnSummaryRow } from '../../src/summary/db';
 import { SummaryClient } from '../../src/summary/client';
 import { parseDashboardMessage } from '../../src/ui/presentation';
+import { buildUsageQuery } from '../../src/summary/db/queries';
+import { modelRelease } from '../../src/summary/modelOrder';
+import { USAGE_SORT_KEYS, type UsageSort } from '../../src/summary/db/types';
 
 const start = Date.parse('2026-01-01T00:00:00Z');
 function turn(index: number, changes: Partial<TurnSummaryInput> = {}): TurnSummaryInput {
@@ -26,6 +29,91 @@ function seed(db: SummaryDatabase, rows: TurnSummaryInput[]): void {
   const sessions = new Map(rows.map(row => [`${row.provider}/${row.session_id}`, { provider: row.provider, session_id: row.session_id }]));
   db.replaceSessions({ sessions: sessions.values(), files: [], summaries: rows });
 }
+
+test('table sorting orders the full result before paging and raw/rollup queries agree for every column', t => {
+  const rows = Array.from({ length: 108 }, (_, index) => {
+    const input = 200 + (index * 13) % 997, output = (index * 17) % 203;
+    const write = index % 11 === 0 ? null : index % 9, read = index % 13 === 0 ? null : index % 23;
+    const model = ['claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-5-5', 'gpt-6.1-sol'][index % 4];
+    return turn(index, { provider: index % 4 === 3 ? 'codex' : 'claude',
+      project_key: `/project-${index}`, project_name: `Project ${107 - index}`, session_id: `session-${index}`,
+      started_at_ms: index > 104 ? null : start + index * 86400000,
+      input_tokens: input, output_tokens: output, total_tokens: input + output,
+      cache_write_input_tokens: write, cache_read_input_tokens: read,
+      duration_ms: index % 19 === 0 ? null : index * 123,
+      model_usage: index % 17 === 0 ? undefined : [{ model, input_tokens: input, output_tokens: output,
+        cache_write_input_tokens: write, cache_read_input_tokens: read }], billing: 'api',
+    });
+  });
+  const db = database(t, rows);
+  const value = (row: UsageRow, key: UsageSort['key']): number | string | null => {
+    if (key === 'input') return row.cache_write_input_tokens == null || row.cache_read_input_tokens == null ? null
+      : Math.max(0, row.input_tokens - row.cache_write_input_tokens - row.cache_read_input_tokens);
+    const fields = { output: 'output_tokens', cacheWrite: 'cache_write_input_tokens', cacheRead: 'cache_read_input_tokens',
+      tokens: 'total_tokens', requests: 'turn_count', averageTokens: 'avg_tokens_per_turn', averageDuration: 'avg_duration_ms', cost: 'cost_usd' } as const;
+    return key === 'model' ? modelRelease(row.model ?? '') : key === 'period' ? row.period
+      : row[fields[key]] ?? null;
+  };
+  for (const grouping of ['day', 'month', 'project', 'session', 'total'] as const) {
+    for (const by of ['provider', 'model'] as const) for (const key of USAGE_SORT_KEYS) for (const direction of ['asc', 'desc'] as const) {
+      const tableSort = { key, direction };
+      const filter = key === 'cost' ? { includeCosts: true } : {};
+      const full = db.queryUsage(filter, grouping, 'UTC', { limit: 1000, tableSort }, by);
+      const raw = buildUsageQuery(filter, grouping, 'UTC', by, undefined, tableSort);
+      assert.deepEqual(full, db.connection.prepare(raw.sql).all(...raw.values, 1000, 0), `${grouping}/${by}/${key}/${direction}: raw vs rollup`);
+      assert.deepEqual([
+        ...db.queryUsage(filter, grouping, 'UTC', { limit: 100, tableSort }, by),
+        ...db.queryUsage(filter, grouping, 'UTC', { offset: 100, limit: 100, tableSort }, by),
+      ], full, 'page boundary does not change the global order');
+      // Existing unknown-model/time priority precedes the selected column.
+      const known = full.filter(row => (by !== 'model' || row.model) && (!['day', 'month'].includes(grouping) || row.period != null));
+      if (key === 'model' && by === 'provider' || key === 'period' && !['day', 'month'].includes(grouping)) continue;
+      const values = known.map(row => value(row, key));
+      const firstNull = values.indexOf(null);
+      if (firstNull >= 0) assert.ok(values.slice(firstNull).every(item => item === null), 'missing values stay last in either direction');
+      const numbers = values.filter(item => item != null);
+      for (let index = 1; index < numbers.length; index++) assert.ok(direction === 'asc' ? numbers[index - 1] <= numbers[index]
+        : numbers[index - 1] >= numbers[index], `${grouping}/${by}/${key}/${direction}: actual values are monotonic`);
+    }
+  }
+  for (const by of ['provider', 'model'] as const) for (const key of USAGE_SORT_KEYS) for (const direction of ['asc', 'desc'] as const) {
+    const filter = { includeCosts: true };
+    const tableSort = { key, direction };
+    const full = db.queryTurns(filter, { limit: 1000, tableSort }, by);
+    const chart = db.queryUsageChart(filter, 'turn', 'UTC', 'tokens', by, { limit: 1000, tableSort });
+    assert.deepEqual(chart.rows, full);
+    assert.deepEqual([
+      ...db.queryTurns(filter, { limit: 100, tableSort }, by),
+      ...db.queryTurns(filter, { offset: 100, limit: 100, tableSort }, by),
+    ], full, 'request sorting also precedes pagination');
+    const known = full.filter(row => row.started_at_ms != null && (by !== 'model' || row.model));
+    const values = known.map(row => key === 'period' ? row.started_at_ms : key === 'averageDuration' ? row.duration_ms
+      : key === 'requests' ? 1 : key === 'averageTokens' ? row.total_tokens : value(row as unknown as UsageRow, key));
+    if (key === 'model' && by === 'provider') continue;
+    const firstNull = values.indexOf(null);
+    if (firstNull >= 0) assert.ok(values.slice(firstNull).every(item => item == null));
+    const present = values.filter(item => item != null);
+    for (let index = 1; index < present.length; index++) assert.ok(direction === 'asc' ? present[index - 1] <= present[index]
+      : present[index - 1] >= present[index], `turn/${by}/${key}/${direction}`);
+  }
+  assert.doesNotThrow(() => db.queryUsage({}, 'day', 'UTC', { tableSort: { key: 'cost', direction: 'desc' } }));
+  assert.throws(() => db.queryTurns({}, { afterId: 1, tableSort: { key: 'period', direction: 'desc' } }), /offsets/);
+});
+
+test('model header follows release dates across providers, aliases and snapshots, then numeric model versions', t => {
+  const newest = ['claude-haiku-5-5', 'gpt-6.1-sol', 'claude-sonnet-5-5', 'gpt-6-sol',
+    'claude-opus-5-5', 'gpt-6-astra', 'claude-sonnet-4-6', 'gpt-5.3-codex', 'claude-opus-4-5', 'claude-haiku-4-5', 'claude-sonnet-4-5'];
+  const db = database(t, [...newest, 'custom-5.10', 'custom-5.9', ''].map((model, index) => turn(index, {
+    model_usage: [{ model, input_tokens: 100, output_tokens: 50, cache_write_input_tokens: 20, cache_read_input_tokens: 30 }],
+  })));
+  const ordered = (direction: UsageSort['direction']) => db.queryUsage({}, 'total', 'UTC', { tableSort: { key: 'model', direction } }, 'model').map(row => row.model);
+  assert.deepEqual(ordered('desc'), [...newest, 'custom-5.10', 'custom-5.9', '']);
+  assert.deepEqual(ordered('asc'), [...newest].reverse().concat(['custom-5.9', 'custom-5.10', '']));
+  assert.equal(modelRelease('claude-sonnet-4-6-latest'), modelRelease('claude-sonnet-4-6-20260217'));
+  assert.equal(modelRelease('gpt-5.4-2026-03-05'), modelRelease('gpt-5.4'));
+  assert.equal(modelRelease('claude-3-5-sonnet-20241022'), 20241022);
+  assert.equal(modelRelease('unknown-custom'), null);
+});
 
 test('empty unknown requests stay in all table groups but are excluded from averages and all chart metrics', t => {
   const db = database(t, [
@@ -359,6 +447,11 @@ test('worker returns the current table page as chart data for all groupings and 
         assert.equal(result.chart!.total, result.total);
         assert.deepEqual(result.chart!.rows, result.rows, `${groupBy}/${chartBy}/${offset}`);
         assert.equal(result.rows.length, groupBy === 'all' && chartBy === 'provider' ? offset ? 0 : 1 : offset === 200 ? 5 : 100);
+        if (groupBy === 'day' || groupBy === 'month') {
+          const periods = (result.rows as UsageRow[]).map(row => row.period!);
+          assert.deepEqual(periods, [...periods].sort().reverse(), 'default shows the newest periods first');
+        }
+        if (groupBy === 'turn') assert.equal((result.rows[0] as TurnSummaryRow).root_turn_id, `request-${204 - offset}`);
       }
     }
     const result = await client.query({ groupBy: 'day', timezone: 'UTC', limit: 1, offset: 100, chartMetric: 'tokens' });
@@ -366,6 +459,12 @@ test('worker returns the current table page as chart data for all groupings and 
     assert.deepEqual((await client.query({ groupBy: 'all', providers: [], chartMetric: 'tokens' })).chart!.rows, []);
     const filtered = await client.query({ groupBy: 'session', projectKey: '/project-204', chartBy: 'model', chartMetric: 'averageDuration' });
     assert.equal(filtered.total, 1); assert.deepEqual(filtered.chart!.rows, filtered.rows);
+    for (const direction of ['asc', 'desc'] as const) {
+      const sorted = await client.query({ groupBy: 'turn', chartBy: 'model', chartMetric: 'tokens', offset: 100,
+        tableSort: { key: 'period', direction } });
+      assert.equal((sorted.rows[0] as TurnSummaryRow).root_turn_id, `request-${direction === 'asc' ? 100 : 104}`);
+      assert.deepEqual(sorted.chart!.rows, sorted.rows, 'worker propagates table sorting to the chart page');
+    }
   } finally { await client.dispose(); }
 });
 
@@ -392,7 +491,7 @@ function ui() {
   };
   get('group').value = 'day'; get('chart-metric').value = 'tokens';
   let receive: ((event: { data: unknown }) => void) | undefined;
-  const messages: { type: string; query?: { chartMetric?: string; offset?: number } }[] = [];
+  const messages: { type: string; query?: { chartMetric?: string; offset?: number; tableSort?: UsageSort } }[] = [];
   new Script(readFileSync(join(__dirname, '../../../media/dashboard.js'), 'utf8')).runInNewContext({ agentTrackerI18n: createTranslator('ko'),
     acquireVsCodeApi: () => ({ getState: () => undefined, setState: () => undefined, postMessage: (value: typeof messages[number]) => messages.push(value) }),
     document: { getElementById: get, createElement: (tag: string) => new Element(tag), createElementNS: (_ns: string, tag: string) => new Element(tag), querySelectorAll: () => [] },
@@ -402,6 +501,55 @@ function ui() {
     groupBy, by, rows, total, coverage: {}, chart: { rows, mode, metric, total, by },
   } } }) };
 }
+
+test('header buttons toggle every numeric column and model sorting, reset the page and show direction', () => {
+  const view = ui();
+  const render = () => view.render('day', 'calendar', 'tokens', [{ ...turn(0), model: 'claude-opus-5-5', period: '2026-01-01' }], 'model', 205);
+  const headers = () => view.get('usage-table').descendants().filter(node => node.tag === 'th');
+  const button = (key: string) => view.get('usage-table').descendants().find(node => node.attributes.get('data-sort-key') === key)!;
+  const indicators = () => view.get('usage-table').descendants().filter(node => node.className === 'sort-indicator');
+  render();
+  assert.equal(indicators().length, 1);
+  assert.equal(indicators()[0].textContent, '↓');
+  assert.ok(headers().filter(node => node.attributes.get('aria-sort') === 'none').every(node => !/[↑↓↕]/.test(node.textContent)));
+  assert.equal(headers()[1].attributes.get('aria-sort'), 'descending');
+  assert.match(headers()[1].textContent, /↓/);
+  button('period').listeners.get('click')!();
+  assert.equal(view.messages.at(-1)!.query!.tableSort!.direction, 'asc');
+  render();
+  assert.equal(headers()[1].attributes.get('aria-sort'), 'ascending');
+  for (const key of ['model', 'input', 'output', 'cacheWrite', 'cacheRead', 'tokens', 'requests', 'averageTokens', 'averageDuration']) {
+    view.get('next').listeners.get('click')!();
+    button(key).listeners.get('click')!();
+    assert.equal(view.messages.at(-1)!.query!.offset, 0);
+    assert.deepEqual(JSON.parse(JSON.stringify(view.messages.at(-1)!.query!.tableSort)), { key, direction: 'desc' });
+    render();
+    assert.equal(indicators().length, 1);
+    assert.equal(indicators()[0].textContent, '↓');
+    assert.equal(headers().find(node => node.children[0]?.attributes.get('data-sort-key') === key)!.attributes.get('aria-sort'), 'descending');
+    button(key).listeners.get('click')!();
+    assert.equal(view.messages.at(-1)!.query!.tableSort!.direction, 'asc');
+    render();
+    assert.equal(indicators().length, 1);
+    assert.equal(indicators()[0].textContent, '↑');
+    assert.equal(headers().find(node => node.children[0]?.attributes.get('data-sort-key') === key)!.attributes.get('aria-sort'), 'ascending');
+  }
+  view.get('reset-filters').listeners.get('click')!();
+  assert.equal(view.messages.at(-1)!.query!.tableSort!.key, 'period');
+  assert.equal(view.messages.at(-1)!.query!.tableSort!.direction, 'desc');
+});
+
+test('table sorting messages accept only supported columns and directions', () => {
+  for (const key of USAGE_SORT_KEYS) for (const direction of ['asc', 'desc']) {
+    const parsed = parseDashboardMessage({ type: 'queryUsage', query: { groupBy: 'day', tableSort: { key, direction } } });
+    assert.ok(parsed?.type === 'queryUsage');
+    assert.deepEqual(parsed.query.tableSort, { key, direction });
+  }
+  for (const tableSort of [null, 'input', { key: 'DROP TABLE', direction: 'desc' }, { key: '__proto__', direction: 'asc' },
+    { key: 'input', direction: 'desc; SELECT' }]) {
+    assert.equal(parseDashboardMessage({ type: 'queryUsage', query: { groupBy: 'day', tableSort } }), null);
+  }
+});
 
 test('request axes show titles and project/session charts place categories next to each other', () => {
   const view = ui();
@@ -470,7 +618,7 @@ test('period/project/session labels keep full text and filter actions inside cla
     assert.ok(labels.some(node=>node.textContent.includes(longName)), 'clipping preserves the original text');
     assert.ok(labels.some(node=>node.title.includes(longName)), 'full names remain available in hover text');
     if (group==='project' || group==='session') {
-      const button = view.get('usage-table').descendants().find(node=>node.tag==='button')!;
+      const button = view.get('usage-table').descendants().find(node=>node.className==='name-filter')!;
       button.listeners.get('click')!();
       assert.equal((view.messages.at(-1)!.query as Record<string,unknown>).projectKey, '/project');
     }

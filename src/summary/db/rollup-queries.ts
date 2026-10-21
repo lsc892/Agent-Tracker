@@ -1,5 +1,6 @@
 import type { SQLInputValue } from 'node:sqlite';
-import type { ChartMetric, SummaryFilter, UsageGrouping } from './types';
+import type { ChartMetric, SummaryFilter, UsageGrouping, UsageSort } from './types';
+import { usageTableOrder } from './sorting';
 import { buildQueryFilter, usageTurns, type QuerySql, type UsageBasis } from './queries';
 import { ROLLUP_STATES, ROLLUP_TABLES } from './rollup-state';
 import { calendarPeriod, periodBounds } from './timezone';
@@ -85,7 +86,7 @@ function mergeMetrics(excludeEmptyUsage = false): string {
 
 /** Undefined selects the unchanged raw builder for unsupported costs/calendar ranges. */
 export function buildRollupUsageQueries(filter: SummaryFilter, grouping: UsageGrouping, timezone: string,
-  by: UsageBasis, sortBy?: ChartMetric): RollupUsageQueries | undefined {
+  by: UsageBasis, sortBy?: ChartMetric, tableSort?: UsageSort): RollupUsageQueries | undefined {
   if (!['total', 'project', 'session', 'day', 'month'].includes(grouping)) throw new RangeError('Unknown usage grouping');
   if (by !== 'provider' && by !== 'model') throw new RangeError('Unknown usage grouping basis');
   buildQueryFilter(filter); // Preserve epoch-integer validation even on fallback paths.
@@ -122,9 +123,10 @@ export function buildRollupUsageQueries(filter: SummaryFilter, grouping: UsageGr
   return {
     mode: source.boundary ? 'rollup-plus-raw-boundaries' : 'rollup',
     rows: {
-      sql: `SELECT ${dimensions.join(',\n      ')}, ${mergeMetrics(filter.excludeEmptyUsage)}
+      sql: `${tableSort ? 'SELECT * FROM (' : ''}SELECT ${dimensions.join(',\n      ')}, ${mergeMetrics(filter.excludeEmptyUsage)}
         FROM (${source.sql}) AS turn_summary
-        GROUP BY ${groups.join(',')} ORDER BY ${unknownOrder}${order} LIMIT ? OFFSET ?`,
+        GROUP BY ${groups.join(',')} ${tableSort ? `) ORDER BY ${usageTableOrder(tableSort, grouping, by === 'model')}`
+          : `ORDER BY ${unknownOrder}${order}`} LIMIT ? OFFSET ?`,
       values: source.values,
     },
     count: {

@@ -1,5 +1,6 @@
 import type { QuotaProviderId } from '../quota/types';
 import type { UsageQuery, NameQuery } from '../summary/types';
+import { USAGE_SORT_KEYS, type UsageSort } from '../summary/db/types';
 
 export const providerName = (id: QuotaProviderId): string => id === 'claude' ? 'Claude' : 'Codex';
 export function escapeHtml(value: string): string {
@@ -43,6 +44,12 @@ export function parseDashboardMessage(input: unknown): DashboardMessage | null {
       const groupBy = raw.groupBy;
       if (!['day', 'month', 'project', 'session', 'all', 'turn'].includes(String(groupBy))) return null;
       const query: UsageQuery = { groupBy: groupBy as UsageQuery['groupBy'], limit: 100, offset: boundedOffset(raw.offset) };
+      if (raw.tableSort !== undefined) {
+        if (!raw.tableSort || typeof raw.tableSort !== 'object') return null;
+        const sort = raw.tableSort as Record<string, unknown>;
+        if (!USAGE_SORT_KEYS.includes(sort.key as UsageSort['key']) || !['asc', 'desc'].includes(String(sort.direction))) return null;
+        query.tableSort = { key: sort.key as UsageSort['key'], direction: sort.direction as UsageSort['direction'] };
+      }
       if (raw.section !== undefined && raw.section !== 'tokens' && raw.section !== 'skills') return null;
       if (raw.section) query.section = raw.section;
       if (raw.capabilityOffsets && typeof raw.capabilityOffsets === 'object') {
