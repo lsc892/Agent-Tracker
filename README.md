@@ -37,32 +37,38 @@ Open **Usage statistics** from the card or run **Agent Tracker: Open Usage Stati
 
 ## Installation and removal
 
-### Install
+### Install and update
 
-Requires Node.js **22.15+**, VS Code **1.101+**, and the `code` command available in your terminal. Sign in through Claude Code or the Codex CLI first.
+- **Requirements:** Node.js **22.15+**, VS Code **1.101+**, and the `code` command available in your terminal
+- **Sign-in:** Sign in through the CLI for each provider you use: Claude Code or the Codex CLI
 
-> The npm commands below will be available once `agent-tracker-vscode` is published to npm.
+Use the same command to install or update:
 
 ```sh
 npx agent-tracker-vscode@latest
 ```
 
-To install the installer command globally with npm:
+When it finishes, run **Developer: Reload Window** from the VS Code Command Palette.
+
+<details>
+<summary>More options: global install · profiles · macOS setup</summary>
+
+**Global install and update**
 
 ```sh
 npm install -g agent-tracker-vscode@latest
 agent-tracker-vscode
 ```
 
-After installation, run **Developer: Reload Window** from the VS Code Command Palette. Use the same installation commands to update. On macOS, if `code` is unavailable, first run **Shell Command: Install 'code' command in PATH**.
-
-To install into a specific profile, provide the name of a profile you have already created:
+**Install into a profile:** Provide the name of a profile you have already created in VS Code.
 
 ```sh
 npx agent-tracker-vscode@latest --profile "Work"
 ```
 
-Clicking the card's status bar item again to close it requires the optional [local VS Code patch (Korean)](docs/research/StatusBarPopup.md).
+**macOS:** If `code` is unavailable, first run **Shell Command: Install 'code' command in PATH** from the VS Code Command Palette.
+
+</details>
 
 ### Uninstall
 

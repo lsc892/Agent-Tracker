@@ -37,32 +37,38 @@
 
 ## 安装与卸载
 
-### 安装
+### 安装与更新
 
-需要 Node.js **22.15 及以上**、VS Code **1.101 及以上**，且终端中可以运行 `code` 命令。请先通过 Claude Code 或 Codex CLI 登录。
+- **运行环境：** Node.js **22.15 及以上**、VS Code **1.101 及以上**，且终端中可以运行 `code` 命令
+- **登录：** 请先通过所用提供商的 CLI（Claude Code 或 Codex CLI）登录
 
-> 以下 npm 命令需在 `agent-tracker-vscode` 包发布到 npm 后使用。
+安装和更新均使用以下命令：
 
 ```sh
 npx agent-tracker-vscode@latest
 ```
 
-如需通过 npm 全局安装安装器命令，请运行：
+完成后，在 VS Code 命令面板运行 **Developer: Reload Window**。
+
+<details>
+<summary>更多选项：全局安装 · 配置文件 · macOS 设置</summary>
+
+**全局安装与更新**
 
 ```sh
 npm install -g agent-tracker-vscode@latest
 agent-tracker-vscode
 ```
 
-安装后，在 VS Code 命令面板运行 **Developer: Reload Window**。更新时使用相同的安装命令。macOS 上若没有 `code` 命令，请先运行 **Shell Command: Install 'code' command in PATH**。
-
-如需安装到指定配置文件，请使用已创建的配置文件名称：
+**安装到指定配置文件：** 使用已在 VS Code 中创建的配置文件名称。
 
 ```sh
 npx agent-tracker-vscode@latest --profile "Work"
 ```
 
-再次点击状态栏项目以关闭卡片，需要应用可选的 [本地 VS Code 补丁（韩语说明）](docs/research/StatusBarPopup.md)。
+**macOS：** 若没有 `code` 命令，请先在 VS Code 命令面板运行 **Shell Command: Install 'code' command in PATH**。
+
+</details>
 
 ### 卸载
 

@@ -37,32 +37,38 @@ Ouvrez **Statistiques d'utilisation** depuis la carte ou lancez **Agent Tracker 
 
 ## Installation et désinstallation
 
-### Installer
+### Installer et mettre à jour
 
-Nécessite Node.js **22.15 ou ultérieur**, VS Code **1.101 ou ultérieur** et la commande `code` disponible dans le terminal. Connectez-vous d'abord via Claude Code ou la CLI Codex.
+- **Prérequis :** Node.js **22.15 ou ultérieur**, VS Code **1.101 ou ultérieur** et la commande `code` disponible dans le terminal
+- **Connexion :** Connectez-vous à la CLI de chaque fournisseur utilisé : Claude Code ou la CLI Codex
 
-> Les commandes npm ci-dessous seront disponibles une fois le paquet `agent-tracker-vscode` publié sur npm.
+Utilisez la même commande pour installer ou mettre à jour :
 
 ```sh
 npx agent-tracker-vscode@latest
 ```
 
-Pour installer la commande de l'installateur globalement avec npm :
+Une fois terminé, lancez **Developer: Reload Window** depuis la palette de commandes de VS Code.
+
+<details>
+<summary>Autres options : installation globale · profils · configuration macOS</summary>
+
+**Installation et mise à jour globales**
 
 ```sh
 npm install -g agent-tracker-vscode@latest
 agent-tracker-vscode
 ```
 
-Après l'installation, lancez **Developer: Reload Window** depuis la palette de commandes de VS Code. Utilisez les mêmes commandes d'installation pour mettre à jour. Sur macOS, si `code` n'est pas disponible, lancez d'abord **Shell Command: Install 'code' command in PATH**.
-
-Pour installer dans un profil précis, indiquez le nom d'un profil déjà créé :
+**Installer dans un profil :** Indiquez le nom d'un profil déjà créé dans VS Code.
 
 ```sh
 npx agent-tracker-vscode@latest --profile "Work"
 ```
 
-Fermer la carte en cliquant à nouveau sur l'élément de la barre d'état nécessite le [correctif local facultatif de VS Code (en coréen)](docs/research/StatusBarPopup.md).
+**macOS :** Si `code` n'est pas disponible, lancez d'abord **Shell Command: Install 'code' command in PATH** depuis la palette de commandes de VS Code.
+
+</details>
 
 ### Désinstaller
 

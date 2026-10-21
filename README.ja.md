@@ -37,32 +37,38 @@ Claude・Codex の現在の使用量とリセットまでの時間を表示し�
 
 ## インストールとアンインストール
 
-### インストール
+### インストールと更新
 
-Node.js **22.15 以降**、VS Code **1.101 以降**、ターミナルで実行できる `code` コマンドが必要です。先に Claude Code または Codex CLI でログインしてください。
+- **動作環境：** Node.js **22.15 以降**、VS Code **1.101 以降**、ターミナルで実行できる `code` コマンド
+- **ログイン：** 利用するプロバイダーのCLI（Claude Code または Codex CLI）で事前にログイン
 
-> 以下の npm コマンドは、`agent-tracker-vscode` パッケージが npm に公開された後に利用できます。
+インストールと更新には同じコマンドを使います。
 
 ```sh
 npx agent-tracker-vscode@latest
 ```
 
-npm でインストーラーのコマンドをグローバルに登録する場合は、次を実行します。
+完了したら、VS Code のコマンドパレットで **Developer: Reload Window** を実行してください。
+
+<details>
+<summary>追加オプション：グローバルインストール・プロファイル指定・macOS設定</summary>
+
+**グローバルインストールと更新**
 
 ```sh
 npm install -g agent-tracker-vscode@latest
 agent-tracker-vscode
 ```
 
-インストール後、VS Code のコマンドパレットで **Developer: Reload Window** を実行します。更新にも同じインストールコマンドを使います。macOS で `code` コマンドがない場合は、先に **Shell Command: Install 'code' command in PATH** を実行してください。
-
-特定のプロファイルにインストールする場合は、作成済みのプロファイル名を指定します。
+**特定のプロファイルにインストール：** VS Code で作成済みのプロファイル名を指定します。
 
 ```sh
 npx agent-tracker-vscode@latest --profile "Work"
 ```
 
-ステータスバーの項目を再度クリックしてカードを閉じるには、任意の [ローカル VS Code パッチ（韓国語）](docs/research/StatusBarPopup.md) が必要です。
+**macOS：** `code` コマンドがない場合は、先に VS Code のコマンドパレットで **Shell Command: Install 'code' command in PATH** を実行してください。
+
+</details>
 
 ### アンインストール
 

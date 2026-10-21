@@ -37,32 +37,38 @@ Abre **Estadísticas de uso** desde la tarjeta o ejecuta **Agent Tracker: Abrir 
 
 ## Instalación y desinstalación
 
-### Instalar
+### Instalar y actualizar
 
-Se requieren Node.js **22.15 o posterior**, VS Code **1.101 o posterior** y el comando `code` disponible en la terminal. Primero inicia sesión mediante Claude Code o la CLI de Codex.
+- **Requisitos:** Node.js **22.15 o posterior**, VS Code **1.101 o posterior** y el comando `code` disponible en la terminal
+- **Inicio de sesión:** Inicia sesión en la CLI de cada proveedor que uses: Claude Code o la CLI de Codex
 
-> Los siguientes comandos de npm estarán disponibles cuando se publique el paquete `agent-tracker-vscode` en npm.
+Usa el mismo comando para instalar o actualizar:
 
 ```sh
 npx agent-tracker-vscode@latest
 ```
 
-Para instalar globalmente el comando del instalador con npm:
+Al finalizar, ejecuta **Developer: Reload Window** desde la paleta de comandos de VS Code.
+
+<details>
+<summary>Más opciones: instalación global · perfiles · configuración de macOS</summary>
+
+**Instalación y actualización global**
 
 ```sh
 npm install -g agent-tracker-vscode@latest
 agent-tracker-vscode
 ```
 
-Después de instalar, ejecuta **Developer: Reload Window** desde la paleta de comandos de VS Code. Usa los mismos comandos de instalación para actualizar. En macOS, si no está disponible `code`, ejecuta primero **Shell Command: Install 'code' command in PATH**.
-
-Para instalar en un perfil específico, indica el nombre de un perfil que hayas creado previamente:
+**Instalar en un perfil:** Indica el nombre de un perfil que hayas creado previamente en VS Code.
 
 ```sh
 npx agent-tracker-vscode@latest --profile "Work"
 ```
 
-Para cerrar la tarjeta haciendo clic de nuevo en el elemento de la barra de estado, se necesita el [parche local opcional de VS Code (en coreano)](docs/research/StatusBarPopup.md).
+**macOS:** Si `code` no está disponible, ejecuta primero **Shell Command: Install 'code' command in PATH** desde la paleta de comandos de VS Code.
+
+</details>
 
 ### Desinstalar
 

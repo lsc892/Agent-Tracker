@@ -37,32 +37,38 @@ Claude·Codex의 현재 사용량과 리셋까지 남은 시간을 확인하고,
 
 ## 설치 및 삭제
 
-### 설치
+### 설치 및 업데이트
 
-Node.js **22.15 이상**, VS Code **1.101 이상**, 터미널에서 실행 가능한 `code` 명령이 필요합니다. Claude Code·Codex CLI에서 먼저 로그인하세요.
+- **실행 환경:** Node.js **22.15 이상**, VS Code **1.101 이상**, 터미널에서 실행 가능한 `code` 명령
+- **로그인:** 사용할 제공자의 CLI(Claude Code 또는 Codex CLI)에 먼저 로그인
 
-> 아래 npm 명령은 `agent-tracker-vscode` 패키지가 npm에 게시된 후 사용할 수 있습니다.
+설치와 업데이트 모두 같은 명령을 사용합니다.
 
 ```sh
 npx agent-tracker-vscode@latest
 ```
 
-npm으로 설치 명령을 전역에 등록하려면 다음을 실행합니다.
+완료되면 VS Code 명령 팔레트에서 **Developer: Reload Window**를 실행하세요.
+
+<details>
+<summary>추가 옵션: 전역 설치 · 프로필 지정 · macOS 설정</summary>
+
+**전역 설치·업데이트**
 
 ```sh
 npm install -g agent-tracker-vscode@latest
 agent-tracker-vscode
 ```
 
-설치 후 VS Code 명령 팔레트에서 **Developer: Reload Window**를 실행합니다. 업데이트도 같은 설치 명령을 사용합니다. macOS에서 `code` 명령이 없으면 **Shell Command: Install 'code' command in PATH**를 먼저 실행하세요.
-
-특정 프로필에 설치하려면 미리 만든 프로필 이름을 지정합니다.
+**특정 프로필에 설치:** VS Code에서 미리 만든 프로필 이름을 지정합니다.
 
 ```sh
 npx agent-tracker-vscode@latest --profile "Work"
 ```
 
-카드를 다시 클릭해 닫는 토글 동작은 선택적인 [로컬 VS Code 패치](docs/research/StatusBarPopup.md)가 필요합니다.
+**macOS:** `code` 명령이 없으면 VS Code 명령 팔레트에서 **Shell Command: Install 'code' command in PATH**를 먼저 실행하세요.
+
+</details>
 
 ### 삭제
 

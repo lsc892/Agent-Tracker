@@ -34,7 +34,7 @@ npm run package
 
 ### npm 배포와 npx 설치
 
-별도 npm 설치 패키지 `agent-tracker-vscode`는 VSIX를 포함하고 VS Code CLI로 설치한 뒤 확장 ID·버전을 확인합니다. **npm에 게시된 뒤** 사용자는 다음 명령으로 설치하거나 업데이트할 수 있습니다. Node.js 22.15 이상과 PATH에 등록된 VS Code `code` 명령이 필요합니다.
+별도 npm 설치 패키지 `agent-tracker-vscode`는 VSIX를 포함하고 VS Code CLI로 설치한 뒤 확장 ID·버전을 확인합니다. 다음 명령으로 설치하거나 업데이트할 수 있습니다. Node.js 22.15 이상과 PATH에 등록된 VS Code `code` 명령이 필요합니다.
 
 ```sh
 npx agent-tracker-vscode@latest
