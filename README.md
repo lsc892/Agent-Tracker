@@ -105,4 +105,18 @@ All setting keys below use the `agentTracker.` prefix.
 
 Use **Agent Tracker: Delete Statistics Data** to clear aggregated statistics. Original conversation logs are preserved, and statistics are recalculated when you reopen the view.
 
+## Release notes
+
+<details>
+<summary>v0.2.0</summary>
+
+- **Database performance** — Indexes optimize queries by period and project, while daily rollups improve model statistics and average calculations.
+- **Compressed Codex logs** — Statistics now include older conversations that Codex has compressed with Zstd (`.jsonl.zst`).
+- **Statistics retention** — Valid statistics stored in the database are kept by default after source conversations are deleted, including by Claude's automatic cleanup of older conversations.
+- **Chart readability** — Provider views now show provider colors, and table headers let you sort in ascending or descending order.
+
+</details>
+
+<br><br>
+
 [Usage and development reference (Korean)](docs/Development.ko.md)

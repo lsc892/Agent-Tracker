@@ -105,4 +105,18 @@ Toutes les clés ci-dessous portent le préfixe `agentTracker.`.
 
 Utilisez **Agent Tracker : Supprimer les données statistiques** pour effacer les résultats agrégés. Les journaux de conversation d'origine sont conservés et les statistiques sont recalculées à la prochaine ouverture de la vue.
 
+## Notes de version
+
+<details>
+<summary>v0.2.0</summary>
+
+- **Performances de la base de données** — Les index optimisent les recherches par période et projet, et les agrégations quotidiennes (rollup) améliorent les statistiques par modèle et le calcul des moyennes.
+- **Journaux Codex compressés** — Les statistiques incluent les anciennes conversations compressées par Codex avec Zstd (`.jsonl.zst`).
+- **Conservation des statistiques** — Les statistiques valides enregistrées dans la base sont conservées par défaut après la suppression des conversations source, y compris lors du nettoyage automatique de Claude.
+- **Graphiques plus lisibles** — Les vues par fournisseur affichent aussi leurs couleurs, et les en-têtes des tableaux permettent de trier par ordre croissant ou décroissant.
+
+</details>
+
+<br><br>
+
 [Référence d'utilisation et de développement (en coréen)](docs/Development.ko.md)

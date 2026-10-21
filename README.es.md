@@ -105,4 +105,18 @@ Todas las claves siguientes llevan el prefijo `agentTracker.`.
 
 Usa **Agent Tracker: Eliminar datos estadísticos** para borrar los resultados agregados. Se conservan los registros originales de conversación y las estadísticas se recalculan al volver a abrir la vista.
 
+## Notas de la versión
+
+<details>
+<summary>v0.2.0</summary>
+
+- **Rendimiento de la base de datos** — Los índices optimizan las consultas por período y proyecto, y las agregaciones diarias (rollup) mejoran las estadísticas por modelo y el cálculo de promedios.
+- **Registros comprimidos de Codex** — Las estadísticas incluyen las conversaciones antiguas que Codex ha comprimido con Zstd (`.jsonl.zst`).
+- **Conservación de estadísticas** — Las estadísticas válidas guardadas en la base de datos se conservan de forma predeterminada aunque se eliminen las conversaciones originales, incluso durante la limpieza automática de Claude.
+- **Gráficos más claros** — Las vistas por proveedor también muestran sus colores, y los encabezados de las tablas permiten ordenar de forma ascendente o descendente.
+
+</details>
+
+<br><br>
+
 [Referencia de uso y desarrollo (en coreano)](docs/Development.ko.md)
