@@ -43,7 +43,9 @@ export function parseDashboardMessage(input: unknown): DashboardMessage | null {
       const raw = value.query as Record<string, unknown>;
       const groupBy = raw.groupBy;
       if (!['day', 'month', 'project', 'session', 'all', 'turn'].includes(String(groupBy))) return null;
-      const query: UsageQuery = { groupBy: groupBy as UsageQuery['groupBy'], limit: 100, offset: boundedOffset(raw.offset) };
+      const limit = raw.limit === undefined ? 100 : raw.limit;
+      if (!validPageLimit(limit)) return null;
+      const query: UsageQuery = { groupBy: groupBy as UsageQuery['groupBy'], limit, offset: boundedOffset(raw.offset) };
       if (raw.tableSort !== undefined) {
         if (!raw.tableSort || typeof raw.tableSort !== 'object') return null;
         const sort = raw.tableSort as Record<string, unknown>;
@@ -56,6 +58,16 @@ export function parseDashboardMessage(input: unknown): DashboardMessage | null {
         const offsets=raw.capabilityOffsets as Record<string,unknown>;
         query.capabilityOffsets=Object.fromEntries((['skill','subagent','plugin','model'] as const)
           .map(category=>[category,boundedOffset(offsets[category])]));
+      }
+      if (raw.capabilityLimits !== undefined) {
+        if (!raw.capabilityLimits || typeof raw.capabilityLimits !== 'object') return null;
+        const limits = raw.capabilityLimits as Record<string, unknown>;
+        query.capabilityLimits = {};
+        for (const category of ['skill', 'subagent', 'plugin', 'model'] as const) {
+          if (limits[category] === undefined) continue;
+          if (!validPageLimit(limits[category])) return null;
+          query.capabilityLimits[category] = limits[category];
+        }
       }
       if (typeof raw.includeCosts === 'boolean') query.includeCosts = raw.includeCosts;
       if (raw.cumulativeBy === 'provider' || raw.cumulativeBy === 'model') {
@@ -73,6 +85,9 @@ export function parseDashboardMessage(input: unknown): DashboardMessage | null {
     }
     default: return null;
   }
+}
+function validPageLimit(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 1 && value <= 1000;
 }
 function boundedOffset(value: unknown): number {
   return typeof value === 'number' && Number.isSafeInteger(value) ? Math.max(0, Math.min(value, 10_000_000)) : 0;

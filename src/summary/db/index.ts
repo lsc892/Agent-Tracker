@@ -101,8 +101,8 @@ export class SummaryDatabase {
     return this.reader.queryTurnsCount(filter, by);
   }
 
-  queryCapabilities(filter: SummaryFilter, category: CapabilityCategory, offset = 0): CapabilityPage {
-    return this.reader.queryCapabilities(filter, category, offset);
+  queryCapabilities(filter: SummaryFilter, category: CapabilityCategory, offset = 0, limit = 100): CapabilityPage {
+    return this.reader.queryCapabilities(filter, category, offset, limit);
   }
 
   queryCumulative(filter: SummaryFilter, by: 'provider' | 'model', offset = 0): { rows: CumulativeRow[]; total: number; by: 'provider' | 'model' } {

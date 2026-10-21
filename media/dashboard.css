@@ -89,7 +89,9 @@ th { font-weight: 500; color: var(--vscode-descriptionForeground); background: v
 td { max-width: 330px; overflow-wrap: anywhere; }
 tr:last-child td { border-bottom: 0; }
 .empty { padding: 30px; text-align: center; color: var(--vscode-descriptionForeground); }
-.pagination { justify-content: flex-end; margin: 14px 0; }
+.pagination { justify-content: flex-end; flex-wrap: wrap; margin: 14px 0; }
+.page-size { display: flex; align-items: center; gap: 8px; }
+.page-size input { width: 86px; }
 #usage-progress { color: var(--vscode-descriptionForeground); min-height: 18px; }
 [hidden] { display: none !important; }
 @media(max-width: 720px) { body { padding: 20px 16px; } header, .section-title { align-items: flex-start; } h1 { font-size: 21px; } }

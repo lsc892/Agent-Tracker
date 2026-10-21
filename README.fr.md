@@ -124,6 +124,7 @@ Utilisez **Agent Tracker : Supprimer les données statistiques** pour effacer le
 - **Journaux Codex compressés** — Les statistiques incluent les anciennes conversations compressées par Codex avec Zstd (`.jsonl.zst`).
 - **Conservation des statistiques** — Les statistiques valides enregistrées dans la base sont conservées par défaut après la suppression des conversations source, y compris lors du nettoyage automatique de Claude.
 - **Graphiques plus lisibles** — Les vues par fournisseur affichent aussi leurs couleurs, et les en-têtes des tableaux permettent de trier par ordre croissant ou décroissant.
+- **Nombre de lignes par page réglable** — Choisissez le nombre de lignes à afficher par page dans la vue des statistiques.
 
 </details>
 

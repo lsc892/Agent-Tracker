@@ -58,14 +58,15 @@ export class SummaryReader {
     return (this.database.connection.prepare(query.sql).get(...query.values) as { count: number }).count;
   }
 
-  queryCapabilities(filter: SummaryFilter, category: CapabilityCategory, offset = 0): CapabilityPage {
+  queryCapabilities(filter: SummaryFilter, category: CapabilityCategory, offset = 0, limit = 100): CapabilityPage {
+    pageLimit(limit);
     const queries = buildCapabilityQueries(filter, category);
     const counts = this.database.connection.prepare(queries.counts.sql)
       .get(...queries.counts.values) as { total: number; totalUses: number; maxUses: number };
     const ranking = this.database.connection.prepare(queries.ranking.sql);
     const pageOffset = nonnegative(offset, 'offset');
-    const rows = ranking.all(...queries.ranking.values, 100, pageOffset) as unknown as CapabilityRow[];
-    const chartRows = pageOffset === 0 ? rows.slice(0, 20)
+    const rows = ranking.all(...queries.ranking.values, limit, pageOffset) as unknown as CapabilityRow[];
+    const chartRows = pageOffset === 0 && limit >= 20 ? rows.slice(0, 20)
       : ranking.all(...queries.ranking.values, 20, 0) as unknown as CapabilityRow[];
     const withPercentage = (row: CapabilityRow): CapabilityRow => ({
       ...row, percentage: counts.totalUses ? row.usage_count / counts.totalUses * 100 : 0,

@@ -21,6 +21,7 @@
   let timezone;
   const date = value => value === null || value === undefined ? t('common.unknown') : new Intl.DateTimeFormat(globalThis.agentTrackerI18n.language, { dateStyle: 'short', timeStyle: 'medium', timeZone: timezone }).format(new Date(value));
   let offset = 0;
+  let pageSize = 100;
   let chartBy = 'provider';
   let tableSort = { key: 'period', direction: 'desc' };
   let showCosts = false;
@@ -28,6 +29,7 @@
   let capabilitiesEnabled = true;
   const capabilityCategories = ['skill', 'subagent', 'plugin', 'model'];
   const capabilityOffsets = { skill: 0, subagent: 0, plugin: 0, model: 0 };
+  const capabilityPageSizes = { skill: 100, subagent: 100, plugin: 100, model: 100 };
   let latestUsage;
   let latestProgress;
   let latestRefreshResult;
@@ -42,6 +44,11 @@
   if (saved && Object.hasOwn(chartMetrics, saved.chartMetric)) $('chart-metric').value = saved.chartMetric;
   if (saved?.chartBy === 'model') chartBy = 'model';
   if (saved?.section === 'skills') section = 'skills';
+  if (validPageSize(saved?.pageSize)) pageSize = saved.pageSize;
+  for (const category of capabilityCategories) {
+    if (validPageSize(saved?.capabilityPageSizes?.[category])) capabilityPageSizes[category] = saved.capabilityPageSizes[category];
+  }
+  syncPageSizes();
 
   function element(tag, text, className) {
     const node = document.createElement(tag);
@@ -67,8 +74,11 @@
     $('group-control').hidden = section !== 'tokens';
     $('chart-by-control').hidden = section !== 'tokens';
     for (const name of ['tokens', 'skills']) $(`section-${name}`).setAttribute('aria-pressed', String(section === name));
-    const request = { section, groupBy: $('group').value, offset, chartBy, tableSort: { ...tableSort } };
-    if (section === 'skills') request.capabilityOffsets = { ...capabilityOffsets };
+    const request = { section, groupBy: $('group').value, limit: pageSize, offset, chartBy, tableSort: { ...tableSort } };
+    if (section === 'skills') {
+      request.capabilityOffsets = { ...capabilityOffsets };
+      request.capabilityLimits = { ...capabilityPageSizes };
+    }
     const metric = $('chart-metric').value || 'tokens';
     request.chartMetric = request.groupBy === 'turn' && metric !== 'averageDuration' ? 'tokens' : metric;
     $('chart-metric').value = request.chartMetric;
@@ -88,7 +98,32 @@
     $('billing-control').hidden = !showCosts || !selectedSession || !$('provider').value;
   }
   function saveState() {
-    vscode.setState({ section, group: $('group').value, chartMetric: $('chart-metric').value, chartBy });
+    vscode.setState({ section, group: $('group').value, chartMetric: $('chart-metric').value, chartBy, pageSize, capabilityPageSizes: { ...capabilityPageSizes } });
+  }
+  function validPageSize(value) {
+    return Number.isSafeInteger(value) && value >= 1 && value <= 1000;
+  }
+  function syncPageSizes() {
+    for (const id of ['page-size', 'chart-page-size']) $(id).value = String(pageSize);
+    for (const category of capabilityCategories) $(`${category}-page-size`).value = String(capabilityPageSizes[category]);
+  }
+  function bindPageSize(id, apply) {
+    const input = $(id);
+    const commit = () => {
+      input.setCustomValidity('');
+      const value = Number(input.value);
+      if (!validPageSize(value)) {
+        input.setCustomValidity(t('dashboard.invalidPageSize'));
+        input.reportValidity();
+        return;
+      }
+      apply(value);
+    };
+    input.addEventListener('input', () => input.setCustomValidity(''));
+    input.addEventListener('change', commit);
+    input.addEventListener('keydown', event => {
+      if (event.key === 'Enter') { event.preventDefault(); commit(); }
+    });
   }
   function nameCaption(kind, text, title = '') {
     $(`${kind}-name`).textContent = text || (kind === 'project' ? t('dashboard.allProjects') : t('dashboard.allSessions'));
@@ -569,6 +604,10 @@
     closeNames(); selectedProject = undefined; selectedSession = undefined;
     for (const id of ['provider', 'from-day', 'to-day', 'from-day-picker', 'to-day-picker']) $(id).value = '';
     $('group').value = 'day'; $('chart-metric').value = 'tokens';
+    pageSize = 100;
+    for (const category of capabilityCategories) capabilityPageSizes[category] = 100;
+    syncPageSizes();
+    for (const id of ['page-size', 'chart-page-size', ...capabilityCategories.map(category => `${category}-page-size`)]) $(id).setCustomValidity('');
     nameCaption('project', ''); nameCaption('session', '');
     offset = 0; chartBy = 'provider'; tableSort = { key: 'period', direction: 'desc' }; section = 'tokens'; query();
   });
@@ -576,8 +615,12 @@
     section = name; closeNames(); query();
   });
   for (const category of capabilityCategories) {
-    $(`${category}-previous`).addEventListener('click', () => { capabilityOffsets[category] = Math.max(0, capabilityOffsets[category] - 100); query(false); });
-    $(`${category}-next`).addEventListener('click', () => { capabilityOffsets[category] += 100; query(false); });
+    bindPageSize(`${category}-page-size`, value => {
+      if (value === capabilityPageSizes[category]) return;
+      capabilityPageSizes[category] = value; capabilityOffsets[category] = 0; query(false);
+    });
+    $(`${category}-previous`).addEventListener('click', () => { capabilityOffsets[category] = Math.max(0, capabilityOffsets[category] - capabilityPageSizes[category]); query(false); });
+    $(`${category}-next`).addEventListener('click', () => { capabilityOffsets[category] += capabilityPageSizes[category]; query(false); });
   }
   $('billing-mode').addEventListener('change', () => {
     if (!selectedSession || !$('provider').value) return;
@@ -606,8 +649,14 @@
   $('provider').addEventListener('change', () => { selectedSession = undefined; nameCaption('session', ''); closeNames(); });
   $('chart-metric').addEventListener('change', query);
   for (const prefix of ['', 'chart-']) {
-    $(`${prefix}previous`).addEventListener('click', () => { offset = Math.max(0, offset - 100); query(); });
-    $(`${prefix}next`).addEventListener('click', () => { offset += 100; query(); });
+    bindPageSize(`${prefix}page-size`, value => {
+      if (value === pageSize) return;
+      pageSize = value; offset = 0;
+      for (const id of ['page-size', 'chart-page-size']) { $(id).value = String(pageSize); $(id).setCustomValidity(''); }
+      query();
+    });
+    $(`${prefix}previous`).addEventListener('click', () => { offset = Math.max(0, offset - pageSize); query(); });
+    $(`${prefix}next`).addEventListener('click', () => { offset += pageSize; query(); });
   }
   window.addEventListener('message', event => {
     const message = event.data;

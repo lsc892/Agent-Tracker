@@ -14,10 +14,27 @@ test('webview boundary only permits bounded known queries and provider commands'
   assert.equal(parseDashboardMessage({ type: 'refreshUsage' }), null);
   assert.equal(parseDashboardMessage({ type: 'tab', tab: 'quota' }), null);
   assert.equal(parseDashboardMessage({ type: 'tab', tab: 'diagnostics' }), null);
-  assert.deepEqual(parseDashboardMessage({ type: 'queryUsage', query: { groupBy: 'turn', limit: 1000000, offset: -1, dbPath: '/secret', provider: 'claude' } }), {
+  assert.deepEqual(parseDashboardMessage({ type: 'queryUsage', query: { groupBy: 'turn', offset: -1, dbPath: '/secret', provider: 'claude' } }), {
     type: 'queryUsage', query: { groupBy: 'turn', limit: 100, offset: 0, provider: 'claude' },
   });
   assert.equal(parseDashboardMessage({ type: 'queryUsage', query: { groupBy: 'DROP TABLE' } }), null);
+});
+
+test('statistics page limits accept typed row counts and reject invalid values at the webview boundary', () => {
+  for (const limit of [1, 37, 1000]) {
+    const parsed = parseDashboardMessage({type:'queryUsage',query:{groupBy:'turn',limit,section:'skills',capabilityLimits:{skill:limit,model:73,unknown:10000}}});
+    assert.ok(parsed?.type === 'queryUsage');
+    assert.equal(parsed.query.limit,limit);
+    assert.deepEqual(parsed.query.capabilityLimits,{skill:limit,model:73});
+  }
+  for (const limit of [0,-1,1.5,1001,NaN,Infinity,'25',null]) {
+    assert.equal(parseDashboardMessage({type:'queryUsage',query:{groupBy:'day',limit}}),null);
+    assert.equal(parseDashboardMessage({type:'queryUsage',query:{groupBy:'day',capabilityLimits:{plugin:limit}}}),null);
+  }
+  const html = dashboardHtml('script','style','source','nonce');
+  for (const id of ['page-size','chart-page-size','skill-page-size','subagent-page-size','plugin-page-size','model-page-size']) {
+    assert.ok(html.includes(`id="${id}" type="number" min="1" max="1000" step="1" value="100" required`));
+  }
 });
 
 test('webview uses external local assets, a nonce CSP, and text-only dynamic labels', () => {

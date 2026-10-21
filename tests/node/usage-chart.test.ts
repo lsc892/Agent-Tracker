@@ -482,6 +482,7 @@ class Element {
   replaceChildren(): void { this.text = ''; this.children = []; this.onReplace?.(); }
   setAttribute(name: string, value: string): void { this.attributes.set(name, value); }
   addEventListener(name: string, listener: () => void): void { this.listeners.set(name, listener); }
+  setCustomValidity(): void {}
   descendants(): Element[] { return this.children.flatMap(child => [child, ...child.descendants()]); }
 }
 function ui() {
