@@ -9,7 +9,7 @@
 
 # Agent Tracker
 
-A VS Code extension that shows current Claude and Codex usage and time until reset, and tracks token usage and task duration from conversation logs.
+A VS Code extension that shows current Claude and Codex usage and time until reset, and tracks token usage and task duration from AI agent usage records.
 
 ## Features
 

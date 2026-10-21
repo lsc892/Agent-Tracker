@@ -9,7 +9,7 @@
 
 # Agent Tracker
 
-在 VS Code 中查看 Claude 和 Codex 的当前用量及重置倒计时，并通过对话日志追踪 Token 消耗与耗时的扩展。
+在 VS Code 中查看 Claude 和 Codex 的当前用量及重置倒计时，并通过 AI 智能体使用记录追踪 Token 消耗与任务耗时的扩展。
 
 ## 主要功能
 
