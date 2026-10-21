@@ -70,6 +70,7 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
   let lastDiagnosticsPage: { offset?: number; providers?: string[] } | undefined;
   const policies: string[] = [];
   const collectionSwitches: boolean[] = [];
+  const retentionSwitches: boolean[] = [];
   const pollingIntervals: number[] = [];
   const uri = (fsPath: string): { fsPath: string; toString(): string } => ({ fsPath, toString: () => fsPath });
   const disposable: Disposable = { dispose() {} };
@@ -151,6 +152,7 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     async refresh(provider: string, force: boolean) { refreshes.push({ provider, force }); }
   }
   class FakeSummary {
+    async setDeletedSourceRetentionEnabled(enabled:boolean) {retentionSwitches.push(enabled);await this.cancelRefresh();}
     async setCapabilityCollectionEnabled(enabled:boolean) {collectionSwitches.push(enabled);await this.cancelRefresh();}
     async initialize() { initializations++; }
     async refresh(options: {roots: typeof lastRoots}) {
@@ -285,6 +287,10 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     assert.equal(refreshes.length, 4);
     assert.equal(scans, 0);
 
+    await update('usage.retainDeletedSourceUsage',false);
+    await update('usage.retainDeletedSourceUsage',true);
+    assert.deepEqual(retentionSwitches,[false,true]);
+    assert.equal(scans,0,'retention settings wait for an explicit statistics refresh');
     await cardAction('agentTracker.openUsage');
     assert.equal(panels.length, 1);
     assert.equal(scans, 0, 'summary starts only when the usage webview is ready');

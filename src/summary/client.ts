@@ -25,6 +25,12 @@ export class SummaryClient {
     await this.clearPending;
     if (this.worker) await this.request('configureCapabilities',{enabled});
   }
+  async setDeletedSourceRetentionEnabled(enabled: boolean): Promise<void> {
+    this.options.retainDeletedSourceUsage=enabled;
+    await this.cancelRefresh();
+    await this.clearPending;
+    if (this.worker) await this.request('configureRetention',{enabled});
+  }
   refresh(options: { roots?: SourceRoot[]; timezone?: string } = {}): Promise<RefreshResult> {
     if (this.clearPending) return this.clearPending.then(() => this.refresh(options));
     if (!this.refreshPending) {

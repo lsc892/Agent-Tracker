@@ -1,4 +1,6 @@
 {
+  "manifest.retainDeletedSourceUsage": "Conserver les statistiques après la suppression des fichiers source si un modèle connu a consommé des jetons et si la requête est liée à une session valide. Les durées manquantes, avertissements, échecs et erreurs de réanalyse n'empêchent pas la conservation. Tant que des sources manquent, les requêtes existantes gardent leur dernier relevé et les nouvelles sont collectées. Désactiver applique les suppressions à la prochaine actualisation. [Effacer les données d’utilisation](command:agentTracker.clearUsageData) supprime aussi cet historique.",
+  "diagnostics.sourceMissing": "Source supprimée · utilisation conservée",
   "configuration.invalidTimezone": "Impossible de lire le fuseau horaire. Le fuseau du système ({value0}) sera utilisé. Vérifiez agentTracker.usage.timezone.",
   "extension.cleanupFailed": "Impossible d'appliquer la durée de conservation des journaux Claude. Vérifiez settings.json et les droits d'écriture du dossier de données. Les fichiers existants sont conservés.",
   "extension.dataCleared": "Les données statistiques ont été supprimées. Elles seront recalculées à partir des journaux d'origine à la prochaine ouverture.",

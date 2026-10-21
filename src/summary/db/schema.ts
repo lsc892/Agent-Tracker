@@ -1,7 +1,7 @@
 import { SCHEMA_ROLLUP_SQL } from './rollup-state';
 
 export { SCHEMA_ROLLUP_SQL } from './rollup-state';
-export const SCHEMA_VERSION = 11;
+export const SCHEMA_VERSION = 12;
 
 /** Only non-Windows discovery uses device/inode to recognize moved files. */
 export function manifestIdentityIndexSql(platform: NodeJS.Platform): string {
@@ -106,6 +106,7 @@ CREATE TABLE IF NOT EXISTS manifest (
   inode TEXT,
   parser_version INTEGER NOT NULL DEFAULT 0,
   capabilities_collected INTEGER NOT NULL DEFAULT 0 CHECK(capabilities_collected IN (0,1)),
+  source_missing INTEGER NOT NULL DEFAULT 0 CHECK(source_missing IN (0,1)),
   last_seen_scan_id TEXT,
   processing_status TEXT NOT NULL DEFAULT 'processing'
     CHECK(processing_status IN ('processing','done','error','interrupted')),

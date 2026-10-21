@@ -28,6 +28,7 @@ export interface FileMetadata {
 
 export interface ManifestRow extends FileMetadata {
   id: number;
+  source_missing: 0 | 1;
   last_seen_scan_id: string | null;
   processing_status: ProcessingStatus;
   processing_position: string | null;
@@ -98,6 +99,8 @@ export interface SessionRef {
 
 export interface SessionReplacement {
   preserveCapabilities?: boolean;
+  /** Keep usable request snapshots while any source of their session is missing. */
+  retainDeletedSourceUsage?: boolean;
   sessions: Iterable<SessionRef>;
   summaries: Iterable<TurnSummaryInput>;
   files: Iterable<FileMetadata & { id: number }>;

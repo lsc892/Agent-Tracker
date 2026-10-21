@@ -72,6 +72,12 @@ test('API cost display is controlled by extension settings and defaults off',()=
   assert.equal(enabled.showApiCosts,true);assert.equal(enabled.usageEnabled,true);assert.equal(enabled.skillsEnabled,true);
 });
 
+test('deleted-source usage retention defaults on and can be disabled independently',()=>{
+  assert.equal(readConfiguration(settings({})).retainDeletedSourceUsage,true);
+  const disabled=readConfiguration(settings({'usage.retainDeletedSourceUsage':false}));
+  assert.equal(disabled.retainDeletedSourceUsage,false);assert.equal(disabled.usageEnabled,true);
+});
+
 test('Skill statistics include AI calls by default and can be disabled independently of tokens and quota',()=>{
   const defaults=readConfiguration(settings({}));assert.equal(defaults.skillsEnabled,true);
   const disabled=readConfiguration(settings({'usage.skillsEnabled':false}));

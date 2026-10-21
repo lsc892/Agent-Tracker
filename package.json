@@ -315,7 +315,13 @@
             "default": "codex",
             "scope": "machine",
             "description": "%manifest.codexExecutable%",
-            "order": 3
+            "order": 4
+          },
+          "agentTracker.usage.retainDeletedSourceUsage": {
+            "type": "boolean",
+            "default": true,
+            "order": 3,
+            "markdownDescription": "%manifest.retainDeletedSourceUsage%"
           }
         }
       }

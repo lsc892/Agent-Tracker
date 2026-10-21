@@ -92,6 +92,7 @@ npm run restore:vscode         # 원본 복원
 | `agentTracker.usage.showApiCosts` | API 추정 비용 표시 꺼짐 |
 | `agentTracker.usage.excludeEmptyUsage` | 미상·0토큰 요청의 도표·평균 제외 켜짐; 하단 표에는 표시 |
 | `agentTracker.claude.cleanupPeriodDays` | `null`(기존 Claude 설정 유지); 1 이상의 보존 일수 입력 |
+| `agentTracker.usage.retainDeletedSourceUsage` | 원본 삭제 후 모델·실제 토큰·유효 세션이 있는 요청 보존 켜짐 |
 | `agentTracker.codex.showReserve` | GPT Reserve 표시 꺼짐 |
 | `agentTracker.codex.showResetCredits` | 사용량 리셋권 표시 켜짐 |
 | `agentTracker.dataHome` | `~`; 그 아래의 `.claude`와 `.codex` 사용 |
@@ -113,6 +114,8 @@ Windows의 npm Codex 설치는 `.cmd` 옆 패키지에서 네이티브 실행 �
 **Claude: Cleanup Period Days**에 보존 일수를 입력하면 Claude 데이터 홈의 `settings.json`에서 `cleanupPeriodDays`만 변경하고 나머지 설정을 유지합니다. `null`로 돌리면 기존 Claude 값을 유지하며 이후 자동 반영을 중단합니다. 기본 보존 기간은 Claude의 30일이며 삭제는 Claude Code가 처리합니다. Agent Tracker는 대화 로그를 직접 삭제하지 않습니다. [Claude 설정](https://code.claude.com/docs/en/settings-reference#cleanupperioddays)
 
 모델을 확인할 수 없는 기록은 **미상**으로 표시합니다. 모델과 토큰 사용량이 모두 없는 요청은 기본적으로 도표와 평균에서 제외하지만 하단 표에는 남습니다. **Usage: Exclude Empty Usage**를 끄면 도표·평균에도 포함합니다. 사용자 요청별 표와 도표는 순번 없이 원본 요청에서 추출한 최대 80자 제목을 표시하고, 세션별 도표는 세션을 가로로 나란히 배치합니다. Windows 프로젝트 경로의 대소문자와 구분자 차이는 같은 프로젝트로 처리합니다.
+
+설정의 **데이터** 아래 **Usage: Retain Deleted Source Usage**는 기본 ON입니다. 원본이 삭제되어도 알려진 모델의 실제 토큰 사용량과 유효한 세션 연결이 있는 요청을 DB에 보존합니다. 시간 누락·품질 경고·실패·재파싱 오류가 있어도 보존하며, 모델 미상 또는 0토큰 요청은 보존 대상이 아닙니다. 일부 원본이 없으면 기존 요청은 마지막 집계값을 유지하고 새 요청은 계속 수집합니다. 누락 원본을 모두 복원하면 다시 집계하며, 같은 요청에 추가된 사용량은 그전까지 기존 snapshot에 반영하지 못합니다. 끄면 다음 통계 갱신에서 기존 보존 이력에도 삭제를 반영합니다. **통계 계산 데이터 삭제**는 보존 이력도 지우며 원본이 없는 이력은 다시 계산할 수 없습니다.
 
 `Usage: Enabled`를 끄면 진행 중인 통계 수집을 취소하고 통계 창을 닫습니다. 이 설정 아래의 **통계 계산 데이터 삭제** 링크 또는 같은 이름의 명령 팔레트 명령으로 파일 처리 정보(`manifest`)와 집계 결과(`turn_summary`)를 함께 비울 수 있습니다. 원본 대화 로그는 유지됩니다. 삭제 직후 재수집하지 않으며, 통계를 켜고 다시 열면 재계산합니다. 상태 표시줄 항목이 모두 숨겨져도 명령 팔레트의 **Agent Tracker: 설정 열기**에서 다시 설정할 수 있습니다.
 

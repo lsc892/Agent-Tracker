@@ -40,7 +40,7 @@
   function render(result) {
     const counts = result.counts;
     $('diagnostic-counts').textContent = t('diagnostics.counts', { value0: number(counts.files), value1: number(counts.processing), value2: number(counts.done), value3: number(counts.error), value4: number(counts.interrupted), value5: number(counts.stale_summaries), value6: result.lastRefresh?.error ? t('diagnostics.recentScanSuffix', { value0: result.lastRefresh.error }) : '' });
-    table($('diagnostic-files'), [t('diagnostics.providerFile'), t('common.session'), t('diagnostics.statusPosition'), t('diagnostics.recordedAt'), t('common.reason')], result.files.map(row => [`${row.provider} · ${row.path}`, row.session_id, `${row.processing_status} · ${row.processing_position ?? '—'}`, date(row.recorded_at), row.last_error]));
+    table($('diagnostic-files'), [t('diagnostics.providerFile'), t('common.session'), t('diagnostics.statusPosition'), t('diagnostics.recordedAt'), t('common.reason')], result.files.map(row => [`${row.provider} · ${row.path}`, row.session_id, `${row.processing_status} · ${row.processing_position ?? '—'}${row.source_missing ? ` · ${t('diagnostics.sourceMissing')}` : ''}`, date(row.recorded_at), row.last_error]));
     table($('diagnostic-summaries'), [t('diagnostics.projectRequestSession'), t('diagnostics.lastSuccess'), t('diagnostics.quality'), t('diagnostics.sourceByte'), t('common.reason')], result.summaries.map(row => [`${row.project_name} · ${row.root_turn_id} · ${row.session_id}`, date(row.updated_at), row.quality_flags, `${row.diagnostic_file_id ?? '—'} / ${row.diagnostic_offset ?? '—'}`, row.last_error]));
     $('diagnostic-previous').disabled = offset === 0;
     $('diagnostic-next').disabled = !result.nextFileId && !result.nextSummaryId;

@@ -1,4 +1,6 @@
 {
+  "manifest.retainDeletedSourceUsage": "원본이 삭제되어도 모델과 실제 토큰 사용량, 유효한 세션 연결이 있는 요청의 집계를 DB에 보존합니다. 시간 누락·품질 경고·실패 상태·재파싱 오류는 보존을 막지 않습니다. 일부 원본이 없으면 기존 요청은 마지막 집계값을 유지하고 새 요청은 계속 수집합니다. 끄면 다음 통계 갱신에서 삭제를 반영합니다. [통계 계산 데이터 삭제](command:agentTracker.clearUsageData)는 보존 이력도 삭제합니다.",
+  "diagnostics.sourceMissing": "원본 삭제 · 집계 보존",
   "configuration.invalidTimezone": "시간대 설정을 해석할 수 없어 시스템 시간대({value0})를 사용합니다. agentTracker.usage.timezone 설정을 확인해 주세요.",
   "extension.cleanupFailed": "Claude 로그 보존 기간을 적용하지 못했습니다. Claude 데이터 홈의 settings.json과 쓰기 권한을 확인해 주세요. 기존 파일은 유지됩니다.",
   "extension.dataCleared": "통계 계산 데이터를 삭제했습니다. 다음에 사용량 통계를 열면 원본 로그에서 다시 계산합니다.",

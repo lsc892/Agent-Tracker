@@ -1,4 +1,6 @@
 {
+  "manifest.retainDeletedSourceUsage": "Conservar las estadísticas tras eliminar los archivos de origen si un modelo conocido tiene uso de tokens positivo y la solicitud está vinculada a una sesión válida. La falta de tiempos, las advertencias, los fallos y los errores de análisis no impiden conservarlas. Mientras falten fuentes, las solicitudes existentes mantienen su último registro y se siguen recopilando solicitudes nuevas. Al desactivar, se aplican las eliminaciones en la próxima actualización. [Borrar datos de uso](command:agentTracker.clearUsageData) también elimina el historial conservado.",
+  "diagnostics.sourceMissing": "Origen eliminado · uso conservado",
   "configuration.invalidTimezone": "No se puede leer la zona horaria. Se usa la del sistema ({value0}). Revise agentTracker.usage.timezone.",
   "extension.cleanupFailed": "No se pudo aplicar la retención de registros de Claude. Revise settings.json y los permisos de escritura en el directorio de datos. Se conservan los archivos existentes.",
   "extension.dataCleared": "Se eliminaron los datos estadísticos. Al volver a abrir las estadísticas, se recalcularán desde los registros originales.",

@@ -1,4 +1,6 @@
 {
+  "manifest.retainDeletedSourceUsage": "当已知模型有实际令牌用量且请求关联到有效会话时，源文件删除后仍在数据库中保留统计。时间缺失、质量警告、请求失败和重新解析错误不影响保留。部分源文件缺失时，现有请求保留最后一次统计，并继续收集新请求。关闭后将在下次刷新统计时应用删除。[清除用量数据](command:agentTracker.clearUsageData)也会删除保留的历史记录。",
+  "diagnostics.sourceMissing": "源文件已删除 · 用量已保留",
   "configuration.invalidTimezone": "无法解析时区设置。使用系统时区（{value0}）。请检查 agentTracker.usage.timezone。",
   "extension.cleanupFailed": "无法应用 Claude 日志保留期限。请检查 Claude 数据目录中的 settings.json 和写入权限。现有文件会保留。",
   "extension.dataCleared": "已删除统计计算数据。下次打开使用统计时，将从原始日志重新计算。",

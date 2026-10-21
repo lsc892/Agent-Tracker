@@ -265,6 +265,7 @@ mtime_ms            // 그 범위를 정할 때 확인한 파일 수정 시각(U
 dev                 // 파일이 위치한 장치 식별자; inode와 함께 파일 동일성 판단
 inode               // 장치 내 파일 식별자; 신뢰할 수 있을 때만 이동 감지에 사용
 parser_version      // 마지막 정상 반영에 사용한 parser 버전; 다르면 해당 session 재집계
+source_missing      // 삭제를 확인했지만 사용량 이력을 보존 중인 원본이면 1; 복원 후 정상 반영하면 0
 last_seen_scan_id   // 파일 존재를 마지막으로 확인한 scan ID; 파싱 성공 여부와 독립
 processing_status   // processing / done / error / interrupted; 최근 시도의 상태
 processing_position // 최근 단계와 위치를 담은 짧은 문자열; 예: parse: byte=8192
@@ -292,7 +293,9 @@ append / modified / truncated / replaced
 
 removed
   대상 로그 루트를 모두 순회한 뒤에도 이번 scan에서 방문하지 않음
-  → 이번 실행에서만 삭제 대상으로 판정; 남은 session 원본 집계와 함께 manifest 삭제
+  → 보존 옵션 ON: 모델·양수 사용량·유효 session 연결이 있는 요청은 마지막 snapshot 유지
+     관련 manifest는 source_missing=1로 남기고 보존 대상이 없는 파일은 삭제
+  → 보존 옵션 OFF: 남은 session 원본 집계와 함께 manifest 삭제
 
 new / previous error or interruption
   이전 정상 metadata가 없거나 최근 시도가 오류·중단으로 끝남
@@ -442,7 +445,7 @@ input_tokens
 
 `requestId`가 빠진 row는 같은 `message.id`에 알려진 request ID가 정확히 하나일 때만 합친다. 후보가 여러 개면 추측하지 않고 `no-req` 임시 후보로 처리하며 summary에 품질 flag를 남긴다.
 
-response candidate는 해당 session을 재집계하는 동안 임시 staging에서만 비교하고 winner의 token을 사용자 요청 summary에 합산한다. 후보는 영속화하지 않는다. winner가 있던 파일이 삭제되면 남은 session 원본 전체를 다시 읽어 차선 후보를 새로 선택하므로 별도 candidate table 없이 복구할 수 있다.
+response candidate는 해당 session을 재집계하는 동안 임시 staging에서만 비교하고 winner의 token을 사용자 요청 summary에 합산한다. 후보는 영속화하지 않는다. winner 파일 삭제 시 보존 옵션이 켜져 있고 요청에 모델·실제 사용량·유효 세션 연결이 있으면 이전 snapshot을 유지한다. 보존 대상이 아니거나 옵션을 끄면 남은 session 원본에서 차선 후보를 새로 선택한다.
 
 ### 5.2 Codex current adapter
 
@@ -618,6 +621,8 @@ CREATE TABLE manifest (
   parser_version      INTEGER NOT NULL DEFAULT 0,             -- 마지막 정상 반영한 parser 버전; 미처리는 0
   capabilities_collected INTEGER NOT NULL DEFAULT 0           -- Skill 횟수까지 정상 집계했으면 1; OFF 처리·이전 DB는 0
                         CHECK(capabilities_collected IN (0,1)),
+  source_missing      INTEGER NOT NULL DEFAULT 0              -- 원본 삭제 후 요청 snapshot을 보존 중이면 1
+                        CHECK(source_missing IN (0,1)),
   last_seen_scan_id   TEXT,                                   -- 마지막 존재 확인 scan ID; 파싱 실패에도 갱신
   processing_status   TEXT NOT NULL DEFAULT 'processing'      -- 최근 시도의 상태; 자동 재처리 대기 상태가 아님
                         CHECK(processing_status IN ('processing', 'done', 'error', 'interrupted')),
@@ -711,7 +716,7 @@ SQLite 조회 계획용 통계는 DB 열기에서 `PRAGMA main.optimize=0x10002`
 
 Claude는 main JSONL의 custom-title을 ai-title보다 우선한다. Codex는 읽기 전용 state_N.sqlite의 threads.name/title을 session_index.jsonl의 thread_name보다 우선하고 session_meta 제목을 보완 경로로 사용한다. metadata는 디스크 TEMP에 묶음 처리하며 통계 화면 진입 시 제목만 바뀐 세션도 갱신한다. metadata를 읽을 수 없으면 기존 제목을 유지한다. 프로젝트명·세션명 필터는 클릭해 이름 목록을 열고 스크롤해 선택하는 방식으로 제공하며, 선택 즉시 표·도표를 ID와 제공자로 정확히 조회한다. 목록이나 세션별 행에는 프로젝트명과 세션 시작 시각을 함께 표시하고 tooltip으로 전체 경로·ID를 확인한다.
 
-schema v1·v2는 기존 이름을 projects로 옮기고 요청 ID·통계·manifest 참조를 보존한 채 전환한다. 세션 제목은 다음 scan에서 채운다. 이름 metadata와 summary 교체는 같은 transaction에 반영하며, 참조하는 summary가 없어진 이름 행은 정리한다. `root_turn_id`는 요청 식별자다. schema v9에서 미사용 `turn_index` 컬럼과 순번 생성·저장 코드를 제거했고 v10은 별도 세션 인덱스와 Windows의 identity 인덱스를 제거했다. 현재 v11은 빈 rollup 표·인덱스만 추가하고 실제 구축은 첫 집계 조회 때 수행한다. 기존 DB의 요청 ID·제목·시각·토큰·진단 참조와 모델·비용·Skill 횟수를 보존하며 migration 실패 시 schema version까지 원복한다. 이 전환 자체로 원본 로그를 다시 스캔하지 않는다. 사용자 요청별 표는 DB 행 `id`순이고 모델별은 같은 요청 안에서 `model`순을 추가한다. 논리 session에 속하는 모든 파일을 읽어야 재집계할 수 있으므로 summary를 파일 하나의 자식 row로 두거나 삭제 cascade하지 않는다.
+schema v1·v2는 기존 이름을 projects로 옮기고 요청 ID·통계·manifest 참조를 보존한 채 전환한다. 세션 제목은 다음 scan에서 채운다. 이름 metadata와 summary 교체는 같은 transaction에 반영하며, 참조하는 summary가 없어진 이름 행은 정리한다. `root_turn_id`는 요청 식별자다. schema v9에서 미사용 `turn_index` 컬럼과 순번 생성·저장 코드를 제거했고 v10은 별도 세션 인덱스와 Windows의 identity 인덱스를 제거했다. v11은 빈 rollup 표·인덱스만 추가하고 실제 구축은 첫 집계 조회 때 수행한다. 현재 v12는 manifest에 기본 0의 `source_missing`을 추가한다. 기존 DB의 요청 ID·제목·시각·토큰·진단 참조와 모델·비용·Skill 횟수를 보존하며 migration 실패 시 schema version까지 원복한다. 이 전환 자체로 원본 로그를 다시 스캔하지 않는다. 사용자 요청별 표는 DB 행 `id`순이고 모델별은 같은 요청 안에서 `model`순을 추가한다. 논리 session에 속하는 모든 파일을 읽어야 재집계할 수 있으므로 summary를 파일 하나의 자식 row로 두거나 삭제 cascade하지 않는다.
 
 ### 8.1 사용자에게 보여 줄 turn summary
 
@@ -775,6 +780,16 @@ schema v6의 `turn_capability_usage`는 `(turn_id, category, name)`을 기본 �
 Codex `response_item`의 function/custom tool 호출과 `exec` 안의 정적인 `tools.method(...)`를 읽는다. exec은 코드에 등장하는 호출마다 1회로 세므로 실제 조건·반복·중간 오류에 따른 실행 횟수는 복원하지 않는다. transcript의 JavaScript를 실행하지 않으며 지원하지 않는 동적 호출이나 원본에 없는 실행은 추측하지 않는다. 도구 출력·스킬 목록·검색·일반 본문 언급은 호출로 세지 않는다. tool call identity·thread·분류·이름으로 디스크 TEMP에서 중복 제거하고 요청별 이름·횟수만 합산한다. 검증된 fork prefix 안의 동일 호출은 제외하고 같은 root의 새 호출은 유지한다. 중단된 Codex root의 횟수는 token summary와 함께 제외하며, 재집계 실패 시 이전 정상 횟수를 유지한다.
 
 각 표는 `(provider, name)`별로 미상 이름을 후순위에 두고 횟수 내림차순·제공자·이름순으로 100개씩 조회한다. 전체 횟수와 비율은 해당 분류의 필터 전체를 대상으로 계산한다. `비율 = 해당 행 사용 횟수 / 해당 분류 전체 사용 횟수 × 100`이며 페이지의 일부 행만 분모로 삼지 않는다. 모든 표의 ‘전체 비율’ 열은 숫자와 상대 막대를 함께 표시한다. 분류별 최다 사용 항목이 막대 전체를 채우며 `막대 길이 = 해당 행 사용 횟수 / 해당 분류의 최다 사용 횟수`다. 최댓값은 필터 전체의 이름별 횟수 집계에서 페이지와 독립적으로 조회하므로 미상 항목이 마지막 페이지에 있어도 유지한다. 막대는 Codex 파랑·Claude 주황이며 접근성 설명에 전체 비율·횟수와 최다 사용 대비 비율을 포함한다. 각 분류의 페이지는 독립적이고 조회 조건을 바꾸면 모두 첫 페이지로 돌아간다. 구역 전환·필터·페이지 이동은 worker DB만 조회하며 원본 스캔을 시작하지 않는다.
+
+### 8.1.2 원본 삭제 뒤 유효 사용량 보존
+
+확장 설정의 **데이터** 소제목에서 `usage.retainDeletedSourceUsage`(기본 ON)를 제공한다. 삭제는 선택 루트 전체 순회 성공 후 판정한다. 삭제된 원본의 세션에 속한 저장 요청 중 비어 있지 않은 session·요청 ID, 기존 sessions 연결, 양수 total_tokens가 있고 이름이 확인된 모델의 input+output이 양수인 요청을 보존한다. 모델 미상 사용량에 0토큰 모델 행이 붙어 있는 경우는 보존하지 않는다. 완료 여부·시간 누락·품질 경고·요청 실패·최근 재파싱 오류는 보존을 막지 않으며 진단 정보도 유지한다.
+
+보존할 요청의 기존 행 ID·모델별 토큰·비용·Skill 횟수·프로젝트/세션 이름과 결제 방식을 함께 유지하고, 관련 manifest는 `source_missing=1`로 남긴다. 데이터 확인 화면은 원본 삭제·집계 보존 상태를 표시한다. 보존 대상이 없는 요청·파일은 기존 재집계·삭제 규칙을 따른다. 이미 삭제 표시한 파일만 계속 없고 다른 변경이 없으면 원본 본문을 다시 읽지 않는다.
+
+일부 원본이 없으면 해당 세션의 기존 보존 대상 요청은 마지막 집계 snapshot을 유지한다. 남은 원본만으로 같은 요청의 누락 기여량·중복 범위를 복원할 수 없으므로 덮어쓰거나 단순 합산하지 않는다. 같은 연결 component에서 세션 귀속이 달라진 동일 요청도 이중 저장하지 않으며 새로운 요청은 계속 수집한다. 누락된 원본이 모두 복원되어 성공적으로 재집계되면 `source_missing`을 해제하고 전체 snapshot을 교체한다. 다른 경로의 새 복사본만으로 누락 원본의 모든 기여가 복구되었다고 추측하지 않는다. 원본이 없는 동안 같은 요청에 추가된 사용량은 전체 원본 복원 전까지 마지막 snapshot에 반영하지 못한다.
+
+옵션 변경은 진행 중인 갱신을 취소하고 다음 통계 진입·명시적 새로 고침부터 적용한다. OFF에서는 이전 보존 이력에도 원본 삭제를 반영한다. **통계 계산 데이터 삭제**는 보존된 요청과 삭제된 원본의 manifest도 함께 지운다. 원본이 없는 이력은 이 작업 이후 재구축할 수 없다. 원본 파일 내용과 전체 대화 본문을 별도로 복제하지 않는다.
 
 ### 8.2 일·월·프로젝트·session별 총량과 turn 평균
 
@@ -994,8 +1009,10 @@ S의 파일 truncate 후 session 기여량이 900:
 
 S의 마지막 파일 삭제:
   전체 순회 후 부재 확인
-  S의 summary 삭제와 관련 manifest 삭제를 함께 commit
-  T = 9,400 - 900 = 8,500
+  보존 ON + S의 요청에 모델·실제 사용량·유효 session 연결이 있음:
+    S의 기존 snapshot 유지, manifest에 source_missing=1 → T = 9,400
+  보존 OFF 또는 보존 대상 요청 없음:
+    S의 summary와 관련 manifest 삭제 → T = 9,400 - 900 = 8,500
 
 S 파일 중 하나 파싱 실패:
   기존 S summary와 정상 metadata 유지
@@ -1003,7 +1020,7 @@ S 파일 중 하나 파싱 실패:
   같은 실행에서 자동 재시도하지 않음
 ```
 
-중복 winner 파일이 삭제되었어도 남은 원본에서 후보를 다시 비교한다. 따라서 파일별 기여량을 단순 차감하지 않고 session 전체를 재집계한다.
+보존하지 않는 요청은 중복 winner 파일이 삭제되었어도 남은 원본에서 후보를 다시 비교한다. 따라서 파일별 기여량을 단순 차감하지 않고 session 전체를 재집계한다. 보존하는 요청은 원본 일부만으로 재집계한 값으로 교체하지 않는다.
 
 ## 12. 실패와 품질 표시
 
@@ -1058,7 +1075,7 @@ last successful session update
 - 전체 경로·manifest·파싱 결과를 메모리에 적재하지 않고 n개·byte 예산·DB 조회 page 경계를 지킨다.
 - 영속 table은 manifest·projects·sessions·turn_summary·turn_model_usage·turn_costs·session_billing·turn_capability_usage이고, session summary·모델별 토큰·비용·Skill 횟수와 이름·정상 metadata·삭제는 함께 commit한다. 부재 판정은 전체 순회 성공 후 수행한다.
 - 오류·중단은 네 진단 항목으로 기록하고 자동 재시도하지 않는다. 다음 화면 진입·수동 새로 고침에서 새로 조사한다.
-- append/rewrite/delete 후 full rebuild 결과와 증분 결과가 같다.
+- 모든 원본이 있거나 보존 옵션이 꺼져 있으면 append/rewrite/delete 후 full rebuild 결과와 증분 결과가 같다. 보존 ON에서 원본이 삭제되면 DB에 저장한 사용량 이력이 추가로 남는다.
 - Claude response duplicate와 Codex cumulative snapshot이 이중 집계되지 않는다.
 - root turn token에는 descendant가 포함되고 duration에는 포함되지 않는다.
 - 일·월·프로젝트·세션 총량과 완료 turn 평균 token·시간을 summary query로 계산하고 누락 시간은 0으로 채우지 않는다.

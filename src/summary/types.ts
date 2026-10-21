@@ -2,6 +2,7 @@ export type Provider = 'claude' | 'codex';
 export interface SourceRoot { provider: Provider; path: string; dataHome?: string }
 export interface SummaryOptions {
   collectCapabilities?: boolean;
+  retainDeletedSourceUsage?: boolean;
   dbPath: string;
   roots: SourceRoot[];
   timezone?: string;

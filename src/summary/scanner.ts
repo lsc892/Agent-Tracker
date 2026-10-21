@@ -39,6 +39,7 @@ export async function refreshSummary(
   const result: RefreshResult = { scanId:randomUUID(),discovered:0,parsed:0,reused:0,failed:0,bodyBytes:0,interrupted:false,completedAt:'' };
   const cancellation = options.cancellation ? new Int32Array(options.cancellation) : undefined;
   const collectCapabilities = options.collectCapabilities !== false;
+  const retainDeletedSourceUsage = options.retainDeletedSourceUsage !== false;
   const isCancelled = (): boolean => Boolean(signal?.aborted || cancellation && Atomics.load(cancellation,0));
   if (isCancelled()) return {...result,interrupted:true,error:'interrupted',completedAt:new Date().toISOString()};
   let release: () => Promise<void>;
@@ -119,7 +120,7 @@ export async function refreshSummary(
         for (const file of batch) {
           const previous = file.previous;
           const observed = previous ? (database.markSeen(previous.id,result.scanId),previous) : database.observeFile(file,result.scanId);
-          const changed = !previous || previous.path !== file.path || previous.source_root !== file.source_root || previous.processing_status !== 'done' || previous.size_bytes !== file.size_bytes
+          const changed = !previous || previous.source_missing === 1 || previous.path !== file.path || previous.source_root !== file.source_root || previous.processing_status !== 'done' || previous.size_bytes !== file.size_bytes
             || previous.mtime_ms !== file.mtime_ms || previous.dev !== file.dev || previous.inode !== file.inode
             || previous.parser_version !== PARSER_VERSION || collectCapabilities && previous.capabilities_collected !== 1;
           staging.addFile({...file,id:observed.id,session_id:previous?.session_id ?? null},previous?.session_id ?? null,changed);
@@ -160,7 +161,7 @@ export async function refreshSummary(
     }
     check();
     for (const root of roots) for (const file of database.unseenFiles(root.provider,root.path,result.scanId)) {
-      staging.addFile(file,file.session_id,true,true);
+      staging.addFile(file,file.session_id,file.source_missing !== 1 || !retainDeletedSourceUsage,true);
     }
     await readSessionNames(staging,roots,isCancelled);
     check();
@@ -205,6 +206,10 @@ export async function refreshSummary(
           const stat = await lstat(previous.path);
           staging.addFile({...previous,size_bytes:stat.size,mtime_ms:stat.mtimeMs,dev:String(stat.dev),inode:String(stat.ino)},previous.session_id,true);
         } catch {
+          if (previous.source_missing && retainDeletedSourceUsage) {
+            staging.addFile(previous,previous.session_id,false,true);
+            continue;
+          }
           staging.addFile(previous,previous.session_id,true);
           failFile({...previous,old_session:previous.session_id,changed:1,parsed:0,removed:0,failed:0,project_key:null,project_name:null,session_name:null,thread_id:null,parent_thread_id:null,is_main:1,forked_from_id:null},new SummaryError('source-unavailable-outside-scan'));
         }
@@ -224,6 +229,13 @@ export async function refreshSummary(
       if (!staging.componentFailed()) {
         staging.prepareSummaries();
         check();
+        if (retainDeletedSourceUsage) {
+          // Surviving subagents cannot recreate a deleted main request. Keep the stored
+          // usable snapshot instead of inventing a replacement from orphaned events.
+          database.connection.exec(`DELETE FROM prepared_turns WHERE has_main=0 AND EXISTS(
+            SELECT 1 FROM scan_files f WHERE f.provider=prepared_turns.provider
+              AND f.old_session=prepared_turns.session_id AND f.removed=1)`);
+        }
         // Rootless subagents already have independent sessions; unresolved explicit roots remain diagnostics.
         const orphan = database.connection.prepare('SELECT file_id,byte_offset FROM prepared_turns WHERE has_main=0 LIMIT 1').get() as {file_id:number;byte_offset:number}|undefined;
         if (orphan) {
@@ -233,6 +245,7 @@ export async function refreshSummary(
           try {
             database.replaceSessions({sessions:staging.componentSessions(),summaries:staging.summaries(),
               preserveCapabilities:!collectCapabilities,
+              retainDeletedSourceUsage,
               files:staging.files(`removed=0 AND ${componentPredicate}`),
               removedFileIds:(function* () { for (const file of staging.files(`removed=1 AND ${componentPredicate}`)) yield file.id; })()});
           } catch {
@@ -244,6 +257,15 @@ export async function refreshSummary(
           WHERE f.failed=1 AND ${componentPredicate.replaceAll('scan_files.','f.')} LIMIT 1`).get() as {id:number;last_error:string|null}|undefined;
         if (failure?.last_error) for (const file of staging.files(`failed=0 AND ${componentPredicate}`)) {
           database.setManifestDiagnostic(file.id,'error','session: preserved',failure.last_error);
+        }
+        if (retainDeletedSourceUsage) {
+          database.replaceSessions({retainDeletedSourceUsage:true,files:[],summaries:[],
+            sessions:(function* () {
+              for (const file of staging.files(`removed=1 AND old_session IS NOT NULL AND ${componentPredicate}`)) {
+                yield {provider:file.provider,session_id:file.old_session!};
+              }
+            })(),
+            removedFileIds:(function* () { for (const file of staging.files(`removed=1 AND ${componentPredicate}`)) yield file.id; })()});
         }
       }
       staging.finishComponent();

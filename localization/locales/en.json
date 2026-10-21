@@ -1,4 +1,6 @@
 {
+  "manifest.retainDeletedSourceUsage": "Keep request statistics in the database after source deletion when a known model has positive token usage and the request is linked to a valid session. Missing timing, quality warnings, failed requests, and reparse errors do not prevent retention. While sources are missing, existing requests keep their last snapshot and new requests are still collected. Turning this off applies deletions on the next statistics refresh. [Clear usage data](command:agentTracker.clearUsageData) also removes retained history.",
+  "diagnostics.sourceMissing": "Source deleted · usage retained",
   "configuration.invalidTimezone": "Cannot read the time zone setting. Using the system time zone ({value0}). Check agentTracker.usage.timezone.",
   "extension.cleanupFailed": "Could not apply the Claude log retention period. Check settings.json and write permissions in the Claude data home. Existing files are preserved.",
   "extension.dataCleared": "Statistics data deleted. Usage statistics will be recalculated from the original logs the next time you open them.",

@@ -49,5 +49,6 @@
   "manifest.data": "Datos y registros",
   "manifest.dataHome": "Carpeta superior común para Claude y Codex; usa `.claude` y `.codex` dentro de ella. `~` es el directorio personal. Se define globalmente en ajustes de usuario y se aplica al uso, estadísticas y retención de registros en todos los espacios.",
   "manifest.cleanupDays": "Período de borrado automático de registros de Claude Code, en días. Un valor de 1 o más escribe `cleanupPeriodDays` en `settings.json`. `null` conserva el ajuste existente; Claude usa 30 días por defecto. Claude Code borra al iniciar; no se recuperan registros ya eliminados.",
-  "manifest.codexExecutable": "Ruta del ejecutable de Codex CLI o comando en PATH."
+  "manifest.codexExecutable": "Ruta del ejecutable de Codex CLI o comando en PATH.",
+  "manifest.retainDeletedSourceUsage": "Conservar las estadísticas tras eliminar los archivos de origen si un modelo conocido tiene uso de tokens positivo y la solicitud está vinculada a una sesión válida. La falta de tiempos, las advertencias, los fallos y los errores de análisis no impiden conservarlas. Mientras falten fuentes, las solicitudes existentes mantienen su último registro y se siguen recopilando solicitudes nuevas. Al desactivar, se aplican las eliminaciones en la próxima actualización. [Borrar datos de uso](command:agentTracker.clearUsageData) también elimina el historial conservado."
 }

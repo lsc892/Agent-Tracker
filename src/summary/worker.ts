@@ -23,6 +23,10 @@ port.on('message',(message: {id?:number;method:string;payload?:unknown}) => {
         const config=message.payload as {enabled?:unknown};
         if (typeof config.enabled !== 'boolean') throw new Error('Invalid capability collection setting');
         options.collectCapabilities=config.enabled;
+      } else if (message.method === 'configureRetention') {
+        const config=message.payload as {enabled?:unknown};
+        if (typeof config.enabled !== 'boolean') throw new Error('Invalid deleted source retention setting');
+        options.retainDeletedSourceUsage=config.enabled;
       } else if (message.method === 'refresh') {
         const config = (message.payload ?? {}) as {roots?:SourceRoot[];timezone?:string;cancellation?:SharedArrayBuffer};
         if (config.roots) options.roots = config.roots;

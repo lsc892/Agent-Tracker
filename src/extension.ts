@@ -29,7 +29,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   ], { pollingSeconds: config.pollingSeconds, refreshPolicy: config.refreshPolicy });
   let quota = createQuota(settings);
   await mkdir(context.globalStorageUri.fsPath, { recursive: true });
-  const summary = new SummaryClient({ dbPath: join(context.globalStorageUri.fsPath, 'agent-tracker.sqlite'), roots: settings.roots, timezone: settings.timezone, collectCapabilities:settings.skillsEnabled });
+  const summary = new SummaryClient({ dbPath: join(context.globalStorageUri.fsPath, 'agent-tracker.sqlite'), roots: settings.roots, timezone: settings.timezone,
+    collectCapabilities:settings.skillsEnabled,retainDeletedSourceUsage:settings.retainDeletedSourceUsage });
   const dashboard = new Dashboard({ extensionUri: context.extensionUri, summary, settings: () => settings });
   const colorSettings = new ColorSettings(context.extensionUri);
   const refreshQuota = async (): Promise<void> => {
@@ -87,6 +88,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         const changedSkills=previous.skillsEnabled!==settings.skillsEnabled;
         if (changedSkills) {
           await summary.setCapabilityCollectionEnabled(settings.skillsEnabled);
+          if (disposed) return;
+        }
+        if (previous.retainDeletedSourceUsage !== settings.retainDeletedSourceUsage) {
+          await summary.setDeletedSourceRetentionEnabled(settings.retainDeletedSourceUsage);
           if (disposed) return;
         }
         const changedTracking = previous.claude.enabled !== settings.claude.enabled || previous.codex.enabled !== settings.codex.enabled;

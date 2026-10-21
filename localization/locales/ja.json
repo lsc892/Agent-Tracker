@@ -1,4 +1,6 @@
 {
+  "manifest.retainDeletedSourceUsage": "既知のモデルに実際のトークン使用量があり、有効なセッションに紐づくリクエストは、元ファイルの削除後も集計をDBに保持します。時間の欠落、品質警告、リクエスト失敗、再解析エラーがあっても保持します。一部の元ファイルがない間は既存リクエストの最後の集計を維持し、新規リクエストの収集は継続します。オフにすると次回の統計更新時に削除を反映します。[使用量データを削除](command:agentTracker.clearUsageData)は保持した履歴も削除します。",
+  "diagnostics.sourceMissing": "元ファイル削除 · 集計保持",
   "configuration.invalidTimezone": "タイムゾーン設定を読み取れません。システムのタイムゾーン（{value0}）を使用します。agentTracker.usage.timezone を確認してください。",
   "extension.cleanupFailed": "Claude のログ保持期間を適用できません。Claude データホームの settings.json と書き込み権限を確認してください。既存のファイルは保持されます。",
   "extension.dataCleared": "統計の計算データを削除しました。次に使用統計を開くと、元のログから再計算します。",

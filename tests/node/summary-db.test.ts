@@ -220,6 +220,42 @@ for (const version of [1,2]) test(`v${version} migration preserves summaries, ma
   assert.equal(db.queryTurns()[0].id,99);assert.equal(db.queryTurns()[0].status,'failed');
 });
 
+test('v11 migration adds source presence without changing stored usage or marking sources deleted', t => {
+  const parent=realpathSync(tmpdir());
+  const directory=mkdtempSync(join(parent,'agent-tracker-db-retention-'));
+  const dbPath=join(directory,'summary.sqlite');
+  t.after(()=>{
+    const target=resolve(directory);assert.ok(target.startsWith(`${parent}${sep}`));
+    assert.ok(target.split(sep).at(-1)?.startsWith('agent-tracker-db-retention-'));
+    rmSync(target,{recursive:true,force:true});
+  });
+  const legacy=new DatabaseSync(dbPath);
+  legacy.exec(SCHEMA_SQL.replace('  source_missing INTEGER NOT NULL DEFAULT 0 CHECK(source_missing IN (0,1)),',''));
+  legacy.exec(`PRAGMA user_version=11;
+    INSERT INTO projects VALUES ('/synthetic/project-a','Project');
+    INSERT INTO sessions VALUES ('claude','session-a','Retained session');
+    INSERT INTO manifest(id,provider,source_root,path,session_id,processing_status,recorded_at)
+      VALUES (42,'claude','/synthetic/claude','/synthetic/claude/1.jsonl','session-a','done','2026-10-03T00:00:02.000Z');
+    INSERT INTO turn_summary(id,provider,project_key,session_id,root_turn_id,duration_quality,input_tokens,output_tokens,
+      cache_write_input_tokens,cache_read_input_tokens,total_tokens,status,quality_flags,last_error,updated_at)
+      VALUES (99,'claude','/synthetic/project-a','session-a','turn-a','missing',100,10,0,0,110,'failed','duration-missing','parse-error','2026-10-03T00:00:02.000Z');
+    INSERT INTO turn_model_usage VALUES (99,'claude-sonnet-4-6',100,10,0,0,NULL,'fixture');`);
+  const before=legacy.prepare('SELECT * FROM turn_summary').all();legacy.close();
+  const db=new SummaryDatabase(dbPath);
+  try {
+    assert.equal(db.connection.prepare('PRAGMA user_version').get()?.user_version,SCHEMA_VERSION);
+    assert.deepEqual(db.connection.prepare('SELECT * FROM turn_summary').all(),before);
+    assert.equal(db.findManifest('claude',metadata().path)?.source_missing,0);
+    const snapshot=db.queryTurns();
+    assert.throws(()=>db.replaceSessions({retainDeletedSourceUsage:true,sessions:[{provider:'claude',session_id:'session-a'}],
+      files:[],removedFileIds:[42],summaries:[turn('invalid',{input_tokens:-1})]}),/nonnegative/);
+    assert.deepEqual(db.queryTurns(),snapshot);assert.equal(db.findManifest('claude',metadata().path)?.source_missing,0);
+    db.replaceSessions({retainDeletedSourceUsage:true,sessions:[{provider:'claude',session_id:'session-a'}],files:[],summaries:[],removedFileIds:[42]});
+    assert.deepEqual(db.queryTurns(),snapshot);assert.equal(db.findManifest('claude',metadata().path)?.source_missing,1);
+    assert.deepEqual(db.connection.prepare('PRAGMA foreign_key_check').all(),[]);
+  } finally { db.close(); }
+});
+
 test('migration rechecks the version after another window finishes the transition', t => {
   const parent = realpathSync(tmpdir());
   const directory = mkdtempSync(join(parent,'agent-tracker-db-race-'));

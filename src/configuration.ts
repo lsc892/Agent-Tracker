@@ -17,6 +17,7 @@ export interface TrackerConfiguration {
   pollingSeconds: number;
   usageEnabled: boolean;
   skillsEnabled: boolean;
+  retainDeletedSourceUsage: boolean;
   showApiCosts: boolean;
   excludeEmptyUsage: boolean;
   claude: { enabled: boolean; dataHome: string; cleanupPeriodDays: number | null };
@@ -64,6 +65,7 @@ export function readConfiguration(settings: SettingsReader, editorLanguage = 'ko
     pollingSeconds: settings.get('quota.pollingIntervalSeconds', 900),
     usageEnabled: settings.get('usage.enabled', true),
     skillsEnabled: settings.get('usage.skillsEnabled', true),
+    retainDeletedSourceUsage: settings.get('usage.retainDeletedSourceUsage', true),
     showApiCosts: settings.get('usage.showApiCosts', false),
     excludeEmptyUsage: settings.get('usage.excludeEmptyUsage', true),
     claude: { enabled: enabled.claude, dataHome: claudeHome,

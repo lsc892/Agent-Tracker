@@ -49,5 +49,6 @@
   "manifest.data": "Data and Logs",
   "manifest.dataHome": "Shared parent folder for Claude and Codex data. Uses `.claude` and `.codex` under this folder. The default `~` is your home directory. Set globally in user settings; applies to subscription usage lookups, statistics, and Claude log retention in all workspaces.",
   "manifest.cleanupDays": "Automatic deletion period for Claude Code conversation logs, in days. A value of at least 1 writes `cleanupPeriodDays` to `settings.json` in the Claude data home. `null` preserves existing settings; Claude defaults to 30 days. Claude Code deletes logs on startup. Already deleted logs cannot be recovered.",
-  "manifest.codexExecutable": "Codex CLI executable path or command on PATH."
+  "manifest.codexExecutable": "Codex CLI executable path or command on PATH.",
+  "manifest.retainDeletedSourceUsage": "Keep request statistics in the database after source deletion when a known model has positive token usage and the request is linked to a valid session. Missing timing, quality warnings, failed requests, and reparse errors do not prevent retention. While sources are missing, existing requests keep their last snapshot and new requests are still collected. Turning this off applies deletions on the next statistics refresh. [Clear usage data](command:agentTracker.clearUsageData) also removes retained history."
 }

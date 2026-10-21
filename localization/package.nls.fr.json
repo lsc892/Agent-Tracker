@@ -49,5 +49,6 @@
   "manifest.data": "Données et journaux",
   "manifest.dataHome": "Dossier parent commun de Claude et Codex ; utilise `.claude` et `.codex` dans ce dossier. `~` désigne le dossier personnel. Défini globalement dans les paramètres utilisateur pour les consultations, statistiques et conservation Claude de tous les espaces.",
   "manifest.cleanupDays": "Durée avant suppression des journaux Claude Code, en jours. Une valeur d'au moins 1 écrit `cleanupPeriodDays` dans `settings.json`. `null` conserve les réglages ; Claude utilise 30 jours par défaut. Claude Code supprime au démarrage ; les journaux supprimés ne sont pas récupérables.",
-  "manifest.codexExecutable": "Chemin de l'exécutable Codex CLI ou commande dans PATH."
+  "manifest.codexExecutable": "Chemin de l'exécutable Codex CLI ou commande dans PATH.",
+  "manifest.retainDeletedSourceUsage": "Conserver les statistiques après la suppression des fichiers source si un modèle connu a consommé des jetons et si la requête est liée à une session valide. Les durées manquantes, avertissements, échecs et erreurs de réanalyse n'empêchent pas la conservation. Tant que des sources manquent, les requêtes existantes gardent leur dernier relevé et les nouvelles sont collectées. Désactiver applique les suppressions à la prochaine actualisation. [Effacer les données d’utilisation](command:agentTracker.clearUsageData) supprime aussi cet historique."
 }

@@ -53,7 +53,14 @@ export class SessionStore {
         provider TEXT NOT NULL, session_id TEXT NOT NULL, PRIMARY KEY(provider, session_id)
       ) WITHOUT ROWID; DELETE FROM db_replacement_sessions;
       CREATE TEMP TABLE IF NOT EXISTS db_replacement_projects(project_key TEXT PRIMARY KEY) WITHOUT ROWID;
-      DELETE FROM db_replacement_projects;`);
+      DELETE FROM db_replacement_projects;
+      CREATE TEMP TABLE IF NOT EXISTS db_removed_files(id INTEGER PRIMARY KEY);
+      DELETE FROM db_removed_files;
+      CREATE TEMP TABLE IF NOT EXISTS db_retained_turns(
+        id INTEGER PRIMARY KEY,provider TEXT NOT NULL,session_id TEXT NOT NULL,root_turn_id TEXT NOT NULL,
+        UNIQUE(provider,session_id,root_turn_id));
+      CREATE INDEX IF NOT EXISTS temp.db_retained_root ON db_retained_turns(provider,root_turn_id);
+      DELETE FROM db_retained_turns;`);
       const addSession = this.database.statement('INSERT OR IGNORE INTO db_replacement_sessions VALUES (?, ?)');
       for (const session of replacement.sessions) addSession.run(session.provider, session.session_id);
       const hasSession = this.database.statement('SELECT 1 FROM db_replacement_sessions WHERE provider = ? AND session_id = ?');
@@ -63,6 +70,18 @@ export class SessionStore {
           throw new Error('Manifest file is outside the replacement session group');
         }
       };
+      const addRemoved = this.database.statement('INSERT INTO db_removed_files VALUES (?)');
+      for (const id of replacement.removedFileIds ?? []) {
+        const previous = existingFile.get(id);
+        if (previous) requireSession(previous.provider, previous.session_id);
+        addRemoved.run(id);
+      }
+      if (replacement.retainDeletedSourceUsage) this.database.connection.exec(`
+        INSERT INTO db_retained_turns SELECT t.id,t.provider,t.session_id,t.root_turn_id FROM turn_summary t
+        JOIN sessions s ON s.provider=t.provider AND s.session_id=t.session_id
+        WHERE (t.provider,t.session_id) IN (SELECT m.provider,m.session_id FROM db_removed_files r JOIN manifest m ON m.id=r.id)
+          AND trim(t.session_id)<>'' AND trim(t.root_turn_id)<>'' AND t.total_tokens>0
+          AND EXISTS(SELECT 1 FROM turn_model_usage u WHERE u.turn_id=t.id AND trim(u.model)<>'' AND u.input_tokens+u.output_tokens>0);`);
       // Row-value IN lets SQLite seek the request UNIQUE index by its session prefix;
       // a correlated EXISTS scans every stored turn for each replaced session.
       this.database.connection.exec(`INSERT OR IGNORE INTO db_replacement_projects SELECT project_key FROM turn_summary
@@ -76,13 +95,14 @@ export class SessionStore {
         DELETE FROM db_saved_capabilities;
         INSERT INTO db_saved_capabilities SELECT t.provider,t.session_id,t.root_turn_id,u.category,u.name,u.usage_count
           FROM turn_summary t JOIN turn_capability_usage u ON u.turn_id=t.id
-          WHERE (t.provider,t.session_id) IN (SELECT provider,session_id FROM db_replacement_sessions);`);
+          WHERE (t.provider,t.session_id) IN (SELECT provider,session_id FROM db_replacement_sessions)
+            AND t.id NOT IN (SELECT id FROM db_retained_turns);`);
       this.database.connection.exec(`DELETE FROM turn_summary WHERE (provider, session_id) IN (
         SELECT provider, session_id FROM db_replacement_sessions
-      )`);
+      ) AND id NOT IN (SELECT id FROM db_retained_turns)`);
       const updateFile = this.database.statement(`UPDATE manifest SET
         source_root = ?, path = ?, session_id = ?, size_bytes = ?, mtime_ms = ?, dev = ?, inode = ?, parser_version = ?, capabilities_collected = ?,
-        processing_status = 'done', processing_position = 'committed', recorded_at = ?, last_error = NULL
+        source_missing = 0, processing_status = 'done', processing_position = 'committed', recorded_at = ?, last_error = NULL
         WHERE id = ? AND provider = ?`);
       const now = new Date().toISOString();
       for (const file of replacement.files) {
@@ -102,8 +122,12 @@ export class SessionStore {
         DO UPDATE SET session_name=excluded.session_name
         WHERE excluded.session_name IS NOT NULL AND session_name IS NOT excluded.session_name`);
       const addProject = this.database.statement('INSERT OR IGNORE INTO db_replacement_projects VALUES (?)');
+      // A request snapshot includes all source contributions. With a source missing, replacing
+      // or adding to that snapshot would lose usage or double count overlapping responses.
+      const retained = this.database.statement('SELECT 1 FROM db_retained_turns WHERE provider=? AND root_turn_id=? LIMIT 1');
       for (const summary of replacement.summaries) {
         if (!hasSession.get(summary.provider, summary.session_id)) throw new Error('Summary is outside the replacement session group');
+        if (retained.get(summary.provider,summary.root_turn_id)) continue;
         project.run(summary.project_key, summary.project_name);
         session.run(summary.provider, summary.session_id, summary.session_name?.trim() || null);
         addProject.run(summary.project_key);
@@ -140,10 +164,12 @@ export class SessionStore {
         INSERT INTO turn_capability_usage SELECT t.id,u.category,u.name,u.usage_count FROM db_saved_capabilities u
           JOIN turn_summary t ON t.provider=u.provider AND t.session_id=u.session_id AND t.root_turn_id=u.root_turn_id;
         DELETE FROM db_saved_capabilities;`);
-      for (const id of replacement.removedFileIds ?? []) {
-        const previous = existingFile.get(id);
-        if (previous) requireSession(previous.provider, previous.session_id);
-        remove.run(id);
+      const keepMissing = this.database.statement(`SELECT 1 FROM db_retained_turns t JOIN manifest m
+        ON m.provider=t.provider AND m.session_id=t.session_id WHERE m.id=? LIMIT 1`);
+      const markMissing = this.database.statement('UPDATE manifest SET source_missing=1,recorded_at=? WHERE id=? AND source_missing=0');
+      for (const row of this.database.statement('SELECT id FROM db_removed_files').iterate()) {
+        if (keepMissing.get(row.id)) markMissing.run(now,row.id);
+        else remove.run(row.id);
       }
       this.database.rollups.refreshChangedSessions();
       this.database.connection.exec(`DELETE FROM sessions WHERE (provider,session_id) IN (SELECT provider,session_id FROM db_replacement_sessions)
@@ -151,7 +177,8 @@ export class SessionStore {
         DELETE FROM projects WHERE project_key IN (SELECT project_key FROM db_replacement_projects)
         AND NOT EXISTS(SELECT 1 FROM turn_summary t WHERE t.provider='claude' AND t.project_key=projects.project_key)
         AND NOT EXISTS(SELECT 1 FROM turn_summary t WHERE t.provider='codex' AND t.project_key=projects.project_key);
-        DELETE FROM db_replacement_sessions; DELETE FROM db_replacement_projects;`);
+        DELETE FROM db_replacement_sessions; DELETE FROM db_replacement_projects;
+        DELETE FROM db_removed_files; DELETE FROM db_retained_turns;`);
     });
   }
 

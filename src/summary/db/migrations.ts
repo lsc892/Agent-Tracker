@@ -22,6 +22,9 @@ export function migrateSchema(connection: DatabaseSync, transaction: (action: ()
       if (!connection.prepare('PRAGMA table_info(manifest)').all().some(column => column.name === 'capabilities_collected')) {
         connection.exec('ALTER TABLE manifest ADD COLUMN capabilities_collected INTEGER NOT NULL DEFAULT 0 CHECK(capabilities_collected IN (0,1))');
       }
+      if (!connection.prepare('PRAGMA table_info(manifest)').all().some(column => column.name === 'source_missing')) {
+        connection.exec('ALTER TABLE manifest ADD COLUMN source_missing INTEGER NOT NULL DEFAULT 0 CHECK(source_missing IN (0,1))');
+      }
       if (!connection.prepare('PRAGMA table_info(turn_summary)').all().some(column => column.name === 'request_title')) {
         connection.exec('ALTER TABLE turn_summary ADD COLUMN request_title TEXT');
       }

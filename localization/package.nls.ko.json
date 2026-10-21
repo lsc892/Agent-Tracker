@@ -49,5 +49,6 @@
   "manifest.data": "데이터 및 로그",
   "manifest.dataHome": "Claude·Codex 데이터의 공통 상위 폴더입니다. 이 폴더 아래의 `.claude`와 `.codex`를 사용합니다. 기본값 `~`는 사용자 홈입니다. 사용자 설정에서 전역으로 지정하며 모든 작업공간의 구독 사용량 조회·통계·Claude 로그 보존 기간에 함께 적용합니다.",
   "manifest.cleanupDays": "Claude Code 대화 로그의 자동 삭제 기간(일)을 설정합니다. 1 이상의 값을 입력하면 Claude 데이터 홈의 `settings.json`에 `cleanupPeriodDays`를 반영합니다. `null`은 기존 설정 유지이며 Claude 기본값은 30일입니다. 삭제는 Claude Code가 시작 시 처리하며 이미 삭제된 로그는 복구되지 않습니다.",
-  "manifest.codexExecutable": "Codex CLI 실행 파일 또는 PATH 명령입니다."
+  "manifest.codexExecutable": "Codex CLI 실행 파일 또는 PATH 명령입니다.",
+  "manifest.retainDeletedSourceUsage": "원본이 삭제되어도 모델과 실제 토큰 사용량, 유효한 세션 연결이 있는 요청의 집계를 DB에 보존합니다. 시간 누락·품질 경고·실패 상태·재파싱 오류는 보존을 막지 않습니다. 일부 원본이 없으면 기존 요청은 마지막 집계값을 유지하고 새 요청은 계속 수집합니다. 끄면 다음 통계 갱신에서 삭제를 반영합니다. [통계 계산 데이터 삭제](command:agentTracker.clearUsageData)는 보존 이력도 삭제합니다."
 }
