@@ -474,11 +474,12 @@ class Element {
   options = ['tokens', 'requests', 'averageTokens', 'averageDuration'].map(value => ({ value, disabled: false, textContent: '' }));
   readonly attributes = new Map<string, string>();
   readonly listeners = new Map<string, () => void>();
+  onReplace?: () => void;
   constructor(readonly tag = 'div') {}
   get textContent(): string { return this.text + this.children.map(child => child.textContent).join(''); }
   set textContent(value: string) { this.text = value; this.children = []; }
   append(...children: Element[]): void { this.children.push(...children); }
-  replaceChildren(): void { this.text = ''; this.children = []; }
+  replaceChildren(): void { this.text = ''; this.children = []; this.onReplace?.(); }
   setAttribute(name: string, value: string): void { this.attributes.set(name, value); }
   addEventListener(name: string, listener: () => void): void { this.listeners.set(name, listener); }
   descendants(): Element[] { return this.children.flatMap(child => [child, ...child.descendants()]); }
@@ -492,12 +493,20 @@ function ui() {
   get('group').value = 'day'; get('chart-metric').value = 'tokens';
   let receive: ((event: { data: unknown }) => void) | undefined;
   const messages: { type: string; query?: { chartMetric?: string; offset?: number; tableSort?: UsageSort } }[] = [];
+  const viewport = {
+    scrollX: 0, scrollY: 0,
+    scrollTo({ left, top, behavior }: { left: number; top: number; behavior: string }) {
+      assert.equal(behavior, 'instant');
+      this.scrollX = left; this.scrollY = top;
+    },
+    addEventListener: (_event: string, listener: typeof receive) => { receive = listener; },
+  };
   new Script(readFileSync(join(__dirname, '../../../media/dashboard.js'), 'utf8')).runInNewContext({ agentTrackerI18n: createTranslator('ko'),
     acquireVsCodeApi: () => ({ getState: () => undefined, setState: () => undefined, postMessage: (value: typeof messages[number]) => messages.push(value) }),
     document: { getElementById: get, createElement: (tag: string) => new Element(tag), createElementNS: (_ns: string, tag: string) => new Element(tag), querySelectorAll: () => [] },
-    window: { addEventListener: (_event: string, listener: typeof receive) => { receive = listener; } },
+    window: viewport,
   });
-  return { get, messages, render: (groupBy: string, mode: string, metric: string, rows: unknown[], by = 'provider', total = rows.length) => receive!({ data: { type: 'usage', result: {
+  return { get, messages, viewport, render: (groupBy: string, mode: string, metric: string, rows: unknown[], by = 'provider', total = rows.length) => receive!({ data: { type: 'usage', result: {
     groupBy, by, rows, total, coverage: {}, chart: { rows, mode, metric, total, by },
   } } }) };
 }
@@ -537,6 +546,37 @@ test('header buttons toggle every numeric column and model sorting, reset the pa
   view.get('reset-filters').listeners.get('click')!();
   assert.equal(view.messages.at(-1)!.query!.tableSort!.key, 'period');
   assert.equal(view.messages.at(-1)!.query!.tableSort!.direction, 'desc');
+});
+
+test('sorting preserves the current page and horizontal scroll positions when redrawing shifts layout', () => {
+  const view = ui();
+  const render = () => view.render('day', 'calendar', 'tokens', [{ ...turn(0), period: '2026-01-01' }]);
+  const click = () => view.get('usage-table').descendants().find(node => node.attributes.get('data-sort-key') === 'input')!.listeners.get('click')!();
+  render();
+  view.viewport.scrollX = 25; view.viewport.scrollY = 640;
+  Object.assign(view.get('usage-chart'), { scrollLeft: 180 });
+  Object.assign(view.get('usage-table'), { scrollLeft: 95 });
+  view.get('usage-chart').onReplace = () => {
+    view.viewport.scrollY = 1400;
+    Object.assign(view.get('usage-chart'), { scrollLeft: 0 });
+  };
+  view.get('usage-table').onReplace = () => {
+    view.viewport.scrollX = 0;
+    Object.assign(view.get('usage-table'), { scrollLeft: 0 });
+  };
+  for (const direction of ['desc', 'asc']) {
+    click();
+    assert.equal(view.viewport.scrollY, 640, 'click itself leaves the viewport unchanged');
+    // A user may scroll while the worker query is pending; preserve their latest position.
+    view.viewport.scrollY = 720;
+    render();
+    assert.equal(view.messages.at(-1)!.query!.tableSort!.direction, direction);
+    assert.equal(view.viewport.scrollX, 25);
+    assert.equal(view.viewport.scrollY, 720);
+    assert.equal((view.get('usage-chart') as unknown as { scrollLeft: number }).scrollLeft, 180);
+    assert.equal((view.get('usage-table') as unknown as { scrollLeft: number }).scrollLeft, 95);
+    view.viewport.scrollY = 640;
+  }
 });
 
 test('table sorting messages accept only supported columns and directions', () => {

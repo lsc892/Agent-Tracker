@@ -464,6 +464,17 @@
     $('chart-detail').textContent = chartDescription(rows[0], chart);
   }
   function renderUsage(result) {
+    const left = window.scrollX, top = window.scrollY;
+    const tableLeft = $('usage-table').scrollLeft, chartLeft = $('usage-chart').scrollLeft;
+    try { updateUsage(result); }
+    finally {
+      $('usage-table').scrollLeft = tableLeft;
+      $('usage-chart').scrollLeft = chartLeft;
+      // Replacing chart/table content can move the browser's scroll anchor during layout.
+      if (window.scrollX !== left || window.scrollY !== top) window.scrollTo({ left, top, behavior: 'instant' });
+    }
+  }
+  function updateUsage(result) {
     latestUsage = result;
     if (result.capabilitiesEnabled !== undefined) setCapabilitiesEnabled(result.capabilitiesEnabled);
     if (section === 'skills' && !capabilitiesEnabled) return;
