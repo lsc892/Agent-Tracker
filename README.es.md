@@ -124,6 +124,7 @@ Usa **Agent Tracker: Eliminar datos estadísticos** para borrar los resultados a
 - **Registros comprimidos de Codex** — Las estadísticas incluyen las conversaciones antiguas que Codex ha comprimido con Zstd (`.jsonl.zst`).
 - **Conservación de estadísticas** — Las estadísticas válidas guardadas en la base de datos se conservan de forma predeterminada aunque se eliminen las conversaciones originales, incluso durante la limpieza automática de Claude.
 - **Gráficos más claros** — Las vistas por proveedor también muestran sus colores, y los encabezados de las tablas permiten ordenar de forma ascendente o descendente.
+- **Filas por página ajustables** — Elige cuántas filas mostrar por página en la vista de estadísticas.
 
 </details>
 

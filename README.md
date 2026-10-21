@@ -124,6 +124,7 @@ Use **Agent Tracker: Delete Statistics Data** to clear aggregated statistics. Or
 - **Compressed Codex logs** — Statistics now include older conversations that Codex has compressed with Zstd (`.jsonl.zst`).
 - **Statistics retention** — Valid statistics stored in the database are kept by default after source conversations are deleted, including by Claude's automatic cleanup of older conversations.
 - **Chart readability** — Provider views now show provider colors, and table headers let you sort in ascending or descending order.
+- **Adjustable rows per page** — Choose how many rows to display per page in the statistics view.
 
 </details>
 
