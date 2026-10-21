@@ -12,6 +12,9 @@ class Element {
   private text = '';
   value = ''; title = ''; hidden = true; children: Element[] = [];
   checked = false; disabled = false;
+  validationMessage = ''; validityReports = 0;
+  setCustomValidity(message: string): void { this.validationMessage = message; }
+  reportValidity(): boolean { this.validityReports++; return !this.validationMessage; }
   scrollTop = 0; scrollHeight = 500; clientHeight = 200;
   readonly options = [{value:'',disabled:false},{value:'claude',disabled:false},{value:'codex',disabled:false}];
   get selectedOptions(): {value:string;disabled:boolean}[] { return this.options.filter(option=>option.value===this.value); }
@@ -130,7 +133,61 @@ test('reset returns query controls and chart grouping to defaults while retainin
   assert.equal(get('cost-note').hidden,false);assert.equal(get('project-options').hidden,true);
   assert.equal(get('billing-control').hidden,true);assert.equal(get('project-name').textContent,'전체 프로젝트');
   assert.equal(get('session-name').textContent,'전체 세션');
-  assert.deepEqual(JSON.parse(JSON.stringify(state())),{section:'tokens',group:'day',chartMetric:'tokens',chartBy:'provider'});
+  assert.deepEqual(JSON.parse(JSON.stringify(state())),{section:'tokens',group:'day',chartMetric:'tokens',chartBy:'provider',pageSize:100,
+    capabilityPageSizes:{skill:100,subagent:100,plugin:100,model:100}});
+});
+
+test('typed token page sizes synchronize chart controls, reset the page and preserve filters and sorting',()=>{
+  const {get,messages,state}=view({pageSize:37,capabilityPageSizes:{skill:19}});
+  assert.equal(messages[0].query?.limit,37);
+  assert.equal(get('page-size').value,'37');assert.equal(get('chart-page-size').value,'37');
+  get('provider').value='codex';get('from-day').value='2026-10-01';
+  get('next').listeners.get('click')!();assert.equal(messages.at(-1)?.query?.offset,37);
+  get('page-size').value='23';
+  get('page-size').listeners.get('keydown')!({key:'Enter',preventDefault:()=>{}});
+  const query=messages.at(-1)!.query!;
+  assert.equal(query.limit,23);assert.equal(query.offset,0);assert.equal(query.provider,'codex');assert.equal(query.fromDay,'2026-10-01');
+  assert.equal(query.groupBy,'session');assert.equal((query.tableSort as {key:string}).key,'period');
+  assert.equal(get('chart-page-size').value,'23');assert.equal((state() as {pageSize:number}).pageSize,23);
+  const count=messages.length;
+  get('page-size').listeners.get('change')!();assert.equal(messages.length,count,'blur after Enter does not repeat the query');
+  get('chart-next').listeners.get('click')!();assert.equal(messages.at(-1)?.query?.offset,23);
+  get('chart-page-size').value='1000';get('chart-page-size').listeners.get('change')!();
+  assert.equal(messages.at(-1)?.query?.limit,1000);assert.equal(messages.at(-1)?.query?.offset,0);
+  assert.equal(get('page-size').value,'1000');
+  get('chart-next').listeners.get('click')!();assert.equal(messages.at(-1)?.query?.offset,1000);
+  get('previous').listeners.get('click')!();assert.equal(messages.at(-1)?.query?.offset,0);
+  get('reset-filters').listeners.get('click')!();
+  assert.equal(get('page-size').value,'100');assert.equal(get('skill-page-size').value,'100');assert.equal(messages.at(-1)?.query?.limit,100);
+});
+
+test('invalid row counts leave the active pagination unchanged and report a correctable input error',()=>{
+  const {get,messages}=view({pageSize:25});
+  for (const value of ['', '0', '-3', '2.5', '1001', 'Infinity', 'abc']) {
+    const count=messages.length;
+    get('page-size').value=value;get('page-size').listeners.get('change')!();
+    assert.equal(messages.length,count);assert.match(get('page-size').validationMessage,/1~1,000/);
+  }
+  get('page-size').listeners.get('input')!();assert.equal(get('page-size').validationMessage,'');
+  get('page-size').value='1';get('page-size').listeners.get('change')!();
+  assert.equal(messages.at(-1)?.query?.limit,1);assert.equal(get('chart-page-size').value,'1');
+  const restored=view({pageSize:0,capabilityPageSizes:{skill:-1,plugin:1001,model:'25'}});
+  assert.equal(restored.messages[0].query?.limit,100);
+  for (const category of ['skill','plugin','model']) assert.equal(restored.get(`${category}-page-size`).value,'100');
+});
+
+test('each Skill table uses its own typed size and changing one leaves other category pages intact',()=>{
+  const {get,messages,state}=view({section:'skills',capabilityPageSizes:{skill:7,plugin:13}});
+  get('skill-next').listeners.get('click')!();get('plugin-next').listeners.get('click')!();
+  get('skill-page-size').value='3';get('skill-page-size').listeners.get('change')!();
+  const query=messages.at(-1)!.query!;
+  assert.deepEqual(JSON.parse(JSON.stringify(query.capabilityOffsets)),{skill:0,subagent:0,plugin:13,model:0});
+  assert.deepEqual(JSON.parse(JSON.stringify(query.capabilityLimits)),{skill:3,subagent:100,plugin:13,model:100});
+  get('skill-next').listeners.get('click')!();
+  assert.equal((messages.at(-1)?.query?.capabilityOffsets as {skill:number}).skill,3);
+  get('plugin-previous').listeners.get('click')!();
+  assert.equal((messages.at(-1)?.query?.capabilityOffsets as {plugin:number}).plugin,0);
+  assert.equal((state() as {capabilityPageSizes:{skill:number}}).capabilityPageSizes.skill,3);
 });
 
 test('extension cost settings display stored costs and session billing without refreshing sources',()=>{

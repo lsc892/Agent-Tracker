@@ -44,7 +44,7 @@ port.on('message',(message: {id?:number;method:string;payload?:unknown}) => {
             result={rows:[],total:0,capabilitiesEnabled:false,coverage:database.diagnostics({limit:1,providers:query.providers}).counts};
           } else {
             const capabilities = Object.fromEntries((['skill','subagent','plugin','model'] as const)
-              .map(category=>[category,database!.queryCapabilities(query,category,query.capabilityOffsets?.[category])]));
+              .map(category=>[category,database!.queryCapabilities(query,category,query.capabilityOffsets?.[category],query.capabilityLimits?.[category] ?? query.limit)]));
             result={rows:[],total:0,capabilities,capabilitiesEnabled:true,coverage:database.diagnostics({limit:1,providers:query.providers}).counts};
           }
         } else {

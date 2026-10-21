@@ -165,6 +165,11 @@ test('capability pagination uses the full denominator, date filters exclude unkn
   const first=db.queryCapabilities({},'skill'),second=db.queryCapabilities({},'skill',100);
   assert.equal(first.totalUses,105);assert.equal(second.totalUses,105);assert.equal(first.rows.length,100);assert.equal(second.rows.length,5);
   assert.equal(first.chartRows.length,20);assert.deepEqual(second.chartRows,first.chartRows,'chart ranking ignores table pagination');
+  const small=db.queryCapabilities({},'skill',0,7),large=db.queryCapabilities({},'skill',0,1000);
+  assert.equal(small.rows.length,7);assert.deepEqual(small.chartRows,first.chartRows);
+  assert.deepEqual(db.queryCapabilities({},'skill',7,7).rows,first.rows.slice(7,14));
+  assert.equal(large.rows.length,105);assert.equal(small.totalUses,large.totalUses);
+  for (const limit of [0,1.5,1001]) assert.throws(()=>db.queryCapabilities({},'skill',0,limit),RangeError);
   assert.deepEqual(first.chartRows,first.rows.slice(0,20),'ties use the same deterministic provider/name ordering');
   assert.deepEqual(db.queryCapabilities({},'skill',200).chartRows,first.chartRows,'even an empty table page retains the full chart');
   assert.ok(Math.abs([...first.rows,...second.rows].reduce((n,row)=>n+row.percentage,0)-100)<1e-10);
@@ -177,6 +182,28 @@ test('capability pagination uses the full denominator, date filters exclude unkn
   db.close();db=new SummaryDatabase(file);
   assert.deepEqual(db.queryTurns(),before);assert.equal(db.queryCapabilities({},'skill').totalUses,0);
   assert.deepEqual(db.connection.prepare('PRAGMA foreign_key_check').all(),[]);
+});
+
+test('worker applies independent Skill page sizes and preserves totals across custom page boundaries',async t=>{
+  const directory=await mkdtemp(join(tmpdir(),'tracker-capability-pages-'));
+  const dbPath=join(directory,'db.sqlite');
+  const db=new SummaryDatabase(dbPath);
+  try {
+    db.replaceSessions({sessions:[{provider:'codex',session_id:'s'}],files:[],summaries:Array.from({length:105},(_,i)=>({
+      ...summary(`entry-${i}`),capability_usage:(['skill','subagent','plugin'] as const).map(category=>({category,name:`entry-${i}`,usage_count:1})),
+    }))});
+  } finally {db.close();}
+  const client=new SummaryClient({dbPath,roots:[]});
+  t.after(async()=>{await client.dispose();await rm(directory,{recursive:true,force:true});});
+  const query={section:'skills' as const,limit:37,capabilityLimits:{skill:7,plugin:1000,model:1}};
+  const first=(await client.query(query)).capabilities!;
+  const second=(await client.query({...query,capabilityOffsets:{skill:7,subagent:37}})).capabilities!;
+  assert.equal(first.skill.rows.length,7);assert.equal(first.subagent.rows.length,37);assert.equal(first.plugin.rows.length,105);
+  assert.equal(second.skill.rows.length,7);assert.equal(second.subagent.rows.length,37);
+  assert.equal(first.skill.total,105);assert.equal(second.skill.totalUses,105);assert.equal(first.plugin.totalUses,105);
+  assert.ok(!second.skill.rows.some(row=>first.skill.rows.some(previous=>previous.name===row.name)));
+  assert.equal(second.skill.rows[0].percentage,first.skill.rows[0].percentage);
+  assert.deepEqual(second.plugin.rows,first.plugin.rows);
 });
 
 test('capability chart ranks the filtered top 20 and retains the denominator of omitted entries',()=>{
