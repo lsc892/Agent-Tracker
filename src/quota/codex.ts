@@ -4,7 +4,8 @@ import { homedir } from 'node:os';
 import { basename, dirname, isAbsolute, join, delimiter } from 'node:path';
 import { StringDecoder } from 'node:string_decoder';
 import { performance } from 'node:perf_hooks';
-import { asRecord, durationLabel, QuotaError, type QuotaProvider, type QuotaReadContext, type QuotaSnapshot, type QuotaWindow } from './types';
+import { BaseQuotaProvider } from './base';
+import { asRecord, durationLabel, QuotaError, type QuotaReadContext, type QuotaSnapshot, type QuotaWindow } from './types';
 
 export interface CodexQuotaProviderOptions {
   dataHome?: string;
@@ -20,30 +21,16 @@ export interface CodexQuotaProviderOptions {
 }
 
 /** No thread or turn methods are sent; every read owns one short-lived process. */
-export class CodexQuotaProvider implements QuotaProvider {
+export class CodexQuotaProvider extends BaseQuotaProvider {
   readonly id = 'codex' as const;
-  private readonly active = new Set<AbortController>();
-  private readonly reads = new Set<Promise<QuotaSnapshot>>();
-  private disposed = false;
-  constructor(private readonly options: CodexQuotaProviderOptions = {}) {}
+  protected readonly closedMessage = { key: 'quota.codexClosed' } as const;
 
-  read(context: QuotaReadContext): Promise<QuotaSnapshot> {
-    if (this.disposed) return Promise.reject(new QuotaError('cancelled', { key: 'quota.codexClosed' }));
-    const promise = this.readOnce(context);
-    this.reads.add(promise);
-    void promise.finally(() => this.reads.delete(promise)).catch(() => {});
-    return promise;
+  constructor(private readonly options: CodexQuotaProviderOptions = {}) {
+    super();
   }
 
-  async dispose(): Promise<void> {
-    this.disposed = true;
-    for (const controller of this.active) controller.abort();
-    await Promise.allSettled(this.reads);
-  }
-
-  private async readOnce(context: QuotaReadContext): Promise<QuotaSnapshot> {
+  protected async readQuota(context: QuotaReadContext): Promise<QuotaSnapshot> {
     const controller = new AbortController();
-    this.active.add(controller);
     const signal = AbortSignal.any([controller.signal, context.signal]);
     const now = this.options.now ?? Date.now;
     const startedAt = performance.now();
@@ -100,7 +87,6 @@ export class CodexQuotaProvider implements QuotaProvider {
       try { await session?.close(); }
       finally {
         if (session?.hasExited) this.lifecycle('stopped', session.child.pid, performance.now() - startedAt);
-        this.active.delete(controller);
       }
     }
   }

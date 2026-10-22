@@ -3,9 +3,9 @@ import { test } from 'node:test';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { ClaudeCliCredentials, ClaudeQuotaProvider, CodexQuotaProvider, parseClaudeQuota,
+import { BaseQuotaProvider, ClaudeCliCredentials, ClaudeQuotaProvider, CodexQuotaProvider, parseClaudeQuota,
   parseCodexQuota, parseRetryAfter, QuotaError, QuotaService,
-  type QuotaClock, type QuotaProvider, type QuotaSnapshot } from '../../src/quota';
+  type QuotaClock, type QuotaProvider, type QuotaReadContext, type QuotaSnapshot } from '../../src/quota';
 
 const signal = () => new AbortController().signal;
 const snapshot = (now: number, used = 25): QuotaSnapshot => ({ provider: 'claude', fetchedAt: now,
@@ -41,6 +41,54 @@ function deferred<T>(): { promise: Promise<T>; resolve(value: T): void } {
   const promise = new Promise<T>(done => { resolve = done; });
   return { promise, resolve };
 }
+
+test('the quota base cancels every active read and waits for cleanup before disposal completes', async () => {
+  const cleanup = deferred<void>();
+  let started = 0;
+  let cancelled = 0;
+  class Provider extends BaseQuotaProvider {
+    readonly id = 'claude' as const;
+    protected readonly closedMessage = { key: 'quota.claudeCancelled' } as const;
+
+    protected async readQuota(context: QuotaReadContext): Promise<QuotaSnapshot> {
+      started++;
+      await new Promise<void>(resolve => context.signal.addEventListener('abort', () => {
+        cancelled++;
+        resolve();
+      }, { once: true }));
+      await cleanup.promise;
+      throw new QuotaError('cancelled', 'Cancelled');
+    }
+  }
+  const provider = new Provider();
+  const first = assert.rejects(provider.read({ signal: signal() }), { code: 'cancelled' });
+  const second = assert.rejects(provider.read({ signal: signal() }), { code: 'cancelled' });
+  await settle();
+  assert.equal(started, 2);
+  const closing = provider.dispose();
+  assert.equal(provider.dispose(), closing);
+  let closed = false;
+  void closing.then(() => { closed = true; });
+  await settle();
+  assert.equal(cancelled, 2);
+  assert.equal(closed, false, 'provider cleanup remains part of the read lifetime');
+  await assert.rejects(provider.read({ signal: signal() }), { code: 'cancelled' });
+  cleanup.resolve();
+  await Promise.all([first, second, closing]);
+  await assert.rejects(provider.read({ signal: signal() }), { code: 'cancelled' });
+  assert.equal(started, 2, 'closed providers do not start additional reads');
+});
+
+test('the quota base releases failed reads even when provider code throws synchronously', async () => {
+  class Provider extends BaseQuotaProvider {
+    readonly id = 'claude' as const;
+    protected readonly closedMessage = { key: 'quota.claudeCancelled' } as const;
+    protected readQuota(): Promise<QuotaSnapshot> { throw new Error('Read failed'); }
+  }
+  const provider = new Provider();
+  await assert.rejects(provider.read({ signal: signal() }), /Read failed/);
+  await provider.dispose();
+});
 
 test('manual refresh policy skips startup, focus and timers and can switch live', async () => {
   const clock = new FakeClock();

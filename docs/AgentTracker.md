@@ -40,6 +40,10 @@ Codex sessions/**/*.jsonl ──┘                              │
 
 `extension.ts`는 `AgentTrackerApp`의 시작·종료를 호출한다. `app.ts`가 서비스 구성, 명령·이벤트 등록, 감시 시작을 순서대로 수행하고 설정 변경을 직렬 큐로 적용한다. 변경 사항 판별과 적용은 별도 메서드로 나누며, 종료 시 명령·이벤트·UI를 해제하고 진행 중인 설정·데이터 삭제·서비스 종료를 기다린다. 초기화 실패 시 이미 만든 리소스도 정리한다.
 
+Claude·Codex quota 제공자는 `BaseQuotaProvider` 추상 클래스를 상속한다. 공통 `read()`는 조회별 취소 신호와 진행 중 Promise를 소유하고 `readQuota(context)`를 호출해 같은 `QuotaSnapshot` 계약으로 사용량을 반환한다. 공통 `dispose()`는 추가 조회를 차단하고 모든 조회를 취소한 뒤 제공자의 정리가 끝날 때까지 기다리며 중복 호출은 같은 Promise를 반환한다. 인증·HTTP/RPC·응답 정규화와 timeout 시작 시점은 각 제공자에 둔다. 특히 Codex의 process 종료 확인은 조회의 일부로 유지한다. `QuotaProvider` 인터페이스는 서비스의 의존 계약으로 유지한다.
+
+새 quota 제공자는 `BaseQuotaProvider`를 상속하고 `id`, 종료 안내 `closedMessage`, `readQuota()`를 구현한다. `readQuota()`는 전달받은 `signal`을 따르고 사용량·조회 시각·reset 시각을 기존 snapshot 규약으로 정규화해야 한다. 제공자 ID 타입·설정과 `AgentTrackerApp`의 생성 목록, 제공자별 UI도 함께 확장한다. 로컬 대화 통계까지 지원하려면 별도의 로그 파서와 통계 provider 연동이 필요하다.
+
 현재 quota는 서버 조회 결과를 사용하고, 과거 token 통계는 manifest에서 변경 session을 찾아 요청·모델·비용 집계를 함께 갱신한다.
 
 확장 대표 아이콘은 `package.json`의 `icon`에 지정한 `resource/icon/AgentTracker_Icon.png`를 사용한다. 같은 PNG를 VSIX에 포함해 VS Code 확장 목록과 상세 화면에 표시한다.
@@ -1058,7 +1062,7 @@ last successful session update
 각 기능을 구현할 때 fixture 기반 테스트를 함께 작성한다. 상세 검증 항목과 자동 실행·패키징 정책은 [CI/CD 계획](./CI-CD.md)에서 관리한다.
 
 1. VS Code extension scaffold와 StatusBar/Webview command
-2. `QuotaService`와 provider adapter interface
+2. `QuotaService`와 provider 계약, `BaseQuotaProvider` 추상 클래스
 3. 짧은 Codex App Server 실행, handshake, account/read, rateLimits read, 모든 경로의 종료 처리
 4. Claude quota adapter와 조회 실패 fallback
 5. SQLite worker와 migration

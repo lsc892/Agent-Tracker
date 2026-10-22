@@ -2,7 +2,8 @@ import { execFile } from 'node:child_process';
 import { readFile, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { asRecord, QuotaError, type QuotaProvider, type QuotaReadContext, type QuotaSnapshot, type QuotaWindow } from './types';
+import { BaseQuotaProvider } from './base';
+import { asRecord, QuotaError, type QuotaReadContext, type QuotaSnapshot, type QuotaWindow } from './types';
 
 export interface ClaudeCredentialSource {
   /** refresh=true re-reads the CLI-owned credential source after a 401. */
@@ -54,25 +55,25 @@ export class ClaudeCliCredentials implements ClaudeCredentialSource {
   }
 }
 
-export class ClaudeQuotaProvider implements QuotaProvider {
+export class ClaudeQuotaProvider extends BaseQuotaProvider {
   readonly id = 'claude' as const;
+  protected readonly closedMessage = { key: 'quota.claudeCancelled' } as const;
   private readonly credentials: ClaudeCredentialSource;
   private readonly fetcher: typeof globalThis.fetch;
   private readonly now: () => number;
   private readonly timeoutMs: number;
-  private readonly active = new Set<AbortController>();
 
   constructor(options: ClaudeQuotaProviderOptions = {}) {
+    super();
     this.credentials = options.credentials ?? new ClaudeCliCredentials(options.dataHome);
     this.fetcher = options.fetch ?? globalThis.fetch;
     this.now = options.now ?? Date.now;
     this.timeoutMs = options.timeoutMs ?? 15_000;
   }
 
-  async read(context: QuotaReadContext): Promise<QuotaSnapshot> {
+  protected async readQuota(context: QuotaReadContext): Promise<QuotaSnapshot> {
     const controller = new AbortController();
     const signal = AbortSignal.any([context.signal, controller.signal]);
-    this.active.add(controller);
     let timedOut = false;
     const timeout = setTimeout(() => { timedOut = true; controller.abort(); }, this.timeoutMs);
     timeout.unref?.();
@@ -114,11 +115,8 @@ export class ClaudeQuotaProvider implements QuotaProvider {
       throw new QuotaError('network', { key: 'quota.claudeNetworkFailed' });
     } finally {
       clearTimeout(timeout);
-      this.active.delete(controller);
     }
   }
-
-  dispose(): void { for (const controller of this.active) controller.abort(); }
 }
 
 export function parseRetryAfter(value: string | null, now: number): number | undefined {

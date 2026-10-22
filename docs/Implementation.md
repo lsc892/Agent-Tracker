@@ -19,7 +19,8 @@
 | 경로 | 역할 |
 |---|---|
 | `src/extension.ts`, `app.ts` | 시작·종료 진입점과 서비스 구성, 명령·설정·focus 이벤트, 종료 순서 |
-| `src/quota/` | Claude OAuth, 짧은 Codex App Server 실행, provider별 refresh 정책 |
+| `src/quota/base.ts`, `claude.ts`, `codex.ts` | 추상 클래스의 공통 조회 수명·취소·종료와 Claude OAuth·짧은 Codex App Server 구현 |
+| `src/quota/service.ts` | provider별 refresh 정책·주기·실패 상태 |
 | `src/summary/client.ts`, `worker.ts` | worker 요청·응답, lazy refresh, 조회·취소 |
 | `src/summary/scanner.ts`, `jsonl.ts`, `lock.ts` | bounded 순회·스트리밍·파일 잠금 |
 | `src/summary/parsers/` | Claude·Codex current/legacy 정규화 |
