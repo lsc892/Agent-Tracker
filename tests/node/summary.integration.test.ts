@@ -214,11 +214,17 @@ test('worker initialization creates only schema; refresh is lazy and requests ar
   const base = await mkdtemp(join(tmpdir(),'agent-tracker-worker-'));const root = join(base,'projects');await mkdir(root);
   await writeFile(join(root,'session-one.jsonl'),jsonl([user(),response()]));
   const client = new SummaryClient({dbPath:join(base,'db.sqlite'),roots:[{provider:'claude',path:root}]});
+  let progressCount = 0;
+  client.subscribe(() => { throw new Error('Observer failed'); });
+  const unsubscribe = client.subscribe(() => { progressCount++; });
   try {
     await client.initialize();assert.equal((await client.diagnostics()).counts.files,0);
     assert.deepEqual(await client.queryNames({kind:'project'}),{rows:[],total:0});
     const a = client.refresh();const b = client.refresh();assert.equal(a,b);
-    assert.equal((await a).failed,0);const query = await client.query({groupBy:'all'});
+    assert.equal((await a).failed,0);
+    assert.ok(progressCount > 0, 'a failed observer does not block other observers or RPC responses');
+    unsubscribe();
+    const query = await client.query({groupBy:'all'});
     assert.equal(query.rows[0].total_tokens,200);assert.equal(query.total,1);
     const names = await client.queryNames({kind:'session',providers:['claude']});
     assert.equal(names.total,1);assert.equal(names.rows[0].session_id,'session-one');
@@ -529,6 +535,44 @@ test('worker cancellation before startup and while waiting for another writer re
     await release();release=undefined;
     assert.equal((await client.refresh()).interrupted,false);
   } finally {await release?.();await client.dispose();await rm(base,{recursive:true,force:true});}
+});
+
+test('summary disposal cancels an active refresh and rejects further requests without restarting the worker', async () => {
+  const base = await mkdtemp(join(tmpdir(), 'agent-tracker-close-'));
+  const options = { dbPath: join(base, 'db.sqlite'), roots: [] };
+  const client = new SummaryClient(options);
+  let release: (() => Promise<void>) | undefined;
+  try {
+    await client.initialize();
+    release = await acquireRefreshLock(options.dbPath);
+    const refreshing = client.refresh();
+    const closing = client.dispose();
+    assert.equal(client.dispose(), closing, 'all callers share the same shutdown');
+    assert.equal((await refreshing).interrupted, true);
+    await closing;
+    await assert.rejects(client.initialize(), /Summary client disposed/);
+    await assert.rejects(client.query(), /Summary client disposed/);
+    await assert.rejects(client.refresh(), /Summary client disposed/);
+  } finally {
+    await release?.();
+    await client.dispose();
+    await rm(base, { recursive: true, force: true });
+  }
+});
+
+test('a summary client disposed before startup never creates its worker or database', async () => {
+  const base = await mkdtemp(join(tmpdir(), 'agent-tracker-cold-close-'));
+  const dbPath = join(base, 'db.sqlite');
+  const client = new SummaryClient({ dbPath, roots: [] });
+  try {
+    await client.dispose();
+    await assert.rejects(client.initialize(), /Summary client disposed/);
+    await assert.rejects(client.refresh(), /Summary client disposed/);
+    await assert.rejects(readFile(dbPath), { code: 'ENOENT' });
+  } finally {
+    await client.dispose();
+    await rm(base, { recursive: true, force: true });
+  }
 });
 
 test('two workers sharing a DB serialize refreshes and preserve unchanged reads',async () => {

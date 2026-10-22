@@ -21,7 +21,7 @@
 | `src/extension.ts`, `app.ts` | 시작·종료 진입점과 서비스 구성, 명령·설정·focus 이벤트, 종료 순서 |
 | `src/quota/base.ts`, `claude.ts`, `codex.ts` | 추상 클래스의 공통 조회 수명·취소·종료와 Claude OAuth·짧은 Codex App Server 구현 |
 | `src/quota/service.ts` | provider별 refresh 정책·주기·실패 상태 |
-| `src/summary/client.ts`, `worker.ts` | worker 요청·응답, lazy refresh, 조회·취소 |
+| `src/summary/client.ts`, `transport.ts`, `refresh.ts`, `worker.ts` | 공개 API, Worker 통신·종료, 중복 갱신·취소·삭제 직렬화, DB 실행 |
 | `src/summary/scanner.ts`, `jsonl.ts`, `lock.ts` | bounded 순회·스트리밍·파일 잠금 |
 | `src/summary/parsers/` | Claude·Codex current/legacy 정규화 |
 | `src/summary/staging.ts` | 디스크 임시 테이블, 중복 제거·lineage·root 요청 합산 |

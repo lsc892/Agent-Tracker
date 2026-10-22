@@ -44,6 +44,8 @@ Claude·Codex quota 제공자는 `BaseQuotaProvider` 추상 클래스를 상속�
 
 새 quota 제공자는 `BaseQuotaProvider`를 상속하고 `id`, 종료 안내 `closedMessage`, `readQuota()`를 구현한다. `readQuota()`는 전달받은 `signal`을 따르고 사용량·조회 시각·reset 시각을 기존 snapshot 규약으로 정규화해야 한다. 제공자 ID 타입·설정과 `AgentTrackerApp`의 생성 목록, 제공자별 UI도 함께 확장한다. 로컬 대화 통계까지 지원하려면 별도의 로그 파서와 통계 provider 연동이 필요하다.
 
+`SummaryClient`는 기존 공개 API를 유지하면서 `WorkerTransport`와 `RefreshController`에 위임한다. transport는 Worker 지연 생성·요청 ID·응답/오류·진행 알림·최대 5초의 종료 대기를 소유하고, refresh controller는 중복 갱신 병합·공유 메모리 취소·데이터 삭제 직렬화를 맡는다. 조회·설정은 진행 중 삭제를 기다리며 종료 후에는 Worker를 새로 만들지 않는다. 내부 종료용 `dispose` 요청은 종료 상태에서도 허용해 DB를 먼저 닫는다.
+
 현재 quota는 서버 조회 결과를 사용하고, 과거 token 통계는 manifest에서 변경 session을 찾아 요청·모델·비용 집계를 함께 갱신한다.
 
 확장 대표 아이콘은 `package.json`의 `icon`에 지정한 `resource/icon/AgentTracker_Icon.png`를 사용한다. 같은 PNG를 VSIX에 포함해 VS Code 확장 목록과 상세 화면에 표시한다.
