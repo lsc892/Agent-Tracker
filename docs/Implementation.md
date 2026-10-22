@@ -18,7 +18,7 @@
 
 | 경로 | 역할 |
 |---|---|
-| `src/extension.ts` | 활성화, 두 상태 표시줄, 명령, 설정·focus 이벤트, 종료 |
+| `src/extension.ts`, `app.ts` | 시작·종료 진입점과 서비스 구성, 명령·설정·focus 이벤트, 종료 순서 |
 | `src/quota/` | Claude OAuth, 짧은 Codex App Server 실행, provider별 refresh 정책 |
 | `src/summary/client.ts`, `worker.ts` | worker 요청·응답, lazy refresh, 조회·취소 |
 | `src/summary/scanner.ts`, `jsonl.ts`, `lock.ts` | bounded 순회·스트리밍·파일 잠금 |

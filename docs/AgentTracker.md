@@ -38,6 +38,8 @@ Codex sessions/**/*.jsonl ──┘                              │
 
 두 경로는 분리한다. 상태 표시줄 quota 갱신이 JSONL 전체 통계 갱신을 유발해서는 안 된다.
 
+`extension.ts`는 `AgentTrackerApp`의 시작·종료를 호출한다. `app.ts`가 서비스 구성, 명령·이벤트 등록, 감시 시작을 순서대로 수행하고 설정 변경을 직렬 큐로 적용한다. 변경 사항 판별과 적용은 별도 메서드로 나누며, 종료 시 명령·이벤트·UI를 해제하고 진행 중인 설정·데이터 삭제·서비스 종료를 기다린다. 초기화 실패 시 이미 만든 리소스도 정리한다.
+
 현재 quota는 서버 조회 결과를 사용하고, 과거 token 통계는 manifest에서 변경 session을 찾아 요청·모델·비용 집계를 함께 갱신한다.
 
 확장 대표 아이콘은 `package.json`의 `icon`에 지정한 `resource/icon/AgentTracker_Icon.png`를 사용한다. 같은 PNG를 VSIX에 포함해 VS Code 확장 목록과 상세 화면에 표시한다.

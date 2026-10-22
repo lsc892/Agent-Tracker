@@ -58,6 +58,7 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
   let diagnostics = 0;
   let initializations = 0;
   let quotaDisposals = 0;
+  let failQuotaSubscription = false;
   let summaryDisposals = 0;
   let cancellations = 0;
   let clears = 0;
@@ -133,7 +134,11 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     constructor(private readonly providers: { id: string }[], options: {refreshPolicy: string; pollingSeconds: number}) {
       policies.push(options.refreshPolicy); pollingIntervals.push(options.pollingSeconds);
     }
-    start() {} setFocused() {} subscribe() { return disposable; }
+    start() {} setFocused() {}
+    subscribe() {
+      if (failQuotaSubscription) throw new Error('Quota subscription failed');
+      return disposable;
+    }
     setPollingInterval(seconds: number) { pollingIntervals.push(seconds); }
     setRefreshPolicy(policy: string) { policies.push(policy); }
     async dispose() { quotaDisposals++; }
@@ -444,6 +449,9 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     for (const subscription of subscriptions) subscription.dispose();
     assert.equal(quotaDisposals, 4);
     assert.equal(summaryDisposals, 1);
+    assert.equal(commands.size, 0, 'shutdown unregisters commands');
+    assert.equal(configuration.size(), 0, 'shutdown unregisters configuration events');
+    assert.equal(focus.size(), 0, 'shutdown unregisters window focus events');
     assert.equal(panels[0].disposed, true);
     assert.ok(items.every(item => item.disposed));
     assert.equal(themes.size(), 0);
@@ -453,6 +461,23 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     assert.equal(initializations, 1, 'disabled statistics do not start the worker on activation');
     await click('agentTracker.openUsage');
     assert.equal(scans, beforeSkillSwitch+1);
+    // VS Code may dispose the context before calling deactivate(). Both paths
+    // must share the same asynchronous shutdown without disposing twice.
+    for (const subscription of subscriptions) subscription.dispose();
+    await extension.deactivate();
+    assert.equal(quotaDisposals, 5);
+    assert.equal(summaryDisposals, 2);
+    assert.equal(commands.size, 0);
+
+    failQuotaSubscription = true;
+    await assert.rejects(extension.activate({
+      globalStorageUri: uri(storage), extensionUri: uri(process.cwd()), subscriptions,
+    } as unknown as import('vscode').ExtensionContext), /Quota subscription failed/);
+    assert.equal(quotaDisposals, 6, 'activation failure closes the partially initialized quota service');
+    assert.equal(summaryDisposals, 3, 'activation failure closes the partially initialized summary client');
+    assert.ok(items.every(item => item.disposed));
+    assert.equal(themes.size(), 0);
+    assert.equal(commands.size, 0);
   } finally {
     await extension?.deactivate();
     for (const subscription of subscriptions) subscription.dispose();
