@@ -8,7 +8,10 @@ import { modelOrderKey, modelRelease } from '../modelOrder';
 
 export type SqliteSessionOptions = string | { databasePath: string; cacheKiB?: number };
 
-/** Owns the SQLite connection shared by all summary readers and stores. */
+/**
+ * 책임: 통계용 SQLite 연결과 제한된 statement cache의 수명을 소유한다.
+ * 알고리즘: WAL·외래 키·파일 TEMP·캐시 상한을 설정하고 마이그레이션과 날짜·모델 함수를 등록해 모든 저장소에 공유한다.
+ */
 export class SqliteSession {
   readonly connection: DatabaseSync;
   readonly rollups: UsageRollupStore;
@@ -57,6 +60,10 @@ export class SqliteSession {
     return statement;
   }
 
+  /**
+   * 책임: 동기 DB 변경을 하나의 원자적 쓰기로 묶는다.
+   * 알고리즘: BEGIN IMMEDIATE로 쓰기 잠금을 확보한 뒤 콜백 성공 시 COMMIT하고 오류 시 ROLLBACK 후 같은 오류를 전달한다.
+   */
   transaction<T>(action: () => T): T {
     this.connection.exec('BEGIN IMMEDIATE');
     try {
@@ -69,7 +76,10 @@ export class SqliteSession {
     }
   }
 
-  /** Collect statistics after the first scan, then at most once per day. */
+  /**
+   * 책임: 조회 계획용 통계를 과도한 유지보수 비용 없이 갱신한다.
+   * 알고리즘: 첫 스캔 완료 후와 이후 하루 간격으로 main.optimize를 시도하고 성공한 시각만 기록하며 유지보수 실패는 전파하지 않는다.
+   */
   optimize(): void {
     const now = Date.now();
     if (this.lastOptimizedAt !== undefined && now - this.lastOptimizedAt < 86_400_000) return;

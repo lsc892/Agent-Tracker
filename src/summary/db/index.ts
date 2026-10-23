@@ -15,7 +15,10 @@ export * from './types';
 export { usageChartFromPage } from './chart';
 export { periodBounds } from './timezone';
 
-/** Stable worker/scanner API. All components share one connection and transaction owner. */
+/**
+ * 책임: Worker와 스캐너가 사용하는 통계 DB의 공통 진입점을 제공한다.
+ * 알고리즘: 하나의 연결·트랜잭션 소유자를 생성하고 manifest·세션 저장·비용·조회 책임에 같은 연결을 주입해 위임한다.
+ */
 export class SummaryDatabase {
   readonly connection: DatabaseSync;
   private readonly sqlite: SqliteSession;

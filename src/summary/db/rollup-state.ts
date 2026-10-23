@@ -6,6 +6,10 @@ export interface RollupState {
   merge: 'SUM' | 'MAX' | 'MIN';
 }
 
+/**
+ * 책임: 일별 저장과 raw 경계 집계가 공유할 병합 가능한 지표를 정의한다.
+ * 알고리즘: 토큰 합계·완료 및 기록 표본 수·알려진 값 개수·시간 품질별 개수를 나열해 평균을 저장하지 않고 합계와 분모를 보존한다.
+ */
 const states: RollupState[] = [];
 const add = (name: string, expression: string, type: RollupState['type'] = 'INTEGER', merge: RollupState['merge'] = 'SUM'): void => {
   states.push({ name, expression, type, merge });

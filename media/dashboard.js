@@ -56,6 +56,10 @@
     if (className) node.className = className;
     return node;
   }
+  /**
+   * 책임: 현재 필터·정렬·페이지 상태를 호스트 조회 요청으로 변환한다.
+   * 알고리즘: 직접 입력한 날짜를 date picker로 교차 검증하고 구역별 페이지 조건과 선택 ID를 모아 전송한 뒤 화면 상태를 저장한다.
+   */
   function query(resetCapabilities = true) {
     for (const id of ['from-day', 'to-day']) {
       const input = $(id);
@@ -107,6 +111,10 @@
     for (const id of ['page-size', 'chart-page-size']) $(id).value = String(pageSize);
     for (const category of capabilityCategories) $(`${category}-page-size`).value = String(capabilityPageSizes[category]);
   }
+  /**
+   * 책임: 페이지당 행 수를 유효한 정수일 때만 적용한다.
+   * 알고리즘: 변경·Enter 이벤트에서 1~1000 범위를 검증하고 오류는 입력칸에 표시하며 성공 값만 호출자에게 전달한다.
+   */
   function bindPageSize(id, apply) {
     const input = $(id);
     const commit = () => {
@@ -157,6 +165,10 @@
     nameCaption('session', row ? row.session_name || t('dashboard.unnamedSession') : '', row ? t('dashboard.sessionId', { value0: row.session_id }) : '');
     closeNames(true); offset = 0; query();
   }
+  /**
+   * 책임: 이름 선택 목록을 중복 요청 없이 다음 페이지까지 불러온다.
+   * 알고리즘: 열린 목록의 pending 상태를 검사하고 현재 제공자·프로젝트와 loaded offset에 증가하는 request ID를 붙여 조회한다.
+   */
   function loadNames(kind) {
     const page = namePages[kind];
     if (openNameKind !== kind || page.pending !== undefined) return;
@@ -167,6 +179,10 @@
     $(`${kind}-list-status`).textContent = t('dashboard.loadingNames');
     send({ type: 'queryNames', query: request, requestId: page.pending });
   }
+  /**
+   * 책임: 이름이 같아도 식별자로 구분되는 프로젝트·세션 선택지를 만든다.
+   * 알고리즘: 표시 이름과 경로·세션 metadata를 textContent로 조합하고 선택 상태는 제공자·프로젝트·세션 ID로 비교해 클릭 동작을 연결한다.
+   */
   function nameOption(kind, row) {
     const title = kind === 'project' ? row?.project_name || t('dashboard.unnamedProject') : row?.session_name || t('dashboard.unnamedSession');
     const node = element('button', row ? title : kind === 'project' ? t('dashboard.allProjects') : t('dashboard.allSessions'), 'name-option');
@@ -193,6 +209,10 @@
     $(`${kind}-list`).append(nameOption(kind));
     loadNames(kind);
   }
+  /**
+   * 책임: 선택 목록에 현재 요청의 응답만 누적한다.
+   * 알고리즘: 열린 목록·pending ID를 대조해 오래된 응답을 버리고 loaded·total을 갱신하며 표시 공간이 남으면 다음 페이지를 요청한다.
+   */
   function renderNames(message) {
     const kind = message.kind;
     const page = namePages[kind];
@@ -206,6 +226,10 @@
     const list = $(`${kind}-options`);
     if (message.result.rows.length && page.loaded < page.total && list.scrollHeight <= list.clientHeight) loadNames(kind);
   }
+  /**
+   * 책임: 통계 표와 헤더 정렬 조작을 안전한 DOM으로 만든다.
+   * 알고리즘: 문자열은 textContent로 넣고 정렬 가능한 헤더에만 방향·접근성 속성을 붙이며 클릭 시 첫 페이지부터 호스트에 다시 조회한다.
+   */
   function table(target, headers, rows, sortKeys = []) {
     target.replaceChildren();
     if (!rows.length) { target.append(element('p', t('common.noRecords'), 'empty')); return; }
@@ -321,6 +345,10 @@
     if (mode === 'total') return provider;
     return `${provider} · ${row.project_name || t('dashboard.unnamedProject')}${row.session_id ? ` / ${row.session_name || t('dashboard.unnamedSession')}` : ''}`;
   }
+  /**
+   * 책임: 토큰 총량·평균을 중복 없는 누적 막대 성분으로 나눈다.
+   * 알고리즘: 입력에서 캐시 읽기·쓰기를 뺀 뒤 출력·캐시를 별도 성분으로 만들고 캐시가 미상이면 총량 한 구간으로 표시한다.
+   */
   function chartSegments(row, metric) {
     const average = metric === 'averageTokens';
     const input = average ? row.avg_input_tokens : row.input_tokens;
@@ -332,6 +360,10 @@
     return [Math.max(0, input - write - read), output, write, read]
       .map((value, index) => ({ value, className: `chart-series-${index}`, label: tokenHeaders[index].label }));
   }
+  /**
+   * 책임: 막대의 의미·토큰 구성·평균 표본을 접근 가능한 설명으로 제공한다.
+   * 알고리즘: 도표 모드와 지표에 맞는 값·구성을 선택하고 완료 횟수·시간 표본·모델 시간 중복 안내를 필요한 경우 덧붙인다.
+   */
   function chartDescription(row, chart) {
     const turn = chart.mode === 'turn';
     const value = chartValue(row, chart.metric, turn);
@@ -349,6 +381,10 @@
     if (chart.by === 'model' && chart.metric === 'averageDuration') detail += t('dashboard.modelTimeSuffix');
     return detail;
   }
+  /**
+   * 책임: 현재 표 페이지의 통계를 기간·요청·비교 도표로 그린다.
+   * 알고리즘: 분류별 peer와 축 최댓값으로 SVG 좌표를 계산하고 토큰 성분을 누적 배치하며, 각 구간에 키보드 접근과 상세 설명을 연결한다.
+   */
   function renderChart(result) {
     const chart = result.chart;
     const plot = $('usage-chart');
@@ -498,6 +534,10 @@
     plot.append(svg);
     $('chart-detail').textContent = chartDescription(rows[0], chart);
   }
+  /**
+   * 책임: 조회 결과를 다시 그려도 사용자가 읽던 위치를 유지한다.
+   * 알고리즘: 창과 표·도표의 스크롤 위치를 저장하고 DOM 갱신 후 finally에서 가로 스크롤과 창 위치를 복원한다.
+   */
   function renderUsage(result) {
     const left = window.scrollX, top = window.scrollY;
     const tableLeft = $('usage-table').scrollLeft, chartLeft = $('usage-chart').scrollLeft;
@@ -509,6 +549,10 @@
       if (window.scrollX !== left || window.scrollY !== top) window.scrollTo({ left, top, behavior: 'instant' });
     }
   }
+  /**
+   * 책임: 조회 응답을 토큰 또는 Skill 표와 페이지 상태에 반영한다.
+   * 알고리즘: 구역에 맞춰 행·전체 개수·지표를 렌더링하고 Skill은 전체 범위 최댓값·비율을 사용하며 토큰 표는 같은 결과로 도표를 갱신한다.
+   */
   function updateUsage(result) {
     latestUsage = result;
     if (result.capabilitiesEnabled !== undefined) setCapabilitiesEnabled(result.capabilitiesEnabled);
@@ -572,6 +616,10 @@
       $(`${category}-table`).replaceChildren();$(`${category}-total`).textContent = '';
     }
   }
+  /**
+   * 책임: Skill 사용량의 상대 막대와 전체 비율을 함께 표시한다.
+   * 알고리즘: 막대 길이는 분류 최다 횟수 대비로 계산하고 텍스트 비율은 서버가 전체 합계로 계산한 값을 사용한다.
+   */
   function capabilityRatio(row, maximum, totalUses) {
     const node = element('div', undefined, 'capability-ratio');
     const detail = t('dashboard.ratioDetail', { value0: number(row.percentage), value1: number(totalUses), value2: number(row.usage_count), value3: number(row.usage_count / maximum * 100) });

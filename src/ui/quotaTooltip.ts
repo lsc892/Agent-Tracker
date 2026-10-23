@@ -59,6 +59,10 @@ function resetCaption(window: QuotaWindow, now: number): string {
     : window.resetsAt <= now ? t('quota.resetElapsed') : t('quota.resetIn', { value0: countdown(window.resetsAt, now) });
 }
 
+/**
+ * 책임: 네이티브 Markdown 카드에서 형제 사용률 막대의 폭을 맞춘다.
+ * 알고리즘: 초기화 안내의 문자 폭을 한글 등 비ASCII와 ASCII로 나눠 추정하고 상·하한을 적용한 최댓값으로 공통 막대 폭을 정한다.
+ */
 function meterWidth(windows: readonly QuotaWindow[], now: number): number {
   // Native Markdown hovers do not expose font metrics or allow arbitrary layout styles.
   // Estimate full-width Korean characters separately, and keep sibling meters aligned.
@@ -69,7 +73,10 @@ function meterWidth(windows: readonly QuotaWindow[], now: number): number {
   return Math.round(width * 0.8) - 15;
 }
 
-/** Quota labels remain plain text even though the tooltip allows our command links. */
+/**
+ * 책임: 공통 quota 카드에 사용률·초기화·오래된 값·허용된 동작을 표시한다.
+ * 알고리즘: 제공자별 표시 정책으로 창을 고르고 기본 기간·추가 창을 배치하며, 외부 문구는 plain text로 넣고 명시된 command 링크만 허용한다.
+ */
 export function createQuotaTooltip(
   states: readonly QuotaState[],
   settings: {

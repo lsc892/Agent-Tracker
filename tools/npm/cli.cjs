@@ -5,6 +5,10 @@ const { createHash } = require('node:crypto');
 const { existsSync, readFileSync, statSync } = require('node:fs');
 const { delimiter, dirname, extname, isAbsolute, join, resolve } = require('node:path');
 
+/**
+ * 책임: 설치 CLI의 지원 옵션과 값을 명확히 구분한다.
+ * 알고리즘: 인자를 한 번 순회하며 허용된 flag·값 쌍만 저장하고 누락·NUL·알 수 없는 옵션은 즉시 거부한다.
+ */
 function parseArguments(args) {
   const options = { code: 'code' };
   const values = new Map([
@@ -24,6 +28,10 @@ function parseArguments(args) {
   return options;
 }
 
+/**
+ * 책임: 사용자가 선택한 VS Code CLI 실행 경로를 찾는다.
+ * 알고리즘: 명시 경로를 먼저 확인하고 그 외에는 플랫폼별 PATH·확장자 후보를 순서대로 검사해 실제 파일을 반환한다.
+ */
 function resolveCli(command, platform = process.platform, env = process.env) {
   if (isAbsolute(command) || /[\\/]/.test(command)) {
     const target = resolve(command);
@@ -41,6 +49,10 @@ function resolveCli(command, platform = process.platform, env = process.env) {
   throw new Error(`VS Code CLI "${command}" was not found. Install VS Code and add "code" to PATH, or pass --code <path>.`);
 }
 
+/**
+ * 책임: Windows launcher도 셸을 거치지 않는 실행 인자로 변환한다.
+ * 알고리즘: 공식 cmd/bat launcher에서 Electron·cli.js 경로를 추출·검증하고 ELECTRON_RUN_AS_NODE 환경과 prefix 인자를 구성한다.
+ */
 function cliInvocation(cli, platform = process.platform, env = process.env) {
   if (platform !== 'win32' || !/\.(cmd|bat)$/i.test(cli)) return { file: cli, prefix: [], env };
   // Run the bundled Electron CLI directly. Profile names and paths never enter cmd.exe.
@@ -73,6 +85,10 @@ function checkVersion(output, range) {
   }
 }
 
+/**
+ * 책임: 동봉한 확장을 선택한 VS Code 환경에 설치하고 결과를 확인한다.
+ * 알고리즘: 확장 ID·버전·VSIX 해시와 최소 VS Code 버전을 검증한 뒤 설치하고 같은 profile·경로의 목록에서 기대 버전을 대조한다.
+ */
 function run(packageRoot, args, dependencies = {}) {
   const spawn = dependencies.spawnSync ?? spawnSync;
   const log = dependencies.log ?? console.log;

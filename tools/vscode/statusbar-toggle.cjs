@@ -14,8 +14,10 @@ const end = '/*agent-tracker:statusbar-toggle:end*/';
 const hash = value => createHash('sha256').update(value).digest('hex');
 const checksum = value => createHash('sha256').update(value).digest('base64').replace(/=+$/, '');
 
-// Serialized into the renderer. Keep this function self-contained and scoped to
-// one status item: the original delegate is shared by the rest of the status bar.
+/**
+ * 책임: Agent Tracker 항목의 자동 미리 보기와 클릭 고정 hover를 구분한다.
+ * 알고리즘: 해당 항목의 delegate만 감싸 일반 hover에 요약을 사용하고 고정 카드가 열리면 mouseover·focus 재진입을 막으며 해제 콜백을 등록한다.
+ */
 function configureQuotaHover(item, summary) {
   item._agentTrackerSummary = summary;
   if (item._agentTrackerHoverConfigured) return;
@@ -54,6 +56,10 @@ function configureQuotaDividers(item) {
   document.head.appendChild(style);
 }
 
+/**
+ * 책임: 지원하는 workbench 코드에 quota 클릭 토글 패치만 생성한다.
+ * 알고리즘: 유일한 심볼·연결 지점을 검증하고 정확히 알려진 기존 payload만 해제·승격해 새 주입 코드를 만들며 알 수 없는 수정은 거부한다.
+ */
 function patchSource(source) {
   const symbols = [...source.matchAll(/\b([\w$]+)\s*=\s*\{\s*id:\s*["']statusBar\.entry\.toggleTooltip["'],\s*title:\s*["']["']\s*\}/g)];
   if (symbols.length !== 1) throw new Error('내장 ToggleTooltipCommand를 유일하게 찾을 수 없습니다. 지원하지 않는 VS Code 빌드입니다.');
@@ -100,6 +106,10 @@ function appRootFromInstallation(root, launcher = join(root, 'bin', 'code.cmd'))
   }
 }
 
+/**
+ * 책임: 패치할 VS Code의 실제 앱 디렉터리를 찾는다.
+ * 알고리즘: 명시 app root·CLI·실행 파일을 우선하고 기본 설치 후보를 검사하며 버전별 설치 경로는 launcher와 product.json으로 확인한다.
+ */
 function resolveAppRoot(options = {}) {
   if (options.appRoot) return realpathSync(resolve(options.appRoot));
   if (options.cli) {
@@ -139,6 +149,10 @@ function backup(path, contents) {
   } else writeFileSync(path, contents, { flag: 'wx' });
 }
 
+/**
+ * 책임: workbench 패치·복원의 무결성과 복구 가능한 상태를 관리한다.
+ * 알고리즘: 대상·해시·백업·구문을 검증하고 변경 전 양쪽 기대 상태를 기록한 뒤 파일과 checksum을 교체하며 실패하면 이전 상태로 되돌린다.
+ */
 function operate(options = {}) {
   const appRoot = resolveAppRoot(options);
   const target = join(appRoot, 'out', ...checksumKey.split('/'));

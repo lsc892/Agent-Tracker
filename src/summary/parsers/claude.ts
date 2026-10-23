@@ -31,6 +31,10 @@ interface ClaudeRowContext {
   rootId: string | undefined;
 }
 
+/**
+ * 책임: Claude 로그의 요청·응답·수명주기를 공통 파싱 이벤트로 변환한다.
+ * 알고리즘: 행을 문맥 객체로 해석한 뒤 메타데이터·요청 식별·도구·응답·종료 순서로 처리하고 현재 root와 오류 상태를 유지한다.
+ */
 export class ClaudeParserAdapter {
   private currentRoot: string | undefined;
   private identityValue: ParsedIdentity;
@@ -64,6 +68,10 @@ export class ClaudeParserAdapter {
     this.recordSystemLifecycle(context);
   }
 
+  /**
+   * 책임: Claude 원본 행을 후속 처리기가 공유할 문맥으로 해석한다.
+   * 알고리즘: 메시지·토큰·시각·식별자를 정규화하고 tool_result·meta·sidechain을 제외해 외부 사용자 요청 여부를 결정한다.
+   */
   private readRow(row: Record<string, unknown>, offset: number): ClaudeRowContext {
     const type = string(row.type);
     const message = object(row.message);
@@ -87,6 +95,10 @@ export class ClaudeParserAdapter {
     };
   }
 
+  /**
+   * 책임: 과거 로그의 결제·제목·세션·프로젝트 metadata를 추적한다.
+   * 알고리즘: 명시 결제 정보를 우선 반영하고 사용자 제목을 AI 제목보다 우선하며 subagent의 부모 세션은 경로 기준으로 유지한다.
+   */
   private updateMetadata(context: ClaudeRowContext): void {
     // Billing metadata is accepted even on rows without a recognized type.
     if (context.hasBillingMetadata) this.billing = billingMode(context.billingValue);
@@ -104,6 +116,10 @@ export class ClaudeParserAdapter {
     if (cwd) Object.assign(this.identityValue, project(cwd));
   }
 
+  /**
+   * 책임: 도구 결과와 외부 사용자 요청을 구분해 사용량의 귀속 요청을 정한다.
+   * 알고리즘: promptId를 우선하고 외부 요청에는 uuid를 대체 키로 사용하며 새 요청이 시작될 때 이전 오류·중단 상태를 초기화한다.
+   */
   private identifyRequest(context: ClaudeRowContext): void {
     const { promptId, uuid, external } = context;
     const previousRoot = this.currentRoot;
@@ -127,6 +143,10 @@ export class ClaudeParserAdapter {
     }
   }
 
+  /**
+   * 책임: 응답 토큰과 요청 상태를 기록하면서 로컬 오류 안내의 모델 오집계를 막는다.
+   * 알고리즘: 실제 응답 또는 양수 토큰만 usage로 내보내고 synthetic 모델은 비우며, API 오류와 stop reason으로 완료·실패 상태를 정한다.
+   */
   private recordAssistant(context: ClaudeRowContext): void {
     if (context.type !== 'assistant') return;
     const { rootId, usage, model, responseId, requestId, apiError, time, offset } = context;
@@ -153,6 +173,10 @@ export class ClaudeParserAdapter {
       flags: this.apiFailed ? ['api-error'] : [], offset });
   }
 
+  /**
+   * 책임: 명시적 시스템 이벤트로 Claude 요청의 종료와 소요 시간을 보정한다.
+   * 알고리즘: stop hook의 계속 실행 여부를 우선하고 차단 상태가 아닐 때만 duration·완료 이벤트를 반영하며 API 실패 상태를 유지한다.
+   */
   private recordSystemLifecycle(context: ClaudeRowContext): void {
     const { type, rootId, subtype, preventedContinuation, durationMs, time, offset } = context;
     if (type !== 'system' || !rootId) return;

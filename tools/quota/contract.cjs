@@ -21,6 +21,10 @@ function epochSeconds(value) {
   requireValue(typeof value === 'number' && Number.isFinite(value) && Math.abs(value) <= 8.64e12);
   return value * 1000;
 }
+/**
+ * 책임: 실제 Claude 서버 응답으로부터 제품 파서와 독립적인 기대 값을 만든다.
+ * 알고리즘: usage 창을 직접 순회해 ID·사용률·초기화 날짜·창 개수를 검증하고 비교에 필요한 필드만 정규화한다.
+ */
 function expectedClaude(body) {
   requireValue(record(body));
   const windows = Object.entries(body).filter(([, row]) => record(row) && row.utilization != null).map(([id, row]) => {
@@ -36,6 +40,10 @@ function expectedClaude(body) {
   requireValue(windows.length > 0 && windows.length <= 100);
   return { provider: 'claude', windows };
 }
+/**
+ * 책임: 실제 Codex 응답의 한도와 초기화 크레딧 기대 값을 독립 계산한다.
+ * 알고리즘: 명시 한도 맵을 우선하고 창별 초 단위를 변환하며 크레딧 개수는 서버 필드, 만료는 유효 항목의 최솟값을 사용한다.
+ */
 function expectedCodex(body) {
   requireValue(record(body));
   const buckets = body.rateLimitsByLimitId == null ? { codex: body.rateLimits } : body.rateLimitsByLimitId;
@@ -67,6 +75,10 @@ function expectedCodex(body) {
   }
   return expected;
 }
+/**
+ * 책임: 제품의 quota 결과가 같은 서버 응답과 정확히 일치하는지 확인한다.
+ * 알고리즘: 제공자·창 개수·ID 유일성을 확인하고 각 사용률·시각·기간·크레딧 필드를 기대 값과 엄격 비교한다.
+ */
 function compareSnapshot(snapshot, expected) {
   requireValue(snapshot?.provider === expected.provider && Number.isFinite(snapshot.fetchedAt), 'snapshot-mismatch');
   requireValue(Array.isArray(snapshot.windows) && snapshot.windows.length === expected.windows.length, 'snapshot-mismatch');
@@ -84,6 +96,10 @@ function compareSnapshot(snapshot, expected) {
     requireValue(snapshot.rateLimitResetCredits?.[field] === expected.rateLimitResetCredits?.[field], 'snapshot-mismatch');
   }
 }
+/**
+ * 책임: quota 표시 모드별 백분율과 잔여 막대가 서버 값과 맞는지 검증한다.
+ * 알고리즘: 상세·간단 및 사용·잔여 조합을 순회해 선택 창의 반올림 백분율·10단계 막대를 독립 계산하고 표시 결과에서 추출한 값과 비교한다.
+ */
 function checkPresentation(snapshot, expected, present) {
   const state = { provider: snapshot.provider, snapshot, status: 'ready', refreshing: false,
     lastSuccessAt: snapshot.fetchedAt, error: null, nextAllowedAt: 0 };

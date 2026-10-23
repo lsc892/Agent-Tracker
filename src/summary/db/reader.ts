@@ -13,10 +13,17 @@ import { nonnegative, pageLimit } from './validation';
 import { buildRollupUsageQueries } from './rollup-queries';
 import type { QuerySql, UsageBasis } from './queries';
 
-/** Executes read queries on the shared connection, including maintained daily usage projections. */
+/**
+ * 책임: 공유 연결에서 필터·페이지가 적용된 통계와 진단을 조회한다.
+ * 알고리즘: 검증된 SQL builder에 바인딩을 전달하고 일별 사전 집계를 사용할 수 있으면 같은 snapshot에서 읽으며 그 외에는 raw SQL을 사용한다.
+ */
 export class SummaryReader {
   constructor(private readonly database: SqliteSession) {}
 
+  /**
+   * 책임: 조회 조건에 맞는 raw 또는 사전 집계 SQL을 선택한다.
+   * 알고리즘: 비용·미지원 기간은 raw로 보내고 그 외에는 rollup의 시간대·형식 준비 여부를 확인한 같은 트랜잭션에서 쿼리를 실행한다.
+   */
   private usageQueries<T>(filter: SummaryFilter, groupBy: UsageGrouping, timezone: string | undefined,
     by: UsageBasis, sortBy: ChartMetric | undefined, action: (queries: { rows: QuerySql; count: QuerySql }) => T, tableSort?: UsageSort): T {
     const raw = (zone: string): { rows: QuerySql; count: QuerySql } => ({
@@ -58,6 +65,10 @@ export class SummaryReader {
     return (this.database.connection.prepare(query.sql).get(...query.values) as { count: number }).count;
   }
 
+  /**
+   * 책임: 분류별 사용 횟수와 페이지에 독립적인 비율을 반환한다.
+   * 알고리즘: 전체 필터 범위의 합계·최댓값을 먼저 구하고 순위 페이지·상위 20개를 조회해 같은 전체 합계를 비율 분모로 사용한다.
+   */
   queryCapabilities(filter: SummaryFilter, category: CapabilityCategory, offset = 0, limit = 100): CapabilityPage {
     pageLimit(limit);
     const queries = buildCapabilityQueries(filter, category);
@@ -74,6 +85,10 @@ export class SummaryReader {
     return { ...counts, rows: rows.map(withPercentage), chartRows: chartRows.map(withPercentage) };
   }
 
+  /**
+   * 책임: 제공자·모델 누계를 비용 표시 정책에 맞춰 조회한다.
+   * 알고리즘: 비용이 없으면 활성 시간대의 rollup을 재사용하고 비용이 있으면 raw 집계를 선택하며 모델 누계는 offset 페이지로 제한한다.
+   */
   queryCumulative(filter: SummaryFilter, by: 'provider' | 'model', offset = 0): { rows: CumulativeRow[]; total: number; by: 'provider' | 'model' } {
     if (by !== 'provider' && by !== 'model') throw new RangeError('Unknown cumulative grouping');
     if (!filter.includeCosts) {
@@ -128,6 +143,10 @@ export class SummaryReader {
     return usageChartFromPage(rows, total, groupBy, metric, by, filter.excludeEmptyUsage);
   }
 
+  /**
+   * 책임: 진단 파일·요약과 처리 개수를 제한된 페이지로 반환한다.
+   * 알고리즘: limit·offset·cursor를 검증해 각각 조회하고 페이지가 가득 찼을 때 마지막 ID를 다음 cursor로 제공한다.
+   */
   diagnostics(page: KeysetPage & { afterSummaryId?: number; offset?: number; providers?: Provider[] } = {}): DiagnosticsPage {
     const limit = pageLimit(page.limit);
     const offset = nonnegative(page.offset ?? 0, 'offset');

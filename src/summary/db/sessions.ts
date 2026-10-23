@@ -12,6 +12,10 @@ const TURN_INSERT = `INSERT INTO turn_summary (
   diagnostic_file_id, diagnostic_offset, last_error, updated_at
 ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`;
 
+/**
+ * 책임: 요청 요약의 숫자·캐시 불변식을 저장 전에 검증한다.
+ * 알고리즘: 토큰·duration의 비음수 정수와 캐시 합계 상한을 검사하고 미상 null과 생략된 기본값을 구분해 INSERT 순서로 변환한다.
+ */
 function turnValues(row: TurnSummaryInput, now: string): SQLInputValue[] {
   for (const name of ['input_tokens', 'output_tokens', 'total_tokens'] as const) {
     nonnegative(row[name], name);
@@ -34,7 +38,10 @@ function turnValues(row: TurnSummaryInput, now: string): SQLInputValue[] {
   ];
 }
 
-/** Installs complete session groups and their dependent usage and billing rows atomically. */
+/**
+ * 책임: 세션과 종속된 요청·모델·도구·비용·집계를 함께 저장한다.
+ * 알고리즘: 교체 대상 집합을 TEMP에 두고 단일 트랜잭션에서 검증·교체·보존·사전 집계 갱신을 수행한다.
+ */
 export class SessionStore {
   constructor(private readonly database: SqliteSession, private readonly billing: SessionBillingStore) {}
 
@@ -46,7 +53,10 @@ export class SessionStore {
     });
   }
 
-  /** Stage outside this call; this transaction only installs a complete session group. */
+  /**
+   * 책임: 준비가 끝난 세션 묶음만 통계에 원자적으로 반영한다.
+   * 알고리즘: 대상·원본 참조를 검증하고 삭제 원본의 유효 요청을 보존한 뒤 나머지를 재삽입하며, 모델 합계 검증과 rollup 갱신도 함께 커밋한다.
+   */
   replaceSessions(replacement: SessionReplacement): void {
     this.database.transaction(() => {
       this.database.connection.exec(`CREATE TEMP TABLE IF NOT EXISTS db_replacement_sessions (

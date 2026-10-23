@@ -6,9 +6,10 @@ export class ZstdError extends Error {
   constructor() { super('Invalid Zstd stream'); }
 }
 
-/** Only frame/block lengths are inspected; native Zstd owns decompression and checksum validation.
- * RFC 8878: https://www.rfc-editor.org/rfc/rfc8878.html#section-3.1.1
- * Node's decoder can stop at the first frame and accept an incomplete trailer, so delimit each frame explicitly.
+/**
+ * 책임: 연결된 Zstd 프레임의 정확한 경계와 잘림을 검사한다.
+ * 알고리즘: RFC 8878의 헤더·블록 길이만 읽어 프레임별 청크를 나누고 압축 해제·체크섬 검증은 네이티브 decoder에 맡긴다.
+ * 규격: https://www.rfc-editor.org/rfc/rfc8878.html#section-3.1.1
  */
 class ZstdFrames {
   private chunk: Buffer = Buffer.alloc(0);
@@ -16,6 +17,10 @@ class ZstdFrames {
 
   constructor(private readonly input: AsyncIterator<Buffer>) {}
 
+  /**
+   * 책임: 입력 청크 경계와 무관하게 지정한 압축 바이트 수를 전달한다.
+   * 알고리즘: 현재 청크에서 필요한 부분만 subarray로 yield하고 부족하면 다음 청크를 읽으며 허용된 경계 종료 외의 EOF는 잘림으로 거부한다.
+   */
   async *take(size: number, allowEnd = false): AsyncGenerator<Buffer> {
     let remaining = size;
     while (remaining) {
@@ -46,6 +51,10 @@ class ZstdFrames {
     return parts.length ? Buffer.concat(parts) : undefined;
   }
 
+  /**
+   * 책임: 단일 Zstd 프레임의 마지막 블록·체크섬까지 정확히 구획한다.
+   * 알고리즘: descriptor로 헤더 길이를 구하고 3바이트 블록 헤더의 type·size·last 비트를 해석해 payload와 체크섬을 순서대로 전달한다.
+   */
   async *frame(magic: Buffer): AsyncGenerator<Buffer> {
     yield magic;
     const descriptor = await this.read(1);
@@ -74,6 +83,10 @@ class ZstdFrames {
   async close(): Promise<void> { await this.input.return?.(); }
 }
 
+/**
+ * 책임: 한 프레임을 스트리밍 해제하고 오류·조기 종료 시 자원을 회수한다.
+ * 알고리즘: backpressure가 적용된 pipeline으로 decoder에 연결하고 원본 읽기 오류를 보존하며, finally에서 양쪽 스트림과 완료 Promise를 정리한다.
+ */
 async function* decodeFrame(chunks: AsyncIterable<Buffer>): AsyncGenerator<Buffer> {
   let sourceError: unknown;
   const input = async function* (): AsyncGenerator<Buffer> {
@@ -99,7 +112,10 @@ async function* decodeFrame(chunks: AsyncIterable<Buffer>): AsyncGenerator<Buffe
   }
 }
 
-/** Backpressure bounds both sides; no expanded file or whole-file buffer is created. */
+/**
+ * 책임: 전체 파일을 적재하거나 임시 해제 파일을 만들지 않고 Zstd 로그를 읽는다.
+ * 알고리즘: magic 값에 따라 일반 프레임은 하나씩 해제하고 skippable 프레임은 길이만큼 건너뛰며 입력 종료까지 반복한다.
+ */
 export async function* zstdChunks(chunks: AsyncIterable<Buffer>): AsyncGenerator<Buffer> {
   const frames = new ZstdFrames(chunks[Symbol.asyncIterator]());
   let seen = false;

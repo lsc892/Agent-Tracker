@@ -17,6 +17,10 @@ function save() {
   catch { process.exitCode = 1; }
 }
 save();
+/**
+ * 책임: 중계하는 RPC에서 검증용 정보만 관찰한다.
+ * 알고리즘: UTF-8 청크를 1MiB 제한 개행 버퍼로 파싱해 소비자에 전달하고 원문 대신 프로토콜 오류 코드만 증거에 남긴다.
+ */
 function observe(stream, consume) {
   const decoder = new StringDecoder('utf8');
   let buffer = '';

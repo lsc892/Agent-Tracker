@@ -17,6 +17,10 @@ function readDisplaySettings(display: ConfigurationValues['display']) {
   return { ...display, colorMode: colorMode(display.colorMode), customColor: normalizeHexColor(display.customColor) };
 }
 
+/**
+ * 책임: 통계에 사용할 시간대를 검증하고 경고를 만든다.
+ * 알고리즘: 공백을 제거한 시간대를 Intl로 검증하고, 유효하지 않으면 시스템 시간대와 번역된 경고로 대체한다.
+ */
 function readUsageSettings(usage: ConfigurationValues['usage'], locale: string) {
   let timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
   let timezoneWarning: string | undefined;
@@ -36,6 +40,10 @@ function readUsageSettings(usage: ConfigurationValues['usage'], locale: string) 
   return { ...usage, timezone, timezoneWarning };
 }
 
+/**
+ * 책임: 공통 데이터 홈에서 제공자별 경로와 보존 기간을 확정한다.
+ * 알고리즘: 상위 경로에 .claude·.codex를 붙이고 보존 기간은 안전한 양의 정수일 때만 적용한다.
+ */
 function readProviderSettings(values: ConfigurationValues, dataHome: string) {
   const cleanup = values.claude.cleanupPeriodDays;
   return {
@@ -54,6 +62,10 @@ function buildSourceRoots(providers: ReturnType<typeof readProviderSettings>): S
   ].filter(root => providers[root.provider].enabled);
 }
 
+/**
+ * 책임: 서비스가 사용할 독립적인 설정 스냅샷을 만든다.
+ * 알고리즘: 공통 정의에서 값을 한 번씩 읽고 언어·경로·색상·시간대를 정규화한 뒤 활성 제공자의 로그 루트를 파생한다.
+ */
 export function readConfiguration(settings: SettingsReader, editorLanguage = 'ko') {
   const values = readSettingValues(settings);
   const locale = resolveLocale(values.language, editorLanguage);

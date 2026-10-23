@@ -3,7 +3,10 @@ import type { FileContext, ParsedIdentity, ParseSink, TokenVector } from '../typ
 import { billingMode, codexTokens, displayName, number, object, project, requestTitle, string, timestamp, tokenFlags } from './common';
 import { toolCapabilities } from './capabilities';
 
-/** Codex lifecycle payloads use Unix seconds; row timestamps and durations keep their existing units. */
+/**
+ * 책임: Codex 수명주기의 시각 단위를 공통 밀리초로 맞춘다.
+ * 알고리즘: 숫자 payload 시각만 Unix 초에서 밀리초로 변환하고 문자열 날짜는 기존 timestamp 검증에 맡긴다.
+ */
 function lifecycleTimestamp(value: unknown): number | null {
   return timestamp(typeof value === 'number' ? value * 1000 : value);
 }
@@ -17,6 +20,10 @@ interface CodexRecordContext {
   rowTimestamp: unknown;
 }
 
+/**
+ * 책임: 신·구 Codex 로그를 요청별 공통 이벤트로 변환한다.
+ * 알고리즘: session metadata와 turn 문맥을 유지하며 행 종류별 처리기로 분배하고 응답별 사용량·legacy 누계·수명주기를 구분한다.
+ */
 export class CodexCurrentParserAdapter {
   private identityValue: ParsedIdentity | undefined;
   private root: string | undefined;
@@ -34,6 +41,10 @@ export class CodexCurrentParserAdapter {
 
   constructor(private readonly context: FileContext, private readonly sink: ParseSink) {}
 
+  /**
+   * 책임: Codex 행을 identity와 root 문맥이 갖춰진 처리기로 분배한다.
+   * 알고리즘: session_meta를 먼저 반영하고 명시 root 유무를 추적한 뒤 turn 문맥·응답 사용량·도구·수명주기별로 분기한다.
+   */
   row(row: Record<string, unknown>, offset: number): void {
     const payload = object(row.payload);
     if (row.type === 'session_meta') {
@@ -56,6 +67,10 @@ export class CodexCurrentParserAdapter {
     }
   }
 
+  /**
+   * 책임: 파일의 thread·부모·논리 세션 identity를 확정한다.
+   * 알고리즘: 첫 thread ID를 유지해 복사된 부모 metadata를 무시하고 명시 session·부모·thread 순으로 세션 ID를 정한다.
+   */
   private sessionMetadata(payload: Record<string, unknown>, offset: number): void {
     const id = string(payload.id) ?? string(payload.thread_id);
     if (!id) throw new SummaryError('missing-session-id', offset);
@@ -95,6 +110,10 @@ export class CodexCurrentParserAdapter {
     this.root = suppliedRoot ?? (ownTurns ? this.turn : this.root);
   }
 
+  /**
+   * 책임: 현재 형식의 응답별 토큰과 요청 누계 검증 값을 구분한다.
+   * 알고리즘: root·turn·response ID를 검증해 usage를 내보내고 turn_token_usage는 check 이벤트로만 기록해 이중 합산을 막는다.
+   */
   private currentUsage(record: CodexRecordContext): void {
     const { payload, offset, identity, suppliedRoot, suppliedTurn } = record;
     this.sawCurrent = true;
@@ -129,6 +148,10 @@ export class CodexCurrentParserAdapter {
     }
   }
 
+  /**
+   * 책임: Codex 요청의 시작·완료·중단과 legacy 사용자 요청 경계를 추적한다.
+   * 알고리즘: 명시 root·turn을 우선하고 사용자 메시지·종료 상태로 대체 요청을 구분하며, 이벤트별 시각·duration·상태를 기록한다.
+   */
   private eventLifecycle(record: CodexRecordContext): void {
     const { payload, offset, identity, suppliedRoot, suppliedTurn } = record;
     const time = timestamp(record.rowTimestamp);
@@ -177,6 +200,10 @@ export class CodexCurrentParserAdapter {
   }
 
   private forkMissing = false;
+  /**
+   * 책임: 이전 형식의 누적 카운터에서 중복 없는 응답 사용량을 복원한다.
+   * 알고리즘: 동일한 total·last 조합은 건너뛰고 last가 없으면 high-water 차분을 사용하며, 누계 역행은 플래그로 남기고 기준값은 감소시키지 않는다.
+   */
   private legacyTokens(record: CodexRecordContext): void {
     const { payload, offset } = record;
     const info = object(payload.info);
@@ -211,7 +238,10 @@ export class CodexCurrentParserAdapter {
     this.sink.identity(identity);
   }
 
-  /** session_meta can establish reassignment before a later malformed row. */
+  /**
+   * 책임: 부모 root가 없는 subagent의 사용량을 독립 세션으로 보존한다.
+   * 알고리즘: 명시 root가 없는 자식 thread만 자신의 세션·주 요청으로 승격하고 기존 부모 정보는 fork 참조로 남긴다.
+   */
   getIdentity(): ParsedIdentity | undefined {
     const identity = this.identityValue;
     if (!identity || identity.isMain || this.hasExplicitRoot) return identity;

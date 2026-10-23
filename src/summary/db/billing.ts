@@ -3,7 +3,10 @@ import type { SqliteSession } from './connection';
 import type { BillingMode, Provider } from './types';
 import { PRICING_VERSION } from '../pricing';
 
-/** Classifies model estimates using a session's billing choice and preserves unknown costs. */
+/**
+ * 책임: 요청의 모델별 추정 비용을 세션 결제 분류에 연결한다.
+ * 알고리즘: 구독은 0, API는 알려진 추정 비용 합계, 미확인은 미상 비용 개수로 보존하고 사용자 선택 시 요청 ID를 나눠 재분류한다.
+ */
 export class SessionBillingStore {
   constructor(private readonly database: SqliteSession) {}
 
@@ -21,6 +24,10 @@ export class SessionBillingStore {
       .run(id, mode, mode, mode, mode, mode, PRICING_VERSION, id);
   }
 
+  /**
+   * 책임: 사용자가 지정한 결제 방식을 세션의 기존 요청 비용에 반영한다.
+   * 알고리즘: 범위·모드를 검증하고 선택 저장과 요청별 비용 재계산을 같은 트랜잭션에서 수행하며 요청 ID는 100개씩 순회한다.
+   */
   setSessionBilling(provider: Provider, sessionId: string, mode: BillingMode): void {
     if (!['claude','codex'].includes(provider) || !sessionId || !['subscription','api','unknown'].includes(mode)) throw new RangeError('Invalid session billing');
     this.database.transaction(() => {

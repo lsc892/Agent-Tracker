@@ -6,7 +6,10 @@ import { settingDefinitions, settingKeys } from '../configuration/schema';
 import { parseColorSettingsMessage, type StatusColorMode, type ColorTarget } from './colors';
 import { colorSettingsHtml } from './html';
 
-/** A settings-only color picker; it never starts quota reads or transcript scans. */
+/**
+ * 책임: quota 조회·로그 스캔과 독립적인 색상 설정 화면을 관리한다.
+ * 알고리즘: 패널을 재사용하고 ready·saving 상태로 메시지 처리를 제어하며, 검증된 색상 설정만 지정된 저장 범위에 반영한다.
+ */
 export class ColorSettings implements vscode.Disposable {
   private panel: vscode.WebviewPanel | undefined;
   private ready = false;
@@ -14,6 +17,10 @@ export class ColorSettings implements vscode.Disposable {
 
   constructor(private readonly extensionUri: vscode.Uri) {}
 
+  /**
+   * 책임: 색상 설정 패널의 생성·재사용과 메시지 연결을 관리한다.
+   * 알고리즘: 기존 패널은 전면화하고 새 패널은 로컬 자원·nonce HTML로 구성하며 현재 패널에서 온 검증된 ready·save 메시지만 처리한다.
+   */
   open(): void {
     if (this.panel) { this.panel.reveal(vscode.ViewColumn.Active);this.update();return; }
     const media=vscode.Uri.joinPath(this.extensionUri,'media');
@@ -46,6 +53,10 @@ export class ColorSettings implements vscode.Disposable {
     this.post({type:'state',localization:localizationBundle(),mode:settings.display.colorMode,color:settings.display.customColor ?? settingDefinitions.display.customColor.default,hasWorkspace,target});
   }
 
+  /**
+   * 책임: 선택한 색상과 모드를 올바른 설정 범위에 저장한다.
+   * 알고리즘: 작업공간 존재 여부를 확인하고 saving으로 중복 처리를 막은 뒤 색상·모드 순으로 저장하며, 같은 패널에만 결과를 알린다.
+   */
   private async save(value:{mode:StatusColorMode;color:string;target:ColorTarget}):Promise<void> {
     if (value.target!=='user' && !vscode.workspace.workspaceFolders?.length) {
       this.post({type:'error',message:t('color.workspaceRequired')});return;

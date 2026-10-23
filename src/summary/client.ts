@@ -4,7 +4,10 @@ import type { SummaryOptions, SummaryProgress, RefreshResult, UsageQuery, UsageR
 import type { BillingMode, Provider } from './db/types';
 export * from './types';
 
-/** Public summary API; worker RPC and refresh lifetimes have separate owners. */
+/**
+ * 책임: 확장 호스트에 통계 API와 설정 적용 순서를 제공한다.
+ * 알고리즘: 통신은 WorkerTransport, 갱신·삭제는 RefreshController에 위임하고 조회·설정 변경은 진행 중 삭제가 끝난 뒤 전달한다.
+ */
 export class SummaryClient {
   private readonly options: SummaryOptions;
   private readonly transport: WorkerTransport;

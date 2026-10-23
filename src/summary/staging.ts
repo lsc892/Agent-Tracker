@@ -18,7 +18,10 @@ export interface StagedFile extends FileMetadata {
   forked_from_id: string | null;
 }
 
-/** All corpus-sized work lives in SQLite's file-backed TEMP store. */
+/**
+ * 책임: 전체 로그 규모의 중간 이벤트·연결 관계·집계 후보를 관리한다.
+ * 알고리즘: 파일 기반 SQLite TEMP 테이블과 인덱스를 사용해 데이터를 디스크에 두고 세션 연결 성분별로 순차 처리한다.
+ */
 export class SummaryStaging {
   private readonly insertEvent: StatementSync;
   private readonly insertFlag: StatementSync;
@@ -101,7 +104,10 @@ export class SummaryStaging {
       capability?.category ?? null,capability?.name ?? null,capability?.eventId ?? null,turn?.title ?? null);
     if ('flags' in event) for (const flag of event.flags ?? []) this.flag(fileId,event.rootId,flag);
   }
-  /** A bounded synchronous TEMP-only transaction; persistent tables and file I/O stay outside. */
+  /**
+   * 책임: 청크 하나의 파싱 결과를 적은 트랜잭션 비용으로 적재한다.
+   * 알고리즘: 동기 파싱 콜백의 TEMP 쓰기만 DEFERRED 트랜잭션으로 묶고 오류 시 롤백하며 파일 I/O와 영속 쓰기는 밖에서 수행한다.
+   */
   batchEvents(parseRows: () => void): void {
     this.connection.exec('BEGIN DEFERRED');
     try { parseRows();this.connection.exec('COMMIT'); }
@@ -122,6 +128,10 @@ export class SummaryStaging {
     }
   }
 
+  /**
+   * 책임: 함께 교체해야 하는 이전·현재 세션의 묶음을 선택한다.
+   * 알고리즘: 영향받은 첫 세션에서 시작해 재귀 CTE로 links의 양방향 연결 성분을 찾아 component 테이블에 저장한다.
+   */
   nextComponent(): boolean {
     this.connection.exec('DELETE FROM component');
     const first = this.connection.prepare('SELECT provider,session_id FROM affected ORDER BY provider,session_id LIMIT 1').get() as {provider:string;session_id:string}|undefined;
@@ -149,7 +159,10 @@ export class SummaryStaging {
     return this.connection.prepare('SELECT provider,session_id FROM component').iterate() as unknown as Iterable<{provider:Provider;session_id:string}>;
   }
 
-  /** Resolve descendant thread trees on disk, after provider metadata has been parsed. */
+  /**
+   * 책임: 파싱한 부모·자식 thread를 같은 논리 세션으로 연결한다.
+   * 알고리즘: 유일하게 확인된 부모 세션을 최대 128회 전파하고 이전·새 세션을 영향 집합에 추가하며, 미확인 부모는 품질 플래그로 남긴다.
+   */
   resolveLineage(): void {
     for (let pass = 0; pass < 128; pass++) {
       this.connection.exec(`DROP TABLE IF EXISTS temp.lineage;
@@ -175,7 +188,10 @@ export class SummaryStaging {
         AND NOT EXISTS(SELECT 1 FROM scan_files p WHERE p.provider=f.provider AND p.thread_id=f.parent_thread_id AND p.parsed=1 AND p.removed=0);`);
   }
 
-  /** Only identical, ordered legacy events from a referenced parent constitute an inherited prefix. */
+  /**
+   * 책임: fork에 복사된 과거 사용량을 중복 집계에서 제외한다.
+   * 알고리즘: 참조된 부모와 자식의 legacy 이벤트를 순서대로 비교해 동일한 연속 접두사만 확인하고 대응하는 토큰·도구 이벤트를 제거한다.
+   */
   excludeVerifiedPrefixes(): void {
     this.connection.exec('CREATE TEMP TABLE IF NOT EXISTS inherited(event_id INTEGER PRIMARY KEY,parent_event_id INTEGER NOT NULL); DELETE FROM inherited;');
     for (const file of this.files("provider='codex' AND parsed=1 AND removed=0 AND failed=0 AND (forked_from_id IS NOT NULL OR parent_thread_id IS NOT NULL)")) {
@@ -216,7 +232,10 @@ export class SummaryStaging {
       DROP TABLE inherited_roots; DROP TABLE inherited;`);
   }
 
-  /** Window functions select whole response vectors, never independent component maxima. */
+  /**
+   * 책임: 연결 성분의 중복 응답을 정리해 요청별 집계 후보를 만든다.
+   * 알고리즘: 윈도 함수로 응답별 전체 토큰 벡터 하나와 최신 요청 상태를 고르고 주 요청·subagent 사용량을 합쳐 prepared_turns에 저장한다.
+   */
   prepareSummaries(): void {
     this.connection.exec(`
       DROP TABLE IF EXISTS temp.component_events;
@@ -300,6 +319,10 @@ export class SummaryStaging {
     `);
   }
 
+  /**
+   * 책임: 집계 후보를 저장용 요청 요약으로 변환한다.
+   * 알고리즘: rowid 기준 100행씩 읽고 명시 duration·수명주기 차이·마지막 응답 시각 순으로 시간을 결정하며 품질 플래그와 모델별 내역을 연결한다.
+   */
   *summaries(): Generator<TurnSummaryInput> {
     let after = 0;
     const sessionName = this.connection.prepare(`SELECT coalesce(

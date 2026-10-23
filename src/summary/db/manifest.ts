@@ -2,7 +2,10 @@ import type { SqliteSession } from './connection';
 import type { FileMetadata, ManifestRow, ProcessingStatus, Provider } from './types';
 import { pageLimit } from './validation';
 
-/** File discovery, accepted metadata and processing diagnostics share one database session. */
+/**
+ * 책임: 발견한 파일의 존재 여부와 승인된 메타데이터·처리 진단을 관리한다.
+ * 알고리즘: 제공자·경로 키로 관측 정보를 기록하고 세션 저장 때 메타데이터를 확정하며 목록은 ID 기반 페이지로 순회한다.
+ */
 export class ManifestStore {
   constructor(private readonly database: SqliteSession) {}
 
@@ -11,7 +14,10 @@ export class ManifestStore {
       .get(provider, path) as unknown as ManifestRow | undefined;
   }
 
-  /** At most two candidates are needed: multiple identities disable the move shortcut. */
+  /**
+   * 책임: 이동한 파일의 기존 identity를 모호하지 않을 때만 재사용하게 한다.
+   * 알고리즘: 유효한 device·inode로 최대 두 행만 조회해 후보가 하나인지 또는 중복인지 판별할 정보를 제공한다.
+   */
   findIdentity(provider: Provider, dev: string | null, inode: string | null): ManifestRow[] {
     if (!dev || !inode || dev === '0' || inode === '0') return [];
     return this.database.statement('SELECT * FROM manifest WHERE provider = ? AND dev = ? AND inode = ? LIMIT 2')
@@ -59,7 +65,10 @@ export class ManifestStore {
     }
   }
 
-  /** Call only after all selected roots were successfully traversed. */
+  /**
+   * 책임: 선택 루트의 전체 순회 성공 후 원본 부재 후보를 찾는다.
+   * 알고리즘: 같은 제공자·루트에서 이번 scan ID로 관측하지 못한 행만 ID keyset 페이지로 반환해 다른 루트의 삭제 오판을 막는다.
+   */
   *unseenFiles(provider: Provider, sourceRoot: string, scanId: string, limit = 100): IterableIterator<ManifestRow> {
     pageLimit(limit);
     let after = 0;

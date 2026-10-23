@@ -20,7 +20,10 @@ export interface CodexQuotaProviderOptions {
   onPhase?: (event: { phase: 'initialized' | 'account-read' | 'quota-read'; pid: number | undefined; elapsedMs: number }) => void;
 }
 
-/** No thread or turn methods are sent; every read owns one short-lived process. */
+/**
+ * 책임: 대화 생성 없이 Codex 계정의 구독 quota만 조회한다.
+ * 알고리즘: 조회마다 짧게 실행한 App Server에서 초기화·계정 확인·한도 조회를 순서대로 수행하고 프로세스 종료까지 기다린다.
+ */
 export class CodexQuotaProvider extends BaseQuotaProvider {
   readonly id = 'codex' as const;
   protected readonly closedMessage = { key: 'quota.codexClosed' } as const;
@@ -29,6 +32,10 @@ export class CodexQuotaProvider extends BaseQuotaProvider {
     super();
   }
 
+  /**
+   * 책임: Codex quota 조회 한 번의 통신·시간 제한·프로세스 회수를 수행한다.
+   * 알고리즘: 초기화와 구독 계정 확인 뒤 한도를 읽고 계정 확인 이후의 갱신 알림만 전달하며, 성공 응답 후에도 종료 중 취소·시간 초과를 확인한다.
+   */
   protected async readQuota(context: QuotaReadContext): Promise<QuotaSnapshot> {
     const controller = new AbortController();
     const signal = AbortSignal.any([controller.signal, context.signal]);
@@ -101,6 +108,10 @@ export class CodexQuotaProvider extends BaseQuotaProvider {
 
 type Pending = { resolve(value: unknown): void; reject(reason: QuotaError): void };
 
+/**
+ * 책임: 한 App Server 프로세스의 JSON-RPC 연결과 요청 수명을 소유한다.
+ * 알고리즘: 요청 ID별 Promise와 UTF-8 행 버퍼로 응답·알림을 분배하고, 실패 시 대기 요청을 함께 거절한다.
+ */
 class RpcSession {
   private nextId = 1;
   private readonly pending = new Map<number, Pending>();
@@ -158,6 +169,10 @@ class RpcSession {
     return this.closePromise;
   }
 
+  /**
+   * 책임: 정상 종료·취소·실패 모두에서 자식 프로세스를 회수한다.
+   * 알고리즘: 입력을 닫고 종료를 기다린 뒤 유예 시간을 넘으면 SIGTERM·SIGKILL 순으로 종료를 강화하고 스트림을 해제한다.
+   */
   private async closeOnce(): Promise<void> {
     this.closing = true;
     this.signal.removeEventListener('abort', this.abort);
@@ -192,6 +207,10 @@ class RpcSession {
     } finally { if (timer) clearTimeout(timer); }
   }
 
+  /**
+   * 책임: stdout 청크를 크기가 제한된 JSON-RPC 메시지로 복원한다.
+   * 알고리즘: UTF-8 decoder로 분할 문자를 이어 붙이고 개행마다 JSON을 해석하며, 행 또는 미완성 버퍼가 상한을 넘으면 실패시킨다.
+   */
   private consume(chunk: Buffer): void {
     if (this.closing || this.failure) return;
     this.buffered += this.decoder.write(chunk);
@@ -208,6 +227,10 @@ class RpcSession {
     if (this.buffered.length > 1_048_576) this.fail(protocolError());
   }
 
+  /**
+   * 책임: RPC 응답과 서버 알림을 올바른 소비자에게 전달한다.
+   * 알고리즘: ID로 대기 요청을 찾고 상태 코드를 공통 오류로 변환하며, 한도 갱신 알림만 허용하고 서버 실행 요청은 거부한다.
+   */
   private receive(value: unknown): void {
     const message = asRecord(value);
     if (!message) throw protocolError();
@@ -249,6 +272,10 @@ class RpcSession {
   }
 }
 
+/**
+ * 책임: Codex의 단일·다중 한도 응답을 공통 quota 창으로 변환한다.
+ * 알고리즘: 명시된 한도 맵을 우선해 각 primary·secondary를 검증하고 초기화 초를 밀리초로 바꾸며 reset credit을 별도 해석한다.
+ */
 export function parseCodexQuota(value: unknown, fetchedAt: number): QuotaSnapshot {
   const result = asRecord(value);
   if (!result) throw protocolError();
@@ -287,6 +314,10 @@ export function parseCodexQuota(value: unknown, fetchedAt: number): QuotaSnapsho
   return { provider: 'codex', fetchedAt, windows, ...(rateLimitResetCredits ? { rateLimitResetCredits } : {}) };
 }
 
+/**
+ * 책임: 초기화 크레딧의 서버 기준 개수와 가장 이른 만료 시각을 보존한다.
+ * 알고리즘: availableCount를 개수로 사용하고 사용 가능한 Codex 크레딧만 순회해 유효한 만료 시각의 최솟값을 구한다.
+ */
 function parseResetCredits(value: unknown): QuotaSnapshot['rateLimitResetCredits'] {
   const summary = asRecord(value);
   const count = summary?.availableCount;
@@ -309,7 +340,10 @@ function parseResetCredits(value: unknown): QuotaSnapshot['rateLimitResetCredits
 function protocolError(): QuotaError { return new QuotaError('protocol', { key: 'quota.codexUnsupportedResponse' }); }
 function cancelled(): QuotaError { return new QuotaError('cancelled', { key: 'quota.codexCancelled' }); }
 
-/** Resolve npm's Windows .cmd shim to its native executable without spawning a shell. */
+/**
+ * 책임: Windows에서도 셸 실행 없이 Codex의 실제 실행 파일을 찾는다.
+ * 알고리즘: 지정 경로 또는 PATH를 순회하고 공식 npm shim이면 아키텍처별 패키지의 codex.exe 후보로 해석한다.
+ */
 export async function resolveCodexExecutable(command: string, env: NodeJS.ProcessEnv = process.env): Promise<string> {
   if (process.platform !== 'win32') return command;
   const hasDirectory = isAbsolute(command) || command.includes('/') || command.includes('\\');

@@ -14,6 +14,10 @@ export interface DashboardDependencies {
   settings(): TrackerConfiguration;
 }
 
+/**
+ * 책임: 통계·진단 Webview의 수명과 호스트 조회 상태를 관리한다.
+ * 알고리즘: 검증한 메시지를 통계 API로 전달하고 갱신 Promise·조회 버전으로 중복 실행과 이전 응답의 화면 덮어쓰기를 막는다.
+ */
 export class Dashboard implements vscode.Disposable {
   private panel: vscode.WebviewPanel | undefined;
   private diagnosticsPanel: vscode.WebviewPanel | undefined;
@@ -31,6 +35,10 @@ export class Dashboard implements vscode.Disposable {
     this.unsubscribe = dependencies.summary.subscribe(progress => this.post({ type: 'progress', progress }));
   }
 
+  /**
+   * 책임: 통계가 활성화된 경우에 통계 패널을 생성하거나 재사용한다.
+   * 알고리즘: 비활성 상태는 설정으로 안내하고 기존 패널은 다시 진입하며 새 패널은 제한된 자원·메시지 검증·해제 콜백을 연결한다.
+   */
   open(): void {
     if (!this.dependencies.settings().usage.enabled) {
       void vscode.window.showInformationMessage(t('dashboard.disabled'));
@@ -81,6 +89,10 @@ export class Dashboard implements vscode.Disposable {
   close(): void { this.panel?.dispose(); this.diagnosticsPanel?.dispose(); }
   dispose(): void { this.unsubscribe(); this.close(); }
 
+  /**
+   * 책임: 검증된 화면 요청을 통계·설정 동작에 연결한다.
+   * 알고리즘: 활성 상태와 ready를 확인해 명령을 분배하고 결제 변경은 현재 선택 세션에만 허용하며 이름 응답은 같은 패널에만 전달한다.
+   */
   private async handle(message: NonNullable<ReturnType<typeof parseDashboardMessage>>): Promise<void> {
     if (!this.dependencies.settings().usage.enabled) return;
     switch (message.type) {
@@ -109,6 +121,10 @@ export class Dashboard implements vscode.Disposable {
     }
   }
 
+  /**
+   * 책임: 통계 스캔과 독립적으로 진단 패널과 페이지 조회를 관리한다.
+   * 알고리즘: 기존 패널은 전면화하고 새 패널에 검증된 메시지 핸들러를 연결해 ready·페이지 이동 시 저장된 진단만 조회한다.
+   */
   private openDiagnostics(): void {
     if (!this.dependencies.settings().usage.enabled) return;
     if (this.diagnosticsPanel) {
@@ -147,6 +163,10 @@ export class Dashboard implements vscode.Disposable {
     void this.refreshUsage().catch(error => this.error(error));
   }
 
+  /**
+   * 책임: 통계 화면 진입 시 스캔을 합치고 완료 후 조회 결과를 갱신한다.
+   * 알고리즘: 진행 중 Promise가 있으면 공유하고 최초 요청만 refresh를 실행하며, 같은 패널이 살아 있을 때만 결과·busy 상태를 전달한다.
+   */
   private async refreshUsage(): Promise<void> {
     if (!this.dependencies.settings().usage.enabled) return;
     this.post({ type: 'busy', busy: true });
@@ -178,6 +198,10 @@ export class Dashboard implements vscode.Disposable {
     await Promise.all([this.loadUsage(), this.loadDiagnostics(0).catch(error => this.error(error, true))]);
   }
 
+  /**
+   * 책임: 현재 설정과 화면 필터에 맞는 최신 통계 페이지만 표시한다.
+   * 알고리즘: 날짜를 현지 기간의 UTC 경계로 바꾸고 호스트 설정을 덧씌워 조회한 뒤 요청 버전이 최신일 때만 응답을 보낸다.
+   */
   private async loadUsage(): Promise<void> {
     if (!this.ready || !this.dependencies.settings().usage.enabled) return;
     const version = ++this.queryVersion;

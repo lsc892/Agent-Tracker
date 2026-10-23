@@ -18,13 +18,20 @@ export interface ClaudeQuotaProviderOptions {
   now?: () => number;
 }
 
-/** Keeps credentials owned by Claude Code; never persists or logs token material. */
+/**
+ * 책임: Claude Code가 소유하는 기존 인증 정보에서 조회용 토큰을 얻는다.
+ * 알고리즘: 크기가 제한된 credential 파일을 읽고 기본 macOS 경로에서는 Keychain도 시도하며, 검증된 토큰만 반환한다.
+ */
 export class ClaudeCliCredentials implements ClaudeCredentialSource {
   private readonly dataHome: string;
   constructor(dataHome?: string) {
     this.dataHome = dataHome || process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude');
   }
 
+  /**
+   * 책임: 요청마다 CLI 소유 인증 정보에서 유효한 access token을 읽는다.
+   * 알고리즘: 파일 종류·크기를 확인해 읽고 기본 macOS 홈의 읽기 실패에는 Keychain을 시도하며, 토큰 길이·개행을 검증하고 원문 참조를 해제한다.
+   */
   async getAccessToken(_refresh: boolean, signal: AbortSignal): Promise<string> {
     let serialized: string | undefined;
     try {
@@ -71,6 +78,10 @@ export class ClaudeQuotaProvider extends BaseQuotaProvider {
     this.timeoutMs = options.timeoutMs ?? 15_000;
   }
 
+  /**
+   * 책임: Claude OAuth 사용량을 취소·시간 제한 안에서 조회한다.
+   * 알고리즘: GET 요청 후 401일 때만 인증을 다시 읽어 한 번 재시도하고, HTTP 상태를 분류한 뒤 제한된 JSON을 정규화한다.
+   */
   protected async readQuota(context: QuotaReadContext): Promise<QuotaSnapshot> {
     const controller = new AbortController();
     const signal = AbortSignal.any([context.signal, controller.signal]);
@@ -119,6 +130,10 @@ export class ClaudeQuotaProvider extends BaseQuotaProvider {
   }
 }
 
+/**
+ * 책임: HTTP 재시도 안내를 밀리초 지연으로 변환한다.
+ * 알고리즘: 숫자는 초 단위로, 그 외는 HTTP 날짜로 해석하고 음수 지연을 0으로 보정하며 타이머 상한을 제한한다.
+ */
 export function parseRetryAfter(value: string | null, now: number): number | undefined {
   if (!value) return undefined;
   const seconds = Number(value);
@@ -127,6 +142,10 @@ export function parseRetryAfter(value: string | null, now: number): number | und
   return Number.isFinite(date) ? Math.min(2_147_000_000, Math.max(0, date - now)) : undefined;
 }
 
+/**
+ * 책임: Claude 응답의 사용률·초기화 시각을 공통 quota 창으로 변환한다.
+ * 알고리즘: utilization이 있는 항목을 순회해 유한한 비음수 사용률과 날짜를 검증하고 최대 100개 창으로 정규화한다.
+ */
 export function parseClaudeQuota(value: unknown, fetchedAt: number): QuotaSnapshot {
   const data = asRecord(value);
   if (!data) throw new QuotaError('protocol', { key: 'quota.claudeUnsupportedResponse' });
@@ -152,6 +171,10 @@ export function parseClaudeQuota(value: unknown, fetchedAt: number): QuotaSnapsh
   return { provider: 'claude', fetchedAt, windows };
 }
 
+/**
+ * 책임: 응답 크기를 제한하면서 Claude JSON 본문을 읽는다.
+ * 알고리즘: 스트림 청크의 누적 크기가 1MiB를 넘으면 중단하고 완료 후 파싱하며, finally에서 reader를 취소·해제한다.
+ */
 async function readBoundedJson(response: Response): Promise<unknown> {
   if (!response.body) throw new QuotaError('protocol', { key: 'quota.claudeEmptyResponse' });
   const reader = response.body.getReader();

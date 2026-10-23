@@ -1,6 +1,9 @@
 import type { ChartMetric, TurnSummaryRow, UsageChart, UsageGrouping, UsageRow } from './types';
 
-/** Keep chart membership and ordering within the selected table page. */
+/**
+ * 책임: 도표의 항목과 순서를 선택한 표 페이지와 일치시킨다.
+ * 알고리즘: 페이지 행에 빈 사용량 제외 정책만 적용하고 요청·기간·순위별 도표 모드와 지표를 정해 같은 순서로 반환한다.
+ */
 export function usageChartFromPage(
   pageRows: UsageRow[] | TurnSummaryRow[], total: number, groupBy: UsageGrouping | 'all' | 'turn',
   metric: ChartMetric, by: 'provider' | 'model' = 'provider', excludeEmptyUsage = false,

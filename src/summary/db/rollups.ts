@@ -8,7 +8,10 @@ interface RollupMetadata { timezone: string; format_version: number }
 const MIN_CALENDAR_TIME = Date.parse('0002-01-03T00:00:00Z');
 const MAX_CALENDAR_TIME = Date.parse('9998-12-29T00:00:00Z');
 
-/** One materialized timezone per database; daily contributions follow facts in the same transaction. */
+/**
+ * 책임: DB당 한 시간대의 일별 사전 집계를 원본 facts와 일치시킨다.
+ * 알고리즘: 최초 조회·시간대 변경 때 전체 구축하고 이후 세션 교체와 같은 트랜잭션에서 해당 세션의 일별 기여분만 교체한다.
+ */
 export class UsageRollupStore {
   constructor(private readonly database: SqliteSession) {}
 
@@ -26,9 +29,8 @@ export class UsageRollupStore {
   }
 
   /**
-   * Check the active timezone and execute reads in the same snapshot. Warm readers use
-   * a deferred transaction, never a writer lock. Caller-owned transactions are reused;
-   * a timezone mismatch there selects raw SQL rather than upgrading a stale snapshot.
+   * 책임: 사전 집계의 준비 상태 확인과 실제 조회에 같은 snapshot을 보장한다.
+   * 알고리즘: DEFERRED 읽기로 시간대·형식을 확인하고 재구축이 필요할 때만 쓰기 트랜잭션으로 재확인하며, 기존 트랜잭션·미지원 환경은 raw로 대체한다.
    */
   read<T>(timezone: string | undefined, action: (ready: boolean, timezone: string) => T): T {
     const connection = this.database.connection;
@@ -85,6 +87,10 @@ export class UsageRollupStore {
     this.refresh('provider = ? AND session_id = ?', [provider, sessionId]);
   }
 
+  /**
+   * 책임: 변경된 세션의 이전 날짜·프로젝트 기여분까지 교체한다.
+   * 알고리즘: 활성 시간대·형식을 검증한 뒤 대상 세션의 provider·model 일별 행을 지우고 현재 facts로 다시 집계한다.
+   */
   private refresh(where: string, values: string[]): void {
     const metadata = this.metadata();
     if (!metadata || metadata.format_version !== ROLLUP_FORMAT_VERSION) return;

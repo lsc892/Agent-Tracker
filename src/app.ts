@@ -20,7 +20,10 @@ interface ConfigurationChanges {
   pollingInterval: boolean;
 }
 
-/** Owns extension services, commands, events and their shutdown order. */
+/**
+ * 책임: 서비스·명령·설정 변경과 확장 종료 순서를 소유한다.
+ * 알고리즘: 설정 변경을 Promise 큐로 직렬화하고 변경 영역만 적용하며, 종료 시 진행 중 작업과 서비스 정리를 함께 기다린다.
+ */
 export class AgentTrackerApp {
   private settings: TrackerConfiguration;
   private quota: QuotaService | undefined;
@@ -48,6 +51,10 @@ export class AgentTrackerApp {
     this.startMonitoring();
   }
 
+  /**
+   * 책임: 설정에 맞는 서비스와 화면을 연결한다.
+   * 알고리즘: 언어·Claude 보존 정책·저장 경로를 준비한 뒤 quota·통계·화면을 생성하고, 비동기 단계마다 종료 여부를 확인한다.
+   */
   private async initializeServices(): Promise<void> {
     setLocale(this.settings.locale);
     await this.applyClaudeCleanup();
@@ -86,6 +93,10 @@ export class AgentTrackerApp {
     this.registerCommand('agentTracker.openUsage', () => this.openDashboard());
   }
 
+  /**
+   * 책임: 포커스와 설정 변경 이벤트를 서비스에 전달한다.
+   * 알고리즘: 포커스는 즉시 반영하고 설정 변경은 기존 큐 뒤에 이어 실행해 비동기 적용의 순서 역전을 막는다.
+   */
   private registerListeners(): void {
     this.track(vscode.window.onDidChangeWindowState(state => this.quota?.setFocused(state.focused)));
     this.track(vscode.workspace.onDidChangeConfiguration(event => {
@@ -144,6 +155,10 @@ export class AgentTrackerApp {
     }
   }
 
+  /**
+   * 책임: 변경된 설정을 실행 중 서비스와 화면에 반영한다.
+   * 알고리즘: 이전 스냅샷과 비교해 보존·수집 정책을 적용하고, 경로 변경 시 스캔을 취소한 뒤 quota와 화면을 갱신한다.
+   */
   private async applyConfiguration(): Promise<void> {
     if (this.disposed) return;
     const previous = this.settings;
@@ -181,6 +196,10 @@ export class AgentTrackerApp {
     };
   }
 
+  /**
+   * 책임: 설정 변경에 따른 quota 제공자 수명을 관리한다.
+   * 알고리즘: 제공자 구성이 바뀌면 기존 구독·서비스 종료 후 재생성하고, 그 외에는 폴링 간격과 갱신 정책만 갱신한다.
+   */
   private async updateQuota(changes: ConfigurationChanges): Promise<void> {
     if (changes.providers) {
       this.quotaSubscription?.dispose();
@@ -233,6 +252,10 @@ export class AgentTrackerApp {
     return this.closing;
   }
 
+  /**
+   * 책임: 확장 종료 시 작업과 리소스가 남지 않도록 정리한다.
+   * 알고리즘: 종료 표시와 이벤트 해제를 먼저 수행하고 quota·Worker·설정 큐·데이터 삭제 작업을 allSettled로 기다린다.
+   */
   private async close(): Promise<void> {
     this.disposed = true;
     this.quotaSubscription?.dispose();

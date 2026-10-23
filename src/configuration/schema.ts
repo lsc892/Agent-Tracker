@@ -152,7 +152,10 @@ export function isSettingDefinition(node: SettingDefinition | SettingTree): node
   return 'default' in node;
 }
 
-/** All traversal stays here so readers and generated keys include new settings automatically. */
+/**
+ * 책임: 설정 읽기와 키 생성에 같은 트리 순회 규칙을 제공한다.
+ * 알고리즘: 객체를 재귀 순회하며 경로를 점으로 연결하고, 기본값이 있는 말단 정의에만 변환 함수를 적용한다.
+ */
 export function mapSettings<T extends SettingTree, Value>(tree: T,
   map: (definition: SettingDefinition, key: string) => Value, prefix = ''): object {
   return Object.fromEntries(Object.entries(tree).map(([name, node]) => {

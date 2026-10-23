@@ -4,7 +4,10 @@ const path = require('node:path');
 const vm = require('node:vm');
 const ts = require('typescript');
 
-// Load the import-free schema before tsc runs; runtime uses its normal compiled module.
+/**
+ * 책임: 공통 TypeScript 설정 정의로 VS Code manifest를 생성한다.
+ * 알고리즘: tsc 실행 전 import 없는 schema만 메모리에서 변환·평가하고 공통 트리를 순회해 언어 선택지와 category별 정렬 속성을 만든다.
+ */
 function configurationManifest(languages) {
   const filename = path.join(__dirname, '../src/configuration/schema.ts');
   const source = fs.readFileSync(filename, 'utf8');

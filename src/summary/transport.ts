@@ -16,7 +16,10 @@ interface WorkerMessage {
   progress?: SummaryProgress;
 }
 
-/** Owns lazy worker creation, request routing and bounded worker shutdown. */
+/**
+ * 책임: Worker 생성·RPC 응답 분배·종료를 소유한다.
+ * 알고리즘: 첫 요청에만 Worker를 만들고 요청 ID별 Promise를 연결하며, 오류·종료 시 대기 요청을 모두 거절한다.
+ */
 export class WorkerTransport {
   private worker: Worker | undefined;
   private sequence = 0;
@@ -51,6 +54,10 @@ export class WorkerTransport {
     return this.closing;
   }
 
+  /**
+   * 책임: 필요한 첫 통계 작업에서만 Worker를 생성한다.
+   * 알고리즘: 설정 스냅샷으로 Worker를 한 번 만들고 메시지·오류·종료 핸들러를 연결하며 해당 인스턴스 종료 시 대기 요청을 거절한다.
+   */
   private ensureWorker(): Worker {
     if (!this.worker) {
       const worker = new Worker(this.options.workerPath ?? join(__dirname, 'worker.js'), { workerData: this.options });
@@ -82,6 +89,10 @@ export class WorkerTransport {
     });
   }
 
+  /**
+   * 책임: Worker의 진행 알림과 RPC 완료를 각각의 소비자에게 전달한다.
+   * 알고리즘: 진행률은 관찰자에 분배하고 나머지는 ID로 pending을 제거한 뒤 번역된 오류 또는 결과로 Promise를 완료한다.
+   */
   private receive(message: WorkerMessage): void {
     if (message.progress) {
       for (const listener of this.listeners) {
@@ -99,6 +110,10 @@ export class WorkerTransport {
     }
   }
 
+  /**
+   * 책임: 통계 작업 취소 후 제한된 시간 안에 Worker를 종료한다.
+   * 알고리즘: 갱신 취소와 dispose 요청을 최대 5초 기다린 뒤 terminate하고 리스너·타이머·미완료 요청을 정리한다.
+   */
   private async close(waitForRefresh: () => Promise<void>): Promise<void> {
     this.disposed = true;
     // Cancellation still runs when no worker has been created.

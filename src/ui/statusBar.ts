@@ -9,7 +9,10 @@ export { statusBarPresentation, remainingBar } from './statusBarPresentation';
 
 type StatusSettings = Pick<TrackerConfiguration, 'display' | 'claude' | 'codex' | 'usage'>;
 
-/** One quota card with native click pinning, followed by its refresh button. */
+/**
+ * 책임: 상태바 quota 항목과 새로고침 버튼의 표시 수명을 소유한다.
+ * 알고리즘: 활성 제공자를 Claude·Codex 순서로 렌더링하고 같은 snapshot을 분 단위로 다시 표시해 추가 조회 없이 남은 시간을 갱신한다.
+ */
 export class QuotaStatusBar implements vscode.Disposable {
   private readonly quota = vscode.window.createStatusBarItem('agentTracker.quota', vscode.StatusBarAlignment.Right, -1000);
   private readonly refresh = vscode.window.createStatusBarItem('agentTracker.refreshQuota', vscode.StatusBarAlignment.Right, -1001);
@@ -30,6 +33,10 @@ export class QuotaStatusBar implements vscode.Disposable {
     this.clock.unref();
   }
 
+  /**
+   * 책임: 현재 설정에 맞는 상태바 텍스트·quota 카드·새로고침 상태를 반영한다.
+   * 알고리즘: 활성·표시 설정으로 제공자를 선택해 순서대로 조합하고 공통 색상·접근성 설명·갱신 아이콘을 적용하며 표시 대상이 없으면 항목을 숨긴다.
+   */
   update(states: readonly QuotaState[], settings: StatusSettings): void {
     this.quota.name = t('status.name');
     this.refresh.name = t('status.refreshName');

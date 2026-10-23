@@ -16,7 +16,10 @@ export type DashboardMessage =
   | { type: 'queryNames'; query: NameQuery; requestId: number }
   | { type: 'diagnostics'; offset: number };
 
-/** A Webview may only ask for known operations; it cannot select files or commands. */
+/**
+ * 책임: Webview가 요청할 수 있는 작업과 데이터 범위를 제한한다.
+ * 알고리즘: 명령 종류·열거 값·ID 길이·숫자 범위를 검사하고 허용 필드만 새 메시지로 복사해 임의 파일·명령 선택을 차단한다.
+ */
 export function parseDashboardMessage(input: unknown): DashboardMessage | null {
   if (!input || typeof input !== 'object') return null;
   const value = input as Record<string, unknown>;

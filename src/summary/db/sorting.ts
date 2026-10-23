@@ -1,6 +1,9 @@
 import { USAGE_SORT_KEYS, type UsageGrouping, type UsageSort } from './types';
 
-/** Expressions run on projected rows, so Input matches the cache-exclusive value on screen. */
+/**
+ * 책임: 표시 값과 일치하는 정렬 및 안정적인 페이지 순서를 만든다.
+ * 알고리즘: 허용된 열·방향을 SQL 식으로 매핑하고 미상 값을 뒤로 보낸 뒤 모델 출시일·숫자 버전·고정 식별자를 보조 정렬로 붙인다.
+ */
 export function usageTableOrder(sort: UsageSort, grouping: UsageGrouping | 'turn', model: boolean, includeCosts = false): string {
   if (!USAGE_SORT_KEYS.includes(sort.key) || !['asc', 'desc'].includes(sort.direction)) throw new RangeError('Unknown table sort');
   const direction = sort.direction === 'asc' ? 'ASC' : 'DESC';

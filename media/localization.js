@@ -7,6 +7,10 @@
     interpolation: { escapeValue: false, prefix: '{', suffix: '}' } });
   delete globalThis.agentTrackerLocale;
   globalThis.agentTrackerI18n = engine;
+  /**
+   * 책임: 열린 Webview의 언어를 입력 상태를 유지하며 바꾼다.
+   * 알고리즘: 언어가 달라지면 번역 bundle을 교체하고 data-i18n 표시가 붙은 텍스트·접근성·안내 속성만 다시 번역한다.
+   */
   globalThis.updateAgentTrackerLocale = bundle => {
     if (!bundle || bundle.locale === engine.language) return false;
     engine.removeResourceBundle(engine.language, 'translation');

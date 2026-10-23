@@ -26,6 +26,10 @@ const codex: Record<string, Rate> = {
   'gpt-5.4': [2.5,15,null,0.25], 'gpt-5.2': [1.75,14,null,0.175],
 };
 
+/**
+ * 책임: 기록된 모델별 토큰으로 표준 API 추정 비용을 계산한다.
+ * 알고리즘: snapshot·latest 접미사를 제거해 단가를 찾고 입력·출력·캐시 쓰기·읽기를 분리 곱셈하며 미지원 단가·미상 캐시는 null로 유지한다.
+ */
 export function estimateCost(provider: Provider, usage: ModelUsageInput): number | null {
   const id = usage.model.replace(/-\d{4}-\d{2}-\d{2}$|-\d{8}$|-latest$/,'');
   const rates = provider === 'claude' ? claude : codex;

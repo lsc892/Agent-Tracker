@@ -30,7 +30,10 @@ interface Entry {
   abort: AbortController | null;
 }
 
-/** Only quota providers run here. No transcript discovery or database work is performed. */
+/**
+ * 책임: 대화 로그·DB 작업과 독립적으로 quota 상태와 갱신 일정을 관리한다.
+ * 알고리즘: 제공자별 조회·재시도·마지막 성공 값을 보관하고 가장 이른 폴링 또는 만료 시각에 단일 타이머를 예약한다.
+ */
 export class QuotaService {
   private readonly entries = new Map<QuotaProviderId, Entry>();
   private readonly listeners = new Set<(states: QuotaState[]) => void>();
@@ -93,7 +96,10 @@ export class QuotaService {
     this.schedule();
   }
 
-  /** force=true bypasses focus/backoff, and coalesces active manual requests into one rerun. */
+  /**
+   * 책임: 같은 제공자의 중복 조회를 합치고 수동 새로고침을 반영한다.
+   * 알고리즘: 진행 중 Promise를 공유하고 강제 요청은 재실행 표시로 합치며, 자동 요청만 포커스·정책·재시도 시각을 검사한다.
+   */
   refresh(provider: QuotaProviderId, force = false): Promise<void> {
     if (this.disposed) return Promise.resolve();
     const entry = this.entry(provider);
@@ -156,6 +162,10 @@ export class QuotaService {
     this.listeners.clear();
   }
 
+  /**
+   * 책임: 조회 결과와 실패에 따른 재시도 상태를 갱신한다.
+   * 알고리즘: 응답·알림은 성공 값으로 반영하고 실패는 30초부터 최대 15분의 지수 지연과 Retry-After 중 큰 값을 적용한다.
+   */
   private async read(entry: Entry): Promise<void> {
     if (this.disposed) return;
     entry.abort = new AbortController();
@@ -187,6 +197,10 @@ export class QuotaService {
     entry.nextAllowedAt = 0;
   }
 
+  /**
+   * 책임: 실패 후 오래된 quota가 계속 표시되지 않도록 만료시킨다.
+   * 알고리즘: 마지막 성공 시각부터 일반 오류는 30분, 요청 제한 오류는 24시간이 지나면 스냅샷을 비운다.
+   */
   private expire(entry: Entry): boolean {
     if (!entry.snapshot || !entry.error || entry.lastSuccessAt === null) return false;
     const ttl = entry.error.code === 'rate-limit' ? 86_400_000 : 1_800_000;
@@ -195,6 +209,10 @@ export class QuotaService {
     return true;
   }
 
+  /**
+   * 책임: 폴링과 오래된 값 만료를 하나의 타이머로 구동한다.
+   * 알고리즘: 각 제공자의 폴링·재시도·만료 시각 중 최솟값을 구하고 Node 타이머 상한 안에서 예약한 뒤 다시 계산한다.
+   */
   private schedule(): void {
     if (this.timer !== undefined) this.clock.clearTimeout(this.timer);
     this.timer = undefined;

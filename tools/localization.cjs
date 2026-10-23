@@ -19,6 +19,10 @@ function write(file, value) {
 }
 const catalogs = new Map();
 const localeIds = new Set();
+/**
+ * 책임: 지원 언어 사전의 완전성과 치환 규칙을 검증한다.
+ * 알고리즘: 언어 ID·별칭 중복, 원문과의 키 집합·placeholder 일치, 빈 번역·미번역 한글을 검사한 뒤 유효 사전만 등록한다.
+ */
 for (const language of languages) {
   if (!localePattern.test(language.locale) || localeIds.has(language.locale)
     || !Array.isArray(language.vscodeLocales) || !language.vscodeLocales.every(alias => localePattern.test(alias))) {
@@ -54,6 +58,10 @@ function files(dir) {
   return fs.readdirSync(path.join(root, dir), {withFileTypes: true}).flatMap(item => item.isDirectory()
     ? files(`${dir}/${item.name}`) : [`${dir}/${item.name}`]);
 }
+/**
+ * 책임: 실행 코드와 HTML의 번역 사용이 사전과 일치하는지 확인한다.
+ * 알고리즘: TypeScript AST로 UI 문자열·t 호출·QuotaError의 키와 인자를 검사하고 HTML의 data-i18n 참조도 사전에 대조한다.
+ */
 for (const file of [...files('src'), ...files('media')].filter(file => /\.(ts|js)$/.test(file) && !file.includes('localization/') && !file.endsWith('i18next.js'))) {
   const source = fs.readFileSync(path.join(root, file), 'utf8');
   const tree = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
@@ -65,6 +73,10 @@ for (const file of [...files('src'), ...files('media')].filter(file => /\.(ts|js
       if (names !== expected) throw new Error(`${file}: mismatched arguments for ${key}`);
     }
   }
+  /**
+   * 책임: 소스 안의 번역 호출과 UI 문자열을 구문 단위로 검사한다.
+   * 알고리즘: AST를 재귀 순회해 문자열의 미이관 한글을 찾고 t·QuotaError의 리터럴 키와 치환 인자를 원문 사전과 대조한다.
+   */
   function walk(node) {
     if ((ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)
       || ts.isTemplateHead(node) || ts.isTemplateMiddle(node) || ts.isTemplateTail(node))

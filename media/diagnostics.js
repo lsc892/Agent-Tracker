@@ -15,6 +15,10 @@
     if (className) node.className = className;
     return node;
   }
+  /**
+   * 책임: 원본 경로·오류 문구가 HTML로 해석되지 않도록 진단 표를 만든다.
+   * 알고리즘: 기존 내용을 지운 뒤 머리글·행·셀을 DOM으로 생성하고 외부 값은 textContent로 넣으며 빈 결과는 안내로 대체한다.
+   */
   function table(target, headers, rows) {
     target.replaceChildren();
     if (!rows.length) { target.append(element('p', t('common.noRecords'), 'empty')); return; }
@@ -37,6 +41,10 @@
     node.append(body);
     target.append(node);
   }
+  /**
+   * 책임: 호스트에서 받은 진단 페이지와 이동 가능 상태를 표시한다.
+   * 알고리즘: 파일·요약 진단을 textContent 기반 표로 변환하고 count·다음 cursor 존재 여부로 페이지 설명과 버튼을 갱신한다.
+   */
   function render(result) {
     const counts = result.counts;
     $('diagnostic-counts').textContent = t('diagnostics.counts', { value0: number(counts.files), value1: number(counts.processing), value2: number(counts.done), value3: number(counts.error), value4: number(counts.interrupted), value5: number(counts.stale_summaries), value6: result.lastRefresh?.error ? t('diagnostics.recentScanSuffix', { value0: result.lastRefresh.error }) : '' });

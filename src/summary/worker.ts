@@ -12,6 +12,10 @@ let database: SummaryDatabase | undefined;
 let cancellation: AbortController | undefined;
 let queue = Promise.resolve();
 let lastRefresh: RefreshResult | undefined;
+/**
+ * 책임: Worker 안에서 DB 작업을 직렬화하고 통계 결과를 반환한다.
+ * 알고리즘: 취소는 즉시 전달하고 나머지 명령은 Promise 큐에서 처리하며, 조회한 표 페이지로 도표를 만들고 쓰기 작업은 공통 잠금으로 보호한다.
+ */
 port.on('message',(message: {id?:number;method:string;payload?:unknown}) => {
   if (message.method === 'cancel') { cancellation?.abort(); return; }
   queue = queue.then(async () => {

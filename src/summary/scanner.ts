@@ -15,6 +15,10 @@ export const PARSER_VERSION = 13;
 const componentPredicate = `EXISTS(SELECT 1 FROM component c WHERE c.provider=scan_files.provider
   AND (c.session_id=scan_files.session_id OR c.session_id=scan_files.old_session))`;
 
+/**
+ * 책임: 지원하는 로그 파일을 제한된 메모리로 발견한다.
+ * 알고리즘: 디렉터리를 깊이 우선 순회하며 symlink를 제외하고 JSONL 및 허용된 Zstd 파일만 yield하며 매 단계 취소를 확인한다.
+ */
 async function* walk(directory: string, signal?: AbortSignal, compressed = false): AsyncGenerator<string> {
   if (signal?.aborted) throw new SummaryError('interrupted');
   const rootStat = await lstat(directory);
@@ -30,6 +34,10 @@ async function* walk(directory: string, signal?: AbortSignal, compressed = false
   }
 }
 
+/**
+ * 책임: 원본 로그의 변경을 세션 단위 통계로 안전하게 반영한다.
+ * 알고리즘: 전역 갱신 잠금 아래 파일 메타데이터를 배치 수집하고 변경·연결 세션을 재파싱한 뒤 성공한 연결 성분만 원자적으로 교체한다.
+ */
 export async function refreshSummary(
   database: SummaryDatabase,
   options: SummaryOptions,
@@ -69,6 +77,10 @@ export async function refreshSummary(
     database.setManifestDiagnostic(file.id,code === 'interrupted' ? 'interrupted' : 'error',`parse: byte=${offset}`,code,offset);
     result.failed++;
   };
+  /**
+   * 책임: 관측한 파일 스냅샷을 파싱하고 변경·실패를 진단으로 남긴다.
+   * 알고리즘: 읽기 전후 파일 identity·크기·수정 시각을 검사하고 JSONL 청크를 TEMP에 적재하며, 실패한 세션의 기존 통계는 보존한다.
+   */
   const parse = async (file: StagedFile): Promise<void> => {
     check();
     database.setManifestDiagnostic(file.id,'processing','parse: byte=0',null);
@@ -115,6 +127,10 @@ export async function refreshSummary(
     // Discovery has bounded metadata batches. Body reads begin only after all roots complete.
     let batch: (FileMetadata & { previous?: ManifestRow })[] = [];
     let batchBytes = 0;
+    /**
+     * 책임: 발견한 파일의 변경 여부를 정하고 메타데이터 배치를 저장한다.
+     * 알고리즘: manifest의 경로·크기·수정 시각·파서 버전을 비교해 재사용 여부를 표시하고 한 트랜잭션으로 staging에 반영한다.
+     */
     const flush = (): void => {
       database.transaction(() => {
         for (const file of batch) {

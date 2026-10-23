@@ -23,6 +23,10 @@ function modelId(model: string): string {
   return model.toLowerCase().replace(/-latest$/, '').replace(/-\d{4}-\d{2}-\d{2}$|-\d{8}$/, '');
 }
 
+/**
+ * 책임: 모델 정렬에 사용할 출시일 또는 snapshot 날짜를 찾는다.
+ * 알고리즘: alias·날짜 접미사를 정규화해 등록 출시일을 우선 조회하고 없으면 모델명의 날짜를 해석한다.
+ */
 export function modelRelease(model: string): number | null {
   const id = modelId(model);
   if (Object.hasOwn(releases, id)) return releases[id];
@@ -30,7 +34,10 @@ export function modelRelease(model: string): number | null {
   return snapshot ? Number(snapshot.slice(1).join('')) : null;
 }
 
-/** Numeric-aware fallback for undated/custom model names and equal release dates. */
+/**
+ * 책임: 출시일이 같거나 없는 모델에도 숫자 버전을 구분하는 정렬 키를 만든다.
+ * 알고리즘: 정규화한 모델명의 각 숫자 구간을 12자리로 0 채워 문자열 비교가 숫자 순서를 따르게 한다.
+ */
 export function modelOrderKey(model: string): string {
   return modelId(model).replace(/\d+/g, value => value.padStart(12, '0'));
 }

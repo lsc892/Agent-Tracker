@@ -4,6 +4,10 @@ const { createHash } = require('node:crypto');
 const { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } = require('node:fs');
 const { dirname, join, resolve } = require('node:path');
 
+/**
+ * 책임: VSIX와 설치 CLI를 별도 공개 npm 패키지로 구성한다.
+ * 알고리즘: 루트 확장 identity·버전을 검증하고 설치 파일을 복사한 뒤 같은 버전 manifest와 VSIX SHA-256 metadata를 기록한다.
+ */
 function prepareInstaller(root, destination, vsix) {
   const extension = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
   const template = JSON.parse(readFileSync(join(root, 'tools/npm/manifest.json'), 'utf8'));
@@ -27,6 +31,10 @@ function prepareInstaller(root, destination, vsix) {
   return manifest;
 }
 
+/**
+ * 책임: 현재 VSIX를 포함하는 npm 배포 파일을 재현 가능한 파일 목록으로 만든다.
+ * 알고리즘: VSIX를 새로 패키징하고 고유 staging에서 npm pack을 실행해 이름·버전·파일 목록을 검증하며 staging 경계를 확인한 뒤 정리한다.
+ */
 function main() {
   const root = resolve(__dirname, '../..');
   const npmCli = process.env.npm_execpath;

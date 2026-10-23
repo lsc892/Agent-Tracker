@@ -12,7 +12,10 @@ export type TranslationValues = Record<string, string | number>;
 export interface LocalizedMessage { key: TranslationKey; values?: TranslationValues }
 export interface LocalizationBundle { locale: string; messages: Record<string, string> }
 
-/** A supported BCP-47 language, or the author's Korean source language. */
+/**
+ * 책임: 사용자·편집기 언어를 지원하는 번역 목록에 연결한다.
+ * 알고리즘: 명시 설정을 우선해 표기를 정규화하고 전체 locale·언어 코드 순으로 찾으며 미지원 언어는 한국어로 대체한다.
+ */
 export function resolveLocale(setting: unknown, editorLanguage: string): string {
   const candidate = typeof setting === 'string' && setting !== 'auto' ? setting : editorLanguage;
   const normalized = candidate.trim().toLowerCase().replaceAll('_', '-');
@@ -21,6 +24,10 @@ export function resolveLocale(setting: unknown, editorLanguage: string): string 
     ?? languages.find(language => language.locale === normalized.split('-')[0])?.locale ?? 'ko';
 }
 
+/**
+ * 책임: 독립된 번역 인스턴스와 누락 문구의 대체 언어를 구성한다.
+ * 알고리즘: 선택 언어 사전과 한국어 원문을 동기 등록하고 점이 포함된 키와 중괄호 치환 규칙을 사용한다.
+ */
 export function createTranslator(locale: string, override?: Record<string, string>): i18n {
   const resolved = resolveLocale(locale, 'ko');
   const messages = override ?? (resolved === 'ko' ? korean
@@ -47,7 +54,10 @@ export function localizationBundle(): LocalizationBundle {
   return { locale: getLocale(), messages: { ...korean, ...current.getResourceBundle(getLocale(), 'translation') } };
 }
 
-/** Only trusted catalogs are embedded; escape HTML script delimiters regardless. */
+/**
+ * 책임: 번역 데이터와 실행 스크립트를 Webview에 안전하게 전달한다.
+ * 알고리즘: JSON의 script 종료·구분 문자를 이스케이프하고 HTML 속성을 인코딩한 nonce·경로로 스크립트를 조립한다.
+ */
 export function localizationScripts(scriptUri: string, nonce: string, bundle = localizationBundle()): string {
   const serialized = JSON.stringify(bundle).replaceAll('<', '\\u003c').replaceAll('>', '\\u003e')
     .replaceAll('&', '\\u0026').replaceAll('\u2028', '\\u2028').replaceAll('\u2029', '\\u2029');

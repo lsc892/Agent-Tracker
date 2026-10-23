@@ -5,7 +5,10 @@ export class SummaryError extends Error {
   constructor(public readonly code: string, public readonly offset = 0) { super(code); }
 }
 
-/** Keeps bounded JSON blocks while discarding inline image bodies before JSON.parse. */
+/**
+ * 책임: 이미지 본문을 보관하지 않으면서 JSON 한 행의 메모리 상한을 지킨다.
+ * 알고리즘: 문자열·이스케이프 상태로 data:image Base64 본문만 버리고, 나머지는 크기가 제한된 블록에 모아 JSON.parse에 넘긴다.
+ */
 class JsonlLine {
   private readonly blocks: Buffer[] = [];
   private block: Buffer;
@@ -22,6 +25,10 @@ class JsonlLine {
     this.block = Buffer.allocUnsafe(Math.min(1024, maxBytes));
   }
 
+  /**
+   * 책임: 행의 일반 구간을 빠르게 복사하고 문자열 경계를 추적한다.
+   * 알고리즘: 다음 따옴표·역슬래시 위치를 재사용해 구간 단위로 이동하고, 이미지 탐지·이스케이프 구간만 바이트 단위로 처리한다.
+   */
   append(chunk: Buffer, start: number, end: number): void {
     this.bytes += end - start;
     // Cache the next delimiter: searching the entire remaining chunk for an absent
@@ -70,6 +77,10 @@ class JsonlLine {
     this.used = 0;
   }
 
+  /**
+   * 책임: 버리는 이미지 문자열까지 JSON 문자열 문법을 검증한다.
+   * 알고리즘: 문자열·escape·유니코드 잔여 길이를 상태로 갱신하고, 이미지 본문은 제어 문자와 잘못된 escape를 거부하며 저장을 생략한다.
+   */
   private appendByte(byte: number): void {
     let retain = true;
     if (this.inString) {
@@ -115,7 +126,10 @@ class JsonlLine {
   }
 }
 
-/** Reads the observed snapshot, streaming .jsonl.zst in memory. Row offsets refer to decoded JSONL. */
+/**
+ * 책임: 관측한 크기까지만 로그를 읽고 행과 원본 위치를 전달한다.
+ * 알고리즘: 64KiB 이하 청크를 개행으로 나누고 필요 시 이미지 제거·Zstd 해제를 적용하며, 미완성 마지막 행은 다음 갱신까지 유예한다.
+ */
 export async function readJsonl(
   path: string,
   size: number,

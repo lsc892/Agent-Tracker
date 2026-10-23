@@ -6,6 +6,10 @@ const { performance } = require('node:perf_hooks');
 const { QaError, requireValue, expectedClaude, compareSnapshot, checkPresentation } = require('./contract.cjs');
 const root = resolve(__dirname, '../..');
 
+/**
+ * 책임: 실계정 QA의 실행 허용과 조회 범위를 검증한다.
+ * 알고리즘: 허용된 옵션 이름을 정규식으로 해석하고 real 지정·제공자 목록·시간 제한 범위를 검사한다.
+ */
 function optionsFromArgs(args) {
   const options = { real: false, providers: ['codex', 'claude'], timeoutMs: 15000,
     output: join(root, 'tests/results/quota-live.json') };
@@ -24,6 +28,10 @@ function optionsFromArgs(args) {
   requireValue(Number.isInteger(options.timeoutMs) && options.timeoutMs >= 100 && options.timeoutMs <= 60000, 'invalid-options');
   return options;
 }
+/**
+ * 책임: QA 관찰용 HTTP 본문에도 메모리 상한을 적용한다.
+ * 알고리즘: 스트림을 읽으며 누적 1MiB를 검사하고 완료 후 Buffer로 합치며 finally에서 reader를 취소·해제한다.
+ */
 async function boundedBody(response) {
   requireValue(response.body, 'reference-protocol');
   const reader = response.body.getReader();
@@ -55,6 +63,10 @@ function verify(snapshot, expected) {
       ...(row.resetsAt !== null ? { resetsAtIso: new Date(row.resetsAt).toISOString() } : {}) })),
     ...(expected.rateLimitResetCredits ? { rateLimitResetCredits: expected.rateLimitResetCredits } : {}) };
 }
+/**
+ * 책임: 제품 조회 경로와 같은 Claude 응답을 기준으로 실제 값을 대조한다.
+ * 알고리즘: fetch 응답을 크기 제한 안에서 관찰해 독립 기대 값을 만들고 제품 파서 결과·표시를 비교하며 보고서에는 고정 오류와 수치만 남긴다.
+ */
 async function readClaude(options, signal, dependencies = {}) {
   const { ClaudeQuotaProvider } = require('../../dist/src/quota');
   const statuses = [];
@@ -92,6 +104,10 @@ function alive(pid) {
   try { process.kill(pid, 0); return true; }
   catch (error) { return error.code === 'ESRCH' ? false : null; }
 }
+/**
+ * 책임: 제품 Codex 조회의 서버 값·RPC 순서·프로세스 종료를 검증한다.
+ * 알고리즘: stdio 관찰기를 사이에 두어 기대 값과 수명 증거를 수집하고 허용 메서드 순서·표시 결과·관찰기와 실제 서버 종료를 모두 확인한다.
+ */
 async function readCodex(options, signal, directory, dependencies = {}) {
   const { CodexQuotaProvider, resolveCodexExecutable } = require('../../dist/src/quota');
   const evidencePath = join(directory, 'codex.json');
@@ -134,6 +150,10 @@ async function readCodex(options, signal, directory, dependencies = {}) {
   } catch (error) { result = { provider: 'codex', passed: false, error: failure ?? safeError(error) }; }
   return { ...result, processExitConfirmed, phases, elapsedMs: Math.round(performance.now() - started) };
 }
+/**
+ * 책임: 명시적으로 허용된 계정 QA를 모든 선택 제공자에 수행한다.
+ * 알고리즘: real 옵션을 확인하고 제공자를 차례로 시도해 실패도 모아 보고하며 고유하게 만든 증거 디렉터리만 finally에서 정리한다.
+ */
 async function runQa(options, dependencies = {}) {
   requireValue(options.real, 'real-opt-in-required');
   const signal = dependencies.signal ?? new AbortController().signal;
@@ -155,6 +175,10 @@ async function runQa(options, dependencies = {}) {
     await rm(directory, { recursive: true, force: true });
   }
 }
+/**
+ * 책임: 계정 QA의 취소·보고서 저장·종료 코드를 연결한다.
+ * 알고리즘: 신호를 AbortController에 연결해 실행하고 권한이 제한된 JSON 보고서와 허용된 수치만 출력한 뒤 신호 리스너를 해제한다.
+ */
 async function main(args = process.argv.slice(2)) {
   const options = optionsFromArgs(args);
   const controller = new AbortController();

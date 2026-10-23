@@ -28,6 +28,10 @@ export function quotaHoverSummary(states: readonly QuotaState[], now = Date.now(
   return [...lines, t('status.toggleHint')].join('\n');
 }
 
+/**
+ * 책임: quota 상태를 짧은 상태바 문구와 접근성 설명으로 변환한다.
+ * 알고리즘: 기본 Codex 한도와 5시간·7일 창을 우선 선택하고 표시 모드에 맞춰 사용·잔여 백분율·초기화 시간·오래된 값 표시를 조합한다.
+ */
 export function statusBarPresentation(
   state: QuotaState,
   percentage: DisplayPercentage,

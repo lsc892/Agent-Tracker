@@ -66,6 +66,10 @@ function modelTurns(costs: boolean): string {
   ${costs ? 'LEFT JOIN turn_costs c ON c.turn_id = t.id' : ''})`;
 }
 
+/**
+ * 책임: 제공자·모델 기준 집계가 사용할 요청 원본 projection을 만든다.
+ * 알고리즘: 모델 기준은 LEFT JOIN으로 기록 부재·모델 미상을 보존하고 제공자 기준은 요청을 유지하며 비용 열은 요청될 때만 연결한다.
+ */
 export function usageTurns(costs = false, by: UsageBasis = 'provider'): string {
   if (by === 'model') return modelTurns(costs);
   if (by !== 'provider') throw new RangeError('Unknown usage grouping basis');
@@ -96,7 +100,10 @@ function unknownOrder(by: UsageBasis, time?: string): string {
   return `${combined}${flags.join(', ')}, `;
 }
 
-/** Shared by rows and counts, including escaped name searches and unknown-time policy. */
+/**
+ * 책임: 행 조회와 개수 조회에 동일한 필터 의미를 제공한다.
+ * 알고리즘: 허용된 열의 조건과 바인딩을 순서대로 만들고 이름 검색 문자를 escape하며 날짜를 검증해 미상 시간 포함 정책을 적용한다.
+ */
 export function buildQueryFilter(filter: SummaryFilter): QuerySql {
   const clauses: string[] = [];
   const values: SQLInputValue[] = [];
@@ -141,6 +148,10 @@ export function buildQueryFilter(filter: SummaryFilter): QuerySql {
   return { sql: clauses.length ? clauses.join(' AND ') : '1 = 1', values };
 }
 
+/**
+ * 책임: 행·개수 조회가 공유할 집계 차원과 바인딩 순서를 정한다.
+ * 알고리즘: 그룹·시간대를 검증하고 일·월 조회의 미상 시간 포함 규칙을 적용한 뒤 제공자·모델·프로젝트·세션·기간 차원을 조립한다.
+ */
 function usageScope(filter: SummaryFilter, groupBy: UsageGrouping, timezone: string, by: UsageBasis): UsageScope {
   if (!['total', 'project', 'session', 'day', 'month'].includes(groupBy)) throw new RangeError('Unknown usage grouping');
   const calendar = groupBy === 'day' || groupBy === 'month';
@@ -162,6 +173,10 @@ function usageScope(filter: SummaryFilter, groupBy: UsageGrouping, timezone: str
   };
 }
 
+/**
+ * 책임: 요청 총량·완료 표본 평균·미상 캐시를 일관되게 집계한다.
+ * 알고리즘: 합계는 모든 상태를 포함하고 평균은 완료 표본만 사용하며, 캐시는 알려진 값의 개수가 표본 수와 같을 때만 합계·평균을 반환한다.
+ */
 function usageSums(excludeEmptyUsage = false): string {
   // Totals include every status; averages use completed requests and optionally recorded usage only.
   const completed = `status = 'completed'${excludeEmptyUsage ? ` AND ${RECORDED_USAGE}` : ''}`;
@@ -195,6 +210,10 @@ function usageSums(excludeEmptyUsage = false): string {
     MAX(updated_at) AS last_successful_update`;
 }
 
+/**
+ * 책임: 집계 결과에 필요한 이름·기간·세션 시작 열을 구성한다.
+ * 알고리즘: 활성 차원만 projection에 포함하고 이름은 저장 metadata로 조회하며 세션 시작은 현재 날짜 필터와 독립적인 최소 요청 시각으로 구한다.
+ */
 function usageDimensions(scope: UsageScope, by: UsageBasis): string[] {
   const dimensions = ['provider'];
   if (by === 'model') dimensions.push('model');
@@ -214,6 +233,10 @@ function usageDimensions(scope: UsageScope, by: UsageBasis): string[] {
   return dimensions;
 }
 
+/**
+ * 책임: 기간·프로젝트·세션별 원본 통계 SQL을 생성한다.
+ * 알고리즘: 공통 scope와 지표 식을 조합해 GROUP BY하고 미상 우선순위·전체 결과 정렬을 적용한 뒤 LIMIT·OFFSET을 붙인다.
+ */
 export function buildUsageQuery(filter: SummaryFilter, groupBy: UsageGrouping, timezone: string,
   by: UsageBasis, sortBy?: ChartMetric, tableSort?: UsageSort): QuerySql {
   const scope = usageScope(filter, groupBy, timezone, by);
@@ -269,6 +292,10 @@ export function buildTurnsCountQuery(filter: SummaryFilter, by: UsageBasis): Que
   };
 }
 
+/**
+ * 책임: 현재 표 페이지나 날짜와 독립적인 이름 선택 목록을 만든다.
+ * 알고리즘: 제공자·프로젝트 범위의 저장 요청에서 ID로 그룹화하고 이름·고정 키로 정렬한 행과 전체 개수 SQL을 함께 생성한다.
+ */
 export function buildNameQueries(query: NameQuery): { count: QuerySql; rows: QuerySql } {
   if (!['project', 'session'].includes(query.kind)) throw new RangeError('Unknown name kind');
   const session = query.kind === 'session';
@@ -301,6 +328,10 @@ export function buildNameQueries(query: NameQuery): { count: QuerySql; rows: Que
   };
 }
 
+/**
+ * 책임: 도구 분류별 순위와 전체 비율 계산용 SQL을 만든다.
+ * 알고리즘: 동일한 필터·category 조건으로 제공자·이름별 횟수를 합산하고 전체 합계·최댓값과 페이지 순위를 각각 조회한다.
+ */
 export function buildCapabilityQueries(filter: SummaryFilter, category: string): { counts: QuerySql; ranking: QuerySql } {
   if (!['skill', 'subagent', 'plugin', 'model'].includes(category)) throw new RangeError('Unknown capability category');
   const where = buildQueryFilter(filter);
@@ -331,6 +362,10 @@ export function buildCapabilityQueries(filter: SummaryFilter, category: string):
   };
 }
 
+/**
+ * 책임: 모델별 누계와 비용을 기존 요청 조회와 같은 의미로 계산한다.
+ * 알고리즘: 모델 토큰·결제 projection에 공통 필터를 적용해 제공자·모델별 합산하고 미상 캐시를 전파하며 토큰 순위로 100행씩 나눈다.
+ */
 export function buildModelCumulativeQueries(filter: SummaryFilter): { count: QuerySql; rows: QuerySql } {
   const where = buildQueryFilter(filter);
   // Keep this projection narrow while sharing token fallback and billing rules with model request queries.
@@ -365,6 +400,10 @@ export function buildModelCumulativeQueries(filter: SummaryFilter): { count: Que
   };
 }
 
+/**
+ * 책임: 원본을 다시 스캔하지 않고 저장된 진단과 처리 범위를 조회한다.
+ * 알고리즘: 같은 필터로 manifest 페이지·오류 또는 품질 플래그가 있는 요청 페이지·상태별 개수를 각각 만들고 ID 기반 페이지 조건을 붙인다.
+ */
 export function buildDiagnosticQueries(filter: SummaryFilter): { files: QuerySql; summaries: QuerySql; counts: QuerySql } {
   const where = buildQueryFilter(filter);
   return {

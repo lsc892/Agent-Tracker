@@ -3,7 +3,10 @@ import { SCHEMA_ROLLUP_SQL } from './rollup-state';
 export { SCHEMA_ROLLUP_SQL } from './rollup-state';
 export const SCHEMA_VERSION = 12;
 
-/** Only non-Windows discovery uses device/inode to recognize moved files. */
+/**
+ * 책임: 파일 이동 판정에 필요한 플랫폼별 identity 인덱스를 구성한다.
+ * 알고리즘: device·inode를 이동 판정에 쓰지 않는 Windows는 인덱스를 제거하고 다른 운영체제에서는 제공자·device·inode 인덱스를 생성한다.
+ */
 export function manifestIdentityIndexSql(platform: NodeJS.Platform): string {
   return platform === 'win32' ? 'DROP INDEX IF EXISTS idx_manifest_identity;'
     : 'CREATE INDEX IF NOT EXISTS idx_manifest_identity ON manifest(provider, dev, inode);';

@@ -19,6 +19,10 @@
     $('color-apply').disabled = busy || mode === 'custom' && !color;
     $('color-status').textContent = mode === 'custom' && !color ? t('color.invalidHex') : '';
   }
+  /**
+   * 책임: HEX·색상 견본·불투명도·미리 보기를 같은 값으로 맞춘다.
+   * 알고리즘: 유효한 HEX를 정규화해 RGB와 alpha를 나누고 마지막 유효 값을 보관하며 입력 검증 상태와 미리 보기를 다시 계산한다.
+   */
   function syncInputs() {
     const color = normalized($('color-hex').value);
     if (color) {
@@ -30,6 +34,10 @@
     }
     preview();
   }
+  /**
+   * 책임: 색상 견본과 투명도 조작을 HEX 입력에 반영한다.
+   * 알고리즘: RGB 뒤에 255 미만의 alpha만 두 자리 16진수로 붙이고 사용자 지정 모드로 전환한 뒤 입력을 동기화한다.
+   */
   function fromPicker() {
     const alpha = Number($('color-opacity').value);
     $('color-hex').value = $('color-picker').value + (alpha < 255 ? alpha.toString(16).padStart(2, '0') : '');

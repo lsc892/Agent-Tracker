@@ -11,7 +11,10 @@ export interface RollupUsageQueries {
   count: QuerySql;
 }
 
-/** The timezone is always a binding; session/date values never become SQL text. */
+/**
+ * 책임: raw facts를 다시 병합할 수 있는 일별 집계 상태로 변환한다.
+ * 알고리즘: 시간대는 바인딩으로 전달하고 제공자·프로젝트·세션·현지 일·모델 키로 그룹화해 공통 합계·표본 수 상태를 계산한다.
+ */
 export function aggregateUsageSource(by: UsageBasis, where = '1 = 1'): string {
   const model = by === 'model' ? ", model, CASE WHEN model IS NULL THEN 'N' ELSE 'V' || model END AS model_key" : '';
   const groups = `provider, project_key, session_id, local_day${by === 'model' ? ', model_key' : ''}`;
@@ -26,6 +29,10 @@ function effectiveFilter(filter: SummaryFilter, grouping: UsageGrouping): Summar
     ? { ...filter, unknownTime: 'include' } : filter;
 }
 
+/**
+ * 책임: 기간 필터의 완전한 현지 일과 부분 경계를 중복 없이 결합한다.
+ * 알고리즘: 완전한 날짜는 일별 rollup에서 읽고 양끝의 불완전 날짜는 raw에서 집계해 UNION ALL하며 미상 시간은 rollup 한쪽에만 둔다.
+ */
 function dailySources(filter: SummaryFilter, grouping: UsageGrouping, timezone: string, by: UsageBasis): QuerySql & { boundary: boolean } {
   const f = effectiveFilter(filter, grouping);
   const dimensions = buildQueryFilter({ ...f, fromMs: undefined, toMs: undefined, unknownTime: undefined });
@@ -63,6 +70,10 @@ function dailySources(filter: SummaryFilter, grouping: UsageGrouping, timezone: 
   return { sql, values, boundary };
 }
 
+/**
+ * 책임: 일별 상태를 병합해 원본 조회와 같은 합계·평균을 복원한다.
+ * 알고리즘: 합계와 완료 표본 수를 더한 뒤 비율로 평균을 구하고 알려진 캐시 개수가 전체 표본 수와 일치할 때만 캐시 값을 확정한다.
+ */
 function mergeMetrics(excludeEmptyUsage = false): string {
   const sum = (field: string): string => `SUM(${field})`;
   const average = (field: string, denominator: string): string => `1.0 * SUM(${field}) / NULLIF(SUM(${denominator}),0)`;
@@ -84,7 +95,10 @@ function mergeMetrics(excludeEmptyUsage = false): string {
   ].join(',\n      ');
 }
 
-/** Undefined selects the unchanged raw builder for unsupported costs/calendar ranges. */
+/**
+ * 책임: 사용 가능한 조건에서 일별 사전 집계 기반의 행·개수 SQL을 만든다.
+ * 알고리즘: 시간대·날짜 범위·비용 조건을 검사하고 일별 상태를 필요한 차원으로 병합하며 미지원 조건은 undefined로 raw builder에 돌린다.
+ */
 export function buildRollupUsageQueries(filter: SummaryFilter, grouping: UsageGrouping, timezone: string,
   by: UsageBasis, sortBy?: ChartMetric, tableSort?: UsageSort): RollupUsageQueries | undefined {
   if (!['total', 'project', 'session', 'day', 'month'].includes(grouping)) throw new RangeError('Unknown usage grouping');
