@@ -61,21 +61,14 @@ export class QuotaService {
     if (this.started || this.disposed) return;
     this.started = true;
     this.focused = focused;
-    if (focused && this.refreshPolicy === 'automatic') for (const id of this.entries.keys()) void this.refresh(id);
+    if (this.isAutomaticRefreshActive()) this.refreshAll();
     this.schedule();
   }
 
   setFocused(focused: boolean): void {
     if (this.disposed || this.focused === focused) return;
     this.focused = focused;
-    if (focused && this.started && this.refreshPolicy === 'automatic') {
-      const now = this.clock.now();
-      for (const [id, entry] of this.entries) {
-        if (entry.lastSuccessAt === null || entry.error || now - entry.lastSuccessAt >= 300_000) {
-          void this.refresh(id);
-        }
-      }
-    }
+    if (this.started && this.isAutomaticRefreshActive()) this.refreshOnFocus();
     this.schedule();
   }
 
@@ -90,9 +83,7 @@ export class QuotaService {
   setRefreshPolicy(policy: RefreshPolicy): void {
     if (this.refreshPolicy === policy || this.disposed) return;
     this.refreshPolicy = policy;
-    if (policy === 'automatic' && this.started && this.focused) {
-      for (const id of this.entries.keys()) void this.refresh(id);
-    }
+    if (this.started && this.isAutomaticRefreshActive()) this.refreshAll();
     this.schedule();
   }
 
@@ -107,24 +98,9 @@ export class QuotaService {
       if (force) entry.rerunRequested = true;
       return entry.running;
     }
-    if (!force && (this.refreshPolicy === 'manual' || !this.focused || this.clock.now() < entry.nextAllowedAt)) return Promise.resolve();
+    if (!force && this.shouldSkipAutomaticRefresh(entry)) return Promise.resolve();
     // Defer execution until running has been installed, including synchronous observers/providers.
-    entry.running = Promise.resolve().then(async () => {
-      try {
-        await this.read(entry);
-        while (!this.disposed && entry.rerunRequested) {
-          entry.rerunRequested = false;
-          await this.read(entry);
-        }
-      } finally {
-        // Clear flight ownership in the same continuation that checks the rerun flag.
-        // A separate Promise.finally leaves a microtask gap where a forced rerun is lost.
-        entry.running = null;
-        entry.abort = null;
-        this.emit();
-        this.schedule();
-      }
-    });
+    entry.running = Promise.resolve().then(() => this.runRefreshCycle(entry));
     this.emit();
     this.schedule();
     return entry.running;
@@ -163,38 +139,129 @@ export class QuotaService {
   }
 
   /**
-   * 책임: 조회 결과와 실패에 따른 재시도 상태를 갱신한다.
-   * 알고리즘: 응답·알림은 성공 값으로 반영하고 실패는 30초부터 최대 15분의 지수 지연과 Retry-After 중 큰 값을 적용한다.
+   * 책임: 한 제공자의 조회·수동 재실행·완료 처리를 같은 실행 흐름에서 수행한다.
+   * 알고리즘: 첫 조회 후 모인 재실행 요청을 소진하고 마지막 요청 확인과 진행 중 상태 해제를 같은 continuation에서 처리한다.
+   */
+  private async runRefreshCycle(entry: Entry): Promise<void> {
+    try {
+      await this.read(entry);
+      while (!this.disposed && entry.rerunRequested) {
+        entry.rerunRequested = false;
+        await this.read(entry);
+      }
+    } finally {
+      // Clear flight ownership in the same continuation that checks the rerun flag.
+      // A separate Promise.finally leaves a microtask gap where a forced rerun is lost.
+      entry.running = null;
+      entry.abort = null;
+      this.emit();
+      this.schedule();
+    }
+  }
+
+  /**
+   * 책임: 제공자 조회 한 번의 성공·알림·실패 처리와 다음 폴링 시각을 연결한다.
+   * 알고리즘: 취소 신호로 조회하고 결과 종류별 처리에 위임하며 완료 시 다음 폴링 시각을 갱신한다.
    */
   private async read(entry: Entry): Promise<void> {
     if (this.disposed) return;
     entry.abort = new AbortController();
     try {
       const snapshot = await entry.provider.read({ signal: entry.abort.signal,
-        onSnapshot: value => { if (!this.disposed) { this.accept(entry, value); this.emit(); } } });
-      if (!this.disposed) this.accept(entry, snapshot);
+        onSnapshot: value => this.handleSnapshotUpdate(entry, value) });
+      if (!this.disposed) this.acceptSnapshot(entry, snapshot);
     } catch (error) {
-      if (this.disposed) return;
-      entry.error = error instanceof QuotaError ? error : new QuotaError('unavailable', { key: 'quota.lookupFailed' });
-      entry.failures += 1;
-      const backoff = Math.min(900_000, 30_000 * 2 ** Math.min(10, entry.failures - 1));
-      entry.nextAllowedAt = this.clock.now() + Math.max(backoff, entry.error.retryAfterMs ?? 0);
-      if (entry.error.code === 'unsupported-account') {
-        entry.snapshot = null;
-        entry.lastSuccessAt = null;
-      }
-      this.expire(entry);
+      this.handleReadFailure(entry, error);
     } finally {
       entry.nextPollAt = this.clock.now() + this.pollingIntervalMs;
     }
   }
 
-  private accept(entry: Entry, snapshot: QuotaSnapshot): void {
+  /** 가장 이른 폴링·만료 시각에 타이머 하나를 예약한다. */
+  private schedule(): void {
+    if (this.timer !== undefined) this.clock.clearTimeout(this.timer);
+    this.timer = undefined;
+    if (this.disposed || !this.started) return;
+    const now = this.clock.now();
+    const due = this.getNextWakeAt();
+    if (!Number.isFinite(due)) return;
+    this.timer = this.clock.setTimeout(() => this.handleTimer(),
+      Math.min(2_147_483_647, Math.max(1, due - now)));
+  }
+
+  private refreshAll(): void {
+    for (const id of this.entries.keys()) void this.refresh(id);
+  }
+
+  /** 포커스 복귀 시 성공 이력이 없거나 실패·5분 경과 상태인 제공자만 갱신한다. */
+  private refreshOnFocus(): void {
+    const now = this.clock.now();
+    for (const [id, entry] of this.entries) {
+      if (entry.lastSuccessAt === null || entry.error || now - entry.lastSuccessAt >= 300_000) {
+        void this.refresh(id);
+      }
+    }
+  }
+
+  private shouldSkipAutomaticRefresh(entry: Entry): boolean {
+    return this.refreshPolicy === 'manual' || !this.focused || this.clock.now() < entry.nextAllowedAt;
+  }
+
+  private handleSnapshotUpdate(entry: Entry, snapshot: QuotaSnapshot): void {
+    if (this.disposed) return;
+    this.acceptSnapshot(entry, snapshot);
+    this.emit();
+  }
+
+  private acceptSnapshot(entry: Entry, snapshot: QuotaSnapshot): void {
     entry.snapshot = structuredClone(snapshot);
     entry.lastSuccessAt = snapshot.fetchedAt;
     entry.error = null;
     entry.failures = 0;
     entry.nextAllowedAt = 0;
+  }
+
+  /**
+   * 책임: 조회 오류·재시도 지연·유효하지 않은 계정의 이전 값을 처리한다.
+   * 알고리즘: 30초부터 최대 15분의 지수 지연과 Retry-After 중 큰 값을 적용하고 계정 변경·보존 기한에 따라 스냅샷을 비운다.
+   */
+  private handleReadFailure(entry: Entry, error: unknown): void {
+    if (this.disposed) return;
+    entry.error = error instanceof QuotaError ? error : new QuotaError('unavailable', { key: 'quota.lookupFailed' });
+    entry.failures += 1;
+    const backoff = Math.min(900_000, 30_000 * 2 ** Math.min(10, entry.failures - 1));
+    entry.nextAllowedAt = this.clock.now() + Math.max(backoff, entry.error.retryAfterMs ?? 0);
+    if (entry.error.code === 'unsupported-account') {
+      entry.snapshot = null;
+      entry.lastSuccessAt = null;
+    }
+    this.expire(entry);
+  }
+
+  /**
+   * 책임: 다음으로 처리할 폴링 또는 오래된 값 만료 시각을 구한다.
+   * 알고리즘: 자동 갱신이 가능한 제공자의 폴링·재시도 시각과 모든 실패 스냅샷의 만료 시각 중 최솟값을 반환한다.
+   */
+  private getNextWakeAt(): number {
+    let due = Infinity;
+    for (const entry of this.entries.values()) {
+      if (this.isAutomaticRefreshActive() && !entry.running) due = Math.min(due, Math.max(entry.nextPollAt, entry.nextAllowedAt));
+      if (entry.snapshot && entry.error && entry.lastSuccessAt !== null) {
+        due = Math.min(due, entry.lastSuccessAt + (entry.error.code === 'rate-limit' ? 86_400_000 : 1_800_000));
+      }
+    }
+    return due;
+  }
+
+  /** 만료·폴링을 처리하고 변경 알림과 다음 예약을 연결한다. */
+  private handleTimer(): void {
+    let expired = false;
+    for (const [id, entry] of this.entries) {
+      expired = this.expire(entry) || expired;
+      if (this.isAutomaticRefreshActive() && this.clock.now() >= Math.max(entry.nextPollAt, entry.nextAllowedAt)) void this.refresh(id);
+    }
+    if (expired) this.emit();
+    this.schedule();
   }
 
   /**
@@ -209,32 +276,8 @@ export class QuotaService {
     return true;
   }
 
-  /**
-   * 책임: 폴링과 오래된 값 만료를 하나의 타이머로 구동한다.
-   * 알고리즘: 각 제공자의 폴링·재시도·만료 시각 중 최솟값을 구하고 Node 타이머 상한 안에서 예약한 뒤 다시 계산한다.
-   */
-  private schedule(): void {
-    if (this.timer !== undefined) this.clock.clearTimeout(this.timer);
-    this.timer = undefined;
-    if (this.disposed || !this.started) return;
-    const now = this.clock.now();
-    let due = Infinity;
-    for (const entry of this.entries.values()) {
-      if (this.refreshPolicy === 'automatic' && this.focused && !entry.running) due = Math.min(due, Math.max(entry.nextPollAt, entry.nextAllowedAt));
-      if (entry.snapshot && entry.error && entry.lastSuccessAt !== null) {
-        due = Math.min(due, entry.lastSuccessAt + (entry.error.code === 'rate-limit' ? 86_400_000 : 1_800_000));
-      }
-    }
-    if (!Number.isFinite(due)) return;
-    this.timer = this.clock.setTimeout(() => {
-      let expired = false;
-      for (const [id, entry] of this.entries) {
-        expired = this.expire(entry) || expired;
-        if (this.refreshPolicy === 'automatic' && this.focused && this.clock.now() >= Math.max(entry.nextPollAt, entry.nextAllowedAt)) void this.refresh(id);
-      }
-      if (expired) this.emit();
-      this.schedule();
-    }, Math.min(2_147_483_647, Math.max(1, due - now)));
+  private isAutomaticRefreshActive(): boolean {
+    return this.refreshPolicy === 'automatic' && this.focused;
   }
 
   private emit(): void {

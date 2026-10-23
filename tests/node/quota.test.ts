@@ -178,6 +178,51 @@ test('inactive activation defers first read until focus; automatic joins and man
   await service.dispose();
 });
 
+test('refreshes requested by synchronous observers share the active cycle, including during a rerun', async () => {
+  const clock = new FakeClock();
+  const replies = [deferred<QuotaSnapshot>(), deferred<QuotaSnapshot>(), deferred<QuotaSnapshot>()];
+  let reads = 0;
+  let active = 0;
+  let maxActive = 0;
+  let startupRefresh: Promise<void> | undefined;
+  let rerunRefresh: Promise<void> | undefined;
+  const service = new QuotaService([{ id: 'claude', read: async context => {
+    const index = reads++;
+    active++;
+    maxActive = Math.max(maxActive, active);
+    try {
+      assert.ok(index < replies.length, 'observer requests must not start extra reads');
+      if (index === 1) context.onSnapshot?.(snapshot(clock.now(), 40));
+      return await replies[index].promise;
+    } finally { active--; }
+  } }], { clock, refreshPolicy: 'manual' });
+  service.subscribe(([state]) => {
+    if (state.refreshing && state.snapshot === null && !startupRefresh) startupRefresh = service.refresh('claude', true);
+    if (state.snapshot?.windows[0].usedPercent === 40 && !rerunRefresh) rerunRefresh = service.refresh('claude', true);
+  });
+  try {
+    const running = service.refresh('claude', true);
+    assert.equal(startupRefresh, running);
+    await settle();
+    assert.equal(reads, 1);
+    replies[0].resolve(snapshot(clock.now(), 20));
+    await settle();
+    assert.equal(reads, 2);
+    assert.equal(rerunRefresh, running);
+    replies[1].resolve(snapshot(clock.now(), 40));
+    await settle();
+    assert.equal(reads, 3);
+    replies[2].resolve(snapshot(clock.now(), 60));
+    await running;
+    assert.equal(maxActive, 1);
+    assert.equal(service.getState('claude').snapshot?.windows[0].usedPercent, 60);
+    assert.equal(service.getState('claude').refreshing, false);
+  } finally {
+    for (const reply of replies) reply.resolve(snapshot(clock.now()));
+    await service.dispose();
+  }
+});
+
 test('failed focus retries back off per provider; forced manual refresh bypasses Retry-After', async () => {
   const clock = new FakeClock();
   let reads = 0;
@@ -227,6 +272,34 @@ test('failed snapshots expire at 30 minutes or 24 hours, retain last success tim
     assert.equal(service.getState('claude').lastSuccessAt, lastSuccess);
     await service.dispose();
   }
+});
+
+test('the expiry timer notifies listeners in manual unfocused mode without polling or a state read', async () => {
+  const clock = new FakeClock();
+  let fail = false;
+  let reads = 0;
+  const seen: string[] = [];
+  const service = new QuotaService([{ id: 'claude', read: async () => {
+    reads++;
+    if (fail) throw new QuotaError('network', 'safe error');
+    return snapshot(clock.now());
+  } }], { clock });
+  service.subscribe(([state]) => seen.push(state.status));
+  try {
+    service.start();
+    await settle();
+    fail = true;
+    await service.refresh('claude', true);
+    service.setRefreshPolicy('manual');
+    service.setFocused(false);
+    assert.equal(clock.tasks.size, 1);
+    await clock.advance(1_800_000 - 1);
+    assert.equal(seen.at(-1), 'stale');
+    await clock.advance(1);
+    assert.equal(seen.at(-1), 'unavailable');
+    assert.equal(reads, 2);
+    assert.equal(clock.tasks.size, 0);
+  } finally { await service.dispose(); }
 });
 
 test('switching to a non-subscription account invalidates the previous quota snapshot', async () => {
