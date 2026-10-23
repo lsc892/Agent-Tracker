@@ -42,6 +42,8 @@ Codex sessions/**/*.jsonl ──┘                              │
 
 Claude·Codex quota 제공자는 `BaseQuotaProvider` 추상 클래스를 상속한다. 공통 `read()`는 조회별 취소 신호와 진행 중 Promise를 소유하고 `readQuota(context)`를 호출해 같은 `QuotaSnapshot` 계약으로 사용량을 반환한다. 공통 `dispose()`는 추가 조회를 차단하고 모든 조회를 취소한 뒤 제공자의 정리가 끝날 때까지 기다리며 중복 호출은 같은 Promise를 반환한다. 인증·HTTP/RPC·응답 정규화와 timeout 시작 시점은 각 제공자에 둔다. 특히 Codex의 process 종료 확인은 조회의 일부로 유지한다. `QuotaProvider` 인터페이스는 서비스의 의존 계약으로 유지한다.
 
+`readQuota()`는 조회·재시도·timeout·취소·정리 흐름을 소유하고 Claude HTTP 응답 검사는 `ensureUsageResponseOk()`, Codex 로그인·구독 계정 검증은 `ensureSupportedAccount()`에 둔다. `RpcSession.receive()`는 서버 메시지와 요청 응답을 private 처리 메서드로 나누며 RPC 오류 분류도 별도 메서드에서 수행한다. 공개 quota 파서는 창 순회와 개수 상한을 관리하고 창 하나의 필드 검증·정규화는 export 없는 파일 내부 함수에 둔다.
+
 새 quota 제공자는 `BaseQuotaProvider`를 상속하고 `id`, 종료 안내 `closedMessage`, `readQuota()`를 구현한다. `readQuota()`는 전달받은 `signal`을 따르고 사용량·조회 시각·reset 시각을 기존 snapshot 규약으로 정규화해야 한다. 제공자 ID 타입·설정과 `AgentTrackerApp`의 생성 목록, 제공자별 UI도 함께 확장한다. 로컬 대화 통계까지 지원하려면 별도의 로그 파서와 통계 provider 연동이 필요하다.
 
 `SummaryClient`는 기존 공개 API를 유지하면서 `WorkerTransport`와 `RefreshController`에 위임한다. transport는 Worker 지연 생성·요청 ID·응답/오류·진행 알림·최대 5초의 종료 대기를 소유하고, refresh controller는 중복 갱신 병합·공유 메모리 취소·데이터 삭제 직렬화를 맡는다. 조회·설정은 진행 중 삭제를 기다리며 종료 후에는 Worker를 새로 만들지 않는다. 내부 종료용 `dispose` 요청은 종료 상태에서도 허용해 DB를 먼저 닫는다.

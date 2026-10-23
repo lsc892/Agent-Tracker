@@ -69,11 +69,7 @@ export class CodexQuotaProvider extends BaseQuotaProvider {
       this.phase('initialized', child.pid, performance.now() - startedAt);
       const accountResult = asRecord(await session.request('account/read', { refreshToken: false }));
       this.phase('account-read', child.pid, performance.now() - startedAt);
-      const account = asRecord(accountResult?.account);
-      if (!account) throw new QuotaError('authentication', { key: 'quota.codexLoginRequired' });
-      if (account.type !== 'chatgpt' && account.type !== 'chatgptAuthTokens') {
-        throw new QuotaError('unsupported-account', { key: 'quota.codexUnsupportedAccount' });
-      }
+      this.ensureSupportedAccount(accountResult);
       canNotify = true;
       const result = await session.request('account/rateLimits/read');
       const snapshot = parseCodexQuota(result, now());
@@ -95,6 +91,15 @@ export class CodexQuotaProvider extends BaseQuotaProvider {
       finally {
         if (session?.hasExited) this.lifecycle('stopped', session.child.pid, performance.now() - startedAt);
       }
+    }
+  }
+
+  /** 로그인 상태와 구독 계정 유형을 확인한 뒤에만 quota 조회·알림을 허용한다. */
+  private ensureSupportedAccount(accountResult: Record<string, unknown> | null): void {
+    const account = asRecord(accountResult?.account);
+    if (!account) throw new QuotaError('authentication', { key: 'quota.codexLoginRequired' });
+    if (account.type !== 'chatgpt' && account.type !== 'chatgptAuthTokens') {
+      throw new QuotaError('unsupported-account', { key: 'quota.codexUnsupportedAccount' });
     }
   }
 
@@ -235,27 +240,53 @@ class RpcSession {
     const message = asRecord(value);
     if (!message) throw protocolError();
     if (typeof message.method === 'string') {
-      if (message.id !== undefined) {
-        // A quota read never accepts server-initiated tool execution or login requests.
-        this.write({ id: message.id, error: { code: -32601, message: 'Unsupported client method' } });
-      } else if (message.method === 'account/rateLimits/updated') {
-        this.onSnapshot(message.params);
-      }
+      this.handleServerMessage(message);
       return;
     }
+    this.handleResponse(message);
+  }
+
+  /** 서버 실행 요청은 거부하고 quota 갱신 알림만 전달한다. */
+  private handleServerMessage(message: Record<string, unknown>): void {
+    if (message.id !== undefined) {
+      // A quota read never accepts server-initiated tool execution or login requests.
+      this.write({ id: message.id, error: { code: -32601, message: 'Unsupported client method' } });
+      return;
+    }
+    if (message.method === 'account/rateLimits/updated') this.onSnapshot(message.params);
+  }
+
+  /** 일치하는 대기 요청을 제거하고 응답 결과 또는 분류한 오류로 완료한다. */
+  private handleResponse(message: Record<string, unknown>): void {
     if (typeof message.id !== 'number') return;
     const pending = this.pending.get(message.id);
     if (!pending) return;
     this.pending.delete(message.id);
     const error = asRecord(message.error);
     if (error) {
-      const data = asRecord(error.data);
-      const status = data?.statusCode ?? data?.status ?? error.code;
-      if (status === 429) pending.reject(new QuotaError('rate-limit', { key: 'quota.codexRateLimited' }));
-      else if (status === 401 || status === 403) pending.reject(new QuotaError('authentication', { key: 'quota.codexSignInAgain' }));
-      else pending.reject(new QuotaError('protocol', { key: 'quota.codexRequestFailed' }));
-    } else if ('result' in message) pending.resolve(message.result);
-    else pending.reject(protocolError());
+      pending.reject(this.parseResponseError(error));
+      return;
+    }
+    if ('result' in message) {
+      pending.resolve(message.result);
+      return;
+    }
+    pending.reject(protocolError());
+  }
+
+  /** RPC 오류의 상태 코드만 해석하며 서버 오류 본문은 노출하지 않는다. */
+  private parseResponseError(error: Record<string, unknown>): QuotaError {
+    const data = asRecord(error.data);
+    const status = data?.statusCode ?? data?.status ?? error.code;
+    switch (status) {
+      case 429:
+        return new QuotaError('rate-limit', { key: 'quota.codexRateLimited' });
+      case 401:
+      case 403:
+        return new QuotaError('authentication', { key: 'quota.codexSignInAgain' });
+      default:
+        return new QuotaError('protocol', { key: 'quota.codexRequestFailed' });
+    }
   }
 
   private write(message: unknown): void {
@@ -290,20 +321,11 @@ export function parseCodexQuota(value: unknown, fetchedAt: number): QuotaSnapsho
     const limitId = typeof bucket.limitId === 'string' ? bucket.limitId.slice(0, 100) : key.slice(0, 100);
     const limitName = typeof bucket.limitName === 'string' && bucket.limitName ? bucket.limitName.slice(0, 100) : undefined;
     for (const windowId of ['primary', 'secondary'] as const) {
-      if (bucket[windowId] == null) continue;
-      const window = asRecord(bucket[windowId]);
-      if (!window || typeof window.usedPercent !== 'number' || !Number.isFinite(window.usedPercent) || window.usedPercent < 0) throw protocolError();
-      const mins = window.windowDurationMins;
-      if (mins != null && (typeof mins !== 'number' || !Number.isFinite(mins) || mins <= 0)) throw protocolError();
-      const reset = window.resetsAt;
-      if (reset != null && (typeof reset !== 'number' || !Number.isFinite(reset) || Math.abs(reset) > 8.64e12)) throw protocolError();
-      const duration = typeof mins === 'number' ? mins : null;
-      const durationText = durationLabel(duration, windowId);
-      windows.push({ id: `${limitId}:${windowId}`, limitId,
+      const window = parseCodexQuotaWindow(bucket[windowId], windowId);
+      if (!window) continue;
+      windows.push({ ...window, id: `${limitId}:${windowId}`, limitId,
         ...(limitName ? { limitName } : {}),
-        label: buckets.length === 1 || limitId === 'codex' ? durationText : `${limitName || limitId} ${durationText}`,
-        usedPercent: window.usedPercent, current: window.usedPercent, maximum: 100,
-        resetsAt: typeof reset === 'number' ? reset * 1000 : null, windowDurationMins: duration,
+        label: buckets.length === 1 || limitId === 'codex' ? window.label : `${limitName || limitId} ${window.label}`,
         ...(typeof bucket.rateLimitReachedType === 'string' ? { rateLimitReachedType: bucket.rateLimitReachedType.slice(0, 100) } : {}),
       });
       if (windows.length > 100) throw protocolError();
@@ -312,6 +334,21 @@ export function parseCodexQuota(value: unknown, fetchedAt: number): QuotaSnapsho
   if (windows.length === 0) throw new QuotaError('unavailable', { key: 'quota.codexUnavailable' });
   const rateLimitResetCredits = parseResetCredits(result.rateLimitResetCredits);
   return { provider: 'codex', fetchedAt, windows, ...(rateLimitResetCredits ? { rateLimitResetCredits } : {}) };
+}
+
+/** 창 하나의 사용률·기간·초기화 초를 검증하고 공통 quota 창으로 변환한다. */
+function parseCodexQuotaWindow(value: unknown, windowId: string): QuotaWindow | null {
+  if (value == null) return null;
+  const window = asRecord(value);
+  if (!window || typeof window.usedPercent !== 'number' || !Number.isFinite(window.usedPercent) || window.usedPercent < 0) throw protocolError();
+  const mins = window.windowDurationMins;
+  if (mins != null && (typeof mins !== 'number' || !Number.isFinite(mins) || mins <= 0)) throw protocolError();
+  const reset = window.resetsAt;
+  if (reset != null && (typeof reset !== 'number' || !Number.isFinite(reset) || Math.abs(reset) > 8.64e12)) throw protocolError();
+  const duration = typeof mins === 'number' ? mins : null;
+  return { id: windowId, label: durationLabel(duration, windowId),
+    usedPercent: window.usedPercent, current: window.usedPercent, maximum: 100,
+    resetsAt: typeof reset === 'number' ? reset * 1000 : null, windowDurationMins: duration };
 }
 
 /**

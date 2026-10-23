@@ -324,6 +324,29 @@ test('Claude re-reads credentials once on 401, does not expose response secrets,
   assert.equal(parseRetryAfter('Sat, 03 Oct 2026 06:00:00 GMT', Date.parse('2026-10-03T05:59:00Z')), 60_000);
 });
 
+test('Claude classifies HTTP failures without retrying or reading their response bodies', async () => {
+  for (const [status, code, key] of [
+    [403, 'authentication', 'quota.claudeAccessDenied'],
+    [500, 'network', 'quota.claudeHttpFailed'],
+  ] as const) {
+    const refreshes: boolean[] = [];
+    let discarded = 0;
+    const provider = new ClaudeQuotaProvider({
+      credentials: { getAccessToken: async refresh => { refreshes.push(refresh); return 'synthetic-token'; } },
+      fetch: async () => new Response(new ReadableStream({
+        pull() { throw new Error('secret-response-body'); },
+        cancel() { discarded++; },
+      }, { highWaterMark: 0 }), { status }),
+    });
+    try {
+      await assert.rejects(provider.read({ signal: signal() }), (error: unknown) =>
+        error instanceof QuotaError && error.code === code && error.translation?.key === key && !error.message.includes('secret'));
+      assert.deepEqual(refreshes, [false]);
+      assert.equal(discarded, 1);
+    } finally { await provider.dispose(); }
+  }
+});
+
 test('Claude skips HTTP when cancelled while waiting for credentials', async () => {
   const controller = new AbortController();
   const credentialStarted = deferred<void>();
@@ -460,6 +483,34 @@ test('Codex short-lived subprocess handshakes, reads once, forwards notification
     assert.throws(() => process.kill(recorded.pid, 0));
     await provider.dispose();
   } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+test('Codex ignores unrelated messages and rejects server requests before forwarding verified quota updates', async () => {
+  const received: number[] = [];
+  const provider = new CodexQuotaProvider({ executable: process.execPath, args: [fixture],
+    env: { QUOTA_FIXTURE_MODE: 'server-messages' }, timeoutMs: 5000 });
+  try {
+    const result = await provider.read({ signal: signal(), onSnapshot: value => received.push(value.windows[0].usedPercent) });
+    assert.equal(result.windows[0].usedPercent, 43);
+    assert.deepEqual(received, [42]);
+  } finally { await provider.dispose(); }
+});
+
+test('Codex classifies RPC failures using statusCode, status, then the RPC code without exposing server details', async () => {
+  for (const [error, code] of [
+    [{ code: 429, data: { statusCode: 401, status: 500 } }, 'authentication'],
+    [{ code: 429, data: { status: 403 } }, 'authentication'],
+    [{ code: 401, data: { statusCode: 429 } }, 'rate-limit'],
+    [{ code: 403 }, 'authentication'],
+    [{ code: -32603 }, 'protocol'],
+  ] as const) {
+    const provider = new CodexQuotaProvider({ executable: process.execPath, args: [fixture],
+      env: { QUOTA_FIXTURE_MODE: 'rpc-error', QUOTA_FIXTURE_RPC_ERROR: JSON.stringify(error) }, timeoutMs: 5000 });
+    try {
+      await assert.rejects(provider.read({ signal: signal() }), (error: unknown) =>
+        error instanceof QuotaError && error.code === code && !error.message.includes('secret'));
+    } finally { await provider.dispose(); }
+  }
 });
 
 for (const [mode, code] of [['api-key', 'unsupported-account'], ['logged-out', 'authentication'], ['rpc-error', 'rate-limit'],
