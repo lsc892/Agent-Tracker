@@ -19,7 +19,8 @@ export abstract class BaseQuotaProvider implements QuotaProvider {
     const signal = AbortSignal.any([context.signal, controller.signal]);
     this.active.add(controller);
     // Install ownership before invoking provider code, including synchronous failures.
-    const reading = Promise.resolve().then(() => this.readQuota({ ...context, signal })).finally(() => {
+    const reading = Promise.resolve().then(() =>
+      this.readQuota({ ...context, signal })).finally(() => {
       this.active.delete(controller);
       this.reads.delete(reading);
     });
@@ -29,7 +30,10 @@ export abstract class BaseQuotaProvider implements QuotaProvider {
 
   dispose(): Promise<void> {
     if (!this.closing) {
-      this.closing = Promise.resolve().then(async () => { await Promise.allSettled(this.reads); });
+      this.closing = Promise.resolve().then(async () => {
+        await Promise.allSettled(this.reads);
+      });
+
       for (const controller of this.active) controller.abort();
     }
     return this.closing;
