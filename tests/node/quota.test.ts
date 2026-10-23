@@ -379,6 +379,21 @@ test('Claude parses all quota windows and reset timezones without inventing miss
   assert.throws(() => parseClaudeQuota({ future: [] }, 1), { code: 'unavailable' });
 });
 
+test('Claude accepts more than 100 valid windows and still validates fields beyond that count', async () => {
+  const usage = Object.fromEntries(Array.from({ length: 101 }, (_, index) =>
+    [`custom_${index}`, { utilization: index, resets_at: null }]));
+  const provider = new ClaudeQuotaProvider({ credentials: { getAccessToken: async () => 'synthetic-token' },
+    fetch: async () => Response.json(usage) });
+  try {
+    const result = await provider.read({ signal: signal() });
+    assert.equal(result.windows.length, 101);
+    assert.deepEqual(result.windows.map(window => window.id), Object.keys(usage));
+    assert.equal(result.windows[100].usedPercent, 100);
+    assert.throws(() => parseClaudeQuota({ ...usage, invalid: { utilization: -1 } }, 1), (error: unknown) =>
+      error instanceof QuotaError && error.translation?.key === 'quota.claudeInvalidPercentage');
+  } finally { await provider.dispose(); }
+});
+
 test('Claude re-reads credentials once on 401, does not expose response secrets, honors Retry-After', async () => {
   const refreshes: boolean[] = [];
   let requests = 0;

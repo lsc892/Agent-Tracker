@@ -109,7 +109,7 @@ export function parseRetryAfter(value: string | null, now: number): number | und
 
 /**
  * 책임: Claude 응답의 사용률·초기화 시각을 공통 quota 창으로 변환한다.
- * 알고리즘: utilization이 있는 항목을 순회해 유한한 비음수 사용률과 날짜를 검증하고 최대 100개 창으로 정규화한다.
+ * 알고리즘: utilization이 있는 항목을 순회해 유한한 비음수 사용률과 날짜를 검증하고 공통 quota 창으로 변환한다.
  */
 export function parseClaudeQuota(value: unknown, fetchedAt: number): QuotaSnapshot {
   const data = asRecord(value);
@@ -119,7 +119,6 @@ export function parseClaudeQuota(value: unknown, fetchedAt: number): QuotaSnapsh
     const window = parseClaudeQuotaWindow(id, raw);
     if (!window) continue;
     windows.push(window);
-    if (windows.length > 100) throw new QuotaError('protocol', { key: 'quota.claudeTooManyWindows' });
   }
   if (windows.length === 0) throw new QuotaError('unavailable', { key: 'quota.claudeUnavailable' });
   return { provider: 'claude', fetchedAt, windows };

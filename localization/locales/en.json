@@ -18,7 +18,6 @@
   "quota.claudeUnsupportedResponse": "Unsupported Claude usage response format.",
   "quota.claudeInvalidPercentage": "Invalid Claude usage percentage format.",
   "quota.claudeInvalidReset": "Invalid Claude usage reset time.",
-  "quota.claudeTooManyWindows": "The number of Claude usage windows exceeds the limit.",
   "quota.claudeUnavailable": "Claude subscription usage is unavailable.",
   "quota.claudeEmptyResponse": "The Claude usage response is empty.",
   "quota.claudeResponseTooLarge": "The Claude usage response exceeds the size limit.",

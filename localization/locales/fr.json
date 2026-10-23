@@ -18,7 +18,6 @@
   "quota.claudeUnsupportedResponse": "Format de réponse d'utilisation de Claude non pris en charge.",
   "quota.claudeInvalidPercentage": "Format du pourcentage d'utilisation de Claude invalide.",
   "quota.claudeInvalidReset": "Heure de réinitialisation de Claude invalide.",
-  "quota.claudeTooManyWindows": "Le nombre de périodes d'utilisation de Claude dépasse la limite.",
   "quota.claudeUnavailable": "L'utilisation de l'abonnement Claude est indisponible.",
   "quota.claudeEmptyResponse": "La réponse d'utilisation de Claude est vide.",
   "quota.claudeResponseTooLarge": "La réponse d'utilisation de Claude dépasse la taille autorisée.",
