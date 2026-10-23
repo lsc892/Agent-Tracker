@@ -10,17 +10,20 @@ import { QuotaError } from '../../src/quota/types';
 import { statusBarPresentation } from '../../src/ui/statusBarPresentation';
 import korean from '../../localization/locales/ko.json';
 
-test('language override takes precedence over VS Code, with regional resolution and Korean fallback', () => {
+test('language override takes precedence over VS Code, with regional resolution and English fallback', () => {
   for (const language of languages) {
     assert.equal(resolveLocale('auto', language.locale), language.locale);
     assert.equal(resolveLocale(language.locale, 'en'), language.locale);
   }
-  for (const [input, expected] of [['EN-us', 'en'], ['fr_CA', 'fr'], ['zh-CN', 'zh'], ['zh-Hant', 'zh'], ['de-DE', 'ko'], ['../../en', 'ko']]) {
+  for (const [input, expected] of [['EN-us', 'en'], ['fr_CA', 'fr'], ['zh-CN', 'zh'], ['zh-Hant', 'zh'], ['de-DE', 'en'], ['../../en', 'en'], ['', 'en'], ['   ', 'en']]) {
     assert.equal(resolveLocale('auto', input), expected);
+    assert.equal(resolveLocale(input, 'ko'), expected);
   }
   const settings = { get<T>(key: string, fallback: T): T { return (key === 'language' ? 'ja' : fallback) as T; } };
   assert.equal(readConfiguration(settings, 'en').locale, 'ja');
   assert.equal(readConfiguration({get: (_key, fallback) => fallback}, 'fr').locale, 'fr');
+  assert.equal(readConfiguration({get: (_key, fallback) => fallback}, 'de-DE').locale, 'en');
+  assert.equal(createTranslator('de-DE').t('common.settings'), 'Settings');
 });
 
 test('missing translations fall back to Korean and interpolation preserves user text', () => {

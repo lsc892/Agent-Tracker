@@ -14,14 +14,14 @@ export interface LocalizationBundle { locale: string; messages: Record<string, s
 
 /**
  * 책임: 사용자·편집기 언어를 지원하는 번역 목록에 연결한다.
- * 알고리즘: 명시 설정을 우선해 표기를 정규화하고 전체 locale·언어 코드 순으로 찾으며 미지원 언어는 한국어로 대체한다.
+ * 알고리즘: 명시 설정을 우선해 표기를 정규화하고 전체 locale·언어 코드 순으로 찾으며 미지원 언어는 영어로 대체한다.
  */
 export function resolveLocale(setting: unknown, editorLanguage: string): string {
   const candidate = typeof setting === 'string' && setting !== 'auto' ? setting : editorLanguage;
   const normalized = candidate.trim().toLowerCase().replaceAll('_', '-');
   // Regional variants share a catalog. Chinese UI is the simplified catalog.
   return languages.find(language => language.locale === normalized)?.locale
-    ?? languages.find(language => language.locale === normalized.split('-')[0])?.locale ?? 'ko';
+    ?? languages.find(language => language.locale === normalized.split('-')[0])?.locale ?? 'en';
 }
 
 /**
