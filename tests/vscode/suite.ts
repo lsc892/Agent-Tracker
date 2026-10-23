@@ -407,7 +407,7 @@ export async function run(): Promise<void> {
         { id: 'extra', label: '| [run](command:evil)\n<img src=x>', usedPercent: NaN, current: 0, maximum: 100, resetsAt: null, windowDurationMins: null },
       ] },
     };
-    const card = originalTooltip([fixture], { percentage: 'remaining', detail: 'compact' }, 0);
+    const card = originalTooltip([fixture], { display: { percentage: 'remaining', detail: 'compact' } }, 0);
     assert.equal(card.supportThemeIcons, true);
     assert.equal(card.supportHtml, true, 'controlled color spans accompany SVG usage meters');
     assert.ok(typeof card.isTrusted === 'object' && !card.isTrusted.enabledCommands.includes('evil'));
@@ -421,13 +421,13 @@ export async function run(): Promise<void> {
     assert.doesNotMatch(card.value, /\| 기간 \|/);
     assert.doesNotMatch(card.value, /\]\(command:evil\)/, 'provider labels cannot introduce command links');
     assert.doesNotMatch(card.value, /<img src=x>/, 'provider HTML remains text');
-    const advanced = originalTooltip([{ ...fixture, status: 'stale', refreshing: true }], { percentage: 'used', detail: 'detailed' }, 61_000);
+    const advanced = originalTooltip([{ ...fixture, status: 'stale', refreshing: true }], { display: { percentage: 'used', detail: 'detailed' } }, 61_000);
     assert.match(advanced.value, /42%/);
     assert.match(advanced.value, /1분 후/);
     assert.match(advanced.value, /마지막 조회 값/);
     assert.match(advanced.value, /조회 중/);
     assert.doesNotMatch(advanced.value, /\]\(command:agentTracker.refreshQuota\)/, 'busy refresh is not a clickable action');
-    const unavailable = originalTooltip([{ ...fixture, snapshot: null, status: 'unavailable', error: { code: 'authentication', message: 'CLI에서 로그인하세요.' } }], { percentage: 'used', detail: 'detailed' }, 0);
+    const unavailable = originalTooltip([{ ...fixture, snapshot: null, status: 'unavailable', error: { code: 'authentication', message: 'CLI에서 로그인하세요.' } }], { display: { percentage: 'used', detail: 'detailed' } }, 0);
     assert.match(unavailable.value, /조회불가/);
     assert.match(unavailable.value.replace(/&nbsp;/g, ' '), /CLI에서 로그인하세요/);
     outcomes.push('native Markdown hover: all windows, remaining percentages, reset countdown, stale/loading/error states, escaped labels');

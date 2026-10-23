@@ -89,6 +89,7 @@
             "type": "string",
             "default": "auto",
             "scope": "window",
+            "markdownDescription": "%manifest.languageDescription%",
             "enum": [
               "auto",
               "ko",
@@ -106,8 +107,7 @@
               "日本語",
               "Español",
               "Français"
-            ],
-            "markdownDescription": "%manifest.languageDescription%"
+            ]
           }
         }
       },
@@ -130,11 +130,11 @@
           },
           "agentTracker.quota.refreshPolicy": {
             "type": "string",
+            "default": "automatic",
             "enum": [
               "automatic",
               "manual"
             ],
-            "default": "automatic",
             "order": 3,
             "enumItemLabels": [
               "%manifest.automaticRefresh%",
@@ -148,8 +148,8 @@
           },
           "agentTracker.quota.pollingIntervalSeconds": {
             "type": "number",
-            "minimum": 30,
             "default": 900,
+            "minimum": 30,
             "order": 4,
             "markdownDescription": "%manifest.pollingInterval%"
           }
@@ -163,45 +163,48 @@
           "agentTracker.codex.showStatusBar": {
             "type": "boolean",
             "default": true,
-            "description": "%manifest.codexStatusBar%",
-            "order": 1
+            "order": 1,
+            "description": "%manifest.codexStatusBar%"
           },
           "agentTracker.display.percentage": {
             "type": "string",
+            "default": "used",
             "enum": [
               "used",
               "remaining"
             ],
-            "default": "used",
+            "order": 2,
             "enumItemLabels": [
               "%manifest.percentageUsed%",
               "%manifest.percentageRemaining%"
             ],
-            "description": "%manifest.percentage%",
-            "order": 2
+            "description": "%manifest.percentage%"
           },
           "agentTracker.display.detail": {
             "type": "string",
+            "default": "detailed",
             "enum": [
               "compact",
               "detailed"
             ],
-            "default": "detailed",
+            "order": 3,
             "enumItemLabels": [
               "%manifest.detailCompact%",
               "%manifest.detailDetailed%"
             ],
-            "description": "%manifest.detail%",
-            "order": 3
+            "description": "%manifest.detail%"
           },
           "agentTracker.display.colorMode": {
             "type": "string",
+            "default": "automatic",
             "enum": [
               "automatic",
               "white",
               "black",
               "custom"
             ],
+            "order": 4,
+            "scope": "window",
             "enumItemLabels": [
               "%common.automatic%",
               "%color.white%",
@@ -214,19 +217,16 @@
               "%manifest.blackColor%",
               "%manifest.customColor%"
             ],
-            "default": "automatic",
-            "scope": "window",
-            "order": 4,
             "markdownDescription": "%manifest.colorMode%"
           },
           "agentTracker.display.customColor": {
             "type": "string",
             "default": "#ffffff",
+            "order": 5,
+            "scope": "window",
             "format": "color-hex",
             "pattern": "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$",
             "patternErrorMessage": "%manifest.invalidHex%",
-            "scope": "window",
-            "order": 5,
             "markdownDescription": "%manifest.hexColor%"
           }
         }
@@ -282,8 +282,8 @@
           "agentTracker.usage.timezone": {
             "type": "string",
             "default": "",
-            "description": "%manifest.timezone%",
-            "order": 5
+            "order": 5,
+            "description": "%manifest.timezone%"
           }
         }
       },
@@ -295,33 +295,33 @@
           "agentTracker.dataHome": {
             "type": "string",
             "default": "~",
+            "order": 1,
             "scope": "machine",
-            "markdownDescription": "%manifest.dataHome%",
-            "order": 1
+            "markdownDescription": "%manifest.dataHome%"
           },
           "agentTracker.claude.cleanupPeriodDays": {
             "type": [
               "integer",
               "null"
             ],
-            "minimum": 1,
             "default": null,
-            "scope": "machine",
+            "minimum": 1,
             "order": 2,
-            "markdownDescription": "%manifest.cleanupDays%"
-          },
-          "agentTracker.codex.executable": {
-            "type": "string",
-            "default": "codex",
             "scope": "machine",
-            "description": "%manifest.codexExecutable%",
-            "order": 4
+            "markdownDescription": "%manifest.cleanupDays%"
           },
           "agentTracker.usage.retainDeletedSourceUsage": {
             "type": "boolean",
             "default": true,
             "order": 3,
             "markdownDescription": "%manifest.retainDeletedSourceUsage%"
+          },
+          "agentTracker.codex.executable": {
+            "type": "string",
+            "default": "codex",
+            "order": 4,
+            "scope": "machine",
+            "description": "%manifest.codexExecutable%"
           }
         }
       }

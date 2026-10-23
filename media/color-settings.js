@@ -4,7 +4,7 @@
   const vscode = acquireVsCodeApi();
   const $ = id => document.getElementById(id);
   let busy = false;
-  let lastValidColor = '#ffffff';
+  let lastValidColor = $('color-hex').value;
   function normalized(value) {
     const color = value.trim().toLowerCase();
     if (!/^#(?:[\da-f]{3}|[\da-f]{4}|[\da-f]{6}|[\da-f]{8})$/.test(color)) return undefined;

@@ -2,6 +2,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const ts = require('typescript');
+const { configurationManifest } = require('./configuration.cjs');
 const root = path.join(__dirname, '..');
 const check = process.argv.includes('--check');
 const read = file => JSON.parse(fs.readFileSync(path.join(root, file), 'utf8'));
@@ -35,13 +36,7 @@ for (const language of languages) {
   catalogs.set(language.locale, catalog);
 }
 const pkg = read('package.json');
-const category = { id: 'agentTracker.localization', title: '%manifest.languageCategory%', order: 0, properties: {
-  'agentTracker.language': { type: 'string', default: 'auto', scope: 'window',
-    enum: ['auto', ...languages.map(language => language.locale)],
-    enumItemLabels: ['%manifest.languageAuto%', ...languages.map(language => language.label)],
-    markdownDescription: '%manifest.languageDescription%' },
-} };
-pkg.contributes.configuration = [category, ...pkg.contributes.configuration.filter(section => section.id !== category.id)];
+pkg.contributes.configuration = configurationManifest(languages);
 write('package.json', pkg);
 const manifestKeys = [...new Set(JSON.stringify(pkg).match(/%[\w.]+%/g))].map(token => token.slice(1, -1));
 for (const language of languages) {

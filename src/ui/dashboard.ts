@@ -32,7 +32,7 @@ export class Dashboard implements vscode.Disposable {
   }
 
   open(): void {
-    if (!this.dependencies.settings().usageEnabled) {
+    if (!this.dependencies.settings().usage.enabled) {
       void vscode.window.showInformationMessage(t('dashboard.disabled'));
       void vscode.commands.executeCommand('agentTracker.openSettings');
       return;
@@ -60,7 +60,7 @@ export class Dashboard implements vscode.Disposable {
 
   update(): void {
     const settings = this.dependencies.settings();
-    const message = { type: 'state', localization: localizationBundle(), timezone: settings.timezone, timezoneWarning: settings.timezoneWarning, providers: this.providers(),capabilitiesEnabled:settings.skillsEnabled,showApiCosts:settings.showApiCosts };
+    const message = { type: 'state', localization: localizationBundle(), timezone: settings.usage.timezone, timezoneWarning: settings.usage.timezoneWarning, providers: this.providers(),capabilitiesEnabled:settings.usage.skillsEnabled,showApiCosts:settings.usage.showApiCosts };
     if (this.diagnosticsPanel) this.diagnosticsPanel.title = t('diagnostics.title');
     this.post(message);
     this.postDiagnostics(message);
@@ -71,7 +71,7 @@ export class Dashboard implements vscode.Disposable {
     this.update();
     if (rebuildCapabilities && this.ready) {
       void (this.refreshPromise ?? Promise.resolve()).then(()=>{
-        if (this.ready && this.dependencies.settings().usageEnabled && this.dependencies.settings().skillsEnabled) return this.refreshUsage();
+        if (this.ready && this.dependencies.settings().usage.enabled && this.dependencies.settings().usage.skillsEnabled) return this.refreshUsage();
       }).catch(error=>this.error(error));
       return;
     }
@@ -82,7 +82,7 @@ export class Dashboard implements vscode.Disposable {
   dispose(): void { this.unsubscribe(); this.close(); }
 
   private async handle(message: NonNullable<ReturnType<typeof parseDashboardMessage>>): Promise<void> {
-    if (!this.dependencies.settings().usageEnabled) return;
+    if (!this.dependencies.settings().usage.enabled) return;
     switch (message.type) {
       case 'ready': if (!this.ready) { this.ready = true; this.enter(); } break;
       case 'openDiagnostics': this.openDiagnostics(); break;
@@ -110,7 +110,7 @@ export class Dashboard implements vscode.Disposable {
   }
 
   private openDiagnostics(): void {
-    if (!this.dependencies.settings().usageEnabled) return;
+    if (!this.dependencies.settings().usage.enabled) return;
     if (this.diagnosticsPanel) {
       this.diagnosticsPanel.reveal(vscode.ViewColumn.Active);
       void this.loadDiagnostics(0).catch(error => this.error(error, true));
@@ -128,7 +128,7 @@ export class Dashboard implements vscode.Disposable {
     webview.onDidReceiveMessage((raw: unknown) => {
       if (this.diagnosticsPanel !== panel) return;
       const message = parseDashboardMessage(raw);
-      if (!message || !this.dependencies.settings().usageEnabled) return;
+      if (!message || !this.dependencies.settings().usage.enabled) return;
       if (message.type === 'ready') {
         if (this.diagnosticsReady) return;
         this.diagnosticsReady = true;
@@ -148,7 +148,7 @@ export class Dashboard implements vscode.Disposable {
   }
 
   private async refreshUsage(): Promise<void> {
-    if (!this.dependencies.settings().usageEnabled) return;
+    if (!this.dependencies.settings().usage.enabled) return;
     this.post({ type: 'busy', busy: true });
     const panel = this.panel;
     if (this.refreshPromise) {
@@ -163,8 +163,8 @@ export class Dashboard implements vscode.Disposable {
     this.refreshPromise = (async () => {
       const settings = this.dependencies.settings();
       // The cached page remains visible during this operation.
-      const result = await this.dependencies.summary.refresh({ roots: settings.roots, timezone: settings.timezone });
-      if (this.panel !== panel || !this.ready || !this.dependencies.settings().usageEnabled) return;
+      const result = await this.dependencies.summary.refresh({ roots: settings.roots, timezone: settings.usage.timezone });
+      if (this.panel !== panel || !this.ready || !this.dependencies.settings().usage.enabled) return;
       this.post({ type: 'refreshResult', result });
       await this.loadDashboard();
     })().finally(() => {
@@ -179,12 +179,12 @@ export class Dashboard implements vscode.Disposable {
   }
 
   private async loadUsage(): Promise<void> {
-    if (!this.ready || !this.dependencies.settings().usageEnabled) return;
+    if (!this.ready || !this.dependencies.settings().usage.enabled) return;
     const version = ++this.queryVersion;
     const settings = this.dependencies.settings();
-    const timezone = settings.timezone;
-    const query = { ...this.query, timezone, providers: this.providers(), includeCosts: settings.showApiCosts,
-      excludeEmptyUsage: settings.excludeEmptyUsage };
+    const timezone = settings.usage.timezone;
+    const query = { ...this.query, timezone, providers: this.providers(), includeCosts: settings.usage.showApiCosts,
+      excludeEmptyUsage: settings.usage.excludeEmptyUsage };
     if (this.fromDay) query.fromMs = periodBounds(this.fromDay, timezone).fromMs;
     if (this.toDay) query.toMs = periodBounds(this.toDay, timezone).toMs;
     if (query.fromMs !== undefined && query.toMs !== undefined && query.fromMs >= query.toMs) throw new Error(t('dashboard.invalidDateRange'));
@@ -193,10 +193,10 @@ export class Dashboard implements vscode.Disposable {
   }
 
   private async loadDiagnostics(offset: number): Promise<void> {
-    if (!this.diagnosticsReady || !this.dependencies.settings().usageEnabled) return;
+    if (!this.diagnosticsReady || !this.dependencies.settings().usage.enabled) return;
     const version = ++this.diagnosticsVersion;
     const settings = this.dependencies.settings();
-    this.postDiagnostics({ type: 'state', localization: localizationBundle(), timezone: settings.timezone, timezoneWarning: settings.timezoneWarning });
+    this.postDiagnostics({ type: 'state', localization: localizationBundle(), timezone: settings.usage.timezone, timezoneWarning: settings.usage.timezoneWarning });
     const result = await this.dependencies.summary.diagnostics({ limit: 100, offset, providers: this.providers() });
     if (version === this.diagnosticsVersion) this.postDiagnostics({ type: 'diagnostics', result, offset });
   }

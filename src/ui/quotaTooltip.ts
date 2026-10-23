@@ -1,6 +1,7 @@
 import { getLocale, t } from '../localization';
 import * as vscode from 'vscode';
 import type { TrackerConfiguration } from '../configuration';
+import type { DisplayPercentage } from '../configuration/schema';
 import type { QuotaState, QuotaWindow } from '../quota/types';
 
 const commands = [
@@ -37,7 +38,7 @@ function muted(text: string): string {
   return `<span style="color:var(--vscode-descriptionForeground);">${text}</span>`;
 }
 
-function usageMeter(used: number, percentage: 'used' | 'remaining', reset: string, width: number, table = false): string {
+function usageMeter(used: number, percentage: DisplayPercentage, reset: string, width: number, table = false): string {
   const percent = Math.round(percentage === 'remaining' ? 100 - used : used);
   const color = used >= 80 ? '#fa3048' : used >= 50 ? '#e9a400' : '#22a06b';
   const label = t(percentage === 'remaining' ? 'quota.remainingPercentage' : 'quota.usedPercentage', { value0: percent });
@@ -46,7 +47,7 @@ function usageMeter(used: number, percentage: 'used' | 'remaining', reset: strin
   return `![${label}](${image}${table ? '\\|' : '|'}width=${width},height=8 "${t('quota.resetTitle', {value0: reset})}") <span style="color:${color};">${percent}%</span>`;
 }
 
-function appendWindow(tooltip: vscode.MarkdownString, window: QuotaWindow, percentage: 'used' | 'remaining', now: number, width: number, table = false): void {
+function appendWindow(tooltip: vscode.MarkdownString, window: QuotaWindow, percentage: DisplayPercentage, now: number, width: number, table = false): void {
   tooltip.appendText(window.label === '7d' ? 'wk' : window.label.replace(/[\r\n]+/g, ' '));
   tooltip.appendMarkdown(' ');
   const used = Number.isFinite(window.usedPercent) ? Math.max(0, Math.min(100, window.usedPercent)) : null;
@@ -71,8 +72,11 @@ function meterWidth(windows: readonly QuotaWindow[], now: number): number {
 /** Quota labels remain plain text even though the tooltip allows our command links. */
 export function createQuotaTooltip(
   states: readonly QuotaState[],
-  settings: Pick<TrackerConfiguration, 'percentage' | 'detail'> & Partial<Pick<TrackerConfiguration, 'usageEnabled'>> &
-    { codex?: Pick<TrackerConfiguration['codex'], 'showReserve' | 'showResetCredits'> },
+  settings: {
+    display: Pick<TrackerConfiguration['display'], 'percentage' | 'detail'>;
+    usage?: Pick<TrackerConfiguration['usage'], 'enabled'>;
+    codex?: Pick<TrackerConfiguration['codex'], 'showReserve' | 'showResetCredits'>;
+  },
   now = Date.now(),
 ): vscode.MarkdownString {
   const tooltip = new vscode.MarkdownString();
@@ -90,7 +94,7 @@ export function createQuotaTooltip(
   tooltip.appendMarkdown(t('quota.statusBarLabel'));
   tooltip.appendMarkdown((['detailed', 'compact'] as const).map(detail => {
     const label = detail === 'detailed' ? t('quota.detailed') : t('quota.compact');
-    return settings.detail === detail ? `**${label}**` : commandLink(label, 'agentTracker.setStatusBarDetail', [detail]);
+    return settings.display.detail === detail ? `**${label}**` : commandLink(label, 'agentTracker.setStatusBarDetail', [detail]);
   }).join(' · '));
 
   for (const provider of ['codex', 'claude'] as const) {
@@ -117,14 +121,14 @@ export function createQuotaTooltip(
       const columnGap = (index: number): string => index < main.length - 1 ? ' &nbsp;&nbsp;&nbsp;' : '';
       section.appendMarkdown('| ' + main.map((window, index) => {
         const cell = new vscode.MarkdownString();
-        appendWindow(cell, window, settings.percentage, now, width, true);
+        appendWindow(cell, window, settings.display.percentage, now, width, true);
         return cell.value + columnGap(index);
       }).join(' | ') + ' |\n');
       section.appendMarkdown('| ' + main.map(() => ':---').join(' | ') + ' |\n');
       section.appendMarkdown('| ' + main.map((window, index) => muted(resetCaption(window, now)) + columnGap(index)).join(' | ') + ' |\n');
       for (const window of extra) {
         section.appendMarkdown('\n\n');
-        appendWindow(section, window, settings.percentage, now, meterWidth([window], now));
+        appendWindow(section, window, settings.display.percentage, now, meterWidth([window], now));
         section.appendMarkdown(`  \n${muted(resetCaption(window, now))}`);
       }
       section.appendMarkdown('\n\n');
@@ -147,7 +151,7 @@ export function createQuotaTooltip(
     }
     tooltip.appendMarkdown(`\n\n${sectionDivider}\n\n${section.value}`);
   }
-  tooltip.appendMarkdown(`\n\n${sectionDivider}\n\n${settings.usageEnabled === false ? t('quota.statisticsDisabled') : commandLink(t('quota.statistics'), 'agentTracker.openUsage')}`);
+  tooltip.appendMarkdown(`\n\n${sectionDivider}\n\n${settings.usage?.enabled === false ? t('quota.statisticsDisabled') : commandLink(t('quota.statistics'), 'agentTracker.openUsage')}`);
   tooltip.appendMarkdown(`\n\n${commandLink(t('quota.settings'), 'agentTracker.openSettings')}`);
   return tooltip;
 }

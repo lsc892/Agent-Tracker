@@ -1,4 +1,5 @@
-export type StatusColorMode = 'automatic' | 'white' | 'black' | 'custom';
+import { settingDefinitions, type StatusColorMode } from '../configuration/schema';
+export type { StatusColorMode } from '../configuration/schema';
 export type ColorTarget = 'user' | 'workspace';
 
 export function parseColorSettingsMessage(raw: unknown): {type:'ready'} | {type:'save';mode:StatusColorMode;color:string;target:ColorTarget} | null {
@@ -6,13 +7,14 @@ export function parseColorSettingsMessage(raw: unknown): {type:'ready'} | {type:
   const value=raw as Record<string,unknown>;
   if (value.type === 'ready') return {type:'ready'};
   const color=normalizeHexColor(value.color);
-  if (value.type !== 'save' || typeof value.mode !== 'string' || !['automatic','white','black','custom'].includes(value.mode)
+  if (value.type !== 'save' || !settingDefinitions.display.colorMode.enum.some(mode => mode === value.mode)
     || typeof value.target !== 'string' || !['user','workspace'].includes(value.target) || !color) return null;
   return {type:'save',mode:value.mode as StatusColorMode,color,target:value.target as ColorTarget};
 }
 
 export function colorMode(value: unknown): StatusColorMode {
-  return typeof value === 'string' && ['automatic','white','black','custom'].includes(value) ? value as StatusColorMode : 'automatic';
+  return settingDefinitions.display.colorMode.enum.some(mode => mode === value)
+    ? value as StatusColorMode : settingDefinitions.display.colorMode.default;
 }
 
 /** Expand short HEX codes; only validated color literals may reach the renderer. */

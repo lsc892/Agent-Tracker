@@ -1,5 +1,6 @@
 import { getLocale, localizationScripts, t } from '../localization';
 import { escapeHtml } from './presentation';
+import { settingDefinitions } from '../configuration/schema';
 
 function pageSizeInput(id: string): string {
   return `<label class="page-size"><span data-i18n="dashboard.rowsPerPage">${escapeHtml(t('dashboard.rowsPerPage'))}</span><input id="${id}" type="number" min="1" max="1000" step="1" value="100" required inputmode="numeric" data-i18n-title="dashboard.pageSizeHelp" title="${escapeHtml(t('dashboard.pageSizeHelp'))}"></label>`;
@@ -13,7 +14,7 @@ export function colorSettingsHtml(scriptUri:string,styleUri:string,cspSource:str
 <main><form id="color-settings" class="color-settings">
 <label><span data-i18n="color.mode">${escapeHtml(t('color.mode'))}</span><select id="color-mode"><option value="automatic" data-i18n="common.automatic">${escapeHtml(t('common.automatic'))}</option><option value="white" data-i18n="color.white">${escapeHtml(t('color.white'))}</option><option value="black" data-i18n="color.black">${escapeHtml(t('color.black'))}</option><option value="custom" data-i18n="color.custom">${escapeHtml(t('color.custom'))}</option></select></label>
 <p class="muted note"><span data-i18n="color.automaticHelp">${escapeHtml(t('color.automaticHelp'))}</span></p>
-<div class="color-inputs"><label><span data-i18n="color.picker">${escapeHtml(t('color.picker'))}</span><input id="color-picker" type="color" value="#ffffff" data-i18n-aria-label="color.pickerAccessible" aria-label="${escapeHtml(t('color.pickerAccessible'))}"></label><label><span data-i18n="color.hex">${escapeHtml(t('color.hex'))}</span><input id="color-hex" type="text" value="#ffffff" data-i18n-placeholder="color.hexPlaceholder" placeholder="${escapeHtml(t('color.hexPlaceholder'))}" maxlength="9" spellcheck="false" autocomplete="off"></label></div>
+<div class="color-inputs"><label><span data-i18n="color.picker">${escapeHtml(t('color.picker'))}</span><input id="color-picker" type="color" value="${settingDefinitions.display.customColor.default}" data-i18n-aria-label="color.pickerAccessible" aria-label="${escapeHtml(t('color.pickerAccessible'))}"></label><label><span data-i18n="color.hex">${escapeHtml(t('color.hex'))}</span><input id="color-hex" type="text" value="${settingDefinitions.display.customColor.default}" data-i18n-placeholder="color.hexPlaceholder" placeholder="${escapeHtml(t('color.hexPlaceholder'))}" maxlength="9" spellcheck="false" autocomplete="off"></label></div>
 <label><span data-i18n="color.opacity">${escapeHtml(t('color.opacity'))}</span> <output id="color-opacity-value">100%</output><input id="color-opacity" type="range" min="0" max="255" value="255" step="1"></label>
 <p class="muted note"><span data-i18n="color.inputHelp">${escapeHtml(t('color.inputHelp'))}</span></p>
 <p class="muted"><span data-i18n="color.preview">${escapeHtml(t('color.preview'))}</span></p><div id="color-preview" class="color-preview"><span data-i18n="color.previewText">${escapeHtml(t('color.previewText'))}</span></div>

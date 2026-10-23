@@ -1,47 +1,26 @@
 import { createTranslator, resolveLocale } from './localization';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { readSettingValues, type SettingsReader } from './configuration/reader';
+import { settingDefinitions, type ConfigurationValues } from './configuration/schema';
 import type { SourceRoot } from './summary/types';
-import { colorMode, normalizeHexColor, type StatusColorMode } from './ui/colors';
+import { colorMode, normalizeHexColor } from './ui/colors';
 
-export interface SettingsReader { get<T>(key: string, fallback: T): T }
-export interface TrackerConfiguration {
-  language: string;
-  locale: string;
-  dataHome: string;
-  percentage: 'used' | 'remaining';
-  detail: 'compact' | 'detailed';
-  colorMode: StatusColorMode;
-  customColor: string | undefined;
-  refreshPolicy: 'automatic' | 'manual';
-  pollingSeconds: number;
-  usageEnabled: boolean;
-  skillsEnabled: boolean;
-  retainDeletedSourceUsage: boolean;
-  showApiCosts: boolean;
-  excludeEmptyUsage: boolean;
-  claude: { enabled: boolean; dataHome: string; cleanupPeriodDays: number | null };
-  codex: { enabled: boolean; dataHome: string; executable: string; showStatusBar: boolean; showReserve: boolean; showResetCredits: boolean };
-  roots: SourceRoot[];
-  timezone: string;
-  timezoneWarning?: string;
-}
+export type { SettingsReader } from './configuration/reader';
+export type TrackerConfiguration = ReturnType<typeof readConfiguration>;
 
 export function expandPath(value: string): string {
   return resolve(homedir(), value === '~' ? homedir() : /^~[/\\]/.test(value) ? join(homedir(), value.slice(2)) : value);
 }
 
-export function readConfiguration(settings: SettingsReader, editorLanguage = 'ko'): TrackerConfiguration {
-  const language = settings.get('language', 'auto');
-  const locale = resolveLocale(language, editorLanguage);
-  const dataHome = expandPath(settings.get('dataHome', '~').trim() || '~');
-  const claudeHome = join(dataHome, '.claude');
-  const codexHome = join(dataHome, '.codex');
-  const enabled = { claude: settings.get('claude.enabled', true), codex: settings.get('codex.enabled', true) };
-  const cleanup = settings.get<unknown>('claude.cleanupPeriodDays', null);
+function readDisplaySettings(display: ConfigurationValues['display']) {
+  return { ...display, colorMode: colorMode(display.colorMode), customColor: normalizeHexColor(display.customColor) };
+}
+
+function readUsageSettings(usage: ConfigurationValues['usage'], locale: string) {
   let timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
   let timezoneWarning: string | undefined;
-  const configuredTimezone = settings.get<unknown>('usage.timezone', '');
+  const configuredTimezone: unknown = usage.timezone;
   if (configuredTimezone !== '' && configuredTimezone !== undefined) {
     try {
       if (typeof configuredTimezone !== 'string') throw new TypeError('Invalid timezone');
@@ -54,29 +33,39 @@ export function readConfiguration(settings: SettingsReader, editorLanguage = 'ko
       timezoneWarning = String(createTranslator(locale).t('configuration.invalidTimezone', { value0: timezone }));
     }
   }
+  return { ...usage, timezone, timezoneWarning };
+}
+
+function readProviderSettings(values: ConfigurationValues, dataHome: string) {
+  const cleanup = values.claude.cleanupPeriodDays;
   return {
-    language, locale,
+    claude: { ...values.claude, dataHome: join(dataHome, '.claude'),
+      cleanupPeriodDays: typeof cleanup === 'number' && Number.isSafeInteger(cleanup)
+        && cleanup >= settingDefinitions.claude.cleanupPeriodDays.minimum ? cleanup : null },
+    codex: { ...values.codex, dataHome: join(dataHome, '.codex') },
+  };
+}
+
+function buildSourceRoots(providers: ReturnType<typeof readProviderSettings>): SourceRoot[] {
+  return [
+    { provider: 'claude' as const, path: join(providers.claude.dataHome, 'projects'), dataHome: providers.claude.dataHome },
+    ...['sessions', 'archived_sessions'].map(directory => ({ provider: 'codex' as const,
+      path: join(providers.codex.dataHome, directory), dataHome: providers.codex.dataHome })),
+  ].filter(root => providers[root.provider].enabled);
+}
+
+export function readConfiguration(settings: SettingsReader, editorLanguage = 'ko') {
+  const values = readSettingValues(settings);
+  const locale = resolveLocale(values.language, editorLanguage);
+  const dataHome = expandPath(values.dataHome.trim() || settingDefinitions.dataHome.default);
+  const providers = readProviderSettings(values, dataHome);
+  return {
+    ...values,
+    locale,
     dataHome,
-    percentage: settings.get('display.percentage', 'used'),
-    detail: settings.get('display.detail', 'detailed'),
-    colorMode: colorMode(settings.get<unknown>('display.colorMode', 'automatic')),
-    customColor: normalizeHexColor(settings.get<unknown>('display.customColor', '#ffffff')),
-    refreshPolicy: settings.get('quota.refreshPolicy', 'automatic'),
-    pollingSeconds: settings.get('quota.pollingIntervalSeconds', 900),
-    usageEnabled: settings.get('usage.enabled', true),
-    skillsEnabled: settings.get('usage.skillsEnabled', true),
-    retainDeletedSourceUsage: settings.get('usage.retainDeletedSourceUsage', true),
-    showApiCosts: settings.get('usage.showApiCosts', false),
-    excludeEmptyUsage: settings.get('usage.excludeEmptyUsage', true),
-    claude: { enabled: enabled.claude, dataHome: claudeHome,
-      cleanupPeriodDays: typeof cleanup === 'number' && Number.isSafeInteger(cleanup) && cleanup >= 1 ? cleanup : null },
-    codex: { enabled: enabled.codex, dataHome: codexHome, executable: settings.get('codex.executable', 'codex'),
-      showStatusBar: settings.get('codex.showStatusBar', true), showReserve: settings.get('codex.showReserve', false),
-      showResetCredits: settings.get('codex.showResetCredits', true) },
-    roots: [
-      { provider: 'claude' as const, path: join(claudeHome, 'projects'), dataHome: claudeHome },
-      ...['sessions', 'archived_sessions'].map(directory => ({ provider: 'codex' as const, path: join(codexHome, directory), dataHome: codexHome })),
-    ].filter(root => enabled[root.provider]),
-    timezone, timezoneWarning,
+    display: readDisplaySettings(values.display),
+    usage: readUsageSettings(values.usage, locale),
+    ...providers,
+    roots: buildSourceRoots(providers),
   };
 }

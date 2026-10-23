@@ -1,5 +1,6 @@
 import { t } from '../localization';
 import type { QuotaState, QuotaWindow } from '../quota/types';
+import type { DisplayPercentage, DisplayDetail } from '../configuration/schema';
 
 /** StatusBarItem accepts contributed font icons, rather than SVG or HTML. */
 export function remainingBar(usedPercent: number): string {
@@ -29,8 +30,8 @@ export function quotaHoverSummary(states: readonly QuotaState[], now = Date.now(
 
 export function statusBarPresentation(
   state: QuotaState,
-  percentage: 'used' | 'remaining',
-  detail: 'compact' | 'detailed',
+  percentage: DisplayPercentage,
+  detail: DisplayDetail,
   now = Date.now(),
   hover = false,
 ): { text: string; accessibleText: string } {

@@ -7,7 +7,7 @@ import { createQuotaTooltip } from './quotaTooltip';
 import { statusForeground } from './colors';
 export { statusBarPresentation, remainingBar } from './statusBarPresentation';
 
-type StatusSettings = Pick<TrackerConfiguration, 'percentage' | 'detail' | 'claude' | 'codex' | 'usageEnabled' | 'colorMode' | 'customColor'>;
+type StatusSettings = Pick<TrackerConfiguration, 'display' | 'claude' | 'codex' | 'usage'>;
 
 /** One quota card with native click pinning, followed by its refresh button. */
 export class QuotaStatusBar implements vscode.Disposable {
@@ -36,12 +36,12 @@ export class QuotaStatusBar implements vscode.Disposable {
     this.refresh.tooltip = t('status.refreshTooltip');
     this.refresh.accessibilityInformation = { label: t('status.refreshAccessible'), role: 'button' };
     this.latest = { states, settings };
-    const color = statusForeground(settings.colorMode, settings.customColor);
+    const color = statusForeground(settings.display.colorMode, settings.display.customColor);
     this.quota.color = color;
     this.refresh.color = color;
     const tracked = states.filter(state => settings[state.provider].enabled);
     const visible = ['claude', 'codex'].flatMap(provider => tracked.filter(state => state.provider === provider && (state.provider === 'claude' || settings.codex.showStatusBar)));
-    const views = visible.map(state => statusBarPresentation(state, settings.percentage, settings.detail));
+    const views = visible.map(state => statusBarPresentation(state, settings.display.percentage, settings.display.detail));
     this.quota.text = views.map(view => view.text).join('  │  ');
     this.quota.tooltip = createQuotaTooltip(tracked, settings);
     // The renderer uses this plain-text preview for automatic hover; the Markdown

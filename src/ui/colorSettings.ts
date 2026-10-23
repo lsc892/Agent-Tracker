@@ -2,6 +2,7 @@ import { localizationBundle, t } from '../localization';
 import { randomBytes } from 'node:crypto';
 import * as vscode from 'vscode';
 import { readConfiguration } from '../configuration';
+import { settingDefinitions, settingKeys } from '../configuration/schema';
 import { parseColorSettingsMessage, type StatusColorMode, type ColorTarget } from './colors';
 import { colorSettingsHtml } from './html';
 
@@ -39,10 +40,10 @@ export class ColorSettings implements vscode.Disposable {
     if (!this.ready || !this.panel || this.saving) return;
     const config=vscode.workspace.getConfiguration('agentTracker');
     const settings=readConfiguration(config);
-    const scopes=['display.colorMode','display.customColor'].map(key=>config.inspect(key));
+    const scopes=[settingKeys.display.colorMode,settingKeys.display.customColor].map(key=>config.inspect(key));
     const hasWorkspace=Boolean(vscode.workspace.workspaceFolders?.length);
     const target:ColorTarget=scopes.some(scope=>scope?.workspaceValue!==undefined) ? 'workspace' : 'user';
-    this.post({type:'state',localization:localizationBundle(),mode:settings.colorMode,color:settings.customColor ?? '#ffffff',hasWorkspace,target});
+    this.post({type:'state',localization:localizationBundle(),mode:settings.display.colorMode,color:settings.display.customColor ?? settingDefinitions.display.customColor.default,hasWorkspace,target});
   }
 
   private async save(value:{mode:StatusColorMode;color:string;target:ColorTarget}):Promise<void> {
@@ -54,8 +55,8 @@ export class ColorSettings implements vscode.Disposable {
     try {
       const target=value.target==='user' ? vscode.ConfigurationTarget.Global : vscode.ConfigurationTarget.Workspace;
       const config=vscode.workspace.getConfiguration('agentTracker');
-      await config.update('display.customColor',value.color,target);
-      await config.update('display.colorMode',value.mode,target);
+      await config.update(settingKeys.display.customColor,value.color,target);
+      await config.update(settingKeys.display.colorMode,value.mode,target);
       this.saving=false;
       if (this.panel===panel) {this.update();this.post({type:'saved'});}
     } finally {this.saving=false;}

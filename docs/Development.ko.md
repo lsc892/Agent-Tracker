@@ -74,6 +74,8 @@ npm run restore:vscode         # 원본 복원
 
 ## 표시 언어
 
+개발 시 설정은 [공통 설정 정의](../src/configuration/schema.ts)의 해당 영역에 추가합니다. 키·기본값·선택지·설명·category를 선언하면 읽기와 타입에 자동 반영되며 `npm run localization:sync`로 VS Code 설정 등록을 생성합니다. 생성된 `package.json`의 `contributes.configuration`을 직접 수정하지 않습니다. 경로·시간대 등 파생 처리는 [설정 변환](../src/configuration.ts)에 구현하고 기능 사용처를 연결한 뒤 `npm run check`로 확인합니다.
+
 확장 설정의 **언어 → Language**에서 표시 언어를 지정합니다. 기본은 VS Code 표시 언어를 따르고, 한국어·영어·중국어 간체·일본어·스페인어·프랑스어를 지원합니다. 열린 화면과 상태 표시줄은 변경에 즉시 반영되며 지원하지 않는 언어와 누락된 번역은 한국어를 사용합니다. 명령 팔레트와 VS Code 설정 설명은 VS Code 표시 언어를 따릅니다. 구조·추가 방법은 [로컬라이징 문서](research/Localization.md)에 있습니다.
 
 ## 로그인과 경로

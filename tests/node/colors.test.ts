@@ -17,7 +17,7 @@ test('status colors inherit theme defaults, accept short and alpha HEX codes and
   assert.equal(statusForeground('custom','#1234'),'#11223344');assert.equal(statusForeground('custom','bad'),'inherit');
   assert.equal(colorMode('invalid'),'automatic');
   const settings=readConfiguration({get:<T>(key:string,fallback:T)=>({'display.colorMode':'custom','display.customColor':'#abc'} as Record<string,unknown>)[key] as T ?? fallback});
-  assert.equal(settings.colorMode,'custom');assert.equal(settings.customColor,'#aabbcc');
+  assert.equal(settings.display.colorMode,'custom');assert.equal(settings.display.customColor,'#aabbcc');
 });
 
 test('color picker messages only accept supported modes, HEX colors and setting scopes',()=>{

@@ -3,6 +3,7 @@ import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { setClaudeCleanupPeriod } from './claudeSettings';
 import { readConfiguration, type TrackerConfiguration } from './configuration';
+import { settingDefinitions, settingKeys } from './configuration/schema';
 import { setLocale, t } from './localization';
 import { ClaudeQuotaProvider, CodexQuotaProvider, QuotaService } from './quota';
 import { SummaryClient } from './summary/client';
@@ -58,9 +59,9 @@ export class AgentTrackerApp {
     this.summary = new SummaryClient({
       dbPath: join(this.context.globalStorageUri.fsPath, 'agent-tracker.sqlite'),
       roots: this.settings.roots,
-      timezone: this.settings.timezone,
-      collectCapabilities: this.settings.skillsEnabled,
-      retainDeletedSourceUsage: this.settings.retainDeletedSourceUsage,
+      timezone: this.settings.usage.timezone,
+      collectCapabilities: this.settings.usage.skillsEnabled,
+      retainDeletedSourceUsage: this.settings.usage.retainDeletedSourceUsage,
     });
     this.dashboard = this.track(new Dashboard({
       extensionUri: this.context.extensionUri,
@@ -99,7 +100,7 @@ export class AgentTrackerApp {
     this.render();
     this.quota?.start(vscode.window.state.focused);
     // Initialize only the schema. Usage alone requests transcript scans.
-    if (this.settings.usageEnabled) {
+    if (this.settings.usage.enabled) {
       void this.summary?.initialize().catch(() => { /* Usage/Diagnostics reports initialization failures when opened. */ });
     }
   }
@@ -122,8 +123,8 @@ export class AgentTrackerApp {
   }
 
   private async setStatusBarDetail(detail: unknown): Promise<void> {
-    if (detail !== 'compact' && detail !== 'detailed') return;
-    await vscode.workspace.getConfiguration('agentTracker').update('display.detail', detail, vscode.ConfigurationTarget.Global);
+    if (!settingDefinitions.display.detail.enum.some(value => value === detail)) return;
+    await vscode.workspace.getConfiguration('agentTracker').update(settingKeys.display.detail, detail, vscode.ConfigurationTarget.Global);
   }
 
   private clearUsageData(): Promise<void> {
@@ -152,9 +153,9 @@ export class AgentTrackerApp {
 
     if (changes.cleanup) await this.applyClaudeCleanup();
     if (this.disposed) return;
-    if (changes.capabilities) await this.summary?.setCapabilityCollectionEnabled(this.settings.skillsEnabled);
+    if (changes.capabilities) await this.summary?.setCapabilityCollectionEnabled(this.settings.usage.skillsEnabled);
     if (this.disposed) return;
-    if (changes.retention) await this.summary?.setDeletedSourceRetentionEnabled(this.settings.retainDeletedSourceUsage);
+    if (changes.retention) await this.summary?.setDeletedSourceRetentionEnabled(this.settings.usage.retainDeletedSourceUsage);
     if (this.disposed) return;
     if (changes.usageSources) {
       this.dashboard?.close();
@@ -165,18 +166,18 @@ export class AgentTrackerApp {
     if (this.disposed) return;
     this.render();
     this.colorSettings?.update();
-    this.dashboard?.configurationChanged(changes.capabilities && this.settings.skillsEnabled);
+    this.dashboard?.configurationChanged(changes.capabilities && this.settings.usage.skillsEnabled);
   }
 
   private configurationChanges(previous: TrackerConfiguration, next: TrackerConfiguration): ConfigurationChanges {
     const tracking = previous.claude.enabled !== next.claude.enabled || previous.codex.enabled !== next.codex.enabled;
     return {
       cleanup: previous.claude.cleanupPeriodDays !== next.claude.cleanupPeriodDays || previous.claude.dataHome !== next.claude.dataHome,
-      capabilities: previous.skillsEnabled !== next.skillsEnabled,
-      retention: previous.retainDeletedSourceUsage !== next.retainDeletedSourceUsage,
-      usageSources: previous.usageEnabled !== next.usageEnabled || JSON.stringify(previous.roots) !== JSON.stringify(next.roots),
+      capabilities: previous.usage.skillsEnabled !== next.usage.skillsEnabled,
+      retention: previous.usage.retainDeletedSourceUsage !== next.usage.retainDeletedSourceUsage,
+      usageSources: previous.usage.enabled !== next.usage.enabled || JSON.stringify(previous.roots) !== JSON.stringify(next.roots),
       providers: tracking || previous.claude.dataHome !== next.claude.dataHome || previous.codex.dataHome !== next.codex.dataHome || previous.codex.executable !== next.codex.executable,
-      pollingInterval: previous.pollingSeconds !== next.pollingSeconds,
+      pollingInterval: previous.quota.pollingIntervalSeconds !== next.quota.pollingIntervalSeconds,
     };
   }
 
@@ -189,8 +190,8 @@ export class AgentTrackerApp {
       this.quotaSubscription = this.quota.subscribe(() => this.render());
       this.quota.start(vscode.window.state.focused);
     } else {
-      if (changes.pollingInterval) this.quota?.setPollingInterval(this.settings.pollingSeconds);
-      this.quota?.setRefreshPolicy(this.settings.refreshPolicy);
+      if (changes.pollingInterval) this.quota?.setPollingInterval(this.settings.quota.pollingIntervalSeconds);
+      this.quota?.setRefreshPolicy(this.settings.quota.refreshPolicy);
     }
   }
 
@@ -199,7 +200,7 @@ export class AgentTrackerApp {
     return new QuotaService([
       ...(config.claude.enabled ? [new ClaudeQuotaProvider({ dataHome: config.claude.dataHome })] : []),
       ...(config.codex.enabled ? [new CodexQuotaProvider({ dataHome: config.codex.dataHome, executable: config.codex.executable })] : []),
-    ], { pollingSeconds: config.pollingSeconds, refreshPolicy: config.refreshPolicy });
+    ], { pollingSeconds: config.quota.pollingIntervalSeconds, refreshPolicy: config.quota.refreshPolicy });
   }
 
   private readSettings(): TrackerConfiguration {

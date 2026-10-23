@@ -220,7 +220,9 @@ Agent Tracker의 VS Code 설정은 다음 순서의 소제목과 목차 하위 �
 | 사용량 통계 | 통계 사용 여부, Skill 집계, API 추정 비용, 빈 사용량 제외, 시간대 |
 | 데이터 및 로그 | 공통 상위 데이터 홈, Claude 로그 보존 기간, Codex CLI 실행 파일 |
 
-`package.json`의 `contributes.configuration`을 여섯 카테고리의 배열로 등록한다. 설정은 총 20개이며 데이터 위치는 `agentTracker.dataHome` 하나로 지정한다. 카드·통계 화면·명령 팔레트의 설정 열기는 `@ext:AgentTracker.agent-tracker`로 필터링한 VS Code Settings를 연다. 카테고리·설명·선택지는 VS Code의 현재 표시 언어로 번역하며 비율의 사용률·남은 비율과 표시 방식의 압축·상세 선택지도 번역한다. 별도의 전체 설정 Webview는 제공하지 않는다. 설정 키·기본값·scope·입력 제약과 VS Code의 사용자·작업공간 저장 및 초기화 동작을 유지한다. 설정 화면을 여는 것만으로 quota 조회·원본 재집계를 실행하지 않는다. [VS Code 설정 카테고리와 정렬 규칙](https://code.visualstudio.com/api/references/contribution-points#contributesconfiguration)
+`package.json`의 `contributes.configuration`을 여섯 카테고리의 배열로 등록한다. 설정은 총 21개이며 데이터 위치는 `agentTracker.dataHome` 하나로 지정한다. 카드·통계 화면·명령 팔레트의 설정 열기는 `@ext:AgentTracker.agent-tracker`로 필터링한 VS Code Settings를 연다. 카테고리·설명·선택지는 VS Code의 현재 표시 언어로 번역하며 비율의 사용률·남은 비율과 표시 방식의 압축·상세 선택지도 번역한다. 별도의 전체 설정 Webview는 제공하지 않는다. 설정 키·기본값·scope·입력 제약과 VS Code의 사용자·작업공간 저장 및 초기화 동작을 유지한다. 설정 화면을 여는 것만으로 quota 조회·원본 재집계를 실행하지 않는다. [VS Code 설정 카테고리와 정렬 규칙](https://code.visualstudio.com/api/references/contribution-points#contributesconfiguration)
+
+설정 원본은 `src/configuration/schema.ts`의 `settingDefinitions`이며 키는 중첩 경로에서 만들고 기본값·선택지·입력 제약·category·설명도 같은 항목에서 관리한다. `tools/configuration.cjs`는 컴파일 전 원본 schema만 메모리에서 변환해 전체 설정 manifest를 구성하며 `tools/localization.cjs`가 동기화하거나 오래된 생성물을 검사한다. 언어 선택지만 `localization/languages.json`에서 확장한다. 실행 시에는 같은 정의를 순회해 설정을 한 번씩 읽고 `configuration.ts`가 표시·통계·제공자별 정규화와 경로 파생을 수행한다. 내부 객체는 `display`·`quota`·`usage`·`claude`·`codex`로 묶고 타입은 공통 정의와 반환값에서 추론한다. 매번 새 스냅샷을 만들어 이전 설정과 비교하며 앱이 최신 설정을 소유한다. 단순 설정은 해당 영역의 정의만 추가하면 읽기·타입·설정 UI에 반영되고, 파생값이나 기능의 실제 처리는 별도 구현한다.
 
 ### 3.8 표시 언어와 번역 리소스
 

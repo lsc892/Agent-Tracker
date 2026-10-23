@@ -1,4 +1,5 @@
 import { QuotaError, type QuotaProvider, type QuotaProviderId, type QuotaSnapshot, type QuotaState } from './types';
+import { settingDefinitions, type RefreshPolicy } from '../configuration/schema';
 
 export interface QuotaClock {
   now(): number;
@@ -14,7 +15,7 @@ const systemClock: QuotaClock = {
 export interface QuotaServiceOptions {
   clock?: QuotaClock;
   pollingSeconds?: number;
-  refreshPolicy?: 'automatic' | 'manual';
+  refreshPolicy?: RefreshPolicy;
 }
 interface Entry {
   provider: QuotaProvider;
@@ -38,13 +39,13 @@ export class QuotaService {
   private started = false;
   private disposed = false;
   private timer: unknown;
-  private refreshPolicy: 'automatic' | 'manual';
+  private refreshPolicy: RefreshPolicy;
   private pollingIntervalMs: number;
 
   constructor(providers: readonly QuotaProvider[], options: QuotaServiceOptions = {}) {
     this.clock = options.clock ?? systemClock;
-    this.refreshPolicy = options.refreshPolicy ?? 'automatic';
-    this.pollingIntervalMs = intervalMs(options.pollingSeconds ?? 900);
+    this.refreshPolicy = options.refreshPolicy ?? settingDefinitions.quota.refreshPolicy.default;
+    this.pollingIntervalMs = intervalMs(options.pollingSeconds ?? settingDefinitions.quota.pollingIntervalSeconds.default);
     for (const provider of providers) {
       if (this.entries.has(provider.id)) throw new Error(`Duplicate quota provider: ${provider.id}`);
       this.entries.set(provider.id, { provider, snapshot: null, lastSuccessAt: null, error: null,
@@ -83,7 +84,7 @@ export class QuotaService {
     this.schedule();
   }
 
-  setRefreshPolicy(policy: 'automatic' | 'manual'): void {
+  setRefreshPolicy(policy: RefreshPolicy): void {
     if (this.refreshPolicy === policy || this.disposed) return;
     this.refreshPolicy = policy;
     if (policy === 'automatic' && this.started && this.focused) {
@@ -232,5 +233,6 @@ export class QuotaService {
 }
 
 function intervalMs(seconds: number): number {
-  return Math.max(30, Number.isFinite(seconds) ? seconds : 900) * 1000;
+  const { minimum, default: fallback } = settingDefinitions.quota.pollingIntervalSeconds;
+  return Math.max(minimum, Number.isFinite(seconds) ? seconds : fallback) * 1000;
 }

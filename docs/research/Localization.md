@@ -18,6 +18,8 @@ localization/
 src/localization/index.ts 언어 결정, 타입이 있는 t(), 한국어 fallback
 media/localization.js     Webview 번역 엔진과 정적 문구 갱신
 tools/localization.cjs    검증, package.nls 생성, 패키지 리소스 준비
+src/configuration/schema.ts 설정 키·기본값·타입·설정 UI 정보의 공통 원본
+tools/configuration.cjs   공통 설정 정의와 언어 목록으로 설정 manifest 구성
 tools/localization-manifest.cjs 패키징·VS Code 실행 동안 manifest 번역 임시 배치
 ```
 
@@ -52,4 +54,4 @@ npm run localization:sync
 npm run check
 ```
 
-`localization/package.nls*.json`은 생성물로 관리하며 번역 수정은 카탈로그에서 한다. 빌드도 동기화하고 타입 검사는 생성물 일치를 확인한다. 실행 시에는 네트워크 없이 패키지에 포함된 JSON과 i18next를 사용한다.
+`localization/package.nls*.json`과 `package.json`의 `contributes.configuration`은 생성물로 관리한다. 번역은 카탈로그에서, 설정 정의는 `src/configuration/schema.ts`에서 수정한다. 언어 선택지는 공통 설정 정의와 언어 목록으로 구성하며 별도로 재정의하지 않는다. 빌드도 동기화하고 타입 검사는 생성물 일치를 확인한다. 실행 시에는 네트워크 없이 패키지에 포함된 JSON과 i18next를 사용한다.
