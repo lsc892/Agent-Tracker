@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { BaseQuotaProvider, ClaudeCliCredentials, ClaudeQuotaProvider, CodexQuotaProvider, parseClaudeQuota,
+import { BaseQuotaProvider, WindowsClaudeCredentials, ClaudeQuotaProvider, CodexQuotaProvider, parseClaudeQuota,
   parseCodexQuota, parseRetryAfter, QuotaError, QuotaService,
   type QuotaClock, type QuotaProvider, type QuotaReadContext, type QuotaSnapshot } from '../../src/quota';
 
@@ -344,7 +344,7 @@ test('Claude HTTP status remains authoritative when cancelling an errored respon
 test('Claude credentials use configured CLI home and report safe guidance for unreadable or malformed files', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'agent-tracker-quota-'));
   try {
-    const credentials = new ClaudeCliCredentials(directory);
+    const credentials = new WindowsClaudeCredentials(directory);
     await assert.rejects(credentials.getAccessToken(false, signal()), { code: 'authentication' });
     await writeFile(join(directory, '.credentials.json'), JSON.stringify({ claudeAiOauth: { accessToken: 'synthetic-token' } }));
     assert.equal(await credentials.getAccessToken(false, signal()), 'synthetic-token');

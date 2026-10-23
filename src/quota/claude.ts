@@ -1,14 +1,8 @@
-import { execFile } from 'node:child_process';
-import { readFile, stat } from 'node:fs/promises';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
 import { BaseQuotaProvider } from './base';
+import { createClaudeCredentials, type ClaudeCredentialSource } from './claudeCredentials';
 import { asRecord, QuotaError, type QuotaReadContext, type QuotaSnapshot, type QuotaWindow } from './types';
 
-export interface ClaudeCredentialSource {
-  /** refresh=true re-reads the CLI-owned credential source after a 401. */
-  getAccessToken(refresh: boolean, signal: AbortSignal): Promise<string>;
-}
+export type { ClaudeCredentialSource } from './claudeCredentials';
 
 export interface ClaudeQuotaProviderOptions {
   dataHome?: string;
@@ -16,50 +10,6 @@ export interface ClaudeQuotaProviderOptions {
   fetch?: typeof globalThis.fetch;
   timeoutMs?: number;
   now?: () => number;
-}
-
-/**
- * 책임: Claude Code가 소유하는 기존 인증 정보에서 조회용 토큰을 얻는다.
- * 알고리즘: 크기가 제한된 credential 파일을 읽고 기본 macOS 경로에서는 Keychain도 시도하며, 검증된 토큰만 반환한다.
- */
-export class ClaudeCliCredentials implements ClaudeCredentialSource {
-  private readonly dataHome: string;
-  constructor(dataHome?: string) {
-    this.dataHome = dataHome || process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude');
-  }
-
-  /**
-   * 책임: 요청마다 CLI 소유 인증 정보에서 유효한 access token을 읽는다.
-   * 알고리즘: 파일 종류·크기를 확인해 읽고 기본 macOS 홈의 읽기 실패에는 Keychain을 시도하며, 토큰 길이·개행을 검증하고 원문 참조를 해제한다.
-   */
-  async getAccessToken(_refresh: boolean, signal: AbortSignal): Promise<string> {
-    let serialized: string | undefined;
-    try {
-      const path = join(this.dataHome, '.credentials.json');
-      const metadata = await stat(path);
-      if (metadata.size > 1_048_576 || !metadata.isFile()) throw new Error('Invalid credential file');
-      serialized = await readFile(path, { encoding: 'utf8', signal });
-    } catch {
-      if (signal.aborted) throw new QuotaError('cancelled', { key: 'quota.claudeCancelled' });
-      // macOS Claude Code normally stores credentials in the login keychain.
-      if (process.platform === 'darwin' && this.dataHome === join(homedir(), '.claude')) {
-        try {
-          serialized = await new Promise<string>((resolve, reject) => {
-            execFile('/usr/bin/security', ['find-generic-password', '-s', 'Claude Code-credentials', '-w'],
-              { signal, timeout: 5_000, maxBuffer: 1_048_576, windowsHide: true },
-              (error, stdout) => error ? reject(new Error('Credential unavailable')) : resolve(stdout));
-          });
-        } catch { /* Return only the fixed login guidance below. */ }
-      }
-    }
-    try {
-      const credential = asRecord(asRecord(JSON.parse(serialized ?? 'null'))?.claudeAiOauth);
-      const token = credential?.accessToken;
-      if (typeof token === 'string' && token.length > 0 && token.length <= 16_384 && !/[\r\n]/.test(token)) return token;
-    } catch { /* Never expose JSON parse errors from credentials. */ }
-    finally { serialized = undefined; }
-    throw new QuotaError('authentication', { key: 'quota.claudeLoginRequired' });
-  }
 }
 
 export class ClaudeQuotaProvider extends BaseQuotaProvider {
@@ -72,7 +22,7 @@ export class ClaudeQuotaProvider extends BaseQuotaProvider {
 
   constructor(options: ClaudeQuotaProviderOptions = {}) {
     super();
-    this.credentials = options.credentials ?? new ClaudeCliCredentials(options.dataHome);
+    this.credentials = options.credentials ?? createClaudeCredentials(options.dataHome);
     this.fetcher = options.fetch ?? globalThis.fetch;
     this.now = options.now ?? Date.now;
     this.timeoutMs = options.timeoutMs ?? 15_000;

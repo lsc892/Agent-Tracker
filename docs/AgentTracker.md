@@ -84,6 +84,8 @@ Authorization: Bearer <Claude OAuth access token>
 
 provider가 백분율만 반환하면 현재 사용량은 `usedPercent`, 최대 사용량은 `100%`로 표시한다. 조회 실패 시 마지막 성공 snapshot과 시각을 유지하고 오래된 값·갱신 실패 안내를 함께 표시한다. 성공 이력이 없거나 유지 기한이 지났으면 `조회 불가`로 표시한다.
 
+인증은 `ClaudeCredentialSource` 인터페이스를 구현하는 `WindowsClaudeCredentials`·`MacClaudeCredentials`로 분리하고 `claudeCredentials/` 아래 OS별 파일에 둔다. `createClaudeCredentials()` 한 곳에서 OS에 맞는 구현을 생성하며 `ClaudeQuotaProvider`는 토큰 조회 계약만 사용한다. Windows와 Linux는 파일 인증 구현을 공유하고 macOS도 파일을 우선 읽는다. macOS의 기본 `~/.claude`에서 파일 읽기에 실패한 경우에만 Keychain을 시도하며, 사용자 지정 경로와 읽기에 성공한 파일의 JSON·토큰 검증 실패에는 Keychain을 사용하지 않는다. 경로 결정·파일 종류와 크기 제한·토큰 검증은 공통 함수로 재사용하며 `401` 재조회도 같은 OS 구현에서 인증 정보를 다시 읽는다.
+
 보안 규칙:
 
 - OAuth token을 SQLite, log, telemetry에 기록하지 않는다.
