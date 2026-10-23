@@ -11,21 +11,31 @@ export class MacClaudeCredentials implements ClaudeCredentialSource {
   }
 
   async getAccessToken(_refresh: boolean, signal: AbortSignal): Promise<string> {
-    let serialized = await readClaudeCredentialFile(this.dataHome, signal);
+    let serialized: string | undefined;
     try {
-      if (serialized === undefined && this.dataHome === defaultClaudeDataHome()) {
-        try { serialized = await readKeychainCredentials(signal); }
-        catch { /* Return only the fixed login guidance below. */ }
-      }
+      serialized = await this.readCredentialText(signal);
       return parseClaudeAccessToken(serialized);
     } finally { serialized = undefined; }
   }
+
+  /** 파일을 읽었으면 검증 단계로 넘기고 기본 경로의 읽기 실패에만 Keychain을 사용한다. */
+  private async readCredentialText(signal: AbortSignal): Promise<string | undefined> {
+    const serialized = await readClaudeCredentialFile(this.dataHome, signal);
+    if (serialized !== undefined) return serialized;
+    if (this.dataHome !== defaultClaudeDataHome()) return undefined;
+    return tryReadKeychainCredentials(signal);
+  }
 }
 
-function readKeychainCredentials(signal: AbortSignal): Promise<string> {
-  return new Promise((resolve, reject) => {
-    execFile('/usr/bin/security', ['find-generic-password', '-s', 'Claude Code-credentials', '-w'],
-      { signal, timeout: 5_000, maxBuffer: 1_048_576, windowsHide: true },
-      (error, stdout) => error ? reject(new Error('Credential unavailable')) : resolve(stdout));
-  });
+/** Keychain 실행 실패는 원문 오류를 노출하지 않고 공통 로그인 안내로 이어지게 한다. */
+async function tryReadKeychainCredentials(signal: AbortSignal): Promise<string | undefined> {
+  try {
+    return await new Promise<string>((resolve, reject) => {
+      execFile('/usr/bin/security', ['find-generic-password', '-s', 'Claude Code-credentials', '-w'],
+        { signal, timeout: 5_000, maxBuffer: 1_048_576, windowsHide: true },
+        (error, stdout) => error ? reject(new Error('Credential unavailable')) : resolve(stdout));
+    });
+  } catch {
+    return undefined;
+  }
 }

@@ -41,16 +41,7 @@ export class ClaudeQuotaProvider extends BaseQuotaProvider {
     try {
       for (let attempt = 0; attempt < 2; attempt += 1) {
         signal.throwIfAborted();
-        let token: string | undefined = await this.credentials.getAccessToken(attempt === 1, signal);
-        let response: Response;
-        try {
-          signal.throwIfAborted();
-          response = await this.fetcher('https://api.anthropic.com/api/oauth/usage', {
-            method: 'GET', signal, redirect: 'error',
-            headers: { Authorization: `Bearer ${token}`, 'anthropic-beta': 'oauth-2025-04-20',
-              'User-Agent': 'agent-tracker/0.1.0', Accept: 'application/json' },
-          });
-        } finally { token = undefined; }
+        const response = await this.requestUsage(attempt === 1, signal);
         if (response.status === 401) {
           // A failed body stream must not erase the status needed for auth/retry policy.
           await response.body?.cancel().catch(() => {});
@@ -77,6 +68,19 @@ export class ClaudeQuotaProvider extends BaseQuotaProvider {
     } finally {
       clearTimeout(timeout);
     }
+  }
+
+  /** 인증 정보를 읽어 HTTP 요청 한 번을 보내고 요청 완료·실패 뒤 토큰 참조를 해제한다. */
+  private async requestUsage(refresh: boolean, signal: AbortSignal): Promise<Response> {
+    let token: string | undefined = await this.credentials.getAccessToken(refresh, signal);
+    try {
+      signal.throwIfAborted();
+      return await this.fetcher('https://api.anthropic.com/api/oauth/usage', {
+        method: 'GET', signal, redirect: 'error',
+        headers: { Authorization: `Bearer ${token}`, 'anthropic-beta': 'oauth-2025-04-20',
+          'User-Agent': 'agent-tracker/0.1.0', Accept: 'application/json' },
+      });
+    } finally { token = undefined; }
   }
 }
 

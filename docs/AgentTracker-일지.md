@@ -56,6 +56,13 @@
 
 ## 2026-10-23 — 사용자·Codex
 
+### Claude 인증 순서와 개별 읽기·HTTP 요청의 실패 처리를 분리
+
+- **의사결정**: 사용자는 앞서 제안한 macOS 인증·Claude HTTP 요청의 중첩 예외 처리 정리를 요청했다. Codex는 `getAccessToken()`에서 원문 조회 순서를 `readCredentialText()`로 추출하고 조기 반환으로 fallback 조건을 표현했다. Keychain 실패 처리는 전용 읽기 함수로 옮기고 HTTP 요청·토큰 정리는 `requestUsage()`에 모았다.
+- **근거**: 상위 메서드에서 인증·재시도 순서를 읽고 개별 작업에서 해당 실패 처리를 확인할 수 있게 한다. 메서드 호출은 늘어나지만 파일 우선순위·오류를 처리하는 범위·비동기 요청 완료 후 참조 해제 시점을 유지하며 중첩을 줄인다.
+- **결과**: macOS의 `getAccessToken()`과 Claude의 재시도 루프에서 내부 `try`를 제거했다. 기본 경로의 파일 읽기 실패에만 Keychain을 사용하는 조건, 안전한 오류 안내와 `401` 재조회·timeout·취소·응답 정규화는 유지한다. 스트림 reader 정리를 보장하는 기존 예외 처리 구조는 유지한다.
+- **검증**: `npm run check`의 타입 검사·린트·326개 테스트와 이번 변경 파일의 `git diff --check`를 통과했다. 기존 인증·quota 회귀 테스트에 Keychain의 동기 실행 실패와 인증 대기 중 취소 후 HTTP 요청 차단 검증을 보강했다. 실제 macOS Keychain과 실계정 quota QA는 수행하지 않았다.
+
 ### Claude 인증을 인터페이스 기반 Windows·macOS 구현으로 분리
 
 - **의사결정**: 사용자는 공통 인터페이스를 구현하는 Windows용·macOS용 클래스 두 개로 인증을 분리하도록 지정했다. Codex는 `WindowsClaudeCredentials`·`MacClaudeCredentials`를 별도 파일로 두고 OS 선택을 `createClaudeCredentials()`에 모았다. 경로 결정·파일 읽기·토큰 검증은 공유하며 Linux는 기존 파일 인증 구현을 재사용한다.

@@ -324,6 +324,25 @@ test('Claude re-reads credentials once on 401, does not expose response secrets,
   assert.equal(parseRetryAfter('Sat, 03 Oct 2026 06:00:00 GMT', Date.parse('2026-10-03T05:59:00Z')), 60_000);
 });
 
+test('Claude skips HTTP when cancelled while waiting for credentials', async () => {
+  const controller = new AbortController();
+  const credentialStarted = deferred<void>();
+  const token = deferred<string>();
+  let requests = 0;
+  const provider = new ClaudeQuotaProvider({
+    credentials: { getAccessToken: async () => { credentialStarted.resolve(); return token.promise; } },
+    fetch: async () => { requests++; return Response.json({ five_hour: { utilization: 5 } }); },
+  });
+  const pending = provider.read({ signal: controller.signal });
+  const rejected = assert.rejects(pending, { code: 'cancelled' });
+  await credentialStarted.promise;
+  controller.abort();
+  token.resolve('private-token');
+  await rejected;
+  assert.equal(requests, 0);
+  await provider.dispose();
+});
+
 test('Claude HTTP status remains authoritative when cancelling an errored response body', async () => {
   const brokenResponse = (status: number) => new Response(new ReadableStream({
     start(controller) { controller.error(new Error('private-response-stream-error')); },

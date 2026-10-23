@@ -86,6 +86,8 @@ provider가 백분율만 반환하면 현재 사용량은 `usedPercent`, 최대 
 
 인증은 `ClaudeCredentialSource` 인터페이스를 구현하는 `WindowsClaudeCredentials`·`MacClaudeCredentials`로 분리하고 `claudeCredentials/` 아래 OS별 파일에 둔다. `createClaudeCredentials()` 한 곳에서 OS에 맞는 구현을 생성하며 `ClaudeQuotaProvider`는 토큰 조회 계약만 사용한다. Windows와 Linux는 파일 인증 구현을 공유하고 macOS도 파일을 우선 읽는다. macOS의 기본 `~/.claude`에서 파일 읽기에 실패한 경우에만 Keychain을 시도하며, 사용자 지정 경로와 읽기에 성공한 파일의 JSON·토큰 검증 실패에는 Keychain을 사용하지 않는다. 경로 결정·파일 종류와 크기 제한·토큰 검증은 공통 함수로 재사용하며 `401` 재조회도 같은 OS 구현에서 인증 정보를 다시 읽는다.
 
+macOS의 `getAccessToken()`은 원문 조회·토큰 검증·참조 정리를 연결하고 `readCredentialText()`가 파일 우선 조회와 Keychain 사용 조건을 결정한다. Keychain 실행 실패는 전용 읽기 함수에서 공통 로그인 안내로 연결한다. Claude의 `readQuota()`는 재시도·HTTP 상태·timeout·취소 정책을 유지하고 `requestUsage()`가 인증 정보를 읽어 HTTP 요청 한 번을 보낸다. 요청은 `await`로 완료를 기다린 뒤 `finally`에서 토큰 참조를 해제한다.
+
 보안 규칙:
 
 - OAuth token을 SQLite, log, telemetry에 기록하지 않는다.

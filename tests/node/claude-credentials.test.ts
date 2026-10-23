@@ -120,8 +120,10 @@ test('macOS Keychain command failures and invalid payloads expose only fixed log
   mockMissingFile(t);
   let commandError: Error | null = new Error('private-command-error');
   let output = 'private-stdout';
+  let synchronousFailure = false;
   t.mock.method(childProcess, 'execFile', (_file: string, _args: string[], _options: childProcess.ExecFileOptions,
     callback: (error: Error | null, stdout: string, stderr: string) => void) => {
+    if (synchronousFailure) throw new Error('private-synchronous-command-error');
     queueMicrotask(() => callback(commandError, output, 'private-stderr'));
     return new childProcess.ChildProcess();
   });
@@ -131,6 +133,8 @@ test('macOS Keychain command failures and invalid payloads expose only fixed log
   await assertSafeError();
   commandError = null;
   for (output of ['private-invalid-json', serialize('private\ntoken'), serialize('')]) await assertSafeError();
+  synchronousFailure = true;
+  await assertSafeError();
 });
 
 test('cancelled Claude file reads do not start Keychain', async t => {
