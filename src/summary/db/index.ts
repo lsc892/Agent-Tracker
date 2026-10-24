@@ -1,7 +1,7 @@
 import type { DatabaseSync } from 'node:sqlite';
 import type { NameQuery, NameResult } from '../types';
 import type {
-  BillingMode, CapabilityCategory, CapabilityPage, ChartMetric, CumulativeRow, DiagnosticsPage, FileMetadata,
+  BillingMode, CapabilityCategory, CapabilityPage, ChartMetric, DiagnosticsPage, FileMetadata,
   KeysetPage, ManifestRow, OffsetPage, ProcessingStatus, Provider, SessionReplacement, SummaryFilter,
   TurnSummaryRow, UsagePage, UsageGrouping, UsageRow, UsageSort,
 } from './types';
@@ -106,10 +106,6 @@ export class SummaryDatabase {
 
   queryCapabilities(filter: SummaryFilter, category: CapabilityCategory, offset = 0, limit = 100): CapabilityPage {
     return this.reader.queryCapabilities(filter, category, offset, limit);
-  }
-
-  queryCumulative(filter: SummaryFilter, by: 'provider' | 'model', offset = 0): { rows: CumulativeRow[]; total: number; by: 'provider' | 'model' } {
-    return this.reader.queryCumulative(filter, by, offset);
   }
 
   queryUsageCount(filter: SummaryFilter = {}, groupBy: UsageGrouping = 'total', timezone = 'UTC', by: 'provider' | 'model' = 'provider'): number {

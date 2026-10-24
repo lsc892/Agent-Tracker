@@ -56,10 +56,8 @@ port.on('message',(message: {id?:number;method:string;payload?:unknown}) => {
           const page = { ...query, tableSort: query.tableSort ?? { key: 'period' as const, direction: 'desc' as const } };
           const {rows,total} = database.queryUsagePage(query,query.groupBy ?? 'all',query.timezone ?? options.timezone ?? 'UTC',page,by);
           const chart = query.chartMetric ? usageChartFromPage(rows, total, query.groupBy ?? 'all', query.chartMetric, by, query.excludeEmptyUsage) : undefined;
-          const cumulativeFilter = query.groupBy === 'day' || query.groupBy === 'month' ? {...query,unknownTime:'include' as const} : query;
-          const cumulative = query.cumulativeBy ? database.queryCumulative(cumulativeFilter,query.cumulativeBy,query.cumulativeOffset) : undefined;
           const billing = query.includeCosts && query.provider && query.sessionId ? database.sessionBilling(query.provider,query.sessionId) : undefined;
-          result = {rows,total,by,chart,cumulative,billing,coverage:database.diagnostics({limit:1,providers:query.providers}).counts};
+          result = {rows,total,by,chart,billing,coverage:database.diagnostics({limit:1,providers:query.providers}).counts};
         }
       } else if (message.method === 'setBilling') {
         const {provider,sessionId,mode} = message.payload as {provider:Provider;sessionId:string;mode:BillingMode};

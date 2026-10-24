@@ -363,44 +363,6 @@ export function buildCapabilityQueries(filter: SummaryFilter, category: string):
 }
 
 /**
- * 책임: 모델별 누계와 비용을 기존 요청 조회와 같은 의미로 계산한다.
- * 알고리즘: 모델 토큰·결제 projection에 공통 필터를 적용해 제공자·모델별 합산하고 미상 캐시를 전파하며 토큰 순위로 100행씩 나눈다.
- */
-export function buildModelCumulativeQueries(filter: SummaryFilter): { count: QuerySql; rows: QuerySql } {
-  const where = buildQueryFilter(filter);
-  // Keep this projection narrow while sharing token fallback and billing rules with model request queries.
-  const source = `(SELECT
-    t.provider, t.project_key, t.session_id, t.started_at_ms,
-    ${MODEL_NAME}, ${MODEL_TOKENS}, ${MODEL_COSTS}
-    FROM turn_summary t
-    LEFT JOIN turn_model_usage m ON m.turn_id = t.id
-    LEFT JOIN turn_costs c ON c.turn_id = t.id) AS turn_summary`;
-  return {
-    count: {
-      sql: `SELECT count(*) AS count FROM (
-        SELECT 1 FROM ${source} WHERE ${where.sql} GROUP BY provider, model
-      )`,
-      values: where.values,
-    },
-    rows: {
-      sql: `SELECT
-        provider, model,
-        sum(input_tokens) AS input_tokens,
-        sum(output_tokens) AS output_tokens,
-        CASE WHEN count(cache_write_input_tokens) = count(*) THEN sum(cache_write_input_tokens) END AS cache_write_input_tokens,
-        CASE WHEN count(cache_read_input_tokens) = count(*) THEN sum(cache_read_input_tokens) END AS cache_read_input_tokens,
-        sum(input_tokens + output_tokens) AS total_tokens${filter.includeCosts ? `, ${COST_SUMS}` : ''}
-      FROM ${source}
-      WHERE ${where.sql}
-      GROUP BY provider, model
-      ORDER BY ${unknownOrder('model')}total_tokens DESC, provider, model
-      LIMIT 100 OFFSET ?`,
-      values: where.values,
-    },
-  };
-}
-
-/**
  * 책임: 원본을 다시 스캔하지 않고 저장된 진단과 처리 범위를 조회한다.
  * 알고리즘: 같은 필터로 manifest 페이지·오류 또는 품질 플래그가 있는 요청 페이지·상태별 개수를 각각 만들고 ID 기반 페이지 조건을 붙인다.
  */

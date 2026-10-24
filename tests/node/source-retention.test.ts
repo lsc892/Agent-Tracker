@@ -126,7 +126,7 @@ test('compressed Codex usage survives deletion and reopening with its model, ses
   try {
     assert.deepEqual(reopened.queryTurns()[0],before);
     assert.equal(reopened.findManifest('codex',path)?.source_missing,1);
-    assert.equal(reopened.queryCumulative({},'model').rows[0].model,'gpt-6.1-sol');
+    assert.equal(reopened.queryUsagePage({},'total','UTC',{},'model').rows[0].model,'gpt-6.1-sol');
     assert.equal((await refreshSummary(reopened,config)).bodyBytes,0);
     await writeFile(path,source);assert.equal((await refreshSummary(reopened,config)).failed,0);
     assert.equal(reopened.queryTurnsCount(),1);assert.equal(reopened.findManifest('codex',path)?.source_missing,0);

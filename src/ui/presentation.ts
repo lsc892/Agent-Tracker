@@ -73,10 +73,6 @@ export function parseDashboardMessage(input: unknown): DashboardMessage | null {
         }
       }
       if (typeof raw.includeCosts === 'boolean') query.includeCosts = raw.includeCosts;
-      if (raw.cumulativeBy === 'provider' || raw.cumulativeBy === 'model') {
-        query.cumulativeBy = raw.cumulativeBy;
-        query.cumulativeOffset = boundedOffset(raw.cumulativeOffset);
-      }
       if (['tokens', 'requests', 'averageTokens', 'averageDuration'].includes(String(raw.chartMetric))) query.chartMetric = raw.chartMetric as UsageQuery['chartMetric'];
       if (raw.chartBy === 'provider' || raw.chartBy === 'model') query.chartBy = raw.chartBy;
       if (raw.provider === 'claude' || raw.provider === 'codex') query.provider = raw.provider;

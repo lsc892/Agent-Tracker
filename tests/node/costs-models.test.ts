@@ -28,14 +28,14 @@ test('model totals deduplicate whole responses, retain subagent models and prese
   await writeFile(join(root,'session','subagents','child.jsonl'),text([user,response('child','claude-haiku-4-5')]));
   assert.equal((await refreshSummary(db,options)).failed,0);
   const filter = {includeCosts:true};
-  let models = db.queryCumulative(filter,'model');
+  let models = db.queryUsagePage(filter,'total','UTC',{sortBy:'tokens'},'model');
   assert.equal(models.total,3);
   assert.equal(models.rows.reduce((sum,row)=>sum+row.total_tokens,0),450);
-  assert.equal(db.queryCumulative(filter,'provider').rows[0].total_tokens,450);
+  assert.equal(db.queryUsagePage(filter,'total').rows[0].total_tokens,450);
   assert.ok(models.rows.every(row=>row.cost_usd === null && row.unknown_costs===1));
   db.setSessionBilling('claude','session','api');
   const expected = 0.000984+0.00164+0.000328;
-  models = db.queryCumulative(filter,'model');
+  models = db.queryUsagePage(filter,'total','UTC',{sortBy:'tokens'},'model');
   assert.ok(Math.abs(models.rows.reduce((sum,row)=>sum+(row.cost_usd ?? 0),0)-expected)<1e-12);
   assert.ok(Math.abs(db.queryUsage(filter)[0].cost_usd!-expected)<1e-12);
   assert.equal(db.queryUsage(filter)[0].unknown_costs,0);
@@ -46,9 +46,9 @@ test('model totals deduplicate whole responses, retain subagent models and prese
     assert.ok(Math.abs(grouped.reduce((sum,row)=>sum+(row.cost_usd ?? 0),0)-expected)<1e-12);
     assert.equal(grouped.reduce((sum,row)=>sum+row.turn_count,0),1);
   }
-  assert.equal(db.queryCumulative({fromMs:Date.parse('2027-01-01')},'model').total,0);
-  assert.equal(db.queryCumulative({providers:['codex']},'model').total,0);
-  assert.equal(db.queryCumulative({projectKey:'/elsewhere'},'model').total,0);
+  assert.equal(db.queryUsagePage({fromMs:Date.parse('2027-01-01')},'total','UTC',{sortBy:'tokens'},'model').total,0);
+  assert.equal(db.queryUsagePage({providers:['codex']},'total','UTC',{sortBy:'tokens'},'model').total,0);
+  assert.equal(db.queryUsagePage({projectKey:'/elsewhere'},'total','UTC',{sortBy:'tokens'},'model').total,0);
   db.close();db = new SummaryDatabase(options.dbPath);
   assert.equal(db.sessionBilling('claude','session'),'api');
   assert.ok(Math.abs(db.queryUsage(filter)[0].cost_usd!-expected)<1e-12);
@@ -62,7 +62,7 @@ test('model totals deduplicate whole responses, retain subagent models and prese
   db.setSessionBilling('claude','session','subscription');
   assert.equal(db.queryUsage(filter)[0].cost_usd,0);
   assert.equal(db.queryUsage(filter)[0].unknown_costs,0);
-  assert.ok(db.queryCumulative(filter,'model').rows.every(row=>row.cost_usd===0));
+  assert.ok(db.queryUsagePage(filter,'total','UTC',{sortBy:'tokens'},'model').rows.every(row=>row.cost_usd===0));
   assert.equal(db.queryTurns().length,1,'model breakdown never multiplies request counts');
   assert.equal(db.queryUsage()[0].completed_turns,1);
   db.clearData();
@@ -96,7 +96,7 @@ test('Codex current and legacy metadata attribute actual model tokens and explic
   assert.equal(db.sessionBilling('codex','current'),'subscription');
   assert.equal(turns.find(row=>row.session_id==='unknown')?.cost_usd,null);
   assert.ok(Math.abs(turns.find(row=>row.session_id==='legacy')!.cost_usd!-0.0008875)<1e-12);
-  const models = db.queryCumulative({includeCosts:true},'model').rows;
+  const models = db.queryUsagePage({includeCosts:true},'total','UTC',{sortBy:'tokens'},'model').rows;
   assert.equal(models.reduce((sum,row)=>sum+row.total_tokens,0),452);
   assert.equal(models.find(row=>row.model==='gpt-6.1-sol')?.cost_usd,0);
   assert.equal(models.find(row=>row.model==='')?.total_tokens,2);
@@ -127,26 +127,26 @@ test('v4 migration retains historical totals and ids while model and billing cov
   db.connection.exec('DROP TABLE turn_costs; DROP TABLE turn_model_usage; DROP TABLE session_billing; PRAGMA user_version=4;');
   db.close();db = new SummaryDatabase(path);
   assert.equal(db.queryTurns()[0].id,id);assert.equal(db.queryTurns()[0].total_tokens,110);
-  const cumulative = db.queryCumulative({includeCosts:true},'model').rows[0];
-  assert.equal(cumulative.model,'');assert.equal(cumulative.total_tokens,110);
-  assert.equal(cumulative.cost_usd,null);assert.equal(cumulative.unknown_costs,1);
+  const totals = db.queryUsagePage({includeCosts:true},'total','UTC',{sortBy:'tokens'},'model').rows[0];
+  assert.equal(totals.model,'');assert.equal(totals.total_tokens,110);
+  assert.equal(totals.cost_usd,null);assert.equal(totals.unknown_costs,1);
   assert.deepEqual(db.connection.prepare('PRAGMA foreign_key_check').all(),[]);
 });
 
-test('model cumulative pages include the full scope, retain unknown legacy totals and roll back invalid splits',()=>{
+test('model total pages include the full scope, retain unknown legacy totals and roll back invalid splits',()=>{
   const db = new SummaryDatabase(':memory:');
   try {
     const rows = Array.from({length:105},(_,index)=>summary(String(index),`model-${String(index).padStart(3,'0')}`));
     db.replaceSessions({sessions:[{provider:'claude',session_id:'s'}],files:[],summaries:rows});
-    const first = db.queryCumulative({},'model');
-    const second = db.queryCumulative({},'model',100);
+    const first = db.queryUsagePage({},'total','UTC',{sortBy:'tokens'},'model');
+    const second = db.queryUsagePage({},'total','UTC',{sortBy:'tokens',offset:100},'model');
     assert.equal(first.total,105);assert.equal(first.rows.length,100);assert.equal(second.rows.length,5);
     assert.equal(new Set([...first.rows,...second.rows].map(row=>row.model)).size,105);
-    assert.equal([...first.rows,...second.rows].reduce((sum,row)=>sum+row.total_tokens,0),db.queryCumulative({},'provider').rows[0].total_tokens);
+    assert.equal([...first.rows,...second.rows].reduce((sum,row)=>sum+row.total_tokens,0),db.queryUsagePage({},'total').rows[0].total_tokens);
     assert.throws(()=>db.replaceSessions({sessions:[{provider:'claude',session_id:'s'}],files:[],summaries:[{...rows[0],total_tokens:999}]}));
-    assert.equal(db.queryCumulative({},'model').total,105);
+    assert.equal(db.queryUsagePage({},'total','UTC',{sortBy:'tokens'},'model').total,105);
     db.replaceSessions({sessions:[{provider:'claude',session_id:'s'}],files:[],summaries:[{...rows[0],model_usage:undefined}]});
-    assert.equal(db.queryCumulative({},'model').rows[0].model,'');
+    assert.equal(db.queryUsagePage({},'total','UTC',{sortBy:'tokens'},'model').rows[0].model,'');
     db.setSessionBilling('claude','s','api');
     assert.equal(db.queryUsage({includeCosts:true})[0].cost_usd,null);
     assert.equal(db.queryUsage({includeCosts:true})[0].unknown_costs,1);
@@ -157,7 +157,7 @@ test('model cumulative pages include the full scope, retain unknown legacy total
   } finally {db.close();}
 });
 
-test('worker stores billing and returns costs and cumulative pages without rescanning sources',async t => {
+test('worker stores billing and returns costs and model pages without rescanning sources',async t => {
   const directory = await mkdtemp(join(tmpdir(),'tracker-cost-worker-'));
   const client = new SummaryClient({dbPath:join(directory,'db.sqlite'),roots:[{provider:'claude',path:directory}]});
   t.after(async()=>{await client.dispose();await rm(directory,{recursive:true,force:true});});
@@ -166,17 +166,17 @@ test('worker stores billing and returns costs and cumulative pages without resca
   await client.refresh();
   await client.setSessionBilling('claude','session','api');
   await appendFile(file,'{bad}\n');
-  const result = await client.query({groupBy:'turn',includeCosts:true,cumulativeBy:'model',provider:'claude',sessionId:'session',limit:1,offset:100});
-  assert.equal(result.rows.length,0);assert.equal(result.cumulative?.rows[0].total_tokens,150);
+  const result = await client.query({groupBy:'turn',includeCosts:true,provider:'claude',sessionId:'session',limit:1,offset:100});
+  assert.equal(result.rows.length,0);assert.equal(result.total,1);
   assert.equal(result.billing,'api');assert.equal(result.coverage.error,0,'queries do not parse newly malformed data');
   assert.equal((await client.query({groupBy:'all',includeCosts:true})).rows[0].cost_usd,0.000984);
 });
 
-test('webview boundary limits cumulative queries and accepts only exact supported billing changes',()=>{
-  const query = parseDashboardMessage({type:'queryUsage',query:{groupBy:'all',includeCosts:true,cumulativeBy:'model',cumulativeOffset:-5}});
-  assert.ok(query?.type==='queryUsage');assert.equal(query.query.includeCosts,true);assert.equal(query.query.cumulativeOffset,0);
-  const invalid = parseDashboardMessage({type:'queryUsage',query:{groupBy:'all',includeCosts:'true',cumulativeBy:'invalid'}});
-  assert.ok(invalid?.type==='queryUsage');assert.equal(invalid.query.includeCosts,undefined);assert.equal(invalid.query.cumulativeBy,undefined);
+test('webview boundary accepts boolean cost settings and exact supported billing changes',()=>{
+  const query = parseDashboardMessage({type:'queryUsage',query:{groupBy:'all',includeCosts:true}});
+  assert.ok(query?.type==='queryUsage');assert.equal(query.query.includeCosts,true);
+  const invalid = parseDashboardMessage({type:'queryUsage',query:{groupBy:'all',includeCosts:'true'}});
+  assert.ok(invalid?.type==='queryUsage');assert.equal(invalid.query.includeCosts,undefined);
   for (const mode of ['subscription','api','unknown']) assert.ok(parseDashboardMessage({type:'setSessionBilling',provider:'claude',sessionId:'s',mode}));
   for (const change of [{provider:'other',sessionId:'s',mode:'api'},{provider:'claude',sessionId:'',mode:'api'},{provider:'claude',sessionId:'s',mode:'free'}]) {
     assert.equal(parseDashboardMessage({type:'setSessionBilling',...change}),null);

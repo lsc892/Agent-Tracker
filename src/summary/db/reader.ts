@@ -1,11 +1,11 @@
 import type { NameQuery, NameResult } from '../types';
 import type {
-  CapabilityCategory, CapabilityPage, CapabilityRow, ChartMetric, CumulativeRow, DiagnosticsPage,
+  CapabilityCategory, CapabilityPage, CapabilityRow, ChartMetric, DiagnosticsPage,
   KeysetPage, ManifestRow, OffsetPage, Provider, SummaryFilter, TurnSummaryRow, UsagePage, UsageGrouping, UsageRow, UsageSort,
 } from './types';
 import { SqliteSession } from './connection';
 import {
-  buildCapabilityQueries, buildDiagnosticQueries, buildModelCumulativeQueries, buildNameQueries, buildQueryFilter,
+  buildCapabilityQueries, buildDiagnosticQueries, buildNameQueries, buildQueryFilter,
   buildTurnsCountQuery, buildTurnsQuery, buildUsageCountQuery, buildUsageQuery,
 } from './queries';
 import { nonnegative, pageLimit } from './validation';
@@ -38,18 +38,15 @@ export class SummaryReader {
    * 책임: 조회 조건에 맞는 raw 또는 사전 집계 SQL을 선택한다.
    * 알고리즘: 비용·미지원 기간은 raw로 보내고 그 외에는 rollup의 시간대·형식 준비 여부를 확인한 같은 트랜잭션에서 쿼리를 실행한다.
    */
-  private usageQueries<T>(filter: SummaryFilter, groupBy: UsageGrouping, timezone: string | undefined,
+  private usageQueries<T>(filter: SummaryFilter, groupBy: UsageGrouping, timezone: string,
     by: UsageBasis, sortBy: ChartMetric | undefined, action: (queries: { rows: QuerySql; count: QuerySql }) => T, tableSort?: UsageSort): T {
-    const raw = (zone: string): { rows: QuerySql; count: QuerySql } => ({
-      rows: buildUsageQuery(filter, groupBy, zone, by, sortBy, tableSort),
-      count: buildUsageCountQuery(filter, groupBy, zone, by),
+    const raw = (): { rows: QuerySql; count: QuerySql } => ({
+      rows: buildUsageQuery(filter, groupBy, timezone, by, sortBy, tableSort),
+      count: buildUsageCountQuery(filter, groupBy, timezone, by),
     });
-    const candidate = timezone === undefined ? undefined : buildRollupUsageQueries(filter, groupBy, timezone, by, sortBy, tableSort);
-    if (filter.includeCosts || timezone !== undefined && !candidate) return action(raw(timezone ?? 'UTC'));
-    return this.database.rollups.read(timezone, (ready, selected) => {
-      const queries = candidate ?? buildRollupUsageQueries(filter, groupBy, selected, by, sortBy, tableSort);
-      return action(ready && queries ? queries : raw(selected));
-    });
+    const candidate = buildRollupUsageQueries(filter, groupBy, timezone, by, sortBy, tableSort);
+    if (!candidate) return action(raw());
+    return this.database.rollups.read(timezone, ready => action(ready ? candidate : raw()));
   }
 
   /** Name choices cover all stored usage, independently of dates and the table page. */
@@ -97,37 +94,6 @@ export class SummaryReader {
       ...row, percentage: counts.totalUses ? row.usage_count / counts.totalUses * 100 : 0,
     });
     return { ...counts, rows: rows.map(withPercentage), chartRows: chartRows.map(withPercentage) };
-  }
-
-  /**
-   * 책임: 제공자·모델 누계를 비용 표시 정책에 맞춰 조회한다.
-   * 알고리즘: 비용이 없으면 활성 시간대의 rollup을 재사용하고 비용이 있으면 raw 집계를 선택하며 모델 누계는 offset 페이지로 제한한다.
-   */
-  queryCumulative(filter: SummaryFilter, by: 'provider' | 'model', offset = 0): { rows: CumulativeRow[]; total: number; by: 'provider' | 'model' } {
-    if (by !== 'provider' && by !== 'model') throw new RangeError('Unknown cumulative grouping');
-    if (!filter.includeCosts) {
-      // Non-calendar cumulative totals reuse the active timezone, avoiding a UTC/local rebuild cycle.
-      return this.usageQueries(filter, 'total', undefined, by, by === 'model' ? 'tokens' : undefined, queries => {
-        const total = (this.database.connection.prepare(queries.count.sql).get(...queries.count.values) as { count: number }).count;
-        const usage = this.database.connection.prepare(queries.rows.sql)
-          .all(...queries.rows.values, 100, by === 'model' ? nonnegative(offset, 'offset') : 0) as unknown as UsageRow[];
-        const rows: CumulativeRow[] = by === 'provider' ? usage.map(row => ({ ...row, model: '' }))
-          : usage.map(row => ({ provider: row.provider, model: row.model ?? null,
-            input_tokens: row.input_tokens, output_tokens: row.output_tokens,
-            cache_write_input_tokens: row.cache_write_input_tokens, cache_read_input_tokens: row.cache_read_input_tokens,
-            total_tokens: row.total_tokens }));
-        return { rows, total, by };
-      });
-    }
-    if (by === 'provider') {
-      return { rows: this.queryUsage(filter).map(row => ({ ...row, model: '' })), total: this.queryUsageCount(filter), by };
-    }
-    const queries = buildModelCumulativeQueries(filter);
-    const total = (this.database.connection.prepare(queries.count.sql)
-      .get(...queries.count.values) as { count: number }).count;
-    const rows = this.database.connection.prepare(queries.rows.sql)
-      .all(...queries.rows.values, nonnegative(offset, 'offset')) as unknown as CumulativeRow[];
-    return { rows, total, by };
   }
 
   queryUsageCount(filter: SummaryFilter = {}, groupBy: UsageGrouping = 'total', timezone = 'UTC', by: 'provider' | 'model' = 'provider'): number {

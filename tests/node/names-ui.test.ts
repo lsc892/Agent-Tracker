@@ -129,7 +129,7 @@ test('reset returns query controls and chart grouping to defaults while retainin
   const query = messages.at(-1)?.query;
   assert.equal(query?.groupBy,'day');assert.equal(query?.chartMetric,'tokens');
   for (const name of ['provider','sessionId','projectKey','fromDay','toDay']) assert.equal(query?.[name],undefined);
-  assert.equal(query?.offset,0);assert.equal(query?.chartBy,'provider');assert.equal(query?.cumulativeBy,undefined);
+  assert.equal(query?.offset,0);assert.equal(query?.chartBy,'provider');
   assert.equal(get('cost-note').hidden,false);assert.equal(get('project-options').hidden,true);
   assert.equal(get('billing-control').hidden,true);assert.equal(get('project-name').textContent,'전체 프로젝트');
   assert.equal(get('session-name').textContent,'전체 세션');

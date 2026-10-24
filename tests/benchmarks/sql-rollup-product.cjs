@@ -38,15 +38,12 @@ function optionsFor(args) {
 
 function publicRead(db, spec) {
   const start = performance.now();
-  if (spec.cumulative) {
-    const result = db.queryCumulative(spec.filter, spec.by, 0);
-    return { rows: result.rows, total: result.total, bundleMs: performance.now() - start };
-  }
-  const rows = db.queryUsage(spec.filter, spec.groupBy, timezone, { limit: 100, sortBy: spec.sortBy }, spec.by);
-  const middle = performance.now();
-  const total = db.queryUsageCount(spec.filter, spec.groupBy, timezone, spec.by);
-  const end = performance.now();
-  return { rows, total, rowsMs: middle - start, countMs: end - middle, bundleMs: end - start };
+  // The frozen baseline predates the combined public page API.
+  const result = typeof db.queryUsagePage === 'function'
+    ? db.queryUsagePage(spec.filter, spec.groupBy, timezone, { limit: 100, sortBy: spec.sortBy }, spec.by)
+    : { rows: db.queryUsage(spec.filter, spec.groupBy, timezone, { limit: 100, sortBy: spec.sortBy }, spec.by),
+      total: db.queryUsageCount(spec.filter, spec.groupBy, timezone, spec.by) };
+  return { ...result, bundleMs: performance.now() - start };
 }
 
 function compare(a, b, name) {
@@ -67,35 +64,31 @@ function measureRead(dbs, spec, options, beforeQueries) {
   const initial = dbs.map(db => publicRead(db, spec));
   const digest = compare(initial[0], initial[1], spec.name);
   let fullGroupDigest, plans;
-  if (!spec.cumulative) {
-    const a = beforeQueries.buildUsageQuery(spec.filter, spec.groupBy, timezone, spec.by, spec.sortBy);
-    const b = buildRollupUsageQueries(spec.filter, spec.groupBy, timezone, spec.by, spec.sortBy);
-    const chosen = b || { rows: raw.buildUsageQuery(spec.filter, spec.groupBy, timezone, spec.by, spec.sortBy),
-      count: raw.buildUsageCountQuery(spec.filter, spec.groupBy, timezone, spec.by) };
-    const fullA = dbs[0].connection.prepare(a.sql).all(...a.values, 10000000, 0);
-    const fullB = dbs[1].connection.prepare(chosen.rows.sql).all(...chosen.rows.values, 10000000, 0);
-    fullGroupDigest = compareResults(fullA, fullB, `${spec.name} all groups`);
-    assert.equal(fullA.length, initial[0].total);
-    plans = { before: { rows: explain(dbs[0], a, true), count: explain(dbs[0],
-      beforeQueries.buildUsageCountQuery(spec.filter, spec.groupBy, timezone, spec.by), false) },
-    product: { mode: b?.mode || 'raw-fallback', rows: explain(dbs[1], chosen.rows, true), count: explain(dbs[1], chosen.count, false) } };
-  }
+  const a = beforeQueries.buildUsageQuery(spec.filter, spec.groupBy, timezone, spec.by, spec.sortBy);
+  const b = buildRollupUsageQueries(spec.filter, spec.groupBy, timezone, spec.by, spec.sortBy);
+  const chosen = b || { rows: raw.buildUsageQuery(spec.filter, spec.groupBy, timezone, spec.by, spec.sortBy),
+    count: raw.buildUsageCountQuery(spec.filter, spec.groupBy, timezone, spec.by) };
+  const fullA = dbs[0].connection.prepare(a.sql).all(...a.values, 10000000, 0);
+  const fullB = dbs[1].connection.prepare(chosen.rows.sql).all(...chosen.rows.values, 10000000, 0);
+  fullGroupDigest = compareResults(fullA, fullB, `${spec.name} all groups`);
+  assert.equal(fullA.length, initial[0].total);
+  plans = { before: { rows: explain(dbs[0], a, true), count: explain(dbs[0],
+    beforeQueries.buildUsageCountQuery(spec.filter, spec.groupBy, timezone, spec.by), false) },
+  product: { mode: b?.mode || 'raw-fallback', rows: explain(dbs[1], chosen.rows, true), count: explain(dbs[1], chosen.count, false) } };
   const iterations = Math.min(20, Math.max(1, Math.ceil(8 / Math.max(...initial.map(v => v.bundleMs), .01))));
   for (const db of dbs) for (let i = 0; i < options.warmup; i++) publicRead(db, spec);
-  const samples = dbs.map(() => ({ bundle: [], rows: [], count: [] }));
+  const samples = dbs.map(() => ({ bundle: [] }));
   for (let i = 0; i < options.samples; i++) for (const variant of i % 2 ? [1, 0] : [0, 1]) {
-    let bundle = 0, rows = 0, count = 0;
+    let bundle = 0;
     for (let j = 0; j < iterations; j++) {
       const value = publicRead(dbs[variant], spec);
-      bundle += value.bundleMs; rows += value.rowsMs || 0; count += value.countMs || 0;
+      bundle += value.bundleMs;
     }
     samples[variant].bundle.push(bundle / iterations);
-    samples[variant].rows.push(rows / iterations); samples[variant].count.push(count / iterations);
   }
   compare(publicRead(dbs[0], spec), publicRead(dbs[1], spec), `${spec.name} after timed reads`);
-  const measured = Object.fromEntries(variants.map((v, i) => [v, { bundle: stats(samples[i].bundle),
-    ...(spec.cumulative ? {} : { rows: stats(samples[i].rows), count: stats(samples[i].count) }) }]));
-  return { name: spec.name, groupBy: spec.groupBy, by: spec.by, cumulative: !!spec.cumulative,
+  const measured = Object.fromEntries(variants.map((v, i) => [v, { bundle: stats(samples[i].bundle) }]));
+  return { name: spec.name, groupBy: spec.groupBy, by: spec.by,
     pageDigest: digest, fullGroupDigest, totalGroups: initial[0].total, iterationsPerSample: iterations,
     variants: measured, percentChange: (measured['product-rollup'].bundle.medianMs / measured.before.bundle.medianMs - 1) * 100,
     plans };
@@ -171,7 +164,7 @@ async function main() {
     baseline: { head: manifest.head, sourceSha256: manifest.sourceSha256 },
     sourceSha256: Object.fromEntries(sourcePaths.map(p => [p, sha(readFileSync(join(root, p)))])),
     method: { sizes: options.sizes, turnsPerSession: options.turns, samples: options.samples, warmup: options.warmup,
-      pageLimit: 100, timezone, scope: 'Actual public queryUsage + queryUsageCount and queryCumulative; includes SQL preparation, rollup snapshot/metadata checks. Fixtures/full-group verification/EXPLAIN/UI/parser excluded. Alternating warm-cache variants.',
+      pageLimit: 100, timezone, scope: 'Current public queryUsagePage versus frozen baseline queryUsage + queryUsageCount; includes SQL preparation, rollup snapshot/metadata checks. Fixtures/full-group verification/EXPLAIN/UI/parser excluded. Alternating warm-cache variants.',
       firstQuery: 'first public provider total query + COUNT; product includes lazy rollup backfill, warm OS cache; single observation',
       writes: 'actual replaceSessions with already initialized rollups; BEGIN IMMEDIATE + COMMIT once; preparation/restoration and TRUNCATE checkpoint excluded; wal_autocheckpoint=0',
       memory: 'shared-process RSS observations include correctness/fixtures and do not isolate A/B peak',
@@ -207,8 +200,6 @@ async function main() {
           console.log(`${label} ${spec.name}: ${value.variants.before.bundle.medianMs.toFixed(3)} -> ${value.variants['product-rollup'].bundle.medianMs.toFixed(3)} ms (${value.percentChange.toFixed(2)}%)`);
           await new Promise(resolveNext => setImmediate(resolveNext));
         }
-        for (const by of ['provider', 'model']) dataset.reads.push(measureRead(dbs,
-          { name: `cumulative-${by}`, cumulative: true, filter: { excludeEmptyUsage: true }, groupBy: 'total', by }, options, beforeQueries));
         dataset.writes = measureWrites(dbs, paths, options);
         dataset.observedSharedProcess = { rssBytes: process.memoryUsage().rss, lifetimePeakBytes: process.resourceUsage().maxRSS * 1024 };
         report.datasets.push(dataset);

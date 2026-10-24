@@ -708,7 +708,7 @@ CREATE INDEX idx_summary_project_period
 
 ```
 
-조회 인덱스는 날짜 범위와 provider·프로젝트·날짜 범위를 유지한다. 세션 조회·교체는 `UNIQUE(provider, session_id, root_turn_id)`의 앞 두 키를 사용하고 별도 `idx_summary_session`은 두지 않는다. 세션으로 좁힌 요청의 `id`순 페이지 조회에는 임시 정렬이 추가될 수 있다. 비용 미포함 전체·프로젝트·세션·일·월 집계와 누계는 아래의 일별 rollup을 사용하고, 요청별 상세·비용 포함 조회는 기존 요청·모델 SQL을 사용한다. 결과 캐시는 추가하지 않는다. manifest의 루트·세션 인덱스는 증분 수집에 유지하고, 이동 탐지에 사용하는 identity 인덱스는 Windows에서 제거하며 Linux·macOS에서는 유지한다.
+조회 인덱스는 날짜 범위와 provider·프로젝트·날짜 범위를 유지한다. 세션 조회·교체는 `UNIQUE(provider, session_id, root_turn_id)`의 앞 두 키를 사용하고 별도 `idx_summary_session`은 두지 않는다. 세션으로 좁힌 요청의 `id`순 페이지 조회에는 임시 정렬이 추가될 수 있다. 비용 미포함 전체·프로젝트·세션·일·월 집계는 아래의 일별 rollup을 사용하고, 요청별 상세·비용 포함 조회는 기존 요청·모델 SQL을 사용한다. 결과 캐시는 추가하지 않는다. manifest의 루트·세션 인덱스는 증분 수집에 유지하고, 이동 탐지에 사용하는 identity 인덱스는 Windows에서 제거하며 Linux·macOS에서는 유지한다.
 
 schema v11은 원본 요청·모델 행을 보존하면서 다음 파생 표를 추가한다.
 
@@ -720,13 +720,13 @@ schema v11은 원본 요청·모델 행을 보존하면서 다음 파생 표를 
 
 상태에는 전체 토큰 합계·건수와 완료 표본 및 사용량이 기록된 완료 표본의 합계·건수를 따로 저장한다. cache의 알려진 표본 수, duration의 유효 표본 합계·건수, 품질·미상 시각·오류 건수와 최종 갱신 시각도 보존한다. 평균은 `SUM(완료 표본 합계) / SUM(같은 표본 건수)`로 계산하며 일별 평균을 단순 평균하지 않는다. 다중 모델 turn은 각 모델에 한 번씩 포함하므로 모델 건수를 합쳐 전체 요청 수로 사용하지 않는다. 미상 시각은 빈 local_day, 이름은 projects·sessions를 조회해 최신 값을 사용한다.
 
-DB당 선택한 시간대 하나의 집계만 유지한다. 처음 집계할 때 저장된 facts로 구축하고 시간대가 바뀌면 같은 두 표를 하나의 transaction에서 다시 구축한다. 완전한 현지 날짜는 rollup, 경계 날짜의 일부 시간은 원본 SQL로 집계해 중복 없이 병합한다. DST의 23·25시간 날짜도 현지 경계를 따른다. 누계는 활성 시간대를 재사용해 UTC와 설정 시간대 사이의 반복 구축을 피한다. 범위 역전·지원 캘린더 밖의 시각·비용 포함은 기존 SQL로 처리하며, `isTransaction`이 없는 Node 22.15도 기존 SQL을 사용한다.
+DB당 선택한 시간대 하나의 집계만 유지한다. 처음 집계할 때 저장된 facts로 구축하고 시간대가 바뀌면 같은 두 표를 하나의 transaction에서 다시 구축한다. 완전한 현지 날짜는 rollup, 경계 날짜의 일부 시간은 원본 SQL로 집계해 중복 없이 병합한다. DST의 23·25시간 날짜도 현지 경계를 따른다. 범위 역전·지원 캘린더 밖의 시각·비용 포함은 기존 SQL로 처리하며, `isTransaction`이 없는 Node 22.15도 기존 SQL을 사용한다.
 
 이미 구축된 집계는 세션 교체·삭제·프로젝트 이동 시 영향받은 세션만 기존 facts 교체 transaction 안에서 다시 계산한다. 파일 오류 진단으로 `last_error`가 바뀔 때도 같은 transaction에서 해당 세션의 오류 건수를 갱신하고 초기화는 facts와 집계를 함께 지운다. warm 조회는 deferred read transaction에서 시간대 확인과 집계 조회를 같은 snapshot으로 처리한다. 구축은 writer transaction에서 재확인한 뒤 수행하며, 호출자가 연 transaction에서 시간대가 다르면 raw SQL을 사용한다.
 
 DB 모듈은 변경 이유별로 책임을 나눈다. `src/summary/db/index.ts`의 `SummaryDatabase`는 기존 worker·scanner API를 구성요소에 연결하는 facade다. `connection.ts`의 `SqliteSession`이 연결·PRAGMA·statement cache·transaction·optimize·close를 소유하고, `migrations.ts`는 schema 버전별 갱신을 처리한다. `manifest.ts`는 파일 발견·방문·진단·iterator, `sessions.ts`는 요청·모델·capability와 정상 metadata의 원자적 세션 교체, `billing.ts`는 비용 분류·재계산을 맡는다. 모든 구성요소는 하나의 `SqliteSession`을 공유하며 세션 교체 중 비용 반영도 같은 transaction에서 실행한다.
 
-`reader.ts`는 조회 실행·페이지·결과 변환과 rollup/raw 경로 선택, `queries.ts`는 기존 facts SQL 생성, `validation.ts`는 공통 수치·페이지 검증을 맡는다. `rollup-state.ts`는 병합 가능한 상태와 schema, `rollup-queries.ts`는 일별 상태·raw 경계의 SQL, `rollups.ts`는 구축·세션별 갱신·조회 snapshot을 맡는다. 실제 통계 worker는 `queryUsagePage()` 한 번으로 페이지 행과 전체 개수를 같은 snapshot에서 읽고, 반환된 행으로 도표를 만든다. 요청별·비용 포함·구버전 Node의 raw 조회도 같은 페이지 계약을 사용하며 별도의 도표 조회 메서드는 두지 않는다. 목록과 개수는 같은 필터·그룹 정의를 사용하고 모델 해석은 공통 facts 표현식을 재사용한다. SQL 구조와 바인딩을 함께 반환하며 시간대·기간·ID는 SQL 문자열에 삽입하지 않는다. 집계 표본·NULL·미상 정렬과 기존 원본 인덱스를 보존한다.
+`reader.ts`는 조회 실행·페이지·결과 변환과 rollup/raw 경로 선택, `queries.ts`는 기존 facts SQL 생성, `validation.ts`는 공통 수치·페이지 검증을 맡는다. `rollup-state.ts`는 병합 가능한 상태와 schema, `rollup-queries.ts`는 일별 상태·raw 경계의 SQL, `rollups.ts`는 구축·세션별 갱신·조회 snapshot을 맡는다. 실제 통계 worker는 `queryUsagePage()` 한 번으로 페이지 행과 전체 개수를 같은 snapshot에서 읽고, 반환된 행으로 도표를 만든다. 요청별·비용 포함·구버전 Node의 raw 조회도 같은 페이지 계약을 사용하며 별도의 도표 조회 메서드와 누계 요청·응답 계약은 두지 않는다. 목록과 개수는 같은 필터·그룹 정의를 사용하고 모델 해석은 공통 facts 표현식을 재사용한다. SQL 구조와 바인딩을 함께 반환하며 시간대·기간·ID는 SQL 문자열에 삽입하지 않는다. 집계 표본·NULL·미상 정렬과 기존 원본 인덱스를 보존한다.
 
 SQLite 조회 계획용 통계는 DB 열기에서 `PRAGMA main.optimize=0x10002`, 첫 스캔 완료와 이후 24시간 이상 지난 스캔 완료 및 연결 종료에서 `PRAGMA main.optimize`로 수집한다. `main`만 지정하여 TEMP 파싱 테이블은 분석하지 않는다. 새 인덱스 생성·기존 인덱스 정리 뒤에도 열기 시 통계 수집이 적용되며, 다른 운영체제에서 복사한 같은 schema version의 DB도 열 때 identity 인덱스를 현재 플랫폼에 맞춘다. 통계 수집은 선택적 유지보수여서 실패가 스캔·연결 정리를 실패시키지 않고 다음 실행 시점에 다시 시도한다. `PRAGMA optimize`는 평균 결과 캐시가 아니라 필요한 `ANALYZE`를 선택하는 SQLite 기능이다. [SQLite 권고](https://www.sqlite.org/lang_analyze.html).
 

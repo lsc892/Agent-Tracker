@@ -32,27 +32,24 @@ export class UsageRollupStore {
    * 책임: 사전 집계의 준비 상태 확인과 실제 조회에 같은 snapshot을 보장한다.
    * 알고리즘: DEFERRED 읽기로 시간대·형식을 확인하고 재구축이 필요할 때만 쓰기 트랜잭션으로 재확인하며, 기존 트랜잭션·미지원 환경은 raw로 대체한다.
    */
-  read<T>(timezone: string | undefined, action: (ready: boolean, timezone: string) => T): T {
+  read<T>(timezone: string, action: (ready: boolean) => T): T {
     const connection = this.database.connection;
     // DatabaseSync.isTransaction arrived in Node 22.16; retain raw reads on 22.15.
-    if (typeof connection.isTransaction !== 'boolean') return action(false, timezone ?? 'UTC');
-    const current = (): { ready: boolean; timezone: string; supported: boolean } => {
+    if (typeof connection.isTransaction !== 'boolean') return action(false);
+    const current = (): { ready: boolean; supported: boolean } => {
       const metadata = this.metadata();
-      const selected = timezone ?? metadata?.timezone ?? 'UTC';
-      return { ready: metadata?.format_version === ROLLUP_FORMAT_VERSION && metadata.timezone === selected,
-        timezone: selected, supported: this.calendarSupported() };
+      return { ready: metadata?.format_version === ROLLUP_FORMAT_VERSION && metadata.timezone === timezone,
+        supported: this.calendarSupported() };
     };
     if (connection.isTransaction) {
       const state = current();
-      return action(state.ready && state.supported, state.timezone);
+      return action(state.ready && state.supported);
     }
     connection.exec('BEGIN');
-    let selected: string;
     try {
       const state = current();
-      selected = state.timezone;
       if (state.ready || !state.supported) {
-        const result = action(state.ready && state.supported, selected);
+        const result = action(state.ready && state.supported);
         connection.exec('COMMIT');
         return result;
       }
@@ -64,17 +61,16 @@ export class UsageRollupStore {
     return this.database.transaction(() => {
       // A different window may have rebuilt while we waited for BEGIN IMMEDIATE.
       const metadata = this.metadata();
-      if (timezone === undefined) selected = metadata?.timezone ?? selected;
-      if (!this.calendarSupported()) return action(false, selected);
-      if (metadata?.format_version !== ROLLUP_FORMAT_VERSION || metadata.timezone !== selected) {
+      if (!this.calendarSupported()) return action(false);
+      if (metadata?.format_version !== ROLLUP_FORMAT_VERSION || metadata.timezone !== timezone) {
         this.clear();
         for (const by of ['provider', 'model'] as const) {
-          this.database.statement(`INSERT INTO ${ROLLUP_TABLES[by]} ${aggregateUsageSource(by)}`).run(selected);
+          this.database.statement(`INSERT INTO ${ROLLUP_TABLES[by]} ${aggregateUsageSource(by)}`).run(timezone);
         }
         this.database.statement('INSERT INTO usage_rollup_meta(singleton, timezone, format_version) VALUES (1, ?, ?)')
-          .run(selected, ROLLUP_FORMAT_VERSION);
+          .run(timezone, ROLLUP_FORMAT_VERSION);
       }
-      return action(true, selected);
+      return action(true);
     });
   }
 

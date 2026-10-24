@@ -76,13 +76,6 @@ export interface ModelUsageInput {
   cache_read_input_tokens: number | null;
 }
 
-export interface CumulativeRow extends Omit<ModelUsageInput, 'model'>, CostFields {
-  /** null identifies a request without model metadata or recorded token usage. */
-  model: string | null;
-  provider: Provider;
-  total_tokens: number;
-}
-
 export interface TurnSummaryRow extends Required<Omit<TurnSummaryInput, 'model_usage' | 'capability_usage' | 'billing'>>, CostFields {
   id: number;
   /** Eligibility for chart display, without removing a row from its table page. */

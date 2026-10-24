@@ -34,8 +34,6 @@ export interface UsageQuery {
   afterId?: number;
   chartMetric?: import('./db/types').ChartMetric;
   chartBy?: 'provider' | 'model';
-  cumulativeBy?: 'provider' | 'model';
-  cumulativeOffset?: number;
 }
 export interface NameQuery {
   kind: 'project' | 'session';
@@ -81,7 +79,6 @@ export interface UsageResult {
   total: number;
   coverage: import('./db/types').DiagnosticsPage['counts'];
   chart?: import('./db/types').UsageChart;
-  cumulative?: { rows: import('./db/types').CumulativeRow[]; total: number; by: 'provider' | 'model' };
 }
 export type DiagnosticsResult = import('./db/types').DiagnosticsPage & { lastRefresh?: RefreshResult };
 export interface TokenVector {
