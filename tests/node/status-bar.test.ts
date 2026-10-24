@@ -13,16 +13,21 @@ const state: QuotaState = {
   ] },
 };
 
-test('hover preview shows both providers, five-hour remaining quota, reset countdown and click instruction', () => {
+test('hover preview shows weekly and five-hour remaining quotas, reset countdowns and click instruction', () => {
   const codex = { ...state, snapshot: { ...state.snapshot!, windows: [
     { ...state.snapshot!.windows[0], usedPercent: 17, resetsAt: 11_400_000 }, state.snapshot!.windows[1],
   ] } };
   const claude = { ...state, provider: 'claude' as const, snapshot: null };
-  assert.equal(quotaHoverSummary([codex, claude], 0), 'Claude: 조회불가\nCodex: 5시간 - 83% 남음, 재설정까지 3h 10m\n클릭하여 열기/닫기');
+  const preview = 'Codex: 7일 - 8% 남음, 재설정까지 5d 21h, 5시간 - 83% 남음, 재설정까지 3h 10m\nClaude: 조회불가\n클릭해서 사용량 창 켜기';
+  assert.equal(quotaHoverSummary([codex, claude], 0), preview);
+  assert.equal(quotaHoverSummary([claude, codex], 0), preview);
   assert.match(quotaHoverSummary([codex], 60_000), /3h 9m/);
-  assert.equal(quotaHoverSummary([{ ...claude, refreshing: true }], 0), 'Claude: 조회 중…\n클릭하여 열기/닫기');
+  assert.equal(quotaHoverSummary([{ ...claude, refreshing: true }], 0), 'Claude: 조회 중…\n클릭해서 사용량 창 켜기');
   assert.match(quotaHoverSummary([{ ...codex, status: 'stale' }], 0), /이전 조회 값/);
-  assert.doesNotMatch(quotaHoverSummary([codex], 0), /7일|92%|\$\(/);
+  assert.doesNotMatch(quotaHoverSummary([codex], 0), /92%|\$\(/);
+  assert.match(quotaHoverSummary([{ ...codex, provider: 'claude' }], 0), /Claude: 7일 - 8% 남음.*5시간 - 83% 남음/);
+  const weeklyOnly = { ...codex, snapshot: { ...codex.snapshot!, windows: [codex.snapshot!.windows[1]] } };
+  assert.equal(quotaHoverSummary([weeklyOnly], 0), 'Codex: 7일 - 8% 남음, 재설정까지 5d 21h\n클릭해서 사용량 창 켜기');
 });
 
 test('status uses logo glyphs, remaining meters, reset times, and accessible provider names', () => {

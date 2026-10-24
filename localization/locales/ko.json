@@ -81,7 +81,7 @@
   "status.refreshTooltip": "현재 Claude/Codex 사용량 새로고침",
   "status.refreshAccessible": "Claude와 Codex 현재 사용량 새로고침",
   "status.waitingReset": "재설정 대기",
-  "status.toggleHint": "클릭하여 열기/닫기",
+  "status.toggleHint": "클릭해서 사용량 창 켜기",
   "status.loading": "조회 중…",
   "status.unavailable": "조회불가",
   "status.missingFiveHour": "{value0} 5시간 정보 없음",

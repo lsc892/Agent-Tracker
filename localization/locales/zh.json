@@ -81,7 +81,7 @@
   "status.refreshTooltip": "刷新当前 Claude/Codex 使用量",
   "status.refreshAccessible": "刷新 Claude 和 Codex 当前使用量",
   "status.waitingReset": "等待重置",
-  "status.toggleHint": "点击打开/关闭",
+  "status.toggleHint": "点击打开用量窗口",
   "status.loading": "加载中…",
   "status.unavailable": "使用量不可用",
   "status.missingFiveHour": "{value0} 无5小时使用量信息",

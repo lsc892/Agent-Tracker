@@ -229,7 +229,8 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     assert.equal(scans,0,'changing colors does not scan transcripts');assert.equal(refreshes.length,0,'changing colors does not query quota');
 
     assert.equal(items[0].command, 'agentTracker.toggleQuotaTooltip', 'the renderer uses this command to toggle the native card');
-    assert.equal(items[0].accessibilityInformation?.label, 'Claude: 5시간 - 77% 남음\nCodex: 5시간 - 77% 남음\n클릭하여 열기/닫기');
+    const hoverSummary = 'Codex: 7일 - 8% 남음, 5시간 - 77% 남음\nClaude: 7일 - 8% 남음, 5시간 - 77% 남음\n클릭해서 사용량 창 켜기';
+    assert.equal(items[0].accessibilityInformation?.label, hoverSummary);
     await click(items[0].command);
     assert.deepEqual(externalCommands.at(-1), { command: 'workbench.action.showHover', arguments: [] }, 'an unpatched renderer can still open the focused hover');
     assert.equal(commands.has('agentTracker.toggleQuota'), false);
@@ -280,6 +281,7 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     assert.deepEqual(configUpdates, [{ key: 'display.detail', value: 'compact', target: 1 }]);
     assert.doesNotMatch(items[0].text!,/7일|92%/);
     assert.equal(items[0].text!.match(/5시간/g)?.length,2);
+    assert.equal(items[0].accessibilityInformation?.label, hoverSummary, 'compact status keeps the detailed hover summary');
     assert.equal(tooltip().value.match(/wk !\[/g)?.length, 2, 'compact status still shows every window in the hover');
     await cardAction('agentTracker.setStatusBarDetail', 'detailed');
     assert.equal(items[0].text!.match(/7일/g)?.length, 2);

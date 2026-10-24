@@ -149,7 +149,7 @@ async function verifyStatusLocalization(cdp, settingsPath, root, editor) {
       const hover=[...document.querySelectorAll('.monaco-hover')].find(node=>node.innerText.includes(${JSON.stringify(messages['status.toggleHint'])}));
       if(!hover)return null;const rect=hover.getBoundingClientRect();return rect.width&&rect.height ? hover.innerText : null;
     })()`), `${locale}: hover shows the translated click hint`);
-    assert.ok(preview.includes('Claude:') && preview.includes('Codex:'));
+    assert.match(preview, /^Codex:[\s\S]*\nClaude:/);
     if (locale !== 'ko') assert.doesNotMatch(preview, /[가-힣]/);
     assert.equal(await cardText(), null, `${locale}: hover keeps the full card closed`);
     await cdp.click(point);
@@ -269,7 +269,7 @@ async function main() {
       return;
     }
     const summary = () => cdp.evaluate(`(() => {
-      const hover=[...document.querySelectorAll('.monaco-hover')].find(node => node.innerText.includes('클릭하여 열기/닫기'));
+      const hover=[...document.querySelectorAll('.monaco-hover')].find(node => node.innerText.includes('클릭해서 사용량 창 켜기'));
       if(!hover)return null;const rect=hover.getBoundingClientRect();return rect.width&&rect.height ? hover.innerText : null;
     })()`);
     const assertStaysClosed = async description => {
@@ -278,11 +278,12 @@ async function main() {
       }
     };
     await cdp.call('Input.dispatchMouseEvent', { type: 'mouseMoved', x: button.x, y: button.y });
-    const preview = await until(summary, 'hover opens the short preview');
-    assert.match(preview, quotaFixture ? /Claude: 5시간 - 67% 남음/ : /Claude: 조회불가/);
-    assert.match(preview, quotaFixture ? /Codex: 5시간 - 31% 남음/ : /Codex: 조회불가/);
+    const preview = await until(summary, 'hover opens the detailed preview');
+    assert.match(preview, /^Codex:[\s\S]*\nClaude:/);
+    assert.match(preview, quotaFixture ? /Claude: 7일 - 86% 남음, 재설정까지 6d 0h, 5시간 - 67% 남음, 재설정까지 4h 37m/ : /Claude: 조회불가/);
+    assert.match(preview, quotaFixture ? /Codex: 7일 - 14% 남음, 재설정까지 6d 0h, 5시간 - 31% 남음, 재설정까지 4h 37m/ : /Codex: 조회불가/);
     await assertStaysClosed('hover alone must not open the quota card');
-    outcomes.push('hover shows only the short provider summary and click instruction');
+    outcomes.push('hover shows weekly and five-hour remaining quota, reset countdowns and the usage-window click instruction');
     await cdp.click(button);
     const card = await until(visible, 'first click opens quota card');
     assert.equal(await summary(), null, 'click replaces the preview with the quota UI');
@@ -313,7 +314,7 @@ async function main() {
         if(!card)return null;
         const rect=card.getBoundingClientRect();
         return {text:card.innerText,tables:[...card.querySelectorAll('table')].filter(table=>!table.querySelector('h3')).length,
-          meters:[...card.querySelectorAll('img[alt^="사용 "], img[alt^="남음 "]')].map(img=>({loaded:img.complete&&img.naturalWidth>0,width:img.width,height:img.height})),
+          meters:[...card.querySelectorAll('img[alt$="% 사용"], img[alt$="% 남음"]')].map(img=>({loaded:img.complete&&img.naturalWidth>0,width:img.width,height:img.height})),
           periods:[...card.querySelectorAll('table')].filter(table=>!table.querySelector('h3')).map(table=>({
             widths:[...table.querySelectorAll('img')].map(img=>img.width),
             captions:[...table.rows[1].cells].map(cell=>{

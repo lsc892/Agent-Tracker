@@ -81,7 +81,7 @@
   "status.refreshTooltip": "現在の Claude/Codex 使用量を更新",
   "status.refreshAccessible": "現在の Claude と Codex の使用量を更新",
   "status.waitingReset": "リセット待ち",
-  "status.toggleHint": "クリックして開く/閉じる",
+  "status.toggleHint": "クリックして使用量ウィンドウを開く",
   "status.loading": "読み込み中…",
   "status.unavailable": "使用量を取得できません",
   "status.missingFiveHour": "{value0} 5時間の使用量情報なし",

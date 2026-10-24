@@ -81,7 +81,7 @@
   "status.refreshTooltip": "Actualiser l'utilisation actuelle de Claude/Codex",
   "status.refreshAccessible": "Actualiser l'utilisation actuelle de Claude et Codex",
   "status.waitingReset": "Réinitialisation en attente",
-  "status.toggleHint": "Cliquez pour ouvrir/fermer",
+  "status.toggleHint": "Cliquez pour ouvrir la fenêtre d’utilisation",
   "status.loading": "Chargement…",
   "status.unavailable": "Utilisation indisponible",
   "status.missingFiveHour": "{value0} Aucune donnée d'utilisation sur 5 heures",

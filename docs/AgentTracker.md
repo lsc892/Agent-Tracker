@@ -178,7 +178,7 @@ manual refresh
 
 ### 3.4 상태 표시줄과 카드형 툴팁
 
-상태 표시줄 오른쪽에 Claude·Codex 통합 사용량 항목과 새로고침 버튼을 배치한다. 통합 항목 안에서는 Claude가 왼쪽, Codex가 오른쪽이다. 로컬 VS Code에 클릭 전용 패치를 적용하면 사용량 항목 클릭으로 `StatusBarItem.tooltip`의 `MarkdownString` 카드를 바로 위에 열어 유지하고 재클릭으로 닫는다. 마우스를 올리거나 포커스만 주어서는 자동으로 열리지 않는다. 바깥 클릭이나 Esc로도 닫으며, 그 뒤 한 번 클릭으로 다시 열린다. 하단 quota 패널이나 별도 창은 만들지 않는다.
+상태 표시줄 오른쪽에 Claude·Codex 통합 사용량 항목과 새로고침 버튼을 배치한다. 통합 항목 안에서는 Claude가 왼쪽, Codex가 오른쪽이다. 로컬 VS Code에 호버·클릭 분리 패치를 적용하면 사용량 항목 클릭으로 `StatusBarItem.tooltip`의 `MarkdownString` 카드를 바로 위에 열어 유지하고 재클릭으로 닫는다. 카드가 닫혀 있을 때 마우스를 올리면 상태 표시줄의 상세/압축 설정과 관계없이 Codex·Claude 순서로 주간(7일)·5시간 남은 비율과 각 초기화까지 남은 시간을 상세 요약으로 표시하고, 마지막 줄에 `클릭해서 사용량 창 켜기`를 안내한다. 클릭해 연 카드가 있으면 요약 호버가 이를 덮어쓰지 않는다. 바깥 클릭이나 Esc로도 닫으며, 그 뒤 한 번 클릭으로 다시 열린다. 하단 quota 패널이나 별도 창은 만들지 않는다.
 
 클릭 명령은 `agentTracker.toggleQuotaTooltip`이다. `tools/vscode/statusbar-toggle.cjs`가 Agent Tracker의 이 명령만 내부 `ToggleTooltipCommand` 객체로 변환한다. 공개 API의 기능은 아니므로 확장 설치·활성화와 패치 적용을 구분한다. 원본 백업과 복원 명령을 제공하며 VS Code 업데이트 뒤 재적용한다. 패치가 없는 설치에서는 기본 호버와 클릭 열기 경로를 사용한다.
 
@@ -1092,7 +1092,7 @@ last successful session update
 - extension 활성화만으로 JSONL 전체 scan이 발생하지 않는다.
 - 조회 중 provider notification은 수신 즉시 반영하고 활성 창의 정기 조회는 제공자별 기본 15분 간격으로 수행한다. 조회 사이 Codex App Server는 상주하지 않는다.
 - 상태바 사용량 항목 안에서 Claude는 왼쪽, Codex는 오른쪽이고, 바로 위 툴팁에서 quota·reset·마지막 성공 갱신 시각을 볼 수 있다.
-- 클릭하면 Markdown Quota 카드가 뜨고 제공자별 새로 고침·상세/압축 설정·확장 관리·사용량 통계 링크를 사용할 수 있다. 패치한 로컬 VS Code에서는 자동 호버 억제, 클릭 유지·재클릭 닫기, 닫은 뒤 재호버 억제와 바깥 클릭·Esc 후 재열기를 실제 UI에서 검증한다.
+- 호버하면 상태 표시줄의 상세/압축 설정과 관계없이 제공자별 주간·5시간 남은 비율·초기화 카운트다운과 사용량 창 열기 안내를 표시한다. 클릭하면 Markdown Quota 카드가 뜨고 공통 새로고침·상세/압축 설정·설정·사용량 통계 링크를 사용할 수 있다. 패치한 로컬 VS Code에서는 상세 요약 호버, 클릭 유지·재클릭 닫기, 닫은 뒤 요약 복원과 바깥 클릭·Esc 후 재열기를 실제 UI에서 검증한다.
 - 누계 refresh에서 변경 없는 session의 파일 body는 다시 읽지 않는다.
 - 전체 경로·manifest·파싱 결과를 메모리에 적재하지 않고 n개·byte 예산·DB 조회 page 경계를 지킨다.
 - 영속 table은 manifest·projects·sessions·turn_summary·turn_model_usage·turn_costs·session_billing·turn_capability_usage이고, session summary·모델별 토큰·비용·Skill 횟수와 이름·정상 metadata·삭제는 함께 commit한다. 부재 판정은 전체 순회 성공 후 수행한다.

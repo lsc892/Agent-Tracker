@@ -18,12 +18,12 @@ function resetTime(window: QuotaWindow, now: number): string {
   return hours ? t('duration.hoursMinutes', { value0: hours, value1: minutes % 60 }) : t('duration.minutes', { value0: minutes });
 }
 
-/** A short, plain-text preview, also used as the status item's accessible label. */
+/** A detailed, plain-text preview, independent of the status bar's display mode. */
 export function quotaHoverSummary(states: readonly QuotaState[], now = Date.now()): string {
-  const lines = (['claude', 'codex'] as const).map(provider => {
+  const lines = (['codex', 'claude'] as const).map(provider => {
     const state = states.find(value => value.provider === provider);
     if (!state) return undefined;
-    return statusBarPresentation(state, 'remaining', 'compact', now, true).accessibleText;
+    return statusBarPresentation(state, 'remaining', 'detailed', now, true).accessibleText;
   }).filter((line): line is string => line !== undefined);
   return [...lines, t('status.toggleHint')].join('\n');
 }
