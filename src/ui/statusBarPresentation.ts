@@ -52,16 +52,14 @@ export function statusBarPresentation(
     ?? mainWindows.find(window => window.windowDurationMins === 300);
   const sevenDay = mainWindows.find(window => window.id === 'seven_day')
     ?? mainWindows.find(window => window.windowDurationMins === 10080);
-  const selected = detail === 'compact'
-    ? fiveHour ? [fiveHour] : []
-    : fiveHour || sevenDay ? [sevenDay, fiveHour].filter((window): window is QuotaWindow => window !== undefined) : mainWindows.slice(0, 2);
+  const selected = selectStatusWindows(detail, fiveHour, sevenDay, mainWindows);
   if (!selected.length) return { text: t('status.missingFiveHour', { value0: icon }), accessibleText: t('status.missingFiveHourAccessible', { value0: name }) };
   const values = selected.map(window => {
     const used = Math.max(0, Math.min(100, window.usedPercent));
     const percent = Math.round(percentage === 'remaining' ? 100 - used : used);
     const label = t(percentage === 'remaining' ? 'quota.remainingPercentage' : 'quota.usedPercentage', { value0: percent });
     const resets = resetTime(window, now);
-    const period = window.windowDurationMins === 300 ? t('status.fiveHour') : window.windowDurationMins === 10080 ? t('status.sevenDay') : window.label;
+    const period = windowPeriod(window);
     return {
       text: `${period} ${remainingBar(used)} ${label}${resets ? ` ${resets}` : ''}`,
       accessibleText: `${period}${hover ? ' -' : ':'} ${label}${resets ? t(hover ? 'status.resetUntil' : 'status.resetSuffix', { value0: resets }) : ''}`,
@@ -72,4 +70,16 @@ export function statusBarPresentation(
     text: `${icon} ${values.map(value => value.text).join(' · ')}${stale ? ' $(history)' : ''}`,
     accessibleText: `${name}: ${values.map(value => value.accessibleText).join(', ')}${stale ? t('status.staleSuffix') : ''}`,
   };
+}
+
+function selectStatusWindows(detail: DisplayDetail, fiveHour: QuotaWindow | undefined, sevenDay: QuotaWindow | undefined, mainWindows: readonly QuotaWindow[]): QuotaWindow[] {
+  if (detail === 'compact') return fiveHour ? [fiveHour] : [];
+  if (fiveHour || sevenDay) return [sevenDay, fiveHour].filter((window): window is QuotaWindow => window !== undefined);
+  return mainWindows.slice(0, 2);
+}
+
+function windowPeriod(window: QuotaWindow): string {
+  if (window.windowDurationMins === 300) return t('status.fiveHour');
+  if (window.windowDurationMins === 10080) return t('status.sevenDay');
+  return window.label;
 }

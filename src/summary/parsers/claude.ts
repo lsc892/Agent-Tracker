@@ -104,16 +104,18 @@ export class ClaudeParserAdapter {
     if (context.hasBillingMetadata) this.billing = billingMode(context.billingValue);
     const { type, sessionName, sessionId, cwd } = context;
     if (!type) return;
-    if (this.identityValue.isMain && (type === 'ai-title' || type === 'custom-title')) {
-      if (sessionName && (type === 'custom-title' || !this.customTitle)) {
-        this.identityValue.sessionName = sessionName;
-        this.customTitle = type === 'custom-title';
-      }
-    }
+    this.updateSessionTitle(type, sessionName);
     if (['user', 'assistant', 'system', 'progress', 'file-history-snapshot', 'queue-operation', 'summary'].includes(type)) this.recognized = true;
     // Subagent sessionId is sometimes its own thread. Its path establishes the parent session.
     if (sessionId && this.identityValue.isMain) this.identityValue.sessionId = this.identityValue.threadId = sessionId;
     if (cwd) Object.assign(this.identityValue, project(cwd));
+  }
+
+  private updateSessionTitle(type: string, sessionName: string | undefined): void {
+    if (!this.identityValue.isMain || (type !== 'ai-title' && type !== 'custom-title')) return;
+    if (!sessionName || (type !== 'custom-title' && this.customTitle)) return;
+    this.identityValue.sessionName = sessionName;
+    this.customTitle = type === 'custom-title';
   }
 
   /**
@@ -149,20 +151,8 @@ export class ClaudeParserAdapter {
    */
   private recordAssistant(context: ClaudeRowContext): void {
     if (context.type !== 'assistant') return;
-    const { rootId, usage, model, responseId, requestId, apiError, time, offset } = context;
-    if (Object.keys(usage).length > 0) {
-      const tokens = claudeTokens(usage);
-      const synthetic = model === '<synthetic>';
-      // Local error notices carry a zero usage vector, rather than an API response.
-      // Retain any reported tokens, but never treat the placeholder as a model.
-      if ((!synthetic && !apiError) || tokens.input + tokens.output > 0) {
-        if (!rootId) throw new SummaryError('missing-root-turn', offset);
-        if (!responseId) throw new SummaryError('missing-response-id', offset);
-        this.sink.event({ kind: 'usage', rootId, responseId, requestId: requestId ?? null,
-          threadId: this.identityValue.threadId, turnId: rootId, tokens,
-          model: synthetic ? undefined : model, billingMode: billingMode(context.usageBillingValue ?? this.billing), offset });
-      }
-    }
+    this.recordAssistantUsage(context);
+    const { rootId, apiError, time, offset } = context;
     if (!rootId) return;
     this.apiFailed = apiError;
     this.stopBlocked = false;
@@ -171,6 +161,21 @@ export class ClaudeParserAdapter {
       completed: stopped, completedAt: stopped ? time : null, durationQuality: 'approximate',
       status: this.apiFailed ? 'failed' : stopped ? 'completed' : 'in_progress', statusAt: time,
       flags: this.apiFailed ? ['api-error'] : [], offset });
+  }
+
+  private recordAssistantUsage(context: ClaudeRowContext): void {
+    const { rootId, usage, model, responseId, requestId, apiError, offset } = context;
+    if (Object.keys(usage).length === 0) return;
+    const tokens = claudeTokens(usage);
+    const synthetic = model === '<synthetic>';
+    // Local error notices carry a zero usage vector, rather than an API response.
+    // Retain any reported tokens, but never treat the placeholder as a model.
+    if ((synthetic || apiError) && tokens.input + tokens.output <= 0) return;
+    if (!rootId) throw new SummaryError('missing-root-turn', offset);
+    if (!responseId) throw new SummaryError('missing-response-id', offset);
+    this.sink.event({ kind: 'usage', rootId, responseId, requestId: requestId ?? null,
+      threadId: this.identityValue.threadId, turnId: rootId, tokens,
+      model: synthetic ? undefined : model, billingMode: billingMode(context.usageBillingValue ?? this.billing), offset });
   }
 
   /**
@@ -188,16 +193,20 @@ export class ClaudeParserAdapter {
       this.sink.event({ kind: 'turn', rootId, isMain: this.identityValue.isMain, completed,
         completedAt: completed ? time : null, durationQuality: 'derived',
         status: this.stopBlocked ? 'in_progress' : this.apiFailed ? 'failed' : 'completed', statusAt: time, offset });
-    } else if (!this.stopBlocked && subtype === 'turn_duration' && durationMs !== undefined) {
-      // A blocked stop hook must keep the request open, including later duration records.
+      return;
+    }
+    // A blocked stop hook must keep the request open, including later duration records.
+    if (this.stopBlocked) return;
+    if (subtype === 'turn_duration' && durationMs !== undefined) {
       this.sink.event({ kind: 'turn', rootId, isMain: this.identityValue.isMain, duration: durationMs,
         durationQuality: 'exact', completed: !this.apiFailed, completedAt: this.apiFailed ? null : time,
         status: this.apiFailed ? 'failed' : 'completed', statusAt: time, offset });
-    } else if (!this.stopBlocked && ['stop', 'turn_complete', 'task_complete'].includes(String(subtype))) {
-      this.sink.event({ kind: 'turn', rootId, isMain: this.identityValue.isMain, completed: !this.apiFailed,
-        completedAt: this.apiFailed ? null : time, durationQuality: 'derived',
-        status: this.apiFailed ? 'failed' : 'completed', statusAt: time, offset });
+      return;
     }
+    if (!['stop', 'turn_complete', 'task_complete'].includes(String(subtype))) return;
+    this.sink.event({ kind: 'turn', rootId, isMain: this.identityValue.isMain, completed: !this.apiFailed,
+      completedAt: this.apiFailed ? null : time, durationQuality: 'derived',
+      status: this.apiFailed ? 'failed' : 'completed', statusAt: time, offset });
   }
 
   finish(): void {

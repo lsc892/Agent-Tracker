@@ -58,16 +58,43 @@ function dailySources(filter: SummaryFilter, grouping: UsageGrouping, timezone: 
   const values = [...dimensions.values, ...fullValues];
   // Full local days and raw boundary ranges are disjoint; unknown timestamps only use the rollup.
   const boundary = knownAllowed && (f.fromMs !== undefined && start !== f.fromMs || f.toMs !== undefined && end !== f.toMs);
-  if (boundary) {
-    const raw = buildQueryFilter({ ...f, unknownTime: 'exclude' });
-    const outside: string[] = [];
-    const outsideValues: SQLInputValue[] = [];
-    if (start !== undefined) { outside.push('started_at_ms < ?'); outsideValues.push(start); }
-    if (end !== undefined) { outside.push('started_at_ms >= ?'); outsideValues.push(end); }
-    sql += ` UNION ALL ${aggregateUsageSource(by, `${raw.sql} AND (${outside.join(' OR ')})`)}`;
-    values.push(timezone, ...raw.values, ...outsideValues);
-  }
+  if (!boundary) return { sql, values, boundary };
+  const raw = buildQueryFilter({ ...f, unknownTime: 'exclude' });
+  const outside: string[] = [];
+  const outsideValues: SQLInputValue[] = [];
+  if (start !== undefined) { outside.push('started_at_ms < ?'); outsideValues.push(start); }
+  if (end !== undefined) { outside.push('started_at_ms >= ?'); outsideValues.push(end); }
+  sql += ` UNION ALL ${aggregateUsageSource(by, `${raw.sql} AND (${outside.join(' OR ')})`)}`;
+  values.push(timezone, ...raw.values, ...outsideValues);
   return { sql, values, boundary };
+}
+
+function supportsCalendarBounds(filter: SummaryFilter, timezone: string): boolean {
+  // periodBounds intentionally supports four-digit AD calendar years. Other ranges keep raw semantics.
+  for (const ms of [filter.fromMs, filter.toMs]) {
+    if (ms === undefined) continue;
+    if (!Number.isFinite(new Date(ms).getTime())) return false;
+    const date = calendarPeriod(ms, timezone, 'day');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
+    const year = Number(date.slice(0, 4));
+    if (year < 2 || year > 9998) return false;
+  }
+  return true;
+}
+
+function rollupPeriod(grouping: UsageGrouping): string {
+  switch (grouping) {
+    case 'day': return "NULLIF(local_day,'')";
+    case 'month': return "substr(NULLIF(local_day,''),1,length(local_day)-3)";
+    default: return 'NULL';
+  }
+}
+
+function rollupUnknownOrder(calendar: boolean, by: UsageBasis): string {
+  const unknown = [...(calendar ? ['period IS NULL'] : []), ...(by === 'model' ? ["coalesce(model,'') = ''"] : [])];
+  if (unknown.length > 1) return `(${unknown.join(' OR ')}), ${unknown.join(', ')}, `;
+  if (unknown.length) return `${unknown[0]}, `;
+  return '';
 }
 
 /**
@@ -108,19 +135,10 @@ export function buildRollupUsageQueries(filter: SummaryFilter, grouping: UsageGr
   try { calendarPeriod(0, timezone, 'day'); }
   catch (error) { if (calendar) throw error; return undefined; }
   if (filter.includeCosts || filter.fromMs !== undefined && filter.toMs !== undefined && filter.fromMs >= filter.toMs) return undefined;
-  // periodBounds intentionally supports four-digit AD calendar years. Other ranges keep raw semantics.
-  for (const ms of [filter.fromMs, filter.toMs]) {
-    if (ms === undefined) continue;
-    if (!Number.isFinite(new Date(ms).getTime())) return undefined;
-    const date = calendarPeriod(ms, timezone, 'day');
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return undefined;
-    const year = Number(date.slice(0, 4));
-    if (year < 2 || year > 9998) return undefined;
-  }
+  if (!supportsCalendarBounds(filter, timezone)) return undefined;
   const source = dailySources(filter, grouping, timezone, by);
   const project = grouping === 'project' || grouping === 'session', session = grouping === 'session';
-  const period = grouping === 'day' ? "NULLIF(local_day,'')" : grouping === 'month'
-    ? "substr(NULLIF(local_day,''),1,length(local_day)-3)" : 'NULL';
+  const period = rollupPeriod(grouping);
   const groups = ['provider', ...(by === 'model' ? ['model'] : []), ...(project ? ['project_key'] : []), ...(session ? ['session_id'] : []), ...(calendar ? ['period'] : [])];
   const dimensions = [
     'provider', ...(by === 'model' ? ['model'] : []), project ? 'project_key' : 'NULL AS project_key',
@@ -130,8 +148,7 @@ export function buildRollupUsageQueries(filter: SummaryFilter, grouping: UsageGr
     session ? `(SELECT MIN(d.min_started_at_ms) FROM ${ROLLUP_TABLES.provider} d WHERE d.provider = turn_summary.provider AND d.session_id = turn_summary.session_id) AS session_started_at_ms` : 'NULL AS session_started_at_ms',
     `${period} AS period`,
   ];
-  const unknown = [...(calendar ? ['period IS NULL'] : []), ...(by === 'model' ? ["coalesce(model,'') = ''"] : [])];
-  const unknownOrder = unknown.length > 1 ? `(${unknown.join(' OR ')}), ${unknown.join(', ')}, ` : unknown.length ? `${unknown[0]}, ` : '';
+  const unknownOrder = rollupUnknownOrder(calendar, by);
   const metrics = { tokens: 'total_tokens', requests: 'turn_count', averageTokens: 'avg_tokens_per_turn', averageDuration: 'avg_duration_ms' };
   const order = sortBy ? `${metrics[sortBy]} DESC, ${groups.join(',')}` : groups.join(',');
   return {

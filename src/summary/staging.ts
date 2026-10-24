@@ -18,6 +18,38 @@ export interface StagedFile extends FileMetadata {
   forked_from_id: string | null;
 }
 
+interface PreparedTurn {
+  cursor: number; provider: Provider; session_id: string; root_id: string;
+  started: number | null; completed_at: number | null; last_assistant: number | null; completed: number;
+  explicit_duration: number | null; lifecycle: number; file_id: number; byte_offset: number; has_main: number;
+  latest_status: TurnSummaryInput['status'] | null; latest_status_at: number | null;
+  latest_status_quality: TurnSummaryInput['duration_quality'] | null;
+  project_key: string; project_name: string; input_tokens: number; output_tokens: number;
+  billing: import('./db/types').BillingMode; cache_read_input_tokens: number; cache_write_input_tokens: number;
+  flags: string | null; request_title: string | null;
+}
+
+function summaryTiming(row: PreparedTurn): {
+  status: TurnSummaryInput['status']; completedAt: number | null;
+  duration: number | null; quality: TurnSummaryInput['duration_quality'];
+} {
+  const status = row.latest_status ?? (row.completed ? 'completed' : 'in_progress');
+  let completedAt: number | null = null;
+  if (status !== 'in_progress') completedAt = row.latest_status !== null ? row.latest_status_at : row.completed_at;
+  if (status !== 'in_progress' && row.explicit_duration !== null) {
+    return { status, completedAt, duration: row.explicit_duration, quality: 'exact' };
+  }
+  if (row.started !== null && completedAt !== null && completedAt >= row.started) {
+    const lifecycle = row.latest_status !== null ? row.latest_status_quality === 'derived' : row.lifecycle;
+    return { status, completedAt, duration: completedAt - row.started,
+      quality: status === 'completed' && lifecycle ? 'derived' : 'approximate' };
+  }
+  if (status === 'completed' && row.started !== null && row.last_assistant !== null && row.last_assistant >= row.started) {
+    return { status, completedAt, duration: row.last_assistant - row.started, quality: 'approximate' };
+  }
+  return { status, completedAt, duration: null, quality: 'missing' };
+}
+
 /**
  * 책임: 전체 로그 규모의 중간 이벤트·연결 관계·집계 후보를 관리한다.
  * 알고리즘: 파일 기반 SQLite TEMP 테이블과 인덱스를 사용해 데이터를 디스크에 두고 세션 연결 성분별로 순차 처리한다.
@@ -209,16 +241,20 @@ export class SummaryStaging {
         const candidate = parent.get(frame.parent_thread_id,frame.last_parent) as {id:number;state:number;target:string|null}|undefined;
         if (candidate?.state === 0) {
           visit.run(candidate.id);push.run(candidate.id);
-        } else if (candidate) {
+          continue;
+        }
+        if (candidate) {
           // A visiting parent is a back edge. Its cycle and dependent path must keep their own identities.
           advance.run(candidate.id,frame.target ?? candidate.target,
             Number(Boolean(frame.ambiguous || frame.target !== null && candidate.target !== null && frame.target !== candidate.target)),
             Number(Boolean(frame.blocked || candidate.state === 1 || candidate.target === null)),frame.depth);
-        } else {
-          // A missing/ambiguous ancestor still has a known metadata session for descendants to use.
-          finish.run(frame.blocked ? null : frame.ambiguous ? frame.previous : frame.target,frame.file_id);
-          pop.run(frame.depth);
+          continue;
         }
+        // A missing/ambiguous ancestor still has a known metadata session for descendants to use.
+        let target = frame.ambiguous ? frame.previous : frame.target;
+        if (frame.blocked) target = null;
+        finish.run(target,frame.file_id);
+        pop.run(frame.depth);
       }
     }
     this.connection.exec(`INSERT OR IGNORE INTO affected SELECT 'codex',target FROM lineage WHERE target<>previous;
@@ -379,23 +415,9 @@ export class SummaryStaging {
       const rows = this.connection.prepare('SELECT rowid AS cursor,* FROM prepared_turns WHERE rowid>? ORDER BY rowid LIMIT 100').all(after);
       if (!rows.length) return;
       for (const raw of rows) {
-        const row = raw as unknown as {cursor:number;provider:Provider;session_id:string;root_id:string;started:number|null;completed_at:number|null;
-          last_assistant:number|null;completed:number;explicit_duration:number|null;lifecycle:number;file_id:number;byte_offset:number;has_main:number;
-          latest_status:TurnSummaryInput['status']|null;latest_status_at:number|null;latest_status_quality:TurnSummaryInput['duration_quality']|null;
-          project_key:string;project_name:string;input_tokens:number;output_tokens:number;billing:import('./db/types').BillingMode;
-          cache_read_input_tokens:number;cache_write_input_tokens:number;flags:string|null;request_title:string|null};
+        const row = raw as unknown as PreparedTurn;
         after = row.cursor;
-        let duration: number | null = null;
-        let quality: TurnSummaryInput['duration_quality'] = 'missing';
-        const status = row.latest_status ?? (row.completed ? 'completed' : 'in_progress');
-        const completedAt = status === 'in_progress' ? null : row.latest_status !== null ? row.latest_status_at : row.completed_at;
-        if (status !== 'in_progress' && row.explicit_duration !== null) { duration = row.explicit_duration; quality = 'exact'; }
-        else if (row.started !== null && completedAt !== null && completedAt >= row.started) {
-          const lifecycle = row.latest_status !== null ? row.latest_status_quality === 'derived' : row.lifecycle;
-          duration = completedAt - row.started; quality = status === 'completed' && lifecycle ? 'derived' : 'approximate';
-        } else if (status === 'completed' && row.started !== null && row.last_assistant !== null && row.last_assistant >= row.started) {
-          duration = row.last_assistant - row.started; quality = 'approximate';
-        }
+        const { status, completedAt, duration, quality } = summaryTiming(row);
         const flags = new Set((row.flags ?? '').split(',').filter(Boolean));
         if (quality === 'missing') flags.add('duration-missing');
         if (quality === 'approximate') flags.add('duration-approximate');

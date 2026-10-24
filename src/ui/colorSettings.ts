@@ -32,13 +32,22 @@ export class ColorSettings implements vscode.Disposable {
       panel.webview.asWebviewUri(vscode.Uri.joinPath(media,'color-settings.js')).toString(),
       panel.webview.asWebviewUri(vscode.Uri.joinPath(media,'dashboard.css')).toString(),
       panel.webview.cspSource,randomBytes(18).toString('base64'));
-    panel.onDidDispose(()=>{ if (this.panel===panel) {this.panel=undefined;this.ready=false;} });
+    panel.onDidDispose(()=>{
+      if (this.panel!==panel) return;
+      this.panel=undefined;
+      this.ready=false;
+    });
     panel.webview.onDidReceiveMessage((raw:unknown)=>{
       if (this.panel!==panel) return;
       const message=parseColorSettingsMessage(raw);
       if (!message) return;
-      if (message.type==='ready') {this.ready=true;this.update();}
-      else if (this.ready && !this.saving) void this.save(message).catch(()=>this.post({type:'error',message:t('color.saveFailed')}));
+      if (message.type==='ready') {
+        this.ready=true;
+        this.update();
+        return;
+      }
+      if (!this.ready || this.saving) return;
+      void this.save(message).catch(()=>this.post({type:'error',message:t('color.saveFailed')}));
     });
   }
 

@@ -56,6 +56,10 @@ Codex 응답의 [parseCodexQuota()](../src/quota/codex/response.ts#L15)는 응�
 
 `SummaryClient`는 기존 공개 API를 유지하면서 `WorkerTransport`와 `RefreshController`에 위임한다. transport는 Worker 지연 생성·요청 ID·응답/오류·진행 알림·최대 5초의 종료 대기를 소유하고, refresh controller는 중복 갱신 병합·공유 메모리 취소·데이터 삭제 직렬화를 맡는다. 조회·설정은 진행 중 삭제를 기다리며 종료 후에는 Worker를 새로 만들지 않는다. 내부 종료용 `dispose` 요청은 종료 상태에서도 허용해 DB를 먼저 닫는다.
 
+[Worker](../src/summary/worker.ts)는 같은 Promise 큐 안에서 메시지 종류를 분배하고 token·capability 조회를 별도 함수로 수행한다. DB 지연 생성·취소·refresh와 쓰기 잠금의 await·finally 경계를 유지한다. [JSONL](../src/summary/jsonl.ts)은 일반 문자열·이미지 prefix·버리는 이미지의 escape 상태와 바이트 보존을 구분하고, [staging](../src/summary/staging.ts)은 요청별 상태·완료 시각·시간 품질을 같은 파일의 함수에서 판정한다. [SQL 조건](../src/summary/db/queries.ts)의 시간 검증·미상 시각 정책과 [rollup](../src/summary/db/rollup-queries.ts)의 지원 범위·경계 선택도 기존 SQL·바인딩 순서를 유지하며 구분한다.
+
+[화면 메시지 파서](../src/ui/presentation.ts)는 종류별 파서를 선택하고 사용량의 필수 제어값과 선택 표현·대상·epoch·달력 범위를 구분한다. 제어값 오류는 메시지를 거부하고 잘못된 선택 필터는 생략한다. [quota 카드](../src/ui/quotaTooltip.ts)는 제공자 창·credit·조회 상태를 순서대로 조립하고, [Webview](../media/dashboard.js)는 날짜 검증·요청 구성·표 머리글/행·state 갱신을 같은 파일의 함수로 연결한다.
+
 현재 quota는 서버 조회 결과를 사용하고, 과거 token 통계는 manifest에서 변경 session을 찾아 요청·모델·비용 집계를 함께 갱신한다.
 
 확장 대표 아이콘은 `package.json`의 `icon`에 지정한 `resource/icon/AgentTracker_Icon.png`를 사용한다. 같은 PNG를 VSIX에 포함해 VS Code 확장 목록과 상세 화면에 표시한다.
@@ -339,6 +343,8 @@ response별 증분 상태를 영속화하지 않으므로 append도 tail만 더�
 ### 4.4 transaction과 오류 처리
 
 누계 갱신은 Usage 화면 진입 또는 사용자 새로 고침으로 시작한다. 파일 조사와 방문 기록은 최대 n개씩 수행하고, 통계의 확정 단위는 논리 session이다. 하나의 session에는 main과 여러 subagent 파일이 함께 속할 수 있다. 파일의 session 귀속이 바뀌면 이전·새 session을 같은 반영 단위로 묶는다.
+
+`refreshSummary()`는 같은 호출 수명 안의 지역 함수로 원본 발견·부재 판정·파싱·영향 세션 확대·연결 성분 저장을 구분한다. 저장 가능한 성분의 반영 실패와 이미 파싱에 실패한 성분의 이전 값 보존은 별도 경계로 유지하며, 모든 단계는 기존 staging·잠금·취소·진행 상태를 공유한다. 파일과 summary iterator를 배열로 펼치지 않고 순차 처리한다.
 
 아래 절차는 각 문제에 대한 처리 기준이다. scan ID, 이번 실행의 대상 루트와 순회 완료 여부는 worker의 실행 상태로만 관리한다. 임시 작업 목록과 집계 결과는 디스크 staging에 두고 종료 시 폐기한다. 요청·모델·비용 결과와 이름·정상 metadata·삭제는 session transaction으로 함께 반영한다.
 
@@ -734,6 +740,8 @@ DB당 선택한 시간대 하나의 집계만 유지한다. 처음 집계할 때
 
 DB 모듈은 변경 이유별로 책임을 나눈다. `src/summary/db/index.ts`의 `SummaryDatabase`는 기존 worker·scanner API를 구성요소에 연결하는 facade다. `connection.ts`의 `SqliteSession`이 연결·PRAGMA·statement cache·transaction·optimize·close를 소유하고, `migrations.ts`는 schema 버전별 갱신을 처리한다. `manifest.ts`는 파일 발견·방문·진단·iterator, `sessions.ts`는 요청·모델·capability와 정상 metadata의 원자적 세션 교체, `billing.ts`는 비용 분류·재계산을 맡는다. 모든 구성요소는 하나의 `SqliteSession`을 공유하며 세션 교체 중 비용 반영도 같은 transaction에서 실행한다.
 
+`SessionStore.replaceSessions()`는 대상 준비·삭제 원본과 Skill 보존·기존 요청 삭제·manifest 반영·요청 삽입·복원과 삭제·rollup 갱신·이름 정리를 같은 클래스의 private 단계로 연결한다. 요청 하나는 [insertCapabilityUsage()](../src/summary/db/sessions.ts#L176) → [insertModelUsage()](../src/summary/db/sessions.ts#L185) → [saveSummaryCost()](../src/summary/db/sessions.ts#L205) 순서로 도구 통계·모델 검증과 저장·결제 방식 선택과 비용 반영을 구분한다. TEMP 준비부터 마지막 정리까지 하나의 transaction 안에서 기존 순서로 수행하며, 어느 단계가 실패해도 함께 rollback한다.
+
 `reader.ts`는 조회 실행·페이지·결과 변환과 rollup/raw 경로 선택, `queries.ts`는 기존 facts SQL 생성, `validation.ts`는 공통 수치·페이지 검증을 맡는다. `rollup-state.ts`는 병합 가능한 상태와 schema, `rollup-queries.ts`는 일별 상태·raw 경계의 SQL, `rollups.ts`는 구축·세션별 갱신·조회 snapshot을 맡는다. 실제 통계 worker는 `queryUsagePage()` 한 번으로 페이지 행과 전체 개수를 같은 snapshot에서 읽고, 반환된 행으로 도표를 만든다. 요청별·비용 포함·구버전 Node의 raw 조회도 같은 페이지 계약을 사용하며 별도의 도표 조회 메서드와 누계 요청·응답 계약은 두지 않는다. 목록과 개수는 같은 필터·그룹 정의를 사용하고 모델 해석은 공통 facts 표현식을 재사용한다. SQL 구조와 바인딩을 함께 반환하며 시간대·기간·ID는 SQL 문자열에 삽입하지 않는다. 집계 표본·NULL·미상 정렬과 기존 원본 인덱스를 보존한다.
 
 SQLite 조회 계획용 통계는 DB 열기에서 `PRAGMA main.optimize=0x10002`, 첫 스캔 완료와 이후 24시간 이상 지난 스캔 완료 및 연결 종료에서 `PRAGMA main.optimize`로 수집한다. `main`만 지정하여 TEMP 파싱 테이블은 분석하지 않는다. 새 인덱스 생성·기존 인덱스 정리 뒤에도 열기 시 통계 수집이 적용되며, 다른 운영체제에서 복사한 같은 schema version의 DB도 열 때 identity 인덱스를 현재 플랫폼에 맞춘다. 통계 수집은 선택적 유지보수여서 실패가 스캔·연결 정리를 실패시키지 않고 다음 실행 시점에 다시 시도한다. `PRAGMA optimize`는 평균 결과 캐시가 아니라 필요한 `ANALYZE`를 선택하는 SQLite 기능이다. [SQLite 권고](https://www.sqlite.org/lang_analyze.html).
@@ -864,6 +872,8 @@ GROUP BY provider, project_key, session_id;
 schema version 2는 기존 `turn_summary`의 행·id·manifest 참조를 보존하며 `failed` 상태를 추가한다. parser version 4는 변경되지 않은 원본도 다음 통계 갱신에서 재파싱해 기존 시간과 실패 분류를 보정한다.
 
 ### 8.3 사용량 도표
+
+`media/dashboard.js`의 동일 IIFE에서 `renderChart()`가 범례·배치·축·범주·막대 조립을 순서대로 호출한다. 막대는 [성분과 상세 설명 조립](../media/dashboard.js#L536), [가로·세로 및 모델·제공자 레이블 조립](../media/dashboard.js#L558)을 구분하며 레이블 분기는 조기 반환으로 표현한다. `updateUsage()`는 Skill·요청·집계 표를 구분하고 토큰 페이지와 품질 안내를 이어 갱신한다. 배치 값은 지역 객체로 전달하며 기존 상태 소유권과 `renderUsage()`의 스크롤 복원 범위를 유지한다. 호스트의 `parseDashboardMessage()`는 메시지 종류를 선택하고 같은 파일의 비공개 `parseUsageMessage()`가 사용량 조회 필드를 검증한다. 필수 제어값 오류의 전체 거부와 잘못된 선택 필터 생략을 구분한다.
 
 사용량 통계 표 위의 총 토큰·평균 토큰 도표는 `Input / Output / Cache Write / Cache Read`를 각각 VS Code 테마의 파랑·주황·보라·초록으로 구분해 쌓은 누적 막대로 표시한다. 제공자에 관계없이 같은 토큰 항목은 같은 색상을 사용하며 모든 구간은 불투명하게 표시한다. 도표 위의 토큰 구성 범례는 이 순서의 이름과 막대에 적용한 색상을 함께 표시하고 좁은 화면에서는 줄바꿈한다. 구성이 미확인인 막대가 있으면 회색 ‘구성 미확인’을 범례에 추가한다. 제공자별·모델별의 총 토큰·평균 토큰 도표에서 같은 범례를 사용하며, 평균 시간·요청 수와 빈 결과에서는 범례를 비우고 숨긴다. 총 토큰 막대는 항목별 총량, 평균 토큰 막대는 항목별 완료 요청 평균을 쌓는다. Input은 cache read/write를 제외한 화면 표시 값을 사용한다. 별도의 ‘토큰 구성’ 지표는 두지 않는다.
 

@@ -96,7 +96,11 @@ export class Dashboard implements vscode.Disposable {
   private async handle(message: NonNullable<ReturnType<typeof parseDashboardMessage>>): Promise<void> {
     if (!this.dependencies.settings().usage.enabled) return;
     switch (message.type) {
-      case 'ready': if (!this.ready) { this.ready = true; this.enter(); } break;
+      case 'ready':
+        if (this.ready) break;
+        this.ready = true;
+        this.enter();
+        break;
       case 'openDiagnostics': this.openDiagnostics(); break;
       case 'settings': await vscode.commands.executeCommand('agentTracker.openSettings'); break;
       case 'cancelUsage': this.dependencies.summary.cancel(); break;
@@ -145,16 +149,25 @@ export class Dashboard implements vscode.Disposable {
       if (this.diagnosticsPanel !== panel) return;
       const message = parseDashboardMessage(raw);
       if (!message || !this.dependencies.settings().usage.enabled) return;
-      if (message.type === 'ready') {
+      this.handleDiagnostics(message);
+    });
+  }
+
+  private handleDiagnostics(message: NonNullable<ReturnType<typeof parseDashboardMessage>>): void {
+    switch (message.type) {
+      case 'ready':
         if (this.diagnosticsReady) return;
         this.diagnosticsReady = true;
         void this.loadDiagnostics(0).catch(error => this.error(error, true));
-      } else if (message.type === 'diagnostics' && this.diagnosticsReady) {
+        break;
+      case 'diagnostics':
+        if (!this.diagnosticsReady) return;
         void this.loadDiagnostics(message.offset).catch(error => this.error(error, true));
-      } else if (message.type === 'settings') {
+        break;
+      case 'settings':
         void vscode.commands.executeCommand('agentTracker.openSettings');
-      }
-    });
+        break;
+    }
   }
 
   private enter(): void {

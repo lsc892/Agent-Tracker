@@ -12,6 +12,12 @@ const commands = [
 // Native hover rules extend through the content padding to both card edges.
 const sectionDivider = '---';
 
+type TooltipSettings = {
+  display: Pick<TrackerConfiguration['display'], 'percentage' | 'detail'>;
+  usage?: Pick<TrackerConfiguration['usage'], 'enabled'>;
+  codex?: Pick<TrackerConfiguration['codex'], 'showReserve' | 'showResetCredits'>;
+};
+
 function commandLink(label: string, command: string, args?: string[]): string {
   const query = args ? `?${encodeURIComponent(JSON.stringify(args))}` : '';
   return `[${label}](command:${command}${query})`;
@@ -30,8 +36,9 @@ function countdown(timestamp: number, now: number): string {
   const minutes = Math.max(0, Math.ceil((timestamp - now) / 60_000));
   const days = Math.floor(minutes / 1440);
   const hours = Math.floor(minutes % 1440 / 60);
-  return days ? t('duration.daysHours', { value0: days, value1: hours }) : hours
-    ? t('duration.hoursMinutes', { value0: hours, value1: minutes % 60 }) : t('duration.minutes', { value0: minutes });
+  if (days) return t('duration.daysHours', { value0: days, value1: hours });
+  if (hours) return t('duration.hoursMinutes', { value0: hours, value1: minutes % 60 });
+  return t('duration.minutes', { value0: minutes });
 }
 
 function muted(text: string): string {
@@ -55,8 +62,9 @@ function appendWindow(tooltip: vscode.MarkdownString, window: QuotaWindow, perce
 }
 
 function resetCaption(window: QuotaWindow, now: number): string {
-  return window.resetsAt === null || !Number.isFinite(window.resetsAt) ? t('quota.resetUnknown')
-    : window.resetsAt <= now ? t('quota.resetElapsed') : t('quota.resetIn', { value0: countdown(window.resetsAt, now) });
+  if (window.resetsAt === null || !Number.isFinite(window.resetsAt)) return t('quota.resetUnknown');
+  if (window.resetsAt <= now) return t('quota.resetElapsed');
+  return t('quota.resetIn', { value0: countdown(window.resetsAt, now) });
 }
 
 /**
@@ -79,11 +87,7 @@ function meterWidth(windows: readonly QuotaWindow[], now: number): number {
  */
 export function createQuotaTooltip(
   states: readonly QuotaState[],
-  settings: {
-    display: Pick<TrackerConfiguration['display'], 'percentage' | 'detail'>;
-    usage?: Pick<TrackerConfiguration['usage'], 'enabled'>;
-    codex?: Pick<TrackerConfiguration['codex'], 'showReserve' | 'showResetCredits'>;
-  },
+  settings: TooltipSettings,
   now = Date.now(),
 ): vscode.MarkdownString {
   const tooltip = new vscode.MarkdownString();
@@ -108,57 +112,75 @@ export function createQuotaTooltip(
     const state = states.find(value => value.provider === provider);
     if (!state) continue;
     const section = new vscode.MarkdownString();
-    const name = provider === 'codex' ? 'Codex' : 'Claude';
-    // The server reports gpt-reserve under limitId=base_model_inference.
-    // Retain the name separately: single-bucket labels contain only the duration.
-    const windows = (state.snapshot?.windows ?? []).filter(window =>
-      provider !== 'codex' || settings.codex?.showReserve === true ||
-      window.limitId !== 'gpt-reserve' && window.limitName !== 'gpt-reserve');
-    const overall = windows.filter(window => provider === 'codex' ? window.limitId === 'codex' : window.id === 'five_hour' || window.id === 'seven_day');
-    const standard = overall.length ? overall : windows.filter(window => window.label === '5h' || window.label === '7d');
-    const main = [...(standard.length ? standard : windows)].sort((a, b) =>
-      (a.windowDurationMins === 300 ? 0 : a.windowDurationMins === 10080 ? 1 : 2) - (b.windowDurationMins === 300 ? 0 : b.windowDurationMins === 10080 ? 1 : 2));
-    const extra = windows.filter(window => !main.includes(window));
-    section.appendMarkdown(`$(agent-tracker-${provider}) **${name}**\n\n`);
-    if (!windows.length) {
-      section.appendMarkdown(state.snapshot?.windows.length ? t('quota.noVisibleWindows')
-        : state.refreshing ? t('quota.loadingLine') : t('quota.unavailableLine'));
-    } else {
-      const width = meterWidth(main, now);
-      const columnGap = (index: number): string => index < main.length - 1 ? ' &nbsp;&nbsp;&nbsp;' : '';
-      section.appendMarkdown('| ' + main.map((window, index) => {
-        const cell = new vscode.MarkdownString();
-        appendWindow(cell, window, settings.display.percentage, now, width, true);
-        return cell.value + columnGap(index);
-      }).join(' | ') + ' |\n');
-      section.appendMarkdown('| ' + main.map(() => ':---').join(' | ') + ' |\n');
-      section.appendMarkdown('| ' + main.map((window, index) => muted(resetCaption(window, now)) + columnGap(index)).join(' | ') + ' |\n');
-      for (const window of extra) {
-        section.appendMarkdown('\n\n');
-        appendWindow(section, window, settings.display.percentage, now, meterWidth([window], now));
-        section.appendMarkdown(`  \n${muted(resetCaption(window, now))}`);
-      }
-      section.appendMarkdown('\n\n');
-    }
-    const credits = provider === 'codex' && settings.codex?.showResetCredits !== false ? state.snapshot?.rateLimitResetCredits : undefined;
-    if (credits) {
-      section.appendMarkdown(`${muted(`<strong>${t('quota.resetCredits', { value0: credits.availableCount })}</strong>`)}\n\n`);
-      if (credits.nextExpiresAt !== null) {
-        const expiry = credits.nextExpiresAt <= now ? t('quota.expiryElapsed') : t('quota.expiresIn', { value0: countdown(credits.nextExpiresAt, now) });
-        section.appendMarkdown(`${muted(expiry)}\n\n`);
-      }
-    }
-    if (state.snapshot) {
-      if (state.refreshing) section.appendMarkdown(t('quota.refreshingLine'));
-      if (state.status === 'stale') section.appendMarkdown(t('quota.staleLine'));
-    }
-    if (state.error) {
-      section.appendText(state.error.translation ? t(state.error.translation.key, state.error.translation.values) : state.error.message);
-      section.appendMarkdown('\n\n');
-    }
+    appendProviderWindows(section, state, provider, settings, now);
+    appendResetCredits(section, state, provider, settings, now);
+    appendProviderStatus(section, state);
     tooltip.appendMarkdown(`\n\n${sectionDivider}\n\n${section.value}`);
   }
   tooltip.appendMarkdown(`\n\n${sectionDivider}\n\n${settings.usage?.enabled === false ? t('quota.statisticsDisabled') : commandLink(t('quota.statistics'), 'agentTracker.openUsage')}`);
   tooltip.appendMarkdown(`\n\n${commandLink(t('quota.settings'), 'agentTracker.openSettings')}`);
   return tooltip;
+}
+
+function appendProviderWindows(section: vscode.MarkdownString, state: QuotaState, provider: QuotaState['provider'], settings: TooltipSettings, now: number): void {
+  const name = provider === 'codex' ? 'Codex' : 'Claude';
+  // The server reports gpt-reserve under limitId=base_model_inference.
+  // Retain the name separately: single-bucket labels contain only the duration.
+  const windows = (state.snapshot?.windows ?? []).filter(window =>
+    provider !== 'codex' || settings.codex?.showReserve === true ||
+    window.limitId !== 'gpt-reserve' && window.limitName !== 'gpt-reserve');
+  const overall = windows.filter(window => provider === 'codex' ? window.limitId === 'codex' : window.id === 'five_hour' || window.id === 'seven_day');
+  const standard = overall.length ? overall : windows.filter(window => window.label === '5h' || window.label === '7d');
+  const main = [...(standard.length ? standard : windows)].sort((a, b) => windowPriority(a) - windowPriority(b));
+  const extra = windows.filter(window => !main.includes(window));
+  section.appendMarkdown(`$(agent-tracker-${provider}) **${name}**\n\n`);
+  if (!windows.length) {
+    section.appendMarkdown(emptyWindowsMessage(state));
+    return;
+  }
+
+  const width = meterWidth(main, now);
+  const columnGap = (index: number): string => index < main.length - 1 ? ' &nbsp;&nbsp;&nbsp;' : '';
+  section.appendMarkdown('| ' + main.map((window, index) => {
+    const cell = new vscode.MarkdownString();
+    appendWindow(cell, window, settings.display.percentage, now, width, true);
+    return cell.value + columnGap(index);
+  }).join(' | ') + ' |\n');
+  section.appendMarkdown('| ' + main.map(() => ':---').join(' | ') + ' |\n');
+  section.appendMarkdown('| ' + main.map((window, index) => muted(resetCaption(window, now)) + columnGap(index)).join(' | ') + ' |\n');
+  for (const window of extra) {
+    section.appendMarkdown('\n\n');
+    appendWindow(section, window, settings.display.percentage, now, meterWidth([window], now));
+    section.appendMarkdown(`  \n${muted(resetCaption(window, now))}`);
+  }
+  section.appendMarkdown('\n\n');
+}
+
+function windowPriority(window: QuotaWindow): number {
+  if (window.windowDurationMins === 300) return 0;
+  if (window.windowDurationMins === 10080) return 1;
+  return 2;
+}
+
+function emptyWindowsMessage(state: QuotaState): string {
+  if (state.snapshot?.windows.length) return t('quota.noVisibleWindows');
+  return state.refreshing ? t('quota.loadingLine') : t('quota.unavailableLine');
+}
+
+function appendResetCredits(section: vscode.MarkdownString, state: QuotaState, provider: QuotaState['provider'], settings: TooltipSettings, now: number): void {
+  const credits = provider === 'codex' && settings.codex?.showResetCredits !== false ? state.snapshot?.rateLimitResetCredits : undefined;
+  if (!credits) return;
+  section.appendMarkdown(`${muted(`<strong>${t('quota.resetCredits', { value0: credits.availableCount })}</strong>`)}\n\n`);
+  if (credits.nextExpiresAt === null) return;
+  const expiry = credits.nextExpiresAt <= now ? t('quota.expiryElapsed') : t('quota.expiresIn', { value0: countdown(credits.nextExpiresAt, now) });
+  section.appendMarkdown(`${muted(expiry)}\n\n`);
+}
+
+function appendProviderStatus(section: vscode.MarkdownString, state: QuotaState): void {
+  const hasSnapshot = !!state.snapshot;
+  if (hasSnapshot && state.refreshing) section.appendMarkdown(t('quota.refreshingLine'));
+  if (hasSnapshot && state.status === 'stale') section.appendMarkdown(t('quota.staleLine'));
+  if (!state.error) return;
+  section.appendText(state.error.translation ? t(state.error.translation.key, state.error.translation.values) : state.error.message);
+  section.appendMarkdown('\n\n');
 }

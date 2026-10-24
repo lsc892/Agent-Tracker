@@ -144,9 +144,25 @@ function atomicWrite(path, contents) {
 }
 
 function backup(path, contents) {
-  if (existsSync(path)) {
-    if (hash(readFileSync(path)) !== hash(contents)) throw new Error(`기존 백업과 원본이 다릅니다: ${path}`);
-  } else writeFileSync(path, contents, { flag: 'wx' });
+  if (!existsSync(path)) { writeFileSync(path, contents, { flag: 'wx' }); return; }
+  if (hash(readFileSync(path)) !== hash(contents)) throw new Error(`기존 백업과 원본이 다릅니다: ${path}`);
+}
+
+function restoreWorkbench(target, productPath, source, productSource, state) {
+  if (!state) throw new Error('복원할 토글 패치 백업이 없습니다.');
+  const original = readFileSync(`${target}.agent-tracker-toggle.bak`);
+  const originalProduct = readFileSync(`${productPath}.agent-tracker-toggle.bak`);
+  if (hash(original) !== state.originalHash || hash(originalProduct) !== state.originalProductHash) throw new Error('백업 무결성 검증 실패.');
+  const restored = hash(source) === state.originalHash && hash(productSource) === state.originalProductHash;
+  if (restored) return 'already-restored';
+  if (![state.originalHash, state.patchedHash, state.previousHash].includes(hash(source)) || ![state.originalProductHash, state.patchedProductHash, state.previousProductHash].includes(hash(productSource))) throw new Error('패치 이후 파일이 변경되어 자동 복원을 중단합니다.');
+  try {
+    atomicWrite(target, original);
+    atomicWrite(productPath, originalProduct);
+  } catch (error) {
+    atomicWrite(target, source); atomicWrite(productPath, productSource); throw error;
+  }
+  return 'restored';
 }
 
 /**
@@ -167,19 +183,7 @@ function operate(options = {}) {
   const productBackup = `${productPath}.agent-tracker-toggle.bak`;
   const state = existsSync(statePath) ? JSON.parse(readFileSync(statePath, 'utf8')) : undefined;
   if (options.restore) {
-    if (!state) throw new Error('복원할 토글 패치 백업이 없습니다.');
-    const original = readFileSync(sourceBackup), originalProduct = readFileSync(productBackup);
-    if (hash(original) !== state.originalHash || hash(originalProduct) !== state.originalProductHash) throw new Error('백업 무결성 검증 실패.');
-    const restored = hash(source) === state.originalHash && hash(productSource) === state.originalProductHash;
-    if (restored) return { status: 'already-restored', appRoot, version: manifest.version };
-    if (![state.originalHash, state.patchedHash, state.previousHash].includes(hash(source)) || ![state.originalProductHash, state.patchedProductHash, state.previousProductHash].includes(hash(productSource))) throw new Error('패치 이후 파일이 변경되어 자동 복원을 중단합니다.');
-    try {
-      atomicWrite(target, original);
-      atomicWrite(productPath, originalProduct);
-    } catch (error) {
-      atomicWrite(target, source); atomicWrite(productPath, productSource); throw error;
-    }
-    return { status: 'restored', appRoot, version: manifest.version };
+    return { status: restoreWorkbench(target, productPath, source, productSource, state), appRoot, version: manifest.version };
   }
   const result = patchSource(source);
   if (result.alreadyPatched) {
@@ -217,13 +221,15 @@ function main(args) {
   const options = {};
   for (let index = 0; index < args.length; index++) {
     const arg = args[index];
-    if (arg === '--restore') options.restore = true;
-    else if (arg === '--check') options.check = true;
-    else if (arg === '--app-root' || arg === '--executable' || arg === '--cli') {
-      const value = args[++index];
-      if (!value || value.startsWith('--')) throw new Error(`${arg} 값이 필요합니다.`);
-      options[arg === '--app-root' ? 'appRoot' : arg === '--cli' ? 'cli' : 'executable'] = value;
-    } else throw new Error(`알 수 없는 옵션: ${arg}`);
+    switch (arg) {
+      case '--restore': options.restore = true; continue;
+      case '--check': options.check = true; continue;
+      case '--app-root': case '--executable': case '--cli': break;
+      default: throw new Error(`알 수 없는 옵션: ${arg}`);
+    }
+    const value = args[++index];
+    if (!value || value.startsWith('--')) throw new Error(`${arg} 값이 필요합니다.`);
+    options[arg === '--app-root' ? 'appRoot' : arg.slice(2)] = value;
   }
   if (options.restore && options.check) throw new Error('--restore와 --check는 함께 사용할 수 없습니다.');
   console.log(JSON.stringify(operate(options), null, 2));

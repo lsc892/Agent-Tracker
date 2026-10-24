@@ -77,53 +77,38 @@ export async function refreshSummary(
     database.setManifestDiagnostic(file.id,code === 'interrupted' ? 'interrupted' : 'error',`parse: byte=${offset}`,code,offset);
     result.failed++;
   };
-  /**
-   * 책임: 관측한 파일 스냅샷을 파싱하고 변경·실패를 진단으로 남긴다.
-   * 알고리즘: 읽기 전후 파일 identity·크기·수정 시각을 검사하고 JSONL 청크를 TEMP에 적재하며, 실패한 세션의 기존 통계는 보존한다.
-   */
-  const parse = async (file: StagedFile): Promise<void> => {
-    check();
-    database.setManifestDiagnostic(file.id,'processing','parse: byte=0',null);
-    const sink = { identity: staging.identity.bind(staging,file.id),event: staging.event.bind(staging,file.id) };
-    const context = {provider:file.provider,path:file.path,sourceRoot:file.source_root,fileId:file.id,collectCapabilities};
-    const parser = file.provider === 'claude' ? new ClaudeParserAdapter(context,sink) : new CodexCurrentParserAdapter(context,sink);
-    try {
-      const snapshot = await lstat(file.path);
-      if (!snapshot.isFile() || snapshot.isSymbolicLink() || String(snapshot.dev) !== file.dev || String(snapshot.ino) !== file.inode || snapshot.size < file.size_bytes) {
-        throw new SummaryError('file-replaced-during-read');
-      }
-      const read = await readJsonl(file.path,file.size_bytes,(row,offset) => parser.row(row,offset),
-        {signal,isCancelled,maxLineBytes:options.maxLineBytes,onBytes:bytes => { result.bodyBytes += bytes; report(); },
-          processBatch:parseRows => staging.batchEvents(parseRows)});
-      const after = await lstat(file.path);
-      if (String(after.dev) !== file.dev || String(after.ino) !== file.inode || after.size < file.size_bytes
-          || after.size === file.size_bytes && after.mtimeMs !== file.mtime_ms) throw new SummaryError('file-rewritten-during-read');
-      if (read.rows === 0) {
-        database.connection.prepare('UPDATE scan_files SET parsed=1,failed=? WHERE id=?')
-          .run(Number(read.partialLine && file.old_session !== null),file.id);
-        if (read.partialLine) {
-          // There is no complete provider record yet. Keep an accepted session intact without reporting a parse error.
-          database.setManifestDiagnostic(file.id,'done','partial-line: waiting for newline',null);
-        } else if (file.old_session === null) {
-          database.replaceSessions({sessions:[],summaries:[],files:[{...file,session_id:null}]});
-          database.connection.prepare('UPDATE scan_files SET settled=1 WHERE id=?').run(file.id);
-        }
-        result.parsed++;
-        return;
-      }
-      parser.finish();
-      if (read.partialLine) staging.flag(file.id,'*','partial-line');
-      result.parsed++;
-    } catch (error) {
-      const identity=parser.getIdentity();
-      if (identity) staging.identity(file.id,identity);
-      failFile(file,error);
-      if (isCancelled()) throw error;
-    }
-    report();
-  };
   try {
     report(true);
+    await discoverSources();
+    check();
+    markMissingSources();
+    await readSessionNames(staging,roots,isCancelled);
+    check();
+    phase = 'parsing'; report(true);
+    for (const file of staging.files('changed=1 AND removed=0')) await parseSource(file);
+    await expandAffectedSessions();
+    staging.excludeVerifiedPrefixes();
+    check();
+    phase = 'committing'; report(true);
+    await commitComponents();
+    check();
+    database.transaction(() => applySessionNames(database.connection));
+    database.optimize();
+  } catch (error) {
+    result.interrupted = true;
+    const code = isCancelled() ? 'interrupted' : error instanceof SummaryError ? error.code : 'source-discovery-error';
+    result.error = code;
+    for (const file of staging.files('(changed=1 OR parsed=1) AND failed=0 AND removed=0 AND settled=0')) {
+      database.setManifestDiagnostic(file.id,code === 'interrupted' ? 'interrupted' : 'error','scan',code);
+    }
+    if (!isCancelled()) result.failed++;
+  } finally {
+    try { staging.close(); } finally { await release(); }
+    phase = 'complete';result.completedAt = new Date().toISOString();report(true);
+  }
+  return result;
+
+  async function discoverSources(): Promise<void> {
     // Discovery has bounded metadata batches. Body reads begin only after all roots complete.
     let batch: (FileMetadata & { previous?: ManifestRow })[] = [];
     let batchBytes = 0;
@@ -154,11 +139,13 @@ export async function refreshSummary(
           const file: FileMetadata & { previous?: ManifestRow } = {provider:root.provider,source_root:root.path,path:resolve(path),session_id:null,
             size_bytes:stat.size,mtime_ms:stat.mtimeMs,dev:String(stat.dev),inode:String(stat.ino),parser_version:PARSER_VERSION};
           file.previous = database.findManifest(root.provider,file.path);
-          if (!file.previous && process.platform !== 'win32') {
-            const candidates = database.findIdentity(file.provider,file.dev,file.inode);
-            if (candidates.length === 1 && candidates[0].last_seen_scan_id !== result.scanId) {
-              try { await lstat(candidates[0].path); }
-              catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') file.previous = candidates[0]; }
+          const identityCandidates = !file.previous && process.platform !== 'win32'
+            ? database.findIdentity(file.provider,file.dev,file.inode) : undefined;
+          const movedSource = identityCandidates?.length === 1 ? identityCandidates[0] : undefined;
+          if (movedSource && movedSource.last_seen_scan_id !== result.scanId) {
+            try { await lstat(movedSource.path); }
+            catch (error) {
+              if ((error as NodeJS.ErrnoException).code === 'ENOENT') file.previous = movedSource;
             }
           }
           const bytes = Buffer.byteLength(file.path + file.source_root,'utf8') + 256;
@@ -175,14 +162,66 @@ export async function refreshSummary(
         if (!missingEmptyRoot) throw error;
       }
     }
-    check();
+  }
+
+  function markMissingSources(): void {
     for (const root of roots) for (const file of database.unseenFiles(root.provider,root.path,result.scanId)) {
       staging.addFile(file,file.session_id,file.source_missing !== 1 || !retainDeletedSourceUsage,true);
     }
-    await readSessionNames(staging,roots,isCancelled);
+  }
+
+  /**
+   * 책임: 관측한 파일 스냅샷을 파싱하고 변경·실패를 진단으로 남긴다.
+   * 알고리즘: 읽기 전후 파일 identity·크기·수정 시각을 검사하고 JSONL 청크를 TEMP에 적재하며, 실패한 세션의 기존 통계는 보존한다.
+   */
+  async function parseSource(file: StagedFile): Promise<void> {
     check();
-    phase = 'parsing'; report(true);
-    for (const file of staging.files('changed=1 AND removed=0')) await parse(file);
+    database.setManifestDiagnostic(file.id,'processing','parse: byte=0',null);
+    const sink = { identity: staging.identity.bind(staging,file.id),event: staging.event.bind(staging,file.id) };
+    const context = {provider:file.provider,path:file.path,sourceRoot:file.source_root,fileId:file.id,collectCapabilities};
+    const parser = file.provider === 'claude' ? new ClaudeParserAdapter(context,sink) : new CodexCurrentParserAdapter(context,sink);
+    try {
+      const snapshot = await lstat(file.path);
+      if (!snapshot.isFile() || snapshot.isSymbolicLink() || String(snapshot.dev) !== file.dev || String(snapshot.ino) !== file.inode || snapshot.size < file.size_bytes) {
+        throw new SummaryError('file-replaced-during-read');
+      }
+      const read = await readJsonl(file.path,file.size_bytes,(row,offset) => parser.row(row,offset),
+        {signal,isCancelled,maxLineBytes:options.maxLineBytes,onBytes:bytes => { result.bodyBytes += bytes; report(); },
+          processBatch:parseRows => staging.batchEvents(parseRows)});
+      const after = await lstat(file.path);
+      if (String(after.dev) !== file.dev || String(after.ino) !== file.inode || after.size < file.size_bytes
+          || after.size === file.size_bytes && after.mtimeMs !== file.mtime_ms) throw new SummaryError('file-rewritten-during-read');
+      if (read.rows === 0) {
+        recordEmptySource(file,read.partialLine);
+        result.parsed++;
+        return;
+      }
+      parser.finish();
+      if (read.partialLine) staging.flag(file.id,'*','partial-line');
+      result.parsed++;
+    } catch (error) {
+      const identity=parser.getIdentity();
+      if (identity) staging.identity(file.id,identity);
+      failFile(file,error);
+      if (isCancelled()) throw error;
+    }
+    report();
+  }
+
+  function recordEmptySource(file: StagedFile, partialLine: boolean): void {
+    database.connection.prepare('UPDATE scan_files SET parsed=1,failed=? WHERE id=?')
+      .run(Number(partialLine && file.old_session !== null),file.id);
+    if (partialLine) {
+      // There is no complete provider record yet. Keep an accepted session intact without reporting a parse error.
+      database.setManifestDiagnostic(file.id,'done','partial-line: waiting for newline',null);
+      return;
+    }
+    if (file.old_session !== null) return;
+    database.replaceSessions({sessions:[],summaries:[],files:[{...file,session_id:null}]});
+    database.connection.prepare('UPDATE scan_files SET settled=1 WHERE id=?').run(file.id);
+  }
+
+  async function expandAffectedSessions(): Promise<void> {
     // Expands the set on disk: every surviving source of an affected logical session is reread.
     while (true) {
       staging.resolveLineage();
@@ -199,16 +238,15 @@ export async function refreshSummary(
         try {
           await readJsonl(candidate.path,candidate.size_bytes,row => {
             const payload = row.payload as {id?:unknown;thread_id?:unknown}|undefined;
-            if (row.type === 'session_meta' && payload) {
-              const id = payload.id ?? payload.thread_id;
-              if (typeof id === 'string') metadataThread=id;
-            }
+            if (row.type !== 'session_meta' || !payload) return false;
+            const id = payload.id ?? payload.thread_id;
+            if (typeof id === 'string') metadataThread=id;
             return false;
           },{signal,maxLineBytes:options.maxLineBytes,onBytes:bytes=>{result.bodyBytes+=bytes;}});
           const referenced = metadataThread && database.connection.prepare(`SELECT 1 FROM scan_files child
             WHERE child.provider='codex' AND child.parsed=1 AND child.removed=0 AND (child.parent_thread_id=? OR child.forked_from_id=?) LIMIT 1`)
             .get(metadataThread,metadataThread);
-          if (referenced) { result.reused=Math.max(0,result.reused-1);await parse(candidate);locatedParent=true; }
+          if (referenced) { result.reused=Math.max(0,result.reused-1);await parseSource(candidate);locatedParent=true; }
         } catch { check(); }
       }
       if (locatedParent) staging.resolveLineage();
@@ -232,57 +270,23 @@ export async function refreshSummary(
       }
       const next = staging.files(`parsed=0 AND failed=0 AND removed=0 AND EXISTS(
         SELECT 1 FROM affected a WHERE a.provider=scan_files.provider AND a.session_id=scan_files.session_id)`).next();
-      if (next.done) { if (excluded.length) continue; break; }
-      result.reused = Math.max(0,result.reused - 1);
-      await parse(next.value);
+      if (!next.done) {
+        result.reused = Math.max(0,result.reused - 1);
+        await parseSource(next.value);
+        continue;
+      }
+      if (!excluded.length) break;
     }
-    staging.excludeVerifiedPrefixes();
-    check();
-    phase = 'committing'; report(true);
+  }
+
+  async function commitComponents(): Promise<void> {
     while (staging.nextComponent()) {
       await yieldToWorker();
       check();
       if (!staging.componentFailed()) {
-        staging.prepareSummaries();
-        check();
-        if (retainDeletedSourceUsage) {
-          // Surviving subagents cannot recreate a deleted main request. Keep the stored
-          // usable snapshot instead of inventing a replacement from orphaned events.
-          database.connection.exec(`DELETE FROM prepared_turns WHERE has_main=0 AND EXISTS(
-            SELECT 1 FROM scan_files f WHERE f.provider=prepared_turns.provider
-              AND f.old_session=prepared_turns.session_id AND f.removed=1)`);
-        }
-        // Rootless subagents already have independent sessions; unresolved explicit roots remain diagnostics.
-        const orphan = database.connection.prepare('SELECT file_id,byte_offset FROM prepared_turns WHERE has_main=0 LIMIT 1').get() as {file_id:number;byte_offset:number}|undefined;
-        if (orphan) {
-          const file = database.connection.prepare('SELECT * FROM scan_files WHERE id=?').get(orphan.file_id) as unknown as StagedFile;
-          failFile(file,new SummaryError('missing-root-turn',orphan.byte_offset));
-        } else {
-          try {
-            database.replaceSessions({sessions:staging.componentSessions(),summaries:staging.summaries(),
-              preserveCapabilities:!collectCapabilities,
-              retainDeletedSourceUsage,
-              files:staging.files(`removed=0 AND ${componentPredicate}`),
-              removedFileIds:(function* () { for (const file of staging.files(`removed=1 AND ${componentPredicate}`)) yield file.id; })()});
-          } catch {
-            for (const file of staging.files(componentPredicate)) failFile(file,new SummaryError('session-commit-error'));
-          }
-        }
+        commitPreparedComponent();
       } else {
-        const failure = database.connection.prepare(`SELECT f.id,f.failed,m.last_error FROM scan_files f JOIN manifest m ON m.id=f.id
-          WHERE f.failed=1 AND ${componentPredicate.replaceAll('scan_files.','f.')} LIMIT 1`).get() as {id:number;last_error:string|null}|undefined;
-        if (failure?.last_error) for (const file of staging.files(`failed=0 AND ${componentPredicate}`)) {
-          database.setManifestDiagnostic(file.id,'error','session: preserved',failure.last_error);
-        }
-        if (retainDeletedSourceUsage) {
-          database.replaceSessions({retainDeletedSourceUsage:true,files:[],summaries:[],
-            sessions:(function* () {
-              for (const file of staging.files(`removed=1 AND old_session IS NOT NULL AND ${componentPredicate}`)) {
-                yield {provider:file.provider,session_id:file.old_session!};
-              }
-            })(),
-            removedFileIds:(function* () { for (const file of staging.files(`removed=1 AND ${componentPredicate}`)) yield file.id; })()});
-        }
+        preserveFailedComponent();
       }
       staging.finishComponent();
       report();
@@ -291,20 +295,50 @@ export async function refreshSummary(
     for (const file of staging.files('removed=1 AND old_session IS NULL')) {
       database.replaceSessions({sessions:[],summaries:[],files:[],removedFileIds:[file.id]});
     }
-    check();
-    database.transaction(() => applySessionNames(database.connection));
-    database.optimize();
-  } catch (error) {
-    result.interrupted = true;
-    const code = isCancelled() ? 'interrupted' : error instanceof SummaryError ? error.code : 'source-discovery-error';
-    result.error = code;
-    for (const file of staging.files('(changed=1 OR parsed=1) AND failed=0 AND removed=0 AND settled=0')) {
-      database.setManifestDiagnostic(file.id,code === 'interrupted' ? 'interrupted' : 'error','scan',code);
-    }
-    if (!isCancelled()) result.failed++;
-  } finally {
-    try { staging.close(); } finally { await release(); }
-    phase = 'complete';result.completedAt = new Date().toISOString();report(true);
   }
-  return result;
+
+  function commitPreparedComponent(): void {
+    staging.prepareSummaries();
+    check();
+    if (retainDeletedSourceUsage) {
+      // Surviving subagents cannot recreate a deleted main request. Keep the stored
+      // usable snapshot instead of inventing a replacement from orphaned events.
+      database.connection.exec(`DELETE FROM prepared_turns WHERE has_main=0 AND EXISTS(
+            SELECT 1 FROM scan_files f WHERE f.provider=prepared_turns.provider
+              AND f.old_session=prepared_turns.session_id AND f.removed=1)`);
+    }
+    // Rootless subagents already have independent sessions; unresolved explicit roots remain diagnostics.
+    const orphan = database.connection.prepare('SELECT file_id,byte_offset FROM prepared_turns WHERE has_main=0 LIMIT 1').get() as {file_id:number;byte_offset:number}|undefined;
+    if (orphan) {
+      const file = database.connection.prepare('SELECT * FROM scan_files WHERE id=?').get(orphan.file_id) as unknown as StagedFile;
+      failFile(file,new SummaryError('missing-root-turn',orphan.byte_offset));
+      return;
+    }
+    try {
+      database.replaceSessions({sessions:staging.componentSessions(),summaries:staging.summaries(),
+        preserveCapabilities:!collectCapabilities,
+        retainDeletedSourceUsage,
+        files:staging.files(`removed=0 AND ${componentPredicate}`),
+        removedFileIds:(function* () { for (const file of staging.files(`removed=1 AND ${componentPredicate}`)) yield file.id; })()});
+    } catch {
+      for (const file of staging.files(componentPredicate)) failFile(file,new SummaryError('session-commit-error'));
+    }
+  }
+
+  function preserveFailedComponent(): void {
+    const failure = database.connection.prepare(`SELECT f.id,f.failed,m.last_error FROM scan_files f JOIN manifest m ON m.id=f.id
+          WHERE f.failed=1 AND ${componentPredicate.replaceAll('scan_files.','f.')} LIMIT 1`).get() as {id:number;last_error:string|null}|undefined;
+    if (failure?.last_error) for (const file of staging.files(`failed=0 AND ${componentPredicate}`)) {
+      database.setManifestDiagnostic(file.id,'error','session: preserved',failure.last_error);
+    }
+    if (retainDeletedSourceUsage) {
+      database.replaceSessions({retainDeletedSourceUsage:true,files:[],summaries:[],
+        sessions:(function* () {
+          for (const file of staging.files(`removed=1 AND old_session IS NOT NULL AND ${componentPredicate}`)) {
+            yield {provider:file.provider,session_id:file.old_session!};
+          }
+        })(),
+        removedFileIds:(function* () { for (const file of staging.files(`removed=1 AND ${componentPredicate}`)) yield file.id; })()});
+    }
+  }
 }

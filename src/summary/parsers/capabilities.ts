@@ -92,6 +92,18 @@ function readsFile(command: string): boolean {
   return false;
 }
 
+function addSkillUse(args: Record<string,unknown>, uses: Use[]): void {
+  const skill=displayName(args.skill ?? args.name);
+  if (!skill) return;
+  uses.push({category:'skill',name:skill});
+  if (skill.includes(':')) uses.push({category:'plugin',name:skill.split(':')[0]});
+}
+
+function addShellSkillUses(args: Record<string,unknown>, uses: Use[]): void {
+  const command=string(args.cmd ?? args.command) ?? '';
+  if (readsFile(command)) uses.push(...skillPaths(command));
+}
+
 /**
  * 책임: 실제 도구 호출을 Skill·subagent·plugin 사용으로 분류한다.
  * 알고리즘: 호출명과 명시 인자를 기준으로 분류하고 파일 읽기 명령의 SKILL 경로를 추출한 뒤 같은 분류·이름을 중복 제거한다.
@@ -100,23 +112,14 @@ function directUses(name: string, args: Record<string,unknown>): Use[] {
   name=name.split('.').at(-1)!;
   const uses: Use[]=[];
   const lower=name.toLowerCase();
-  if (lower === 'skill') {
-    const skill=displayName(args.skill ?? args.name);
-    if (skill) {
-      uses.push({category:'skill',name:skill});
-      if (skill.includes(':')) uses.push({category:'plugin',name:skill.split(':')[0]});
-    }
-  }
+  if (lower === 'skill') addSkillUse(args,uses);
   if (['spawn_agent','task','agent'].includes(lower)) {
     uses.push({category:'subagent',name:displayName(args.subagent_type ?? args.agent_type) ?? 'default'});
   }
   const plugin=/^mcp__(.+?)__/.exec(name)?.[1];
   if (plugin) uses.push({category:'plugin',name:displayName(plugin)!});
   if (['read','read_file'].includes(lower)) uses.push(...skillPaths(string(args.file_path ?? args.path) ?? ''));
-  if (['exec_command','bash','powershell','shell_command','shell'].includes(lower)) {
-    const command=string(args.cmd ?? args.command) ?? '';
-    if (readsFile(command)) uses.push(...skillPaths(command));
-  }
+  if (['exec_command','bash','powershell','shell_command','shell'].includes(lower)) addShellSkillUses(args,uses);
   return uses.flatMap(use=>{ const name=displayName(use.name);return name ? [{...use,name}] : []; })
     .filter((use,index,all)=>all.findIndex(other=>other.category===use.category && other.name===use.name)===index);
 }

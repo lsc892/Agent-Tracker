@@ -4,6 +4,15 @@ import {
   SCHEMA_MODEL_SQL, SCHEMA_CAPABILITY_SQL, SCHEMA_ROLLUP_SQL, SCHEMA_TURN_INDEX_MIGRATION_SQL, manifestIdentityIndexSql,
 } from './schema';
 
+function initialMigrationSql(version: number): string {
+  switch (version) {
+    case 1:
+    case 2: return SCHEMA_LEGACY_MIGRATION_SQL;
+    case 3: return SCHEMA_CACHE_MIGRATION_SQL;
+    default: return SCHEMA_SQL;
+  }
+}
+
 /**
  * 책임: 기존 통계와 식별자를 보존하며 DB 스키마를 현재 버전으로 맞춘다.
  * 알고리즘: 쓰기 트랜잭션 안에서 버전을 다시 확인하고 버전별 SQL·누락 열을 적용한 뒤 운영체제별 인덱스와 user_version을 갱신한다.
@@ -17,8 +26,7 @@ export function migrateSchema(connection: DatabaseSync, transaction: (action: ()
       const current = connection.prepare('PRAGMA user_version').get() as { user_version: number };
       if (current.user_version > SCHEMA_VERSION) throw new Error('Database schema is newer than this extension');
       if (current.user_version === SCHEMA_VERSION) return;
-      connection.exec(current.user_version === 1 || current.user_version === 2 ? SCHEMA_LEGACY_MIGRATION_SQL
-        : current.user_version === 3 ? SCHEMA_CACHE_MIGRATION_SQL : SCHEMA_SQL);
+      connection.exec(initialMigrationSql(current.user_version));
       connection.exec(SCHEMA_MODEL_SQL);
       connection.exec(SCHEMA_CAPABILITY_SQL);
       connection.exec(SCHEMA_ROLLUP_SQL);

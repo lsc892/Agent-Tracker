@@ -38,10 +38,9 @@ function observe(stream, consume) {
   });
 }
 observe(process.stdin, message => {
-  if (allowedMethods.has(message.method)) {
-    evidence.methods.push(message.method);
-    if (message.id != null) pending.set(message.id, message.method);
-  } else evidence.errorCode = 'unexpected-rpc';
+  if (!allowedMethods.has(message.method)) { evidence.errorCode = 'unexpected-rpc'; return; }
+  evidence.methods.push(message.method);
+  if (message.id != null) pending.set(message.id, message.method);
 });
 observe(child.stdout, message => {
   const method = pending.get(message.id);
@@ -50,7 +49,9 @@ observe(child.stdout, message => {
   if (method === 'account/read') {
     const type = message.result?.account?.type;
     evidence.accountType = ['chatgpt', 'chatgptAuthTokens', 'apiKey'].includes(type) ? type : 'other';
-  } else if (method === 'account/rateLimits/read' && message.result) {
+    return;
+  }
+  if (method === 'account/rateLimits/read' && message.result) {
     evidence.expected = expectedCodex(message.result);
   }
 });

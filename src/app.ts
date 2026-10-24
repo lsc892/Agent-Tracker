@@ -208,10 +208,10 @@ export class AgentTrackerApp {
       this.quota = this.createQuota();
       this.quotaSubscription = this.quota.subscribe(() => this.render());
       this.quota.start(vscode.window.state.focused);
-    } else {
-      if (changes.pollingInterval) this.quota?.setPollingInterval(this.settings.quota.pollingIntervalSeconds);
-      this.quota?.setRefreshPolicy(this.settings.quota.refreshPolicy);
+      return;
     }
+    if (changes.pollingInterval) this.quota?.setPollingInterval(this.settings.quota.pollingIntervalSeconds);
+    this.quota?.setRefreshPolicy(this.settings.quota.refreshPolicy);
   }
 
   private createQuota(): QuotaService {

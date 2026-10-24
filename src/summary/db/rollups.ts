@@ -63,15 +63,19 @@ export class UsageRollupStore {
       const metadata = this.metadata();
       if (!this.calendarSupported()) return action(false);
       if (metadata?.format_version !== ROLLUP_FORMAT_VERSION || metadata.timezone !== timezone) {
-        this.clear();
-        for (const by of ['provider', 'model'] as const) {
-          this.database.statement(`INSERT INTO ${ROLLUP_TABLES[by]} ${aggregateUsageSource(by)}`).run(timezone);
-        }
-        this.database.statement('INSERT INTO usage_rollup_meta(singleton, timezone, format_version) VALUES (1, ?, ?)')
-          .run(timezone, ROLLUP_FORMAT_VERSION);
+        this.rebuild(timezone);
       }
       return action(true);
     });
+  }
+
+  private rebuild(timezone: string): void {
+    this.clear();
+    for (const by of ['provider', 'model'] as const) {
+      this.database.statement(`INSERT INTO ${ROLLUP_TABLES[by]} ${aggregateUsageSource(by)}`).run(timezone);
+    }
+    this.database.statement('INSERT INTO usage_rollup_meta(singleton, timezone, format_version) VALUES (1, ?, ?)')
+      .run(timezone, ROLLUP_FORMAT_VERSION);
   }
 
   /** Reuses the installer session set before it is cleared; old dates/projects are deleted too. */

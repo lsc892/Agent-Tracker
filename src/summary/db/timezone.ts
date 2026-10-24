@@ -1,18 +1,17 @@
 const formatters = new Map<string, Intl.DateTimeFormat>();
 
 function formatter(timezone: string): Intl.DateTimeFormat {
-  let value = formatters.get(timezone);
-  if (!value) {
-    value = new Intl.DateTimeFormat('en-CA', {
-      timeZone: timezone,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    });
-    // Bound this cache even when callers repeatedly change arbitrary timezones.
-    if (formatters.size >= 16) formatters.delete(formatters.keys().next().value!);
-    formatters.set(timezone, value);
-  }
+  const cached = formatters.get(timezone);
+  if (cached) return cached;
+  const value = new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  // Bound this cache even when callers repeatedly change arbitrary timezones.
+  if (formatters.size >= 16) formatters.delete(formatters.keys().next().value!);
+  formatters.set(timezone, value);
   return value;
 }
 

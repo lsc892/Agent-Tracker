@@ -36,5 +36,10 @@ export function statusForeground(mode: StatusColorMode, custom: string | undefin
   // VS Code writes this value to the label's inline CSS. Explicit inheritance
   // follows the status bar's normal, no-folder and debugging foreground, even
   // when a label rule (such as hover) would otherwise supply a different color.
-  return mode === 'white' ? '#ffffff' : mode === 'black' ? '#000000' : mode === 'custom' ? normalizeHexColor(custom) ?? 'inherit' : 'inherit';
+  switch (mode) {
+    case 'white': return '#ffffff';
+    case 'black': return '#000000';
+    case 'custom': return normalizeHexColor(custom) ?? 'inherit';
+    default: return 'inherit';
+  }
 }

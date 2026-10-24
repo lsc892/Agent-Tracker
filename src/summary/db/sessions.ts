@@ -1,4 +1,4 @@
-import type { SQLInputValue } from 'node:sqlite';
+import type { SQLInputValue, StatementSync } from 'node:sqlite';
 import type { SessionBillingStore } from './billing';
 import type { SqliteSession } from './connection';
 import type { BillingMode, SessionReplacement, TurnSummaryInput } from './types';
@@ -59,7 +59,29 @@ export class SessionStore {
    */
   replaceSessions(replacement: SessionReplacement): void {
     this.database.transaction(() => {
-      this.database.connection.exec(`CREATE TEMP TABLE IF NOT EXISTS db_replacement_sessions (
+      this.prepareReplacementSessions(replacement);
+      const hasSession = this.database.statement('SELECT 1 FROM db_replacement_sessions WHERE provider = ? AND session_id = ?');
+      const existingFile = this.database.statement('SELECT provider, session_id FROM manifest WHERE id = ?');
+      const requireSession = (provider: SQLInputValue, session: SQLInputValue): void => {
+        if (session !== null && !hasSession.get(provider, session)) {
+          throw new Error('Manifest file is outside the replacement session group');
+        }
+      };
+      this.prepareRemovedFiles(replacement, existingFile, requireSession);
+      this.preserveReplacementData(replacement);
+      this.database.connection.exec(`DELETE FROM turn_summary WHERE (provider, session_id) IN (
+        SELECT provider, session_id FROM db_replacement_sessions
+      ) AND id NOT IN (SELECT id FROM db_retained_turns)`);
+      const now = this.replaceManifestFiles(replacement, existingFile, requireSession);
+      this.insertSummaries(replacement, hasSession, now);
+      this.restoreCapabilitiesAndRemoveFiles(replacement, now);
+      this.database.rollups.refreshChangedSessions();
+      this.cleanReplacementNames();
+    });
+  }
+
+  private prepareReplacementSessions(replacement: SessionReplacement): void {
+    this.database.connection.exec(`CREATE TEMP TABLE IF NOT EXISTS db_replacement_sessions (
         provider TEXT NOT NULL, session_id TEXT NOT NULL, PRIMARY KEY(provider, session_id)
       ) WITHOUT ROWID; DELETE FROM db_replacement_sessions;
       CREATE TEMP TABLE IF NOT EXISTS db_replacement_projects(project_key TEXT PRIMARY KEY) WITHOUT ROWID;
@@ -71,32 +93,31 @@ export class SessionStore {
         UNIQUE(provider,session_id,root_turn_id));
       CREATE INDEX IF NOT EXISTS temp.db_retained_root ON db_retained_turns(provider,root_turn_id);
       DELETE FROM db_retained_turns;`);
-      const addSession = this.database.statement('INSERT OR IGNORE INTO db_replacement_sessions VALUES (?, ?)');
-      for (const session of replacement.sessions) addSession.run(session.provider, session.session_id);
-      const hasSession = this.database.statement('SELECT 1 FROM db_replacement_sessions WHERE provider = ? AND session_id = ?');
-      const existingFile = this.database.statement('SELECT provider, session_id FROM manifest WHERE id = ?');
-      const requireSession = (provider: SQLInputValue, session: SQLInputValue): void => {
-        if (session !== null && !hasSession.get(provider, session)) {
-          throw new Error('Manifest file is outside the replacement session group');
-        }
-      };
-      const addRemoved = this.database.statement('INSERT INTO db_removed_files VALUES (?)');
-      for (const id of replacement.removedFileIds ?? []) {
-        const previous = existingFile.get(id);
-        if (previous) requireSession(previous.provider, previous.session_id);
-        addRemoved.run(id);
-      }
-      if (replacement.retainDeletedSourceUsage) this.database.connection.exec(`
+    const addSession = this.database.statement('INSERT OR IGNORE INTO db_replacement_sessions VALUES (?, ?)');
+    for (const session of replacement.sessions) addSession.run(session.provider, session.session_id);
+  }
+
+  private prepareRemovedFiles(replacement: SessionReplacement, existingFile: StatementSync, requireSession: (provider: SQLInputValue, session: SQLInputValue) => void): void {
+    const addRemoved = this.database.statement('INSERT INTO db_removed_files VALUES (?)');
+    for (const id of replacement.removedFileIds ?? []) {
+      const previous = existingFile.get(id);
+      if (previous) requireSession(previous.provider, previous.session_id);
+      addRemoved.run(id);
+    }
+    if (replacement.retainDeletedSourceUsage) this.database.connection.exec(`
         INSERT INTO db_retained_turns SELECT t.id,t.provider,t.session_id,t.root_turn_id FROM turn_summary t
         JOIN sessions s ON s.provider=t.provider AND s.session_id=t.session_id
         WHERE (t.provider,t.session_id) IN (SELECT m.provider,m.session_id FROM db_removed_files r JOIN manifest m ON m.id=r.id)
           AND trim(t.session_id)<>'' AND trim(t.root_turn_id)<>'' AND t.total_tokens>0
           AND EXISTS(SELECT 1 FROM turn_model_usage u WHERE u.turn_id=t.id AND trim(u.model)<>'' AND u.input_tokens+u.output_tokens>0);`);
-      // Row-value IN lets SQLite seek the request UNIQUE index by its session prefix;
-      // a correlated EXISTS scans every stored turn for each replaced session.
-      this.database.connection.exec(`INSERT OR IGNORE INTO db_replacement_projects SELECT project_key FROM turn_summary
+  }
+
+  private preserveReplacementData(replacement: SessionReplacement): void {
+    // Row-value IN lets SQLite seek the request UNIQUE index by its session prefix;
+    // a correlated EXISTS scans every stored turn for each replaced session.
+    this.database.connection.exec(`INSERT OR IGNORE INTO db_replacement_projects SELECT project_key FROM turn_summary
         WHERE (provider,session_id) IN (SELECT provider,session_id FROM db_replacement_sessions)`);
-      if (replacement.preserveCapabilities) this.database.connection.exec(`
+    if (replacement.preserveCapabilities) this.database.connection.exec(`
         CREATE TEMP TABLE IF NOT EXISTS db_saved_capabilities (
           provider TEXT NOT NULL,session_id TEXT NOT NULL,root_turn_id TEXT NOT NULL,
           category TEXT NOT NULL,name TEXT NOT NULL,usage_count INTEGER NOT NULL,
@@ -107,89 +128,108 @@ export class SessionStore {
           FROM turn_summary t JOIN turn_capability_usage u ON u.turn_id=t.id
           WHERE (t.provider,t.session_id) IN (SELECT provider,session_id FROM db_replacement_sessions)
             AND t.id NOT IN (SELECT id FROM db_retained_turns);`);
-      this.database.connection.exec(`DELETE FROM turn_summary WHERE (provider, session_id) IN (
-        SELECT provider, session_id FROM db_replacement_sessions
-      ) AND id NOT IN (SELECT id FROM db_retained_turns)`);
-      const updateFile = this.database.statement(`UPDATE manifest SET
+  }
+
+  private replaceManifestFiles(replacement: SessionReplacement, existingFile: StatementSync, requireSession: (provider: SQLInputValue, session: SQLInputValue) => void): string {
+    const updateFile = this.database.statement(`UPDATE manifest SET
         source_root = ?, path = ?, session_id = ?, size_bytes = ?, mtime_ms = ?, dev = ?, inode = ?, parser_version = ?, capabilities_collected = ?,
         source_missing = 0, processing_status = 'done', processing_position = 'committed', recorded_at = ?, last_error = NULL
         WHERE id = ? AND provider = ?`);
-      const now = new Date().toISOString();
-      for (const file of replacement.files) {
-        nonnegative(file.size_bytes, 'size_bytes');
-        const previous = existingFile.get(file.id);
-        if (!previous || previous.provider !== file.provider) throw new Error('Replacement refers to an unknown manifest file');
-        requireSession(previous.provider, previous.session_id);
-        requireSession(file.provider, file.session_id);
-        const result = updateFile.run(file.source_root, file.path, file.session_id, file.size_bytes, file.mtime_ms,
-          file.dev, file.inode, file.parser_version, file.capabilities_collected ?? 1, now, file.id, file.provider);
-        if (result.changes !== 1) throw new Error('Replacement refers to an unknown manifest file');
-      }
-      const insert = this.database.statement(TURN_INSERT);
-      const project = this.database.statement(`INSERT INTO projects VALUES (?,?) ON CONFLICT(project_key)
+    const now = new Date().toISOString();
+    for (const file of replacement.files) {
+      nonnegative(file.size_bytes, 'size_bytes');
+      const previous = existingFile.get(file.id);
+      if (!previous || previous.provider !== file.provider) throw new Error('Replacement refers to an unknown manifest file');
+      requireSession(previous.provider, previous.session_id);
+      requireSession(file.provider, file.session_id);
+      const result = updateFile.run(file.source_root, file.path, file.session_id, file.size_bytes, file.mtime_ms,
+        file.dev, file.inode, file.parser_version, file.capabilities_collected ?? 1, now, file.id, file.provider);
+      if (result.changes !== 1) throw new Error('Replacement refers to an unknown manifest file');
+    }
+    return now;
+  }
+
+  private insertSummaries(replacement: SessionReplacement, hasSession: StatementSync, now: string): void {
+    const insert = this.database.statement(TURN_INSERT);
+    const project = this.database.statement(`INSERT INTO projects VALUES (?,?) ON CONFLICT(project_key)
         DO UPDATE SET project_name=excluded.project_name WHERE project_name<>excluded.project_name`);
-      const session = this.database.statement(`INSERT INTO sessions VALUES (?,?,?) ON CONFLICT(provider,session_id)
+    const session = this.database.statement(`INSERT INTO sessions VALUES (?,?,?) ON CONFLICT(provider,session_id)
         DO UPDATE SET session_name=excluded.session_name
         WHERE excluded.session_name IS NOT NULL AND session_name IS NOT excluded.session_name`);
-      const addProject = this.database.statement('INSERT OR IGNORE INTO db_replacement_projects VALUES (?)');
-      // A request snapshot includes all source contributions. With a source missing, replacing
-      // or adding to that snapshot would lose usage or double count overlapping responses.
-      const retained = this.database.statement('SELECT 1 FROM db_retained_turns WHERE provider=? AND root_turn_id=? LIMIT 1');
-      for (const summary of replacement.summaries) {
-        if (!hasSession.get(summary.provider, summary.session_id)) throw new Error('Summary is outside the replacement session group');
-        if (retained.get(summary.provider,summary.root_turn_id)) continue;
-        project.run(summary.project_key, summary.project_name);
-        session.run(summary.provider, summary.session_id, summary.session_name?.trim() || null);
-        addProject.run(summary.project_key);
-        const inserted = insert.run(...turnValues(summary, now));
-        for (const usage of summary.capability_usage ?? []) {
-          nonnegative(usage.usage_count, 'capability count');
-          if (usage.name.length > 512) throw new RangeError('Capability name is too long');
-          this.database.statement('INSERT INTO turn_capability_usage VALUES (?,?,?,?)')
-            .run(inserted.lastInsertRowid,usage.category,usage.name,usage.usage_count);
-        }
-        let input = 0, output = 0, cacheWrite = 0, cacheRead = 0;
-        for (const model of summary.model_usage ?? []) {
-          nonnegative(model.input_tokens, 'model input tokens');
-          nonnegative(model.output_tokens, 'model output tokens');
-          if (model.cache_write_input_tokens != null) nonnegative(model.cache_write_input_tokens, 'model cache write tokens');
-          if (model.cache_read_input_tokens != null) nonnegative(model.cache_read_input_tokens, 'model cache read tokens');
-          if ((model.cache_write_input_tokens ?? 0) + (model.cache_read_input_tokens ?? 0) > model.input_tokens) throw new RangeError('Invalid model cache components');
-          this.database.statement('INSERT INTO turn_model_usage VALUES (?,?,?,?,?,?,?,?)').run(inserted.lastInsertRowid,model.model,
-            model.input_tokens,model.output_tokens,model.cache_write_input_tokens,model.cache_read_input_tokens,
-            estimateCost(summary.provider,model),PRICING_VERSION);
-          input += model.input_tokens; output += model.output_tokens;
-          cacheWrite += model.cache_write_input_tokens ?? 0; cacheRead += model.cache_read_input_tokens ?? 0;
-        }
-        if (summary.model_usage && (input !== summary.input_tokens || output !== summary.output_tokens
-          || cacheWrite !== (summary.cache_write_input_tokens ?? 0) || cacheRead !== (summary.cache_read_input_tokens ?? 0))) {
-          throw new RangeError('Model totals must match the request summary');
-        }
-        const chosen = this.database.statement('SELECT billing_mode FROM session_billing WHERE provider=? AND session_id=?')
-          .get(summary.provider,summary.session_id)?.billing_mode as BillingMode | undefined;
-        this.billing.saveTurnCost(inserted.lastInsertRowid,chosen ?? summary.billing ?? 'unknown');
-      }
-      const remove = this.database.statement('DELETE FROM manifest WHERE id = ?');
-      if (replacement.preserveCapabilities) this.database.connection.exec(`
+    const addProject = this.database.statement('INSERT OR IGNORE INTO db_replacement_projects VALUES (?)');
+    // A request snapshot includes all source contributions. With a source missing, replacing
+    // or adding to that snapshot would lose usage or double count overlapping responses.
+    const retained = this.database.statement('SELECT 1 FROM db_retained_turns WHERE provider=? AND root_turn_id=? LIMIT 1');
+    for (const summary of replacement.summaries) {
+      if (!hasSession.get(summary.provider, summary.session_id)) throw new Error('Summary is outside the replacement session group');
+      if (retained.get(summary.provider,summary.root_turn_id)) continue;
+      project.run(summary.project_key, summary.project_name);
+      session.run(summary.provider, summary.session_id, summary.session_name?.trim() || null);
+      addProject.run(summary.project_key);
+      const inserted = insert.run(...turnValues(summary, now));
+      this.insertCapabilityUsage(summary, inserted.lastInsertRowid);
+      this.insertModelUsage(summary, inserted.lastInsertRowid);
+      this.saveSummaryCost(summary, inserted.lastInsertRowid);
+    }
+  }
+
+  private insertCapabilityUsage(summary: TurnSummaryInput, turnId: number | bigint): void {
+    for (const usage of summary.capability_usage ?? []) {
+      nonnegative(usage.usage_count, 'capability count');
+      if (usage.name.length > 512) throw new RangeError('Capability name is too long');
+      this.database.statement('INSERT INTO turn_capability_usage VALUES (?,?,?,?)')
+        .run(turnId,usage.category,usage.name,usage.usage_count);
+    }
+  }
+
+  private insertModelUsage(summary: TurnSummaryInput, turnId: number | bigint): void {
+    let input = 0, output = 0, cacheWrite = 0, cacheRead = 0;
+    for (const model of summary.model_usage ?? []) {
+      nonnegative(model.input_tokens, 'model input tokens');
+      nonnegative(model.output_tokens, 'model output tokens');
+      if (model.cache_write_input_tokens != null) nonnegative(model.cache_write_input_tokens, 'model cache write tokens');
+      if (model.cache_read_input_tokens != null) nonnegative(model.cache_read_input_tokens, 'model cache read tokens');
+      if ((model.cache_write_input_tokens ?? 0) + (model.cache_read_input_tokens ?? 0) > model.input_tokens) throw new RangeError('Invalid model cache components');
+      this.database.statement('INSERT INTO turn_model_usage VALUES (?,?,?,?,?,?,?,?)').run(turnId,model.model,
+        model.input_tokens,model.output_tokens,model.cache_write_input_tokens,model.cache_read_input_tokens,
+        estimateCost(summary.provider,model),PRICING_VERSION);
+      input += model.input_tokens; output += model.output_tokens;
+      cacheWrite += model.cache_write_input_tokens ?? 0; cacheRead += model.cache_read_input_tokens ?? 0;
+    }
+    if (summary.model_usage && (input !== summary.input_tokens || output !== summary.output_tokens
+      || cacheWrite !== (summary.cache_write_input_tokens ?? 0) || cacheRead !== (summary.cache_read_input_tokens ?? 0))) {
+      throw new RangeError('Model totals must match the request summary');
+    }
+  }
+
+  private saveSummaryCost(summary: TurnSummaryInput, turnId: number | bigint): void {
+    const chosen = this.database.statement('SELECT billing_mode FROM session_billing WHERE provider=? AND session_id=?')
+      .get(summary.provider,summary.session_id)?.billing_mode as BillingMode | undefined;
+    this.billing.saveTurnCost(turnId,chosen ?? summary.billing ?? 'unknown');
+  }
+
+  private restoreCapabilitiesAndRemoveFiles(replacement: SessionReplacement, now: string): void {
+    const remove = this.database.statement('DELETE FROM manifest WHERE id = ?');
+    if (replacement.preserveCapabilities) this.database.connection.exec(`
         INSERT INTO turn_capability_usage SELECT t.id,u.category,u.name,u.usage_count FROM db_saved_capabilities u
           JOIN turn_summary t ON t.provider=u.provider AND t.session_id=u.session_id AND t.root_turn_id=u.root_turn_id;
         DELETE FROM db_saved_capabilities;`);
-      const keepMissing = this.database.statement(`SELECT 1 FROM db_retained_turns t JOIN manifest m
+    const keepMissing = this.database.statement(`SELECT 1 FROM db_retained_turns t JOIN manifest m
         ON m.provider=t.provider AND m.session_id=t.session_id WHERE m.id=? LIMIT 1`);
-      const markMissing = this.database.statement('UPDATE manifest SET source_missing=1,recorded_at=? WHERE id=? AND source_missing=0');
-      for (const row of this.database.statement('SELECT id FROM db_removed_files').iterate()) {
-        if (keepMissing.get(row.id)) markMissing.run(now,row.id);
-        else remove.run(row.id);
-      }
-      this.database.rollups.refreshChangedSessions();
-      this.database.connection.exec(`DELETE FROM sessions WHERE (provider,session_id) IN (SELECT provider,session_id FROM db_replacement_sessions)
+    const markMissing = this.database.statement('UPDATE manifest SET source_missing=1,recorded_at=? WHERE id=? AND source_missing=0');
+    for (const row of this.database.statement('SELECT id FROM db_removed_files').iterate()) {
+      if (keepMissing.get(row.id)) markMissing.run(now,row.id);
+      else remove.run(row.id);
+    }
+  }
+
+  private cleanReplacementNames(): void {
+    this.database.connection.exec(`DELETE FROM sessions WHERE (provider,session_id) IN (SELECT provider,session_id FROM db_replacement_sessions)
         AND NOT EXISTS(SELECT 1 FROM turn_summary t WHERE t.provider=sessions.provider AND t.session_id=sessions.session_id);
         DELETE FROM projects WHERE project_key IN (SELECT project_key FROM db_replacement_projects)
         AND NOT EXISTS(SELECT 1 FROM turn_summary t WHERE t.provider='claude' AND t.project_key=projects.project_key)
         AND NOT EXISTS(SELECT 1 FROM turn_summary t WHERE t.provider='codex' AND t.project_key=projects.project_key);
         DELETE FROM db_replacement_sessions; DELETE FROM db_replacement_projects;
         DELETE FROM db_removed_files; DELETE FROM db_retained_turns;`);
-    });
   }
-
 }

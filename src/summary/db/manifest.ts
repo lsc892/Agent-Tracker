@@ -44,12 +44,11 @@ export class ManifestStore {
       if (!file) throw new Error('Unknown manifest file');
       this.database.statement(`UPDATE manifest SET processing_status = ?, processing_position = ?, recorded_at = ?, last_error = ? WHERE id = ?`)
         .run(status, position, new Date().toISOString(), error, id);
-      if (status === 'error' || status === 'interrupted') {
-        this.database.statement(`UPDATE turn_summary SET diagnostic_file_id = ?, diagnostic_offset = ?, last_error = ?
+      if (status !== 'error' && status !== 'interrupted') return;
+      this.database.statement(`UPDATE turn_summary SET diagnostic_file_id = ?, diagnostic_offset = ?, last_error = ?
           WHERE provider = ? AND session_id = ?`)
-          .run(id, offset, error ?? status, file.provider, file.session_id);
-        if (file.session_id !== null) this.database.rollups.refreshSession(file.provider as Provider, file.session_id as string);
-      }
+        .run(id, offset, error ?? status, file.provider, file.session_id);
+      if (file.session_id !== null) this.database.rollups.refreshSession(file.provider as Provider, file.session_id as string);
     });
   }
 

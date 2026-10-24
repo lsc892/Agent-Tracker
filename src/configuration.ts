@@ -25,17 +25,16 @@ function readUsageSettings(usage: ConfigurationValues['usage'], locale: string) 
   let timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
   let timezoneWarning: string | undefined;
   const configuredTimezone: unknown = usage.timezone;
-  if (configuredTimezone !== '' && configuredTimezone !== undefined) {
-    try {
-      if (typeof configuredTimezone !== 'string') throw new TypeError('Invalid timezone');
-      const selected = configuredTimezone.trim();
-      if (selected) {
-        new Intl.DateTimeFormat('en', { timeZone: selected }).format(0);
-        timezone = selected;
-      }
-    } catch {
-      timezoneWarning = String(createTranslator(locale).t('configuration.invalidTimezone', { value0: timezone }));
+  if (configuredTimezone === '' || configuredTimezone === undefined) return { ...usage, timezone, timezoneWarning };
+  try {
+    if (typeof configuredTimezone !== 'string') throw new TypeError('Invalid timezone');
+    const selected = configuredTimezone.trim();
+    if (selected) {
+      new Intl.DateTimeFormat('en', { timeZone: selected }).format(0);
+      timezone = selected;
     }
+  } catch {
+    timezoneWarning = String(createTranslator(locale).t('configuration.invalidTimezone', { value0: timezone }));
   }
   return { ...usage, timezone, timezoneWarning };
 }

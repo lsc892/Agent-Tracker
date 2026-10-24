@@ -59,20 +59,19 @@ export class WorkerTransport {
    * 알고리즘: 설정 스냅샷으로 Worker를 한 번 만들고 메시지·오류·종료 핸들러를 연결하며 해당 인스턴스 종료 시 대기 요청을 거절한다.
    */
   private ensureWorker(): Worker {
-    if (!this.worker) {
-      const worker = new Worker(this.options.workerPath ?? join(__dirname, 'worker.js'), { workerData: this.options });
-      this.worker = worker;
-      worker.on('message', (message: WorkerMessage) => this.receive(message));
-      worker.on('error', () => {
-        this.rejectAll(new Error('Summary worker failed. Node.js 22.15+ with node:sqlite is required.'));
-      });
-      worker.on('exit', () => {
-        if (this.worker === worker) {
-          this.worker = undefined;
-          this.rejectAll(new Error('Summary worker stopped'));
-        }
-      });
-    }
+    if (this.worker) return this.worker;
+    const worker = new Worker(this.options.workerPath ?? join(__dirname, 'worker.js'), { workerData: this.options });
+    this.worker = worker;
+    worker.on('message', (message: WorkerMessage) => this.receive(message));
+    worker.on('error', () => {
+      this.rejectAll(new Error('Summary worker failed. Node.js 22.15+ with node:sqlite is required.'));
+    });
+    worker.on('exit', () => {
+      if (this.worker === worker) {
+        this.worker = undefined;
+        this.rejectAll(new Error('Summary worker stopped'));
+      }
+    });
     return this.worker;
   }
 
@@ -121,16 +120,15 @@ export class WorkerTransport {
     const worker = this.worker;
     let timeout: ReturnType<typeof setTimeout> | undefined;
     try {
-      if (worker) {
-        await Promise.race([
-          (async () => {
-            await refreshSettled;
-            if (this.worker === worker) await this.request('dispose').catch(() => undefined);
-          })(),
-          new Promise<void>(resolve => { timeout = setTimeout(resolve, 5000); }),
-        ]);
-        await worker.terminate();
-      }
+      if (!worker) return;
+      await Promise.race([
+        (async () => {
+          await refreshSettled;
+          if (this.worker === worker) await this.request('dispose').catch(() => undefined);
+        })(),
+        new Promise<void>(resolve => { timeout = setTimeout(resolve, 5000); }),
+      ]);
+      await worker.terminate();
     } finally {
       if (timeout) clearTimeout(timeout);
       this.worker = undefined;

@@ -18,10 +18,12 @@ function optionsFromArgs(args) {
     const match = /^--(provider|timeout-ms|output|codex-executable|codex-home|claude-home)=(.+)$/.exec(arg);
     if (!match) throw new QaError('invalid-options');
     const [, key, value] = match;
-    if (key === 'provider') options.providers = value === 'both' ? ['codex', 'claude'] : [value];
-    else if (key === 'timeout-ms') options.timeoutMs = Number(value);
-    else if (key === 'output') options.output = resolve(value);
-    else options[{ 'codex-executable': 'codexExecutable', 'codex-home': 'codexHome', 'claude-home': 'claudeHome' }[key]] = value;
+    switch (key) {
+      case 'provider': options.providers = value === 'both' ? ['codex', 'claude'] : [value]; break;
+      case 'timeout-ms': options.timeoutMs = Number(value); break;
+      case 'output': options.output = resolve(value); break;
+      default: options[{ 'codex-executable': 'codexExecutable', 'codex-home': 'codexHome', 'claude-home': 'claudeHome' }[key]] = value;
+    }
   }
   requireValue(options.real, 'real-opt-in-required');
   requireValue(options.providers.every(id => ['codex', 'claude'].includes(id)), 'invalid-options');

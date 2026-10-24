@@ -13,11 +13,19 @@
   function preview() {
     const mode = $('color-mode').value;
     const color = normalized($('color-hex').value);
-    const foreground = mode === 'white' ? '#ffffff' : mode === 'black' ? '#000000' : mode === 'custom' ? color : undefined;
+    const foreground = previewForeground(mode, color);
     if (foreground) $('color-preview').style.setProperty('--tracker-status-color', foreground);
     else $('color-preview').style.removeProperty('--tracker-status-color');
     $('color-apply').disabled = busy || mode === 'custom' && !color;
     $('color-status').textContent = mode === 'custom' && !color ? t('color.invalidHex') : '';
+  }
+  function previewForeground(mode, color) {
+    switch (mode) {
+      case 'white': return '#ffffff';
+      case 'black': return '#000000';
+      case 'custom': return color;
+      default: return undefined;
+    }
   }
   /**
    * 책임: HEX·색상 견본·불투명도·미리 보기를 같은 값으로 맞춘다.
@@ -57,17 +65,20 @@
   });
   window.addEventListener('message', event => {
     const message = event.data;
-    if (message.type === 'state') {
-      globalThis.updateAgentTrackerLocale?.(message.localization);
-      $('color-mode').value = message.mode;
-      $('color-hex').value = message.color;
-      $('color-target').value = message.target;
-      for (const option of $('color-target').options) option.disabled = option.value !== 'user' && !message.hasWorkspace;
-      $('color-preview').classList.toggle('no-workspace', !message.hasWorkspace);
-      syncInputs();
-    } else if (message.type === 'saved' || message.type === 'error') {
-      busy = false;preview();
-      $('color-status').textContent = message.type === 'saved' ? t('color.saved') : message.message;
+    switch (message.type) {
+      case 'state':
+        globalThis.updateAgentTrackerLocale?.(message.localization);
+        $('color-mode').value = message.mode;
+        $('color-hex').value = message.color;
+        $('color-target').value = message.target;
+        for (const option of $('color-target').options) option.disabled = option.value !== 'user' && !message.hasWorkspace;
+        $('color-preview').classList.toggle('no-workspace', !message.hasWorkspace);
+        syncInputs();
+        break;
+      case 'saved': case 'error':
+        busy = false;preview();
+        $('color-status').textContent = message.type === 'saved' ? t('color.saved') : message.message;
+        break;
     }
   });
   vscode.postMessage({type:'ready'});

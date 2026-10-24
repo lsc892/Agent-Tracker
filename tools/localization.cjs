@@ -13,9 +13,8 @@ const localePattern = /^[a-z]{2,3}(?:-[a-z0-9]+)*$/;
 function write(file, value) {
   const target = path.join(root, file);
   const expected = JSON.stringify(value, null, 2) + '\n';
-  if (check) {
-    if (!fs.existsSync(target) || fs.readFileSync(target, 'utf8').replaceAll('\r\n', '\n') !== expected) throw new Error(`${file} is stale. Run npm run localization:sync.`);
-  } else fs.writeFileSync(target, expected);
+  if (!check) { fs.writeFileSync(target, expected); return; }
+  if (!fs.existsSync(target) || fs.readFileSync(target, 'utf8').replaceAll('\r\n', '\n') !== expected) throw new Error(`${file} is stale. Run npm run localization:sync.`);
 }
 const catalogs = new Map();
 const localeIds = new Set();
@@ -67,11 +66,19 @@ for (const file of [...files('src'), ...files('media')].filter(file => /\.(ts|js
   const tree = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
   function validateUsage(key, variables) {
     if (!Object.hasOwn(base, key)) throw new Error(`${file}: unknown translation key ${key}`);
-    if (!variables || ts.isObjectLiteralExpression(variables)) {
-      const names = variables ? variables.properties.map(property => property.name?.getText(tree)).sort().join(',') : '';
-      const expected = placeholders(base[key]).replace(/[{}]/g, '');
-      if (names !== expected) throw new Error(`${file}: mismatched arguments for ${key}`);
-    }
+    if (variables && !ts.isObjectLiteralExpression(variables)) return;
+    const names = variables ? variables.properties.map(property => property.name?.getText(tree)).sort().join(',') : '';
+    const expected = placeholders(base[key]).replace(/[{}]/g, '');
+    if (names !== expected) throw new Error(`${file}: mismatched arguments for ${key}`);
+  }
+  function validateQuotaErrorUsage(node) {
+    if (!(ts.isNewExpression(node) && node.expression.getText(tree) === 'QuotaError' && node.arguments?.[1]
+      && ts.isObjectLiteralExpression(node.arguments[1]))) return;
+    const properties = node.arguments[1].properties;
+    const key = properties.find(property => ts.isPropertyAssignment(property) && property.name.getText(tree) === 'key');
+    const values = properties.find(property => ts.isPropertyAssignment(property) && property.name.getText(tree) === 'values');
+    if (!key || !ts.isStringLiteral(key.initializer)) return;
+    validateUsage(key.initializer.text, values?.initializer);
   }
   /**
    * 책임: 소스 안의 번역 호출과 UI 문자열을 구문 단위로 검사한다.
@@ -87,15 +94,7 @@ for (const file of [...files('src'), ...files('media')].filter(file => /\.(ts|js
       const key = node.arguments[0].text;
       validateUsage(key, node.arguments[1]);
     }
-    if (ts.isNewExpression(node) && node.expression.getText(tree) === 'QuotaError' && node.arguments?.[1]
-      && ts.isObjectLiteralExpression(node.arguments[1])) {
-      const properties = node.arguments[1].properties;
-      const key = properties.find(property => ts.isPropertyAssignment(property) && property.name.getText(tree) === 'key');
-      const values = properties.find(property => ts.isPropertyAssignment(property) && property.name.getText(tree) === 'values');
-      if (key && ts.isStringLiteral(key.initializer)) {
-        validateUsage(key.initializer.text, values?.initializer);
-      }
-    }
+    validateQuotaErrorUsage(node);
     ts.forEachChild(node, walk);
   }
   walk(tree);

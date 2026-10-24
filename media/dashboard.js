@@ -5,13 +5,18 @@
   const $ = id => document.getElementById(id);
   const send = message => vscode.postMessage(message);
   const number = value => value === null || value === undefined ? '—' : new Intl.NumberFormat(globalThis.agentTrackerI18n.language, { maximumFractionDigits: 1 }).format(value);
-  const duration = value => value === null || value === undefined ? '—' : value < 1000 ? `${number(value)} ms` : t('dashboard.seconds', { value0: number(value / 1000) });
+  function duration(value) {
+    if (value === null || value === undefined) return '—';
+    if (value < 1000) return `${number(value)} ms`;
+    return t('dashboard.seconds', { value0: number(value / 1000) });
+  }
   const tokenHeaders = [
     { get label() { return t('common.input'); }, get title() { return t('dashboard.inputHelp'); } },
     { get label() { return t('common.output'); }, get title() { return t('dashboard.outputHelp'); } },
     { get label() { return t('common.cacheWrite'); }, get title() { return t('dashboard.cacheWriteHelp'); } },
     { get label() { return t('common.cacheRead'); }, get title() { return t('dashboard.cacheReadHelp'); } },
   ];
+  const tokenSortKeys = ['input', 'output', 'cacheWrite', 'cacheRead', 'tokens'];
   const tokenValues = row => [
     number(row.input_tokens == null || row.cache_write_input_tokens == null || row.cache_read_input_tokens == null
       ? null : Math.max(0, row.input_tokens - row.cache_write_input_tokens - row.cache_read_input_tokens)),
@@ -61,23 +66,37 @@
    * 알고리즘: 직접 입력한 날짜를 date picker로 교차 검증하고 구역별 페이지 조건과 선택 ID를 모아 전송한 뒤 화면 상태를 저장한다.
    */
   function query(resetCapabilities = true) {
+    if (!validateDateFilters()) return;
+    if (resetCapabilities) for (const category of capabilityCategories) capabilityOffsets[category] = 0;
+    updateSectionControls();
+    const request = usageRequest();
+    send({ type: 'queryUsage', query: request });
+    saveState();
+    updateCostControls();
+    $('billing-mode').disabled = true;
+    for (const by of ['provider', 'model']) $(`chart-${by}`).setAttribute('aria-pressed', String(chartBy === by));
+  }
+  function validateDateFilters() {
     for (const id of ['from-day', 'to-day']) {
       const input = $(id);
       const picker = $(`${id}-picker`);
       picker.value = input.value;
-      if (input.value && (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(input.value) || picker.value !== input.value)) {
-        $('error').textContent = t('dashboard.invalidDate');
-        $('error').hidden = false;
-        input.focus();
-        return;
-      }
+      if (!input.value || /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(input.value) && picker.value === input.value) continue;
+      $('error').textContent = t('dashboard.invalidDate');
+      $('error').hidden = false;
+      input.focus();
+      return false;
     }
-    if (resetCapabilities) for (const category of capabilityCategories) capabilityOffsets[category] = 0;
+    return true;
+  }
+  function updateSectionControls() {
     $('token-section').hidden = section !== 'tokens';
     $('skill-section').hidden = section !== 'skills';
     $('group-control').hidden = section !== 'tokens';
     $('chart-by-control').hidden = section !== 'tokens';
     for (const name of ['tokens', 'skills']) $(`section-${name}`).setAttribute('aria-pressed', String(section === name));
+  }
+  function usageRequest() {
     const request = { section, groupBy: $('group').value, limit: pageSize, offset, chartBy, tableSort: { ...tableSort } };
     if (section === 'skills') {
       request.capabilityOffsets = { ...capabilityOffsets };
@@ -91,11 +110,7 @@
     if (selectedSession) request.sessionId = selectedSession;
     if ($('from-day').value) request.fromDay = $('from-day').value;
     if ($('to-day').value) request.toDay = $('to-day').value;
-    send({ type: 'queryUsage', query: request });
-    saveState();
-    updateCostControls();
-    $('billing-mode').disabled = true;
-    for (const by of ['provider', 'model']) $(`chart-${by}`).setAttribute('aria-pressed', String(chartBy === by));
+    return request;
   }
   function updateCostControls() {
     $('cost-note').hidden = !showCosts;
@@ -185,11 +200,11 @@
    */
   function nameOption(kind, row) {
     const title = kind === 'project' ? row?.project_name || t('dashboard.unnamedProject') : row?.session_name || t('dashboard.unnamedSession');
-    const node = element('button', row ? title : kind === 'project' ? t('dashboard.allProjects') : t('dashboard.allSessions'), 'name-option');
+    let label = title;
+    if (!row) label = kind === 'project' ? t('dashboard.allProjects') : t('dashboard.allSessions');
+    const node = element('button', label, 'name-option');
     node.type = 'button';
-    const selected = row ? kind === 'project' ? selectedProject === row.project_key
-      : selectedProject === row.project_key && selectedSession === row.session_id && $('provider').value === row.provider
-      : kind === 'project' ? !selectedProject : !selectedSession;
+    const selected = isNameSelected(kind, row);
     node.setAttribute('aria-pressed', String(selected));
     if (row) {
       node.title = `${row.project_key}${row.session_id ? t('dashboard.sessionIdLine', { value0: row.session_id }) : ''}`;
@@ -198,6 +213,11 @@
     }
     node.addEventListener('click', () => kind === 'project' ? chooseProject(row) : chooseSession(row));
     return node;
+  }
+  function isNameSelected(kind, row) {
+    if (!row) return kind === 'project' ? !selectedProject : !selectedSession;
+    if (kind === 'project') return selectedProject === row.project_key;
+    return selectedProject === row.project_key && selectedSession === row.session_id && $('provider').value === row.provider;
   }
   function toggleNames(kind) {
     if (openNameKind === kind) { closeNames(); return; }
@@ -239,45 +259,54 @@
     for (const [index, header] of headers.entries()) {
       const label = typeof header === 'string' ? header : header.label;
       const key = sortKeys[index];
-      const cell = element('th', key ? undefined : label);
-      cell.setAttribute('scope', 'col');
-      if (typeof header !== 'string') cell.title = header.title;
-      if (key) {
-        const active = tableSort.key === key;
-        cell.setAttribute('aria-sort', active ? tableSort.direction === 'asc' ? 'ascending' : 'descending' : 'none');
-        const button = element('button', undefined, 'table-sort');
-        button.type = 'button';
-        button.setAttribute('data-sort-key', key);
-        button.append(element('span', label));
-        if (active) {
-          const indicator = element('span', tableSort.direction === 'asc' ? '↑' : '↓', 'sort-indicator');
-          indicator.setAttribute('aria-hidden', 'true');
-          button.append(indicator);
-        }
-        button.addEventListener('click', () => {
-          tableSort = { key, direction: tableSort.key === key && tableSort.direction === 'desc' ? 'asc' : 'desc' };
-          offset = 0;
-          query();
-        });
-        cell.append(button);
-      }
+      const cell = tableHeader(header, label, key);
       tr.append(cell);
     }
     head.append(tr);
     node.append(head);
     const body = element('tbody');
     for (const values of rows) {
-      const row = element('tr');
-      for (const value of values) {
-        const cell = element('td');
-        if (value && typeof value === 'object') cell.append(value);
-        else cell.textContent = String(value ?? '—');
-        row.append(cell);
-      }
+      const row = tableRow(values);
       body.append(row);
     }
     node.append(body);
     target.append(node);
+  }
+  function tableHeader(header, label, key) {
+    const cell = element('th', key ? undefined : label);
+    cell.setAttribute('scope', 'col');
+    if (typeof header !== 'string') cell.title = header.title;
+    if (!key) return cell;
+    const active = tableSort.key === key;
+    let direction = 'none';
+    if (active) direction = tableSort.direction === 'asc' ? 'ascending' : 'descending';
+    cell.setAttribute('aria-sort', direction);
+    const button = element('button', undefined, 'table-sort');
+    button.type = 'button';
+    button.setAttribute('data-sort-key', key);
+    button.append(element('span', label));
+    if (active) {
+      const indicator = element('span', tableSort.direction === 'asc' ? '↑' : '↓', 'sort-indicator');
+      indicator.setAttribute('aria-hidden', 'true');
+      button.append(indicator);
+    }
+    button.addEventListener('click', () => {
+      tableSort = { key, direction: tableSort.key === key && tableSort.direction === 'desc' ? 'asc' : 'desc' };
+      offset = 0;
+      query();
+    });
+    cell.append(button);
+    return cell;
+  }
+  function tableRow(values) {
+    const row = element('tr');
+    for (const value of values) {
+      const cell = element('td');
+      if (value && typeof value === 'object') cell.append(value);
+      else cell.textContent = String(value ?? '—');
+      row.append(cell);
+    }
+    return row;
   }
   function tableLabel(text) {
     const node = element('span', text, 'table-label');
@@ -367,7 +396,7 @@
   function chartDescription(row, chart) {
     const turn = chart.mode === 'turn';
     const value = chartValue(row, chart.metric, turn);
-    let detail = `${chartLabel(row, chart.mode)} · ${chart.metric === 'averageDuration' ? duration(value) : `${number(value)} ${chart.metric === 'requests' ? t('dashboard.items') : t('common.tokens')}`}`;
+    let detail = `${chartLabel(row, chart.mode)} · ${chartMetricValue(value, chart)}`;
     if (['tokens', 'averageTokens'].includes(chart.metric) && value != null) {
       const segments = chartSegments(row, chart.metric);
       detail += segments[0].className === 'chart-unknown' ? t('dashboard.unknownBreakdownSuffix')
@@ -377,9 +406,13 @@
     if (chart.metric === 'averageDuration' && !turn) detail += t('dashboard.timeSampleSuffix', { value0: number(row.turns_with_duration) });
     if (chart.metric === 'averageTokens') detail += t('dashboard.completedRequestsSuffix', { value0: number(row.completed_turns) });
     if (chart.mode === 'ranking' && row.session_id) detail += t('dashboard.sessionIdSuffix', { value0: row.session_id });
-    if (turn) detail += ` · ${row.status === 'completed' ? t('common.completed') : row.status === 'failed' ? t('common.failed') : t('common.inProgress')} · ${row.duration_quality}`;
+    if (turn) detail += ` · ${requestStatus(row)} · ${row.duration_quality}`;
     if (chart.by === 'model' && chart.metric === 'averageDuration') detail += t('dashboard.modelTimeSuffix');
     return detail;
+  }
+  function chartMetricValue(value, chart) {
+    if (chart.metric === 'averageDuration') return duration(value);
+    return `${number(value)} ${chart.metric === 'requests' ? t('dashboard.items') : t('common.tokens')}`;
   }
   /**
    * 책임: 현재 표 페이지의 통계를 기간·요청·비교 도표로 그린다.
@@ -396,7 +429,6 @@
     if (!chart) return;
     const turn = chart.mode === 'turn';
     const metric = chart.metric;
-    const tokenMetric = ['tokens', 'averageTokens'].includes(metric);
     $('chart-metric').value = metric;
     for (const option of $('chart-metric').options) {
       option.disabled = turn && ['requests', 'averageTokens'].includes(option.value);
@@ -410,23 +442,40 @@
     if (rows.length < result.rows.length) $('chart-scope').textContent += t('dashboard.emptyExcludedSuffix', { value0: number(result.rows.length - rows.length) });
     if (chart.by === 'model') $('chart-scope').textContent += t('dashboard.modelScopeSuffix');
     if (!rows.length) { plot.append(element('p', t('common.noRecords'), 'empty')); return; }
-    if (tokenMetric) {
-      const entries = tokenHeaders.map((header, index) => ({ ...header, className: `chart-series-${index}` }));
-      if (rows.some(row => chartValue(row, metric, turn) != null && chartSegments(row, metric)[0].className === 'chart-unknown')) {
-        entries.push({ label: t('dashboard.unknownBreakdown'), get title() { return t('dashboard.unknownBreakdownHelp'); }, className: 'chart-unknown' });
-      }
-      for (const entry of entries) {
-        const item = element('li');
-        item.title = entry.title;
-        const swatch = svgElement('svg', { width: 12, height: 12, viewBox: '0 0 12 12', 'aria-hidden': 'true' });
-        swatch.append(svgElement('rect', { width: 12, height: 12, rx: 2, class: entry.className }));
-        item.append(swatch, element('span', entry.label));
-        legend.append(item);
-      }
-      legend.hidden = false;
+    renderChartLegend(legend, rows, metric, turn);
+    const layout = calculateChartLayout(chart, rows, result.groupBy, plot);
+    const { width, height } = layout;
+    const svg = svgElement('svg', { viewBox: `0 0 ${width} ${height}`, width, height, class: 'chart-svg', role: 'group', 'aria-label': `${title} · ${$('chart-scope').textContent}` });
+    svg.append(svgElement('title', {}, t('dashboard.chartTitle', { value0: title })));
+    appendChartAxes(svg, metric, layout);
+    appendChartCategories(svg, chart, rows, layout);
+    appendChartBars(svg, chart, rows, layout);
+    plot.append(svg);
+    $('chart-detail').textContent = chartDescription(rows[0], chart);
+  }
+
+  function renderChartLegend(legend, rows, metric, turn) {
+    if (!['tokens', 'averageTokens'].includes(metric)) return;
+    const entries = tokenHeaders.map((header, index) => ({ ...header, className: `chart-series-${index}` }));
+    if (rows.some(row => chartValue(row, metric, turn) != null && chartSegments(row, metric)[0].className === 'chart-unknown')) {
+      entries.push({ label: t('dashboard.unknownBreakdown'), get title() { return t('dashboard.unknownBreakdownHelp'); }, className: 'chart-unknown' });
     }
-    const sessions = chart.mode === 'ranking' && result.groupBy === 'session';
-    const projects = chart.mode === 'ranking' && result.groupBy === 'project';
+    for (const entry of entries) {
+      const item = element('li');
+      item.title = entry.title;
+      const swatch = svgElement('svg', { width: 12, height: 12, viewBox: '0 0 12 12', 'aria-hidden': 'true' });
+      swatch.append(svgElement('rect', { width: 12, height: 12, rx: 2, class: entry.className }));
+      item.append(swatch, element('span', entry.label));
+      legend.append(item);
+    }
+    legend.hidden = false;
+  }
+
+  function calculateChartLayout(chart, rows, groupBy, plot) {
+    const turn = chart.mode === 'turn';
+    const metric = chart.metric;
+    const sessions = chart.mode === 'ranking' && groupBy === 'session';
+    const projects = chart.mode === 'ranking' && groupBy === 'project';
     const vertical = chart.mode === 'calendar' || turn || sessions || projects;
     const categoryKey = (row, index) => turn ? String(index) : sessions ? `${row.provider}/${row.project_key}/${row.session_id}` : projects ? `${row.provider}/${row.project_key}` : row.period;
     const categories = vertical ? [...new Set(rows.map(categoryKey))] : [];
@@ -436,13 +485,16 @@
     const categoryWidth = Math.max(turn || sessions || projects ? 164 : 128, maxPeers * peerWidth + 36);
     const width = Math.max(plot.clientWidth || 736, 736, vertical ? 86 + categories.length * categoryWidth : 0);
     const height = vertical ? chart.by === 'model' ? 414 : 372 : 62 + rows.length * 62;
-    const svg = svgElement('svg', { viewBox: `0 0 ${width} ${height}`, width, height, class: 'chart-svg', role: 'group', 'aria-label': `${title} · ${$('chart-scope').textContent}` });
-    svg.append(svgElement('title', {}, t('dashboard.chartTitle', { value0: title })));
     const max = Math.max(1, ...rows.map(row => chartValue(row, metric, turn) ?? 0));
     const maximum = max === 1 ? 1 : Math.ceil(max / (10 ** Math.floor(Math.log10(max)))) * (10 ** Math.floor(Math.log10(max)));
     const left = vertical ? 70 : 0;
     const top = vertical ? 28 : 26;
     const length = vertical ? 224 : width - 96;
+    return { turn, sessions, projects, vertical, categoryKey, categories, peerWidth, width, height, maximum, left, top, length };
+  }
+
+  function appendChartAxes(svg, metric, layout) {
+    const { vertical, maximum, left, top, length, width, height } = layout;
     const tick = value => metric === 'averageDuration' ? compactDuration(value) : compact(value);
     svg.append(svgElement('text', { x: left, y: 14, class: 'chart-axis-label' }, metric === 'averageDuration' ? t('dashboard.time') : metric === 'requests' ? t('dashboard.requestCountAxis') : t('common.tokens')));
     for (let index = 0; index <= 4; index++) {
@@ -457,25 +509,34 @@
           svgElement('text', { x, y: top - 5, 'text-anchor': index === 0 ? 'start' : 'middle', class: 'chart-axis-label' }, tick(maximum * ratio)));
       }
     }
-    if (vertical) {
-      categories.forEach((category, index) => {
-        const x = left + (width - left - 16) * (index + .5) / categories.length;
-        const row = rows.find((row, rowIndex) => categoryKey(row, rowIndex) === category);
-        const shortened = text => text.length > 16 ? `${text.slice(0, 15)}…` : text;
-        const label = turn ? shortened(requestLabel(row)) : sessions ? shortened(row.session_name || t('dashboard.unnamedSession')) : projects ? shortened(row.project_name || t('dashboard.unnamedProject')) : category || t('dashboard.unknownTime');
-        const parts = turn ? [label] : label.split(' ~ ');
-        const labelY = chart.by === 'model' ? 352 : 292;
-        const caption = svgElement('text', { x, y: labelY, 'text-anchor': 'middle', class: 'chart-axis-label' }, parts[0]);
-        if (turn) caption.append(svgElement('title', {}, requestLabel(row)));
-        svg.append(caption);
-        if (parts[1]) svg.append(svgElement('text', { x, y: labelY + 16, 'text-anchor': 'middle', class: 'chart-axis-label' }, `~ ${parts[1]}`));
-        if (turn) {
-          svg.append(svgElement('text', { x, y: labelY + 16, 'text-anchor': 'middle', class: 'chart-axis-label' }, row.started_at_ms == null ? t('dashboard.unknownTime')
-            : new Intl.DateTimeFormat(globalThis.agentTrackerI18n.language, { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: timezone }).format(new Date(row.started_at_ms))));
-        }
-        if (sessions) svg.append(svgElement('text', { x, y: labelY + 16, 'text-anchor': 'middle', class: 'chart-axis-label' }, shortened(row.project_name || t('dashboard.unnamedProject'))));
-      });
-    }
+  }
+
+  function appendChartCategories(svg, chart, rows, layout) {
+    const { turn, sessions, projects, vertical, categoryKey, categories, left, width } = layout;
+    if (!vertical) return;
+    categories.forEach((category, index) => {
+      const x = left + (width - left - 16) * (index + .5) / categories.length;
+      const row = rows.find((row, rowIndex) => categoryKey(row, rowIndex) === category);
+      const shortened = text => text.length > 16 ? `${text.slice(0, 15)}…` : text;
+      const label = turn ? shortened(requestLabel(row)) : sessions ? shortened(row.session_name || t('dashboard.unnamedSession')) : projects ? shortened(row.project_name || t('dashboard.unnamedProject')) : category || t('dashboard.unknownTime');
+      const parts = turn ? [label] : label.split(' ~ ');
+      const labelY = chart.by === 'model' ? 352 : 292;
+      const caption = svgElement('text', { x, y: labelY, 'text-anchor': 'middle', class: 'chart-axis-label' }, parts[0]);
+      if (turn) caption.append(svgElement('title', {}, requestLabel(row)));
+      svg.append(caption);
+      if (parts[1]) svg.append(svgElement('text', { x, y: labelY + 16, 'text-anchor': 'middle', class: 'chart-axis-label' }, `~ ${parts[1]}`));
+      if (turn) {
+        svg.append(svgElement('text', { x, y: labelY + 16, 'text-anchor': 'middle', class: 'chart-axis-label' }, row.started_at_ms == null ? t('dashboard.unknownTime')
+          : new Intl.DateTimeFormat(globalThis.agentTrackerI18n.language, { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: timezone }).format(new Date(row.started_at_ms))));
+      }
+      if (sessions) svg.append(svgElement('text', { x, y: labelY + 16, 'text-anchor': 'middle', class: 'chart-axis-label' }, shortened(row.project_name || t('dashboard.unnamedProject'))));
+    });
+  }
+
+  function appendChartBars(svg, chart, rows, layout) {
+    const { turn, vertical, categoryKey, categories, peerWidth, width, maximum, left, top, length } = layout;
+    const metric = chart.metric;
+    const tokenMetric = ['tokens', 'averageTokens'].includes(metric);
     rows.forEach((row, index) => {
       const value = chartValue(row, metric, turn);
       const description = chartDescription(row, chart);
@@ -489,50 +550,61 @@
       const barSize = vertical ? 36 : 22;
       group.append(svgElement('rect', { x: vertical ? x - 4 : x, y: vertical ? top : y - 20,
         width: vertical ? barSize + 8 : width, height: vertical ? length + 32 : 52, class: 'chart-hit' }));
-      const segments = tokenMetric ? chartSegments(row, metric) : [{ value, className: 'chart-measure' }];
-      let consumed = 0;
-      for (const segment of segments) {
-        if (segment.value == null || segment.value <= 0) continue;
-        const size = segment.value / maximum * length;
-        const mark = svgElement('rect', { x: vertical ? x : x + consumed, y: vertical ? y - consumed - size : y,
-          width: vertical ? barSize : size, height: vertical ? size : barSize, class: `chart-segment ${segment.className}` });
-        if (tokenMetric) {
-          const detail = t('dashboard.tokenChartDetail', { value0: chartLabel(row, chart.mode), value1: segment.label, value2: number(segment.value) });
-          mark.append(svgElement('title', {}, detail));
-          mark.setAttribute('aria-label', detail);
-          mark.addEventListener('mouseenter', () => { $('chart-detail').textContent = detail; });
-          mark.addEventListener('mouseleave', () => { $('chart-detail').textContent = description; });
-        }
-        group.append(mark);
-        consumed += size;
-      }
+      const bar = { x, y, barSize, vertical, maximum, length, value, metric, tokenMetric, description };
+      const consumed = appendChartSegments(group, row, chart, bar);
       if (value === 0) group.append(svgElement('line', { x1: x, x2: x + (vertical ? barSize : 2), y1: y, y2: y + (vertical ? 0 : barSize), class: 'chart-grid' }));
       const displayValue = metric === 'averageDuration' ? compactDuration(value) : compact(value);
       group.append(svgElement('text', { x: vertical ? x + barSize / 2 : x + consumed + 8,
         y: vertical ? y - consumed - 8 : y + 16, 'text-anchor': vertical ? 'middle' : 'start', class: 'chart-value' }, displayValue));
-      if (vertical) {
-        if (row.model !== undefined) {
-          const label = modelLabel(row);
-          const name = svgElement('g', { transform: `translate(${x + barSize / 2} 274) rotate(35)` });
-          name.append(providerMarker(row.provider, { x: 0, y: -8 }),
-            svgElement('text', { x: 14, y: 0, 'text-anchor': 'start', class: 'chart-provider' }, label.length > 18 ? `${label.slice(0,17)}…` : label));
-          group.append(name);
-        } else group.append(providerMarker(row.provider, { x: x + barSize / 2 - 26, y: 266 }),
-          svgElement('text', { x: x + barSize / 2 + 7, y: 274, 'text-anchor': 'middle', class: 'chart-provider' }, providerLabel(row.provider)));
-      }
-      else {
-        const label = chartLabel(row, chart.mode);
-        group.append(providerMarker(row.provider, { x, y: y - 14 }));
-        group.append(svgElement('text', { x: x + 14, y: y - 6, class: 'chart-label' }, label.length > 48 ? `${label.slice(0, 47)}…` : label));
-      }
+      appendChartBarLabel(group, row, chart, bar);
       const showDetail = () => { $('chart-detail').textContent = description; };
       group.addEventListener('mouseenter', showDetail);
       group.addEventListener('focus', showDetail);
       group.addEventListener('click', showDetail);
       svg.append(group);
     });
-    plot.append(svg);
-    $('chart-detail').textContent = chartDescription(rows[0], chart);
+  }
+
+  function appendChartSegments(group, row, chart, bar) {
+    const { x, y, barSize, vertical, maximum, length, value, metric, tokenMetric, description } = bar;
+    const segments = tokenMetric ? chartSegments(row, metric) : [{ value, className: 'chart-measure' }];
+    let consumed = 0;
+    for (const segment of segments) {
+      if (segment.value == null || segment.value <= 0) continue;
+      const size = segment.value / maximum * length;
+      const mark = svgElement('rect', { x: vertical ? x : x + consumed, y: vertical ? y - consumed - size : y,
+        width: vertical ? barSize : size, height: vertical ? size : barSize, class: `chart-segment ${segment.className}` });
+      if (tokenMetric) {
+        const detail = t('dashboard.tokenChartDetail', { value0: chartLabel(row, chart.mode), value1: segment.label, value2: number(segment.value) });
+        mark.append(svgElement('title', {}, detail));
+        mark.setAttribute('aria-label', detail);
+        mark.addEventListener('mouseenter', () => { $('chart-detail').textContent = detail; });
+        mark.addEventListener('mouseleave', () => { $('chart-detail').textContent = description; });
+      }
+      group.append(mark);
+      consumed += size;
+    }
+    return consumed;
+  }
+
+  function appendChartBarLabel(group, row, chart, bar) {
+    const { x, y, barSize, vertical } = bar;
+    if (!vertical) {
+      const label = chartLabel(row, chart.mode);
+      group.append(providerMarker(row.provider, { x, y: y - 14 }));
+      group.append(svgElement('text', { x: x + 14, y: y - 6, class: 'chart-label' }, label.length > 48 ? `${label.slice(0, 47)}…` : label));
+      return;
+    }
+    if (row.model === undefined) {
+      group.append(providerMarker(row.provider, { x: x + barSize / 2 - 26, y: 266 }),
+        svgElement('text', { x: x + barSize / 2 + 7, y: 274, 'text-anchor': 'middle', class: 'chart-provider' }, providerLabel(row.provider)));
+      return;
+    }
+    const label = modelLabel(row);
+    const name = svgElement('g', { transform: `translate(${x + barSize / 2} 274) rotate(35)` });
+    name.append(providerMarker(row.provider, { x: 0, y: -8 }),
+      svgElement('text', { x: 14, y: 0, 'text-anchor': 'start', class: 'chart-provider' }, label.length > 18 ? `${label.slice(0,17)}…` : label));
+    group.append(name);
   }
   /**
    * 책임: 조회 결과를 다시 그려도 사용자가 읽던 위치를 유지한다.
@@ -558,26 +630,10 @@
     if (result.capabilitiesEnabled !== undefined) setCapabilitiesEnabled(result.capabilitiesEnabled);
     if (section === 'skills' && !capabilitiesEnabled) return;
     if (result.capabilities) {
-      for (const category of capabilityCategories) {
-        const page = result.capabilities[category];
-        const maximum = Math.max(1, page.maxUses);
-        table($(`${category}-table`), [t('common.provider'), t('common.name'), t('dashboard.usageCount'), t('dashboard.overallRatio')],
-          page.rows.map(row => [providerLabel(row.provider), row.name || t('dashboard.unknownModel'), number(row.usage_count), capabilityRatio(row, maximum, page.totalUses)]));
-        $(`${category}-total`).textContent = t('dashboard.totalUses', { value0: number(page.totalUses) });
-        $(`${category}-previous`).disabled = capabilityOffsets[category] === 0;
-        $(`${category}-next`).disabled = capabilityOffsets[category] + page.rows.length >= page.total;
-        $(`${category}-page`).textContent = page.total ? `${number(capabilityOffsets[category] + 1)}–${number(capabilityOffsets[category] + page.rows.length)} / ${number(page.total)}` : t('dashboard.zeroItems');
-      }
+      renderCapabilityTables(result.capabilities);
       return;
     }
     renderChart(result);
-    const costHeaders = showCosts ? [t('dashboard.estimatedApiCost')] : [];
-    const cost = row => {
-      if (!showCosts) return [];
-      const value = row.billing_mode === 'subscription' ? t('dashboard.subscriptionZero') : row.cost_usd == null ? '—'
-        : new Intl.NumberFormat(globalThis.agentTrackerI18n.language, { style: 'currency', currency: 'USD', minimumFractionDigits: 4, maximumFractionDigits: 6 }).format(row.cost_usd);
-      return [`${value}${row.unknown_costs ? t('dashboard.unknownCostsSuffix', { value0: number(row.unknown_costs) }) : ''}`];
-    };
     if (result.billing && selectedSession && showCosts) {
       $('billing-mode').value = result.billing;
       $('billing-mode').disabled = false;
@@ -585,26 +641,84 @@
     const turn = result.groupBy === 'turn';
     const model = result.by === 'model';
     $('model-note').hidden = !model;
-    const scopeLabel = row => row.period != null ? tableLabel(row.period) : row.session_id ? sessionLabel(row)
-      : row.project_key ? projectLabel(row) : tableLabel(['day', 'month'].includes(result.groupBy) ? t('dashboard.unknownTime') : t('common.all'));
     const rows = result.rows;
-    const tokenSortKeys = ['input', 'output', 'cacheWrite', 'cacheRead', 'tokens'];
-    const costSortKeys = showCosts ? ['cost'] : [];
-    if (turn) {
-      table($('usage-table'), [t('dashboard.projectHeader', { value0: model ? t('common.model') : t('common.provider') }), t('dashboard.requestSessionHeader'), t('dashboard.startTime'), ...tokenHeaders, t('dashboard.totalTokens'), t('dashboard.duration'), t('dashboard.statusQuality'), ...costHeaders], rows.map(row => [
-        seriesName(row, model, ` / ${row.project_name}`), sessionLabel(row, true), date(row.started_at_ms), ...tokenValues(row), number(row.total_tokens), duration(row.duration_ms), `${row.status === 'completed' ? t('common.completed') : row.status === 'failed' ? t('common.failed') : t('common.inProgress')} · ${row.duration_quality}${row.quality_flags ? ` · ${row.quality_flags}` : ''}${row.last_error ? t('dashboard.previousValueSuffix', { value0: row.last_error }) : ''}`, ...cost(row),
-      ]), ['model', undefined, 'period', ...tokenSortKeys, 'averageDuration', undefined, ...costSortKeys]);
-    } else {
-      table($('usage-table'), [model ? t('common.model') : t('common.provider'), t('dashboard.periodProjectSession'), ...tokenHeaders, t('dashboard.totalTokens'), t('dashboard.completedTotal'), t('dashboard.averageTokens'), t('dashboard.averageTimeSamples'), ...costHeaders], rows.map(row => [
-        seriesName(row, model), scopeLabel(row), ...tokenValues(row), number(row.total_tokens), `${number(row.completed_turns)} / ${number(row.turn_count)}`, number(row.avg_tokens_per_turn), t('dashboard.timeSamples', { value0: duration(row.avg_duration_ms), value1: number(row.turns_with_duration) }), ...cost(row),
-      ]), ['model', 'period', ...tokenSortKeys, 'requests', 'averageTokens', 'averageDuration', ...costSortKeys]);
+    if (turn) renderTurnTable(rows, model);
+    else renderAggregateTable(rows, model, result.groupBy);
+    updateUsagePagination(rows, result.total);
+    updateUsageCoverage(result.coverage, rows, turn);
+  }
+
+  function renderCapabilityTables(pages) {
+    for (const category of capabilityCategories) {
+      const page = pages[category];
+      const maximum = Math.max(1, page.maxUses);
+      table($(`${category}-table`), [t('common.provider'), t('common.name'), t('dashboard.usageCount'), t('dashboard.overallRatio')],
+        page.rows.map(row => [providerLabel(row.provider), row.name || t('dashboard.unknownModel'), number(row.usage_count), capabilityRatio(row, maximum, page.totalUses)]));
+      $(`${category}-total`).textContent = t('dashboard.totalUses', { value0: number(page.totalUses) });
+      $(`${category}-previous`).disabled = capabilityOffsets[category] === 0;
+      $(`${category}-next`).disabled = capabilityOffsets[category] + page.rows.length >= page.total;
+      $(`${category}-page`).textContent = page.total ? `${number(capabilityOffsets[category] + 1)}–${number(capabilityOffsets[category] + page.rows.length)} / ${number(page.total)}` : t('dashboard.zeroItems');
     }
+  }
+
+  function renderTurnTable(rows, model) {
+    const costHeaders = showCosts ? [t('dashboard.estimatedApiCost')] : [];
+    const costSortKeys = showCosts ? ['cost'] : [];
+    table($('usage-table'), [t('dashboard.projectHeader', { value0: model ? t('common.model') : t('common.provider') }), t('dashboard.requestSessionHeader'), t('dashboard.startTime'), ...tokenHeaders, t('dashboard.totalTokens'), t('dashboard.duration'), t('dashboard.statusQuality'), ...costHeaders], rows.map(row => [
+      seriesName(row, model, ` / ${row.project_name}`), sessionLabel(row, true), date(row.started_at_ms), ...tokenValues(row), number(row.total_tokens), duration(row.duration_ms), requestStatusQuality(row), ...costValues(row),
+    ]), ['model', undefined, 'period', ...tokenSortKeys, 'averageDuration', undefined, ...costSortKeys]);
+  }
+
+  function renderAggregateTable(rows, model, groupBy) {
+    const costHeaders = showCosts ? [t('dashboard.estimatedApiCost')] : [];
+    const costSortKeys = showCosts ? ['cost'] : [];
+    table($('usage-table'), [model ? t('common.model') : t('common.provider'), t('dashboard.periodProjectSession'), ...tokenHeaders, t('dashboard.totalTokens'), t('dashboard.completedTotal'), t('dashboard.averageTokens'), t('dashboard.averageTimeSamples'), ...costHeaders], rows.map(row => [
+      seriesName(row, model), usageScopeLabel(row, groupBy), ...tokenValues(row), number(row.total_tokens), `${number(row.completed_turns)} / ${number(row.turn_count)}`, number(row.avg_tokens_per_turn), t('dashboard.timeSamples', { value0: duration(row.avg_duration_ms), value1: number(row.turns_with_duration) }), ...costValues(row),
+    ]), ['model', 'period', ...tokenSortKeys, 'requests', 'averageTokens', 'averageDuration', ...costSortKeys]);
+  }
+
+  function costValues(row) {
+    if (!showCosts) return [];
+    const value = estimatedCost(row);
+    return [`${value}${row.unknown_costs ? t('dashboard.unknownCostsSuffix', { value0: number(row.unknown_costs) }) : ''}`];
+  }
+
+  function estimatedCost(row) {
+    if (row.billing_mode === 'subscription') return t('dashboard.subscriptionZero');
+    if (row.cost_usd == null) return '—';
+    return new Intl.NumberFormat(globalThis.agentTrackerI18n.language, { style: 'currency', currency: 'USD', minimumFractionDigits: 4, maximumFractionDigits: 6 }).format(row.cost_usd);
+  }
+
+  function requestStatus(row) {
+    if (row.status === 'completed') return t('common.completed');
+    if (row.status === 'failed') return t('common.failed');
+    return t('common.inProgress');
+  }
+
+  function requestStatusQuality(row) {
+    const status = requestStatus(row);
+    let quality = `${status} · ${row.duration_quality}`;
+    if (row.quality_flags) quality += ` · ${row.quality_flags}`;
+    if (row.last_error) quality += t('dashboard.previousValueSuffix', { value0: row.last_error });
+    return quality;
+  }
+
+  function usageScopeLabel(row, groupBy) {
+    if (row.period != null) return tableLabel(row.period);
+    if (row.session_id) return sessionLabel(row);
+    if (row.project_key) return projectLabel(row);
+    return tableLabel(['day', 'month'].includes(groupBy) ? t('dashboard.unknownTime') : t('common.all'));
+  }
+
+  function updateUsagePagination(rows, total) {
     for (const prefix of ['', 'chart-']) {
       $(`${prefix}previous`).disabled = offset === 0;
-      $(`${prefix}next`).disabled = offset + rows.length >= result.total;
-      $(`${prefix}page-label`).textContent = rows.length ? `${number(offset + 1)}–${number(offset + rows.length)} / ${number(result.total)}` : t('dashboard.zeroItems');
+      $(`${prefix}next`).disabled = offset + rows.length >= total;
+      $(`${prefix}page-label`).textContent = rows.length ? `${number(offset + 1)}–${number(offset + rows.length)} / ${number(total)}` : t('dashboard.zeroItems');
     }
-    const coverage = result.coverage;
+  }
+
+  function updateUsageCoverage(coverage, rows, turn) {
     const durationCoverage = turn ? '' : t('dashboard.timeQualitySuffix', { value0: number(rows.reduce((n, r) => n + (r.exact_duration_turns ?? 0), 0)), value1: number(rows.reduce((n, r) => n + (r.derived_duration_turns ?? 0), 0)), value2: number(rows.reduce((n, r) => n + (r.approximate_duration_turns ?? 0), 0)), value3: number(rows.reduce((n, r) => n + (r.missing_duration_turns ?? 0), 0)) });
     $('coverage').textContent = t('dashboard.coverage', { value0: number(coverage.files), value1: number(coverage.done), value2: number(coverage.error), value3: number(coverage.interrupted), value4: number(coverage.stale_summaries), value5: durationCoverage });
   }
@@ -612,7 +726,8 @@
     capabilitiesEnabled = enabled;
     $('skill-content').hidden = !enabled;
     $('skill-disabled').hidden = enabled;
-    if (!enabled) for (const category of capabilityCategories) {
+    if (enabled) return;
+    for (const category of capabilityCategories) {
       $(`${category}-table`).replaceChildren();$(`${category}-total`).textContent = '';
     }
   }
@@ -633,11 +748,20 @@
   function renderProgress() {
     if (latestRefreshResult) {
       const r = latestRefreshResult;
-      $('usage-progress').textContent = t('dashboard.refreshResult', { value0: r.interrupted ? t('common.interrupted') : r.failed ? t('dashboard.partialFailure') : t('dashboard.updated'), value1: number(r.discovered), value2: number(r.parsed), value3: number(r.reused), value4: number(r.failed), value5: number(r.bodyBytes), value6: r.error ? t('dashboard.reasonSuffix', { value0: r.error }) : '' });
-    } else if (latestProgress) {
+      $('usage-progress').textContent = t('dashboard.refreshResult', { value0: refreshStatus(r), value1: number(r.discovered), value2: number(r.parsed), value3: number(r.reused), value4: number(r.failed), value5: number(r.bodyBytes), value6: r.error ? t('dashboard.reasonSuffix', { value0: r.error }) : '' });
+      return;
+    }
+    if (latestProgress) {
       const p = latestProgress;
       $('usage-progress').textContent = t('dashboard.progress', { value0: ({ scanning: t('dashboard.scanning'), parsing: t('dashboard.parsing'), committing: t('dashboard.committing'), complete: t('common.completed') })[p.phase] ?? p.phase, value1: number(p.discovered), value2: number(p.parsed), value3: number(p.failed) });
-    } else if (busy) $('usage-progress').textContent = t('dashboard.updating');
+      return;
+    }
+    if (busy) $('usage-progress').textContent = t('dashboard.updating');
+  }
+  function refreshStatus(result) {
+    if (result.interrupted) return t('common.interrupted');
+    if (result.failed) return t('dashboard.partialFailure');
+    return t('dashboard.updated');
   }
   $('skill-settings').addEventListener('click', () => send({ type: 'settings' }));
   $('open-diagnostics').addEventListener('click', event => { event.preventDefault(); send({ type: 'openDiagnostics' }); });
@@ -706,32 +830,44 @@
     $(`${prefix}previous`).addEventListener('click', () => { offset = Math.max(0, offset - pageSize); query(); });
     $(`${prefix}next`).addEventListener('click', () => { offset += pageSize; query(); });
   }
+  function applyState(message) {
+    updateLocaleCaptions(message);
+    if (typeof message.showApiCosts === 'boolean') { showCosts = message.showApiCosts; updateCostControls(); }
+    updateCapabilities(message);
+    timezone = message.timezone;
+    $('timezone').textContent = t('dashboard.timezone', { value0: timezone });
+    $('configuration-warning').textContent = message.timezoneWarning ?? '';
+    $('configuration-warning').hidden = !message.timezoneWarning;
+    updateProviders(message);
+    if (latestUsage) renderUsage(latestUsage);
+    renderProgress();
+  }
+  function updateLocaleCaptions(message) {
+    if (!globalThis.updateAgentTrackerLocale?.(message.localization)) return;
+    if (!selectedProject) nameCaption('project', '');
+    if (!selectedSession) nameCaption('session', '');
+  }
+  function updateCapabilities(message) {
+    if (typeof message.capabilitiesEnabled !== 'boolean') return;
+    if (latestUsage?.capabilitiesEnabled !== undefined && latestUsage.capabilitiesEnabled !== message.capabilitiesEnabled) latestUsage = undefined;
+    setCapabilitiesEnabled(message.capabilitiesEnabled);
+  }
+  function updateProviders(message) {
+    if (!Array.isArray(message.providers)) return;
+    for (const option of $('provider').options) option.disabled = Boolean(option.value) && !message.providers.includes(option.value);
+    closeNames();
+    if (!$('provider').selectedOptions[0]?.disabled) return;
+    $('provider').value = '';
+    selectedSession = undefined;
+    nameCaption('session', '');
+    offset = 0;
+    query();
+  }
   window.addEventListener('message', event => {
     const message = event.data;
     if (!message || typeof message !== 'object') return;
     switch (message.type) {
-      case 'state':
-        if (globalThis.updateAgentTrackerLocale?.(message.localization)) {
-          if (!selectedProject) nameCaption('project', '');
-          if (!selectedSession) nameCaption('session', '');
-        }
-        if (typeof message.showApiCosts === 'boolean') { showCosts = message.showApiCosts; updateCostControls(); }
-        if (typeof message.capabilitiesEnabled === 'boolean') {
-          if (latestUsage?.capabilitiesEnabled !== undefined && latestUsage.capabilitiesEnabled !== message.capabilitiesEnabled) latestUsage = undefined;
-          setCapabilitiesEnabled(message.capabilitiesEnabled);
-        }
-        timezone = message.timezone;
-        $('timezone').textContent = t('dashboard.timezone', { value0: timezone });
-        $('configuration-warning').textContent = message.timezoneWarning ?? '';
-        $('configuration-warning').hidden = !message.timezoneWarning;
-        if (Array.isArray(message.providers)) {
-          for (const option of $('provider').options) option.disabled = Boolean(option.value) && !message.providers.includes(option.value);
-          closeNames();
-          if ($('provider').selectedOptions[0]?.disabled) { $('provider').value = ''; selectedSession = undefined; nameCaption('session', ''); offset = 0; query(); }
-        }
-        if (latestUsage) renderUsage(latestUsage);
-        renderProgress();
-        break;
+      case 'state': applyState(message); break;
       case 'usage': $('error').hidden = true; renderUsage(message.result); break;
       case 'names': renderNames(message); break;
       case 'busy': busy = message.busy; $('cancel-usage').hidden = !busy; if (busy) { latestProgress = undefined; latestRefreshResult = undefined; } renderProgress(); break;

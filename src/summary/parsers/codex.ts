@@ -138,13 +138,14 @@ export class CodexCurrentParserAdapter {
 
   private responseCapabilities(record: CodexRecordContext): void {
     const { payload, offset, identity } = record;
-    if (this.context.collectCapabilities !== false && this.root && ['function_call', 'custom_tool_call'].includes(String(payload.type))) {
-      const name = string(payload.name);
-      const eventId = string(payload.call_id) ?? string(payload.id);
-      if (name && eventId) for (const use of toolCapabilities(name, payload.arguments ?? payload.input)) {
-        this.sink.event({ kind: 'capability', rootId: this.root, threadId: identity.threadId,
-          eventId: `${eventId}:${use.index}`, category: use.category, name: use.name, offset });
-      }
+    if (this.context.collectCapabilities === false || !this.root) return;
+    if (!['function_call', 'custom_tool_call'].includes(String(payload.type))) return;
+    const name = string(payload.name);
+    const eventId = string(payload.call_id) ?? string(payload.id);
+    if (!name || !eventId) return;
+    for (const use of toolCapabilities(name, payload.arguments ?? payload.input)) {
+      this.sink.event({ kind: 'capability', rootId: this.root, threadId: identity.threadId,
+        eventId: `${eventId}:${use.index}`, category: use.category, name: use.name, offset });
     }
   }
 

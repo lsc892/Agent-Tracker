@@ -37,6 +37,37 @@ test('statistics page limits accept typed row counts and reject invalid values a
   }
 });
 
+test('usage messages reject invalid query controls but omit invalid optional filters', () => {
+  const base = { groupBy: 'day' };
+  for (const fields of [
+    { tableSort: null }, { tableSort: { key: 'tokens', direction: 'sideways' } },
+    { section: null }, { section: 'other' }, { capabilityLimits: null },
+  ]) {
+    assert.equal(parseDashboardMessage({ type: 'queryUsage', query: { ...base, ...fields } }), null);
+  }
+  assert.deepEqual(parseDashboardMessage({ type: 'queryUsage', query: {
+    ...base, provider: 'other', projectKey: '', sessionId: 'x'.repeat(2049),
+    fromMs: '0', toMs: 8.64e15 + 1, fromDay: null, toDay: '2026-1-01',
+    includeCosts: 1, chartMetric: 'other', chartBy: 'other', capabilityOffsets: null,
+  } }), { type: 'queryUsage', query: { ...base, limit: 100, offset: 0 } });
+
+  const id = 'x'.repeat(2048);
+  assert.deepEqual(parseDashboardMessage({ type: 'queryUsage', query: {
+    ...base, offset: 10_000_001, projectKey: id, sessionId: id,
+    fromMs: -8.64e15, toMs: 8.64e15, fromDay: '2026-99-99',
+    tableSort: { key: 'tokens', direction: 'desc', extra: true },
+    capabilityOffsets: { skill: -1, model: 10_000_001, plugin: 1.5 }, capabilityLimits: {},
+  } }), { type: 'queryUsage', query: {
+    ...base, limit: 100, offset: 10_000_000, projectKey: id, sessionId: id,
+    fromMs: -8.64e15, toMs: 8.64e15, tableSort: { key: 'tokens', direction: 'desc' },
+    capabilityOffsets: { skill: 0, subagent: 0, plugin: 0, model: 10_000_000 }, capabilityLimits: {},
+  }, fromDay: '2026-99-99' });
+  const groupBy = { toString: () => 'day' };
+  const parsed = parseDashboardMessage({ type: 'queryUsage', query: { groupBy } });
+  assert.ok(parsed?.type === 'queryUsage');
+  assert.equal(parsed.query.groupBy, groupBy);
+});
+
 test('webview uses external local assets, a nonce CSP, and text-only dynamic labels', () => {
   const html = dashboardHtml('local/script.js', 'local/style.css', 'local:', 'safe');
   assert.match(html, /default-src 'none'/);

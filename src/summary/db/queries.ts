@@ -112,40 +112,42 @@ export function buildQueryFilter(filter: SummaryFilter): QuerySql {
     values.push(...filter.providers);
   }
   for (const [name, column] of [['provider', 'provider'], ['projectKey', 'project_key'], ['sessionId', 'session_id']] as const) {
-    if (filter[name] !== undefined) {
-      clauses.push(`${column} = ?`);
-      values.push(filter[name]!);
-    }
+    if (filter[name] === undefined) continue;
+    clauses.push(`${column} = ?`);
+    values.push(filter[name]!);
   }
   for (const [name, table, condition, column] of [
     ['projectName', 'projects', 'projects.project_key = turn_summary.project_key', 'project_name'],
     ['sessionName', 'sessions', 'sessions.provider = turn_summary.provider AND sessions.session_id = turn_summary.session_id', 'session_name'],
   ] as const) {
-    if (filter[name]) {
-      clauses.push(`EXISTS(SELECT 1 FROM ${table} WHERE ${condition} AND ${column} LIKE ? ESCAPE '\\')`);
-      values.push(`%${filter[name]!.replace(/[\\%_]/g, character => `\\${character}`)}%`);
-    }
+    if (!filter[name]) continue;
+    clauses.push(`EXISTS(SELECT 1 FROM ${table} WHERE ${condition} AND ${column} LIKE ? ESCAPE '\\')`);
+    values.push(`%${filter[name]!.replace(/[\\%_]/g, character => `\\${character}`)}%`);
   }
+  appendTimeFilter(filter, clauses, values);
+  return { sql: clauses.length ? clauses.join(' AND ') : '1 = 1', values };
+}
 
+function appendTimeFilter(filter: SummaryFilter, clauses: string[], values: SQLInputValue[]): void {
   const time: string[] = [];
   const timeValues: SQLInputValue[] = [];
   for (const [name, operator] of [['fromMs', '>='], ['toMs', '<']] as const) {
-    if (filter[name] !== undefined) {
-      if (!Number.isSafeInteger(filter[name])) throw new RangeError(`${name} must be an epoch millisecond integer`);
-      time.push(`started_at_ms ${operator} ?`);
-      timeValues.push(filter[name]!);
-    }
+    if (filter[name] === undefined) continue;
+    if (!Number.isSafeInteger(filter[name])) throw new RangeError(`${name} must be an epoch millisecond integer`);
+    time.push(`started_at_ms ${operator} ?`);
+    timeValues.push(filter[name]!);
   }
   if (filter.unknownTime === 'only') {
     clauses.push('started_at_ms IS NULL');
-  } else if (time.length) {
+    return;
+  }
+  if (time.length) {
     const interval = time.join(' AND ');
     clauses.push(filter.unknownTime === 'include' ? `((${interval}) OR started_at_ms IS NULL)` : `(${interval})`);
     values.push(...timeValues);
-  } else if (filter.unknownTime === 'exclude') {
-    clauses.push('started_at_ms IS NOT NULL');
+    return;
   }
-  return { sql: clauses.length ? clauses.join(' AND ') : '1 = 1', values };
+  if (filter.unknownTime === 'exclude') clauses.push('started_at_ms IS NOT NULL');
 }
 
 /**
