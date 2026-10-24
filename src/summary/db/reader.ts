@@ -78,7 +78,7 @@ export class SummaryReader {
 
   /**
    * 책임: 분류별 사용 횟수와 페이지에 독립적인 비율을 반환한다.
-   * 알고리즘: 전체 필터 범위의 합계·최댓값을 먼저 구하고 순위 페이지·상위 20개를 조회해 같은 전체 합계를 비율 분모로 사용한다.
+   * 알고리즘: 전체 필터 범위의 합계·최댓값과 요청 페이지를 조회해 전체 합계를 비율 분모로 사용한다.
    */
   queryCapabilities(filter: SummaryFilter, category: CapabilityCategory, offset = 0, limit = 100): CapabilityPage {
     pageLimit(limit);
@@ -88,12 +88,10 @@ export class SummaryReader {
     const ranking = this.database.connection.prepare(queries.ranking.sql);
     const pageOffset = nonnegative(offset, 'offset');
     const rows = ranking.all(...queries.ranking.values, limit, pageOffset) as unknown as CapabilityRow[];
-    const chartRows = pageOffset === 0 && limit >= 20 ? rows.slice(0, 20)
-      : ranking.all(...queries.ranking.values, 20, 0) as unknown as CapabilityRow[];
     const withPercentage = (row: CapabilityRow): CapabilityRow => ({
       ...row, percentage: counts.totalUses ? row.usage_count / counts.totalUses * 100 : 0,
     });
-    return { ...counts, rows: rows.map(withPercentage), chartRows: chartRows.map(withPercentage) };
+    return { ...counts, rows: rows.map(withPercentage) };
   }
 
   queryUsageCount(filter: SummaryFilter = {}, groupBy: UsageGrouping = 'total', timezone = 'UTC', by: 'provider' | 'model' = 'provider'): number {

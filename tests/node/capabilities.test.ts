@@ -110,7 +110,6 @@ test('Codex current and legacy model counts, exec calls, descendant calls and ab
   assert.equal(result.capabilities?.plugin.totalUses,1);
   assert.equal(result.capabilities?.model.totalUses,2);
   assert.ok(result.capabilities?.model.rows.every(row=>row.percentage===50));
-  assert.deepEqual(result.capabilities?.skill.chartRows,result.capabilities?.skill.rows,'worker sends the filtered chart ranking');
   assert.equal((await client.query({section:'skills'})).capabilities?.model.totalUses,3);
   assert.equal((await client.query({section:'skills',projectKey:normalize('/other')})).capabilities?.model.rows[0].name,'');
   await rm(root,{recursive:true,force:true});
@@ -164,17 +163,17 @@ test('capability pagination uses the full denominator, date filters exclude unkn
   db.replaceSessions({sessions:[{provider:'codex',session_id:'s'}],files:[],summaries:Array.from({length:105},(_,i)=>summary(`skill-${i}`))});
   const first=db.queryCapabilities({},'skill'),second=db.queryCapabilities({},'skill',100);
   assert.equal(first.totalUses,105);assert.equal(second.totalUses,105);assert.equal(first.rows.length,100);assert.equal(second.rows.length,5);
-  assert.equal(first.chartRows.length,20);assert.deepEqual(second.chartRows,first.chartRows,'chart ranking ignores table pagination');
+  assert.equal(first.maxUses,1);assert.equal(second.maxUses,1);
   const small=db.queryCapabilities({},'skill',0,7),large=db.queryCapabilities({},'skill',0,1000);
-  assert.equal(small.rows.length,7);assert.deepEqual(small.chartRows,first.chartRows);
+  assert.equal(small.rows.length,7);assert.equal(small.maxUses,first.maxUses);
   assert.deepEqual(db.queryCapabilities({},'skill',7,7).rows,first.rows.slice(7,14));
   assert.equal(large.rows.length,105);assert.equal(small.totalUses,large.totalUses);
   for (const limit of [0,1.5,1001]) assert.throws(()=>db.queryCapabilities({},'skill',0,limit),RangeError);
-  assert.deepEqual(first.chartRows,first.rows.slice(0,20),'ties use the same deterministic provider/name ordering');
-  assert.deepEqual(db.queryCapabilities({},'skill',200).chartRows,first.chartRows,'even an empty table page retains the full chart');
+  const empty=db.queryCapabilities({},'skill',200);
+  assert.deepEqual(empty.rows,[]);assert.equal(empty.maxUses,first.maxUses);assert.equal(empty.totalUses,first.totalUses);
   assert.ok(Math.abs([...first.rows,...second.rows].reduce((n,row)=>n+row.percentage,0)-100)<1e-10);
   assert.equal(db.queryCapabilities({fromMs:0},'skill').totalUses,0);
-  assert.deepEqual(db.queryCapabilities({fromMs:0},'skill').chartRows,[]);
+  assert.deepEqual(db.queryCapabilities({fromMs:0},'skill').rows,[]);
   const before=db.queryTurns();
   assert.throws(()=>db.replaceSessions({sessions:[{provider:'codex',session_id:'s'}],files:[],summaries:[summary('bad','/other',0)]}));
   assert.equal(db.queryCapabilities({},'skill').totalUses,105);
@@ -206,7 +205,7 @@ test('worker applies independent Skill page sizes and preserves totals across cu
   assert.deepEqual(second.plugin.rows,first.plugin.rows);
 });
 
-test('capability chart ranks the filtered top 20 and retains the denominator of omitted entries',()=>{
+test('capability pages retain filtered maxima and the denominator of omitted entries',()=>{
   const db=new SummaryDatabase(':memory:');
   try {
     const startedAt=Date.parse('2026-10-07T00:00:00Z');
@@ -214,13 +213,15 @@ test('capability chart ranks the filtered top 20 and retains the denominator of 
       ...Array.from({length:25},(_,i)=>({...summary(`rank-${i}`,'/project',25-i),started_at_ms:startedAt})),
       {...summary('outside','/other',1000),provider:'claude',session_id:'other',started_at_ms:startedAt-86_400_000},
     ]});
-    assert.equal(db.queryCapabilities({},'skill').chartRows[0].name,'outside');
+    assert.equal(db.queryCapabilities({},'skill').rows[0].name,'outside');
     for (const filter of [{provider:'codex' as const},{projectKey:'/project'},{sessionId:'s'},{fromMs:startedAt,toMs:startedAt+1}]) {
-      const page=db.queryCapabilities(filter,'skill',100);
-      assert.equal(page.rows.length,0);assert.equal(page.chartRows.length,20);assert.equal(page.totalUses,325);
-      assert.deepEqual(page.chartRows.map(row=>row.name),Array.from({length:20},(_,i)=>`rank-${i}`));
-      assert.ok(Math.abs(page.chartRows[0].percentage-25/325*100)<1e-10);
-      assert.ok(page.chartRows.reduce((sum,row)=>sum+row.percentage,0)<100,'unshown entries stay in the denominator');
+      const page=db.queryCapabilities(filter,'skill',7,7);
+      assert.equal(page.rows.length,7);assert.equal(page.maxUses,25);assert.equal(page.totalUses,325);
+      assert.deepEqual(page.rows.map(row=>row.name),Array.from({length:7},(_,i)=>`rank-${i+7}`));
+      assert.ok(Math.abs(page.rows[0].percentage-18/325*100)<1e-10);
+      assert.ok(page.rows.reduce((sum,row)=>sum+row.percentage,0)<100,'unshown entries stay in the denominator');
+      const empty=db.queryCapabilities(filter,'skill',100);
+      assert.deepEqual(empty.rows,[]);assert.equal(empty.maxUses,25);assert.equal(empty.totalUses,325);
     }
   } finally {db.close();}
 });

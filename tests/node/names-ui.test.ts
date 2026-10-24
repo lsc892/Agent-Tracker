@@ -102,7 +102,7 @@ test('Skill statistics keep the four tables and descriptions without the removed
 test('Skill off clears cached counts, shows settings guidance and leaves token statistics available',()=>{
   const {get,messages,receive}=view({section:'skills'});
   const rows=[{provider:'codex',name:'commit',usage_count:3,percentage:100}];
-  const page={rows,chartRows:rows,total:1,totalUses:3};
+  const page={rows,total:1,totalUses:3,maxUses:3};
   receive({type:'usage',result:{capabilitiesEnabled:true,capabilities:{skill:page,subagent:page,plugin:page,model:page},rows:[],total:0}});
   assert.match(get('skill-table').textContent,/commit/);
   receive({type:'state',timezone:'UTC',capabilitiesEnabled:false});
@@ -233,7 +233,7 @@ test('every capability table paints ratios relative to the full-scope leader acr
   const {get,receive}=view({section:'skills'});
   const leader={provider:'claude',name:'leader',usage_count:200,percentage:20};
   const second={provider:'codex',name:'second',usage_count:100,percentage:10};
-  const page={rows:[leader,second],chartRows:[leader,second],total:105,totalUses:1000};
+  const page={rows:[leader,second],total:105,totalUses:1000,maxUses:200};
   const sendPage=(value:typeof page)=>receive({type:'usage',result:{capabilities:Object.fromEntries(['skill','subagent','plugin','model'].map(category=>[category,value])),rows:[],total:0}});
   const fills=(category:string)=>get(`${category}-table`).children[0].children[1].children.map(row=>row.children[3].children[0].children[0].children[2]);
   sendPage(page);

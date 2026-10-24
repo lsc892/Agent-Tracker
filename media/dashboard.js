@@ -560,7 +560,7 @@
     if (result.capabilities) {
       for (const category of capabilityCategories) {
         const page = result.capabilities[category];
-        const maximum = Math.max(1, page.maxUses ?? Math.max(0, ...(page.chartRows ?? page.rows).map(row => row.usage_count)));
+        const maximum = Math.max(1, page.maxUses);
         table($(`${category}-table`), [t('common.provider'), t('common.name'), t('dashboard.usageCount'), t('dashboard.overallRatio')],
           page.rows.map(row => [providerLabel(row.provider), row.name || t('dashboard.unknownModel'), number(row.usage_count), capabilityRatio(row, maximum, page.totalUses)]));
         $(`${category}-total`).textContent = t('dashboard.totalUses', { value0: number(page.totalUses) });
