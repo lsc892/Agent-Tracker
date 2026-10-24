@@ -334,6 +334,46 @@ test('long polling intervals respect the Node timer delay bound without refreshi
   await service.dispose();
 });
 
+test('provider and listener mutations cannot change accepted notification or completed quota snapshots', async () => {
+  const update = snapshot(1_000_000, 33);
+  const completion = deferred<QuotaSnapshot>();
+  const provider: QuotaProvider = { id: 'claude', read: context => {
+    context.onSnapshot?.(update);
+    return completion.promise;
+  } };
+  const service = new QuotaService([provider]);
+  const seen: number[] = [];
+  service.subscribe(([state]) => {
+    if (state.snapshot) state.snapshot.windows[0].usedPercent = 999;
+  });
+  service.subscribe(([state]) => {
+    if (state.snapshot) seen.push(state.snapshot.windows[0].usedPercent);
+  });
+  try {
+    const reading = service.refresh('claude', true);
+    await settle();
+    assert.equal(service.getState('claude').refreshing, true);
+    assert.equal(service.getState('claude').snapshot?.windows[0].usedPercent, 33);
+    update.windows[0].usedPercent = 77;
+    assert.equal(service.getState('claude').snapshot?.windows[0].usedPercent, 33);
+
+    const completed = snapshot(1_000_001, 66);
+    completion.resolve(completed);
+    await reading;
+    completed.windows[0].usedPercent = 88;
+    const state = service.getState('claude');
+    assert.equal(state.refreshing, false);
+    assert.equal(state.status, 'ready');
+    assert.equal(state.snapshot?.windows[0].usedPercent, 66);
+    assert.ok(seen.includes(33));
+    assert.ok(seen.includes(66));
+    assert.equal(seen.includes(999), false);
+  } finally {
+    completion.resolve(snapshot(1_000_001, 66));
+    await service.dispose();
+  }
+});
+
 test('notifications update immediately; listener failures do not affect cleanup; disposal cancels reads', async () => {
   let aborted = false;
   const provider: QuotaProvider = { id: 'claude', read: context => {
@@ -516,6 +556,44 @@ test('Codex prefers multi-bucket data, uses dynamic durations, seconds reset and
   assert.throws(() => parseCodexQuota({ rateLimits: bucket(99, 300), rateLimitsByLimitId: {} }, 1), { code: 'unavailable' });
   assert.throws(() => parseCodexQuota({ rateLimits: bucket(99, 300), rateLimitsByLimitId: [] }, 1), { code: 'protocol' });
   assert.throws(() => parseCodexQuota({ rateLimits: { primary: { usedPercent: NaN } } }, 1), { code: 'protocol' });
+});
+
+test('Codex preserves bucket and primary-secondary order with metadata and missing windows', () => {
+  const limitId = 'i'.repeat(105);
+  const limitName = 'n'.repeat(105);
+  const reachedType = 'r'.repeat(105);
+  const result = parseCodexQuota({ rateLimitsByLimitId: {
+    named: { limitId, limitName, rateLimitReachedType: reachedType,
+      primary: { usedPercent: 10, windowDurationMins: 300 },
+      secondary: { usedPercent: 20, windowDurationMins: 10080 } },
+    noWindows: {},
+    secondaryOnly: { primary: null, secondary: { usedPercent: 30, windowDurationMins: 60 } },
+    codex: { primary: { usedPercent: 40, windowDurationMins: 90 } },
+  } }, 123);
+  assert.equal(result.fetchedAt, 123);
+  assert.deepEqual(result.windows.map(window => [window.id, window.usedPercent, window.label]), [
+    [`${limitId.slice(0, 100)}:primary`, 10, `${limitName.slice(0, 100)} 5h`],
+    [`${limitId.slice(0, 100)}:secondary`, 20, `${limitName.slice(0, 100)} 7d`],
+    ['secondaryOnly:secondary', 30, 'secondaryOnly 1h'],
+    ['codex:primary', 40, '90m'],
+  ]);
+  for (const window of result.windows.slice(0, 2)) {
+    assert.equal(window.limitId, limitId.slice(0, 100));
+    assert.equal(window.limitName, limitName.slice(0, 100));
+    assert.equal(window.rateLimitReachedType, reachedType.slice(0, 100));
+  }
+  assert.equal(result.windows[2].limitName, undefined);
+  assert.equal(result.windows[2].rateLimitReachedType, undefined);
+});
+
+test('Codex rejects malformed later windows and buckets after earlier valid usage', () => {
+  const valid = { primary: { usedPercent: 10, windowDurationMins: 300 } };
+  assert.throws(() => parseCodexQuota({ rateLimitsByLimitId: {
+    first: { ...valid, secondary: { usedPercent: 'invalid' } },
+  } }, 1), { code: 'protocol' });
+  assert.throws(() => parseCodexQuota({ rateLimitsByLimitId: {
+    first: valid, malformedLater: null,
+  } }, 1), { code: 'protocol' });
 });
 
 test('Codex accepts more than 100 valid windows and still validates later fields', () => {

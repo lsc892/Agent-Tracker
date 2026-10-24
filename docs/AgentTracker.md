@@ -42,9 +42,15 @@ Codex sessions/**/*.jsonl ──┘                              │
 
 Claude·Codex quota 제공자는 `BaseQuotaProvider` 추상 클래스를 상속한다. 공통 `read()`는 조회별 취소 신호와 진행 중 Promise를 소유하고 `readQuota(context)`를 호출해 같은 `QuotaSnapshot` 계약으로 사용량을 반환한다. 공통 `dispose()`는 추가 조회를 차단하고 모든 조회를 취소한 뒤 제공자의 정리가 끝날 때까지 기다리며 중복 호출은 같은 Promise를 반환한다. 인증·HTTP/RPC·응답 정규화와 timeout 시작 시점은 각 제공자에 둔다. 특히 Codex의 process 종료 확인은 조회의 일부로 유지한다. `QuotaProvider` 인터페이스는 서비스의 의존 계약으로 유지한다.
 
-`readQuota()`는 조회·재시도·timeout·취소·정리 흐름을 소유하고 Claude HTTP 응답 검사는 `ensureUsageResponseOk()`, Codex 로그인·구독 계정 검증은 `ensureSupportedAccount()`에 둔다. `RpcSession.receive()`는 서버 메시지와 요청 응답을 private 처리 메서드로 나누며 RPC 오류 분류도 별도 메서드에서 수행한다. 공개 quota 파서는 창 순회를 관리하고 창 하나의 필드 검증·정규화는 export 없는 파일 내부 함수에 둔다. Claude HTTP 본문과 Codex RPC 메시지의 기존 크기 제한을 유지하며 두 파서 모두 별도의 창 개수 상한 없이 유효한 창을 변환한다. HTTP User-Agent와 RPC 초기화 정보의 버전은 공통 모듈에서 `package.json`의 실제 확장 버전을 읽어 사용한다.
+제공자의 `readQuota()`는 조회·재시도·timeout·취소·정리 순서를 조율한다. [codex.ts](../src/quota/codex.ts)는 실행·handshake·계정 검증·한도 조회를 연결하고, [codex/rpcSession.ts](../src/quota/codex/rpcSession.ts)의 `RpcSession`이 child·stream·decoder·요청 ID·대기 Promise와 종료 수명을 함께 소유한다. [codex/response.ts](../src/quota/codex/response.ts)는 한도·reset credit 해석, [codex/executable.ts](../src/quota/codex/executable.ts)는 실행 파일 탐색, [codex/errors.ts](../src/quota/codex/errors.ts)는 공유 오류 생성을 맡는다. 내부 모듈은 provider 진입점을 역참조하지 않는다.
 
-`QuotaService`는 공개 진입점 아래에 `runRefreshCycle()`·`read()`·`schedule()`의 실행 흐름을 두고 세부 정책은 아래 private 메서드로 분리한다. `refresh()`는 중복 요청과 갱신 조건을 판단하고 조회 사이클에 위임하며, 마지막 재실행 확인과 `running` 해제는 같은 비동기 흐름에서 처리한다. `read()`는 성공·알림·실패를 각 처리 메서드로 연결하고, `schedule()`은 `getNextWakeAt()`의 시각에 `handleTimer()`를 예약한다. 제공자별 상태·취소 신호와 단일 타이머는 계속 서비스가 소유한다.
+Codex 응답의 [parseCodexQuota()](../src/quota/codex/response.ts#L15)는 응답 확인·창 목록 변환·빈 결과 거부·선택 credit·snapshot 조립을 연결한다. [창 목록 변환](../src/quota/codex/response.ts#L25)은 한도 묶음을 한 번 순회하고, [묶음 해석](../src/quota/codex/response.ts#L37)은 공통 식별자·이름을 확정한 뒤 primary·secondary 처리를 순서대로 호출한다. [창 추가](../src/quota/codex/response.ts#L47)는 없는 창을 건너뛰고 검증된 창에 표시 정보를 연결해 기존 결과 배열에 바로 쓴다. 별도 한도별 결과 배열이나 중첩 창 순회를 두지 않으며 기존 입력 우선순위·검증·출력 순서를 유지한다.
+
+[claude.ts](../src/quota/claude.ts)는 인증·요청·401 재확인 1회·HTTP 상태 분류와 Retry-After를 조율한다. [claude/httpBody.ts](../src/quota/claude/httpBody.ts)는 제한된 본문 읽기와 reader 해제, [claude/response.ts](../src/quota/claude/response.ts)는 quota 창 검증·정규화를 맡는다. 기존 제공자 파일과 [quota 공개 진입점](../src/quota/index.ts)의 클래스·options·parser·실행 파일 탐색 export를 유지한다. Claude HTTP 본문과 Codex RPC 메시지의 기존 크기 제한을 유지하며 두 파서 모두 별도의 창 개수 상한 없이 유효한 창을 변환한다. HTTP User-Agent와 RPC 초기화 정보의 버전은 공통 모듈에서 `package.json`의 실제 확장 버전을 읽어 사용한다.
+
+[QuotaService](../src/quota/service.ts)는 provider 목록·진행 중 조회·취소·강제 재실행·focus·갱신 정책·poll 시각·단일 timer·구독자를 소유한다. `refresh()`는 중복 요청과 갱신 조건을 판단하고 조회 사이클에 위임하며, 마지막 재실행 확인과 `running` 해제는 같은 비동기 흐름에서 처리한다. 성공·알림·실패는 [ProviderQuotaState](../src/quota/providerState.ts)에 전달한다. 이 상태 객체가 provider 하나의 snapshot·마지막 성공 시각·오류·실패 횟수·재시도 가능 시각을 단독 소유하며 수용·backoff·만료·화면 상태 복제를 수행한다. 서비스는 상태 필드를 직접 수정하지 않고, 상태 객체는 provider·timer·listener를 호출하지 않는다.
+
+포커스 복귀·재시도·snapshot 보존 정책 상수는 상태 파일에, timer 최대 지연은 서비스에 둔다. 실패 snapshot의 일반 오류 30분·rate limit 오류 24시간 보존 기간은 상태 파일의 `snapshotRetentionMs()`에서 선택해 예약과 실제 만료가 공유한다. 시계는 callback으로 지연 조회해 기존 guard와 읽기 시점을 유지하고, 구독자마다 snapshot을 복제한다.
 
 새 quota 제공자는 `BaseQuotaProvider`를 상속하고 `id`, 종료 안내 `closedMessage`, `readQuota()`를 구현한다. `readQuota()`는 전달받은 `signal`을 따르고 사용량·조회 시각·reset 시각을 기존 snapshot 규약으로 정규화해야 한다. 제공자 ID 타입·설정과 `AgentTrackerApp`의 생성 목록, 제공자별 UI도 함께 확장한다. 로컬 대화 통계까지 지원하려면 별도의 로그 파서와 통계 provider 연동이 필요하다.
 

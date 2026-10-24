@@ -1,5 +1,8 @@
-import { QuotaError, type QuotaProvider, type QuotaProviderId, type QuotaSnapshot, type QuotaState } from './types';
+import type { QuotaProvider, QuotaProviderId, QuotaSnapshot, QuotaState } from './types';
 import { settingDefinitions, type RefreshPolicy } from '../configuration/schema';
+import { ProviderQuotaState } from './providerState';
+
+const MAX_TIMER_DELAY_MS = 2_147_483_647;
 
 export interface QuotaClock {
   now(): number;
@@ -19,11 +22,7 @@ export interface QuotaServiceOptions {
 }
 interface Entry {
   provider: QuotaProvider;
-  snapshot: QuotaSnapshot | null;
-  lastSuccessAt: number | null;
-  error: QuotaError | null;
-  failures: number;
-  nextAllowedAt: number;
+  state: ProviderQuotaState;
   nextPollAt: number;
   running: Promise<void> | null;
   rerunRequested: boolean;
@@ -31,8 +30,8 @@ interface Entry {
 }
 
 /**
- * 책임: 대화 로그·DB 작업과 독립적으로 quota 상태와 갱신 일정을 관리한다.
- * 알고리즘: 제공자별 조회·재시도·마지막 성공 값을 보관하고 가장 이른 폴링 또는 만료 시각에 단일 타이머를 예약한다.
+ * 책임: 제공자 조회·수동 재실행·구독 알림과 갱신 일정을 조율한다.
+ * 알고리즘: 제공자별 진행 중 조회를 합치고 가장 이른 폴링 또는 상태 만료 시각에 단일 타이머를 예약한다.
  */
 export class QuotaService {
   private readonly entries = new Map<QuotaProviderId, Entry>();
@@ -51,8 +50,7 @@ export class QuotaService {
     this.pollingIntervalMs = intervalMs(options.pollingSeconds ?? settingDefinitions.quota.pollingIntervalSeconds.default);
     for (const provider of providers) {
       if (this.entries.has(provider.id)) throw new Error(`Duplicate quota provider: ${provider.id}`);
-      this.entries.set(provider.id, { provider, snapshot: null, lastSuccessAt: null, error: null,
-        failures: 0, nextAllowedAt: 0, nextPollAt: 0,
+      this.entries.set(provider.id, { provider, state: new ProviderQuotaState(() => this.clock.now()), nextPollAt: 0,
         running: null, rerunRequested: false, abort: null });
     }
   }
@@ -108,13 +106,8 @@ export class QuotaService {
 
   getState(provider: QuotaProviderId): QuotaState {
     const entry = this.entry(provider);
-    this.expire(entry);
-    const snapshot = entry.snapshot ? structuredClone(entry.snapshot) : null;
-    return { provider, snapshot, refreshing: entry.running !== null,
-      status: snapshot ? (entry.error ? 'stale' : 'ready') : (entry.running ? 'loading' : 'unavailable'),
-      lastSuccessAt: entry.lastSuccessAt,
-      error: entry.error ? { code: entry.error.code, message: entry.error.message, translation: entry.error.translation } : null,
-      nextAllowedAt: entry.nextAllowedAt };
+    entry.state.expire();
+    return entry.state.getState(provider, entry.running !== null);
   }
 
   getStates(): QuotaState[] { return [...this.entries.keys()].map(id => this.getState(id)); }
@@ -169,9 +162,9 @@ export class QuotaService {
     try {
       const snapshot = await entry.provider.read({ signal: entry.abort.signal,
         onSnapshot: value => this.handleSnapshotUpdate(entry, value) });
-      if (!this.disposed) this.acceptSnapshot(entry, snapshot);
+      if (!this.disposed) entry.state.acceptSnapshot(snapshot);
     } catch (error) {
-      this.handleReadFailure(entry, error);
+      if (!this.disposed) entry.state.recordFailure(error);
     } finally {
       entry.nextPollAt = this.clock.now() + this.pollingIntervalMs;
     }
@@ -186,7 +179,7 @@ export class QuotaService {
     const due = this.getNextWakeAt();
     if (!Number.isFinite(due)) return;
     this.timer = this.clock.setTimeout(() => this.handleTimer(),
-      Math.min(2_147_483_647, Math.max(1, due - now)));
+      Math.min(MAX_TIMER_DELAY_MS, Math.max(1, due - now)));
   }
 
   private refreshAll(): void {
@@ -197,45 +190,20 @@ export class QuotaService {
   private refreshOnFocus(): void {
     const now = this.clock.now();
     for (const [id, entry] of this.entries) {
-      if (entry.lastSuccessAt === null || entry.error || now - entry.lastSuccessAt >= 300_000) {
+      if (entry.state.shouldRefreshOnFocus(now)) {
         void this.refresh(id);
       }
     }
   }
 
   private shouldSkipAutomaticRefresh(entry: Entry): boolean {
-    return this.refreshPolicy === 'manual' || !this.focused || this.clock.now() < entry.nextAllowedAt;
+    return this.refreshPolicy === 'manual' || !this.focused || this.clock.now() < entry.state.nextAllowedAt;
   }
 
   private handleSnapshotUpdate(entry: Entry, snapshot: QuotaSnapshot): void {
     if (this.disposed) return;
-    this.acceptSnapshot(entry, snapshot);
+    entry.state.acceptSnapshot(snapshot);
     this.emit();
-  }
-
-  private acceptSnapshot(entry: Entry, snapshot: QuotaSnapshot): void {
-    entry.snapshot = structuredClone(snapshot);
-    entry.lastSuccessAt = snapshot.fetchedAt;
-    entry.error = null;
-    entry.failures = 0;
-    entry.nextAllowedAt = 0;
-  }
-
-  /**
-   * 책임: 조회 오류·재시도 지연·유효하지 않은 계정의 이전 값을 처리한다.
-   * 알고리즘: 30초부터 최대 15분의 지수 지연과 Retry-After 중 큰 값을 적용하고 계정 변경·보존 기한에 따라 스냅샷을 비운다.
-   */
-  private handleReadFailure(entry: Entry, error: unknown): void {
-    if (this.disposed) return;
-    entry.error = error instanceof QuotaError ? error : new QuotaError('unavailable', { key: 'quota.lookupFailed' });
-    entry.failures += 1;
-    const backoff = Math.min(900_000, 30_000 * 2 ** Math.min(10, entry.failures - 1));
-    entry.nextAllowedAt = this.clock.now() + Math.max(backoff, entry.error.retryAfterMs ?? 0);
-    if (entry.error.code === 'unsupported-account') {
-      entry.snapshot = null;
-      entry.lastSuccessAt = null;
-    }
-    this.expire(entry);
   }
 
   /**
@@ -245,10 +213,8 @@ export class QuotaService {
   private getNextWakeAt(): number {
     let due = Infinity;
     for (const entry of this.entries.values()) {
-      if (this.isAutomaticRefreshActive() && !entry.running) due = Math.min(due, Math.max(entry.nextPollAt, entry.nextAllowedAt));
-      if (entry.snapshot && entry.error && entry.lastSuccessAt !== null) {
-        due = Math.min(due, entry.lastSuccessAt + (entry.error.code === 'rate-limit' ? 86_400_000 : 1_800_000));
-      }
+      if (this.isAutomaticRefreshActive() && !entry.running) due = Math.min(due, Math.max(entry.nextPollAt, entry.state.nextAllowedAt));
+      due = Math.min(due, entry.state.expiresAt);
     }
     return due;
   }
@@ -257,23 +223,11 @@ export class QuotaService {
   private handleTimer(): void {
     let expired = false;
     for (const [id, entry] of this.entries) {
-      expired = this.expire(entry) || expired;
-      if (this.isAutomaticRefreshActive() && this.clock.now() >= Math.max(entry.nextPollAt, entry.nextAllowedAt)) void this.refresh(id);
+      expired = entry.state.expire() || expired;
+      if (this.isAutomaticRefreshActive() && this.clock.now() >= Math.max(entry.nextPollAt, entry.state.nextAllowedAt)) void this.refresh(id);
     }
     if (expired) this.emit();
     this.schedule();
-  }
-
-  /**
-   * 책임: 실패 후 오래된 quota가 계속 표시되지 않도록 만료시킨다.
-   * 알고리즘: 마지막 성공 시각부터 일반 오류는 30분, 요청 제한 오류는 24시간이 지나면 스냅샷을 비운다.
-   */
-  private expire(entry: Entry): boolean {
-    if (!entry.snapshot || !entry.error || entry.lastSuccessAt === null) return false;
-    const ttl = entry.error.code === 'rate-limit' ? 86_400_000 : 1_800_000;
-    if (this.clock.now() - entry.lastSuccessAt < ttl) return false;
-    entry.snapshot = null;
-    return true;
   }
 
   private isAutomaticRefreshActive(): boolean {
