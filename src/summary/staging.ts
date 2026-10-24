@@ -161,31 +161,77 @@ export class SummaryStaging {
 
   /**
    * 책임: 파싱한 부모·자식 thread를 같은 논리 세션으로 연결한다.
-   * 알고리즘: 유일하게 확인된 부모 세션을 최대 128회 전파하고 이전·새 세션을 영향 집합에 추가하며, 미확인 부모는 품질 플래그로 남긴다.
+   * 알고리즘: TEMP 방문 상태·스택으로 부모를 먼저 해소하고 같은 최종 세션의 부모 후보만 채택하며, 순환 경로는 재배정하지 않는다.
    */
   resolveLineage(): void {
-    for (let pass = 0; pass < 128; pass++) {
-      this.connection.exec(`DROP TABLE IF EXISTS temp.lineage;
-        CREATE TEMP TABLE lineage AS SELECT f.id,f.provider,f.session_id previous,min(p.session_id) target
-        FROM scan_files f JOIN scan_files p ON p.provider=f.provider AND p.thread_id=f.parent_thread_id
-        WHERE f.provider='codex' AND f.removed=0 AND p.removed=0 AND p.failed=0 AND p.parsed=1
-        GROUP BY f.id HAVING count(DISTINCT p.session_id)=1 AND target<>f.session_id;
-        INSERT OR IGNORE INTO affected SELECT provider,target FROM lineage;
-        INSERT OR IGNORE INTO affected SELECT provider,previous FROM lineage;
-        INSERT OR IGNORE INTO links SELECT provider,previous,target FROM lineage;
-        UPDATE scan_files SET session_id=(SELECT target FROM lineage WHERE lineage.id=scan_files.id)
-          WHERE id IN (SELECT id FROM lineage);`);
-      const changed = this.connection.prepare('SELECT count(*) count FROM lineage').get() as {count:number};
-      if (!changed.count) break;
-      if (pass === 127) {
-        this.connection.exec(`INSERT OR IGNORE INTO flags SELECT id,'*','missing-parent-agent' FROM scan_files WHERE parent_thread_id IS NOT NULL`);
+    this.connection.exec(`CREATE TEMP TABLE lineage (
+        id INTEGER PRIMARY KEY,previous TEXT NOT NULL,target TEXT,state INTEGER NOT NULL,missing INTEGER NOT NULL
+      );
+      CREATE INDEX temp.lineage_state ON lineage(state,id);
+      CREATE TEMP TABLE lineage_stack (
+        depth INTEGER PRIMARY KEY,file_id INTEGER NOT NULL,last_parent INTEGER NOT NULL DEFAULT 0,
+        target TEXT,ambiguous INTEGER NOT NULL DEFAULT 0,blocked INTEGER NOT NULL DEFAULT 0
+      );
+      INSERT INTO lineage
+        SELECT id,session_id,CASE WHEN terminal THEN session_id END,CASE WHEN terminal THEN 2 ELSE 0 END,
+          parent_thread_id IS NOT NULL AND terminal
+        FROM (SELECT f.*,parent_thread_id IS NULL OR NOT EXISTS(
+          SELECT 1 FROM scan_files p WHERE p.provider='codex' AND p.thread_id=f.parent_thread_id
+            AND p.parsed=1 AND p.removed=0 AND p.failed=0) terminal
+          FROM scan_files f WHERE f.provider='codex' AND f.removed=0 AND f.thread_id IS NOT NULL AND f.session_id IS NOT NULL);
+      WITH ready AS MATERIALIZED (
+        SELECT child.id,CASE WHEN count(DISTINCT parent.target)=1 THEN min(parent.target) ELSE child.previous END target
+        FROM lineage child JOIN scan_files f ON f.id=child.id
+        JOIN scan_files p ON p.provider='codex' AND p.thread_id=f.parent_thread_id
+          AND p.parsed=1 AND p.removed=0 AND p.failed=0
+        JOIN lineage parent ON parent.id=p.id WHERE child.state=0
+        GROUP BY child.id HAVING min(parent.state)=2
+      ) UPDATE lineage SET state=2,target=ready.target FROM ready WHERE lineage.id=ready.id;`);
+    const nextFile = this.connection.prepare('SELECT id FROM lineage WHERE state=0 ORDER BY id LIMIT 1');
+    const visit = this.connection.prepare('UPDATE lineage SET state=1 WHERE id=?');
+    const push = this.connection.prepare('INSERT INTO lineage_stack(file_id) VALUES (?)');
+    const top = this.connection.prepare(`SELECT s.*,f.parent_thread_id,l.previous FROM lineage_stack s
+      JOIN scan_files f ON f.id=s.file_id JOIN lineage l ON l.id=s.file_id ORDER BY depth DESC LIMIT 1`);
+    const parent = this.connection.prepare(`SELECT l.id,l.state,l.target FROM scan_files p JOIN lineage l ON l.id=p.id
+      WHERE p.provider='codex' AND p.thread_id=? AND p.parsed=1 AND p.removed=0 AND p.failed=0 AND p.id>?
+      ORDER BY p.id LIMIT 1`);
+    const advance = this.connection.prepare(`UPDATE lineage_stack SET last_parent=?,target=?,ambiguous=?,blocked=? WHERE depth=?`);
+    const finish = this.connection.prepare('UPDATE lineage SET state=2,target=? WHERE id=?');
+    const pop = this.connection.prepare('DELETE FROM lineage_stack WHERE depth=?');
+    while (true) {
+      const next = nextFile.get() as {id:number}|undefined;
+      if (!next) break;
+      visit.run(next.id);push.run(next.id);
+      while (true) {
+        const frame = top.get() as {depth:number;file_id:number;last_parent:number;target:string|null;
+          ambiguous:number;blocked:number;parent_thread_id:string;previous:string}|undefined;
+        if (!frame) break;
+        const candidate = parent.get(frame.parent_thread_id,frame.last_parent) as {id:number;state:number;target:string|null}|undefined;
+        if (candidate?.state === 0) {
+          visit.run(candidate.id);push.run(candidate.id);
+        } else if (candidate) {
+          // A visiting parent is a back edge. Its cycle and dependent path must keep their own identities.
+          advance.run(candidate.id,frame.target ?? candidate.target,
+            Number(Boolean(frame.ambiguous || frame.target !== null && candidate.target !== null && frame.target !== candidate.target)),
+            Number(Boolean(frame.blocked || candidate.state === 1 || candidate.target === null)),frame.depth);
+        } else {
+          // A missing/ambiguous ancestor still has a known metadata session for descendants to use.
+          finish.run(frame.blocked ? null : frame.ambiguous ? frame.previous : frame.target,frame.file_id);
+          pop.run(frame.depth);
+        }
       }
     }
-    this.connection.exec(`DROP TABLE IF EXISTS temp.lineage;
+    this.connection.exec(`INSERT OR IGNORE INTO affected SELECT 'codex',target FROM lineage WHERE target<>previous;
+      INSERT OR IGNORE INTO affected SELECT 'codex',previous FROM lineage WHERE target<>previous;
+      INSERT OR IGNORE INTO links SELECT 'codex',previous,target FROM lineage WHERE target<>previous;
+      UPDATE scan_files SET session_id=(SELECT target FROM lineage WHERE lineage.id=scan_files.id)
+        WHERE id IN(SELECT id FROM lineage WHERE target<>previous);
+      DELETE FROM flags WHERE flag='missing-parent-agent';
+      INSERT OR IGNORE INTO flags SELECT l.id,'*','missing-parent-agent' FROM lineage l JOIN scan_files f ON f.id=l.id
+        WHERE f.parent_thread_id IS NOT NULL AND f.parsed=1 AND (l.missing=1 OR l.target IS NULL);
+      DROP TABLE lineage_stack;DROP TABLE lineage;
       DELETE FROM events WHERE schema_kind='legacy' AND file_id IN (SELECT file_id FROM events WHERE schema_kind='current');
-      INSERT OR IGNORE INTO flags SELECT f.id,'*','missing-parent-agent' FROM scan_files f
-        WHERE f.provider='codex' AND f.parent_thread_id IS NOT NULL AND f.parsed=1
-        AND NOT EXISTS(SELECT 1 FROM scan_files p WHERE p.provider=f.provider AND p.thread_id=f.parent_thread_id AND p.parsed=1 AND p.removed=0);`);
+    `);
   }
 
   /**
@@ -389,7 +435,8 @@ export class SummaryStaging {
   }
 
   close(): void {
-    this.connection.exec(`DROP TABLE IF EXISTS temp.prepared_turns; DROP TABLE IF EXISTS temp.winners; DROP TABLE IF EXISTS temp.capability_winners; DROP TABLE IF EXISTS temp.component_events;
+    this.connection.exec(`DROP TABLE IF EXISTS temp.lineage_stack; DROP TABLE IF EXISTS temp.lineage;
+      DROP TABLE IF EXISTS temp.prepared_turns; DROP TABLE IF EXISTS temp.winners; DROP TABLE IF EXISTS temp.capability_winners; DROP TABLE IF EXISTS temp.component_events;
       DROP TABLE temp.flags; DROP TABLE temp.events; DROP TABLE temp.component; DROP TABLE temp.links;
       DROP TABLE temp.affected; DROP TABLE temp.scan_files; DROP TABLE temp.session_names;`);
   }

@@ -11,7 +11,7 @@ import { acquireRefreshLock } from './lock';
 import { applySessionNames, readSessionNames } from './names';
 import type { SourceRoot, SummaryOptions, SummaryProgress, RefreshResult } from './types';
 
-export const PARSER_VERSION = 13;
+export const PARSER_VERSION = 14;
 const componentPredicate = `EXISTS(SELECT 1 FROM component c WHERE c.provider=scan_files.provider
   AND (c.session_id=scan_files.session_id OR c.session_id=scan_files.old_session))`;
 
@@ -307,8 +307,4 @@ export async function refreshSummary(
     phase = 'complete';result.completedAt = new Date().toISOString();report(true);
   }
   return result;
-}
-
-export function normalizeRoots(roots: SourceRoot[]): SourceRoot[] {
-  return roots.map(root => ({provider:root.provider,path:resolve(root.path)}));
 }

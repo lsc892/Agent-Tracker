@@ -517,6 +517,8 @@ agent_role = parent_thread_id가 없으면 main, 있으면 subagent
 
 파일의 첫 `session_meta`가 소유 thread를 정한다. fork 로그 안에 복제된 다른 thread의 부모 `session_meta`는 소유 식별자·프로젝트·lineage를 덮어쓰지 않는다. 같은 thread의 반복 metadata는 기존 부모·fork·프로젝트 정보를 유지하면서 제공된 제목 등을 갱신한다.
 
+부모 세션 연결은 파일 기반 TEMP 방문 상태와 스택을 사용하는 그래프 순회로 계산한다. 부모를 먼저 해소하고, 같은 thread의 여러 정상 소스가 같은 최종 세션을 가리킬 때만 자식을 재배정한다. 조상 누락·모호한 부모에서는 확인된 현재 세션 정보를 유지하며 자식도 이를 사용할 수 있다. 순환과 그 순환에 의존하는 경로는 임의로 재배정하지 않고 `missing-parent-agent`를 남긴다. 반복 횟수 상한과 전체 그래프의 메모리 적재는 두지 않는다. parser version 14는 다음 통계 갱신에서 기존 원본도 한 번 재파싱해 변경된 연결 판정을 반영한다.
+
 예외로, 파일 전체에 `root_turn_id`가 없는 구형 subagent는 `thread_id`를 독립 `session_id`로 사용하고 자체 `turn_id`로 요청을 구분한다. 요청 식별자가 없는 usage-only 기록은 thread에 하나의 안정적인 요청 id를 부여한다. 해당 thread의 token·시간을 자체 대화에 집계하고 `standalone-subagent` 품질 flag를 남긴다. 원래 부모·fork 정보는 복제 이력의 중복 검증에 사용하며, 명시적인 `root_turn_id`가 있는 subagent는 부모 요청 합산을 유지한다.
 
 forked child가 부모의 token prefix를 복제한 구형 로그는 verified lineage prefix만 제외한다. 부모를 찾을 수 없으면 임의로 차감하지 않고 `missing-parent`를 표시한다.
