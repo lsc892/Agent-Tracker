@@ -42,7 +42,7 @@ Codex sessions/**/*.jsonl ──┘                              │
 
 Claude·Codex quota 제공자는 `BaseQuotaProvider` 추상 클래스를 상속한다. 공통 `read()`는 조회별 취소 신호와 진행 중 Promise를 소유하고 `readQuota(context)`를 호출해 같은 `QuotaSnapshot` 계약으로 사용량을 반환한다. 공통 `dispose()`는 추가 조회를 차단하고 모든 조회를 취소한 뒤 제공자의 정리가 끝날 때까지 기다리며 중복 호출은 같은 Promise를 반환한다. 인증·HTTP/RPC·응답 정규화와 timeout 시작 시점은 각 제공자에 둔다. 특히 Codex의 process 종료 확인은 조회의 일부로 유지한다. `QuotaProvider` 인터페이스는 서비스의 의존 계약으로 유지한다.
 
-`readQuota()`는 조회·재시도·timeout·취소·정리 흐름을 소유하고 Claude HTTP 응답 검사는 `ensureUsageResponseOk()`, Codex 로그인·구독 계정 검증은 `ensureSupportedAccount()`에 둔다. `RpcSession.receive()`는 서버 메시지와 요청 응답을 private 처리 메서드로 나누며 RPC 오류 분류도 별도 메서드에서 수행한다. 공개 quota 파서는 창 순회를 관리하고 창 하나의 필드 검증·정규화는 export 없는 파일 내부 함수에 둔다. Claude HTTP 본문과 Codex RPC 메시지의 기존 크기 제한을 유지하며 두 파서 모두 별도의 창 개수 상한 없이 유효한 창을 변환한다.
+`readQuota()`는 조회·재시도·timeout·취소·정리 흐름을 소유하고 Claude HTTP 응답 검사는 `ensureUsageResponseOk()`, Codex 로그인·구독 계정 검증은 `ensureSupportedAccount()`에 둔다. `RpcSession.receive()`는 서버 메시지와 요청 응답을 private 처리 메서드로 나누며 RPC 오류 분류도 별도 메서드에서 수행한다. 공개 quota 파서는 창 순회를 관리하고 창 하나의 필드 검증·정규화는 export 없는 파일 내부 함수에 둔다. Claude HTTP 본문과 Codex RPC 메시지의 기존 크기 제한을 유지하며 두 파서 모두 별도의 창 개수 상한 없이 유효한 창을 변환한다. HTTP User-Agent와 RPC 초기화 정보의 버전은 공통 모듈에서 `package.json`의 실제 확장 버전을 읽어 사용한다.
 
 `QuotaService`는 공개 진입점 아래에 `runRefreshCycle()`·`read()`·`schedule()`의 실행 흐름을 두고 세부 정책은 아래 private 메서드로 분리한다. `refresh()`는 중복 요청과 갱신 조건을 판단하고 조회 사이클에 위임하며, 마지막 재실행 확인과 `running` 해제는 같은 비동기 흐름에서 처리한다. `read()`는 성공·알림·실패를 각 처리 메서드로 연결하고, `schedule()`은 `getNextWakeAt()`의 시각에 `handleTimer()`를 예약한다. 제공자별 상태·취소 신호와 단일 타이머는 계속 서비스가 소유한다.
 

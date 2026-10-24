@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { readFileSync } from 'node:fs';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -7,6 +8,7 @@ import { BaseQuotaProvider, WindowsClaudeCredentials, ClaudeQuotaProvider, Codex
   parseCodexQuota, parseRetryAfter, QuotaError, QuotaService,
   type QuotaClock, type QuotaProvider, type QuotaReadContext, type QuotaSnapshot } from '../../src/quota';
 
+const { version: extensionVersion } = JSON.parse(readFileSync(join(__dirname, '../../../package.json'), 'utf8')) as { version: string };
 const signal = () => new AbortController().signal;
 const snapshot = (now: number, used = 25): QuotaSnapshot => ({ provider: 'claude', fetchedAt: now,
   windows: [{ id: '5h', label: '5h', usedPercent: used, current: used, maximum: 100, resetsAt: now - 1, windowDurationMins: 300 }] });
@@ -400,6 +402,7 @@ test('Claude re-reads credentials once on 401, does not expose response secrets,
   const provider = new ClaudeQuotaProvider({ credentials: { getAccessToken: async refresh => { refreshes.push(refresh); return 'fixture-token'; } },
     fetch: async (_url, init) => {
       assert.equal(new Headers(init?.headers).get('authorization'), 'Bearer fixture-token');
+      assert.equal(new Headers(init?.headers).get('user-agent'), `agent-tracker/${extensionVersion}`);
       requests++;
       return requests === 1 ? new Response('secret-body', { status: 401 }) : Response.json({ five_hour: { utilization: 5, resets_at: null } });
     } });
@@ -582,8 +585,9 @@ test('Codex short-lived subprocess handshakes, reads once, forwards notification
     assert.deepEqual(result.rateLimitResetCredits, { availableCount: 2, nextExpiresAt: 1700600000000 });
     assert.deepEqual(received, [42]);
     assert.deepEqual(events, ['started', 'stopped']);
-    const recorded = JSON.parse(await readFile(log, 'utf8')) as { methods: string[]; pid: number; dataHome: string };
+    const recorded = JSON.parse(await readFile(log, 'utf8')) as { methods: string[]; pid: number; dataHome: string; clientInfo: { version: string } };
     assert.deepEqual(recorded.methods, ['initialize', 'initialized', 'account/read', 'account/rateLimits/read']);
+    assert.equal(recorded.clientInfo.version, extensionVersion);
     assert.equal(recorded.dataHome, directory);
     assert.throws(() => process.kill(recorded.pid, 0));
     await provider.dispose();

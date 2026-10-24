@@ -4,6 +4,7 @@ const readline = require('node:readline');
 const mode = process.env.QUOTA_FIXTURE_MODE || 'success';
 const methods = [];
 let quotaRequestId;
+let clientInfo;
 const send = value => process.stdout.write(JSON.stringify(value) + '\n');
 const limits = used => ({ rateLimits: { limitId: 'codex', primary: {
   usedPercent: used, windowDurationMins: 90, resetsAt: 1700000000,
@@ -14,7 +15,8 @@ const rl = readline.createInterface({ input: process.stdin });
 rl.on('line', line => {
   const message = JSON.parse(line);
   methods.push(message.method || 'client-response');
-  if (process.env.QUOTA_FIXTURE_LOG) fs.writeFileSync(process.env.QUOTA_FIXTURE_LOG, JSON.stringify({ methods, pid: process.pid, dataHome: process.env.CODEX_HOME }));
+  if (message.method === 'initialize') clientInfo = message.params.clientInfo;
+  if (process.env.QUOTA_FIXTURE_LOG) fs.writeFileSync(process.env.QUOTA_FIXTURE_LOG, JSON.stringify({ methods, pid: process.pid, dataHome: process.env.CODEX_HOME, clientInfo }));
   if (mode === 'stall') return;
   if (mode === 'exit') process.exit(7);
   if (mode === 'malformed') { process.stdout.write('not-json\n'); return; }

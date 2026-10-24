@@ -4,6 +4,7 @@ import { homedir } from 'node:os';
 import { basename, dirname, isAbsolute, join, delimiter } from 'node:path';
 import { StringDecoder } from 'node:string_decoder';
 import { performance } from 'node:perf_hooks';
+import { extensionVersion } from '../version';
 import { BaseQuotaProvider } from './base';
 import { asRecord, durationLabel, QuotaError, type QuotaReadContext, type QuotaSnapshot, type QuotaWindow } from './types';
 
@@ -64,7 +65,7 @@ export class CodexQuotaProvider extends BaseQuotaProvider {
       });
       timeout = setTimeout(() => { timedOut = true; controller.abort(); }, this.options.timeoutMs ?? 15_000);
       timeout.unref?.();
-      await session.request('initialize', { clientInfo: { name: 'agent_tracker', title: 'Agent Tracker', version: '0.1.0' }, capabilities: null });
+      await session.request('initialize', { clientInfo: { name: 'agent_tracker', title: 'Agent Tracker', version: extensionVersion }, capabilities: null });
       session.notify('initialized', {});
       this.phase('initialized', child.pid, performance.now() - startedAt);
       const accountResult = asRecord(await session.request('account/read', { refreshToken: false }));

@@ -1,3 +1,4 @@
+import { extensionVersion } from '../version';
 import { BaseQuotaProvider } from './base';
 import { createClaudeCredentials, type ClaudeCredentialSource } from './claudeCredentials';
 import { asRecord, QuotaError, type QuotaReadContext, type QuotaSnapshot, type QuotaWindow } from './types';
@@ -71,7 +72,7 @@ export class ClaudeQuotaProvider extends BaseQuotaProvider {
       return await this.fetcher('https://api.anthropic.com/api/oauth/usage', {
         method: 'GET', signal, redirect: 'error',
         headers: { Authorization: `Bearer ${token}`, 'anthropic-beta': 'oauth-2025-04-20',
-          'User-Agent': 'agent-tracker/0.1.0', Accept: 'application/json' },
+          'User-Agent': `agent-tracker/${extensionVersion}`, Accept: 'application/json' },
       });
     } finally { token = undefined; }
   }
