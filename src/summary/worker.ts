@@ -54,10 +54,7 @@ port.on('message',(message: {id?:number;method:string;payload?:unknown}) => {
         } else {
           const by = query.chartBy ?? 'provider';
           const page = { ...query, tableSort: query.tableSort ?? { key: 'period' as const, direction: 'desc' as const } };
-          const rows = query.groupBy === 'turn' ? database.queryTurns(query,{...page,unknownLast:true},by)
-          : database.queryUsage(query,query.groupBy === 'all' || !query.groupBy ? 'total' : query.groupBy,query.timezone ?? options.timezone ?? 'UTC',page,by);
-          const total = query.groupBy === 'turn' ? database.queryTurnsCount(query,by)
-          : database.queryUsageCount(query,query.groupBy === 'all' || !query.groupBy ? 'total' : query.groupBy,query.timezone ?? options.timezone ?? 'UTC',by);
+          const {rows,total} = database.queryUsagePage(query,query.groupBy ?? 'all',query.timezone ?? options.timezone ?? 'UTC',page,by);
           const chart = query.chartMetric ? usageChartFromPage(rows, total, query.groupBy ?? 'all', query.chartMetric, by, query.excludeEmptyUsage) : undefined;
           const cumulativeFilter = query.groupBy === 'day' || query.groupBy === 'month' ? {...query,unknownTime:'include' as const} : query;
           const cumulative = query.cumulativeBy ? database.queryCumulative(cumulativeFilter,query.cumulativeBy,query.cumulativeOffset) : undefined;

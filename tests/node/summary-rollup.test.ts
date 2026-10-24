@@ -1,3 +1,4 @@
+import { queryChart } from '../fixtures/usage-chart';
 import assert from 'node:assert/strict';
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -8,7 +9,7 @@ import {
   SummaryDatabase, periodBounds, type ChartMetric, type FileMetadata, type ModelUsageInput,
   type SummaryFilter, type TurnSummaryInput, type UsageGrouping, type UsageRow,
 } from '../../src/summary/db';
-import { buildModelCumulativeQueries, buildUsageCountQuery, buildUsageQuery, type UsageBasis } from '../../src/summary/db/queries';
+import { buildUsageCountQuery, buildUsageQuery, type UsageBasis } from '../../src/summary/db/queries';
 import { SCHEMA_VERSION } from '../../src/summary/db/schema';
 import { applySessionNames } from '../../src/summary/names';
 import type { SqliteSession } from '../../src/summary/db/connection';
@@ -109,7 +110,7 @@ test('public usage rolls completed turn sums and counts across days without aver
       avg_tokens_per_turn: 75, avg_input_tokens: 75, avg_output_tokens: 0,
     });
   }
-  const chart = db.queryUsageChart({}, 'day', 'Asia/Seoul', 'averageTokens');
+  const chart = queryChart(db, {}, 'day', 'Asia/Seoul', 'averageTokens');
   assert.deepEqual(chart.rows, daily, 'Charts use the same product aggregate route');
   assert.equal(chart.total, 2);
 });
@@ -468,26 +469,6 @@ test('metadata-only session renames immediately affect rollup dimensions and nam
   assert.deepEqual(snapshot(db, rollupTables), before, 'Names remain normalized instead of duplicating them in rollups');
 });
 
-test('cumulative product queries reuse the active timezone without rebuilding local-day rollups', t => {
-  const db = fixture(t, [
-    turn('a', '2026-10-01T00:00:00', 100, { model_usage: [model('A', 100)] }),
-    turn('b', '2026-10-02T00:00:00', 30, { model_usage: [model('A', 20), model('B', 10)] }),
-    turn('unknown', null, 1),
-  ]);
-  oracle(db, {}, 'day', 'Asia/Seoul');
-  const before = snapshot(db, rollupTables);
-  for (const filter of [{}, { fromMs: epoch('2026-10-01T12:00:00'), unknownTime: 'include' as const }]) {
-    const provider = buildUsageQuery(filter, 'total', 'UTC', 'provider');
-    const providerRows = db.connection.prepare(provider.sql).all(...provider.values, 100, 0).map(row => ({ ...row, model: '' }));
-    assert.deepEqual(db.queryCumulative(filter, 'provider'), { rows: providerRows, total: providerRows.length, by: 'provider' });
-    const models = buildModelCumulativeQueries(filter);
-    const modelRows = db.connection.prepare(models.rows.sql).all(...models.rows.values, 0).map(row => ({ ...row }));
-    const modelCount = db.connection.prepare(models.count.sql).get(...models.count.values)?.count;
-    assert.deepEqual(db.queryCumulative(filter, 'model'), { rows: modelRows, total: modelCount, by: 'model' });
-  }
-  assert.deepEqual(snapshot(db, rollupTables), before, 'Worker cumulative reads do not alternate UTC and local materializations');
-});
-
 test('two WAL connections can alternate timezones and update sessions without mixing their snapshots', t => {
   const files = disk(t);
   const writer = files.open();
@@ -521,9 +502,81 @@ test('Node 22.15 without isTransaction retains correct raw reads and supports ca
   for (const timezone of ['UTC', 'Asia/Seoul', 'America/New_York']) {
     const query = buildUsageQuery({}, 'day', timezone, 'provider');
     assert.deepEqual(reader.queryUsage({}, 'day', timezone), db.connection.prepare(query.sql).all(...query.values, 100, 0));
+    const page = reader.queryUsagePage({}, 'day', timezone);
+    assert.deepEqual(page.rows, reader.queryUsage({}, 'day', timezone));
+    assert.equal(page.total, 1);
     db.transaction(() => expect(reader.queryUsage()[0], { total_tokens: 100, turn_count: 1 }));
+    db.transaction(() => assert.equal(reader.queryUsagePage({}, 'turn', timezone).rows[0].total_tokens, 100));
   }
   oracle(db);
+});
+
+test('page rows and counts keep one snapshot across concurrent WAL writes for raw, rollup and legacy reads', t => {
+  const files = disk(t), writer = files.open(), db = files.open();
+  const original = turn('original', '2026-10-01T13:00:00', 100, { model_usage: [model('A', 100)] });
+  const added = turn('added', '2026-10-02T13:00:00', 200, {
+    project_key: '/rollup/other', project_name: 'Other', model_usage: [model('B', 200)],
+  });
+  const cases: { group: UsageGrouping | 'turn'; filter: SummaryFilter; by: UsageBasis }[] = [
+    { group: 'turn', filter: { includeCosts: true }, by: 'provider' },
+    { group: 'project', filter: { includeCosts: true }, by: 'model' },
+    { group: 'day', filter: {}, by: 'provider' },
+    { group: 'day', filter: { fromMs: epoch('2026-10-01T12:00:00') }, by: 'model' },
+  ];
+  for (const legacy of [false, true]) for (const { group, filter, by } of cases) {
+    replace(writer, [original]);
+    writer.queryUsagePage({}, 'day', 'Asia/Seoul');
+    const prepare = db.connection.prepare;
+    let injected = false;
+    db.connection.prepare = function(sql) {
+      const statement = prepare.call(this, sql);
+      if (sql.includes('LIMIT ? OFFSET ?')) {
+        const all = statement.all;
+        statement.all = function(...values) {
+          const rows = Reflect.apply(all, this, values);
+          if (!injected) { injected = true; replace(writer, [original, added]); }
+          return rows;
+        };
+      }
+      return statement;
+    };
+    try {
+      const compatible = { connection: {
+        prepare: db.connection.prepare.bind(db.connection), exec: db.connection.exec.bind(db.connection),
+      } } as unknown as SqliteSession;
+      Object.assign(compatible, { rollups: new UsageRollupStore(compatible) });
+      const reader = legacy ? new SummaryReader(compatible) : db;
+      const page = reader.queryUsagePage(filter, group, 'Asia/Seoul', {}, by);
+      assert.ok(injected, 'Writer commits after the page rows are selected');
+      assert.equal(page.rows.length, 1);assert.equal(page.total, 1);
+      assert.equal(page.rows[0].total_tokens, 100);
+      assert.equal(reader.queryUsagePage(filter, group, 'Asia/Seoul', {}, by).total, 2, 'Next page sees the committed write');
+    } finally { db.connection.prepare = prepare; }
+  }
+});
+
+test('legacy page count failures release their savepoint and preserve the caller transaction', t => {
+  const db = fixture(t, [turn('same', '2026-10-01T12:00:00', 100)]);
+  const count = buildUsageCountQuery({ includeCosts: true }, 'project', 'UTC', 'provider');
+  let failCount = true;
+  const compatible = { connection: {
+    prepare: (sql: string) => {
+      if (failCount && sql === count.sql) throw new Error('injected page count failure');
+      return db.connection.prepare(sql);
+    },
+    exec: db.connection.exec.bind(db.connection),
+  } } as unknown as SqliteSession;
+  const reader = new SummaryReader(compatible);
+  db.transaction(() => {
+    db.connection.exec("UPDATE projects SET project_name = 'Caller change'");
+    assert.throws(() => reader.queryUsagePage({ includeCosts: true }, 'project'), /injected page count failure/);
+    assert.equal(db.connection.isTransaction, true);
+    assert.equal(db.connection.prepare('SELECT project_name FROM projects').get()?.project_name, 'Caller change');
+    failCount = false;
+    assert.equal(reader.queryUsagePage({ includeCosts: true }, 'project').total, 1);
+  });
+  assert.equal(db.connection.isTransaction, false);
+  assert.equal(reader.queryUsagePage({}, 'turn').total, 1, 'The connection remains usable after the caller commits');
 });
 
 test('extreme stored years retain numeric date filtering through raw fallback and allow later ingestion', t => {

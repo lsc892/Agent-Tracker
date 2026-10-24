@@ -3,7 +3,7 @@ import type { NameQuery, NameResult } from '../types';
 import type {
   BillingMode, CapabilityCategory, CapabilityPage, ChartMetric, CumulativeRow, DiagnosticsPage, FileMetadata,
   KeysetPage, ManifestRow, OffsetPage, ProcessingStatus, Provider, SessionReplacement, SummaryFilter,
-  TurnSummaryRow, UsageChart, UsageGrouping, UsageRow, UsageSort,
+  TurnSummaryRow, UsagePage, UsageGrouping, UsageRow, UsageSort,
 } from './types';
 import { SqliteSession, type SqliteSessionOptions } from './connection';
 import { ManifestStore } from './manifest';
@@ -120,9 +120,10 @@ export class SummaryDatabase {
     return this.reader.queryUsage(filter, groupBy, timezone, page, by);
   }
 
-  queryUsageChart(filter: SummaryFilter, groupBy: UsageGrouping | 'all' | 'turn', timezone: string, metric: ChartMetric,
-    by: 'provider' | 'model' = 'provider', page: OffsetPage & { afterId?: number; tableSort?: UsageSort } = {}): UsageChart {
-    return this.reader.queryUsageChart(filter, groupBy, timezone, metric, by, page);
+  queryUsagePage(filter: SummaryFilter = {}, groupBy: UsageGrouping | 'all' | 'turn' = 'total', timezone = 'UTC',
+    page: OffsetPage & { afterId?: number; sortBy?: ChartMetric; tableSort?: UsageSort } = {},
+    by: 'provider' | 'model' = 'provider'): UsagePage {
+    return this.reader.queryUsagePage(filter, groupBy, timezone, page, by);
   }
 
   diagnostics(page: KeysetPage & { afterSummaryId?: number; offset?: number; providers?: Provider[] } = {}): DiagnosticsPage {

@@ -140,6 +140,8 @@ export interface UsageSort {
   key: typeof USAGE_SORT_KEYS[number];
   direction: 'asc' | 'desc';
 }
+export interface UsagePage { rows: UsageRow[] | TurnSummaryRow[]; total: number }
+
 export interface UsageChart {
   by?: 'provider' | 'model';
   rows: UsageRow[] | TurnSummaryRow[];

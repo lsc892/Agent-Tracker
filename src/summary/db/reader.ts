@@ -1,10 +1,9 @@
 import type { NameQuery, NameResult } from '../types';
 import type {
   CapabilityCategory, CapabilityPage, CapabilityRow, ChartMetric, CumulativeRow, DiagnosticsPage,
-  KeysetPage, ManifestRow, OffsetPage, Provider, SummaryFilter, TurnSummaryRow, UsageChart, UsageGrouping, UsageRow, UsageSort,
+  KeysetPage, ManifestRow, OffsetPage, Provider, SummaryFilter, TurnSummaryRow, UsagePage, UsageGrouping, UsageRow, UsageSort,
 } from './types';
 import { SqliteSession } from './connection';
-import { usageChartFromPage } from './chart';
 import {
   buildCapabilityQueries, buildDiagnosticQueries, buildModelCumulativeQueries, buildNameQueries, buildQueryFilter,
   buildTurnsCountQuery, buildTurnsQuery, buildUsageCountQuery, buildUsageQuery,
@@ -19,6 +18,21 @@ import type { QuerySql, UsageBasis } from './queries';
  */
 export class SummaryReader {
   constructor(private readonly database: SqliteSession) {}
+
+  /** SAVEPOINT also nests safely in caller-owned transactions on Node 22.15. */
+  private readPage<T>(action: () => T): T {
+    const connection = this.database.connection;
+    if (connection.isTransaction) return action();
+    connection.exec('SAVEPOINT usage_page');
+    try {
+      const result = action();
+      connection.exec('RELEASE usage_page');
+      return result;
+    } catch (error) {
+      connection.exec('ROLLBACK TO usage_page; RELEASE usage_page');
+      throw error;
+    }
+  }
 
   /**
    * 책임: 조회 조건에 맞는 raw 또는 사전 집계 SQL을 선택한다.
@@ -126,21 +140,22 @@ export class SummaryReader {
       .all(...rows.values, pageLimit(page.limit), nonnegative(page.offset ?? 0, 'offset')) as unknown as UsageRow[], page.tableSort);
   }
 
-  /** Charts use the same page, grouping and order as the table. */
-  queryUsageChart(filter: SummaryFilter, groupBy: UsageGrouping | 'all' | 'turn', timezone: string, metric: ChartMetric,
-    by: 'provider' | 'model' = 'provider', page: OffsetPage & { afterId?: number; sortBy?: ChartMetric; tableSort?: UsageSort } = {}): UsageChart {
+  /** Read table rows and their total from one snapshot; charts reuse these rows. */
+  queryUsagePage(filter: SummaryFilter = {}, groupBy: UsageGrouping | 'all' | 'turn' = 'total', timezone = 'UTC',
+    page: OffsetPage & { afterId?: number; sortBy?: ChartMetric; tableSort?: UsageSort } = {},
+    by: 'provider' | 'model' = 'provider'): UsagePage {
     const grouping = groupBy === 'all' ? 'total' : groupBy;
-    if (grouping !== 'turn') {
-      return this.usageQueries(filter, grouping, timezone, by, page.sortBy, queries => {
-        const rows = this.database.connection.prepare(queries.rows.sql)
-          .all(...queries.rows.values, pageLimit(page.limit), nonnegative(page.offset ?? 0, 'offset')) as unknown as UsageRow[];
-        const total = (this.database.connection.prepare(queries.count.sql).get(...queries.count.values) as { count: number }).count;
-        return usageChartFromPage(rows, total, groupBy, metric, by, filter.excludeEmptyUsage);
-      }, page.tableSort);
+    if (grouping === 'turn') {
+      return this.readPage(() => ({
+        rows: this.queryTurns(filter, { ...page, unknownLast: page.afterId === undefined }, by),
+        total: this.queryTurnsCount(filter, by),
+      }));
     }
-    const rows = this.queryTurns(filter, { ...page, unknownLast: page.afterId === undefined }, by);
-    const total = this.queryTurnsCount(filter, by);
-    return usageChartFromPage(rows, total, groupBy, metric, by, filter.excludeEmptyUsage);
+    return this.usageQueries(filter, grouping, timezone, by, page.sortBy, queries => this.readPage(() => ({
+      rows: this.database.connection.prepare(queries.rows.sql)
+        .all(...queries.rows.values, pageLimit(page.limit), nonnegative(page.offset ?? 0, 'offset')) as unknown as UsageRow[],
+      total: (this.database.connection.prepare(queries.count.sql).get(...queries.count.values) as { count: number }).count,
+    })), page.tableSort);
   }
 
   /**

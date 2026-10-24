@@ -1,3 +1,4 @@
+import { queryChart } from '../fixtures/usage-chart';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
@@ -67,7 +68,7 @@ test('rebuild merges ProjectFarm model rows and persists bounded titles through 
   assert.equal(db.queryUsage({}, 'project', 'UTC', {}, 'model')[0].total_tokens, 30);
   assert.equal(db.queryCapabilities({}, 'model').totalUses, 2);
   assert.equal(db.queryNames({ kind: 'project' }).total, 1);
-  assert.deepEqual(db.queryUsageChart({}, 'turn', 'UTC', 'tokens', 'model').rows.map(row => 'request_title' in row ? row.request_title : null).sort(), ['Request a', 'Request b']);
+  assert.deepEqual(queryChart(db, {}, 'turn', 'UTC', 'tokens', 'model').rows.map(row => 'request_title' in row ? row.request_title : null).sort(), ['Request a', 'Request b']);
   db.connection.prepare('INSERT INTO projects VALUES (?,?)').run('C:\\Work\\ProjectFarm', 'ProjectFarm');
   db.connection.prepare('UPDATE turn_summary SET project_key=? WHERE session_id=?').run('C:\\Work\\ProjectFarm', 'a');
   db.connection.exec('UPDATE manifest SET parser_version=12');

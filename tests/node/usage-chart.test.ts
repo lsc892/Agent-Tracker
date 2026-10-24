@@ -1,3 +1,4 @@
+import { queryChart } from '../fixtures/usage-chart';
 import { createTranslator } from '../../src/localization';
 import test, { type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
@@ -80,7 +81,7 @@ test('table sorting orders the full result before paging and raw/rollup queries 
     const filter = { includeCosts: true };
     const tableSort = { key, direction };
     const full = db.queryTurns(filter, { limit: 1000, tableSort }, by);
-    const chart = db.queryUsageChart(filter, 'turn', 'UTC', 'tokens', by, { limit: 1000, tableSort });
+    const chart = queryChart(db, filter, 'turn', 'UTC', 'tokens', by, { limit: 1000, tableSort });
     assert.deepEqual(chart.rows, full);
     assert.deepEqual([
       ...db.queryTurns(filter, { limit: 100, tableSort }, by),
@@ -129,13 +130,13 @@ test('empty unknown requests stay in all table groups but are excluded from aver
       assert.equal(selected.length, full.length, 'table retains every group');
       assert.equal(selected.reduce((n, r) => n + r.turn_count, 0), 3);
       for (const metric of ['tokens', 'requests', 'averageTokens', 'averageDuration'] as const) {
-        const chart = db.queryUsageChart({ excludeEmptyUsage: true }, group, 'UTC', metric, by);
+        const chart = queryChart(db, { excludeEmptyUsage: true }, group, 'UTC', metric, by);
         assert.equal(chart.rows.reduce((n, r) => n + ('turn_count' in r ? r.turn_count : 1), 0), 2);
       }
     }
     assert.equal(db.queryTurns({ excludeEmptyUsage: true }, {}, by).length, 3);
-    assert.equal(db.queryUsageChart({ excludeEmptyUsage: true }, 'turn', 'UTC', 'tokens', by).rows.length, 2);
-    assert.equal(db.queryUsageChart({}, 'turn', 'UTC', 'tokens', by).rows.length, 3);
+    assert.equal(queryChart(db, { excludeEmptyUsage: true }, 'turn', 'UTC', 'tokens', by).rows.length, 2);
+    assert.equal(queryChart(db, {}, 'turn', 'UTC', 'tokens', by).rows.length, 3);
   }
   const included = db.queryUsage()[0];
   const excluded = db.queryUsage({ excludeEmptyUsage: true })[0];
@@ -152,20 +153,20 @@ test('excluding empty usage keeps page boundaries and includes known zero-token 
     ...(index%3===0 ? zero : index%3===1 ? {...zero,model_usage:[{model:'known-zero',...zero}]} : {}),
   })));
   for (const by of ['provider','model'] as const) {
-    const tableRows = db.queryUsageChart({},'turn','UTC','tokens',by,{limit:1000}).rows as TurnSummaryRow[];
+    const tableRows = queryChart(db, {},'turn','UTC','tokens',by,{limit:1000}).rows as TurnSummaryRow[];
     const emptyOffset = tableRows.findIndex(row=>row.root_turn_id==='request-0');
     const knownOffset = tableRows.findIndex(row=>row.root_turn_id==='request-1');
-    const excluded = db.queryUsageChart({excludeEmptyUsage:true},'turn','UTC','tokens',by,{limit:1,offset:emptyOffset});
+    const excluded = queryChart(db, {excludeEmptyUsage:true},'turn','UTC','tokens',by,{limit:1,offset:emptyOffset});
     assert.equal(excluded.rows.length,0,'an empty page stays empty rather than borrowing from the next page');
-    const known = db.queryUsageChart({excludeEmptyUsage:true},'turn','UTC','tokens',by,{limit:1,offset:knownOffset});
+    const known = queryChart(db, {excludeEmptyUsage:true},'turn','UTC','tokens',by,{limit:1,offset:knownOffset});
     assert.equal(known.rows.length,1);assert.equal(known.rows[0].total_tokens,0);
-    const chart = db.queryUsageChart({excludeEmptyUsage:true},'turn','UTC','tokens',by,{offset:100});
+    const chart = queryChart(db, {excludeEmptyUsage:true},'turn','UTC','tokens',by,{offset:100});
     assert.equal(chart.total,105);
     const expectedIds = tableRows.slice(100).filter(row=>Number(row.root_turn_id.split('-')[1])%3!==0).map(row=>row.root_turn_id);
     assert.deepEqual(chart.rows.map(row=>(row as TurnSummaryRow).root_turn_id),expectedIds);
     const projectRows = db.queryUsage({},'project','UTC',{limit:1000},by);
     const projectOffset = projectRows.findIndex(row=>row.project_key==='/project-000');
-    const projects = db.queryUsageChart({excludeEmptyUsage:true},'project','UTC','requests',by,{limit:1,offset:projectOffset});
+    const projects = queryChart(db, {excludeEmptyUsage:true},'project','UTC','requests',by,{limit:1,offset:projectOffset});
     assert.equal(projects.rows.length,0,'aggregate pages also apply exclusion after paging');
   }
 });
@@ -232,15 +233,15 @@ test('project and session charts follow table pages across metrics and filters',
     const selected = db.queryUsage({}, group, 'UTC', page);
     assert.equal(selected.length, offset ? 30 : 100);
     for (const metric of ['tokens', 'requests', 'averageTokens', 'averageDuration'] as const) {
-      const chart = db.queryUsageChart({}, group, 'UTC', metric, 'provider', page);
+      const chart = queryChart(db, {}, group, 'UTC', metric, 'provider', page);
       assert.equal(chart.total, 130);
       assert.deepEqual(chart.rows, selected, 'changing metrics retains table membership and order');
     }
   }
-  const filtered = db.queryUsageChart({ projectName: 'Project 129', providers: ['claude'] }, 'project', 'UTC', 'averageTokens');
+  const filtered = queryChart(db, { projectName: 'Project 129', providers: ['claude'] }, 'project', 'UTC', 'averageTokens');
   assert.equal(filtered.total, 1);
   assert.equal((filtered.rows[0] as UsageRow).avg_tokens_per_turn, 279);
-  assert.equal(db.queryUsageChart({ providers: [] }, 'all', 'UTC', 'tokens').rows.length, 0);
+  assert.equal(queryChart(db, { providers: [] }, 'all', 'UTC', 'tokens').rows.length, 0);
 });
 
 test('model charts preserve every model, token totals and filters without tail grouping',t=>{
@@ -252,7 +253,7 @@ test('model charts preserve every model, token totals and filters without tail g
     turn(3,{started_at_ms:null}),
   ]);
   for (const group of ['day','month','all'] as const) {
-    const chart=db.queryUsageChart({},group,'UTC','tokens','model');
+    const chart=queryChart(db, {},group,'UTC','tokens','model');
     assert.equal(chart.by,'model');
     assert.equal(chart.rows.reduce((n,row)=>n+row.total_tokens,0),691);
     assert.ok(chart.rows.every(row=>!row.other_models));
@@ -260,15 +261,15 @@ test('model charts preserve every model, token totals and filters without tail g
     assert.ok((chart.rows as UsageRow[]).some(row=>row.model==='' && !row.other_models),'missing model records remain visible');
     assert.deepEqual(chart.rows,db.queryUsage({},group==='all' ? 'total' : group,'UTC',{},'model'));
   }
-  const filtered=db.queryUsageChart({projectKey:'/project',provider:'claude',fromMs:start,toMs:start+86400000},'project','UTC','tokens','model');
+  const filtered=queryChart(db, {projectKey:'/project',provider:'claude',fromMs:start,toMs:start+86400000},'project','UTC','tokens','model');
   assert.deepEqual(filtered.rows.map(row=>row.total_tokens),[200,100]);
   assert.equal(filtered.total,2);
-  const monthly=db.queryUsageChart({provider:'codex'},'month','UTC','tokens','model');
+  const monthly=queryChart(db, {provider:'codex'},'month','UTC','tokens','model');
   assert.equal((monthly.rows[0] as UsageRow).period,'2026-01');assert.equal(monthly.rows[0].total_tokens,150);
   for (const group of ['day','month','project','session','all','turn'] as const) {
-    assert.deepEqual(db.queryUsageChart({providers:[]},group,'UTC','tokens','model').rows,[]);
+    assert.deepEqual(queryChart(db, {providers:[]},group,'UTC','tokens','model').rows,[]);
   }
-  const averages=db.queryUsageChart({projectKey:'/project',provider:'claude',fromMs:start,toMs:start+86400000},'all','UTC','averageTokens','model');
+  const averages=queryChart(db, {projectKey:'/project',provider:'claude',fromMs:start,toMs:start+86400000},'all','UTC','averageTokens','model');
   assert.deepEqual(averages.rows.map(row=>(row as UsageRow).avg_tokens_per_turn),[200,100]);
 });
 
@@ -280,7 +281,7 @@ test('calendar charts keep exact table periods and averages without combining da
   rows.push(turn(1002, { started_at_ms: start, status: 'failed', input_tokens: 9900, total_tokens: 9950, duration_ms: null }));
   rows.push(turn(1003, { started_at_ms: null, cache_read_input_tokens: null }));
   const db = database(t, rows);
-  const chart = db.queryUsageChart({}, 'day', 'Asia/Seoul', 'tokens');
+  const chart = queryChart(db, {}, 'day', 'Asia/Seoul', 'tokens');
   const bars = chart.rows as UsageRow[];
   assert.equal(bars.reduce((sum, row) => sum + row.total_tokens, 0), rows.reduce((sum, row) => sum + row.total_tokens, 0));
   assert.equal(bars.length, 92, '90 Claude dates, one Codex date and one undated row');
@@ -292,7 +293,7 @@ test('calendar charts keep exact table periods and averages without combining da
   assert.equal(first.turn_count, 3, 'failed tokens count toward totals but not averages');
   assert.equal(bars.find(row=>row.provider==='codex')!.avg_duration_ms, null);
   assert.equal(bars.find(row=>row.period===null)!.cache_read_input_tokens, null);
-  const filtered = db.queryUsageChart({ fromMs: start, toMs: start + 86400000, providers: ['claude'] }, 'day', 'Asia/Seoul', 'requests');
+  const filtered = queryChart(db, { fromMs: start, toMs: start + 86400000, providers: ['claude'] }, 'day', 'Asia/Seoul', 'requests');
   assert.equal(filtered.rows.length, 2, 'dated and undated rows both obey calendar table semantics');
   assert.equal((filtered.rows as UsageRow[]).find(row=>row.period!==null)!.turn_count, 3);
   assert.equal((filtered.rows as UsageRow[]).find(row=>row.period===null)!.unknown_time_turns, 1);
@@ -359,7 +360,7 @@ test('model queries separate unrecorded usage from unknown tokens in every group
     assert.equal(rows.reduce((sum,row)=>sum+row.total_tokens,0),160);
     assert.equal(rows.filter(row=>row.model===null).reduce((sum,row)=>sum+row.turn_count,0),2);
     assert.equal(rows.filter(row=>row.model==='').reduce((sum,row)=>sum+row.turn_count,0),2);
-    const chart = db.queryUsageChart({},group,'UTC','requests','model');
+    const chart = queryChart(db, {},group,'UTC','requests','model');
     assert.equal(chart.rows.reduce((sum,row)=>sum+row.total_tokens,0),160);
     assert.equal((chart.rows as UsageRow[]).filter(row=>row.model===null).reduce((sum,row)=>sum+row.turn_count,0),2);
     assert.equal((chart.rows as UsageRow[]).filter(row=>row.model==='').reduce((sum,row)=>sum+row.turn_count,0),2);
@@ -368,11 +369,11 @@ test('model queries separate unrecorded usage from unknown tokens in every group
   const turns = db.queryTurns({}, {}, 'model');
   assert.deepEqual(turns.map(row=>row.model),[null,null,'','known-zero','']);
   assert.equal(db.queryTurnsCount({},'model'),5);
-  const chart = db.queryUsageChart({},'turn','UTC','tokens','model');
+  const chart = queryChart(db, {},'turn','UTC','tokens','model');
   assert.equal(chart.total,5);assert.equal(chart.rows.filter(row=>row.model===null).length,2);
-  const cumulative = db.queryCumulative({},'model');
-  assert.equal(cumulative.total,3);assert.equal(cumulative.rows.find(row=>row.model===null)!.total_tokens,0);
-  assert.equal(cumulative.rows.find(row=>row.model==='')!.total_tokens,160);
+  const totals = db.queryUsagePage({},'total','UTC',{sortBy:'tokens'},'model');
+  assert.equal(totals.total,3);assert.equal(totals.rows.find(row=>row.model===null)!.total_tokens,0);
+  assert.equal(totals.rows.find(row=>row.model==='')!.total_tokens,160);
   const filtered = db.queryUsage({fromMs:start,toMs:start+86400000},'total','UTC',{},'model');
   assert.equal(filtered.length,1);assert.equal(filtered[0].model,null);
 });
@@ -408,10 +409,10 @@ test('model table and chart pagination show the same models in every grouping', 
 
 test('short calendar and monthly charts retain exact periods, zeros, and empty results', t => {
   const db = database(t, [turn(0), turn(1, { input_tokens: 0, output_tokens: 0, cache_write_input_tokens: 0, cache_read_input_tokens: 0, total_tokens: 0 })]);
-  assert.deepEqual(db.queryUsageChart({}, 'day', 'UTC', 'tokens').rows.map(row => (row as UsageRow).period), ['2026-01-01', '2026-01-02']);
-  assert.equal((db.queryUsageChart({}, 'month', 'UTC', 'tokens').rows[0] as UsageRow).total_tokens, 150);
+  assert.deepEqual(queryChart(db, {}, 'day', 'UTC', 'tokens').rows.map(row => (row as UsageRow).period), ['2026-01-01', '2026-01-02']);
+  assert.equal((queryChart(db, {}, 'month', 'UTC', 'tokens').rows[0] as UsageRow).total_tokens, 150);
   for (const group of ['day', 'month', 'project', 'session', 'all', 'turn'] as const) {
-    assert.deepEqual(db.queryUsageChart({ providers: [] }, group, 'UTC', 'tokens').rows, []);
+    assert.deepEqual(queryChart(db, { providers: [] }, group, 'UTC', 'tokens').rows, []);
   }
 });
 
@@ -419,13 +420,13 @@ test('request charts render rows 1–100, 101–200 and the final page in table 
   const rows = Array.from({ length: 205 }, (_, index) => turn(index));
   const db = database(t, rows.reverse());
   for (const offset of [0, 100, 200]) {
-    const chart = db.queryUsageChart({}, 'turn', 'UTC', 'averageDuration', 'provider', { offset });
+    const chart = queryChart(db, {}, 'turn', 'UTC', 'averageDuration', 'provider', { offset });
     assert.equal(chart.total, 205);
     assert.equal(chart.rows.length, offset === 200 ? 5 : 100);
     assert.deepEqual(chart.rows, db.queryTurns({}, { offset }));
     assert.equal((chart.rows[0] as TurnSummaryRow).root_turn_id, `request-${204-offset}`);
   }
-  assert.equal(db.queryUsageChart({}, 'turn', 'UTC', 'requests').metric, 'tokens');
+  assert.equal(queryChart(db, {}, 'turn', 'UTC', 'requests').metric, 'tokens');
 });
 
 test('worker returns the current table page as chart data for all groupings and both bases', async t => {
@@ -774,7 +775,7 @@ test('average token charts stack completed components and show the legend across
   for (const by of ['provider', 'model'] as const) for (const [group, mode] of [
     ['day', 'calendar'], ['month', 'calendar'], ['project', 'ranking'], ['session', 'ranking'], ['all', 'total'],
   ] as const) {
-    const chart = db.queryUsageChart({}, group, 'UTC', 'averageTokens', by);
+    const chart = queryChart(db, {}, group, 'UTC', 'averageTokens', by);
     view.render(group, mode, chart.metric, chart.rows, by);
     const legend = view.get('chart-legend');
     assert.equal(legend.hidden, false);
@@ -800,7 +801,7 @@ test('average charts distinguish unknown composition, zero averages and no compl
     turn(1, { project_key: '/zero', input_tokens: 0, output_tokens: 0, total_tokens: 0, cache_write_input_tokens: 0, cache_read_input_tokens: 0 }),
     turn(2, { project_key: '/unfinished', status: 'in_progress' }),
   ]);
-  const chart = db.queryUsageChart({}, 'project', 'UTC', 'averageTokens');
+  const chart = queryChart(db, {}, 'project', 'UTC', 'averageTokens');
   view.render('project', 'ranking', chart.metric, chart.rows);
   const marks = view.get('usage-chart').descendants().filter(node => node.attributes.get('class')?.includes('chart-segment'));
   assert.equal(marks.length, 1, 'zero averages and missing samples produce no positive segments');
