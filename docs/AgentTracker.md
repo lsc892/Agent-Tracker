@@ -95,7 +95,7 @@ macOS의 `getAccessToken()`은 원문 조회·토큰 검증·참조 정리를 �
 보안 규칙:
 
 - OAuth token을 SQLite, log, telemetry에 기록하지 않는다.
-- token은 요청 직전 메모리에서만 사용하고 응답 후 참조를 폐기한다.
+- token은 HTTP 요청을 만드는 지역 변수로 사용하고 서비스 상태에 보관하지 않는다. 지역 변수에 `undefined`를 대입하는 메모리 소거 절차는 두지 않는다.
 - credential 접근 실패 시 사용자에게 Claude Code 로그인을 안내하되 로그인 정보를 직접 요구하지 않는다.
 - `401`은 credential refresh 경로를 한 번만 시도하고, 자동 조회의 `429`는 `Retry-After` 또는 지수 backoff를 따른다. 명시적인 수동 강제 조회의 예외는 3.3을 따른다.
 

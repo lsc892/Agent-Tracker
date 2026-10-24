@@ -64,17 +64,15 @@ export class ClaudeQuotaProvider extends BaseQuotaProvider {
     }
   }
 
-  /** 인증 정보를 읽어 HTTP 요청 한 번을 보내고 요청 완료·실패 뒤 토큰 참조를 해제한다. */
+  /** 인증 정보를 읽고 취소 여부를 확인한 뒤 HTTP 요청 한 번을 보낸다. */
   private async requestUsage(refresh: boolean, signal: AbortSignal): Promise<Response> {
-    let token: string | undefined = await this.credentials.getAccessToken(refresh, signal);
-    try {
-      signal.throwIfAborted();
-      return await this.fetcher('https://api.anthropic.com/api/oauth/usage', {
-        method: 'GET', signal, redirect: 'error',
-        headers: { Authorization: `Bearer ${token}`, 'anthropic-beta': 'oauth-2025-04-20',
-          'User-Agent': `agent-tracker/${extensionVersion}`, Accept: 'application/json' },
-      });
-    } finally { token = undefined; }
+    const token = await this.credentials.getAccessToken(refresh, signal);
+    signal.throwIfAborted();
+    return this.fetcher('https://api.anthropic.com/api/oauth/usage', {
+      method: 'GET', signal, redirect: 'error',
+      headers: { Authorization: `Bearer ${token}`, 'anthropic-beta': 'oauth-2025-04-20',
+        'User-Agent': `agent-tracker/${extensionVersion}`, Accept: 'application/json' },
+    });
   }
 
   /** 실패 응답의 본문을 폐기하고 HTTP 상태에 맞는 안전한 오류를 던진다. */
