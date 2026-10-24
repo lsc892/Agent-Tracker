@@ -328,7 +328,6 @@ export function parseCodexQuota(value: unknown, fetchedAt: number): QuotaSnapsho
         label: buckets.length === 1 || limitId === 'codex' ? window.label : `${limitName || limitId} ${window.label}`,
         ...(typeof bucket.rateLimitReachedType === 'string' ? { rateLimitReachedType: bucket.rateLimitReachedType.slice(0, 100) } : {}),
       });
-      if (windows.length > 100) throw protocolError();
     }
   }
   if (windows.length === 0) throw new QuotaError('unavailable', { key: 'quota.codexUnavailable' });

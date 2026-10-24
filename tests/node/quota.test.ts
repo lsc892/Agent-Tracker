@@ -515,6 +515,23 @@ test('Codex prefers multi-bucket data, uses dynamic durations, seconds reset and
   assert.throws(() => parseCodexQuota({ rateLimits: { primary: { usedPercent: NaN } } }, 1), { code: 'protocol' });
 });
 
+test('Codex accepts more than 100 valid windows and still validates later fields', () => {
+  const rateLimitsByLimitId = Object.fromEntries(Array.from({ length: 101 }, (_, index) =>
+    [`limit_${index}`, { primary: { usedPercent: index, windowDurationMins: 300, resetsAt: 1700000000 } }]));
+  const result = parseCodexQuota({ rateLimitsByLimitId }, 1);
+  assert.equal(result.windows.length, 101);
+  assert.deepEqual(result.windows.map(window => window.id), Object.keys(rateLimitsByLimitId).map(id => `${id}:primary`));
+  assert.equal(result.windows[100].usedPercent, 100);
+  for (const invalid of [
+    { usedPercent: -1 },
+    { usedPercent: 1, windowDurationMins: 0 },
+    { usedPercent: 1, resetsAt: 'invalid' },
+  ]) {
+    assert.throws(() => parseCodexQuota({ rateLimitsByLimitId: { ...rateLimitsByLimitId, invalid: { primary: invalid } } }, 1),
+      { code: 'protocol' });
+  }
+});
+
 test('Codex retains the reserve name independently of its identifier and single-bucket label', () => {
   const reserve = { limitId: 'base_model_inference', limitName: 'gpt-reserve',
     secondary: { usedPercent: 17, windowDurationMins: 10080 } };
