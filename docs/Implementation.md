@@ -4,7 +4,7 @@
 
 ## 2026-10-05 사용량 카드 변경
 
-하단 사용량 Webview 패널을 제거하고 상태표시줄 항목의 Markdown 툴팁으로 교체했습니다. `src/ui/quotaTooltip.ts`가 모든 quota 기간과 초기화 시간, 조회 상태를 표시하며 새로고침·상세/압축·확장 관리·사용량 통계 명령 링크를 제공합니다. `agentTracker.toggleQuotaTooltip` 클릭 명령을 로컬 VS Code 내부 `ToggleTooltipCommand` 객체에 연결해 클릭으로 열어 유지하고 재클릭으로 닫습니다. 위치·테마·크기는 VS Code가 결정합니다. API 조사와 적용 지점은 [StatusBarPopup.md](StatusBarPopup.md)를 참고하세요.
+하단 사용량 Webview 패널을 제거하고 상태표시줄 항목의 Markdown 툴팁으로 교체했습니다. `src/ui/quotaTooltip.ts`가 모든 quota 기간과 초기화 시간, 조회 상태를 표시하며 새로고침·상세/압축·확장 관리·사용량 통계 명령 링크를 제공합니다. `agentTracker.toggleQuotaTooltip` 클릭 명령을 로컬 VS Code 내부 `ToggleTooltipCommand` 객체에 연결해 클릭으로 열어 유지하고 재클릭으로 닫습니다. 위치·테마·크기는 VS Code가 결정합니다. API 조사와 적용 지점은 [StatusBarPopup.md](research/StatusBarPopup.md)를 참고하세요.
 
 `tools/vscode/statusbar-toggle.cjs`가 현재 설치의 내부 구현과 checksum을 확인하고 workbench에 연결 코드를 적용합니다. 원본 workbench와 product 파일, 변경 전후 hash를 보관하고 복원할 수 있습니다. 다른 확장·명령에는 적용하지 않습니다. 일반 빌드·확장 활성화에는 설치 파일 변경이 포함되지 않으며 업데이트 뒤 재적용이 필요합니다.
 
