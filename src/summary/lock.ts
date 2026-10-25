@@ -6,13 +6,13 @@ import { SummaryError } from './jsonl';
 
 /**
  * 책임: 여러 창의 통계 갱신이 동시에 쓰지 못하도록 잠금을 소유한다.
- * 알고리즘: 별도 SQLite 파일에 EXCLUSIVE 트랜잭션을 시도하고 busy·locked일 때 75ms 후 재시도하며 취소·해제를 처리한다. 잠금 파일은 삭제하지 않는다.
+ * 알고리즘: 별도 SQLite 파일에 EXCLUSIVE 트랜잭션을 시도하고 busy·locked일 때 75ms 후 재시도하며 취소와 동기 해제를 처리한다. 잠금 파일은 삭제하지 않는다.
  */
 export async function acquireRefreshLock(
   databasePath: string,
   signal?: AbortSignal,
   isCancelled?: () => boolean,
-): Promise<() => Promise<void>> {
+): Promise<() => void> {
   await mkdir(dirname(databasePath),{recursive:true});
   // Import only in the worker/acquisition path; the extension host never opens this connection.
   const {DatabaseSync}=await import('node:sqlite');
@@ -24,7 +24,7 @@ export async function acquireRefreshLock(
       try {
         connection.exec('BEGIN EXCLUSIVE');
         let released=false;
-        return async () => {
+        return () => {
           if (released) return;
           released=true;
           try { connection.exec('ROLLBACK'); } finally { connection.close(); }

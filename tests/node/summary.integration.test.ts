@@ -525,7 +525,7 @@ test('worker cancellation before startup and while waiting for another writer re
   const base = await mkdtemp(join(tmpdir(),'agent-tracker-cancel-'));
   const options = {dbPath:join(base,'db.sqlite'),roots:[]};
   const client = new SummaryClient(options);
-  let release: (()=>Promise<void>)|undefined;
+  let release: (()=>void)|undefined;
   try {
     const early = client.refresh();client.cancel();
     assert.equal((await early).interrupted,true);
@@ -533,16 +533,16 @@ test('worker cancellation before startup and while waiting for another writer re
     const waiting = client.refresh();
     await new Promise(resolve=>setTimeout(resolve,100));client.cancel();
     assert.equal((await waiting).interrupted,true);
-    await release();release=undefined;
+    release();release=undefined;
     assert.equal((await client.refresh()).interrupted,false);
-  } finally {await release?.();await client.dispose();await rm(base,{recursive:true,force:true});}
+  } finally {release?.();await client.dispose();await rm(base,{recursive:true,force:true});}
 });
 
 test('summary disposal cancels an active refresh and rejects further requests without restarting the worker', async () => {
   const base = await mkdtemp(join(tmpdir(), 'agent-tracker-close-'));
   const options = { dbPath: join(base, 'db.sqlite'), roots: [] };
   const client = new SummaryClient(options);
-  let release: (() => Promise<void>) | undefined;
+  let release: (() => void) | undefined;
   try {
     await client.initialize();
     release = await acquireRefreshLock(options.dbPath);
@@ -555,7 +555,7 @@ test('summary disposal cancels an active refresh and rejects further requests wi
     await assert.rejects(client.query(), /Summary client disposed/);
     await assert.rejects(client.refresh(), /Summary client disposed/);
   } finally {
-    await release?.();
+    release?.();
     await client.dispose();
     await rm(base, { recursive: true, force: true });
   }
@@ -598,7 +598,7 @@ test('clearing derived data cancels a scan, respects the shared lock and rebuild
   const options = {dbPath: join(base, 'db.sqlite'), roots: [{provider: 'claude' as const, path: root}]};
   const client = new SummaryClient(options);
   const observer = new SummaryClient(options);
-  let release: (() => Promise<void>) | undefined;
+  let release: (() => void) | undefined;
   try {
     await client.refresh(); await observer.initialize();
     assert.equal((await client.query()).total, 1);
@@ -610,7 +610,7 @@ test('clearing derived data cancels a scan, respects the shared lock and rebuild
     await new Promise(resolve => setTimeout(resolve, 100));
     assert.equal(cleared, false, 'deletion waits for another window holding the refresh lock');
     assert.equal((await observer.query()).total, 1);
-    await release(); release = undefined;
+    release(); release = undefined;
     await clearing;
     assert.equal((await client.query()).total, 0);
     assert.equal((await observer.query()).total, 0, 'other database connections observe the deletion');
@@ -622,7 +622,7 @@ test('clearing derived data cancels a scan, respects the shared lock and rebuild
     assert.equal(rebuilt.parsed, 1);
     assert.equal((await client.query()).rows[0].total_tokens, 200);
   } finally {
-    await release?.();
+    release?.();
     await Promise.all([client.dispose(), observer.dispose()]);
     await rm(base, {recursive: true, force: true});
   }

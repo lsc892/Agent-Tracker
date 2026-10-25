@@ -73,7 +73,7 @@ port.on('message',(message: WorkerMessage) => {
         case 'setBilling': {
           const {provider,sessionId,mode} = message.payload as {provider:Provider;sessionId:string;mode:BillingMode};
           const release = await acquireRefreshLock(options.dbPath,AbortSignal.timeout(30_000));
-          try { database.setSessionBilling(provider,sessionId,mode); } finally { await release(); }
+          try { database.setSessionBilling(provider,sessionId,mode); } finally { release(); }
           break;
         }
         case 'names': result = database.queryNames(message.payload as NameQuery); break;
@@ -82,7 +82,7 @@ port.on('message',(message: WorkerMessage) => {
           // Use the same cross-window lock as scanning; never unlink a live DB or lock file.
           const release = await acquireRefreshLock(options.dbPath, AbortSignal.timeout(30_000));
           try { database.clearData(); lastRefresh = undefined; }
-          finally { await release(); }
+          finally { release(); }
           break;
         }
         case 'dispose': database.close(); database=undefined; break;

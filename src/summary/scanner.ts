@@ -51,7 +51,7 @@ export async function refreshSummary(
   const retainDeletedSourceUsage = options.retainDeletedSourceUsage !== false;
   const isCancelled = (): boolean => Boolean(signal?.aborted || cancellation && Atomics.load(cancellation,0));
   if (isCancelled()) return {...result,interrupted:true,error:'interrupted',completedAt:new Date().toISOString()};
-  let release: () => Promise<void>;
+  let release: () => void;
   try { release = await acquireRefreshLock(options.dbPath,signal,isCancelled); }
   catch (error) {
     return {...result,interrupted:true,failed:isCancelled()?0:1,error:error instanceof SummaryError?error.code:'lock-unavailable',completedAt:new Date().toISOString()};
@@ -61,7 +61,7 @@ export async function refreshSummary(
   try {
     staging = new SummaryStaging(database.connection,collectCapabilities);
     roots = options.roots.map(root => ({ ...root,path:resolve(root.path) }));
-  } catch (error) { await release();throw error; }
+  } catch (error) { release();throw error; }
   let phase: SummaryProgress['phase'] = 'scanning';
   let lastProgress = 0;
   const report = (force = false): void => {
@@ -104,7 +104,7 @@ export async function refreshSummary(
     }
     if (!isCancelled()) result.failed++;
   } finally {
-    try { staging.close(); } finally { await release(); }
+    try { staging.close(); } finally { release(); }
     phase = 'complete';result.completedAt = new Date().toISOString();report(true);
   }
   return result;

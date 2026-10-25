@@ -384,7 +384,7 @@ response별 증분 상태를 영속화하지 않으므로 append도 tail만 더�
 1. 같은 process에서 같은 DB의 누계 갱신 요청은 진행 중인 한 작업으로 합친다.
 2. 여러 VS Code 창이 DB를 공유하면 process 간 lock을 획득한 작업만 갱신한다. 다른 창의 갱신은 lock이 해제될 때까지 대기한다.
 3. lock은 파일 조사부터 삭제 판정·재집계·결과 반영·임시 작업 정리까지 갱신 전체에 적용한다. 각 session의 write transaction은 그 안에서 필요한 때만 연다.
-4. 작업 종료·오류·정상 취소 시 lock을 해제한다.
+4. 작업 종료·오류·정상 취소 시 동기 `release()`로 잠금 전용 SQLite 트랜잭션을 종료하고 연결을 닫는다. 잠금 획득 대기는 취소 가능한 비동기로 유지한다.
 
 **처리 결과**: 한 DB에 대한 조사·집계 작업이 직렬 실행된다. SQLite transaction은 한 반영 단위의 DB 변경을 보호하고, process 간 lock은 transaction 밖의 파일 조사·staging까지 포함한 갱신 순서를 보호한다.
 

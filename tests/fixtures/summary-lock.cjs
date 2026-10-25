@@ -6,9 +6,9 @@ const { acquireRefreshLock } = require(config.lockModule);
 const send = value => parentPort ? parentPort.postMessage(value) : process.send(value);
 const receiver = parentPort || process;
 let release;
-receiver.on('message', async message => {
+receiver.on('message', message => {
   if (message !== 'release') return;
-  await release();
+  release();
   send('released');
 });
 send('waiting');
