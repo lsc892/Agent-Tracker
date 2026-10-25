@@ -44,6 +44,8 @@ Claude·Codex quota 제공자는 `BaseQuotaProvider` 추상 클래스를 상속�
 
 제공자의 `readQuota()`는 조회·재시도·timeout·취소·정리 순서를 조율한다. [codex.ts](../src/quota/codex.ts)는 실행·handshake·계정 검증·한도 조회를 연결하고, [codex/rpcSession.ts](../src/quota/codex/rpcSession.ts)의 `RpcSession`이 child·stream·decoder·요청 ID·대기 Promise와 종료 수명을 함께 소유한다. [codex/response.ts](../src/quota/codex/response.ts)는 한도·reset credit 해석, [codex/executable.ts](../src/quota/codex/executable.ts)는 실행 파일 탐색, [codex/errors.ts](../src/quota/codex/errors.ts)는 공유 오류 생성을 맡는다. 내부 모듈은 provider 진입점을 역참조하지 않는다.
 
+Codex 제공자 내부에서는 실행 환경·세션 준비, 초기화, 계정 확인, quota 응답 처리, 오류 분류와 종료 확인을 같은 클래스의 private 메소드로 나눈다. `readQuota()`는 조회별 timeout·알림 허용 상태와 단계 순서를 소유한다. 계정 검증 직후 알림을 허용하고 quota 응답 뒤 process 종료까지 기다린 다음 취소를 다시 확인하며, 실패 경로도 같은 세션을 정리한다.
+
 Codex 응답의 [parseCodexQuota()](../src/quota/codex/response.ts#L15)는 응답 확인·창 목록 변환·빈 결과 거부·선택 credit·snapshot 조립을 연결한다. [창 목록 변환](../src/quota/codex/response.ts#L25)은 한도 묶음을 한 번 순회하고, [묶음 해석](../src/quota/codex/response.ts#L37)은 공통 식별자·이름을 확정한 뒤 primary·secondary 처리를 순서대로 호출한다. [창 추가](../src/quota/codex/response.ts#L47)는 없는 창을 건너뛰고 검증된 창에 표시 정보를 연결해 기존 결과 배열에 바로 쓴다. 별도 한도별 결과 배열이나 중첩 창 순회를 두지 않으며 기존 입력 우선순위·검증·출력 순서를 유지한다.
 
 [claude.ts](../src/quota/claude.ts)는 인증·요청·401 재확인 1회·HTTP 상태 분류와 Retry-After를 조율한다. [claude/httpBody.ts](../src/quota/claude/httpBody.ts)는 제한된 본문 읽기와 reader 해제, [claude/response.ts](../src/quota/claude/response.ts)는 quota 창 검증·정규화를 맡는다. 기존 제공자 파일과 [quota 공개 진입점](../src/quota/index.ts)의 클래스·options·parser·실행 파일 탐색 export를 유지한다. Claude HTTP 본문과 Codex RPC 메시지의 기존 크기 제한을 유지하며 두 파서 모두 별도의 창 개수 상한 없이 유효한 창을 변환한다. HTTP User-Agent와 RPC 초기화 정보의 버전은 공통 모듈에서 `package.json`의 실제 확장 버전을 읽어 사용한다.

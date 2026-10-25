@@ -658,15 +658,19 @@ test('Codex short-lived subprocess handshakes, reads once, forwards notification
   const directory = await mkdtemp(join(tmpdir(), 'agent-tracker-quota-'));
   const log = join(directory, 'protocol.json');
   const events: string[] = [];
-  const received: number[] = [];
+  const received: QuotaSnapshot[] = [];
+  let now = 1_000;
   try {
     const provider = new CodexQuotaProvider({ executable: process.execPath, args: [fixture], dataHome: directory,
-      env: { QUOTA_FIXTURE_MODE: 'notification', QUOTA_FIXTURE_LOG: log }, onLifecycle: event => events.push(event.event) });
-    const result = await provider.read({ signal: signal(), onSnapshot: value => received.push(value.windows[0].usedPercent) });
+      env: { QUOTA_FIXTURE_MODE: 'notification', QUOTA_FIXTURE_LOG: log }, now: () => now++,
+      onLifecycle: event => events.push(event.event), onPhase: event => events.push(event.phase) });
+    const result = await provider.read({ signal: signal(), onSnapshot: value => received.push(value) });
     assert.equal(result.windows[0].usedPercent, 43);
+    assert.equal(result.fetchedAt, 1_001);
     assert.deepEqual(result.rateLimitResetCredits, { availableCount: 2, nextExpiresAt: 1700600000000 });
-    assert.deepEqual(received, [42]);
-    assert.deepEqual(events, ['started', 'stopped']);
+    assert.deepEqual(received.map(value => [value.windows[0].usedPercent, value.fetchedAt]), [[42, 1_000]]);
+    assert.equal(now, 1_002, 'only accepted notifications and the quota response read the snapshot clock');
+    assert.deepEqual(events, ['started', 'initialized', 'account-read', 'quota-read', 'stopped']);
     const recorded = JSON.parse(await readFile(log, 'utf8')) as { methods: string[]; pid: number; dataHome: string; clientInfo: { version: string } };
     assert.deepEqual(recorded.methods, ['initialize', 'initialized', 'account/read', 'account/rateLimits/read']);
     assert.equal(recorded.clientInfo.version, extensionVersion);

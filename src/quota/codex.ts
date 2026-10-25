@@ -13,6 +13,9 @@ import { asRecord, QuotaError, type QuotaReadContext, type QuotaSnapshot } from 
 
 export { parseCodexQuota, resolveCodexExecutable };
 
+const DEFAULT_TIMEOUT_MS = 15_000;
+const DEFAULT_SHUTDOWN_GRACE_MS = 500;
+
 export interface CodexQuotaProviderOptions {
   dataHome?: string;
   executable?: string;
@@ -36,8 +39,8 @@ export class CodexQuotaProvider extends BaseQuotaProvider {
   }
 
   /**
-   * 책임: Codex quota 조회 한 번의 통신·시간 제한·프로세스 회수를 수행한다.
-   * 알고리즘: 초기화와 구독 계정 확인 뒤 한도를 읽고 계정 확인 이후의 갱신 알림만 전달하며, 성공 응답 후에도 종료 중 취소·시간 초과를 확인한다.
+   * 책임: Codex quota 조회 단계와 오류·자원 정리의 순서를 조율한다.
+   * 알고리즘: 세션 준비·초기화·계정 확인·한도 읽기·종료를 순서대로 수행하고, 조회별 시간 제한과 알림 허용 시점을 관리한다.
    */
   protected async readQuota(context: QuotaReadContext): Promise<QuotaSnapshot> {
     const controller = new AbortController();
@@ -50,51 +53,73 @@ export class CodexQuotaProvider extends BaseQuotaProvider {
     let canNotify = false;
     try {
       if (signal.aborted) throw cancelled();
-      const env = { ...process.env, ...this.options.env,
-        CODEX_HOME: this.options.dataHome || this.options.env?.CODEX_HOME || process.env.CODEX_HOME || join(homedir(), '.codex') };
+      const env = this.createEnvironment();
       const executable = await resolveCodexExecutable(this.options.executable || 'codex', env);
       if (signal.aborted) throw cancelled();
-      const child = spawn(executable, [...(this.options.args ?? []), 'app-server'], {
-        stdio: ['pipe', 'pipe', 'pipe'], shell: false, windowsHide: true, env,
-        // Avoid repository-owned project configuration when reading account quota.
-        cwd: homedir(),
-      });
-      this.lifecycle('started', child.pid, performance.now() - startedAt);
-      session = new RpcSession(child, signal, this.options.shutdownGraceMs ?? 500, value => {
+      session = this.startSession(executable, env, signal, startedAt, value => {
         if (!canNotify || signal.aborted) return;
-        const snapshot = parseCodexQuota(value, now());
-        context.onSnapshot?.(snapshot);
+        this.forwardQuotaUpdate(value, now, context);
       });
-      timeout = setTimeout(() => { timedOut = true; controller.abort(); }, this.options.timeoutMs ?? 15_000);
+      timeout = setTimeout(() => { timedOut = true; controller.abort(); }, this.options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
       timeout.unref?.();
-      await session.request('initialize', { clientInfo: { name: 'agent_tracker', title: 'Agent Tracker', version: extensionVersion }, capabilities: null });
-      session.notify('initialized', {});
-      this.phase('initialized', child.pid, performance.now() - startedAt);
-      const accountResult = asRecord(await session.request('account/read', { refreshToken: false }));
-      this.phase('account-read', child.pid, performance.now() - startedAt);
-      this.ensureSupportedAccount(accountResult);
+      await this.requestInitialization(session);
+      this.notifyInitialized(session, startedAt);
+      const accountResult = await session.request('account/read', { refreshToken: false });
+      this.verifyAccountResponse(accountResult, session, startedAt);
       canNotify = true;
       const result = await session.request('account/rateLimits/read');
-      const snapshot = parseCodexQuota(result, now());
-      this.phase('quota-read', child.pid, performance.now() - startedAt);
+      const snapshot = this.parseQuotaResponse(result, now, session, startedAt);
       // Shutdown is part of success: failures to reap the child must be reported.
       await session.close();
       // Cancellation or timeout may arrive after the response, while close() reaps the child.
       if (signal.aborted) throw cancelled();
       return snapshot;
     } catch (error) {
-      if (timedOut) throw new QuotaError('timeout', { key: 'quota.codexTimeout' });
-      if (signal.aborted) throw cancelled();
-      if (error instanceof QuotaError) throw error;
-      throw new QuotaError('process', { key: 'quota.codexLaunchFailed' });
+      throw this.classifyReadError(error, timedOut, signal);
     } finally {
       if (timeout) clearTimeout(timeout);
       canNotify = false;
       try { await session?.close(); }
-      finally {
-        if (session?.hasExited) this.lifecycle('stopped', session.child.pid, performance.now() - startedAt);
-      }
+      finally { this.notifySessionStopped(session, startedAt); }
     }
+  }
+
+  private createEnvironment(): NodeJS.ProcessEnv {
+    return { ...process.env, ...this.options.env,
+      CODEX_HOME: this.options.dataHome || this.options.env?.CODEX_HOME || process.env.CODEX_HOME || join(homedir(), '.codex') };
+  }
+
+  private startSession(executable: string, env: NodeJS.ProcessEnv, signal: AbortSignal, startedAt: number,
+    onSnapshot: (value: unknown) => void): RpcSession {
+    const child = spawn(executable, [...(this.options.args ?? []), 'app-server'], {
+      stdio: ['pipe', 'pipe', 'pipe'], shell: false, windowsHide: true, env,
+      // Avoid repository-owned project configuration when reading account quota.
+      cwd: homedir(),
+    });
+    this.lifecycle('started', child.pid, performance.now() - startedAt);
+    return new RpcSession(child, signal, this.options.shutdownGraceMs ?? DEFAULT_SHUTDOWN_GRACE_MS, onSnapshot);
+  }
+
+  private forwardQuotaUpdate(value: unknown, now: () => number, context: QuotaReadContext): void {
+    const snapshot = parseCodexQuota(value, now());
+    context.onSnapshot?.(snapshot);
+  }
+
+  private requestInitialization(session: RpcSession): Promise<unknown> {
+    return session.request('initialize', {
+      clientInfo: { name: 'agent_tracker', title: 'Agent Tracker', version: extensionVersion }, capabilities: null,
+    });
+  }
+
+  private notifyInitialized(session: RpcSession, startedAt: number): void {
+    session.notify('initialized', {});
+    this.phase('initialized', session.child.pid, performance.now() - startedAt);
+  }
+
+  private verifyAccountResponse(value: unknown, session: RpcSession, startedAt: number): void {
+    const accountResult = asRecord(value);
+    this.phase('account-read', session.child.pid, performance.now() - startedAt);
+    this.ensureSupportedAccount(accountResult);
   }
 
   /** 로그인 상태와 구독 계정 유형을 확인한 뒤에만 quota 조회·알림을 허용한다. */
@@ -104,6 +129,23 @@ export class CodexQuotaProvider extends BaseQuotaProvider {
     if (account.type !== 'chatgpt' && account.type !== 'chatgptAuthTokens') {
       throw new QuotaError('unsupported-account', { key: 'quota.codexUnsupportedAccount' });
     }
+  }
+
+  private parseQuotaResponse(value: unknown, now: () => number, session: RpcSession, startedAt: number): QuotaSnapshot {
+    const snapshot = parseCodexQuota(value, now());
+    this.phase('quota-read', session.child.pid, performance.now() - startedAt);
+    return snapshot;
+  }
+
+  private classifyReadError(error: unknown, timedOut: boolean, signal: AbortSignal): QuotaError {
+    if (timedOut) return new QuotaError('timeout', { key: 'quota.codexTimeout' });
+    if (signal.aborted) return cancelled();
+    if (error instanceof QuotaError) return error;
+    return new QuotaError('process', { key: 'quota.codexLaunchFailed' });
+  }
+
+  private notifySessionStopped(session: RpcSession | undefined, startedAt: number): void {
+    if (session?.hasExited) this.lifecycle('stopped', session.child.pid, performance.now() - startedAt);
   }
 
   private lifecycle(event: 'started' | 'stopped', pid: number | undefined, elapsedMs: number): void {
