@@ -191,7 +191,7 @@ npm run benchmark:transactions # 합성 JSONL의 실제 집계·DB 교체 transa
 
 `test:vscode`는 별도 프로필과 합성 로그를 `tests/.cache/vscode/`에 만듭니다. Windows에서는 설치된 VS Code를 우선 사용하고, 그 외에는 테스트용 VS Code를 다운로드합니다. `VSCODE_TEST_VERSION`으로 다운로드 버전을, `VSCODE_EXECUTABLE`로 실행 파일을 지정할 수 있습니다. Linux의 화면 없는 환경에서는 `xvfb-run -a npm run test:vscode`를 실행합니다. 결과는 `tests/results/vscode-smoke.json`에 기록합니다.
 
-`test:toggle`은 패치가 적용된 설치를 읽기 전용으로 확인하고 격리된 창에서 실제 마우스 이동·클릭과 키보드 입력을 보냅니다. hover 지연을 100ms로 설정하고 1.5초 동안 관찰해 요약 호버와 전체 카드가 분리되는지, 카드가 열린 동안 요약이 숨겨지는지, 반복 클릭으로 닫은 카드가 다시 열리지 않는지 검증합니다. 결과와 화면은 `tests/results/statusbar-toggle.json`, `statusbar-toggle.png`에 기록합니다. 패치가 없는 설치에서는 `node tests/vscode/statusbar-toggle.cjs --baseline`으로 클릭 시 카드가 닫힌 뒤 다시 생성되는 기존 버그를 재현하고 `statusbar-toggle-baseline.json`에 기록할 수 있습니다.
+`test:toggle`은 패치가 적용된 설치를 읽기 전용으로 확인하고 격리된 창에서 실제 마우스 이동·클릭과 키보드 입력을 보냅니다. hover 지연을 100ms로 설정해 호버 시 전체 카드 표시와 이탈 시 닫힘, 클릭 고정 후 이탈 시 유지, 재클릭 닫기와 재진입 시 임시 호버 복원을 검증합니다. 반복 클릭 후에는 1.5초 동안 관찰해 닫힌 카드가 저절로 다시 열리지 않는지도 확인합니다. 결과와 화면은 `tests/results/statusbar-toggle.json`, `statusbar-toggle.png`에 기록합니다. 패치가 없는 설치에서는 `node tests/vscode/statusbar-toggle.cjs --baseline`으로 클릭 시 카드가 닫힌 뒤 다시 생성되는 기존 버그를 재현하고 `statusbar-toggle-baseline.json`에 기록할 수 있습니다.
 
 PR CI는 Windows·Linux·macOS, Node 22·24의 단위·통합 테스트와 Linux의 최소 지원 VS Code 1.101.0·stable 실제 확장 호스트 테스트를 구성했습니다. verify job과 버전 tag는 검증을 거쳐 VSIX와 npx 설치용 npm tarball을 artifact로 보관합니다. npm과 Marketplace 자동 게시 단계는 포함하지 않습니다.
 

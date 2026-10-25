@@ -51,8 +51,8 @@ export class QuotaStatusBar implements vscode.Disposable {
     const views = visible.map(state => statusBarPresentation(state, settings.display.percentage, settings.display.detail));
     this.quota.text = views.map(view => view.text).join('  │  ');
     this.quota.tooltip = createQuotaTooltip(tracked, settings);
-    // The renderer uses this plain-text preview for automatic hover; the Markdown
-    // tooltip remains the full quota UI opened by the native click toggle.
+    // Mouse hover and the native click toggle share the Markdown card above.
+    // Keep the plain-text quota summary available to screen readers.
     this.quota.accessibilityInformation = { label: quotaHoverSummary(tracked), role: 'button' };
     this.refresh.text = tracked.some(state => state.refreshing) ? '$(sync~spin)' : '$(refresh)';
     if (visible.length) {

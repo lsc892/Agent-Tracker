@@ -18,7 +18,7 @@ function resetTime(window: QuotaWindow, now: number): string {
   return hours ? t('duration.hoursMinutes', { value0: hours, value1: minutes % 60 }) : t('duration.minutes', { value0: minutes });
 }
 
-/** A detailed, plain-text preview, independent of the status bar's display mode. */
+/** A detailed accessible label, independent of the status bar's display mode. */
 export function quotaHoverSummary(states: readonly QuotaState[], now = Date.now()): string {
   const lines = (['codex', 'claude'] as const).map(provider => {
     const state = states.find(value => value.provider === provider);

@@ -60,7 +60,7 @@ test('native toggle mapping preserves object identity and is limited to the Agen
   assert.throws(() => patcher.patchSource(source + source), /유일하게/);
 });
 
-test('the preview uses plain text, the clicked card retains Markdown, and pinned cards suppress automatic hover', () => {
+test('hover and click share the Markdown card, and pinned cards suppress automatic hover', () => {
   const context = rendererContext();
   runInNewContext(patcher.patchSource(source).patched, context);
   const target = new context.EventTarget();
@@ -79,13 +79,13 @@ test('the preview uses plain text, the clicked card retains Markdown, and pinned
   assert.equal(item.hoverDelegate.delay, 500, 'configuration changes remain observable');
   const card = { value: '### 사용량' };
   item.hoverDelegate.showHover({ content: card }, false);
-  assert.deepEqual(shown.at(-1), { content: entry.ariaLabel, focus: false });
+  assert.deepEqual(shown.at(-1), { content: card, focus: false });
   item.hoverDelegate.showHover({ content: card }, true);
   assert.deepEqual(shown.at(-1), { content: card, focus: true });
   pinned = true;
   const count = shown.length;
   item.hoverDelegate.showHover({ content: card }, false);
-  assert.equal(shown.length, count, 'a pending preview cannot replace a pinned card');
+  assert.equal(shown.length, count, 'a pending hover cannot replace a pinned card');
   const events: string[] = [];
   for (const type of ['mouseover', 'focus', 'click', 'pointerdown', 'keydown']) {
     target.addEventListener(type, () => events.push(type), true);
@@ -94,10 +94,13 @@ test('the preview uses plain text, the clicked card retains Markdown, and pinned
   assert.deepEqual(events, ['click', 'pointerdown', 'keydown']);
   pinned = false;
   target.dispatchEvent(new Event('mouseover'));
-  assert.equal(events.at(-1), 'mouseover', 'closed cards allow ordinary preview hover');
+  assert.equal(events.at(-1), 'mouseover', 'closed cards allow ordinary card hover');
   item.update({ ...entry, ariaLabel: 'updated preview' });
   item.hoverDelegate.showHover({ content: card }, false);
-  assert.equal(shown.at(-1)?.content, 'updated preview', 'refresh uses the latest summary');
+  assert.equal(shown.at(-1)?.content, card, 'accessibility updates do not replace the Markdown hover');
+  const updatedCard = { value: '### Updated usage' };
+  item.hoverDelegate.showHover({ content: updatedCard }, false);
+  assert.equal(shown.at(-1)?.content, updatedCard, 'hover uses the current Markdown after quota updates');
   item.hoverDelegate.showHover({ content: card }, true);
   assert.equal(shown.at(-1)?.content, card, 'refresh of a pinned card keeps full content');
   item.update({ ...entry, command: { id: 'another.command' } });
@@ -116,17 +119,21 @@ test('the preview uses plain text, the clicked card retains Markdown, and pinned
   assert.equal(context.styles.length, 1, 'quota updates install only one divider stylesheet per document');
 });
 
-for (const version of [1, 2, 3, 4]) test(`previous publisher v${version} upgrades while retaining the original restore backups`, () => {
+const historicalPatches = ['AgentTracker.agent-tracker', 'agent-tracker.agent-tracker']
+  .flatMap(publisher => [1, 2, 3, 4].map(version => ({ publisher, version })));
+for (const { publisher, version } of historicalPatches) test(`${publisher} v${version} upgrades while retaining the original restore backups`, () => {
   const files = fixture();
   try {
     const anchor = 'update(e){';
     // Exact historical v2 payload: automatic activation was always suppressed.
-    const clickOnly = version === 1 ? '' : `if(!this._agentTrackerClickOnly){this._agentTrackerClickOnly=true;const stop=event=>{if(this.entry?.extensionId==="agent-tracker.agent-tracker"&&this.entry?.command===nativeToggle)event.stopImmediatePropagation();};for(const type of ["mouseover","focus"])this.container.addEventListener(type,stop,{capture:true});this._register({dispose:()=>{for(const type of ["mouseover","focus"])this.container.removeEventListener(type,stop,{capture:true});}});}`;
-    const previousPublisher = patcher.patchSource(source).patched.replaceAll('"AgentTracker.agent-tracker"', '"agent-tracker.agent-tracker"');
-    const old = version === 4 ? previousPublisher : version === 3
-      ? previousPublisher.replace(':statusbar-toggle:v4*/', ':statusbar-toggle:v3*/')
+    const clickOnly = version === 1 ? '' : `if(!this._agentTrackerClickOnly){this._agentTrackerClickOnly=true;const stop=event=>{if(this.entry?.extensionId===${JSON.stringify(publisher)}&&this.entry?.command===nativeToggle)event.stopImmediatePropagation();};for(const type of ["mouseover","focus"])this.container.addEventListener(type,stop,{capture:true});this._register({dispose:()=>{for(const type of ["mouseover","focus"])this.container.removeEventListener(type,stop,{capture:true});}});}`;
+    const historical = readFileSync(join(__dirname, '../../../tests/fixtures/statusbar-toggle-v4.txt'), 'utf8')
+      .replace(/\r\n/g, '\n')
+      .replaceAll('"AgentTracker.agent-tracker"', JSON.stringify(publisher));
+    const old = version === 4 ? historical : version === 3
+      ? historical.replace(':statusbar-toggle:v4*/', ':statusbar-toggle:v3*/')
         .replace(/\(function configureQuotaDividers\(item\) \{[\s\S]*?\}\)\(this\);/, '')
-      : source.replace(anchor, `${anchor}/*agent-tracker:statusbar-toggle:v${version}*/if(e.extensionId==="agent-tracker.agent-tracker"&&e.command?.id==="${patcher.command}"){e={...e,command:nativeToggle};${clickOnly}}/*agent-tracker:statusbar-toggle:end*/`);
+      : source.replace(anchor, `${anchor}/*agent-tracker:statusbar-toggle:v${version}*/if(e.extensionId===${JSON.stringify(publisher)}&&e.command?.id==="${patcher.command}"){e={...e,command:nativeToggle};${clickOnly}}/*agent-tracker:statusbar-toggle:end*/`);
     const oldProduct = JSON.stringify({ checksums: { 'vs/workbench/workbench.desktop.main.js': patcher.checksum(old), unrelated: 'unchanged' } });
     writeFileSync(`${files.target}.agent-tracker-toggle.bak`, source);
     writeFileSync(`${files.productPath}.agent-tracker-toggle.bak`, files.product);

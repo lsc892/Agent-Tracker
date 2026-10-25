@@ -143,17 +143,19 @@ async function verifyStatusLocalization(cdp, settingsPath, root, editor) {
       const label=document.querySelector('[id$="agentTracker.quota"] .statusbar-item-label');
       if(!label?.getAttribute('aria-label')?.includes(${JSON.stringify(messages['status.toggleHint'])}))return null;
       const rect=label.getBoundingClientRect();return {x:rect.x+rect.width/2,y:rect.y+rect.height/2};
-    })()`), `${locale}: accessible preview uses the selected language`);
+    })()`), `${locale}: accessible label uses the selected language`);
     await cdp.call('Input.dispatchMouseEvent', { type: 'mouseMoved', ...point });
-    const preview = await until(() => cdp.evaluate(`(() => {
-      const hover=[...document.querySelectorAll('.monaco-hover')].find(node=>node.innerText.includes(${JSON.stringify(messages['status.toggleHint'])}));
-      if(!hover)return null;const rect=hover.getBoundingClientRect();return rect.width&&rect.height ? hover.innerText : null;
-    })()`), `${locale}: hover shows the translated click hint`);
-    assert.match(preview, /^Codex:[\s\S]*\nClaude:/);
-    if (locale !== 'ko') assert.doesNotMatch(preview, /[가-힣]/);
-    assert.equal(await cardText(), null, `${locale}: hover keeps the full card closed`);
+    const hoveredCard = await until(cardText, `${locale}: hover shows the translated card`);
+    assert.ok(hoveredCard.includes(messages['quota.usage']));
+    if (locale !== 'ko') assert.doesNotMatch(hoveredCard, /[가-힣]/);
+    await cdp.call('Input.dispatchMouseEvent', { type: 'mouseMoved', ...editor });
+    await until(async () => !await cardText(), `${locale}: leaving closes the unpinned card`);
+    await cdp.call('Input.dispatchMouseEvent', { type: 'mouseMoved', ...point });
+    await until(cardText, `${locale}: hover opens the card again`);
     await cdp.click(point);
-    await until(cardText, `${locale}: click opens the card`);
+    await cdp.call('Input.dispatchMouseEvent', { type: 'mouseMoved', ...editor });
+    await sleep(500);
+    assert.ok(await cardText(), `${locale}: click pins the hovered card`);
     await cdp.click(point);
     for (let attempt = 0; attempt < 5; attempt++) {
       await sleep(100);
@@ -162,7 +164,7 @@ async function verifyStatusLocalization(cdp, settingsPath, root, editor) {
     await cdp.click(point);
     await until(cardText, `${locale}: click reopens the card`);
     await cdp.call('Input.dispatchMouseEvent', { type: 'mouseMoved', ...editor });
-    observations.push({ locale, preview, card: translatedCard });
+    observations.push({ locale, hoveredCard, card: translatedCard });
   }
   return observations;
 }
@@ -187,7 +189,7 @@ async function main() {
   await writeFile(join(userData, 'User', 'settings.json'), JSON.stringify({
     'workbench.startupEditor': 'none', 'workbench.colorTheme': 'Default Dark Modern', 'security.workspace.trust.enabled': false,
     'telemetry.telemetryLevel': 'off', 'extensions.autoCheckUpdates': false, 'update.mode': 'none',
-    // A short delay makes an accidentally retained automatic hover observable.
+    // A short delay makes automatic hover and accidental reopening observable.
     'workbench.hover.delay': 100,
     'agentTracker.display.detail': 'compact',
     'agentTracker.language': 'ko',
@@ -278,26 +280,27 @@ async function main() {
       }
     };
     await cdp.call('Input.dispatchMouseEvent', { type: 'mouseMoved', x: button.x, y: button.y });
-    const preview = await until(summary, 'hover opens the detailed preview');
-    assert.match(preview, /^Codex:[\s\S]*\nClaude:/);
-    assert.match(preview, quotaFixture ? /Claude: 7일 - 86% 남음, 재설정까지 6d 0h, 5시간 - 67% 남음, 재설정까지 4h 37m/ : /Claude: 조회불가/);
-    assert.match(preview, quotaFixture ? /Codex: 7일 - 14% 남음, 재설정까지 6d 0h, 5시간 - 31% 남음, 재설정까지 4h 37m/ : /Codex: 조회불가/);
-    await assertStaysClosed('hover alone must not open the quota card');
-    outcomes.push('hover shows weekly and five-hour remaining quota, reset countdowns and the usage-window click instruction');
+    const hoverCard = await until(visible, 'hover opens the full quota card');
+    assert.ok(hoverCard.bottom <= button.top + 8, 'hover card is anchored above the status bar');
+    assert.equal(await summary(), null, 'hover uses the Markdown card instead of the plain-text summary');
+    await cdp.call('Input.dispatchMouseEvent', { type: 'mouseMoved', ...editor });
+    await until(async () => !await visible(), 'leaving closes the unpinned card');
+    outcomes.push('hover opens the full quota card and moving away dismisses it');
+    await cdp.call('Input.dispatchMouseEvent', { type: 'mouseMoved', x: button.x, y: button.y });
+    await until(visible, 'hover opens the card again before pinning');
     await cdp.click(button);
-    const card = await until(visible, 'first click opens quota card');
-    assert.equal(await summary(), null, 'click replaces the preview with the quota UI');
+    const card = await until(visible, 'first click pins quota card');
     assert.ok(card.bottom <= button.top + 8, 'card is anchored above the status bar');
     await cdp.call('Input.dispatchMouseEvent', { type: 'mouseMoved', x: editor.x, y: editor.y });
     await sleep(500); assert.ok(await visible(), 'card remains pinned after the mouse leaves');
-    outcomes.push('first click opens and pins the card above the status bar');
+    outcomes.push('first click pins the hovered card above the status bar');
     await cdp.call('Input.dispatchMouseEvent', { type: 'mouseMoved', x: button.x, y: button.y });
     for (let attempt = 0; attempt < 15; attempt++) {
       await sleep(100);
       assert.equal(await summary(), null, 'an open quota UI suppresses the preview');
       assert.ok(await visible(), 'hover cannot replace the pinned quota UI');
     }
-    outcomes.push('hover preview stays suppressed while the quota UI is pinned');
+    outcomes.push('automatic hover cannot replace the pinned quota card');
     const refresh = await cdp.evaluate(`(() => {
       const link=document.querySelector('.monaco-hover a[data-href="command:agentTracker.refreshQuota"]');
       if(!link)return null;const rect=link.getBoundingClientRect();return {x:rect.x+rect.width/2,y:rect.y+rect.height/2};
@@ -395,10 +398,12 @@ async function main() {
     await assertStaysClosed('the card stays closed while the mouse remains over the button');
     await cdp.call('Input.dispatchMouseEvent', { type: 'mouseMoved', x: editor.x, y: editor.y });
     await cdp.call('Input.dispatchMouseEvent', { type: 'mouseMoved', x: button.x, y: button.y });
-    await until(summary, 'preview is available again after closing');
-    await assertStaysClosed('hovering again after closing must not reopen the card');
+    await until(visible, 'hover opens an unpinned card again after closing');
+    await cdp.call('Input.dispatchMouseEvent', { type: 'mouseMoved', ...editor });
+    await until(async () => !await visible(), 'leaving closes the card after mouse reentry');
+    await assertStaysClosed('an unpinned card stays closed after moving away');
     outcomes.push('second click closes the pinned card');
-    outcomes.push('closed card stays closed on mouse reentry');
+    outcomes.push('mouse reentry restores temporary hover after toggling the pinned card closed');
     for (let attempt = 0; attempt < 3; attempt++) {
       await cdp.click(button); await until(visible, 'repeated click opens');
       await cdp.click(button); await assertStaysClosed('repeated second click must not reopen');
@@ -423,7 +428,7 @@ async function main() {
     if (statusLocalization) {
       const observations = await verifyStatusLocalization(cdp, join(userData, 'User', 'settings.json'), root, editor);
       await writeFile(join(resultDirectory, 'statusbar-localization.json'), JSON.stringify({ passed: true, version: patch.version, observations }, null, 2));
-      outcomes.push('six languages: translated hover hints, pinned card updates and repeated click toggles');
+      outcomes.push('six languages: translated hover cards, dismissal on leave, pinned card updates and repeated click toggles');
     }
     await sleep(3000);
     const notificationText = await cdp.evaluate('[...document.querySelectorAll(".notification-list-item-message")].map(node=>node.innerText).join("\\n")');

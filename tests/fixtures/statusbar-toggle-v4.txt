@@ -1,0 +1,37 @@
+const nativeToggle={id:"statusBar.entry.toggleTooltip",title:""};
+class Item{constructor(container=new EventTarget()){this.label={};this.container=container;this.disposables=[]}_register(value){this.disposables.push(value);return value}update(e){/*agent-tracker:statusbar-toggle:v4*/if(e.extensionId==="AgentTracker.agent-tracker"&&e.command?.id==="agentTracker.toggleQuotaTooltip"){(function configureQuotaHover(item, summary) {
+  item._agentTrackerSummary = summary;
+  if (item._agentTrackerHoverConfigured) return;
+  item._agentTrackerHoverConfigured = true;
+  const delegate = item.hoverDelegate;
+  item.hoverDelegate = {
+    get delay() { return delegate.delay; },
+    get placement() { return delegate.placement; },
+    get showNativeHover() { return delegate.showNativeHover; },
+    showHover(options, focus) {
+      if (item._agentTrackerSummary !== undefined && !focus) {
+        if (item.hoverService.getStickyHover(item.container)) return undefined;
+        options = { ...options, content: item._agentTrackerSummary };
+      }
+      return delegate.showHover(options, focus);
+    },
+    onDidHideHover() { delegate.onDidHideHover?.(); },
+  };
+  const stop = event => {
+    if (item._agentTrackerSummary !== undefined && item.hoverService.getStickyHover(item.container)) event.stopImmediatePropagation();
+  };
+  for (const type of ['mouseover', 'focus']) item.container.addEventListener(type, stop, { capture: true });
+  item._register({ dispose() {
+    for (const type of ['mouseover', 'focus']) item.container.removeEventListener(type, stop, { capture: true });
+  } });
+})(this,e.ariaLabel??e.name??"");e={...e,command:nativeToggle};(function configureQuotaDividers(item) {
+  const document = item.container.ownerDocument;
+  const id = 'agent-tracker-quota-divider-style';
+  if (document.getElementById(id)) return;
+  const style = document.createElement('style');
+  style.id = id;
+  style.textContent = '.monaco-hover:has(a[data-href="command:agentTracker.openSettings"]) hr{border-top:2px solid #888888;border-bottom:0;height:2px;margin:8px -8px;}';
+  document.head.appendChild(style);
+})(this);}else{this._agentTrackerSummary=undefined;}/*agent-tracker:statusbar-toggle:end*/if(this.label.showProgress=e.showProgress??false){}this.commandPointerListener=e.command;this.entry=e}
+show(){return this.hoverService.getStickyHover(this.container)}}
+globalThis.Item=Item;globalThis.nativeToggle=nativeToggle;

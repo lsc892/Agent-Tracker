@@ -8,7 +8,7 @@
 
 다만 공개 API로 지원되는 기본 동작은 **마우스를 올려 표시하는 툴팁**이다. 원하는 **클릭으로 열고 다시 클릭해서 닫는 동작**과 **현재 HTML 카드의 디자인을 그대로 옮기는 기능**은 공개 API에 없다. VS Code 내부에는 클릭 토글 구현이 있지만 일반 확장에서 그대로 사용할 수 있는 API는 아니다. [공개 API][statusbar-api], [내부 상태표시줄 구현][statusbar-item]
 
-Agent Tracker에서는 **로컬 VS Code의 내부 토글 객체에 연결하는 패치**를 적용했다. 상태표시줄 사용량 항목을 클릭하면 카드가 위에 열려 유지되고, 다시 클릭하면 닫힌다. 카드가 닫혀 있을 때 호버하면 상태표시줄의 상세/압축 설정과 관계없이 제공자별 주간(7일)·5시간 남은 비율·재설정까지 남은 시간과 `클릭해서 사용량 창 켜기` 안내를 표시한다. 카드가 열려 있으면 요약 호버를 표시하지 않는다. 바깥 클릭이나 Esc로도 닫을 수 있다. 이 연결에는 확장 VSIX 외에 아래의 workbench 패치가 필요하다.
+Agent Tracker에서는 **로컬 VS Code의 내부 토글 객체에 연결하는 패치**를 적용했다. 상태표시줄 사용량 항목에 호버하면 전체 사용량 카드가 위에 나타나고 항목과 카드에서 마우스를 옮기면 닫힌다. 클릭하면 같은 카드를 고정해 마우스 이탈 뒤에도 유지하고, 다시 클릭하면 닫힌다. 고정된 카드에는 자동 호버가 재진입하지 않으며 닫은 뒤 다시 호버하면 임시 카드가 나타난다. 바깥 클릭이나 Esc로도 닫을 수 있다. 클릭 토글에는 확장 VSIX 외에 아래의 workbench 패치가 필요하다.
 
 ## 요구사항과 지원 범위
 
@@ -72,7 +72,7 @@ VS Code 자체의 사용량 카드에는 DOM으로 만든 대시보드가 사용
 상태 표시줄 색상은 `display.colorMode`의 자동·흰색·검은색·사용자 지정으로 설정한다. 자동은 `StatusBarItem.color`에 CSS 값 `inherit`를 지정해 호버 중에도 현재 테마와 작업공간의 상태 표시줄 전경색을 상속한다. 흰색·검은색·사용자 지정은 검증한 HEX를 인라인 CSS 색상으로 고정한다. `display.customColor`는 짧은 HEX와 투명도를 포함한 HEX를 지원하며, 설정 설명의 색상 선택 링크로 [colorSettings.ts](../../src/ui/colorSettings.ts)의 견본·HEX·불투명도 편집 화면을 연다. 사용량 항목과 새로고침에 함께 적용하며 Markdown 카드의 의미별 막대 색은 기존 규칙을 유지한다.
 
 - [src/ui/quotaTooltip.ts](../src/ui/quotaTooltip.ts): 제공자 이름 아래에 5h·wk의 색상 막대·비율을 나란히 표시하고 각 기간 바로 아래에 초기화 카운트다운을 표시한다. Markdown 표의 이미지 크기 구분자는 이스케이프하여 열이 나뉘지 않게 한다. codex.showReserve는 기본 OFF로 limitId 또는 limitName이 gpt-reserve인 한도를 숨긴다. 서버의 base_model_inference 식별자는 그대로 보존하고 별도로 보존한 gpt-reserve 이름으로도 판별하며 기간만 표시한 단일 한도에서도 적용한다. codex.showResetCredits는 기본 ON으로 사용량 리셋권을 표시한다. 막대는 자체 생성한 SVG data URI를 사용하며 사용률에 따라 초록·노랑·빨강으로 표시한다. 추가 quota, 조회 중·오래된 값·오류 안내와 마지막 갱신 시각도 유지한다. `supportHtml`은 제한된 색상 span에 사용하고 외부 문자열은 `appendText`로 이스케이프한다. Codex 응답의 `rateLimitResetCredits.availableCount`와 사용 가능한 항목의 가장 빠른 `expiresAt`을 재설정 가능 횟수·다음 만료 시간으로 표시한다. 상세 항목 수로 횟수를 추정하지 않으며, 만료 정보가 없으면 횟수만 표시한다. [Codex App Server](https://learn.chatgpt.com/docs/app-server#6-rate-limits-chatgpt)
-- [src/ui/statusBar.ts](../../src/ui/statusBar.ts): `tooltip`에는 전체 카드를, 접근성 label에는 상세 요약을 제공하고 클릭 명령을 `agentTracker.toggleQuotaTooltip`으로 지정한다. 패치가 label을 자동 호버에 사용하므로 스크린리더와 마우스 사용자가 같은 요약을 받는다. [statusBarPresentation.ts](../../src/ui/statusBarPresentation.ts)의 `quotaHoverSummary`는 상태표시줄의 상세/압축 설정과 관계없이 Codex·Claude 순서로 주간·5시간 남은 비율과 재설정까지의 시간을 표시한다. 카운트다운은 1분마다 현재 snapshot에서 다시 계산하며 네트워크 조회나 통계 스캔을 시작하지 않는다.
+- [src/ui/statusBar.ts](../../src/ui/statusBar.ts): `tooltip`에는 호버·클릭이 공유하는 전체 카드를, 접근성 label에는 상세 요약을 제공하고 클릭 명령을 `agentTracker.toggleQuotaTooltip`으로 지정한다. [statusBarPresentation.ts](../../src/ui/statusBarPresentation.ts)의 `quotaHoverSummary`는 스크린리더용 label에 상태표시줄의 상세/압축 설정과 관계없이 Codex·Claude 순서로 주간·5시간 남은 비율과 재설정까지의 시간을 제공한다. 카운트다운은 1분마다 현재 snapshot에서 다시 계산하며 네트워크 조회나 통계 스캔을 시작하지 않는다.
 - [src/extension.ts](../src/extension.ts): 전체 새로고침·사용량 통계·상세/압축 명령과 Agent Tracker 설정 열기를 등록한다. 제공자별 새로고침·확장 관리 명령은 제거했다. 설정에서 추적 대상, 자동/수동 갱신, 통계 사용 여부와 계산 데이터 삭제를 관리한다. 패치가 없는 설치에서 클릭 명령은 `workbench.action.showHover`로 열린다.
 - [package.json](../package.json): 하단 사용량 패널 등록과 기존 `agentTracker.toggleQuota` 명령을 제거했다. 기존 quota Webview 구현과 전용 JS/CSS도 제거했다. 사용량 통계·Diagnostics Webview는 계속 사용한다.
 - [tools/vscode/statusbar-toggle.cjs](../tools/vscode/statusbar-toggle.cjs): Agent Tracker 클릭 명령을 내부 토글 객체에 연결하는 로컬 설치 패치와 적용 확인·복원을 제공한다.
@@ -85,17 +85,17 @@ VS Code 자체의 사용량 카드에는 DOM으로 만든 대시보드가 사용
 
 1. 현재 VS Code 설치의 workbench bundle에서 `statusBar.entry.toggleTooltip` 객체와 `StatusbarEntryItem.update` 처리 지점을 찾는다. 변수 이름은 현재 bundle에서 구하며 고정하지 않는다. 중복되거나 예상한 pointer·sticky hover 처리가 없으면 중단한다.
 2. `update(entry)` 시작에 `entry.extensionId === 'AgentTracker.agent-tracker'`이고 `entry.command.id === 'agentTracker.toggleQuotaTooltip'`인 경우만 명령 객체를 내부 `ToggleTooltipCommand`로 바꾸는 코드를 삽입한다. 입력 객체는 복사하므로 원래 entry는 변경하지 않는다.
-3. 항목별 hover delegate를 만들어 자동 표시(`focus=false`)에는 접근성 label의 plain text 요약을, 클릭·키보드 표시(`focus=true`)에는 원래 Markdown 카드를 전달한다. 다른 항목과 공유하는 원본 delegate는 변경하지 않고 hover 지연과 해제 처리는 그대로 위임한다. 카드가 열린 상태에서는 `mouseover`·`focus` capture listener와 delegate 양쪽에서 요약 표시를 막는다. listener는 한 번만 등록하고 항목 해제 시 제거한다. [자동 호버 소스][hover-service]
+3. 항목별 hover delegate를 만들어 자동 표시(`focus=false`)와 클릭·키보드 표시(`focus=true`)에 원래 Markdown 카드를 그대로 전달한다. 다른 항목과 공유하는 원본 delegate는 변경하지 않고 hover 지연과 해제 처리는 그대로 위임한다. 클릭으로 고정한 sticky 카드가 있을 때만 `mouseover`·`focus` capture listener와 delegate 양쪽에서 자동 재진입을 막는다. listener는 한 번만 등록하고 항목 해제 시 제거한다. [자동 호버 소스][hover-service]
 4. VS Code의 기존 pointerdown·click 처리는 그대로 실행된다. pointerdown에서 기존 sticky hover 여부를 기록하므로 mousedown의 기본 닫기 처리 뒤에도 두 번째 클릭을 닫기로 판단할 수 있다. 열기는 `hover.show(true)`를 사용해 마우스를 옮겨도 유지한다. [내장 처리 소스][statusbar-item]
 5. 다른 확장·명령과 quota 데이터 조회는 이 변환을 거치지 않는다. 닫기·외부 클릭·Esc의 상태 처리는 VS Code가 맡는다.
 
-명령 ID만 전달하는 방식에서 부족했던 **객체 동일성**을 2번에서 해결한다. 3번은 요약 호버와 전체 카드를 분리하고 명시적인 클릭·키보드 토글과 열린 카드의 갱신을 유지한다. 확장 호스트가 내부 sentinel 객체를 직접 얻는 방식은 아니다.
+명령 ID만 전달하는 방식에서 부족했던 **객체 동일성**을 2번에서 해결한다. 3번은 기본 호버 카드의 수명을 유지하면서 클릭·키보드 고정 토글과 열린 카드의 갱신을 보호한다. 확장 호스트가 내부 sentinel 객체를 직접 얻는 방식은 아니다.
 
 ### 클릭 후 다시 열리는 버그의 원인과 재현
 
 2026-10-05 조사 당시 실제 설치에는 토글 패치가 없었다. 따라서 `agentTracker.toggleQuotaTooltip`은 확장 호스트의 fallback인 `workbench.action.showHover`를 매번 실행했다. VS Code의 mousedown 처리가 기존 카드를 먼저 닫은 다음 click 명령이 카드를 다시 열었다. `node tests/vscode/statusbar-toggle.cjs --baseline`으로 격리된 VS Code 1.140.0에서 두 번째 클릭의 DOM 제거·재생성을 관찰해 재현했다. 결과는 `tests/results/statusbar-toggle-baseline.json`에 기록했다.
 
-v3 패치는 내장 토글의 pointerdown 상태 보존을 사용해 닫기 클릭을 구별한다. 닫힌 뒤 마우스가 다시 들어와도 전체 카드를 열지 않고 짧은 요약만 표시한다. 패치가 없는 환경의 fallback은 여전히 열기 전용이므로 VSIX 설치만으로 토글 동작이 적용되지는 않는다.
+v3·v4 패치는 내장 토글의 pointerdown 상태 보존을 사용해 닫기 클릭을 구별하고 자동 호버에는 텍스트 요약을 표시했다. v5는 pointerdown 동작을 유지하면서 자동 호버를 전체 카드로 되돌린다. 재클릭 직후 마우스가 그대로 있으면 닫힌 상태를 유지하며, 이탈 후 재진입하면 임시 호버 카드가 다시 나타난다. 패치가 없는 환경의 fallback은 여전히 열기 전용이므로 VSIX 설치만으로 토글 동작이 적용되지는 않는다.
 
 ## 적용·확인·복원
 
@@ -115,7 +115,7 @@ npm run restore:vscode
 
 Windows 기본 설치는 환경 변수에서 찾고 `bin/code.cmd`가 가리키는 현재 버전의 `resources/app`을 사용한다. 개인 계정이나 저장소 절대 경로는 코드에 고정하지 않는다. 선택한 Windows CLI를 대상으로 하려면 `npm run patch:vscode -- --cli "<code.cmd 경로>"`를 사용한다. 별도 설치는 `--executable` 또는 `--app-root`로 지정한다. 확인과 복원에도 동일한 대상 옵션을 사용한다.
 
-수정 전에 등록된 workbench checksum과 JavaScript 구문을 검증한다. 원본 `workbench.desktop.main.js`와 `product.json`을 각각 `.agent-tracker-toggle.bak`으로 보관하며 변경 전후 SHA-256을 `.agent-tracker-toggle.json`에 기록한다. `product.json`에서는 해당 workbench 파일의 checksum만 갱신한다. 재실행은 중복 삽입하지 않고, 기존 v1·v2·v3 토글 패치는 원본 백업을 보존하며 v4 요약·카드 분리 및 구분선 스타일 패치로 갱신한다. 복원은 원본 파일을 정확히 되돌린다. 이후 다른 수정이나 백업 손상이 감지되면 덮어쓰지 않는다. 적용·갱신 도중 한 파일만 변경된 경우도 백업으로 복원할 수 있다.
+수정 전에 등록된 workbench checksum과 JavaScript 구문을 검증한다. 원본 `workbench.desktop.main.js`와 `product.json`을 각각 `.agent-tracker-toggle.bak`으로 보관하며 변경 전후 SHA-256을 `.agent-tracker-toggle.json`에 기록한다. `product.json`에서는 해당 workbench 파일의 checksum만 갱신한다. 재실행은 중복 삽입하지 않고, 기존 v1~v4 토글 패치는 원본 백업을 보존하며 v5 호버 카드·클릭 고정 패치로 갱신한다. 카드 구분선 스타일도 유지한다. 복원은 원본 파일을 정확히 되돌린다. 이후 다른 수정이나 백업 손상이 감지되면 덮어쓰지 않는다. 적용·갱신 도중 한 파일만 변경된 경우도 백업으로 복원할 수 있다.
 
 이는 비공개 구현에 의존하는 로컬 패치다. **VS Code 업데이트 뒤에는 재적용해야 한다.** VSIX 패키징·확장 활성화·CI에서는 설치 파일을 자동 수정하지 않는다. 지원하지 않는 내부 구조에서는 적용을 중단하며, 패치가 없는 설치는 기본 마우스 호버와 클릭 열기 경로를 사용한다.
 
@@ -129,9 +129,9 @@ VS Code는 현재 파일 checksum을 실행 시 전달받은 product 기준값�
 
 ## 구현 검증
 
-- `npm run check`: 타입 검사·lint와 104개 테스트 통과. 카드 명령과 통계 스캔 분리 외에 요약 문구·순서·카운트다운, 내부 객체 동일성, 확장·명령 범위, 열린 카드의 요약 호버 차단과 listener 해제, v1·v2 패치 갱신, 현재 CLI 경로 선택, checksum·백업·복원, 중단된 적용 복구를 검증했다.
+- `npm run check`: 타입 검사·lint와 346개 테스트 통과. 카드 명령과 통계 스캔 분리 외에 접근성 요약 문구·순서·카운트다운, 호버·클릭의 같은 Markdown 전달, 내부 객체 동일성, 확장·명령 범위, 고정 카드의 자동 재진입 차단과 listener 해제, v1~v4 패치 갱신, 현재 CLI 경로 선택, checksum·백업·복원, 중단된 적용 복구를 검증했다.
 - `npm run test:vscode`: 실제 VS Code 1.140.0에서 `MarkdownString`의 문자열 이스케이프, 모든 기간 표시, 사용률/남은 비율, 초기화 카운트다운과 조회 상태를 검증했다. 카드에 연결된 통계 명령과 Usage·Diagnostics Webview는 light/dark 테마에서 통과했다.
-- `npm run test:toggle`: 격리된 실제 VS Code 1.140.0에서 닫힌 카드의 요약 호버, 첫 클릭 열기, 상태표시줄 위 배치, 마우스 이탈 뒤 유지, 열린 카드의 요약 숨김, 두 번째 클릭 닫기와 반복 클릭, 닫은 뒤 요약 호버 복원, 바깥 클릭·Esc 뒤 한 번 클릭 재열기를 검증한다. hover 지연을 100ms로 설정하고 1.5초간 관찰하며 실제 마우스·키보드 이벤트를 전송한다. [검증 스크립트](../tests/vscode/statusbar-toggle.cjs)
+- `npm run test:toggle`: 격리된 실제 VS Code에서 호버 카드 표시와 이탈 시 닫힘, 상태표시줄 위 배치, 클릭 고정과 마우스 이탈 뒤 유지, 고정 중 자동 재진입 차단, 두 번째 클릭 닫기와 반복 클릭, 재진입 시 임시 호버 복원, 바깥 클릭·Esc 뒤 한 번 클릭 재열기를 검증한다. hover 지연을 100ms로 설정하고 1.5초간 관찰하며 실제 마우스·키보드 이벤트를 전송한다. [검증 스크립트](../../tests/vscode/statusbar-toggle.cjs)
 - 같은 테스트에서 새 프로세스가 로드한 product checksum과 디스크 registry, 파일 10개의 실제 checksum이 일치함을 검증하고 설치 손상 알림이 표시되지 않는지 확인한다.
 - 클릭 결과는 `tests/results/statusbar-toggle.json`, 실제 화면은 `tests/results/statusbar-toggle.png`에 저장했다. 합성 계정 오류 상태의 카드 화면도 직접 확인했다. 모든 제공자 상태·창 크기·원격 환경의 화면 검증까지 포함한 결과는 아니다.
 

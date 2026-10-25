@@ -6,7 +6,8 @@ const { spawnSync } = require('node:child_process');
 const command = 'agentTracker.toggleQuotaTooltip';
 const extensionId = 'AgentTracker.agent-tracker';
 const checksumKey = 'vs/workbench/workbench.desktop.main.js';
-const begin = '/*agent-tracker:statusbar-toggle:v4*/';
+const begin = '/*agent-tracker:statusbar-toggle:v5*/';
+const dividedPreviewBegin = '/*agent-tracker:statusbar-toggle:v4*/';
 const previewBegin = '/*agent-tracker:statusbar-toggle:v3*/';
 const clickOnlyBegin = '/*agent-tracker:statusbar-toggle:v2*/';
 const legacyBegin = '/*agent-tracker:statusbar-toggle:v1*/';
@@ -14,10 +15,7 @@ const end = '/*agent-tracker:statusbar-toggle:end*/';
 const hash = value => createHash('sha256').update(value).digest('hex');
 const checksum = value => createHash('sha256').update(value).digest('base64').replace(/=+$/, '');
 
-/**
- * 책임: Agent Tracker 항목의 자동 미리 보기와 클릭 고정 hover를 구분한다.
- * 알고리즘: 해당 항목의 delegate만 감싸 일반 hover에 요약을 사용하고 고정 카드가 열리면 mouseover·focus 재진입을 막으며 해제 콜백을 등록한다.
- */
+// Preserve the historical v3/v4 function verbatim to verify upgrades safely.
 function configureQuotaHover(item, summary) {
   item._agentTrackerSummary = summary;
   if (item._agentTrackerHoverConfigured) return;
@@ -45,7 +43,34 @@ function configureQuotaHover(item, summary) {
   } });
 }
 
-// Keep the v3 hover function unchanged so upgrades can verify its exact payload.
+/**
+ * 책임: 호버와 클릭에 같은 quota 카드를 사용하고 클릭 고정 상태를 유지한다.
+ * 알고리즘: 원래 Markdown과 자동 hover 수명을 위임하되 sticky 카드가 있을 때만 자동 재진입을 막는다.
+ */
+function configureQuotaCardHover(item) {
+  item._agentTrackerQuotaHover = true;
+  if (item._agentTrackerCardHoverConfigured) return;
+  item._agentTrackerCardHoverConfigured = true;
+  const delegate = item.hoverDelegate;
+  item.hoverDelegate = {
+    get delay() { return delegate.delay; },
+    get placement() { return delegate.placement; },
+    get showNativeHover() { return delegate.showNativeHover; },
+    showHover(options, focus) {
+      if (item._agentTrackerQuotaHover && !focus && item.hoverService.getStickyHover(item.container)) return undefined;
+      return delegate.showHover(options, focus);
+    },
+    onDidHideHover() { delegate.onDidHideHover?.(); },
+  };
+  const stop = event => {
+    if (item._agentTrackerQuotaHover && item.hoverService.getStickyHover(item.container)) event.stopImmediatePropagation();
+  };
+  for (const type of ['mouseover', 'focus']) item.container.addEventListener(type, stop, { capture: true });
+  item._register({ dispose() {
+    for (const type of ['mouseover', 'focus']) item.container.removeEventListener(type, stop, { capture: true });
+  } });
+}
+
 function configureQuotaDividers(item) {
   const document = item.container.ownerDocument;
   const id = 'agent-tracker-quota-divider-style';
@@ -66,7 +91,7 @@ function patchSource(source) {
   let original = source;
   const markers = [...source.matchAll(/\/\*agent-tracker:statusbar-toggle:v\d+\*\//g)];
   if (markers.length || source.includes(end)) {
-    if (markers.length !== 1 || source.split(end).length !== 2 || ![begin, previewBegin, clickOnlyBegin, legacyBegin].includes(markers[0][0])) throw new Error('토글 패치 표식이 손상되었습니다.');
+    if (markers.length !== 1 || source.split(end).length !== 2 || ![begin, dividedPreviewBegin, previewBegin, clickOnlyBegin, legacyBegin].includes(markers[0][0])) throw new Error('토글 패치 표식이 손상되었습니다.');
     const start = markers[0].index, finish = source.indexOf(end);
     if (finish < start) throw new Error('토글 패치 표식 순서가 잘못되었습니다.');
     original = source.slice(0, start) + source.slice(finish + end.length);
@@ -81,18 +106,20 @@ function patchSource(source) {
   // Keep the exact v2 injection to safely recognize upgrades and restore backups.
   const clickOnly = `if(!this._agentTrackerClickOnly){this._agentTrackerClickOnly=true;const stop=event=>{if(this.entry?.extensionId===${JSON.stringify(extensionId)}&&this.entry?.command===${symbols[0][1]})event.stopImmediatePropagation();};for(const type of ["mouseover","focus"])this.container.addEventListener(type,stop,{capture:true});this._register({dispose:()=>{for(const type of ["mouseover","focus"])this.container.removeEventListener(type,stop,{capture:true});}});}`;
   const configureSource = configureQuotaHover.toString().replace(/\r\n/g, '\n');
+  const cardSource = configureQuotaCardHover.toString().replace(/\r\n/g, '\n');
   const dividerSource = configureQuotaDividers.toString().replace(/\r\n/g, '\n');
   const previewInjection = `if(${condition}){(${configureSource})(this,${argument}.ariaLabel??${argument}.name??"");${mapping}}else{this._agentTrackerSummary=undefined;}`;
-  const injection = `${begin}if(${condition}){(${configureSource})(this,${argument}.ariaLabel??${argument}.name??"");${mapping}(${dividerSource})(this);}else{this._agentTrackerSummary=undefined;}${end}`;
+  const injection = `${begin}if(${condition}){(${cardSource})(this);${mapping}(${dividerSource})(this);}else{this._agentTrackerQuotaHover=false;}${end}`;
   const position = target.index + target[0].length;
   const patched = original.slice(0, position) + injection + original.slice(position);
   const legacy = original.slice(0, position) + `${legacyBegin}if(${condition}){${mapping}}${end}` + original.slice(position);
   const clickOnlySource = original.slice(0, position) + `${clickOnlyBegin}if(${condition}){${mapping}${clickOnly}}${end}` + original.slice(position);
   const preview = original.slice(0, position) + `${previewBegin}${previewInjection}${end}` + original.slice(position);
+  const dividedPreview = original.slice(0, position) + `${dividedPreviewBegin}if(${condition}){(${configureSource})(this,${argument}.ariaLabel??${argument}.name??"");${mapping}(${dividerSource})(this);}else{this._agentTrackerSummary=undefined;}${end}` + original.slice(position);
   // Recognize exact historical payloads so a publisher change retains restore backups.
-  const previousPublisher = [patched, legacy, clickOnlySource, preview].map(value =>
+  const previousPublisher = [patched, legacy, clickOnlySource, preview, dividedPreview].map(value =>
     value.replaceAll(JSON.stringify(extensionId), JSON.stringify('agent-tracker.agent-tracker')));
-  if (![original, patched, legacy, clickOnlySource, preview, ...previousPublisher].includes(source)) throw new Error('기존 토글 패치가 예상 코드와 다릅니다. 자동으로 덮어쓰지 않습니다.');
+  if (![original, patched, legacy, clickOnlySource, preview, dividedPreview, ...previousPublisher].includes(source)) throw new Error('기존 토글 패치가 예상 코드와 다릅니다. 자동으로 덮어쓰지 않습니다.');
   return { original, patched, alreadyPatched: source === patched, upgradeRequired: source !== original && source !== patched };
 }
 
