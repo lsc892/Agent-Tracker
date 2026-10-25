@@ -23,12 +23,17 @@ export interface FileMetadata {
   dev: string | null;
   inode: string | null;
   parser_version: number;
+  /** Parsed source thread/role and SHA-256 of the accepted raw file snapshot. */
+  source_identity?: string | null;
+  content_hash?: string | null;
   /** 0 when Skill counts were skipped; re-enable rebuilds these sources. */
   capabilities_collected?: 0 | 1;
 }
 
 export interface ManifestRow extends FileMetadata {
   id: number;
+  source_identity: string | null;
+  content_hash: string | null;
   source_missing: 0 | 1;
   last_seen_scan_id: string | null;
   processing_status: ProcessingStatus;
@@ -99,6 +104,8 @@ export interface SessionReplacement {
   summaries: Iterable<TurnSummaryInput>;
   files: Iterable<FileMetadata & { id: number }>;
   removedFileIds?: Iterable<number>;
+  /** Verified replacements of missing source snapshots; bypass deleted-source retention. */
+  reconnectedFiles?: Iterable<{ old_id: number; new_id: number }>;
 }
 
 export interface SummaryFilter {

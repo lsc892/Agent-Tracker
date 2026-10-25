@@ -27,6 +27,12 @@ export function migrateSchema(connection: DatabaseSync, transaction: (action: ()
       const current = connection.prepare('PRAGMA user_version').get() as { user_version: number };
       if (current.user_version > SCHEMA_VERSION) throw new Error('Database schema is newer than this extension');
       if (current.user_version === SCHEMA_VERSION) return;
+      const manifestColumns = connection.prepare('PRAGMA table_info(manifest)').all();
+      for (const column of ['source_identity', 'content_hash']) {
+        if (manifestColumns.length && !manifestColumns.some(existing => existing.name === column)) {
+          connection.exec(`ALTER TABLE manifest ADD COLUMN ${column} TEXT`);
+        }
+      }
       connection.exec(initialMigrationSql(current.user_version));
       connection.exec(SCHEMA_MODEL_SQL);
       connection.exec(SCHEMA_CAPABILITY_SQL);
@@ -37,6 +43,7 @@ export function migrateSchema(connection: DatabaseSync, transaction: (action: ()
       if (!connection.prepare('PRAGMA table_info(manifest)').all().some(column => column.name === 'source_missing')) {
         connection.exec('ALTER TABLE manifest ADD COLUMN source_missing INTEGER NOT NULL DEFAULT 0 CHECK(source_missing IN (0,1))');
       }
+      connection.exec('CREATE INDEX IF NOT EXISTS idx_manifest_source ON manifest(provider, source_identity, id)');
       if (!connection.prepare('PRAGMA table_info(turn_summary)').all().some(column => column.name === 'request_title')) {
         connection.exec('ALTER TABLE turn_summary ADD COLUMN request_title TEXT');
       }

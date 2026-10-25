@@ -285,7 +285,7 @@ Claude credential·로그 보존 설정은 `<dataHome>/.claude`, Codex App Serve
 manifest 전체를 메모리에 적재하지 않는다. 파일 metadata 전수조사는 유지하되 발견·조회·비교는 최대 `n`개씩 처리한다. 진단용 정보는 상태·처리 위치·기록 시각·오류 네 column으로 제한한다.
 
 ```text
-id                  // 내부 파일 식별자; 경로 이동에도 유지하며 디버깅에서 참조
+id                  // 내부 파일 식별자; dev/inode 이동 최적화는 유지하고 내용 검증 연결은 새 위치의 id 사용
 provider            // 로그 제공자: claude 또는 codex
 source_root         // 정규화된 소속 로그 루트; 삭제 판정 범위를 제한
 path                // 정규화된 JSONL 파일 경로; provider와 함께 유일한 조회 key
@@ -295,6 +295,8 @@ mtime_ms            // 그 범위를 정할 때 확인한 파일 수정 시각(U
 dev                 // 파일이 위치한 장치 식별자; inode와 함께 파일 동일성 판단
 inode               // 장치 내 파일 식별자; 신뢰할 수 있을 때만 이동 감지에 사용
 parser_version      // 마지막 정상 반영에 사용한 parser 버전; 다르면 해당 session 재집계
+source_identity     // 파싱된 thread id와 main 여부; 같은 세션의 다른 원본을 구분
+content_hash        // 마지막 정상 반영한 원본 byte 범위의 SHA-256; 본문은 저장하지 않음
 source_missing      // 삭제를 확인했지만 사용량 이력을 보존 중인 원본이면 1; 복원 후 정상 반영하면 0
 last_seen_scan_id   // 파일 존재를 마지막으로 확인한 scan ID; 파싱 성공 여부와 독립
 processing_status   // processing / done / error / interrupted; 최근 시도의 상태
@@ -334,9 +336,17 @@ new / previous error or interruption
 moved
   path는 달라졌지만 신뢰 가능한 dev/inode가 동일
   → 같은 파일 id로 path와 source_root 갱신; 내용·session 귀속 변화는 별도 판정
+
+reconnected
+  이전 경로가 실제로 없고 provider·source_identity가 같은 정상 원본 후보가 새 위치에 하나 있음
+  새 원본이 이전 정상 byte 범위 전체를 SHA-256 검증으로 포함함
+  → 새 위치의 manifest id를 유지하고 이전 행은 세션 통계 반영 transaction에서 삭제
+     다른 누락 원본이 없으면 기존 요청도 현재 원본으로 다시 집계
 ```
 
-Windows나 일부 filesystem에서 `dev/inode`가 `0`, 누락, 반복 충돌이면 이동 최적화를 사용하지 않고 `removed + new`로 처리한다.
+Windows는 dev/inode 이동 최적화를 사용하지 않는다. 그 외 운영체제도 dev/inode가 0·누락·모호하면 새 경로를 신규 행으로 발견한다. 이후 모든 운영체제에서 정상 파싱된 source_identity와 content_hash로 누락 원본의 연결을 검증한다. 전체 탐색과 초기 파싱이 끝난 뒤 연결을 판정하므로 session_id만 같은 main·subagent나 여러 정상 복사본을 임의로 합치지 않는다. 현재 탐색 루트 밖의 이전 원본도 실제 ENOENT와 내용 포함을 확인하면 연결하며, 다른 제외 원본의 읽기 실패는 기존 보존 정책을 따른다.
+
+content_hash는 이미지 생략·Zstd 해제 전 원본 byte를 스트리밍하며 계산한다. 같은 크기는 저장된 해시를 비교하고, 새 원본이 더 크면 이전 크기까지의 prefix와 새 원본 전체를 고정 크기 버퍼로 재검증해 append를 허용한다. 재검증 I/O도 읽은 byte 통계에 포함한다. 연결된 이전 행은 보존 대상에서 제외하고, 다른 원본 누락으로 유지되는 요청의 진단 파일 참조는 새 행으로 옮긴다. 파싱·취소·연결 성분 실패나 DB 반영 실패에서는 기존 통계와 이전 행을 보존한다. 내용이 다르거나 정상 새 원본이 여러 개여서 연결이 모호한 경우에도 기존 누락 보존을 유지한다.
 
 agent 실행 중 조회는 읽기 시작 시 확인한 파일 크기까지 처리한다. JSONL 마지막 줄이 newline 없이 끝나면 보류한다. 완료 신호가 아직 없는 요청은 진행 중으로 표시한다. 이후의 순수 append는 다음 화면 진입·수동 새로 고침에 반영한다. 마지막 줄 보류와 실행 중 요청은 오류가 아니다.
 
@@ -643,7 +653,7 @@ PRAGMA foreign_keys = ON;
 PRAGMA journal_mode = WAL;
 
 CREATE TABLE manifest (
-  id                  INTEGER PRIMARY KEY,                   -- 경로 이동에도 유지하는 내부 파일 id
+  id                  INTEGER PRIMARY KEY,                   -- 내부 파일 id; 내용 검증 연결 시 새 위치의 id 유지
   provider            TEXT NOT NULL,                          -- claude / codex
   source_root         TEXT NOT NULL,                          -- 정규화된 소속 로그 루트; 삭제 범위 구분
   path                TEXT NOT NULL,                          -- 정규화된 JSONL 파일 경로
@@ -653,6 +663,8 @@ CREATE TABLE manifest (
   dev                 TEXT,                                   -- 장치 식별자; inode와 묶어서 비교
   inode               TEXT,                                   -- 장치 내 파일 식별자; 신뢰 가능한 경우 이동 감지
   parser_version      INTEGER NOT NULL DEFAULT 0,             -- 마지막 정상 반영한 parser 버전; 미처리는 0
+  source_identity     TEXT,                                   -- 파싱된 thread id·main 여부; 이전 DB는 NULL
+  content_hash        TEXT,                                   -- 정상 반영 원본 byte 범위의 SHA-256; 이전 DB는 NULL
   capabilities_collected INTEGER NOT NULL DEFAULT 0           -- Skill 횟수까지 정상 집계했으면 1; OFF 처리·이전 DB는 0
                         CHECK(capabilities_collected IN (0,1)),
   source_missing      INTEGER NOT NULL DEFAULT 0              -- 원본 삭제 후 요청 snapshot을 보존 중이면 1
@@ -674,6 +686,9 @@ CREATE INDEX idx_manifest_root_id
 
 CREATE INDEX idx_manifest_session
   ON manifest(provider, session_id, id);                    -- 재집계할 session의 원본 파일 page 조회
+
+CREATE INDEX idx_manifest_source
+  ON manifest(provider, source_identity, id);               -- 내용 검증 연결 후보를 page 조회; 모든 운영체제
 
 CREATE TABLE projects (
   project_key        TEXT PRIMARY KEY,
@@ -752,7 +767,7 @@ SQLite 조회 계획용 통계는 DB 열기에서 `PRAGMA main.optimize=0x10002`
 
 Claude는 main JSONL의 custom-title을 ai-title보다 우선한다. Codex는 읽기 전용 state_N.sqlite의 threads.name/title을 session_index.jsonl의 thread_name보다 우선하고 session_meta 제목을 보완 경로로 사용한다. metadata는 디스크 TEMP에 묶음 처리하며 통계 화면 진입 시 제목만 바뀐 세션도 갱신한다. metadata를 읽을 수 없으면 기존 제목을 유지한다. 프로젝트명·세션명 필터는 클릭해 이름 목록을 열고 스크롤해 선택하는 방식으로 제공하며, 선택 즉시 표·도표를 ID와 제공자로 정확히 조회한다. 목록이나 세션별 행에는 프로젝트명과 세션 시작 시각을 함께 표시하고 tooltip으로 전체 경로·ID를 확인한다.
 
-schema v1·v2는 기존 이름을 projects로 옮기고 요청 ID·통계·manifest 참조를 보존한 채 전환한다. 세션 제목은 다음 scan에서 채운다. 이름 metadata와 summary 교체는 같은 transaction에 반영하며, 참조하는 summary가 없어진 이름 행은 정리한다. `root_turn_id`는 요청 식별자다. schema v9에서 미사용 `turn_index` 컬럼과 순번 생성·저장 코드를 제거했고 v10은 별도 세션 인덱스와 Windows의 identity 인덱스를 제거했다. v11은 빈 rollup 표·인덱스만 추가하고 실제 구축은 첫 집계 조회 때 수행한다. 현재 v12는 manifest에 기본 0의 `source_missing`을 추가한다. 기존 DB의 요청 ID·제목·시각·토큰·진단 참조와 모델·비용·Skill 횟수를 보존하며 migration 실패 시 schema version까지 원복한다. 이 전환 자체로 원본 로그를 다시 스캔하지 않는다. 사용자 요청별 표는 DB 행 `id`순이고 모델별은 같은 요청 안에서 `model`순을 추가한다. 논리 session에 속하는 모든 파일을 읽어야 재집계할 수 있으므로 summary를 파일 하나의 자식 row로 두거나 삭제 cascade하지 않는다.
+schema v1·v2는 기존 이름을 projects로 옮기고 요청 ID·통계·manifest 참조를 보존한 채 전환한다. 세션 제목은 다음 scan에서 채운다. 이름 metadata와 summary 교체는 같은 transaction에 반영하며, 참조하는 summary가 없어진 이름 행은 정리한다. `root_turn_id`는 요청 식별자다. schema v9에서 미사용 `turn_index` 컬럼과 순번 생성·저장 코드를 제거했고 v10은 별도 세션 인덱스와 Windows의 identity 인덱스를 제거했다. v11은 빈 rollup 표·인덱스만 추가하고 실제 구축은 첫 집계 조회 때 수행한다. v12는 manifest에 기본 0의 `source_missing`을 추가한다. 현재 v13은 nullable `source_identity`·`content_hash`와 원본 식별자 인덱스를 추가한다. 기존 DB의 요청 ID·제목·시각·토큰·진단 참조와 모델·비용·Skill 횟수를 보존하며 migration 실패 시 schema version까지 원복한다. 전환 자체는 원본 로그를 읽지 않고, 다음 통계 갱신에서 원본이 남은 기존 파일을 한 번 재파싱해 식별자와 해시를 채운다. 이미 누락돼 해시가 없는 과거 행은 추정해서 연결·삭제하지 않는다. 사용자 요청별 표는 DB 행 `id`순이고 모델별은 같은 요청 안에서 `model`순을 추가한다. 논리 session에 속하는 모든 파일을 읽어야 재집계할 수 있으므로 summary를 파일 하나의 자식 row로 두거나 삭제 cascade하지 않는다.
 
 ### 8.1 사용자에게 보여 줄 turn summary
 
@@ -823,7 +838,7 @@ Codex `response_item`의 function/custom tool 호출과 `exec` 안의 정적인 
 
 보존할 요청의 기존 행 ID·모델별 토큰·비용·Skill 횟수·프로젝트/세션 이름과 결제 방식을 함께 유지하고, 관련 manifest는 `source_missing=1`로 남긴다. 데이터 확인 화면은 원본 삭제·집계 보존 상태를 표시한다. 보존 대상이 없는 요청·파일은 기존 재집계·삭제 규칙을 따른다. 이미 삭제 표시한 파일만 계속 없고 다른 변경이 없으면 원본 본문을 다시 읽지 않는다.
 
-일부 원본이 없으면 해당 세션의 기존 보존 대상 요청은 마지막 집계 snapshot을 유지한다. 남은 원본만으로 같은 요청의 누락 기여량·중복 범위를 복원할 수 없으므로 덮어쓰거나 단순 합산하지 않는다. 같은 연결 component에서 세션 귀속이 달라진 동일 요청도 이중 저장하지 않으며 새로운 요청은 계속 수집한다. 누락된 원본이 모두 복원되어 성공적으로 재집계되면 `source_missing`을 해제하고 전체 snapshot을 교체한다. 다른 경로의 새 복사본만으로 누락 원본의 모든 기여가 복구되었다고 추측하지 않는다. 원본이 없는 동안 같은 요청에 추가된 사용량은 전체 원본 복원 전까지 마지막 snapshot에 반영하지 못한다.
+일부 원본이 없으면 해당 세션의 기존 보존 대상 요청은 마지막 집계 snapshot을 유지한다. 남은 원본만으로 같은 요청의 누락 기여량·중복 범위를 복원할 수 없으므로 덮어쓰거나 단순 합산하지 않는다. 같은 연결 component에서 세션 귀속이 달라진 동일 요청도 이중 저장하지 않으며 새로운 요청은 계속 수집한다. 누락된 원본이 모두 복원되거나 다른 경로에서 원본 식별자·전체 byte prefix의 SHA-256으로 연결을 검증해 성공적으로 재집계되면 전체 snapshot을 교체한다. 연결된 이전 manifest는 삭제하고 새 위치의 행을 유지한다. session_id나 이름만 일치하는 복사본은 복원으로 추측하지 않는다. 검증되지 않은 누락 원본이 남으면 기존 요청의 추가 사용량 반영을 유예한다.
 
 옵션 변경은 진행 중인 갱신을 취소하고 다음 통계 진입·명시적 새로 고침부터 적용한다. OFF에서는 이전 보존 이력에도 원본 삭제를 반영한다. **통계 계산 데이터 삭제**는 보존된 요청과 삭제된 원본의 manifest도 함께 지운다. 원본이 없는 이력은 이 작업 이후 재구축할 수 없다. 원본 파일 내용과 전체 대화 본문을 별도로 복제하지 않는다.
 

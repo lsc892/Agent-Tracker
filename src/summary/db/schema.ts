@@ -2,7 +2,7 @@
 import { SCHEMA_ROLLUP_SQL } from './rollup-state';
 
 export { SCHEMA_ROLLUP_SQL } from './rollup-state';
-export const SCHEMA_VERSION = 12;
+export const SCHEMA_VERSION = 13;
 
 /**
  * 책임: 파일 이동 판정에 필요한 플랫폼별 identity 인덱스를 구성한다.
@@ -109,6 +109,8 @@ CREATE TABLE IF NOT EXISTS manifest (
   dev TEXT,
   inode TEXT,
   parser_version INTEGER NOT NULL DEFAULT 0,
+  source_identity TEXT,
+  content_hash TEXT,
   capabilities_collected INTEGER NOT NULL DEFAULT 0 CHECK(capabilities_collected IN (0,1)),
   source_missing INTEGER NOT NULL DEFAULT 0 CHECK(source_missing IN (0,1)),
   last_seen_scan_id TEXT,
@@ -122,6 +124,7 @@ CREATE TABLE IF NOT EXISTS manifest (
 ${manifestIdentityIndexSql(process.platform)}
 CREATE INDEX IF NOT EXISTS idx_manifest_root_id ON manifest(provider, source_root, id);
 CREATE INDEX IF NOT EXISTS idx_manifest_session ON manifest(provider, session_id, id);
+CREATE INDEX IF NOT EXISTS idx_manifest_source ON manifest(provider, source_identity, id);
 ${NAMES_SQL}
 ${TURN_SUMMARY_SQL}
 ${TURN_SUMMARY_INDEX_SQL}

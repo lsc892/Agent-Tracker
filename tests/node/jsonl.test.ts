@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { readJsonl } from '../../src/summary/jsonl';
 import { readJsonl as readByteJsonl } from '../fixtures/jsonl-byte-reader';
 import { truncateSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 
 async function fixture(text: string, run: (path: string, size: number) => Promise<void>): Promise<void> {
   const directory = await mkdtemp(join(tmpdir(), 'agent-tracker-jsonl-'));
@@ -33,6 +34,19 @@ test('inline image bodies crossing read chunks do not consume the retained line 
     assert.deepEqual(rows[1].row.usage, { input_tokens: 123, output_tokens: 7 });
     assert.equal(rows[1].row.text, 'embedded "data:image/png;base64,keep"');
     assert.equal(rows[2].row.value, '한글');
+  });
+});
+
+test('source fingerprint chunks preserve raw image bytes and stop at the observed snapshot size', async () => {
+  const source=JSON.stringify({image_url:`data:image/png;base64,${'A'.repeat(128*1024)}`,value:'synthetic'})+'\n';
+  await fixture(source+'{"unobserved":true}\n',async(path)=>{
+    const digest=createHash('sha256');
+    const rows: Record<string,unknown>[]=[];
+    const size=Buffer.byteLength(source);
+    const result=await readJsonl(path,size,row=>{rows.push(row);},{maxLineBytes:256,onChunk:chunk=>{digest.update(chunk);}});
+    assert.equal(result.bytes,size);assert.equal(result.rows,1);
+    assert.equal(digest.digest('hex'),createHash('sha256').update(source).digest('hex'));
+    assert.equal(rows[0].image_url,'data:image/png;base64,');
   });
 });
 

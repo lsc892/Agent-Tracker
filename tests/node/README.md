@@ -24,6 +24,7 @@ Node 테스트 러너로 파서·DB·quota·설정·UI와 배포 도구의 회�
 - [request-title-ab.test.ts](request-title-ab.test.ts) — 제목 집계 SQL 대안이 모든 요약 열과 기대 제목을 보존하는지 검증한다.
 - [request-titles.test.ts](request-titles.test.ts) — 요청 제목의 정규화·저장·하위 에이전트 제외와 표·차트 노출을 검증한다.
 - [source-retention.test.ts](source-retention.test.ts) — 원본 삭제·부분 유실·복원 시 사용량 보존과 설정 전환을 검증한다.
+- [source-reconnection.test.ts](source-reconnection.test.ts) — 로그 이동의 내용 검증·이전 manifest 정리·재집계와 실패 시 보존을 검증한다.
 - [sql-rollup-oracle.test.ts](sql-rollup-oracle.test.ts) — 독립 기대 값으로 롤업의 평균·모델·날짜·세션 필터 의미를 검증한다.
 - [status-bar.test.ts](status-bar.test.ts) — quota 상태바와 툴팁의 창 선택·백분율·아이콘·상태 표시를 검증한다.
 - [statusbar-toggle.test.ts](statusbar-toggle.test.ts) — VS Code 상태바 패치의 토글·카드·체크섬·백업·복원을 검증한다.

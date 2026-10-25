@@ -86,6 +86,8 @@ export class SessionStore {
       DELETE FROM db_replacement_projects;
       CREATE TEMP TABLE IF NOT EXISTS db_removed_files(id INTEGER PRIMARY KEY);
       DELETE FROM db_removed_files;
+      CREATE TEMP TABLE IF NOT EXISTS db_reconnected_files(old_id INTEGER PRIMARY KEY,new_id INTEGER NOT NULL);
+      DELETE FROM db_reconnected_files;
       CREATE TEMP TABLE IF NOT EXISTS db_retained_turns(
         id INTEGER PRIMARY KEY,provider TEXT NOT NULL,session_id TEXT NOT NULL,root_turn_id TEXT NOT NULL,
         UNIQUE(provider,session_id,root_turn_id));
@@ -102,10 +104,22 @@ export class SessionStore {
       if (previous) requireSession(previous.provider, previous.session_id);
       addRemoved.run(id);
     }
+    const removed = this.database.statement('SELECT 1 FROM db_removed_files WHERE id=?');
+    const reconnect = this.database.statement('INSERT INTO db_reconnected_files VALUES (?,?)');
+    for (const link of replacement.reconnectedFiles ?? []) {
+      const previous = existingFile.get(link.old_id);
+      const current = existingFile.get(link.new_id);
+      if (link.old_id === link.new_id || !removed.get(link.old_id) || !previous || !current || previous.provider !== current.provider) {
+        throw new Error('Invalid reconnected source');
+      }
+      requireSession(current.provider,current.session_id);
+      reconnect.run(link.old_id,link.new_id);
+    }
     if (replacement.retainDeletedSourceUsage) this.database.connection.exec(`
         INSERT INTO db_retained_turns SELECT t.id,t.provider,t.session_id,t.root_turn_id FROM turn_summary t
         JOIN sessions s ON s.provider=t.provider AND s.session_id=t.session_id
-        WHERE (t.provider,t.session_id) IN (SELECT m.provider,m.session_id FROM db_removed_files r JOIN manifest m ON m.id=r.id)
+        WHERE (t.provider,t.session_id) IN (SELECT m.provider,m.session_id FROM db_removed_files r JOIN manifest m ON m.id=r.id
+            WHERE NOT EXISTS(SELECT 1 FROM db_reconnected_files c WHERE c.old_id=r.id))
           AND trim(t.session_id)<>'' AND trim(t.root_turn_id)<>'' AND t.total_tokens>0
           AND EXISTS(SELECT 1 FROM turn_model_usage u WHERE u.turn_id=t.id AND trim(u.model)<>'' AND u.input_tokens+u.output_tokens>0);`);
   }
@@ -131,6 +145,7 @@ export class SessionStore {
   private replaceManifestFiles(replacement: SessionReplacement, existingFile: StatementSync, requireSession: (provider: SQLInputValue, session: SQLInputValue) => void): string {
     const updateFile = this.database.statement(`UPDATE manifest SET
         source_root = ?, path = ?, session_id = ?, size_bytes = ?, mtime_ms = ?, dev = ?, inode = ?, parser_version = ?, capabilities_collected = ?,
+        source_identity = ?, content_hash = ?,
         source_missing = 0, processing_status = 'done', processing_position = 'committed', recorded_at = ?, last_error = NULL
         WHERE id = ? AND provider = ?`);
     const now = new Date().toISOString();
@@ -141,7 +156,8 @@ export class SessionStore {
       requireSession(previous.provider, previous.session_id);
       requireSession(file.provider, file.session_id);
       const result = updateFile.run(file.source_root, file.path, file.session_id, file.size_bytes, file.mtime_ms,
-        file.dev, file.inode, file.parser_version, file.capabilities_collected ?? 1, now, file.id, file.provider);
+        file.dev, file.inode, file.parser_version, file.capabilities_collected ?? 1,
+        file.source_identity ?? null,file.content_hash ?? null,now,file.id,file.provider);
       if (result.changes !== 1) throw new Error('Replacement refers to an unknown manifest file');
     }
     return now;
@@ -214,9 +230,14 @@ export class SessionStore {
         DELETE FROM db_saved_capabilities;`);
     const keepMissing = this.database.statement(`SELECT 1 FROM db_retained_turns t JOIN manifest m
         ON m.provider=t.provider AND m.session_id=t.session_id WHERE m.id=? LIMIT 1`);
+    const reconnected = this.database.statement('SELECT 1 FROM db_reconnected_files WHERE old_id=?');
+    if (this.database.statement('SELECT 1 FROM db_reconnected_files LIMIT 1').get()) this.database.connection.exec(`
+      UPDATE turn_summary SET diagnostic_file_id=(SELECT new_id FROM db_reconnected_files WHERE old_id=diagnostic_file_id)
+      WHERE (provider,session_id) IN (SELECT provider,session_id FROM db_replacement_sessions)
+        AND diagnostic_file_id IN (SELECT old_id FROM db_reconnected_files);`);
     const markMissing = this.database.statement('UPDATE manifest SET source_missing=1,recorded_at=? WHERE id=? AND source_missing=0');
     for (const row of this.database.statement('SELECT id FROM db_removed_files').iterate()) {
-      if (keepMissing.get(row.id)) markMissing.run(now,row.id);
+      if (!reconnected.get(row.id) && keepMissing.get(row.id)) markMissing.run(now,row.id);
       else remove.run(row.id);
     }
   }
@@ -228,6 +249,6 @@ export class SessionStore {
         AND NOT EXISTS(SELECT 1 FROM turn_summary t WHERE t.provider='claude' AND t.project_key=projects.project_key)
         AND NOT EXISTS(SELECT 1 FROM turn_summary t WHERE t.provider='codex' AND t.project_key=projects.project_key);
         DELETE FROM db_replacement_sessions; DELETE FROM db_replacement_projects;
-        DELETE FROM db_removed_files; DELETE FROM db_retained_turns;`);
+        DELETE FROM db_removed_files; DELETE FROM db_reconnected_files; DELETE FROM db_retained_turns;`);
   }
 }

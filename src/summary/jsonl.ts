@@ -157,6 +157,8 @@ export async function readJsonl(
   size: number,
   onRow: (row: Record<string, unknown>, offset: number) => void | boolean,
   options: { maxLineBytes?: number; signal?: AbortSignal; isCancelled?: () => boolean; onBytes?: (bytes: number) => void;
+    /** Raw file bytes, before image filtering or decompression; valid only during the callback. */
+    onChunk?: (chunk: Buffer) => void;
     /** Synchronous processing of at most one chunk; file reads stay outside the callback. */
     processBatch?: (parseRows: () => void) => void } = {},
 ): Promise<{ partialLine: boolean; bytes: number; rows: number }> {
@@ -175,6 +177,7 @@ export async function readJsonl(
       const { bytesRead } = await file.read(chunk, 0, Math.min(chunk.length, size - read), read);
       if (!bytesRead) throw new SummaryError('file-truncated-during-read', read);
       read += bytesRead;
+      options.onChunk?.(chunk.subarray(0, bytesRead));
       options.onBytes?.(bytesRead);
       // The decoder can prefetch; it must not see a buffer overwritten by the next file read.
       yield compressed ? Buffer.from(chunk.subarray(0, bytesRead)) : chunk.subarray(0, bytesRead);

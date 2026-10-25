@@ -1,6 +1,6 @@
 // 로그 파싱 결과와 세션 연결 관계를 임시 저장해 요청별 집계 후보를 만든다.
 import type { DatabaseSync, StatementSync } from 'node:sqlite';
-import type { FileMetadata, TurnSummaryInput, ModelUsageInput, CapabilityUsageInput } from './db/types';
+import type { FileMetadata, ManifestRow, TurnSummaryInput, ModelUsageInput, CapabilityUsageInput } from './db/types';
 import type { ParsedIdentity, ParseEvent, Provider } from './types';
 
 export interface StagedFile extends FileMetadata {
@@ -62,6 +62,7 @@ export class SummaryStaging {
         id INTEGER PRIMARY KEY, provider TEXT NOT NULL, source_root TEXT NOT NULL, path TEXT NOT NULL,
         session_id TEXT, old_session TEXT, size_bytes INTEGER NOT NULL, mtime_ms REAL NOT NULL,
         dev TEXT, inode TEXT, parser_version INTEGER NOT NULL, capabilities_collected INTEGER NOT NULL, changed INTEGER NOT NULL,
+        source_identity TEXT, content_hash TEXT, reconnection_checked INTEGER NOT NULL DEFAULT 0,
         parsed INTEGER NOT NULL DEFAULT 0, removed INTEGER NOT NULL DEFAULT 0, failed INTEGER NOT NULL DEFAULT 0,
         settled INTEGER NOT NULL DEFAULT 0,
         project_key TEXT, project_name TEXT, session_name TEXT, thread_id TEXT, parent_thread_id TEXT, forked_from_id TEXT, is_main INTEGER DEFAULT 1
@@ -69,6 +70,8 @@ export class SummaryStaging {
       CREATE INDEX temp.scan_session ON scan_files(provider,session_id,id);
       CREATE INDEX temp.scan_old_session ON scan_files(provider,old_session,id);
       CREATE INDEX temp.scan_thread ON scan_files(provider,thread_id);
+      CREATE INDEX temp.scan_source ON scan_files(provider,source_identity);
+      CREATE TEMP TABLE source_reconnections(old_id INTEGER PRIMARY KEY,new_id INTEGER NOT NULL);
       CREATE TEMP TABLE affected(provider TEXT NOT NULL, session_id TEXT NOT NULL, PRIMARY KEY(provider,session_id));
       CREATE TEMP TABLE links(provider TEXT NOT NULL, a TEXT NOT NULL,b TEXT NOT NULL, PRIMARY KEY(provider,a,b));
       CREATE TEMP TABLE component(provider TEXT NOT NULL,session_id TEXT NOT NULL,PRIMARY KEY(provider,session_id));
@@ -98,9 +101,11 @@ export class SummaryStaging {
 
   addFile(file: FileMetadata & { id: number }, oldSession: string | null, changed: boolean, removed = false): void {
     this.connection.prepare(`INSERT OR REPLACE INTO scan_files
-      (id,provider,source_root,path,session_id,old_session,size_bytes,mtime_ms,dev,inode,parser_version,capabilities_collected,changed,removed)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(file.id,file.provider,file.source_root,file.path,file.session_id,oldSession,
-      file.size_bytes,file.mtime_ms,file.dev,file.inode,file.parser_version,Number(this.collectCapabilities),Number(changed),Number(removed));
+      (id,provider,source_root,path,session_id,old_session,size_bytes,mtime_ms,dev,inode,parser_version,capabilities_collected,changed,removed,
+        source_identity,content_hash)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(file.id,file.provider,file.source_root,file.path,file.session_id,oldSession,
+      file.size_bytes,file.mtime_ms,file.dev,file.inode,file.parser_version,Number(this.collectCapabilities),Number(changed),Number(removed),
+      file.source_identity ?? null,file.content_hash ?? null);
     if (changed && oldSession) this.affect(file.provider,oldSession);
   }
   affect(provider: Provider, session: string): void {
@@ -147,6 +152,37 @@ export class SummaryStaging {
     this.insertFlag.run(fileId,root,flag);
   }
   fail(fileId: number): void { this.connection.prepare('UPDATE scan_files SET failed=1 WHERE id=?').run(fileId); }
+
+  acceptFingerprint(fileId: number, identity: string | null, hash: string | null): void {
+    this.connection.prepare('UPDATE scan_files SET source_identity=?,content_hash=? WHERE id=?').run(identity,hash,fileId);
+  }
+
+  /** Page accepted snapshots of the same source, excluding paths already observed in this scan. */
+  *moveCandidates(file: StagedFile, scanId: string): Generator<ManifestRow> {
+    let after = 0;
+    const query = this.connection.prepare(`SELECT m.* FROM manifest m WHERE m.provider=? AND m.source_identity=? AND m.id>?
+      AND m.id<>? AND m.session_id IS NOT NULL AND m.content_hash IS NOT NULL AND m.size_bytes>0 AND m.size_bytes<=?
+      AND (m.last_seen_scan_id IS NULL OR m.last_seen_scan_id<>?)
+      AND NOT EXISTS(SELECT 1 FROM source_reconnections r WHERE r.old_id=m.id) ORDER BY m.id LIMIT 100`);
+    while (true) {
+      const rows = query.all(file.provider,file.source_identity!,after,file.id,file.size_bytes,scanId) as unknown as ManifestRow[];
+      if (!rows.length) return;
+      for (const row of rows) { after=row.id;yield row; }
+    }
+  }
+
+  reconnectSource(previous: ManifestRow, current: StagedFile): void {
+    this.addFile(previous,previous.session_id,true,true);
+    this.connection.prepare('INSERT INTO source_reconnections VALUES (?,?)').run(previous.id,current.id);
+    if (previous.session_id !== current.session_id) {
+      this.connection.prepare('INSERT OR IGNORE INTO links VALUES (?,?,?)').run(current.provider,previous.session_id,current.session_id);
+    }
+  }
+
+  reconnectedFiles(): Iterable<{old_id:number;new_id:number}> {
+    return this.connection.prepare(`SELECT r.old_id,r.new_id FROM source_reconnections r JOIN scan_files f ON f.id=r.old_id
+      JOIN component c ON c.provider=f.provider AND c.session_id=f.old_session`).iterate() as unknown as Iterable<{old_id:number;new_id:number}>;
+  }
 
   *files(sql: string, parameters: (string | number)[] = []): Generator<StagedFile> {
     let after = 0;
@@ -458,6 +494,6 @@ export class SummaryStaging {
     this.connection.exec(`DROP TABLE IF EXISTS temp.lineage_stack; DROP TABLE IF EXISTS temp.lineage;
       DROP TABLE IF EXISTS temp.prepared_turns; DROP TABLE IF EXISTS temp.winners; DROP TABLE IF EXISTS temp.capability_winners; DROP TABLE IF EXISTS temp.component_events;
       DROP TABLE temp.flags; DROP TABLE temp.events; DROP TABLE temp.component; DROP TABLE temp.links;
-      DROP TABLE temp.affected; DROP TABLE temp.scan_files; DROP TABLE temp.session_names;`);
+      DROP TABLE temp.affected; DROP TABLE temp.scan_files; DROP TABLE temp.session_names; DROP TABLE temp.source_reconnections;`);
   }
 }

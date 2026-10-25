@@ -2,7 +2,7 @@
 import { opendir, lstat } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { setImmediate as yieldToWorker } from 'node:timers/promises';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { SummaryDatabase } from './db';
 import type { FileMetadata, ManifestRow } from './db';
 import { SummaryStaging, type StagedFile } from './staging';
@@ -10,6 +10,7 @@ import { readJsonl, SummaryError } from './jsonl';
 import { ClaudeParserAdapter, CodexCurrentParserAdapter } from './parsers';
 import { acquireRefreshLock } from './lock';
 import { applySessionNames, readSessionNames } from './names';
+import { includesSourceSnapshot, sourceIdentity } from './sourceFingerprint';
 import type { SourceRoot, SummaryOptions, SummaryProgress, RefreshResult } from './types';
 
 export const PARSER_VERSION = 14;
@@ -87,6 +88,7 @@ export async function refreshSummary(
     check();
     phase = 'parsing'; report(true);
     for (const file of staging.files('changed=1 AND removed=0')) await parseSource(file);
+    await reconnectMovedSources();
     await expandAffectedSessions();
     staging.excludeVerifiedPrefixes();
     check();
@@ -124,8 +126,10 @@ export async function refreshSummary(
           const observed = previous ? (database.markSeen(previous.id,result.scanId),previous) : database.observeFile(file,result.scanId);
           const changed = !previous || previous.source_missing === 1 || previous.path !== file.path || previous.source_root !== file.source_root || previous.processing_status !== 'done' || previous.size_bytes !== file.size_bytes
             || previous.mtime_ms !== file.mtime_ms || previous.dev !== file.dev || previous.inode !== file.inode
-            || previous.parser_version !== PARSER_VERSION || collectCapabilities && previous.capabilities_collected !== 1;
-          staging.addFile({...file,id:observed.id,session_id:previous?.session_id ?? null},previous?.session_id ?? null,changed);
+            || previous.parser_version !== PARSER_VERSION || collectCapabilities && previous.capabilities_collected !== 1
+            || previous.session_id !== null && previous.size_bytes > 0 && (!previous.source_identity || !previous.content_hash);
+          staging.addFile({...file,id:observed.id,session_id:previous?.session_id ?? null,
+            source_identity:previous?.source_identity,content_hash:previous?.content_hash},previous?.session_id ?? null,changed);
           if (!changed) result.reused++;
         }
       });
@@ -178,6 +182,7 @@ export async function refreshSummary(
   async function parseSource(file: StagedFile): Promise<void> {
     check();
     database.setManifestDiagnostic(file.id,'processing','parse: byte=0',null);
+    staging.acceptFingerprint(file.id,null,null);
     const sink = { identity: staging.identity.bind(staging,file.id),event: staging.event.bind(staging,file.id) };
     const context = {provider:file.provider,path:file.path,sourceRoot:file.source_root,fileId:file.id,collectCapabilities};
     const parser = file.provider === 'claude' ? new ClaudeParserAdapter(context,sink) : new CodexCurrentParserAdapter(context,sink);
@@ -186,8 +191,10 @@ export async function refreshSummary(
       if (!snapshot.isFile() || snapshot.isSymbolicLink() || String(snapshot.dev) !== file.dev || String(snapshot.ino) !== file.inode || snapshot.size < file.size_bytes) {
         throw new SummaryError('file-replaced-during-read');
       }
+      const digest = createHash('sha256');
       const read = await readJsonl(file.path,file.size_bytes,(row,offset) => parser.row(row,offset),
         {signal,isCancelled,maxLineBytes:options.maxLineBytes,onBytes:bytes => { result.bodyBytes += bytes; report(); },
+          onChunk:chunk => { digest.update(chunk); },
           processBatch:parseRows => staging.batchEvents(parseRows)});
       const after = await lstat(file.path);
       if (String(after.dev) !== file.dev || String(after.ino) !== file.inode || after.size < file.size_bytes
@@ -198,6 +205,7 @@ export async function refreshSummary(
         return;
       }
       parser.finish();
+      staging.acceptFingerprint(file.id,sourceIdentity(parser.getIdentity()!),digest.digest('hex'));
       if (read.partialLine) staging.flag(file.id,'*','partial-line');
       result.parsed++;
     } catch (error) {
@@ -220,6 +228,29 @@ export async function refreshSummary(
     if (file.old_session !== null) return;
     database.replaceSessions({sessions:[],summaries:[],files:[{...file,session_id:null}]});
     database.connection.prepare('UPDATE scan_files SET settled=1 WHERE id=?').run(file.id);
+  }
+
+  /** Reconnect only fully parsed sources whose accepted bytes survive at a missing path's replacement. */
+  async function reconnectMovedSources(): Promise<void> {
+    for (const file of staging.files('parsed=1 AND failed=0 AND removed=0 AND reconnection_checked=0 AND content_hash IS NOT NULL')) {
+      check();
+      database.connection.prepare('UPDATE scan_files SET reconnection_checked=1 WHERE id=?').run(file.id);
+      const candidates = database.connection.prepare(`SELECT count(*) AS count FROM scan_files
+        WHERE provider=? AND source_identity=? AND removed=0 AND failed=0`).get(file.provider,file.source_identity!);
+      if (candidates?.count !== 1) continue;
+      try {
+        for (const previous of staging.moveCandidates(file,result.scanId)) {
+          check();
+          try { await lstat(previous.path);continue; }
+          catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') continue; }
+          const verified = await includesSourceSnapshot(file,previous,{check,onBytes:bytes => { result.bodyBytes+=bytes;report(); }});
+          if (verified) staging.reconnectSource(previous,file);
+        }
+      } catch (error) {
+        failFile(file,error);
+        if (isCancelled()) throw error;
+      }
+    }
   }
 
   async function expandAffectedSessions(): Promise<void> {
@@ -250,7 +281,10 @@ export async function refreshSummary(
           if (referenced) { result.reused=Math.max(0,result.reused-1);await parseSource(candidate);locatedParent=true; }
         } catch { check(); }
       }
-      if (locatedParent) staging.resolveLineage();
+      if (locatedParent) {
+        await reconnectMovedSources();
+        staging.resolveLineage();
+      }
       // A source root excluded from this scan is not a deletion. Preserve its contribution
       // by including known sources when a shared logical session needs rebuilding.
       const excluded = database.connection.prepare(`SELECT m.* FROM manifest m JOIN affected a
@@ -274,6 +308,7 @@ export async function refreshSummary(
       if (!next.done) {
         result.reused = Math.max(0,result.reused - 1);
         await parseSource(next.value);
+        await reconnectMovedSources();
         continue;
       }
       if (!excluded.length) break;
@@ -319,6 +354,7 @@ export async function refreshSummary(
       database.replaceSessions({sessions:staging.componentSessions(),summaries:staging.summaries(),
         preserveCapabilities:!collectCapabilities,
         retainDeletedSourceUsage,
+        reconnectedFiles:staging.reconnectedFiles(),
         files:staging.files(`removed=0 AND ${componentPredicate}`),
         removedFileIds:(function* () { for (const file of staging.files(`removed=1 AND ${componentPredicate}`)) yield file.id; })()});
     } catch {

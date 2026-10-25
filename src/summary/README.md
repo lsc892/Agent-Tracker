@@ -12,6 +12,7 @@ Claude·Codex 대화 로그를 수집·집계하고 Worker를 통해 통계 API�
 - [pricing.ts](pricing.ts) — 모델별 표준 단가로 API 추정 비용을 계산한다.
 - [refresh.ts](refresh.ts) — `RefreshController`: 갱신·취소·삭제 요청의 중복과 실행 순서를 관리한다.
 - [scanner.ts](scanner.ts) — 변경된 로그와 연결 세션을 다시 파싱해 통계를 교체한다.
+- [sourceFingerprint.ts](sourceFingerprint.ts) — 원본 식별자·내용 해시로 이동한 로그의 이전 snapshot 포함 여부를 검증한다.
 - [staging.ts](staging.ts) — `SummaryStaging`: 임시 테이블에서 세션 계보·중복 제거·요청 집계 후보를 관리한다.
 - [transport.ts](transport.ts) — `WorkerTransport`: Worker 수명과 요청·응답·진행 알림을 관리한다.
 - [types.ts](types.ts) — 통계 API와 제공자 공통 파싱 이벤트 타입을 정의한다.
