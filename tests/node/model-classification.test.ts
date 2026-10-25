@@ -1,3 +1,4 @@
+// Claude 오류 알림과 Codex 빈 스냅샷의 모델 사용량 분류를 검증한다.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';

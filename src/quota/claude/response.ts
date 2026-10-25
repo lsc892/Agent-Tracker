@@ -1,3 +1,4 @@
+// Claude 사용량 응답을 검증하고 공통 quota 스냅샷으로 변환한다.
 import { asRecord, QuotaError, type QuotaSnapshot, type QuotaWindow } from '../types';
 
 /**

@@ -1,3 +1,4 @@
+// 요약 DB의 스키마·마이그레이션·교체·조회·진단 일관성을 검증한다.
 import assert from 'node:assert/strict';
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -272,6 +273,7 @@ test('migration rechecks the version after another window finishes the transitio
   legacy.prepare(`INSERT INTO turn_summary (${keys.join(',')}) VALUES (${keys.map(()=>'?').join(',')})`).run(...Object.values(row));
   legacy.close();
   let raceInjected = false;
+  /** 마이그레이션 잠금 직전 다른 연결의 완료를 끼워 넣어 경쟁 상황을 재현한다. */
   class WaitingSession extends SqliteSession {
     override transaction<T>(action: ()=>T): T {
       // Simulate the other opener committing after our initial version read, before our lock is acquired.

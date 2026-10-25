@@ -1,3 +1,4 @@
+// 고정 메모리와 응답 지연을 가진 quota 벤치마크용 RPC 서버를 모사한다.
 'use strict';
 const { createInterface } = require('node:readline');
 const { writeFileSync } = require('node:fs');

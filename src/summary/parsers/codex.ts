@@ -1,3 +1,4 @@
+// 현재·이전 Codex 로그의 식별 정보·요청·사용량·도구 호출을 공통 이벤트로 변환한다.
 import { SummaryError } from '../jsonl';
 import type { FileContext, ParsedIdentity, ParseSink, TokenVector } from '../types';
 import { billingMode, codexTokens, displayName, number, object, project, requestTitle, string, timestamp, tokenFlags } from './common';
@@ -20,10 +21,7 @@ interface CodexRecordContext {
   rowTimestamp: unknown;
 }
 
-/**
- * 책임: 신·구 Codex 로그를 요청별 공통 이벤트로 변환한다.
- * 알고리즘: session metadata와 turn 문맥을 유지하며 행 종류별 처리기로 분배하고 응답별 사용량·legacy 누계·수명주기를 구분한다.
- */
+/** Codex 세션·턴 문맥을 유지하며 현재 사용량과 이전 누계·수명주기를 해석한다. */
 export class CodexCurrentParserAdapter {
   private identityValue: ParsedIdentity | undefined;
   private root: string | undefined;
@@ -251,4 +249,5 @@ export class CodexCurrentParserAdapter {
   }
 }
 
+/** 공통 Codex 파서를 이전 로그 형식용 클래스 이름으로 제공한다. */
 export class CodexLegacyParserAdapter extends CodexCurrentParserAdapter {}

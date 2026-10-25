@@ -1,3 +1,4 @@
+// 통계·진단 Webview의 요청과 통계 서비스의 조회·갱신을 연결한다.
 import { localizationBundle, t } from '../localization';
 import { randomBytes } from 'node:crypto';
 import * as vscode from 'vscode';
@@ -14,10 +15,7 @@ export interface DashboardDependencies {
   settings(): TrackerConfiguration;
 }
 
-/**
- * 책임: 통계·진단 Webview의 수명과 호스트 조회 상태를 관리한다.
- * 알고리즘: 검증한 메시지를 통계 API로 전달하고 갱신 Promise·조회 버전으로 중복 실행과 이전 응답의 화면 덮어쓰기를 막는다.
- */
+/** 통계·진단 패널의 수명과 조회·갱신 상태를 관리한다. */
 export class Dashboard implements vscode.Disposable {
   private panel: vscode.WebviewPanel | undefined;
   private diagnosticsPanel: vscode.WebviewPanel | undefined;

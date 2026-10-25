@@ -1,3 +1,4 @@
+// 공통 TypeScript 설정 정의로 VS Code manifest의 설정 항목을 생성한다.
 'use strict';
 const fs = require('node:fs');
 const path = require('node:path');

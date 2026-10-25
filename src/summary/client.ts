@@ -1,13 +1,11 @@
+// 확장 호스트에서 통계 Worker를 사용하는 공개 API를 제공한다.
 import { WorkerTransport } from './transport';
 import { RefreshController, type RefreshOptions } from './refresh';
 import type { SummaryOptions, SummaryProgress, RefreshResult, UsageQuery, UsageResult, DiagnosticsResult, SourceRoot, NameQuery, NameResult } from './types';
 import type { BillingMode, Provider } from './db/types';
 export * from './types';
 
-/**
- * 책임: 확장 호스트에 통계 API와 설정 적용 순서를 제공한다.
- * 알고리즘: 통신은 WorkerTransport, 갱신·삭제는 RefreshController에 위임하고 조회·설정 변경은 진행 중 삭제가 끝난 뒤 전달한다.
- */
+/** 통계 조회·갱신·설정 API를 제공하고 작업 순서를 조율한다. */
 export class SummaryClient {
   private readonly options: SummaryOptions;
   private readonly transport: WorkerTransport;

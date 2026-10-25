@@ -1,3 +1,4 @@
+// 요청 제목 집계 SQL 대안의 정확성·시간·저장 공간을 비교한다.
 const assert = require('node:assert/strict');
 const { fork } = require('node:child_process');
 const { createHash } = require('node:crypto');

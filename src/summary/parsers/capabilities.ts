@@ -1,3 +1,4 @@
+// 도구 호출과 정적인 중첩 호출에서 스킬·서브에이전트·플러그인 사용을 추출한다.
 import type { CapabilityEvent } from '../types';
 import { displayName, object, string } from './common';
 

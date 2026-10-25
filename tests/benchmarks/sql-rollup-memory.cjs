@@ -1,3 +1,4 @@
+// 분리된 자식 프로세스에서 원본·롤업 쿼리의 RSS와 결과 일치를 비교한다.
 // Fresh-process query memory observations, separate from full-result correctness runs.
 const assert = require('node:assert/strict');
 const { fork } = require('node:child_process');

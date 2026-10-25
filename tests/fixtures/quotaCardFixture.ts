@@ -1,3 +1,4 @@
+// 실제 VS Code 팝업 검증에 사용할 합성 quota 상태와 상태바를 준비한다.
 import * as vscode from 'vscode';
 import { writeFile } from 'node:fs/promises';
 import type { QuotaState } from '../../src/quota/types';

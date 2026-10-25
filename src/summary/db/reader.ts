@@ -1,3 +1,4 @@
+// 필터와 페이지 조건에 맞는 통계·이름·도구 사용량·진단을 조회한다.
 import type { NameQuery, NameResult } from '../types';
 import type {
   CapabilityCategory, CapabilityPage, CapabilityRow, ChartMetric, DiagnosticsPage,
@@ -12,10 +13,7 @@ import { nonnegative, pageLimit } from './validation';
 import { buildRollupUsageQueries } from './rollup-queries';
 import type { QuerySql, UsageBasis } from './queries';
 
-/**
- * 책임: 공유 연결에서 필터·페이지가 적용된 통계와 진단을 조회한다.
- * 알고리즘: 검증된 SQL builder에 바인딩을 전달하고 일별 사전 집계를 사용할 수 있으면 같은 snapshot에서 읽으며 그 외에는 raw SQL을 사용한다.
- */
+/** 조회 조건을 검증하고 원본·사전 집계 SQL로 통계 페이지를 읽는다. */
 export class SummaryReader {
   constructor(private readonly database: SqliteSession) {}
 

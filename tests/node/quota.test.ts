@@ -1,3 +1,4 @@
+// quota 제공자의 파싱·통신·취소와 서비스의 갱신·만료·재시도를 검증한다.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
@@ -13,6 +14,7 @@ const signal = () => new AbortController().signal;
 const snapshot = (now: number, used = 25): QuotaSnapshot => ({ provider: 'claude', fetchedAt: now,
   windows: [{ id: '5h', label: '5h', usedPercent: used, current: used, maximum: 100, resetsAt: now - 1, windowDurationMins: 300 }] });
 
+/** 가상 시각과 타이머를 제어해 quota 갱신·만료·재시도를 검증한다. */
 class FakeClock implements QuotaClock {
   time = 1_000_000;
   serial = 0;
@@ -48,6 +50,7 @@ test('the quota base cancels every active read and waits for cleanup before disp
   const cleanup = deferred<void>();
   let started = 0;
   let cancelled = 0;
+  /** 취소와 정리 완료를 지연시켜 quota 제공자의 종료 대기를 검증한다. */
   class Provider extends BaseQuotaProvider {
     readonly id = 'claude' as const;
     protected readonly closedMessage = { key: 'quota.claudeCancelled' } as const;
@@ -82,6 +85,7 @@ test('the quota base cancels every active read and waits for cleanup before disp
 });
 
 test('the quota base releases failed reads even when provider code throws synchronously', async () => {
+  /** 동기 조회 예외를 발생시켜 quota 제공자의 활성 작업 정리를 검증한다. */
   class Provider extends BaseQuotaProvider {
     readonly id = 'claude' as const;
     protected readonly closedMessage = { key: 'quota.claudeCancelled' } as const;

@@ -1,3 +1,4 @@
+// 현재 VSIX와 설치 CLI를 검증된 파일 목록의 공개 npm 패키지로 구성한다.
 'use strict';
 const { execFileSync } = require('node:child_process');
 const { createHash } = require('node:crypto');

@@ -1,3 +1,4 @@
+// 원본 로그의 변경을 발견하고 영향받은 세션 통계를 다시 집계해 저장한다.
 import { opendir, lstat } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { setImmediate as yieldToWorker } from 'node:timers/promises';

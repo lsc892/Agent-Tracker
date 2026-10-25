@@ -1,3 +1,4 @@
+// Claude OAuth 사용량 API 조회와 인증 재시도·HTTP 오류 분류를 담당한다.
 import { extensionVersion } from '../version';
 import { BaseQuotaProvider } from './base';
 import { readBoundedJson } from './claude/httpBody';
@@ -16,6 +17,7 @@ export interface ClaudeQuotaProviderOptions {
   now?: () => number;
 }
 
+/** Claude 인증 정보를 사용해 구독 quota를 조회하고 취소·시간 제한·인증 재시도를 관리한다. */
 export class ClaudeQuotaProvider extends BaseQuotaProvider {
   readonly id = 'claude' as const;
   protected readonly closedMessage = { key: 'quota.claudeCancelled' } as const;

@@ -1,3 +1,4 @@
+// 통계 DB의 파일 관리·세션 저장·결제·조회 기능을 공통 API로 묶는다.
 import type { DatabaseSync } from 'node:sqlite';
 import type { NameQuery, NameResult } from '../types';
 import type {
@@ -15,10 +16,7 @@ export * from './types';
 export { usageChartFromPage } from './chart';
 export { periodBounds } from './timezone';
 
-/**
- * 책임: Worker와 스캐너가 사용하는 통계 DB의 공통 진입점을 제공한다.
- * 알고리즘: 하나의 연결·트랜잭션 소유자를 생성하고 manifest·세션 저장·비용·조회 책임에 같은 연결을 주입해 위임한다.
- */
+/** 하나의 DB 연결을 공유하는 저장소들을 구성하고 통계 작업을 위임한다. */
 export class SummaryDatabase {
   readonly connection: DatabaseSync;
   private readonly sqlite: SqliteSession;

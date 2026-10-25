@@ -1,3 +1,4 @@
+// 제목 인덱스 트랜잭션 벤치마크의 실제 갱신·전후 대조·보고를 검증한다.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';

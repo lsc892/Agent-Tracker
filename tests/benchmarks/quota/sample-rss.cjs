@@ -1,3 +1,4 @@
+// Linux·POSIX 대상 프로세스의 RSS를 주기적으로 읽어 표준 출력으로 전달한다.
 'use strict';
 const { readFile } = require('node:fs/promises');
 const { execFile } = require('node:child_process');

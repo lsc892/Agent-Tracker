@@ -1,3 +1,4 @@
+// 웹뷰 메시지의 허용 범위와 자산·보안 정책·요청 상태 표를 검증한다.
 import { createTranslator } from '../../src/localization';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -87,6 +88,7 @@ test('webview uses external local assets, a nonce CSP, and text-only dynamic lab
 });
 
 test('request table renders API failures separately from completed and running requests', () => {
+  /** 요청 상태 표 검증에 필요한 DOM 요소와 자식 조작을 모사한다. */
   class Element {
     textContent = '';value = '';children: Element[] = [];
     append(...children: Element[]): void {this.children.push(...children);}

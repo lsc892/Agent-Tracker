@@ -1,3 +1,4 @@
+// 플랫폼별 Claude 인증 파일·Keychain 선택과 실패·취소 처리를 검증한다.
 import assert from 'node:assert/strict';
 import childProcess from 'node:child_process';
 import fs from 'node:fs/promises';

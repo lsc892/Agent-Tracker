@@ -1,3 +1,4 @@
+// 통계 DB의 저장 입력·조회 필터·페이지·집계·진단 타입을 정의한다.
 export type Provider = 'claude' | 'codex';
 export type ProcessingStatus = 'processing' | 'done' | 'error' | 'interrupted';
 export type DurationQuality = 'exact' | 'derived' | 'approximate' | 'missing';

@@ -1,3 +1,4 @@
+// VS Code 상태바의 quota 카드 토글 패치를 검사·적용·복원한다.
 const { existsSync, readFileSync, writeFileSync, renameSync, unlinkSync, statSync, realpathSync } = require('node:fs');
 const { dirname, join, resolve } = require('node:path');
 const { createHash } = require('node:crypto');

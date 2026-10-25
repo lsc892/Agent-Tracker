@@ -1,3 +1,4 @@
+// 색상 설정 메시지와 HEX 값을 검증하고 상태바 전경색을 결정한다.
 import { settingDefinitions, type StatusColorMode } from '../configuration/schema';
 export type { StatusColorMode } from '../configuration/schema';
 export type ColorTarget = 'user' | 'workspace';

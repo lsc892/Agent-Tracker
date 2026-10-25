@@ -1,3 +1,4 @@
+// 언어 선택·번역 대체·치환과 웹뷰·quota 표시의 다국어 동작을 검증한다.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

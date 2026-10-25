@@ -1,3 +1,4 @@
+// 운영체제에 맞는 Claude 인증 소스를 생성하고 인증 구현을 공개한다.
 import { type ClaudeCredentialSource } from './common';
 import { MacClaudeCredentials } from './mac';
 import { WindowsClaudeCredentials } from './windows';

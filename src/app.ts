@@ -1,3 +1,4 @@
+// 확장 서비스와 화면을 구성하고 명령·설정 변경·종료를 연결한다.
 import * as vscode from 'vscode';
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -20,10 +21,7 @@ interface ConfigurationChanges {
   pollingInterval: boolean;
 }
 
-/**
- * 책임: 서비스·명령·설정 변경과 확장 종료 순서를 소유한다.
- * 알고리즘: 설정 변경을 Promise 큐로 직렬화하고 변경 영역만 적용하며, 종료 시 진행 중 작업과 서비스 정리를 함께 기다린다.
- */
+/** 서비스·명령·설정 변경을 조율하고 확장의 시작과 종료를 관리한다. */
 export class AgentTrackerApp {
   private settings: TrackerConfiguration;
   private quota: QuotaService | undefined;

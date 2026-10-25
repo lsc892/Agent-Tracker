@@ -1,3 +1,4 @@
+// 제공자 파서가 공유하는 값·경로·제목·토큰·결제 분류 정규화를 제공한다.
 import { basename, normalize, win32 } from 'node:path';
 import type { TokenVector } from '../types';
 import { SummaryError } from '../jsonl';

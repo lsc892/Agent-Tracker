@@ -1,3 +1,4 @@
+// Codex 한도 응답과 초기화 크레딧을 검증해 공통 quota 스냅샷으로 변환한다.
 import { asRecord, durationLabel, QuotaError, type QuotaSnapshot, type QuotaWindow } from '../types';
 import { protocolError } from './errors';
 

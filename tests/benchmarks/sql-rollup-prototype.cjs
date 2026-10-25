@@ -1,3 +1,4 @@
+// 벤치마크용 세션·일별 롤업 테이블과 집계 쿼리를 구성한다.
 // Benchmark-only materialized aggregate candidate. Nothing in src imports this file.
 const assert = require('node:assert/strict');
 const { buildUsageQuery, buildUsageCountQuery, buildQueryFilter } = require('../../dist/src/summary/db/queries');

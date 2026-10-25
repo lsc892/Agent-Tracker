@@ -1,3 +1,4 @@
+// 일별 사전 집계의 병합 지표·테이블·형식 버전을 정의한다.
 /** Mergeable states shared by persistent daily tables and exact raw boundary queries. */
 export interface RollupState {
   name: string;

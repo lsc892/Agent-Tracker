@@ -1,3 +1,4 @@
+// 확장 호스트와 통계 Worker 사이의 요청·응답 및 진행 알림을 전달한다.
 import { Worker } from 'node:worker_threads';
 import { join } from 'node:path';
 import { t, type TranslationKey } from '../localization';
@@ -16,10 +17,7 @@ interface WorkerMessage {
   progress?: SummaryProgress;
 }
 
-/**
- * 책임: Worker 생성·RPC 응답 분배·종료를 소유한다.
- * 알고리즘: 첫 요청에만 Worker를 만들고 요청 ID별 Promise를 연결하며, 오류·종료 시 대기 요청을 모두 거절한다.
- */
+/** Worker의 수명과 요청별 응답·진행 알림 분배를 관리한다. */
 export class WorkerTransport {
   private worker: Worker | undefined;
   private sequence = 0;

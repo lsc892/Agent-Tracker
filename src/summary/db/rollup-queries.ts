@@ -1,3 +1,4 @@
+// 일별 사전 집계와 원본 경계 구간을 결합하는 통계 조회 SQL을 생성한다.
 import type { SQLInputValue } from 'node:sqlite';
 import type { ChartMetric, SummaryFilter, UsageGrouping, UsageSort } from './types';
 import { usageTableOrder } from './sorting';

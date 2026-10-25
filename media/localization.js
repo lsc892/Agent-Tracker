@@ -1,3 +1,4 @@
+// Webview의 번역 엔진을 초기화하고 열린 화면의 언어를 갱신한다.
 (() => {
   'use strict';
   const engine = globalThis.i18next.createInstance();

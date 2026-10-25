@@ -1,3 +1,4 @@
+// 통계 표의 표시 기준과 안정적인 페이지 순서에 맞는 SQL 정렬식을 만든다.
 import { USAGE_SORT_KEYS, type UsageGrouping, type UsageSort } from './types';
 
 function scopeColumn(grouping: UsageGrouping | 'turn'): string {

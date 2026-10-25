@@ -1,3 +1,4 @@
+// Windows의 경로·npm shim에서 셸 없이 실행할 Codex 실행 파일을 찾는다.
 import { access, realpath } from 'node:fs/promises';
 import { basename, dirname, isAbsolute, join, delimiter } from 'node:path';
 import { QuotaError } from '../types';

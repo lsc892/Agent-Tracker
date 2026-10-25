@@ -1,3 +1,4 @@
+// 원본 집계와 세션·일별 롤업 시제품의 정확성·읽기·쓰기·공간을 비교한다.
 const assert = require('node:assert/strict');
 const { createHash } = require('node:crypto');
 const { readFileSync, statSync } = require('node:fs');

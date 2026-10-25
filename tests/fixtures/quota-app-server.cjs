@@ -1,3 +1,4 @@
+// quota 테스트용 Codex RPC 응답과 실패·종료 시나리오를 모사한다.
 'use strict';
 const fs = require('node:fs');
 const readline = require('node:readline');

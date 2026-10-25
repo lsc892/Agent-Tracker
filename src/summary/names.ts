@@ -1,3 +1,4 @@
+// Codex의 별도 제목 메타데이터를 수집해 저장된 세션 이름에 반영한다.
 import { lstat, readdir } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';

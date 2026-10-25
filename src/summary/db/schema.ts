@@ -1,3 +1,4 @@
+// 통계 DB의 테이블·인덱스·버전과 기존 스키마 변환 SQL을 정의한다.
 import { SCHEMA_ROLLUP_SQL } from './rollup-state';
 
 export { SCHEMA_ROLLUP_SQL } from './rollup-state';

@@ -1,3 +1,4 @@
+// quota 벤치마크의 실계정 동의·자원 보고·합성 종료 시나리오를 검증한다.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { execFile } from 'node:child_process';

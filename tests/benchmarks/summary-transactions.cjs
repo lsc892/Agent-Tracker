@@ -1,3 +1,4 @@
+// 동일 로그 스냅샷으로 제목 인덱스 전후의 전체 요약 갱신 비용을 비교한다.
 const assert = require('node:assert/strict');
 const { fork } = require('node:child_process');
 const { createHash } = require('node:crypto');

@@ -1,3 +1,4 @@
+// 기준·후보 JSONL 리더의 결과 일치와 읽기·전체 갱신 성능을 비교한다.
 const assert = require('node:assert/strict');
 const { fork, execFileSync } = require('node:child_process');
 const { createHash } = require('node:crypto');

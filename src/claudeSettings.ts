@@ -1,3 +1,4 @@
+// 기존 설정과 권한을 보존하며 Claude 로그 보존 기간 설정을 원자적으로 갱신한다.
 import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, rename, stat, writeFile, unlink } from 'node:fs/promises';
 import { dirname, join } from 'node:path';

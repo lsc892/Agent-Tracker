@@ -1,3 +1,4 @@
+// 원본 요청을 기준으로 통계·이름·도구 사용량·진단 조회 SQL을 생성한다.
 import type { SQLInputValue } from 'node:sqlite';
 import { usageTableOrder } from './sorting';
 import type { NameQuery } from '../types';

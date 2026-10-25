@@ -1,3 +1,4 @@
+// 사용량 쿼리의 실행 계획과 인덱스 대안별 조회 성능·공간을 비교한다.
 const assert = require('node:assert/strict');
 const { createHash } = require('node:crypto');
 const { existsSync, readFileSync, statSync } = require('node:fs');

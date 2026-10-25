@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// 동봉 VSIX의 무결성을 확인해 VS Code에 설치하고 설치 버전을 검증한다.
 'use strict';
 const { spawnSync } = require('node:child_process');
 const { createHash } = require('node:crypto');

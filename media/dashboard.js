@@ -1,3 +1,4 @@
+// 사용량 통계의 필터·표·차트를 렌더링하고 사용자 요청을 확장에 전달한다.
 (() => {
   'use strict';
   const t = (key, values) => globalThis.agentTrackerI18n.t(key, values);

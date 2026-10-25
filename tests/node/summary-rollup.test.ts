@@ -1,3 +1,4 @@
+// 공개 DB API의 롤업 조회·갱신·시간대·마이그레이션 일관성을 검증한다.
 import { queryChart } from '../fixtures/usage-chart';
 import assert from 'node:assert/strict';
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';

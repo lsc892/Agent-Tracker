@@ -1,3 +1,4 @@
+// 상태바 색상 입력과 미리 보기를 갱신하고 설정 저장을 요청한다.
 (() => {
   'use strict';
   const t = (key, values) => globalThis.agentTrackerI18n.t(key, values);

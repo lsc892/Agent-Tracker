@@ -1,3 +1,4 @@
+// 화면의 문자열을 안전하게 변환하고 Webview 요청의 종류와 조회 범위를 검증한다.
 import type { QuotaProviderId } from '../quota/types';
 import type { UsageQuery, NameQuery } from '../summary/types';
 import { USAGE_SORT_KEYS, type BillingMode, type UsageSort } from '../summary/db/types';

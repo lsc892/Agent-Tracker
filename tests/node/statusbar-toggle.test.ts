@@ -1,3 +1,4 @@
+// VS Code 상태바 패치의 토글·카드·체크섬·백업·복원을 검증한다.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, realpathSync, rmSync } from 'node:fs';
@@ -24,6 +25,7 @@ function rendererContext(): Record<string, any> {
     createElement: () => ({}),
     head: { appendChild: (style: { id?: string; textContent?: string }) => styles.push(style) },
   };
+  /** 상태바 패치 검증용 이벤트 컨테이너에 가짜 문서를 연결한다. */
   class Container extends EventTarget { readonly ownerDocument = document; }
   return { EventTarget: Container, styles };
 }

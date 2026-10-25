@@ -1,3 +1,4 @@
+// 상태바 색상 해석과 색상 설정 화면의 입력·저장 동작을 검증한다.
 import { createTranslator } from '../../src/localization';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -31,6 +32,7 @@ test('color picker messages only accept supported modes, HEX colors and setting 
   assert.match(html,/type="color"/);assert.match(html,/default-src 'none'/);assert.doesNotMatch(html,/unsafe-inline|onclick=/);
 });
 
+/** 색상 설정 검증에 필요한 DOM 입력 상태와 이벤트를 모사한다. */
 class Element {
   value='';textContent='';disabled=false;
   options=[{value:'user',disabled:false},{value:'workspace',disabled:false}];

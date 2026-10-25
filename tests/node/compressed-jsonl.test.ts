@@ -1,3 +1,4 @@
+// Zstd JSONL의 프레임·UTF-8·오프셋·예산·오류·취소 처리를 검증한다.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, readFile, readdir, rm } from 'node:fs/promises';

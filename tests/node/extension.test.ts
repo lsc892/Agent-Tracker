@@ -1,3 +1,4 @@
+// VS Code와 서비스를 모사해 확장 명령·설정·화면·종료 연결을 검증한다.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -76,6 +77,7 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
   const uri = (fsPath: string): { fsPath: string; toString(): string } => ({ fsPath, toString: () => fsPath });
   const disposable: Disposable = { dispose() {} };
   const activeColorTheme = { kind: 2 };
+  /** 확장 검증에 필요한 Markdown 누적과 일반 텍스트 이스케이프를 모사한다. */
   class MarkdownString {
     value = '';
     appendMarkdown(value: string) { this.value += value; return this; }
@@ -130,6 +132,7 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
       },
     },
   };
+  /** quota 상태와 설정·갱신·종료 호출을 기록해 확장 연결을 검증한다. */
   class FakeQuota {
     constructor(private readonly providers: { id: string }[], options: {refreshPolicy: string; pollingSeconds: number}) {
       policies.push(options.refreshPolicy); pollingIntervals.push(options.pollingSeconds);
@@ -156,6 +159,7 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     getStates() { return this.providers.map(provider => this.getState(provider.id)); }
     async refresh(provider: string, force: boolean) { refreshes.push({ provider, force }); }
   }
+  /** 요약 조회·갱신·설정·취소·종료 호출을 기록해 확장 연결을 검증한다. */
   class FakeSummary {
     async setDeletedSourceRetentionEnabled(enabled:boolean) {retentionSwitches.push(enabled);await this.cancelRefresh();}
     async setCapabilityCollectionEnabled(enabled:boolean) {collectionSwitches.push(enabled);await this.cancelRefresh();}
@@ -175,7 +179,11 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
   }
   Module._load = function(request, parent, isMain) {
     if (request === 'vscode') return vscode;
-    if (request === './quota') return { QuotaService: FakeQuota, ClaudeQuotaProvider: class { id = 'claude'; }, CodexQuotaProvider: class { id = 'codex'; } };
+    if (request === './quota') return { QuotaService: FakeQuota, ClaudeQuotaProvider:
+      /** Claude quota 제공자 식별자를 제공해 확장 서비스 구성을 모사한다. */
+      class { id = 'claude'; }, CodexQuotaProvider:
+      /** Codex quota 제공자 식별자를 제공해 확장 서비스 구성을 모사한다. */
+      class { id = 'codex'; } };
     if (request === './summary/client') return { SummaryClient: FakeSummary };
     return original.call(this, request, parent, isMain);
   };

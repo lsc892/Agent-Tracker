@@ -1,4 +1,5 @@
-﻿import { mkdir } from 'node:fs/promises';
+﻿// 여러 VS Code 창의 통계 쓰기 작업을 직렬화하는 SQLite 잠금을 제공한다.
+import { mkdir } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { SummaryError } from './jsonl';

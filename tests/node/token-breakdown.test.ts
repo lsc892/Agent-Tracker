@@ -1,3 +1,4 @@
+// 입출력·캐시 토큰의 파싱·중복 제거·집계·마이그레이션·표시를 검증한다.
 import { createTranslator } from '../../src/localization';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, appendFile, rm, realpath } from 'node:fs/promises';
@@ -158,6 +159,7 @@ test('invalid cache components are clamped per response while preserving totals 
 });
 
 test('all dashboard groups render four named token columns with unknown and zero values distinguished', () => {
+  /** 토큰 구성 열 검증에 필요한 DOM 요소와 자식 조작을 모사한다. */
   class Element {
     textContent = ''; value = ''; title = ''; children: Element[] = [];
     append(...children: Element[]): void { this.children.push(...children); }

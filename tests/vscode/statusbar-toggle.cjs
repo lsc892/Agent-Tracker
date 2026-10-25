@@ -1,3 +1,4 @@
+// 실제 VS Code를 CDP로 조작해 quota 팝업·색상·다국어 상태바를 검증한다.
 const assert = require('node:assert/strict');
 const { mkdir, mkdtemp, writeFile } = require('node:fs/promises');
 const { existsSync, readFileSync } = require('node:fs');
@@ -14,6 +15,7 @@ async function until(probe, description, timeout = 15000) {
   throw new Error(`Timeout: ${description}`);
 }
 
+/** CDP 연결과 요청·평가·클릭을 감싸 실제 VS Code UI 검증을 지원한다. */
 class Cdp {
   constructor(socket) {
     this.socket = socket; this.nextId = 0; this.pending = new Map();

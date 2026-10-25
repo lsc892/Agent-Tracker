@@ -1,12 +1,10 @@
+// 세션 결제 분류와 요청별 비용을 저장하고 사용자 선택에 따라 재계산한다.
 import type { SQLInputValue } from 'node:sqlite';
 import type { SqliteSession } from './connection';
 import type { BillingMode, Provider } from './types';
 import { PRICING_VERSION } from '../pricing';
 
-/**
- * 책임: 요청의 모델별 추정 비용을 세션 결제 분류에 연결한다.
- * 알고리즘: 구독은 0, API는 알려진 추정 비용 합계, 미확인은 미상 비용 개수로 보존하고 사용자 선택 시 요청 ID를 나눠 재분류한다.
- */
+/** 세션의 결제 분류를 관리하고 모델별 추정 비용을 요청 비용으로 저장한다. */
 export class SessionBillingStore {
   constructor(private readonly database: SqliteSession) {}
 

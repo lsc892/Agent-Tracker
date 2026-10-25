@@ -1,3 +1,4 @@
+// 로그 탐색부터 파싱·세션 연결·요약 저장까지의 통합 동작을 검증한다.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, readFile, appendFile, unlink, rm } from 'node:fs/promises';

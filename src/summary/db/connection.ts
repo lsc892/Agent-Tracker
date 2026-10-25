@@ -1,3 +1,4 @@
+// 통계 SQLite 연결의 설정·마이그레이션·트랜잭션·수명을 관리한다.
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { DatabaseSync, type StatementSync } from 'node:sqlite';
@@ -8,10 +9,7 @@ import { modelOrderKey, modelRelease } from '../modelOrder';
 
 export type SqliteSessionOptions = string | { databasePath: string; cacheKiB?: number };
 
-/**
- * 책임: 통계용 SQLite 연결과 제한된 statement cache의 수명을 소유한다.
- * 알고리즘: WAL·외래 키·파일 TEMP·캐시 상한을 설정하고 마이그레이션과 날짜·모델 함수를 등록해 모든 저장소에 공유한다.
- */
+/** 공유 SQLite 연결·고정 쿼리 캐시·트랜잭션과 유지보수를 관리한다. */
 export class SqliteSession {
   readonly connection: DatabaseSync;
   readonly rollups: UsageRollupStore;

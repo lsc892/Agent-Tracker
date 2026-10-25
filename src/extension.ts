@@ -1,3 +1,4 @@
+// VS Code의 활성화·비활성화 요청을 앱의 시작·종료로 연결한다.
 import type * as vscode from 'vscode';
 import { AgentTrackerApp } from './app';
 

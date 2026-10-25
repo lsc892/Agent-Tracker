@@ -1,3 +1,4 @@
+// 세션 통계와 종속 데이터를 검증해 원자적으로 교체·보존·삭제한다.
 import type { SQLInputValue, StatementSync } from 'node:sqlite';
 import type { SessionBillingStore } from './billing';
 import type { SqliteSession } from './connection';
@@ -38,10 +39,7 @@ function turnValues(row: TurnSummaryInput, now: string): SQLInputValue[] {
   ];
 }
 
-/**
- * 책임: 세션과 종속된 요청·모델·도구·비용·집계를 함께 저장한다.
- * 알고리즘: 교체 대상 집합을 TEMP에 두고 단일 트랜잭션에서 검증·교체·보존·사전 집계 갱신을 수행한다.
- */
+/** 세션 교체 시 요청·모델·도구·비용·원본 참조·사전 집계의 일관성을 지킨다. */
 export class SessionStore {
   constructor(private readonly database: SqliteSession, private readonly billing: SessionBillingStore) {}
 

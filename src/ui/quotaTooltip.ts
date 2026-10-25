@@ -1,3 +1,4 @@
+// 제공자별 quota와 초기화 시각·조회 상태를 Markdown 툴팁으로 구성한다.
 import { getLocale, t } from '../localization';
 import * as vscode from 'vscode';
 import type { TrackerConfiguration } from '../configuration';

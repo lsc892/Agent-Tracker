@@ -1,3 +1,4 @@
+// quota 상태를 상태바 문구·잔량 아이콘·접근성 설명으로 변환한다.
 import { t } from '../localization';
 import type { QuotaState, QuotaWindow } from '../quota/types';
 import type { DisplayPercentage, DisplayDetail } from '../configuration/schema';

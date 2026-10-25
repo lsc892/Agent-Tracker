@@ -1,3 +1,4 @@
+// 설정 값을 정규화해 서비스 설정과 제공자별 로그 경로를 구성한다.
 import { createTranslator, resolveLocale } from './localization';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';

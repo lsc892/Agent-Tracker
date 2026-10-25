@@ -1,6 +1,6 @@
+// Codex RPC를 중계하며 quota 기대 값과 자식 프로세스 수명 증거만 기록한다.
 'use strict';
 
-// Transparent stdio observer: only quota fields and lifecycle evidence leave memory.
 const { spawn } = require('node:child_process');
 const { writeFileSync } = require('node:fs');
 const { StringDecoder } = require('node:string_decoder');

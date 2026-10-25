@@ -1,3 +1,4 @@
+// 대시보드의 이름 선택·Skill 표·페이지·설정·응답 동기화를 검증한다.
 import { createTranslator } from '../../src/localization';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -7,6 +8,7 @@ import { Script } from 'node:vm';
 import { dashboardHtml } from '../../src/ui/html';
 import { parseDashboardMessage } from '../../src/ui/presentation';
 
+/** 이름 선택과 Skill 표 검증에 필요한 DOM 상태·자식·이벤트를 모사한다. */
 class Element {
   constructor(readonly tagName = '') {}
   private text = '';

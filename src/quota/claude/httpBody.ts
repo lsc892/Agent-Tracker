@@ -1,3 +1,4 @@
+// Claude HTTP 응답의 크기를 제한하며 JSON 본문을 읽는다.
 import { QuotaError } from '../types';
 
 /**

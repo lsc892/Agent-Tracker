@@ -1,3 +1,4 @@
+// quota 상태바와 툴팁의 창 선택·백분율·아이콘·상태 표시를 검증한다.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

@@ -1,3 +1,4 @@
+// 실제 확장 호스트에서 대시보드·요약·설정·테마·페이지 동작을 검증한다.
 ﻿import * as assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';

@@ -1,3 +1,4 @@
+// 통계 갱신·취소·삭제 요청의 중복과 실행 순서를 관리한다.
 import { WorkerTransport } from './transport';
 import type { RefreshResult, SourceRoot } from './types';
 
@@ -6,10 +7,7 @@ export interface RefreshOptions {
   timezone?: string;
 }
 
-/**
- * 책임: 통계 갱신의 중복 병합과 데이터 삭제의 실행 순서를 관리한다.
- * 알고리즘: 진행 중 갱신·삭제 Promise를 공유하고 삭제 전 갱신을 취소하며, 공유 메모리의 원자적 플래그로 Worker에 취소를 전달한다.
- */
+/** 진행 중 갱신·삭제를 공유하고 Worker에 갱신 취소를 전달한다. */
 export class RefreshController {
   private refreshPending: Promise<RefreshResult> | undefined;
   private clearPending: Promise<void> | undefined;

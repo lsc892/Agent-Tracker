@@ -1,3 +1,4 @@
+// 공통 설정 정의의 키와 기본값으로 현재 설정을 새 객체에 읽는다.
 import { mapSettings, settingDefinitions, type ConfigurationValues } from './schema';
 
 export interface SettingsReader { get<T>(key: string, fallback: T): T }

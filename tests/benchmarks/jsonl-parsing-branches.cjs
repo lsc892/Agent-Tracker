@@ -1,3 +1,4 @@
+// 메모리에 고정한 JSONL 입력으로 파싱 분기 변경 전후의 속도와 메모리를 비교한다.
 const assert = require('node:assert/strict');
 const { fork, execFileSync } = require('node:child_process');
 const { createHash } = require('node:crypto');

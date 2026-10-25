@@ -1,3 +1,4 @@
+// macOS의 Claude 인증 파일과 기본 경로의 Keychain 대체 조회를 제공한다.
 import { execFile } from 'node:child_process';
 import { defaultClaudeDataHome, parseClaudeAccessToken, readClaudeCredentialFile, resolveClaudeDataHome,
   type ClaudeCredentialSource } from './common';

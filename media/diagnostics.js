@@ -1,3 +1,4 @@
+// 파일별 수집 상태와 오류를 진단 표에 표시하고 페이지 조회를 요청한다.
 (() => {
   'use strict';
   const t = (key, values) => globalThis.agentTrackerI18n.t(key, values);

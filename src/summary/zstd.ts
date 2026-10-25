@@ -1,16 +1,15 @@
+// Zstd 로그의 프레임 경계를 검증하며 압축 데이터를 스트리밍 해제한다.
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { constants, createZstdDecompress } from 'node:zlib';
 
+/** 잘못되거나 잘린 Zstd 스트림을 오류로 알린다. */
 export class ZstdError extends Error {
   constructor() { super('Invalid Zstd stream'); }
 }
 
-/**
- * 책임: 연결된 Zstd 프레임의 정확한 경계와 잘림을 검사한다.
- * 알고리즘: RFC 8878의 헤더·블록 길이만 읽어 프레임별 청크를 나누고 압축 해제·체크섬 검증은 네이티브 decoder에 맡긴다.
- * 규격: https://www.rfc-editor.org/rfc/rfc8878.html#section-3.1.1
- */
+// 규격: https://www.rfc-editor.org/rfc/rfc8878.html#section-3.1.1
+/** 입력 청크를 Zstd 프레임 경계로 나누고 헤더·블록의 잘림을 검증한다. */
 class ZstdFrames {
   private chunk: Buffer = Buffer.alloc(0);
   private offset = 0;

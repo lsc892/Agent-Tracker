@@ -1,3 +1,4 @@
+// quota 조회 시나리오별 실행 시간과 자식 프로세스 자원 사용량을 측정한다.
 'use strict';
 const { spawn } = require('node:child_process');
 const { mkdtemp, mkdir, readFile, rm, writeFile } = require('node:fs/promises');

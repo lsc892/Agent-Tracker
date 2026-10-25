@@ -1,3 +1,4 @@
+// 요약 임시 저장소의 계보 해석과 제한된 배치 트랜잭션을 검증한다.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';

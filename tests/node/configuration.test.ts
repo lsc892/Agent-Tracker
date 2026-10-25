@@ -1,3 +1,4 @@
+// 확장 설정의 기본값·정규화·독립 스냅샷·추적 범위를 검증한다.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { homedir } from 'node:os';

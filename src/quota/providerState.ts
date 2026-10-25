@@ -1,3 +1,4 @@
+// quota 제공자 하나의 성공 스냅샷·오류·재시도·만료 상태를 관리한다.
 import { QuotaError, type QuotaProviderId, type QuotaSnapshot, type QuotaState } from './types';
 
 const FOCUS_REFRESH_AGE_MS = 300_000;

@@ -1,3 +1,4 @@
+// 사용량 표·차트의 정렬·페이지·모델·평균·필터·렌더링 일치를 검증한다.
 import { queryChart } from '../fixtures/usage-chart';
 import { createTranslator } from '../../src/localization';
 import test, { type TestContext } from 'node:test';
@@ -469,6 +470,7 @@ test('worker returns the current table page as chart data for all groupings and 
   } finally { await client.dispose(); }
 });
 
+/** 차트·표 렌더링 검증에 필요한 DOM 속성·자식·이벤트를 모사한다. */
 class Element {
   private text = '';
   value = ''; className = ''; disabled = false; hidden = false; title = ''; children: Element[] = [];

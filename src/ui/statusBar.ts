@@ -1,3 +1,4 @@
+// quota 상태를 VS Code 상태바 항목과 새로고침 버튼에 반영한다.
 import { t } from '../localization';
 import * as vscode from 'vscode';
 import type { TrackerConfiguration } from '../configuration';
@@ -9,10 +10,7 @@ export { statusBarPresentation, remainingBar } from './statusBarPresentation';
 
 type StatusSettings = Pick<TrackerConfiguration, 'display' | 'claude' | 'codex' | 'usage'>;
 
-/**
- * 책임: 상태바 quota 항목과 새로고침 버튼의 표시 수명을 소유한다.
- * 알고리즘: 활성 제공자를 Claude·Codex 순서로 렌더링하고 같은 snapshot을 분 단위로 다시 표시해 추가 조회 없이 남은 시간을 갱신한다.
- */
+/** quota 상태바 항목·툴팁·새로고침 버튼과 남은 시간의 주기적 표시를 관리한다. */
 export class QuotaStatusBar implements vscode.Disposable {
   private readonly quota = vscode.window.createStatusBarItem('agentTracker.quota', vscode.StatusBarAlignment.Right, -1000);
   private readonly refresh = vscode.window.createStatusBarItem('agentTracker.refreshQuota', vscode.StatusBarAlignment.Right, -1001);

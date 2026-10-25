@@ -1,3 +1,4 @@
+// Claude 인증 소스 계약·데이터 경로·인증 파일 읽기·토큰 검증을 제공한다.
 import { readFile, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';

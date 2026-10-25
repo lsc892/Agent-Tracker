@@ -1,3 +1,4 @@
+// Claude 대화 로그의 식별 정보·요청·사용량·도구 호출을 공통 이벤트로 변환한다.
 import { basename, dirname, sep } from 'node:path';
 import { SummaryError } from '../jsonl';
 import type { FileContext, ParsedIdentity, ParseSink } from '../types';
@@ -31,10 +32,7 @@ interface ClaudeRowContext {
   rootId: string | undefined;
 }
 
-/**
- * 책임: Claude 로그의 요청·응답·수명주기를 공통 파싱 이벤트로 변환한다.
- * 알고리즘: 행을 문맥 객체로 해석한 뒤 메타데이터·요청 식별·도구·응답·종료 순서로 처리하고 현재 root와 오류 상태를 유지한다.
- */
+/** Claude 로그의 세션 문맥을 유지하며 요청·응답·수명주기 이벤트를 내보낸다. */
 export class ClaudeParserAdapter {
   private currentRoot: string | undefined;
   private identityValue: ParsedIdentity;

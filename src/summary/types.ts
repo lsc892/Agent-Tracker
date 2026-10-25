@@ -1,3 +1,4 @@
+// 통계 API의 설정·조회 결과와 제공자 공통 파싱 이벤트 타입을 정의한다.
 export type Provider = 'claude' | 'codex';
 export interface SourceRoot { provider: Provider; path: string; dataHome?: string }
 export interface SummaryOptions {

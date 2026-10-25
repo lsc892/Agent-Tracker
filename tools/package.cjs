@@ -1,3 +1,4 @@
+// 번역을 생성하고 임시 manifest를 적용해 현재 확장을 VSIX로 패키징한다.
 'use strict';
 const { execFileSync } = require('node:child_process');
 const { join } = require('node:path');

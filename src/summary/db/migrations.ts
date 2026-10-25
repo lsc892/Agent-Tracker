@@ -1,3 +1,4 @@
+// 저장된 통계와 식별자를 보존하며 SQLite 스키마를 현재 버전으로 갱신한다.
 import type { DatabaseSync } from 'node:sqlite';
 import {
   SCHEMA_SQL, SCHEMA_VERSION, SCHEMA_LEGACY_MIGRATION_SQL, SCHEMA_CACHE_MIGRATION_SQL,

@@ -1,3 +1,4 @@
+// 선택한 통계 표 페이지를 동일한 항목·순서의 도표 데이터로 변환한다.
 import type { ChartMetric, TurnSummaryRow, UsageChart, UsageGrouping, UsageRow } from './types';
 
 function chartRows(pageRows: UsageRow[] | TurnSummaryRow[], turn: boolean, excludeEmptyUsage: boolean): UsageChart['rows'] {

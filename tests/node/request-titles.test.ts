@@ -1,3 +1,4 @@
+// 요청 제목의 정규화·저장·하위 에이전트 제외와 표·차트 노출을 검증한다.
 import { queryChart } from '../fixtures/usage-chart';
 import test from 'node:test';
 import assert from 'node:assert/strict';

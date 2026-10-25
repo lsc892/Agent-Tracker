@@ -1,3 +1,4 @@
+// 원본 요청과 일치하도록 활성 시간대의 일별 사전 집계를 구축·갱신한다.
 import type { SqliteSession } from './connection';
 import type { Provider } from './types';
 import { aggregateUsageSource } from './rollup-queries';
@@ -8,10 +9,7 @@ interface RollupMetadata { timezone: string; format_version: number }
 const MIN_CALENDAR_TIME = Date.parse('0002-01-03T00:00:00Z');
 const MAX_CALENDAR_TIME = Date.parse('9998-12-29T00:00:00Z');
 
-/**
- * 책임: DB당 한 시간대의 일별 사전 집계를 원본 facts와 일치시킨다.
- * 알고리즘: 최초 조회·시간대 변경 때 전체 구축하고 이후 세션 교체와 같은 트랜잭션에서 해당 세션의 일별 기여분만 교체한다.
- */
+/** DB에서 활성 시간대 하나의 일별 사전 집계를 구축하고 세션 변경을 반영한다. */
 export class UsageRollupStore {
   constructor(private readonly database: SqliteSession) {}
 

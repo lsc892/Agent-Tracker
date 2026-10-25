@@ -1,3 +1,4 @@
+// 실계정 quota를 조회해 서버 응답·확장 결과·화면 표시와 프로세스 정리를 대조한다.
 'use strict';
 
 const { mkdir, mkdtemp, readFile, rm, writeFile } = require('node:fs/promises');

@@ -1,3 +1,4 @@
+// 소스·테스트·도구에 적용할 ESLint 검사 범위와 규칙을 정의한다.
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(

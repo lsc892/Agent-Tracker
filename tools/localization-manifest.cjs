@@ -1,3 +1,4 @@
+// 패키징·테스트·디버깅 중 manifest 번역을 임시 배치하고 원본을 복원한다.
 'use strict';
 const { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } = require('node:fs');
 const { join } = require('node:path');

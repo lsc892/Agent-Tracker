@@ -1,3 +1,4 @@
+// 통계 Worker에서 호스트 명령을 받아 DB 조회·갱신·설정·삭제를 실행한다.
 import { parentPort, workerData } from 'node:worker_threads';
 import { SummaryDatabase, usageChartFromPage } from './db';
 import { refreshSummary } from './scanner';

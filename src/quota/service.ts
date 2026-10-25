@@ -1,3 +1,4 @@
+// quota 제공자별 조회와 갱신 일정·상태 알림을 조율한다.
 import type { QuotaProvider, QuotaProviderId, QuotaSnapshot, QuotaState } from './types';
 import { settingDefinitions, type RefreshPolicy } from '../configuration/schema';
 import { ProviderQuotaState } from './providerState';
@@ -29,10 +30,7 @@ interface Entry {
   abort: AbortController | null;
 }
 
-/**
- * 책임: 제공자 조회·수동 재실행·구독 알림과 갱신 일정을 조율한다.
- * 알고리즘: 제공자별 진행 중 조회를 합치고 가장 이른 폴링 또는 상태 만료 시각에 단일 타이머를 예약한다.
- */
+/** 제공자 조회·수동 재실행·구독 알림과 자동 갱신 일정을 조율한다. */
 export class QuotaService {
   private readonly entries = new Map<QuotaProviderId, Entry>();
   private readonly listeners = new Set<(states: QuotaState[]) => void>();

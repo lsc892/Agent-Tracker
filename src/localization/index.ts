@@ -1,3 +1,4 @@
+// 언어 선택·번역 인스턴스·메시지 조회와 Webview 번역 데이터 전달을 담당한다.
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { i18n } from 'i18next';

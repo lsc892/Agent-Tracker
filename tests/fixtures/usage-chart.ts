@@ -1,3 +1,4 @@
+// 공개 사용량 표 페이지를 차트로 변환하는 공통 테스트 도우미를 제공한다.
 import { SummaryDatabase, usageChartFromPage } from '../../src/summary/db';
 import type { ChartMetric, OffsetPage, SummaryFilter, UsageGrouping, UsageSort } from '../../src/summary/db';
 

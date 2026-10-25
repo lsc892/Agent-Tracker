@@ -1,3 +1,4 @@
+// 통계·진단·색상 설정 Webview의 초기 HTML과 실행 자원 경계를 구성한다.
 import { getLocale, localizationScripts, t } from '../localization';
 import { escapeHtml } from './presentation';
 import { settingDefinitions } from '../configuration/schema';

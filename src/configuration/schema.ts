@@ -1,4 +1,4 @@
-/** The single source for setting keys, defaults, choices and VS Code metadata. */
+// 설정 키·기본값·선택지·VS Code 메타데이터와 공통 트리 순회 규칙을 정의한다.
 export const settingCategories = {
   localization: { title: '%manifest.languageCategory%', order: 0 },
   tracking: { title: '%manifest.tracking%', order: 1 },

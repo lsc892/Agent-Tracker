@@ -1,3 +1,4 @@
+// 독립 기대 값으로 롤업의 평균·모델·날짜·세션 필터 의미를 검증한다.
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { test, type TestContext } from 'node:test';

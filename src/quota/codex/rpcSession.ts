@@ -1,3 +1,4 @@
+// Codex App Server의 JSON-RPC 메시지 교환과 자식 프로세스 종료를 관리한다.
 import type { ChildProcessWithoutNullStreams } from 'node:child_process';
 import { StringDecoder } from 'node:string_decoder';
 import { asRecord, QuotaError } from '../types';
@@ -5,10 +6,7 @@ import { cancelled, protocolError } from './errors';
 
 type Pending = { resolve(value: unknown): void; reject(reason: QuotaError): void };
 
-/**
- * 책임: 한 App Server 프로세스의 JSON-RPC 연결과 요청 수명을 소유한다.
- * 알고리즘: 요청 ID별 Promise와 UTF-8 행 버퍼로 응답·알림을 분배하고, 실패 시 대기 요청을 함께 거절한다.
- */
+/** App Server 하나의 JSON-RPC 연결·대기 요청·프로세스 종료 수명을 관리한다. */
 export class RpcSession {
   private nextId = 1;
   private readonly pending = new Map<number, Pending>();

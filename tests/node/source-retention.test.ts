@@ -1,3 +1,4 @@
+// 원본 삭제·부분 유실·복원 시 사용량 보존과 설정 전환을 검증한다.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, appendFile, unlink, rm } from 'node:fs/promises';

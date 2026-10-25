@@ -1,3 +1,4 @@
+// 모델별 사용량·과금 분류·비용 추정과 마이그레이션·조회 경계를 검증한다.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, appendFile, rm, mkdir } from 'node:fs/promises';

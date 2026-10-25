@@ -1,3 +1,4 @@
+// 프로세스·스레드 간 요약 갱신 잠금의 대기·취소·강제 종료 복구를 검증한다.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fork, type ChildProcess } from 'node:child_process';

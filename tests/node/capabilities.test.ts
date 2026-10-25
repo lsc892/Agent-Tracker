@@ -1,3 +1,4 @@
+// Skill·MCP·명령·에이전트 호출 집계와 필터·페이지·수집 설정을 검증한다.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, appendFile, rm } from 'node:fs/promises';

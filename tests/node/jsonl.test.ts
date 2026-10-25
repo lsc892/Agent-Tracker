@@ -1,3 +1,4 @@
+// JSONL 리더의 이미지 생략·청크 경계·오류·취소를 기준 구현과 대조한다.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';

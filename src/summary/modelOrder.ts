@@ -1,3 +1,4 @@
+// 모델 출시일과 숫자 버전으로 모델 정렬 기준을 제공한다.
 // Official release dates, checked 2026-10-21. Keep aliases and snapshots on the same model line.
 // https://platform.claude.com/docs/en/release-notes/overview
 // https://developers.openai.com/api/docs/changelog

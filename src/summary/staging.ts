@@ -1,3 +1,4 @@
+// 로그 파싱 결과와 세션 연결 관계를 임시 저장해 요청별 집계 후보를 만든다.
 import type { DatabaseSync, StatementSync } from 'node:sqlite';
 import type { FileMetadata, TurnSummaryInput, ModelUsageInput, CapabilityUsageInput } from './db/types';
 import type { ParsedIdentity, ParseEvent, Provider } from './types';
@@ -50,10 +51,7 @@ function summaryTiming(row: PreparedTurn): {
   return { status, completedAt, duration: null, quality: 'missing' };
 }
 
-/**
- * 책임: 전체 로그 규모의 중간 이벤트·연결 관계·집계 후보를 관리한다.
- * 알고리즘: 파일 기반 SQLite TEMP 테이블과 인덱스를 사용해 데이터를 디스크에 두고 세션 연결 성분별로 순차 처리한다.
- */
+/** SQLite 임시 테이블에서 파싱 이벤트·세션 계보·중복 제거·집계 후보를 관리한다. */
 export class SummaryStaging {
   private readonly insertEvent: StatementSync;
   private readonly insertFlag: StatementSync;

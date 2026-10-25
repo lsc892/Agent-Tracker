@@ -1,6 +1,7 @@
+// 제품 파서와 독립적으로 서버 quota 기대 값과 표시의 일치를 검증한다.
 'use strict';
 
-// Independent expectations from the server schema; do not call the product parsers here.
+/** 실계정 QA 실패를 원문 데이터가 없는 고정 오류 코드로 전달한다. */
 class QaError extends Error {
   constructor(code) { super(code); this.code = code; }
 }

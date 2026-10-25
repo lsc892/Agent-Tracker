@@ -1,3 +1,4 @@
+// Codex App Server를 실행해 구독 quota를 조회하고 프로세스를 회수한다.
 import { spawn } from 'node:child_process';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -25,10 +26,7 @@ export interface CodexQuotaProviderOptions {
   onPhase?: (event: { phase: 'initialized' | 'account-read' | 'quota-read'; pid: number | undefined; elapsedMs: number }) => void;
 }
 
-/**
- * 책임: 대화 생성 없이 Codex 계정의 구독 quota만 조회한다.
- * 알고리즘: 조회마다 짧게 실행한 App Server에서 초기화·계정 확인·한도 조회를 순서대로 수행하고 프로세스 종료까지 기다린다.
- */
+/** 대화 생성 없이 Codex 구독 quota를 조회하고 App Server의 실행 수명을 관리한다. */
 export class CodexQuotaProvider extends BaseQuotaProvider {
   readonly id = 'codex' as const;
   protected readonly closedMessage = { key: 'quota.codexClosed' } as const;

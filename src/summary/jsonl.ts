@@ -1,14 +1,13 @@
+// 일반·Zstd JSONL 로그를 메모리 상한과 이미지 본문 제거 정책에 맞춰 읽는다.
 import { open } from 'node:fs/promises';
 import { zstdChunks, ZstdError } from './zstd';
 
+/** 통계 처리 오류의 코드와 원본 바이트 위치를 전달한다. */
 export class SummaryError extends Error {
   constructor(public readonly code: string, public readonly offset = 0) { super(code); }
 }
 
-/**
- * 책임: 이미지 본문을 보관하지 않으면서 JSON 한 행의 메모리 상한을 지킨다.
- * 알고리즘: 문자열·이스케이프 상태로 data:image Base64 본문만 버리고, 나머지는 크기가 제한된 블록에 모아 JSON.parse에 넘긴다.
- */
+/** 이미지 Base64 본문을 제외한 JSON 한 행을 메모리 상한 안에서 구성한다. */
 class JsonlLine {
   private readonly blocks: Buffer[] = [];
   private block: Buffer;

@@ -1,3 +1,4 @@
+// 독립 합성 데이터로 롤업 시제품의 평균·필터·집계 의미를 검증한다.
 // Deterministic semantic/rollback checks independent of benchmark timing.
 const assert = require('node:assert/strict');
 const { createHash } = require('node:crypto');

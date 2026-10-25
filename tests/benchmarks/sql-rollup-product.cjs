@@ -1,3 +1,4 @@
+// 실제 공개 조회 API의 롤업 적용 전후 읽기·쓰기 성능과 결과를 비교한다.
 // Compare the frozen pre-change public database API with the actual product implementation.
 const assert = require('node:assert/strict');
 const { createHash } = require('node:crypto');

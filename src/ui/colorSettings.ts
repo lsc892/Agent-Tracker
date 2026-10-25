@@ -1,3 +1,4 @@
+// 상태바 색상 설정 화면과 검증된 설정 저장을 연결한다.
 import { localizationBundle, t } from '../localization';
 import { randomBytes } from 'node:crypto';
 import * as vscode from 'vscode';
@@ -6,10 +7,7 @@ import { settingDefinitions, settingKeys } from '../configuration/schema';
 import { parseColorSettingsMessage, type StatusColorMode, type ColorTarget } from './colors';
 import { colorSettingsHtml } from './html';
 
-/**
- * 책임: quota 조회·로그 스캔과 독립적인 색상 설정 화면을 관리한다.
- * 알고리즘: 패널을 재사용하고 ready·saving 상태로 메시지 처리를 제어하며, 검증된 색상 설정만 지정된 저장 범위에 반영한다.
- */
+/** 색상 설정 패널의 수명과 사용자·워크스페이스 범위의 설정 저장을 관리한다. */
 export class ColorSettings implements vscode.Disposable {
   private panel: vscode.WebviewPanel | undefined;
   private ready = false;

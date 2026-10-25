@@ -1,3 +1,4 @@
+// 지정 시간대의 일·월 집계 키와 해당 기간의 UTC 경계를 계산한다.
 const formatters = new Map<string, Intl.DateTimeFormat>();
 
 function formatter(timezone: string): Intl.DateTimeFormat {

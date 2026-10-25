@@ -1,11 +1,9 @@
+// 원본 로그 파일의 관측 정보·승인된 메타데이터·처리 진단을 저장한다.
 import type { SqliteSession } from './connection';
 import type { FileMetadata, ManifestRow, ProcessingStatus, Provider } from './types';
 import { pageLimit } from './validation';
 
-/**
- * 책임: 발견한 파일의 존재 여부와 승인된 메타데이터·처리 진단을 관리한다.
- * 알고리즘: 제공자·경로 키로 관측 정보를 기록하고 세션 저장 때 메타데이터를 확정하며 목록은 ID 기반 페이지로 순회한다.
- */
+/** 파일 식별·관측·진단과 세션별·미관측 파일 조회를 관리한다. */
 export class ManifestStore {
   constructor(private readonly database: SqliteSession) {}
 

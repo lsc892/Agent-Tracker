@@ -1,3 +1,4 @@
+// 번역 사전·사용처를 검증하고 manifest 번역과 실행용 다국어 자산을 동기화한다.
 'use strict';
 const fs = require('node:fs');
 const path = require('node:path');

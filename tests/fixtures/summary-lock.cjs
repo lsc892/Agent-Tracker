@@ -1,3 +1,4 @@
+// 스레드·자식 프로세스에서 요약 갱신 잠금의 획득과 해제를 제어한다.
 'use strict';
 const { parentPort, workerData } = require('node:worker_threads');
 const config = workerData || JSON.parse(process.argv[2]);
