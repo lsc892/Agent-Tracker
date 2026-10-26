@@ -1,0 +1,173 @@
+{
+  "observedAt": "2026-10-25 18:46:55",
+  "access": "read-only connection, query_only, one read transaction; no migration or source logs",
+  "node": "v24.14.1",
+  "sqlite": "3.51.2",
+  "schemaVersion": 12,
+  "pageSize": 4096,
+  "pages": 393,
+  "freePages": 0,
+  "counts": {
+    "manifest": 458,
+    "projects": 32,
+    "sessions": 368,
+    "turn_summary": 1100,
+    "turn_model_usage": 918,
+    "turn_capability_usage": 1231,
+    "usage_request_daily": 419,
+    "usage_model_daily": 502
+  },
+  "unknownTime": 35,
+  "allocated": [
+    {
+      "name": "idx_manifest_root_id",
+      "bytes": 28672,
+      "pages": 7
+    },
+    {
+      "name": "idx_manifest_session",
+      "bytes": 32768,
+      "pages": 8
+    },
+    {
+      "name": "idx_summary_period",
+      "bytes": 28672,
+      "pages": 7
+    },
+    {
+      "name": "idx_summary_project_period",
+      "bytes": 90112,
+      "pages": 22
+    },
+    {
+      "name": "idx_usage_model_daily_day",
+      "bytes": 69632,
+      "pages": 17
+    },
+    {
+      "name": "idx_usage_model_daily_project_day",
+      "bytes": 65536,
+      "pages": 16
+    },
+    {
+      "name": "idx_usage_request_daily_day",
+      "bytes": 57344,
+      "pages": 14
+    },
+    {
+      "name": "idx_usage_request_daily_project_day",
+      "bytes": 53248,
+      "pages": 13
+    },
+    {
+      "name": "manifest",
+      "bytes": 172032,
+      "pages": 42
+    },
+    {
+      "name": "projects",
+      "bytes": 4096,
+      "pages": 1
+    },
+    {
+      "name": "session_billing",
+      "bytes": 4096,
+      "pages": 1
+    },
+    {
+      "name": "sessions",
+      "bytes": 126976,
+      "pages": 31
+    },
+    {
+      "name": "sqlite_autoindex_manifest_1",
+      "bytes": 69632,
+      "pages": 17
+    },
+    {
+      "name": "sqlite_autoindex_turn_summary_1",
+      "bytes": 110592,
+      "pages": 27
+    },
+    {
+      "name": "sqlite_schema",
+      "bytes": 16384,
+      "pages": 4
+    },
+    {
+      "name": "sqlite_stat1",
+      "bytes": 4096,
+      "pages": 1
+    },
+    {
+      "name": "turn_capability_usage",
+      "bytes": 40960,
+      "pages": 10
+    },
+    {
+      "name": "turn_costs",
+      "bytes": 53248,
+      "pages": 13
+    },
+    {
+      "name": "turn_model_usage",
+      "bytes": 69632,
+      "pages": 17
+    },
+    {
+      "name": "turn_summary",
+      "bytes": 258048,
+      "pages": 63
+    },
+    {
+      "name": "usage_model_daily",
+      "bytes": 135168,
+      "pages": 33
+    },
+    {
+      "name": "usage_request_daily",
+      "bytes": 114688,
+      "pages": 28
+    },
+    {
+      "name": "usage_rollup_meta",
+      "bytes": 4096,
+      "pages": 1
+    }
+  ],
+  "indexes": [
+    {
+      "name": "idx_manifest_root_id",
+      "sql": "CREATE INDEX idx_manifest_root_id ON manifest(provider, source_root, id)"
+    },
+    {
+      "name": "idx_manifest_session",
+      "sql": "CREATE INDEX idx_manifest_session ON manifest(provider, session_id, id)"
+    },
+    {
+      "name": "idx_summary_period",
+      "sql": "CREATE INDEX idx_summary_period ON turn_summary(started_at_ms, provider)"
+    },
+    {
+      "name": "idx_summary_project_period",
+      "sql": "CREATE INDEX idx_summary_project_period ON turn_summary(provider, project_key, started_at_ms)"
+    },
+    {
+      "name": "idx_usage_model_daily_day",
+      "sql": "CREATE INDEX idx_usage_model_daily_day ON usage_model_daily(local_day, provider)"
+    },
+    {
+      "name": "idx_usage_model_daily_project_day",
+      "sql": "CREATE INDEX idx_usage_model_daily_project_day ON usage_model_daily(provider, project_key, local_day)"
+    },
+    {
+      "name": "idx_usage_request_daily_day",
+      "sql": "CREATE INDEX idx_usage_request_daily_day ON usage_request_daily(local_day, provider)"
+    },
+    {
+      "name": "idx_usage_request_daily_project_day",
+      "sql": "CREATE INDEX idx_usage_request_daily_project_day ON usage_request_daily(provider, project_key, local_day)"
+    }
+  ],
+  "scope": "Page allocation and aggregate counts only. No paths, names, titles, prompts, responses, credentials or tokens are exported. WAL/TEMP/OS cache are excluded."
+}

@@ -13,5 +13,6 @@
 - [JsonlParsingBranches-2026-10-09.md](JsonlParsingBranches-2026-10-09.md): JSONL 파싱 방식별 비교와 선택 근거를 기록한다.
 - [RequestTitleAB.md](RequestTitleAB.md): 요청 제목 TEMP 인덱스와 집계 통합 방식의 A/B 검증을 기록한다.
 - [RequestTitleTransactions.md](RequestTitleTransactions.md): 요청 제목 집계의 실제 갱신·트랜잭션 측정을 기록한다.
-- [research/](research/README.md): UI와 다국어 지원의 조사·설계 근거를 둔다.
+- [DateStorageAB-2026-10-25.md](DateStorageAB-2026-10-25.md): 날짜 저장 순서·집계 기본 키·조회 SQL·정렬 인덱스의 A/B 결과와 정확성 제약을 기록한다.
+- [research/](research/README.md): UI·다국어·저장소 조회의 조사·설계 근거를 둔다.
 - [benchmarks/](benchmarks/README.md): 성능 비교 결과와 검증용 산출물을 보존한다.
