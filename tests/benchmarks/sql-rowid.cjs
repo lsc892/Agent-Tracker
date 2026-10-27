@@ -281,7 +281,7 @@ async function main() {
   const samples = Number(args.samples ?? 3), readSamples = Number(args['read-samples'] ?? 5);
   assert.ok(Number.isInteger(samples) && samples >= 3 && samples <= 15);
   assert.ok(Number.isInteger(readSamples) && readSamples >= 3 && readSamples <= 25);
-  const output = resolve(args.output ?? 'docs/benchmarks/SqlRowid-2026-10-27.json');
+  const output = resolve(args.output ?? 'docs/benchmarks/2026-10-27/SqlRowid-2026-10-27.json');
   assert.ok(!existsSync(output), 'Choose a new output path; existing measurements are preserved');
   const sizes = (args.sizes ?? '280,100000').split(',').map(Number), densities = (args.turns ?? '100,10000').split(',').map(Number);
   assert.ok([...sizes, ...densities].every(n => Number.isSafeInteger(n) && n > 0 && n <= 1000000));

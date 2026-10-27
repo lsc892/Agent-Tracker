@@ -76,8 +76,8 @@ E/T/R의 최대값은 각각 구한 값이며 같은 component에서 모두 최�
 
 ## 재실행
 
-`npm run benchmark:transactions -- --real --pairs 3 --report docs/RequestTitleTransactions.md`
+`npm run benchmark:transactions -- --real --pairs 3 --report docs/benchmarks/2026-10-08/RequestTitleTransactions.md`
 
 `--real` 없이 실행하면 개인 파일을 읽지 않는 30개 요청의 합성 검증이다. CI는 이 합성 실행만 검사한다. 기본 보고서는 tests/results/benchmarks에 저장한다.
 
-[원시 JSON](benchmarks/RequestTitleTransactions.json), [transaction JSONL](benchmarks/RequestTitleTransactions.jsonl.gz), [측정 실행기](../tests/benchmarks/summary-transactions.cjs).
+[원시 JSON](RequestTitleTransactions.json), [transaction JSONL](RequestTitleTransactions.jsonl.gz), [측정 실행기](../../../tests/benchmarks/summary-transactions.cjs).

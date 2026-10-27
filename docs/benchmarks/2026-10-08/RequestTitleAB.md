@@ -70,8 +70,8 @@
 
 `npm run benchmark:titles -- --cases 2000 --pairs 20 --warmups 4`
 
-정확성 테스트는 `npm run check`에 포함된다. 시간에 고정된 합격선을 두지 않는다. 기본 Markdown·원시 JSON은 `tests/results/benchmarks/request-titles.md`, `tests/results/benchmarks/request-titles.json`에 저장된다. `--report docs/RequestTitleAB.md`를 추가하면 Markdown과 인접한 `benchmarks/RequestTitleAB.json`에도 보관한다. 원시 JSON에는 개별 시간·공간, SQL hash, 실행 계획이 들어간다.
+정확성 테스트는 `npm run check`에 포함된다. 시간에 고정된 합격선을 두지 않는다. 기본 Markdown·원시 JSON은 `tests/results/benchmarks/request-titles.md`, `tests/results/benchmarks/request-titles.json`에 저장된다. `--report docs/benchmarks/2026-10-08/RequestTitleAB.md`를 추가하면 같은 폴더의 `RequestTitleAB.json`에도 보관한다. 원시 JSON에는 개별 시간·공간, SQL hash, 실행 계획이 들어간다.
 
-원시 기록: [측정 JSON](benchmarks/RequestTitleAB.json).
+원시 기록: [측정 JSON](RequestTitleAB.json).
 
-코드: [fixture와 두 SQL](../tests/fixtures/request-title-ab.ts), [정확성 테스트](../tests/node/request-title-ab.test.ts), [A/B 실행기](../tests/benchmarks/request-titles.cjs).
+코드: [fixture와 두 SQL](../../../tests/fixtures/request-title-ab.ts), [정확성 테스트](../../../tests/node/request-title-ab.test.ts), [A/B 실행기](../../../tests/benchmarks/request-titles.cjs).

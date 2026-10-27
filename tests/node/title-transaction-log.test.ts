@@ -13,7 +13,7 @@ test('transaction benchmark measures the actual refresh and verifies before/afte
     const report = join(directory, 'report.md');
     await promisify(execFile)(process.execPath, [resolve(__dirname, '../../../tests/benchmarks/summary-transactions.cjs'),
       '--pairs', '1', '--report', report], { timeout:60000, windowsHide:true });
-    const lines = (await readFile(join(directory, 'benchmarks/report.jsonl'), 'utf8')).trim().split('\n')
+    const lines = (await readFile(join(directory, 'report.jsonl'), 'utf8')).trim().split('\n')
       .map(line => JSON.parse(line));
     assert.equal(lines[0].input, 'fixture');
     assert.equal(lines[0].inventory[0].files, 1);

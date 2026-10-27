@@ -181,9 +181,9 @@ npm run benchmark:transactions # 합성 JSONL의 실제 집계·DB 교체 transa
 
 대량 benchmark는 `BENCHMARK_FILES`, `BENCHMARK_TURNS` 환경 변수로 조절합니다. 결과는 `tests/results/benchmarks/summary.json`에 남으며 실제 개인 대화 기록은 사용하지 않습니다. quota 자원 측정 옵션과 한계는 [측정 안내](QuotaBenchmark.md)를 참고하세요.
 
-제목 A/B는 같은 2,000개 요청을 긴 세션과 여러 제공자·세션에 배치하고, 워밍업 후 순서를 교차해 20쌍을 비교합니다. 정확성은 `node:test`에서 현재 제품 SQL과 두 후보의 전체 집계 결과를 대조하며, 성능 실행은 시간·TEMP 할당·process RSS를 별도 보고서로 남깁니다. `--cases`, `--pairs`, `--warmups`로 규모를 조절하고 `--report docs/RequestTitleAB.md`로 Markdown과 원시 JSON을 보관할 수 있습니다. 조건과 측정 결과는 [제목 A/B 보고서](RequestTitleAB.md)를 참고하세요.
+제목 A/B는 같은 2,000개 요청을 긴 세션과 여러 제공자·세션에 배치하고, 워밍업 후 순서를 교차해 20쌍을 비교합니다. 정확성은 `node:test`에서 현재 제품 SQL과 두 후보의 전체 집계 결과를 대조하며, 성능 실행은 시간·TEMP 할당·process RSS를 별도 보고서로 남깁니다. `--cases`, `--pairs`, `--warmups`로 규모를 조절하고 `--report docs/benchmarks/2026-10-08/RequestTitleAB.md`로 Markdown과 원시 JSON을 보관할 수 있습니다. 조건과 측정 결과는 [제목 A/B 보고서](benchmarks/2026-10-08/RequestTitleAB.md)를 참고하세요.
 
-제품은 A(TEMP partial index)를 사용합니다. `npm run benchmark:transactions -- --real --pairs 3 --report docs/RequestTitleTransactions.md`는 실제 로컬 대화내역을 고정 사본으로 읽고, 무인덱스 대조군과 A의 최초·전체 재집계·변경 없는 갱신을 비교합니다. 전체 시간과 실제 transaction 시간, TEMP 페이지·RSS·결과 동등성을 Markdown·JSON·JSONL로 남깁니다. 원본과 설치된 확장 DB는 수정하지 않으며 사본·실험 DB는 종료 후 삭제합니다. `--real`을 생략하면 개인 파일을 읽지 않는 합성 검증입니다. 선택 근거와 복잡도·측정 한계는 [실제 transaction 보고서](RequestTitleTransactions.md)를 참고하세요.
+제품은 A(TEMP partial index)를 사용합니다. `npm run benchmark:transactions -- --real --pairs 3 --report docs/benchmarks/2026-10-08/RequestTitleTransactions.md`는 실제 로컬 대화내역을 고정 사본으로 읽고, 무인덱스 대조군과 A의 최초·전체 재집계·변경 없는 갱신을 비교합니다. 전체 시간과 실제 transaction 시간, TEMP 페이지·RSS·결과 동등성을 Markdown·JSON·JSONL로 남깁니다. 원본과 설치된 확장 DB는 수정하지 않으며 사본·실험 DB는 종료 후 삭제합니다. `--real`을 생략하면 개인 파일을 읽지 않는 합성 검증입니다. 선택 근거와 복잡도·측정 한계는 [실제 transaction 보고서](benchmarks/2026-10-08/RequestTitleTransactions.md)를 참고하세요.
 
 `$quota-qa` 또는 [quota-qa 스킬](../.agents/skills/quota-qa/SKILL.md)로 실제 계정 검증을 실행합니다. `test:quota:live`는 Claude의 OAuth usage 응답과 Codex의 실제 App Server 응답을 동일 응답 기준으로 제품 provider와 대조하고 사용/남음 표시 반올림·잔량 막대·Codex 프로세스 종료도 검사합니다. 결과는 `tests/results/quota-live.json`에 남으며 토큰·계정 식별자는 저장하지 않습니다. 두 제공자 중 하나라도 인증 오류·429·timeout·불일치이면 종료 코드 1입니다. 429는 자동 재시도하지 않습니다. 일반 `check`와 CI는 합성 입력으로 QA 도구를 검사하며 실제 계정을 호출하지 않습니다. 설치된 VS Code나 제공자 웹 화면의 대조는 별도 검증입니다.
 

@@ -81,7 +81,7 @@ RSS는 두 비교군·검증 결과가 섞인 공유 프로세스 관측이므�
 npm.cmd run benchmark:sql:rollup:product -- --baseline=tests/results/benchmarks/rollup-product-baseline-20261015-221640 --sizes=280,100000 --turns=10,100 --samples=3 --output=tests/results/benchmarks/sql-rollup-product.json
 ```
 
-기준 사본은 변경 전 `src/`·`dist/src/`·`manifest.json`이며 tests/results 아래의 로컬 보존물이다. 다른 환경에서는 JSON에 기록한 기준 revision으로 같은 실행물을 준비해야 한다. [실제 제품 비교 실행기](../../tests/benchmarks/sql-rollup-product.cjs) · [제품 회귀 테스트](../../tests/node/summary-rollup.test.ts) · [현재 설계](../AgentTracker.md).
+기준 사본은 변경 전 `src/`·`dist/src/`·`manifest.json`이며 tests/results 아래의 로컬 보존물이다. 다른 환경에서는 JSON에 기록한 기준 revision으로 같은 실행물을 준비해야 한다. [실제 제품 비교 실행기](../../../tests/benchmarks/sql-rollup-product.cjs) · [제품 회귀 테스트](../../../tests/node/summary-rollup.test.ts) · [현재 설계](../../AgentTracker.md).
 
 <details>
 <summary>실제 제품 64개 조회의 소량·대량 전체 비교</summary>
@@ -328,7 +328,7 @@ node tests/benchmarks/sql-rollup-memory.cjs
 npm.cmd run check
 ```
 
-[rollup A/B 원시 결과·소스 hash·전체 계획·표본 JSON](SqlRollupABBenchmark-2026-10-15.json), [비교 실행기](../../tests/benchmarks/sql-rollup.cjs), [집계 후보](../../tests/benchmarks/sql-rollup-prototype.cjs), [독립 기대값·rollback 검증](../../tests/benchmarks/sql-rollup-validation.cjs), [프로세스별 메모리 측정](../../tests/benchmarks/sql-rollup-memory.cjs), [단위 테스트](../../tests/node/sql-rollup-oracle.test.ts).
+[rollup A/B 원시 결과·소스 hash·전체 계획·표본 JSON](SqlRollupABBenchmark-2026-10-15.json), [비교 실행기](../../../tests/benchmarks/sql-rollup.cjs), [집계 후보](../../../tests/benchmarks/sql-rollup-prototype.cjs), [독립 기대값·rollback 검증](../../../tests/benchmarks/sql-rollup-validation.cjs), [프로세스별 메모리 측정](../../../tests/benchmarks/sql-rollup-memory.cjs), [단위 테스트](../../../tests/node/sql-rollup-oracle.test.ts).
 
 </details>
 

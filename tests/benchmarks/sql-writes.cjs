@@ -184,7 +184,7 @@ function runWorker(config) {
 async function main() {
   const args = Object.fromEntries(process.argv.slice(2).map(s => { const i = s.indexOf('='); assert.ok(i > 2); return [s.slice(2, i), s.slice(i + 1)]; }));
   assert.ok(args.baseline, '--baseline required');
-  const baseline = resolve(args.baseline), output = resolve(args.output ?? 'docs/benchmarks/SqlWrites-2026-10-26.json');
+  const baseline = resolve(args.baseline), output = resolve(args.output ?? 'docs/benchmarks/2026-10-26/SqlWrites-2026-10-26.json');
   const expected = args.expected ? JSON.parse(readFileSync(resolve(args.expected), 'utf8')) : undefined;
   const selectedVariants = args.variants ? args.variants.split(',') : variants;
   assert.ok(selectedVariants.every(v => variants.includes(v)));

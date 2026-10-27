@@ -21,7 +21,7 @@ const sha = value => createHash('sha256').update(value).digest('hex');
 
 function optionsFor(args) {
   const options = { sizes: [280, 100000], turns: [10, 100], samples: 3, warmup: 1,
-    baseline: undefined, output: resolve(root, 'docs/benchmarks/SqlRollupProductBenchmark-2026-10-15.json') };
+    baseline: undefined, output: resolve(root, 'docs/benchmarks/2026-10-15/SqlRollupProductBenchmark-2026-10-15.json') };
   for (const arg of args) {
     if (arg.startsWith('--baseline=')) options.baseline = resolve(arg.slice(11));
     else if (arg.startsWith('--sizes=')) options.sizes = arg.slice(8).split(',').map(Number);

@@ -88,7 +88,7 @@ function runValidation() {
 if(require.main===module) {
   const result=runValidation();
   if(process.argv[2]==='--append') {
-    const path=resolve(__dirname,'../../docs/benchmarks/SqlRollupABBenchmark-2026-10-15.json');
+    const path=resolve(__dirname,'../../docs/benchmarks/2026-10-15/SqlRollupABBenchmark-2026-10-15.json');
     const report=JSON.parse(readFileSync(path,'utf8'));
     report.supplementaryValidation=result;
     writeFileSync(path,JSON.stringify(report,null,2)+'\n');

@@ -2,7 +2,7 @@
 
 이번 실험은 사용자가 제시한 **처음에 JSONL을 읽어 일괄 적재하고, 이후에는 저장한 위치 다음의 신규 요청만 INSERT하는 경로**를 비교한다. 정규화된 요청 요약 JSONL을 사용하는 벤치마크 시제품이며, 현재 제품의 Claude·Codex 원본 로그 파서 전체 성능을 측정한 결과는 아니다. 제품 코드는 변경하지 않는다.
 
-재현 실행기는 [sql-rowid-append.cjs](../../../tests/benchmarks/sql-rowid-append.cjs), 측정 원본은 [JSON](SqlRowidAppend-2026-10-27.json)이다. [앞선 현재 제품 저장 경로 실험](../SqlRowid-2026-10-27.md)과 구분한다.
+재현 실행기는 [sql-rowid-append.cjs](../../../tests/benchmarks/sql-rowid-append.cjs), 측정 원본은 [JSON](SqlRowidAppend-2026-10-27.json)이다. [앞선 현재 제품 저장 경로 실험](SqlRowid-2026-10-27.md)과 구분한다.
 
 ## 측정 결과
 

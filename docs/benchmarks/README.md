@@ -1,21 +1,11 @@
 # benchmarks
 
-JSONL 파싱·요청 집계·SQL 조회의 성능 비교 결과를 보존한다.
+벤치마크 보고서와 원시 결과를 실험 기준일(Asia/Seoul)의 `YYYY-MM-DD` 폴더에 보존한다. 같은 실험의 후속 고찰·보완 측정은 기준 실험과 함께 둔다.
 
-- [JsonlParsingBranches-2026-10-09.json](JsonlParsingBranches-2026-10-09.json): JSONL 파싱 방식별 비교 수치를 보존한다.
-- [JsonlReaderTradeoff.json](JsonlReaderTradeoff.json): JSONL 읽기 방식의 성능·자원 사용 비교를 보존한다.
-- [PerformanceReview-2026-10-08.json](PerformanceReview-2026-10-08.json): 인덱스·파싱·집계 성능 검토의 측정값을 보존한다.
-- [RequestTitleAB.json](RequestTitleAB.json): 요청 제목 집계 A/B 검증의 결과를 보존한다.
-- [RequestTitleTransactions.json](RequestTitleTransactions.json): 실제 요청 제목 갱신·트랜잭션의 측정값을 보존한다.
-- [RequestTitleTransactions.jsonl.gz](RequestTitleTransactions.jsonl.gz): 요청 제목 갱신 측정의 압축 실행 로그를 보존한다.
-- [SqlExplainBenchmark-2026-10-15.md](SqlExplainBenchmark-2026-10-15.md): 기존 SQL과 일별 rollup 비교의 해석과 선택 근거를 설명한다.
-- [SqlExplainBenchmark-2026-10-15.json](SqlExplainBenchmark-2026-10-15.json): SQL 조회 계획과 실행 성능 측정값을 보존한다.
-- [SqlRollupABBenchmark-2026-10-15.json](SqlRollupABBenchmark-2026-10-15.json): rollup 후보 간 A/B 측정값을 보존한다.
-- [SqlRollupProductBenchmark-2026-10-15.json](SqlRollupProductBenchmark-2026-10-15.json): 제품 rollup 적용 전후의 조회·갱신 비용을 보존한다.
-- [SqlWrites-2026-10-26.md](SqlWrites-2026-10-26.md): 증분 저장·일/월 기본키 배치와 세션 날짜 인덱스의 A/B 결과와 채택 근거를 설명한다.
-- [SqlWrites-2026-10-26-Analysis.md](SqlWrites-2026-10-26-Analysis.md): 현재 PK 저장 구조·월별 GROUP BY와 한 달 탐색의 차이·월 우선 배치의 공간/쓰기 비용 원인을 고찰한다.
-- [SqlWrites-2026-10-26.json](SqlWrites-2026-10-26.json): 같은 비교의 표본·전체 결과 해시·실행 계획·DB 공간·프로세스 메모리를 보존한다.
-- [SqlRowid-2026-10-27.md](SqlRowid-2026-10-27.md): 같은 세션 키·증분 저장에서 일별 집계의 rowid 유무에 따른 시간·공간과 원인을 비교한다.
-- [SqlRowid-2026-10-27.json](SqlRowid-2026-10-27.json): rowid A/B의 프로세스별 표본·전체 결과 해시·실행 계획·물리 점유를 보존한다.
-- [SqlRowidAppend-2026-10-27.md](2026-10-27/SqlRowidAppend-2026-10-27.md): 최초 일괄 적재와 추가분 INSERT 시제품의 rowid A/B 결과·현재 제품과의 차이를 설명한다.
-- [SqlRowidAppend-2026-10-27.json](2026-10-27/SqlRowidAppend-2026-10-27.json): 같은 비교의 교대 표본·구간별 시간·입력 바이트·공간·정합성 검증을 보존한다.
+- [2026-10-27](2026-10-27/README.md): 현재 제품 저장 경로와 추가분 INSERT 시제품의 rowid A/B.
+- [2026-10-26](2026-10-26/README.md): 증분 저장·월/일 기본키 배치·세션 날짜 인덱스 비교와 후속 고찰.
+- [2026-10-15](2026-10-15/README.md): SQL 실행 계획·인덱스·일별 rollup 후보와 제품 경로 비교.
+- [2026-10-09](2026-10-09/README.md): JSONL reader·adapter 및 파싱 분기 비교.
+- [2026-10-08](2026-10-08/README.md): 초기 성능 검토와 요청 제목 인덱스·트랜잭션 비교.
+
+원시 JSON·압축 로그의 측정값과 당시 경로·소스 해시는 변경하지 않는다. 실행기와 다른 문서의 참조는 현재 보관 경로를 사용한다. 로컬 재실행·smoke 산출물은 기존 `tests/results/benchmarks/`에 둔다.

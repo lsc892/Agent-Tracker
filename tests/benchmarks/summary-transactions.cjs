@@ -372,7 +372,7 @@ function markdown(report, documentPath, jsonPath, logPath) {
 
 사용자는 개인용·간헐적 통계 갱신에서 상시 인덱스 유지보다 갱신 중 메모리를 우선하여 **A: TEMP partial index**를 선택했다. 제목이 있는 메인 이벤트만 \`component_events(root_id,id) WHERE is_main=1 AND request_title IS NOT NULL\`로 인덱싱하며, 기존 최초 제목 선택 SQL을 유지한다. 제목 Map을 추가하지 않고 SQLite의 FILE TEMP와 기존 100행 단위 결과 읽기를 사용한다. component 재생성·staging 종료 시 인덱스가 제거되며 영속 schema·parser version은 변경하지 않는다.
 
-검토한 B는 기존 roots 집계에 최초 제목 이벤트 ID를 포함한 뒤 events의 기본 키로 제목을 JOIN한다. B도 JS HashSet/Map을 사용하지 않는다. [앞선 2,000개 A/B 실험](${link(resolve(__dirname, '../../docs/RequestTitleAB.md'))})에서 B는 집계 시간과 TEMP live 공간이 적었고 A는 관측 RSS가 작았다. 그 RSS 차이는 fixture·결과 검증까지 포함한 process 값이므로 알고리즘 고유 메모리 차이로 확정하지 않는다. 이번에는 **최적화 전 무인덱스 SQL과 실제 구현 A**를 동일한 원본으로 비교했다. B와 A 비교 수치에 이번 결과를 섞지 않는다.
+검토한 B는 기존 roots 집계에 최초 제목 이벤트 ID를 포함한 뒤 events의 기본 키로 제목을 JOIN한다. B도 JS HashSet/Map을 사용하지 않는다. [앞선 2,000개 A/B 실험](${link(resolve(__dirname, '../../docs/benchmarks/2026-10-08/RequestTitleAB.md'))})에서 B는 집계 시간과 TEMP live 공간이 적었고 A는 관측 RSS가 작았다. 그 RSS 차이는 fixture·결과 검증까지 포함한 process 값이므로 알고리즘 고유 메모리 차이로 확정하지 않는다. 이번에는 **최적화 전 무인덱스 SQL과 실제 구현 A**를 동일한 원본으로 비교했다. B와 A 비교 수치에 이번 결과를 섞지 않는다.
 
 이번 최적화의 대상은 한 prepared_turns SQL 안에서 요청마다 실행되는 제목 상관 서브쿼리의 반복 탐색 비용이다. 프로젝트·세션 이름의 기존 정규화와 요청별 제목 탐색은 별도 경로다.
 
@@ -426,7 +426,7 @@ E/T/R의 최대값은 각각 구한 값이며 같은 component에서 모두 최�
 
 ## 재실행
 
-\`npm run benchmark:transactions -- --real --pairs 3 --report docs/RequestTitleTransactions.md\`
+\`npm run benchmark:transactions -- --real --pairs 3 --report docs/benchmarks/2026-10-08/RequestTitleTransactions.md\`
 
 \`--real\` 없이 실행하면 개인 파일을 읽지 않는 30개 요청의 합성 검증이다. CI는 이 합성 실행만 검사한다. 기본 보고서는 tests/results/benchmarks에 저장한다.
 
@@ -489,7 +489,7 @@ async function main() {
         indexSpace:'O(T * key width) TEMP B-tree', commonTempSpace:'approximately O(E * row width)', logBufferMaxBytes:65536 },
       results, samples:records };
     const documentPath = options.report;
-    const output = join(dirname(documentPath), 'benchmarks');
+    const output = dirname(documentPath);
     await mkdir(output, { recursive:true });
     const jsonPath = join(output, `${basename(documentPath, '.md')}.json`);
     const logPath = join(output, `${basename(documentPath, '.md')}.jsonl${options.real ? '.gz' : ''}`);

@@ -69,7 +69,7 @@ function runWorker(path, variant, name) {
 }
 
 async function main() {
-  const output = resolve(process.argv[2] || join(root, 'docs/benchmarks/SqlRollupABBenchmark-2026-10-15.json'));
+  const output = resolve(process.argv[2] || join(root, 'docs/benchmarks/2026-10-15/SqlRollupABBenchmark-2026-10-15.json'));
   const report = JSON.parse(await readFile(output, 'utf8'));
   const directory = await mkdtemp(join(tmpdir(), 'agent-tracker-rollup-memory-'));
   const result = {

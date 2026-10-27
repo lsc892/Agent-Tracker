@@ -22,7 +22,7 @@ const round = value => typeof value === 'number' && !Number.isInteger(value) ? N
 const canonical = value => JSON.stringify(value, (_key, raw) => round(raw));
 
 function optionsFor(args) {
-  const options = { sizes:[280,100000],turnsPerSession:[10,100],samples:3,warmup:1,output:resolve(root,'docs/benchmarks/SqlRollupABBenchmark-2026-10-15.json'),worstCase:true };
+  const options = { sizes:[280,100000],turnsPerSession:[10,100],samples:3,warmup:1,output:resolve(root,'docs/benchmarks/2026-10-15/SqlRollupABBenchmark-2026-10-15.json'),worstCase:true };
   for (const arg of args) {
     if (arg.startsWith('--sizes=')) options.sizes=arg.slice(8).split(',').map(Number);
     else if (arg.startsWith('--turns-per-session=')) options.turnsPerSession=arg.slice(20).split(',').map(Number);

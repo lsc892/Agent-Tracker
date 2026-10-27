@@ -1,6 +1,6 @@
 # JSONL 파싱 전용: 적용 전·후 브랜치 비교
 
-2026-10-09 Asia/Seoul. 같은 JSONL Buffer에 대해 줄 분리·문자열 처리·이미지 제거·UTF-8 변환·JSON.parse의 실행 시간을 비교했다. **파일 I/O·adapter·SQLite는 파싱 시간에 포함하지 않는다.** 이전 [reader+adapter 측정 보고서](JsonlReaderTradeoff.md)와 [이전 측정 JSON](benchmarks/JsonlReaderTradeoff.json)은 원본 그대로 보존했다.
+2026-10-09 Asia/Seoul. 같은 JSONL Buffer에 대해 줄 분리·문자열 처리·이미지 제거·UTF-8 변환·JSON.parse의 실행 시간을 비교했다. **파일 I/O·adapter·SQLite는 파싱 시간에 포함하지 않는다.** 이전 [reader+adapter 측정 보고서](JsonlReaderTradeoff.json)와 [이전 측정 JSON](JsonlReaderTradeoff.json)은 원본 그대로 보존했다.
 
 이 비교의 규모 기준은 파일 개수가 아니라 JSONL 행 수와 원본·보관 바이트다. 원본 파일 경계는 offset과 부분 줄 처리를 동일하게 검증하기 위한 입력 metadata로만 유지한다.
 
@@ -11,7 +11,7 @@
 | 적용 전 | `bench/jsonl-parse-before-20261009` | `3f5b49b3fefd32847399e9042c9fe9ca8ddcab24`의 바이트별 reader |
 | 적용 후 | `bench/jsonl-parse-after-20261009` | 같은 commit 위에 현재 `src/summary/jsonl.ts` 개선을 적용한 상태 |
 
-각 브랜치는 별도 worktree에 체크아웃하여 빌드했다. 적용 후 변경은 아직 커밋하지 않았으며 현재 작업 폴더의 reader와 동일한 소스 hash를 사용한다. 두 브랜치의 소스·컴파일 결과 hash를 [새 원시 결과](benchmarks/JsonlParsingBranches-2026-10-09.json)에 기록했다. 측정 시 원래 작업 폴더는 `dev`였으며 미커밋 변경을 유지했다.
+각 브랜치는 별도 worktree에 체크아웃하여 빌드했다. 적용 후 변경은 아직 커밋하지 않았으며 현재 작업 폴더의 reader와 동일한 소스 hash를 사용한다. 두 브랜치의 소스·컴파일 결과 hash를 [새 원시 결과](JsonlParsingBranches-2026-10-09.json)에 기록했다. 측정 시 원래 작업 폴더는 `dev`였으며 미커밋 변경을 유지했다.
 
 이전 고정 사본을 다시 사용하고 모든 입력 Buffer의 크기·SHA-256을 실행 전에 확인했다. 이전 결과를 새 값으로 덮어쓰지 않았다. 이전 측정 JSON의 SHA-256은 측정 전후 모두 다음과 같다.
 
@@ -23,7 +23,7 @@
 
 ## 측정 범위와 조건
 
-실행 환경은 Windows x64 / Node v24.19.0이다. [동일 측정 실행기](../tests/benchmarks/jsonl-parsing-branches.cjs)가 두 브랜치의 실제 빌드된 reader를 호출한다. 제품 reader 소스를 측정을 위해 변경하지 않았다.
+실행 환경은 Windows x64 / Node v24.19.0이다. [동일 측정 실행기](../../../tests/benchmarks/jsonl-parsing-branches.cjs)가 두 브랜치의 실제 빌드된 reader를 호출한다. 제품 reader 소스를 측정을 위해 변경하지 않았다.
 
 입력 전체를 측정 전에 메모리에 준비하고 `node:fs/promises.open`을 해당 Buffer만 읽는 RAM handle로 대체한다. 따라서 reader 실행 중 디스크 open/read/close가 발생하지 않는다. 시간은 reader의 기존 `processBatch(parseRows)` 경계에서 동기 `parseRows()` 실행 시간만 합산한다. RAM 입력에서 재사용 64 KiB chunk로 복사하는 시간과 async await·초기화도 주 지표에서 제외한다.
 

@@ -305,14 +305,14 @@ async function compare() {
     baselineCommit: manifest.baselineCommit, baselineSourceSha256: manifest.baselineSourceSha256, candidateSourceSha256: sha(currentSource),
     beforeImplementation: JSON.parse(await readFile(join(cache, 'before.json'), 'utf8')),
     method: 'Three sequential alternating pairs in fresh processes. Frozen input; filesystem cache warmed by correctness runs. Modules loaded before timer; first-use JIT included. Small reader repeats 50 times; others once. Hash and memory sampling excluded from timing runs. Memory sampled at chunk boundaries and every 256 rows in separate runs without hash. Native maxRSS includes full child lifetime. Full refresh includes SQL, phase callbacks and RSS sampling; output hash runs afterward. Capture probe used the earlier runner with TypeScript loaded in children; it is only a before-implementation record, not part of the paired comparison.', cases, refresh };
-  const destination = join(root, 'docs/benchmarks/JsonlReaderTradeoff.json');
+  const destination = join(root, 'docs/benchmarks/2026-10-09/JsonlReaderTradeoff.json');
   await mkdir(dirname(destination), { recursive: true });
   await writeFile(destination, JSON.stringify(report, null, 2));
-  console.log('Report: docs/benchmarks/JsonlReaderTradeoff.json');
+  console.log('Report: docs/benchmarks/2026-10-09/JsonlReaderTradeoff.json');
 }
 
 async function confirmRefresh() {
-  const destination = join(root, 'docs/benchmarks/JsonlReaderTradeoff.json');
+  const destination = join(root, 'docs/benchmarks/2026-10-09/JsonlReaderTradeoff.json');
   const report = JSON.parse(await readFile(destination, 'utf8'));
   assert.equal(report.candidateSourceSha256, sha(await readFile(join(root, 'src/summary/jsonl.ts'), 'utf8')));
   const runs = [];

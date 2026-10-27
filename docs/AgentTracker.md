@@ -759,7 +759,7 @@ DB 모듈은 변경 이유별로 책임을 나눈다. `src/summary/db/index.ts`�
 
 `SessionStore.replaceSessions()`는 대상·삭제 원본 준비, manifest 반영, 요청별 차이 적용, 사라진 요청·원본 삭제, rollup 갱신과 이름 정리를 하나의 `BEGIN IMMEDIATE`/`COMMIT`으로 묶는다. 요청·모델·Skill 입력은 한 번씩 소비하고 요청 ID를 유지한 채 변경 요청만 UPDATE, 추가 요청만 INSERT하며 입력에 없어진 요청만 DELETE한다. 요청별 모델·Skill 비교는 디스크 TEMP에서 수행하고 달라진 요청의 해당 자식 묶음만 교체한다. `preserveCapabilities`는 저장된 Skill 값을 우선 보존하고, 비용 저장도 값이 같으면 쓰지 않는다. 어느 단계가 실패해도 facts·집계·metadata를 함께 rollback한다.
 
-입력에 `updated_at`이 있으면 그 값을 사용한다. 생략된 경우 값이 바뀐 요청·모델·Skill만 현재 시각으로 갱신하고 동일한 요청은 기존 시각을 유지한다. 따라서 집계의 최종 갱신 시각은 통계 값의 변경 시각이며, 성공한 파일 재검사 시각은 manifest.recorded_at으로 확인한다. 전체 로그 재파싱은 계속 영향 세션 단위이며, 이번 최적화는 DB 저장·집계 유지 비용을 줄인다. 재현 조건과 쓰기·인덱스 후보 비교는 [A/B 보고서](benchmarks/SqlWrites-2026-10-26.md)에 기록한다.
+입력에 `updated_at`이 있으면 그 값을 사용한다. 생략된 경우 값이 바뀐 요청·모델·Skill만 현재 시각으로 갱신하고 동일한 요청은 기존 시각을 유지한다. 따라서 집계의 최종 갱신 시각은 통계 값의 변경 시각이며, 성공한 파일 재검사 시각은 manifest.recorded_at으로 확인한다. 전체 로그 재파싱은 계속 영향 세션 단위이며, 이번 최적화는 DB 저장·집계 유지 비용을 줄인다. 재현 조건과 쓰기·인덱스 후보 비교는 [A/B 보고서](benchmarks/2026-10-26/SqlWrites-2026-10-26.md)에 기록한다.
 
 `reader.ts`는 조회 실행·페이지·결과 변환과 rollup/raw 경로 선택, `queries.ts`는 기존 facts SQL 생성, `validation.ts`는 공통 수치·페이지 검증을 맡는다. `rollup-state.ts`는 병합 가능한 상태와 schema, `rollup-queries.ts`는 일별 상태·raw 경계의 SQL, `rollups.ts`는 구축·세션별 갱신·조회 snapshot을 맡는다. 실제 통계 worker는 `queryUsagePage()` 한 번으로 페이지 행과 전체 개수를 같은 snapshot에서 읽고, 반환된 행으로 도표를 만든다. 요청별·비용 포함·구버전 Node의 raw 조회도 같은 페이지 계약을 사용하며 별도의 도표 조회 메서드와 누계 요청·응답 계약은 두지 않는다. 목록과 개수는 같은 필터·그룹 정의를 사용하고 모델 해석은 공통 facts 표현식을 재사용한다. SQL 구조와 바인딩을 함께 반환하며 시간대·기간·ID는 SQL 문자열에 삽입하지 않는다. 집계 표본·NULL·미상 정렬과 기존 원본 인덱스를 보존한다.
 
@@ -953,9 +953,9 @@ Extension Host 메모리에 유지하는 값:
 
 SQLite query는 기간과 project/session filter를 먼저 적용하고 turn_summary는 page 단위로 가져온다. 기본 page size는 100으로 한다. 통계의 도표·표 하단에는 `페이지당 행 수` 숫자 입력칸을 이전 버튼 바로 왼쪽에 배치하고 페이지 이동 조작 전체를 오른쪽에 모은다. 1~1,000 사이 정수를 직접 입력하고 Enter 또는 입력칸 이탈로 적용하며 빈 값·소수·범위 밖 값은 입력 오류를 표시하고 조회하지 않는다. 토큰 도표와 표는 같은 값을 공유하고, Skill 네 분류는 각각 독립적인 값을 사용한다. 개수 변경은 해당 표만 첫 페이지로 되돌리며 기간·대상·정렬을 유지하고 원본 로그를 다시 읽지 않는다. 적용한 개수는 기존 조회 선택과 함께 Webview state에 보존하며 `초기화`는 모두 100행으로 되돌린다. 프로젝트·세션 이름 목록과 데이터 확인의 조회 크기는 기존 100개를 유지한다.
 
-집계 조회의 주 입력은 요청 facts `K`행에서 선택된 일별 상태 `r`행과 부분 날짜의 raw 입력 `B`행으로 줄어든다. 범위 탐색·주 순회 모델은 `O(log N + K)`에서 `O(log R + r + B)`로 바뀌지만 GROUP BY·정렬 비용은 별도로 남는다. 추가 영속 공간은 실제 요청·모델 일별 조합 수 `O(R + Rm)`이다. 세션·날짜·모델 조합이 매 turn마다 달라지면 집계 행 수도 facts와 비슷해져 최악의 선형 비용은 유지된다. 최초 구축·시간대 변경에는 전체 재집계, 세션 변경에는 해당 세션 재집계와 추가 인덱스·WAL 비용이 생긴다. 소량·좁은 기간은 고정 경계 계산 비용으로 느려질 수 있으며 자동 임계값·결과 캐시는 추가하지 않았다. 실제 제품 경로의 전후 시간·공간·transaction 비교는 [SQL 측정 보고서](benchmarks/SqlExplainBenchmark-2026-10-15.md)에 둔다.
+집계 조회의 주 입력은 요청 facts `K`행에서 선택된 일별 상태 `r`행과 부분 날짜의 raw 입력 `B`행으로 줄어든다. 범위 탐색·주 순회 모델은 `O(log N + K)`에서 `O(log R + r + B)`로 바뀌지만 GROUP BY·정렬 비용은 별도로 남는다. 추가 영속 공간은 실제 요청·모델 일별 조합 수 `O(R + Rm)`이다. 세션·날짜·모델 조합이 매 turn마다 달라지면 집계 행 수도 facts와 비슷해져 최악의 선형 비용은 유지된다. 최초 구축·시간대 변경에는 전체 재집계, 세션 변경에는 해당 세션 재집계와 추가 인덱스·WAL 비용이 생긴다. 소량·좁은 기간은 고정 경계 계산 비용으로 느려질 수 있으며 자동 임계값·결과 캐시는 추가하지 않았다. 실제 제품 경로의 전후 시간·공간·transaction 비교는 [SQL 측정 보고서](benchmarks/2026-10-15/SqlExplainBenchmark-2026-10-15.md)에 둔다.
 
-요청 제목은 component 재집계 때 `component_events(root_id,id) WHERE is_main=1 AND request_title IS NOT NULL` TEMP partial index로 탐색한다. provider·session 조건을 유지하며 가장 먼저 기록된 메인 제목을 선택한다. 인덱스는 component 테이블 재생성·staging 종료 시 사라지고 영속 DB에는 추가하지 않는다. 별도 JS 제목 Map을 만들지 않으며 준비된 요청도 100행씩 읽는다. `prepareSummaries`는 영속 교체 transaction 전에 실행하고 실제 `replaceSessions`의 BEGIN IMMEDIATE/COMMIT 구간과 별도로 측정한다. FILE TEMP는 page cache를 사용하므로 전체 process 메모리의 고정 상한으로 해석하지 않는다. 제목 탐색의 복잡도 모델과 실제 고정 원본의 구현 전후 transaction 기록은 [측정 보고서](RequestTitleTransactions.md)에 둔다.
+요청 제목은 component 재집계 때 `component_events(root_id,id) WHERE is_main=1 AND request_title IS NOT NULL` TEMP partial index로 탐색한다. provider·session 조건을 유지하며 가장 먼저 기록된 메인 제목을 선택한다. 인덱스는 component 테이블 재생성·staging 종료 시 사라지고 영속 DB에는 추가하지 않는다. 별도 JS 제목 Map을 만들지 않으며 준비된 요청도 100행씩 읽는다. `prepareSummaries`는 영속 교체 transaction 전에 실행하고 실제 `replaceSessions`의 BEGIN IMMEDIATE/COMMIT 구간과 별도로 측정한다. FILE TEMP는 page cache를 사용하므로 전체 process 메모리의 고정 상한으로 해석하지 않는다. 제목 탐색의 복잡도 모델과 실제 고정 원본의 구현 전후 transaction 기록은 [측정 보고서](benchmarks/2026-10-08/RequestTitleTransactions.md)에 둔다.
 
 SQLite 자체보다 주의할 부분은 VS Code extension 배포 방식이다.
 
@@ -986,7 +986,7 @@ SQLite 자체보다 주의할 부분은 VS Code extension 배포 방식이다.
 
 SQLite 사용 자체가 고정 메모리를 보장하지 않는다. worker의 discovery 목록·중복 검증 작업량·DB page cache도 측정하고, corpus 전체를 host에 반환하지 않도록 batch/page 경계를 지킨다.
 
-JSONL reader는 바이트별 JS 처리 대신 일반 줄의 직접 파싱과 연속 Buffer 구간 처리를 사용한다. 읽은 원본 byte N에 대한 시간 O(N), chunk C와 보관 줄 한도 K에 대한 reader 보조 공간 O(C + min(L,K))는 유지한다. 이미지 검사에는 C 이내의 임시 Latin-1 문자열을 사용하며, row 객체·adapter·DB 메모리는 별도다. 파싱의 규모는 JSONL 행 수·원본/보관 byte·최대 줄 크기로 비교한다. 동일한 RAM 입력으로 I/O·adapter·DB를 제외한 적용 전후 브랜치 측정은 [파싱 전용 보고서](JsonlParsingBranches-2026-10-09.md)에 둔다. 이전 reader+adapter 및 전체 갱신 측정은 [기존 트레이드오프 보고서](benchmarks/JsonlReaderTradeoff.json)에 원본 그대로 보존한다. parser version과 집계 결과를 유지하므로 이 최적화만으로 정상 파일 전체를 강제 재파싱하지 않는다.
+JSONL reader는 바이트별 JS 처리 대신 일반 줄의 직접 파싱과 연속 Buffer 구간 처리를 사용한다. 읽은 원본 byte N에 대한 시간 O(N), chunk C와 보관 줄 한도 K에 대한 reader 보조 공간 O(C + min(L,K))는 유지한다. 이미지 검사에는 C 이내의 임시 Latin-1 문자열을 사용하며, row 객체·adapter·DB 메모리는 별도다. 파싱의 규모는 JSONL 행 수·원본/보관 byte·최대 줄 크기로 비교한다. 동일한 RAM 입력으로 I/O·adapter·DB를 제외한 적용 전후 브랜치 측정은 [파싱 전용 보고서](benchmarks/2026-10-09/JsonlParsingBranches-2026-10-09.md)에 둔다. 이전 reader+adapter 및 전체 갱신 측정은 [기존 트레이드오프 보고서](benchmarks/2026-10-09/JsonlReaderTradeoff.json)에 원본 그대로 보존한다. parser version과 집계 결과를 유지하므로 이 최적화만으로 정상 파일 전체를 강제 재파싱하지 않는다.
 
 ## 11. 검증 및 시뮬레이션
 

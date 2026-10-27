@@ -2,9 +2,9 @@
 
 2026-10-08, Asia/Seoul 기준 조사. 인덱싱과 파싱은 각각 별도 서브에이전트가 분석·측정하고, 스킬 집계는 주 에이전트가 확인했다. 이 문서는 분석과 개선 제안이며 제품 구현을 변경하지 않았다.
 
-2026-10-09 후속 적용: 평균·프로젝트·월간 집계를 주 사용처로 삼아 schema v10에서 별도 summary 세션 인덱스를 제거하고 기존 요청 UNIQUE의 세션 prefix를 사용한다. Windows의 manifest identity 인덱스는 제거하고 다른 플랫폼의 이동 탐지용 인덱스는 유지한다. 날짜·프로젝트 및 manifest 루트·세션 인덱스는 유지하며 `PRAGMA main.optimize`를 DB 열기·첫 스캔 완료·이후 하루 간격의 스캔 완료·종료에 적용한다. 아래 수치는 당시 schema 7·8 사본의 측정 이력이며 현재 구현의 적용 전후 실측으로 취급하지 않는다. 최종 구조는 [설계 명세](AgentTracker.md)를 따른다.
+2026-10-09 후속 적용: 평균·프로젝트·월간 집계를 주 사용처로 삼아 schema v10에서 별도 summary 세션 인덱스를 제거하고 기존 요청 UNIQUE의 세션 prefix를 사용한다. Windows의 manifest identity 인덱스는 제거하고 다른 플랫폼의 이동 탐지용 인덱스는 유지한다. 날짜·프로젝트 및 manifest 루트·세션 인덱스는 유지하며 `PRAGMA main.optimize`를 DB 열기·첫 스캔 완료·이후 하루 간격의 스캔 완료·종료에 적용한다. 아래 수치는 당시 schema 7·8 사본의 측정 이력이며 현재 구현의 적용 전후 실측으로 취급하지 않는다. 최종 구조는 [설계 명세](../../AgentTracker.md)를 따른다.
 
-우선 검토할 곳은 현재 요청 제목 집계의 TEMP partial index와 JSONL reader의 바이트 전처리다. 영속 DB는 0.83 MiB로 작고, provider별 최신 요청 인덱스는 별도로 조회를 개선할 근거가 있다. 스킬 통계는 SQL에 저장되지만 명시 호출과 문서 읽기 탐지라는 집계 정의를 분명히 할 필요가 있다. 반복 측정 원본은 [측정 JSON](benchmarks/PerformanceReview-2026-10-08.json)에 보관했다.
+우선 검토할 곳은 현재 요청 제목 집계의 TEMP partial index와 JSONL reader의 바이트 전처리다. 영속 DB는 0.83 MiB로 작고, provider별 최신 요청 인덱스는 별도로 조회를 개선할 근거가 있다. 스킬 통계는 SQL에 저장되지만 명시 호출과 문서 읽기 탐지라는 집계 정의를 분명히 할 필요가 있다. 반복 측정 원본은 [측정 JSON](PerformanceReview-2026-10-08.json)에 보관했다.
 
 ## 조사 범위와 측정 조건
 
@@ -95,7 +95,7 @@ DB에는 JSONL 원문 전체가 들어가지 않는다. 파일 메타데이터, 
 
 ## 2. JSONL 파싱
 
-> 이 절은 2026-10-08의 구현과 실험을 기록한다. 2026-10-09 제품 reader에 일반 줄 직접 파싱·연속 Buffer 처리와 기존 보호 조건을 함께 적용했다. 최종 소스의 JSONL 행 수·바이트 기준 파싱 비교는 I/O를 제외한 [적용 전후 브랜치 보고서](JsonlParsingBranches-2026-10-09.md)를 따른다. 이전 I/O 포함 측정은 [JSONL reader 트레이드오프 보고서](JsonlReaderTradeoff.md)에 그대로 보존한다.
+> 이 절은 2026-10-08의 구현과 실험을 기록한다. 2026-10-09 제품 reader에 일반 줄 직접 파싱·연속 Buffer 처리와 기존 보호 조건을 함께 적용했다. 최종 소스의 JSONL 행 수·바이트 기준 파싱 비교는 I/O를 제외한 [적용 전후 브랜치 보고서](../2026-10-09/JsonlParsingBranches-2026-10-09.md)를 따른다. 이전 I/O 포함 측정은 [JSONL reader 트레이드오프 보고서](../2026-10-09/JsonlReaderTradeoff.json)에 그대로 보존한다.
 
 ### 현재 실행 구조
 
@@ -109,7 +109,7 @@ flowchart LR
   D --> S[영속 세션 교체]
 ```
 
-관련 코드: [JSONL reader](../src/summary/jsonl.ts), [scanner](../src/summary/scanner.ts), [staging](../src/summary/staging.ts), [worker](../src/summary/worker.ts).
+관련 코드: [JSONL reader](../../../src/summary/jsonl.ts), [scanner](../../../src/summary/scanner.ts), [staging](../../../src/summary/staging.ts), [worker](../../../src/summary/worker.ts).
 
 summary worker는 하나이며 파일을 순서대로 처리한다. 8개 논리 CPU가 있어도 파싱·동기 SQL이 자동으로 8개 코어에 나뉘지는 않는다. 파일 읽기는 비동기지만 JS reader·adapter·SQLite는 해당 worker에서 실행된다.
 
@@ -187,7 +187,7 @@ WHERE is_main = 1 AND request_title IS NOT NULL;
 
 ### 실제 SQL 저장 구조
 
-[schema.ts](../src/summary/db/schema.ts)의 `turn_capability_usage`에 다음 네 값이 저장된다.
+[schema.ts](../../../src/summary/db/schema.ts)의 `turn_capability_usage`에 다음 네 값이 저장된다.
 
 ```sql
 turn_id, category, name, usage_count
@@ -196,7 +196,7 @@ PRIMARY KEY(turn_id, category, name) WITHOUT ROWID
 
 category는 `skill`, `subagent`, `plugin`, `model`이다. 원본 툴 명령과 응답, 스킬 파일 전문은 이 테이블에 저장하지 않는다. 요청 요약이 삭제되면 foreign key cascade로 횟수도 삭제된다.
 
-[capabilities.ts](../src/summary/parsers/capabilities.ts)는 다음 신호를 수집한다.
+[capabilities.ts](../../../src/summary/parsers/capabilities.ts)는 다음 신호를 수집한다.
 
 | 종류 | 탐지 기준 |
 |---|---|
@@ -205,11 +205,11 @@ category는 `skill`, `subagent`, `plugin`, `model`이다. 원본 툴 명령과 �
 | plugin | `mcp__server__tool`의 server 부분, plugin 경로 또는 skill 접두사 |
 | model | 중복 제거를 통과한 모델 응답/사용량 이벤트 수 |
 
-Codex `exec` 안의 정적 `tools.xxx(...)`도 탐색한다. 문자열과 주석은 건너뛰며 코드를 실행하지 않는다. 툴 호출 ID와 wrapper 내 index를 사용해 중복 이벤트를 제거하고, 요청별·종류별·이름별 횟수로 압축한다. 모델 횟수는 요청 수·토큰 수와 다른 단위다. fork의 검증된 복사 이력도 중복 제거한다. 근거: [staging.ts](../src/summary/staging.ts)의 capability winners와 capabilityUsage.
+Codex `exec` 안의 정적 `tools.xxx(...)`도 탐색한다. 문자열과 주석은 건너뛰며 코드를 실행하지 않는다. 툴 호출 ID와 wrapper 내 index를 사용해 중복 이벤트를 제거하고, 요청별·종류별·이름별 횟수로 압축한다. 모델 횟수는 요청 수·토큰 수와 다른 단위다. fork의 검증된 복사 이력도 중복 제거한다. 근거: [staging.ts](../../../src/summary/staging.ts)의 capability winners와 capabilityUsage.
 
 ### 통계 계산
 
-[queryCapabilities](../src/summary/db/index.ts)는 요청 요약과 capability 테이블을 JOIN하고 provider·프로젝트·세션·요청 시작 날짜 등의 filter를 적용한다. `GROUP BY provider,name`, `SUM(usage_count)`로 순위를 구하고 아래 식으로 비율을 계산한다.
+[queryCapabilities](../../../src/summary/db/index.ts)는 요청 요약과 capability 테이블을 JOIN하고 provider·프로젝트·세션·요청 시작 날짜 등의 filter를 적용한다. `GROUP BY provider,name`, `SUM(usage_count)`로 순위를 구하고 아래 식으로 비율을 계산한다.
 
 `percentage = 해당 provider·이름의 횟수 / 필터 범위의 해당 category 전체 횟수 × 100`
 
