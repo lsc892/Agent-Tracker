@@ -2,6 +2,13 @@
 
 요약·JSONL·SQL·quota 처리의 정확성과 성능을 비교하는 도구를 모은다.
 
+- [date-storage-profile.cjs](date-storage-profile.cjs) — 설치 DB의 스키마·행 수·인덱스 공간을 읽기 전용으로 조사한다.
+- [date-storage-raw.cjs](date-storage-raw.cjs) — 날짜순 입력과 요청 날짜 인덱스 후보의 정확성·읽기·쓰기·저장 공간을 비교한다.
+- [date-storage-rollup.cjs](date-storage-rollup.cjs) — 일별 집계 기본 키 순서와 세션 보완 인덱스 후보를 비교한다.
+- [date-storage-query.cjs](date-storage-query.cjs) — 날짜 OR 조건의 UNION 분리·특수화를 준비된 SQL로 비교한다.
+- [date-storage-order.cjs](date-storage-order.cjs) — 실제 최신 요청 정렬과 일치하는 표현식 인덱스의 읽기·쓰기·공간을 비교한다.
+- [date-storage-sqlite-repro.cjs](date-storage-sqlite-repro.cjs) — 날짜 선두 PK와 OR 계획의 결과 누락을 독립 메모리 DB로 재현한다.
+
 - [jsonl-parsing-branches.cjs](jsonl-parsing-branches.cjs) — 메모리에 고정한 JSONL 입력으로 파싱 분기 변경 전후의 속도와 메모리를 비교한다.
 - [jsonl-reader.cjs](jsonl-reader.cjs) — 기준·후보 JSONL 리더의 결과 일치와 읽기·전체 갱신 성능을 비교한다.
 - [quota](quota/) — quota 조회 시나리오와 운영체제별 자원 샘플러로 시간·메모리를 측정한다.
