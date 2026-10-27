@@ -15,5 +15,6 @@
 - [RequestTitleTransactions.md](RequestTitleTransactions.md): 요청 제목 집계의 실제 갱신·트랜잭션 측정을 기록한다.
 - [SqlWrites-2026-10-26.md](benchmarks/SqlWrites-2026-10-26.md): 실제 DB와 100,000건의 증분 저장·월/일 인덱스 배치 A/B 결과를 기록한다.
 - [SqlWrites-2026-10-26-Analysis.md](benchmarks/SqlWrites-2026-10-26-Analysis.md): 현재 저장 순서와 월 우선 배치의 이점·비용, 복합 인덱스와 증분 처리의 효과를 고찰한다.
+- [SqlRowid-2026-10-27.md](benchmarks/SqlRowid-2026-10-27.md): 현재 증분 구현과 같은 세션 키에서 일반 rowid와 WITHOUT ROWID 집계의 조회·갱신·공간을 비교한다.
 - [research/](research/README.md): UI와 다국어 지원의 조사·설계 근거를 둔다.
 - [benchmarks/](benchmarks/README.md): 성능 비교 결과와 검증용 산출물을 보존한다.
