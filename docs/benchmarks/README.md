@@ -17,3 +17,5 @@ JSONL 파싱·요청 집계·SQL 조회의 성능 비교 결과를 보존한다.
 - [SqlWrites-2026-10-26.json](SqlWrites-2026-10-26.json): 같은 비교의 표본·전체 결과 해시·실행 계획·DB 공간·프로세스 메모리를 보존한다.
 - [SqlRowid-2026-10-27.md](SqlRowid-2026-10-27.md): 같은 세션 키·증분 저장에서 일별 집계의 rowid 유무에 따른 시간·공간과 원인을 비교한다.
 - [SqlRowid-2026-10-27.json](SqlRowid-2026-10-27.json): rowid A/B의 프로세스별 표본·전체 결과 해시·실행 계획·물리 점유를 보존한다.
+- [SqlRowidAppend-2026-10-27.md](2026-10-27/SqlRowidAppend-2026-10-27.md): 최초 일괄 적재와 추가분 INSERT 시제품의 rowid A/B 결과·현재 제품과의 차이를 설명한다.
+- [SqlRowidAppend-2026-10-27.json](2026-10-27/SqlRowidAppend-2026-10-27.json): 같은 비교의 교대 표본·구간별 시간·입력 바이트·공간·정합성 검증을 보존한다.

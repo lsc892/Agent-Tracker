@@ -47,6 +47,7 @@
     "benchmark:sql": "npm run build && node tests/benchmarks/sql-explain.cjs",
     "benchmark:sql:writes": "npm run build && node tests/benchmarks/sql-writes.cjs",
     "benchmark:sql:rowid": "npm run build && node tests/benchmarks/sql-rowid.cjs",
+    "benchmark:sql:rowid:append": "npm run build && node tests/benchmarks/sql-rowid-append.cjs",
     "benchmark:sql:rollup": "npm run build && node tests/benchmarks/sql-rollup.cjs",
     "benchmark:sql:rollup:product": "npm run build && node tests/benchmarks/sql-rollup-product.cjs",
     "localization:sync": "node tools/localization.cjs",
