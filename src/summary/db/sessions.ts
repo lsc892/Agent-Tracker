@@ -6,12 +6,13 @@ import type { BillingMode, SessionReplacement, TurnSummaryInput } from './types'
 import { nonnegative } from './validation';
 import { estimateCost, PRICING_VERSION } from '../pricing';
 
-const TURN_INSERT = `INSERT INTO turn_summary (
+const TURN_COLUMNS = `
   provider, project_key, session_id, root_turn_id, request_title,
   started_at_ms, completed_at_ms, duration_ms, duration_quality,
   input_tokens, output_tokens, cache_write_input_tokens, cache_read_input_tokens, total_tokens, status, quality_flags,
   diagnostic_file_id, diagnostic_offset, last_error, updated_at
-) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`;
+`.split(',').map(column => column.trim());
+const TURN_INSERT = `INSERT INTO turn_summary (${TURN_COLUMNS.join(',')}) VALUES (${TURN_COLUMNS.map(() => '?').join(',')})`;
 
 /**
  * 책임: 요청 요약의 숫자·캐시 불변식을 저장 전에 검증한다.
@@ -53,7 +54,7 @@ export class SessionStore {
 
   /**
    * 책임: 준비가 끝난 세션 묶음만 통계에 원자적으로 반영한다.
-   * 알고리즘: 대상·원본 참조를 검증하고 삭제 원본의 유효 요청을 보존한 뒤 나머지를 재삽입하며, 모델 합계 검증과 rollup 갱신도 함께 커밋한다.
+   * 알고리즘: 대상·원본 참조를 검증하고 요청별 차이만 반영하며, 사라진 요청 삭제와 영향 날짜 집계까지 같은 transaction에 커밋한다.
    */
   replaceSessions(replacement: SessionReplacement): void {
     this.database.transaction(() => {
@@ -66,14 +67,16 @@ export class SessionStore {
         }
       };
       this.prepareRemovedFiles(replacement, existingFile, requireSession);
-      this.preserveReplacementData(replacement);
-      this.database.connection.exec(`DELETE FROM turn_summary WHERE (provider, session_id) IN (
-        SELECT provider, session_id FROM db_replacement_sessions
-      ) AND id NOT IN (SELECT id FROM db_retained_turns)`);
+      this.rememberReplacementProjects();
+      this.database.rollups.beginChanges();
       const now = this.replaceManifestFiles(replacement, existingFile, requireSession);
-      this.insertSummaries(replacement, hasSession, now);
-      this.restoreCapabilitiesAndRemoveFiles(replacement, now);
-      this.database.rollups.refreshChangedSessions();
+      this.applySummaries(replacement, hasSession, now);
+      const removed = `(provider,session_id) IN (SELECT provider,session_id FROM db_replacement_sessions)
+        AND id NOT IN (SELECT id FROM db_replacement_turns) AND id NOT IN (SELECT id FROM db_retained_turns)`;
+      this.database.rollups.captureTurns(removed);
+      this.database.connection.exec(`DELETE FROM turn_summary WHERE ${removed}`);
+      this.removeReplacedFiles(now);
+      this.database.rollups.refreshChangedTurns();
       this.cleanReplacementNames();
     });
   }
@@ -92,7 +95,16 @@ export class SessionStore {
         id INTEGER PRIMARY KEY,provider TEXT NOT NULL,session_id TEXT NOT NULL,root_turn_id TEXT NOT NULL,
         UNIQUE(provider,session_id,root_turn_id));
       CREATE INDEX IF NOT EXISTS temp.db_retained_root ON db_retained_turns(provider,root_turn_id);
-      DELETE FROM db_retained_turns;`);
+      DELETE FROM db_retained_turns;
+      CREATE TEMP TABLE IF NOT EXISTS db_replacement_turns(id INTEGER PRIMARY KEY);
+      DELETE FROM db_replacement_turns;
+      CREATE TEMP TABLE IF NOT EXISTS db_next_models(
+        model TEXT PRIMARY KEY, input_tokens INTEGER, output_tokens INTEGER,
+        cache_write_input_tokens INTEGER, cache_read_input_tokens INTEGER,
+        estimated_cost_usd REAL, pricing_version TEXT NOT NULL) WITHOUT ROWID;
+      CREATE TEMP TABLE IF NOT EXISTS db_next_capabilities(
+        category TEXT NOT NULL,name TEXT NOT NULL,usage_count INTEGER NOT NULL,
+        PRIMARY KEY(category,name)) WITHOUT ROWID;`);
     const addSession = this.database.statement('INSERT OR IGNORE INTO db_replacement_sessions VALUES (?, ?)');
     for (const session of replacement.sessions) addSession.run(session.provider, session.session_id);
   }
@@ -124,22 +136,11 @@ export class SessionStore {
           AND EXISTS(SELECT 1 FROM turn_model_usage u WHERE u.turn_id=t.id AND trim(u.model)<>'' AND u.input_tokens+u.output_tokens>0);`);
   }
 
-  private preserveReplacementData(replacement: SessionReplacement): void {
+  private rememberReplacementProjects(): void {
     // Row-value IN lets SQLite seek the request UNIQUE index by its session prefix;
     // a correlated EXISTS scans every stored turn for each replaced session.
     this.database.connection.exec(`INSERT OR IGNORE INTO db_replacement_projects SELECT project_key FROM turn_summary
         WHERE (provider,session_id) IN (SELECT provider,session_id FROM db_replacement_sessions)`);
-    if (replacement.preserveCapabilities) this.database.connection.exec(`
-        CREATE TEMP TABLE IF NOT EXISTS db_saved_capabilities (
-          provider TEXT NOT NULL,session_id TEXT NOT NULL,root_turn_id TEXT NOT NULL,
-          category TEXT NOT NULL,name TEXT NOT NULL,usage_count INTEGER NOT NULL,
-          PRIMARY KEY(provider,session_id,root_turn_id,category,name)
-        ) WITHOUT ROWID;
-        DELETE FROM db_saved_capabilities;
-        INSERT INTO db_saved_capabilities SELECT t.provider,t.session_id,t.root_turn_id,u.category,u.name,u.usage_count
-          FROM turn_summary t JOIN turn_capability_usage u ON u.turn_id=t.id
-          WHERE (t.provider,t.session_id) IN (SELECT provider,session_id FROM db_replacement_sessions)
-            AND t.id NOT IN (SELECT id FROM db_retained_turns);`);
   }
 
   private replaceManifestFiles(replacement: SessionReplacement, existingFile: StatementSync, requireSession: (provider: SQLInputValue, session: SQLInputValue) => void): string {
@@ -163,8 +164,11 @@ export class SessionStore {
     return now;
   }
 
-  private insertSummaries(replacement: SessionReplacement, hasSession: StatementSync, now: string): void {
+  private applySummaries(replacement: SessionReplacement, hasSession: StatementSync, now: string): void {
     const insert = this.database.statement(TURN_INSERT);
+    const previousTurn = this.database.statement('SELECT * FROM turn_summary WHERE provider=? AND session_id=? AND root_turn_id=?');
+    const update = this.database.statement(`UPDATE turn_summary SET ${TURN_COLUMNS.map(column => `${column}=?`).join(',')} WHERE id=?`);
+    const seen = this.database.statement('INSERT INTO db_replacement_turns VALUES (?)');
     const project = this.database.statement(`INSERT INTO projects VALUES (?,?) ON CONFLICT(project_key)
         DO UPDATE SET project_name=excluded.project_name WHERE project_name<>excluded.project_name`);
     const session = this.database.statement(`INSERT INTO sessions VALUES (?,?,?) ON CONFLICT(provider,session_id)
@@ -180,23 +184,58 @@ export class SessionStore {
       project.run(summary.project_key, summary.project_name);
       session.run(summary.provider, summary.session_id, summary.session_name?.trim() || null);
       addProject.run(summary.project_key);
-      const inserted = insert.run(...turnValues(summary, now));
-      this.insertCapabilityUsage(summary, inserted.lastInsertRowid);
-      this.insertModelUsage(summary, inserted.lastInsertRowid);
-      this.saveSummaryCost(summary, inserted.lastInsertRowid);
+      const previous = previousTurn.get(summary.provider, summary.session_id, summary.root_turn_id);
+      this.database.connection.exec('DELETE FROM db_next_models; DELETE FROM db_next_capabilities;');
+      this.prepareCapabilityUsage(summary);
+      this.prepareModelUsage(summary);
+      if (replacement.preserveCapabilities && previous) this.database.statement(`INSERT OR REPLACE INTO db_next_capabilities
+        SELECT category,name,usage_count FROM turn_capability_usage WHERE turn_id=?`).run(previous.id);
+      const modelsChanged = !previous || this.childrenChanged('turn_model_usage', 'db_next_models', previous.id);
+      const capabilitiesChanged = !previous || this.childrenChanged('turn_capability_usage', 'db_next_capabilities', previous.id);
+      const values = turnValues(summary, (previous?.updated_at as string | undefined) ?? now);
+      const changed = !previous || TURN_COLUMNS.some((column, index) => previous[column] !== values[index]);
+      if (summary.updated_at === undefined && (changed || modelsChanged || capabilitiesChanged)) values[values.length - 1] = now;
+      let id = previous?.id as number | bigint | undefined;
+      if (changed || modelsChanged || capabilitiesChanged) {
+        if (previous) {
+          this.database.rollups.captureTurns('id=?', [previous.id]);
+          update.run(...values, previous.id);
+        } else id = insert.run(...values).lastInsertRowid;
+        if (!previous || previous.project_key !== values[1] || previous.started_at_ms !== values[5]) {
+          this.database.rollups.captureTurns('id=?', [id!]);
+        }
+      }
+      seen.run(id!); // Reject duplicate input keys, including one-shot summary iterators.
+      if (modelsChanged) this.replaceChildren('turn_model_usage', 'db_next_models', id!);
+      if (capabilitiesChanged) this.replaceChildren('turn_capability_usage', 'db_next_capabilities', id!);
+      this.saveSummaryCost(summary, id!);
     }
   }
 
-  private insertCapabilityUsage(summary: TurnSummaryInput, turnId: number | bigint): void {
+  private childrenChanged(table: 'turn_model_usage' | 'turn_capability_usage', source: string, id: SQLInputValue): boolean {
+    const columns = table === 'turn_model_usage'
+      ? 'model,input_tokens,output_tokens,cache_write_input_tokens,cache_read_input_tokens,estimated_cost_usd,pricing_version'
+      : 'category,name,usage_count';
+    return !!this.database.statement(`SELECT 1 WHERE EXISTS(SELECT ${columns} FROM ${table} WHERE turn_id=? EXCEPT SELECT * FROM ${source})
+      OR EXISTS(SELECT * FROM ${source} EXCEPT SELECT ${columns} FROM ${table} WHERE turn_id=?)`).get(id, id);
+  }
+
+  private replaceChildren(table: 'turn_model_usage' | 'turn_capability_usage', source: string, id: SQLInputValue): void {
+    this.database.statement(`DELETE FROM ${table} WHERE turn_id=?`).run(id);
+    this.database.statement(`INSERT INTO ${table} SELECT ?,s.* FROM ${source} s`).run(id);
+  }
+
+  private prepareCapabilityUsage(summary: TurnSummaryInput): void {
     for (const usage of summary.capability_usage ?? []) {
       nonnegative(usage.usage_count, 'capability count');
       if (usage.name.length > 512) throw new RangeError('Capability name is too long');
-      this.database.statement('INSERT INTO turn_capability_usage VALUES (?,?,?,?)')
-        .run(turnId,usage.category,usage.name,usage.usage_count);
+      if (!['skill','subagent','plugin','model'].includes(usage.category) || usage.usage_count === 0) throw new RangeError('Invalid capability usage');
+      this.database.statement('INSERT INTO db_next_capabilities VALUES (?,?,?)')
+        .run(usage.category,usage.name,usage.usage_count);
     }
   }
 
-  private insertModelUsage(summary: TurnSummaryInput, turnId: number | bigint): void {
+  private prepareModelUsage(summary: TurnSummaryInput): void {
     let input = 0, output = 0, cacheWrite = 0, cacheRead = 0;
     for (const model of summary.model_usage ?? []) {
       nonnegative(model.input_tokens, 'model input tokens');
@@ -204,7 +243,7 @@ export class SessionStore {
       if (model.cache_write_input_tokens != null) nonnegative(model.cache_write_input_tokens, 'model cache write tokens');
       if (model.cache_read_input_tokens != null) nonnegative(model.cache_read_input_tokens, 'model cache read tokens');
       if ((model.cache_write_input_tokens ?? 0) + (model.cache_read_input_tokens ?? 0) > model.input_tokens) throw new RangeError('Invalid model cache components');
-      this.database.statement('INSERT INTO turn_model_usage VALUES (?,?,?,?,?,?,?,?)').run(turnId,model.model,
+      this.database.statement('INSERT INTO db_next_models VALUES (?,?,?,?,?,?,?)').run(model.model,
         model.input_tokens,model.output_tokens,model.cache_write_input_tokens,model.cache_read_input_tokens,
         estimateCost(summary.provider,model),PRICING_VERSION);
       input += model.input_tokens; output += model.output_tokens;
@@ -222,12 +261,8 @@ export class SessionStore {
     this.billing.saveTurnCost(turnId,chosen ?? summary.billing ?? 'unknown');
   }
 
-  private restoreCapabilitiesAndRemoveFiles(replacement: SessionReplacement, now: string): void {
+  private removeReplacedFiles(now: string): void {
     const remove = this.database.statement('DELETE FROM manifest WHERE id = ?');
-    if (replacement.preserveCapabilities) this.database.connection.exec(`
-        INSERT INTO turn_capability_usage SELECT t.id,u.category,u.name,u.usage_count FROM db_saved_capabilities u
-          JOIN turn_summary t ON t.provider=u.provider AND t.session_id=u.session_id AND t.root_turn_id=u.root_turn_id;
-        DELETE FROM db_saved_capabilities;`);
     const keepMissing = this.database.statement(`SELECT 1 FROM db_retained_turns t JOIN manifest m
         ON m.provider=t.provider AND m.session_id=t.session_id WHERE m.id=? LIMIT 1`);
     const reconnected = this.database.statement('SELECT 1 FROM db_reconnected_files WHERE old_id=?');
@@ -249,6 +284,7 @@ export class SessionStore {
         AND NOT EXISTS(SELECT 1 FROM turn_summary t WHERE t.provider='claude' AND t.project_key=projects.project_key)
         AND NOT EXISTS(SELECT 1 FROM turn_summary t WHERE t.provider='codex' AND t.project_key=projects.project_key);
         DELETE FROM db_replacement_sessions; DELETE FROM db_replacement_projects;
-        DELETE FROM db_removed_files; DELETE FROM db_reconnected_files; DELETE FROM db_retained_turns;`);
+        DELETE FROM db_removed_files; DELETE FROM db_reconnected_files; DELETE FROM db_retained_turns;
+        DELETE FROM db_replacement_turns; DELETE FROM db_next_models; DELETE FROM db_next_capabilities;`);
   }
 }

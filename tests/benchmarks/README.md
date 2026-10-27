@@ -7,6 +7,7 @@
 - [quota](quota/) — quota 조회 시나리오와 운영체제별 자원 샘플러로 시간·메모리를 측정한다.
 - [request-titles.cjs](request-titles.cjs) — 요청 제목 집계 SQL 대안의 정확성·시간·저장 공간을 비교한다.
 - [sql-explain.cjs](sql-explain.cjs) — 사용량 쿼리의 실행 계획과 인덱스 대안별 조회 성능·공간을 비교한다.
+- [sql-writes.cjs](sql-writes.cjs) — 고정 DB와 별도 프로세스로 요청 증분 저장·일/월 기본키 배치·세션 인덱스의 비용을 비교한다.
 - [sql-rollup-memory.cjs](sql-rollup-memory.cjs) — 분리된 자식 프로세스에서 원본·롤업 쿼리의 RSS와 결과 일치를 비교한다.
 - [sql-rollup-product.cjs](sql-rollup-product.cjs) — 실제 공개 조회 API의 롤업 적용 전후 읽기·쓰기 성능과 결과를 비교한다.
 - [sql-rollup-prototype.cjs](sql-rollup-prototype.cjs) — 벤치마크용 세션·일별 롤업 테이블과 집계 쿼리를 구성한다.

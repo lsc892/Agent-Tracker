@@ -1,6 +1,8 @@
 // 원본 요청과 일치하도록 활성 시간대의 일별 사전 집계를 구축·갱신한다.
 import type { SqliteSession } from './connection';
 import type { Provider } from './types';
+import type { SQLInputValue } from 'node:sqlite';
+import { periodBounds } from './timezone';
 import { aggregateUsageSource } from './rollup-queries';
 import { ROLLUP_FORMAT_VERSION, ROLLUP_TABLES } from './rollup-state';
 
@@ -11,6 +13,9 @@ const MAX_CALENDAR_TIME = Date.parse('9998-12-29T00:00:00Z');
 
 /** DB에서 활성 시간대 하나의 일별 사전 집계를 구축하고 세션 변경을 반영한다. */
 export class UsageRollupStore {
+  private readonly dayBounds = new Map<string, { fromMs: number; toMs: number }>();
+  private trackingChanges = false;
+  private dirtyKeys = 0;
   constructor(private readonly database: SqliteSession) {}
 
   private metadata(): RollupMetadata | undefined {
@@ -79,6 +84,69 @@ export class UsageRollupStore {
   /** Reuses the installer session set before it is cleared; old dates/projects are deleted too. */
   refreshChangedSessions(): void {
     this.refresh('(provider, session_id) IN (SELECT provider, session_id FROM db_replacement_sessions)', []);
+  }
+
+  /** Keep old and new grouping keys on disk; a moved/deleted minimum or maximum needs exact recomputation. */
+  beginChanges(): void {
+    this.trackingChanges = this.metadata()?.format_version === ROLLUP_FORMAT_VERSION;
+    this.dirtyKeys = 0;
+    this.database.connection.exec(`CREATE TEMP TABLE IF NOT EXISTS db_rollup_dirty(
+      provider TEXT NOT NULL,session_id TEXT NOT NULL,project_key TEXT NOT NULL,local_day TEXT NOT NULL,
+      PRIMARY KEY(provider,session_id,project_key,local_day)) WITHOUT ROWID;
+      DELETE FROM db_rollup_dirty;
+      CREATE TEMP TABLE IF NOT EXISTS db_rollup_inputs(id INTEGER PRIMARY KEY);
+      DELETE FROM db_rollup_inputs;`);
+  }
+
+  captureTurns(where: string, values: SQLInputValue[] = []): void {
+    if (!this.trackingChanges || this.dirtyKeys > 32) return;
+    const result = this.database.statement(`INSERT OR IGNORE INTO db_rollup_dirty
+      SELECT provider,session_id,project_key,CASE WHEN started_at_ms>=${MIN_CALENDAR_TIME} AND started_at_ms<${MAX_CALENDAR_TIME}
+        THEN agent_tracker_period(started_at_ms,meta.timezone,'day') ELSE '' END
+      FROM turn_summary CROSS JOIN usage_rollup_meta meta WHERE meta.singleton=1 AND meta.format_version=? AND (${where})`)
+      .run(ROLLUP_FORMAT_VERSION, ...values);
+    this.dirtyKeys += Number(result.changes);
+  }
+
+  /**
+   * 책임: 실제 요청 변경이 닿은 이전·새 일별 구간만 정확하게 갱신한다.
+   * 알고리즘: 현지 일 경계를 epoch 범위로 바꿔 현재 facts를 좁히고 두 rollup의 해당 키를 교체한다. 합계와 분모·MIN/MAX를 함께 복원한다.
+   */
+  refreshChangedTurns(): void {
+    const metadata = this.metadata();
+    if (!metadata || metadata.format_version !== ROLLUP_FORMAT_VERSION) return;
+    if (!this.calendarSupported()) { this.clear(); return; }
+    // Dense rebuilds amortize calendar work with the existing set-based session SQL.
+    // Sparse refreshes keep exact bucket invalidation, including very long sessions.
+    if (this.dirtyKeys > 32) {
+      this.refreshChangedSessions();
+      this.database.connection.exec('DELETE FROM db_rollup_dirty; DELETE FROM db_rollup_inputs;');
+      return;
+    }
+    const dated = this.database.statement(`INSERT OR IGNORE INTO db_rollup_inputs SELECT id FROM turn_summary
+      WHERE provider=? AND session_id=? AND project_key=? AND started_at_ms>=? AND started_at_ms<?`);
+    const unknown = this.database.statement(`INSERT OR IGNORE INTO db_rollup_inputs SELECT id FROM turn_summary
+      WHERE provider=? AND session_id=? AND project_key=? AND started_at_ms IS NULL`);
+    for (const row of this.database.statement('SELECT * FROM db_rollup_dirty').iterate()) {
+      if (row.local_day === '') unknown.run(row.provider,row.session_id,row.project_key);
+      else {
+        const key = `${metadata.timezone}/${row.local_day}`;
+        let bounds = this.dayBounds.get(key);
+        if (!bounds) {
+          bounds = periodBounds(row.local_day as string, metadata.timezone);
+          if (this.dayBounds.size >= 32) this.dayBounds.delete(this.dayBounds.keys().next().value!);
+          this.dayBounds.set(key, bounds);
+        }
+        dated.run(row.provider,row.session_id,row.project_key,bounds.fromMs,bounds.toMs);
+      }
+    }
+    for (const by of ['provider', 'model'] as const) {
+      this.database.connection.exec(`DELETE FROM ${ROLLUP_TABLES[by]} WHERE (provider,session_id,project_key,local_day)
+        IN (SELECT provider,session_id,project_key,local_day FROM db_rollup_dirty)`);
+      this.database.statement(`INSERT INTO ${ROLLUP_TABLES[by]} ${aggregateUsageSource(by, 'id IN (SELECT id FROM db_rollup_inputs)')}`)
+        .run(metadata.timezone);
+    }
+    this.database.connection.exec('DELETE FROM db_rollup_dirty; DELETE FROM db_rollup_inputs;');
   }
 
   refreshSession(provider: Provider, sessionId: string): void {
