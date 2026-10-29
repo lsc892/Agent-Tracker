@@ -13,6 +13,7 @@ const { buildUsageQuery } = require('../../dist/src/summary/db/queries');
 const { calendarPeriod, periodBounds } = require('../../dist/src/summary/db/timezone');
 const { seed, compareResults } = require('./sql-rollup.cjs');
 const { workloads, stats } = require('./sql-explain.cjs');
+const { querySourceFiles } = require('./query-source-files.cjs');
 
 const root = resolve(__dirname, '../..'), timezone = 'Asia/Seoul';
 const tables = ['usage_request_daily', 'usage_model_daily'];
@@ -201,7 +202,7 @@ async function main() {
   const directory = await mkdtemp(join(tmpdir(), 'agent-tracker-date-rollup-'));
   const report = { createdAtSeoul: time(), environment: { node: process.version, cpu: cpus()[0]?.model, platform: process.platform, arch: process.arch },
     sourceSha256: Object.fromEntries(['tests/benchmarks/date-storage-rollup.cjs', 'src/summary/db/rollup-state.ts',
-      'src/summary/db/rollup-queries.ts', 'src/summary/db/rollups.ts', 'src/summary/db/reader.ts', 'tests/benchmarks/sql-rollup.cjs']
+      'src/summary/db/rollups.ts', 'src/summary/db/reader.ts', 'tests/benchmarks/sql-rollup.cjs', ...querySourceFiles()]
       .map(path => [path, sha(readFileSync(join(root, path)))])),
     method: { ...options, variants, timezone, order: 'rotate variants and reverse every other sample; same-process warm SQLite/OS caches',
       read: 'actual public queryUsagePage, includes snapshot, metadata/calendar readiness, statement preparation, rows/count; 100 rows; full-group/page validation and EXPLAIN outside timings',

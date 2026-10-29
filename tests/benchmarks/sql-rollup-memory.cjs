@@ -11,6 +11,7 @@ const { SummaryDatabase } = require('../../dist/src/summary/db');
 const { buildUsageQuery, buildUsageCountQuery } = require('../../dist/src/summary/db/queries');
 const { seed } = require('./sql-rollup.cjs');
 const rollup = require('./sql-rollup-prototype.cjs');
+const { querySourceFiles } = require('./query-source-files.cjs');
 
 const root = resolve(__dirname, '../..');
 const variants = ['current', 'session-day-rollup'];
@@ -82,7 +83,7 @@ async function main() {
   };
   try {
     for (const path of ['tests/benchmarks/sql-rollup-memory.cjs', 'tests/benchmarks/sql-rollup.cjs',
-      'tests/benchmarks/sql-rollup-prototype.cjs', 'src/summary/db/queries.ts']) {
+      'tests/benchmarks/sql-rollup-prototype.cjs', ...querySourceFiles()]) {
       result.sourceSha256[path] = sha(await readFile(join(root, path)));
     }
     for (const size of result.options.sizes) {

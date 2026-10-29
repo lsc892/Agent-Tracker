@@ -14,6 +14,7 @@ const { buildRollupUsageQueries } = require('../../dist/src/summary/db/rollup-qu
 const { calendarPeriod, periodBounds } = require('../../dist/src/summary/db/timezone');
 const { seed, compareResults } = require('./sql-rollup.cjs');
 const { workloads, stats } = require('./sql-explain.cjs');
+const { querySourceFiles } = require('./query-source-files.cjs');
 
 const root = resolve(__dirname, '../..'), timezone = 'Asia/Seoul';
 const variants = ['before', 'product-rollup'];
@@ -158,8 +159,9 @@ async function main() {
   const beforeQueries = require(join(options.baseline, 'dist/src/summary/db/queries'));
   const directory = await mkdtemp(join(tmpdir(), 'agent-tracker-product-rollup-'));
   const sourcePaths = ['src/summary/db/schema.ts', 'src/summary/db/connection.ts', 'src/summary/db/reader.ts',
-    'src/summary/db/queries.ts', 'src/summary/db/rollup-state.ts', 'src/summary/db/rollup-queries.ts', 'src/summary/db/rollups.ts',
-    'src/summary/db/sessions.ts', 'src/summary/db/manifest.ts', 'tests/benchmarks/sql-rollup-product.cjs', 'tests/benchmarks/sql-rollup.cjs'];
+    'src/summary/db/rollup-state.ts', 'src/summary/db/rollups.ts',
+    'src/summary/db/sessions.ts', 'src/summary/db/manifest.ts', 'tests/benchmarks/sql-rollup-product.cjs', 'tests/benchmarks/sql-rollup.cjs',
+    ...querySourceFiles()];
   const report = { createdAtSeoul: new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Seoul', dateStyle: 'short', timeStyle: 'medium' }).format(new Date()),
     environment: { node: process.version, cpu: cpus()[0]?.model, platform: process.platform, arch: process.arch },
     baseline: { head: manifest.head, sourceSha256: manifest.sourceSha256 },

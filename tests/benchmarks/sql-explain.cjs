@@ -11,6 +11,7 @@ const { SummaryDatabase } = require('../../dist/src/summary/db');
 const { buildUsageQuery, buildUsageCountQuery, buildQueryFilter } = require('../../dist/src/summary/db/queries');
 const { SCHEMA_VERSION } = require('../../dist/src/summary/db/schema');
 const { PARSER_VERSION, refreshSummary } = require('../../dist/src/summary/scanner');
+const { querySourceFiles } = require('./query-source-files.cjs');
 
 const root = resolve(__dirname, '../..');
 const DAY = 86400000;
@@ -300,7 +301,7 @@ async function main() {
   const report = { createdAtSeoul: seoulTime(), environment: { node: process.version,
     sqlite: undefined, cpu: cpus()[0]?.model, logicalCpus: cpus().length, platform: process.platform,
     schema: SCHEMA_VERSION, parser: PARSER_VERSION,
-    sourceSha256: Object.fromEntries(['src/summary/db/queries.ts', 'src/summary/db/schema.ts', 'src/summary/db/timezone.ts'].map(path => [path, sha(readFileSync(join(root, path)))])) },
+    sourceSha256: Object.fromEntries(['src/summary/db/schema.ts', 'src/summary/db/timezone.ts', ...querySourceFiles()].map(path => [path, sha(readFileSync(join(root, path)))])) },
     method: { samples: options.samples, warmup: options.warmup, pageLimit: 100, offset: 0,
       timings: 'prepared statement execution/materialization: rows + count; warm cache; alternating variants',
       secondaryIndexesRemoved: SECONDARY, statistics: 'ANALYZE on both isolated variants', cacheKiB: 4096, tempStore: 'FILE' }, datasets: [] };

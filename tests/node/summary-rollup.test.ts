@@ -531,7 +531,7 @@ test('page rows and counts keep one snapshot across concurrent WAL writes for ra
     let injected = false;
     db.connection.prepare = function(sql) {
       const statement = prepare.call(this, sql);
-      if (sql.includes('LIMIT ? OFFSET ?')) {
+      if (/\bLIMIT\s+\?\s+OFFSET\s+\?/.test(sql)) {
         const all = statement.all;
         statement.all = function(...values) {
           const rows = Reflect.apply(all, this, values);

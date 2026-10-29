@@ -13,6 +13,7 @@ const { buildUsageQuery } = require('../../dist/src/summary/db/queries');
 const { ROLLUP_STATES, ROLLUP_TABLES } = require('../../dist/src/summary/db/rollup-state');
 const { compareResults } = require('./sql-rollup.cjs');
 const { stats } = require('./sql-explain.cjs');
+const { querySourceFiles } = require('./query-source-files.cjs');
 
 const root = resolve(__dirname, '../..'), timezone = 'Asia/Seoul';
 const variants = ['without-rowid', 'rowid'];
@@ -27,9 +28,8 @@ const turnColumns = ['id', 'provider', 'project_key', 'session_id', 'root_turn_i
 function hashes() {
   const paths = ['tests/benchmarks/sql-rowid-append.cjs', 'tests/benchmarks/sql-rollup.cjs', 'tests/benchmarks/sql-explain.cjs',
     'src/summary/db/connection.ts', 'src/summary/db/schema.ts', 'src/summary/db/rollup-state.ts', 'src/summary/db/rollups.ts',
-    'src/summary/db/rollup-queries.ts', 'src/summary/db/queries.ts',
     'dist/src/summary/db/connection.js', 'dist/src/summary/db/schema.js', 'dist/src/summary/db/rollup-state.js',
-    'dist/src/summary/db/rollups.js', 'dist/src/summary/db/rollup-queries.js', 'dist/src/summary/db/queries.js'];
+    'dist/src/summary/db/rollups.js', ...querySourceFiles({ compiled: true })];
   return Object.fromEntries(paths.map(path => [path, sha(readFileSync(join(root, path)))]));
 }
 

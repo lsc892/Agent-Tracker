@@ -13,6 +13,7 @@ const { SCHEMA_VERSION } = require('../../dist/src/summary/db/schema');
 const { calendarPeriod, periodBounds } = require('../../dist/src/summary/db/timezone');
 const { describe, workloads, prepared, execute, stats } = require('./sql-explain.cjs');
 const rollup = require('./sql-rollup-prototype.cjs');
+const { querySourceFiles } = require('./query-source-files.cjs');
 
 const root = resolve(__dirname, '../..');
 const sha = input => createHash('sha256').update(input).digest('hex');
@@ -294,7 +295,7 @@ async function main() {
   const options=optionsFor(process.argv.slice(2));
   const directory=await mkdtemp(join(tmpdir(),'agent-tracker-sql-rollup-'));
   const report={createdAtSeoul:seoulTime(),environment:{node:process.version,cpu:cpus()[0]?.model,logicalCpus:cpus().length,platform:process.platform,arch:process.arch,schema:SCHEMA_VERSION,
-    sourceSha256:Object.fromEntries(['src/summary/db/queries.ts','src/summary/db/schema.ts','src/summary/db/timezone.ts','src/summary/db/sessions.ts','tests/benchmarks/sql-rollup.cjs','tests/benchmarks/sql-rollup-prototype.cjs'].map(path=>[path,sha(readFileSync(join(root,path)))]))},
+    sourceSha256:Object.fromEntries(['src/summary/db/schema.ts','src/summary/db/timezone.ts','src/summary/db/sessions.ts','tests/benchmarks/sql-rollup.cjs','tests/benchmarks/sql-rollup-prototype.cjs',...querySourceFiles()].map(path=>[path,sha(readFileSync(join(root,path)))]))},
     method:{...options,output:undefined,pageLimit:100,offset:0,timezone:rollup.TIMEZONE,statistics:'ANALYZE on both isolated variants',cacheKiB:4096,tempStore:'FILE',
       scope:'prepared SQL rows materialization + group COUNT; excludes prepare, EXPLAIN, fixtures, initial rollup build, full correctness comparison, IPC/UI/parsing; alternating warm-cache variants',
       sampleReason:'3 independent timed samples with at least one warmup; slow current full-history SQL and complete-group correctness execute additional untimed SQL',

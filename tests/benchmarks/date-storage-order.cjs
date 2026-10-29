@@ -10,6 +10,7 @@ const { SummaryDatabase } = require('../../dist/src/summary/db');
 const { buildQueryFilter, buildTurnsQuery, buildTurnsCountQuery } = require('../../dist/src/summary/db/queries');
 const { seed, compareResults } = require('./sql-rollup.cjs');
 const { stats } = require('./sql-explain.cjs');
+const { querySourceFiles } = require('./query-source-files.cjs');
 
 const root = resolve(__dirname, '../..'), timezone = 'Asia/Seoul', day = 86400000;
 const indexName = 'bench_summary_ui_date_order';
@@ -176,7 +177,7 @@ async function main() {
   const options = optionsFor(process.argv.slice(2)), directory = await mkdtemp(join(tmpdir(), 'agent-tracker-date-order-'));
   const report = { createdAtSeoul: new Intl.DateTimeFormat('sv-SE', { timeZone: timezone, dateStyle: 'short', timeStyle: 'medium' }).format(new Date()),
     environment: { node: process.version, platform: process.platform, arch: process.arch, cpu: cpus()[0]?.model, logicalCpus: cpus().length,
-      sourceSha256: Object.fromEntries(['src/summary/db/schema.ts', 'src/summary/db/queries.ts', 'src/summary/db/sorting.ts'].map(path => [path, sha(readFileSync(join(root, path)))])) },
+      sourceSha256: Object.fromEntries(['src/summary/db/schema.ts', ...querySourceFiles()].map(path => [path, sha(readFileSync(join(root, path)))])) },
     options, references: [
       { url: 'https://www.sqlite.org/expridx.html', reason: 'Expression indexes must match the query expression; algebraic equivalence does not suffice.' },
       { url: 'https://www.sqlite.org/optoverview.html#order_by_optimizations', reason: 'The planner balances WHERE search and ORDER BY index cost; partial prefixes can still require sorting.' },

@@ -10,6 +10,7 @@ const { SummaryDatabase } = require('../../dist/src/summary/db');
 const { buildQueryFilter, buildTurnsQuery, buildTurnsCountQuery, buildUsageQuery, buildUsageCountQuery } = require('../../dist/src/summary/db/queries');
 const { seed, compareResults } = require('./sql-rollup.cjs');
 const { stats } = require('./sql-explain.cjs');
+const { querySourceFiles } = require('./query-source-files.cjs');
 
 const root = resolve(__dirname, '../..'), timezone = 'Asia/Seoul', DAY = 86400000;
 const variants = [
@@ -210,7 +211,7 @@ async function main() {
   try {
     const report = { createdAtSeoul: new Intl.DateTimeFormat('sv-SE', { timeZone: timezone, dateStyle: 'short', timeStyle: 'medium' }).format(new Date()),
       environment: { node: process.version, cpu: cpus()[0]?.model, logicalCpus: cpus().length, platform: process.platform,
-        sourceSha256: Object.fromEntries(['src/summary/db/schema.ts', 'src/summary/db/queries.ts', 'src/summary/db/sorting.ts'].map(path => [path, sha(readFileSync(join(root, path)))])) },
+        sourceSha256: Object.fromEntries(['src/summary/db/schema.ts', ...querySourceFiles()].map(path => [path, sha(readFileSync(join(root, path)))])) },
       method: { samples: options.samples, warmup: options.warmup, variants, cacheKiB: 4096, tempStore: 'FILE', pageLimit: 100,
         readTiming: 'actual queryUsagePage API, rows + COUNT + prepare + snapshot; warm SQLite/OS caches; no UI/worker IPC; each sample averages a batch of at least 12ms (1000-call cap); alternating/reversing and rotating variant order',
         buildTiming: 'INSERT SELECT transaction/commit with indexes already present; base fixture generation/schema creation excluded; first load separately; repeated refill uses recycled pages',
