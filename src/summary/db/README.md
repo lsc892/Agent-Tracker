@@ -13,9 +13,9 @@
 - [reader.ts](reader.ts) — `SummaryReader`: 조건에 맞는 원본·사전 집계 SQL로 통계 페이지를 조회한다.
 - [rollup-queries.ts](rollup-queries.ts) — 롤업 조회·원본 일별 집계의 공개 SQL 함수를 재노출한다.
 - [rollup-state.ts](rollup-state.ts) — 일별 사전 집계의 병합 지표·테이블·형식 버전을 정의한다.
-- [rollups.ts](rollups.ts) — `UsageRollupStore`: 일별 사전 집계를 구축하고 변경 요청의 이전·새 날짜 구간을 갱신한다.
+- [rollups.ts](rollups.ts) — `UsageRollupStore`: 일별 사전 집계를 구축하고 교체 대상 세션 전체를 재집계한다.
 - [schema.ts](schema.ts) — 테이블·인덱스·버전과 기존 스키마 변환 SQL을 정의한다.
-- [sessions.ts](sessions.ts) — `SessionStore`: 세션 입력을 검증하고 요청·종속 통계의 차이와 원본 보존을 원자적으로 반영한다.
+- [sessions.ts](sessions.ts) — `SessionStore`: 세션 입력을 검증하고 요청·종속 통계를 일괄 교체하며 원본 누락 이력을 보존한다.
 - [timezone.ts](timezone.ts) — 지정 시간대의 일·월 집계 키와 UTC 기간 경계를 계산한다.
 - [types.ts](types.ts) — DB 저장 입력·조회 필터·페이지·집계·진단 타입을 정의한다.
 - [validation.ts](validation.ts) — 페이지 상한과 비음수 정수를 검증한다.

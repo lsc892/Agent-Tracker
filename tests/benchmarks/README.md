@@ -24,5 +24,6 @@
 - [sql-rollup-validation.cjs](sql-rollup-validation.cjs) — 독립 합성 데이터로 롤업 시제품의 평균·필터·집계 의미를 검증한다.
 - [sql-rollup.cjs](sql-rollup.cjs) — 원본 집계와 세션·일별 롤업 시제품의 정확성·읽기·쓰기·공간을 비교한다.
 - [incremental-refresh.cjs](incremental-refresh.cjs) — 빌드된 전후 워크트리에서 실제 로그 사본 또는 요청 수·세션 밀도를 지정한 합성 입력의 증분 저장·전체 갱신 시간과 결과를 비교한다.
+- [refresh-rollback.cjs](refresh-rollback.cjs) — 현재 소스의 증분 저장 롤백을 전후 워크트리에서 비교하고 파일 확인·파싱·집계 준비·DB 저장과 주요 기간·세션·평균 조회를 측정한다.
 - [summary-transactions.cjs](summary-transactions.cjs) — 동일 로그 스냅샷으로 제목 인덱스 전후의 전체 요약 갱신 비용을 비교한다.
 - [summary.cjs](summary.cjs) — 합성 대화 로그로 최초·재사용·추가 갱신의 요약 처리 성능을 측정한다.

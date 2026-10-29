@@ -9,7 +9,7 @@ export class SessionBillingStore {
   constructor(private readonly database: SqliteSession) {}
 
   saveTurnCost(id: SQLInputValue, mode: BillingMode): void {
-    this.database.statement(`INSERT INTO turn_costs
+    this.database.statement(`INSERT OR REPLACE INTO turn_costs
       SELECT ?, ?,
         CASE WHEN ? = 'subscription' THEN 0 WHEN ? = 'api' THEN sum(estimated_cost_usd) END,
         CASE
@@ -18,11 +18,7 @@ export class SessionBillingStore {
           ELSE max(1, count(*))
         END, ?
       FROM turn_model_usage
-      WHERE turn_id = ?
-      ON CONFLICT(turn_id) DO UPDATE SET billing_mode=excluded.billing_mode,cost_usd=excluded.cost_usd,
-        unknown_costs=excluded.unknown_costs,pricing_version=excluded.pricing_version
-      WHERE billing_mode IS NOT excluded.billing_mode OR cost_usd IS NOT excluded.cost_usd
-        OR unknown_costs IS NOT excluded.unknown_costs OR pricing_version IS NOT excluded.pricing_version`)
+      WHERE turn_id = ?`)
       .run(id, mode, mode, mode, mode, mode, PRICING_VERSION, id);
   }
 

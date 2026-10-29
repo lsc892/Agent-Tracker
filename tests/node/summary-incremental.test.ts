@@ -1,4 +1,4 @@
-// 요청 차이 저장이 무관한 facts·일별 집계를 쓰지 않고 원자성과 정확성을 지키는지 검증한다.
+// manifest 뒤의 세션 일괄 교체가 스트리밍 입력·원자성·정확한 집계 결과를 유지하는지 검증한다.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { SummaryDatabase, type TurnSummaryInput } from '../../src/summary/db';
@@ -39,25 +39,27 @@ function exact(db: SummaryDatabase): void {
   }
 }
 
-test('identical streamed snapshots preserve IDs, timestamps and all persistent fact/rollup rows', t => {
+test('identical streamed snapshots replace session rows and preserve their semantic statistics', t => {
   const db = new SummaryDatabase(':memory:'); t.after(() => db.close());
   const rows = [row('a', '2026-10-01T00:00:00Z'), row('b', null)];
   replace(db, rows); db.queryUsage({}, 'total', 'Asia/Seoul');
-  const before = db.queryTurns(); audit(db);
+  const semantics = () => db.queryTurns().map(({ id: _id, updated_at: _updated, ...value }) => value);
+  const before = semantics(); audit(db);
   replace(db, (function* () { yield* rows; })());
-  assert.deepEqual(db.queryTurns(), before);
-  assert.deepEqual(db.connection.prepare('SELECT * FROM writes').all(), []);
+  assert.deepEqual(semantics(), before);
+  assert.ok(db.connection.prepare("SELECT 1 FROM writes WHERE name='turn_summary'").get(), 'Accepted sessions use the restored bulk replacement path');
+  assert.equal(db.connection.prepare("SELECT count(*) n FROM sqlite_temp_master WHERE name IN ('db_next_models','db_next_capabilities','db_replacement_turns','db_rollup_dirty','db_rollup_inputs')").get()?.n, 0);
   exact(db);
 });
 
-test('append only writes the new request and its local-day bucket; historical moves and deletes restore extrema', t => {
+test('session replacement rebuilds existing day buckets and historical moves and deletes restore extrema', t => {
   const db = new SummaryDatabase(':memory:'); t.after(() => db.close());
   const a = row('a', '2026-03-08T06:30:00Z'), b = row('b', '2026-03-09T06:30:00Z');
   replace(db, [a, b]); db.queryUsage({}, 'total', 'America/New_York'); audit(db);
   const added = row('c', '2026-03-08T07:30:00Z', 20);
   replace(db, [a, b, added]);
-  assert.deepEqual(db.connection.prepare("SELECT DISTINCT key FROM writes WHERE name='turn_summary'").all().map(r => r.key), ['c']);
-  assert.deepEqual(db.connection.prepare("SELECT DISTINCT key FROM writes WHERE name LIKE 'usage_%'").all().map(r => r.key), ['2026-03-08']);
+  assert.deepEqual(db.connection.prepare("SELECT DISTINCT key FROM writes WHERE name='turn_summary' ORDER BY key").all().map(r => r.key), ['a', 'b', 'c']);
+  assert.deepEqual(db.connection.prepare("SELECT DISTINCT key FROM writes WHERE name LIKE 'usage_%' ORDER BY key").all().map(r => r.key), ['2026-03-08', '2026-03-09']);
   exact(db);
   const moved = { ...a, started_at_ms: null, project_key: 'other', project_name: 'Other', model_usage: undefined };
   replace(db, [moved, b]); exact(db);
@@ -65,15 +67,14 @@ test('append only writes the new request and its local-day bucket; historical mo
   assert.equal(db.queryUsage()[0].turn_count, 1);
 });
 
-test('model-only changes, preserved Skill counts and invalid one-shot snapshots remain atomic', t => {
+test('model replacement, preserved Skill counts and invalid one-shot snapshots remain atomic', t => {
   const db = new SummaryDatabase(':memory:'); t.after(() => db.close());
   const original = row('a', '2026-10-01T00:00:00Z'); replace(db, [original]);
   db.queryUsage({}, 'total', 'Asia/Seoul');
-  const id = db.queryTurns()[0].id;
   const changed = { ...original, capability_usage: undefined,
     model_usage: [{ model: 'new-model', input_tokens: 10, output_tokens: 0, cache_write_input_tokens: 0, cache_read_input_tokens: 0 }] };
   db.replaceSessions({ sessions, files: [], summaries: [changed], preserveCapabilities: true });
-  assert.equal(db.queryTurns()[0].id, id);
+  assert.equal(db.queryTurns()[0].root_turn_id, original.root_turn_id);
   assert.equal(db.queryCapabilities({}, 'skill').totalUses, 1);
   exact(db);
   const before = db.queryTurns();
@@ -91,14 +92,14 @@ test('out-of-calendar writes invalidate rollups and retain raw fallback without 
   assert.equal(db.queryUsage()[0].total_tokens, 10);
 });
 
-test('dense historical corrections use the set-based fallback and preserve exact multi-day state', t => {
+test('dense historical corrections rebuild the session and preserve exact multi-day state', t => {
   const db = new SummaryDatabase(':memory:'); t.after(() => db.close());
   const rows = Array.from({ length: 40 }, (_, index) => row(`r${index}`,
     new Date(Date.UTC(2026, 0, 1 + index)).toISOString(), index + 1));
   replace(db, rows); db.queryUsage({}, 'total', 'Asia/Seoul');
-  const ids = db.queryTurns().map(r => r.id);
+  const roots = db.queryTurns().map(r => r.root_turn_id);
   replace(db, rows.map(r => ({ ...r, status: 'failed', duration_ms: null, duration_quality: 'missing' })));
-  assert.deepEqual(db.queryTurns().map(r => r.id), ids);
+  assert.deepEqual(db.queryTurns().map(r => r.root_turn_id), roots);
   assert.equal(db.queryUsage()[0].completed_turns, 0); exact(db);
-  assert.equal(db.connection.prepare('SELECT count(*) n FROM db_rollup_dirty').get()?.n, 0);
+  assert.equal(db.connection.prepare("SELECT count(*) n FROM sqlite_temp_master WHERE name='db_rollup_dirty'").get()?.n, 0);
 });

@@ -1,0 +1,5078 @@
+{
+  "startedAtSeoul": "2026-10-29 17:44:53",
+  "completedAtSeoul": "2026-10-29 17:48:37",
+  "referenceMs": 1793263493798,
+  "input": "real",
+  "pairs": 3,
+  "warmups": 1,
+  "inventory": [
+    {
+      "provider": "claude",
+      "rootOrdinal": 0,
+      "files": 33,
+      "bytes": 12426071,
+      "compressed": 0
+    },
+    {
+      "provider": "codex",
+      "rootOrdinal": 1,
+      "files": 461,
+      "bytes": 268045833,
+      "compressed": 427,
+      "metadata": {
+        "indexBytes": 32646,
+        "threads": 460
+      }
+    },
+    {
+      "provider": "codex",
+      "rootOrdinal": 2,
+      "files": 0,
+      "bytes": 0,
+      "compressed": 0,
+      "metadata": {
+        "indexBytes": 32646,
+        "threads": 460
+      }
+    }
+  ],
+  "inputSha256": "1b4460016605ee221543efb64dfeec998a4dcd93bd9edd0e28181cc021a22cec",
+  "sourceSha256": {
+    "before": {
+      "src/app.ts": "5fa7a79afd4356aaab7cd3322221dc3544997f2ac72e5cf8fd634ce19fea79f9",
+      "src/claudeSettings.ts": "b1a75438a08df4a986aea30868431bf7d7734918998c3ede3a111530bcd94cad",
+      "src/configuration/reader.ts": "6bb8a9c1e555056dc6538cb992b18610495833ab262b34b4d8b8722a4d753915",
+      "src/configuration/README.md": "0bafb2622dd8df002e89ef045bae5633a4714d3cb1b8250537b07afaa3c61f3f",
+      "src/configuration/schema.ts": "302483826dd4750d3afff31598b39165c8f55ca408a47db908f2647b2cdfb0d6",
+      "src/configuration.ts": "aa80778c22f5b6d038b9110c3647ad86cee42327b2524a9f65d93d4052566d74",
+      "src/extension.ts": "5f4b769e88ae1c7b02cfe7445dbe9ad88a750280b38a43d32fa9a22f138802b1",
+      "src/localization/index.ts": "35f9872282db8951eda841a594847802bc64de6842fe5e81fb4e2289e83bcb55",
+      "src/localization/README.md": "3423e66515a8bcd4bd31f1e91da5bc88095154fdbc54c1c7ac195229489bb6f8",
+      "src/quota/base.ts": "be72adf71413ecc94bccc35f264f70978d3918187b5f403b5019e94db4675c17",
+      "src/quota/claude/httpBody.ts": "6e53aa050c4c747b6ca2a579b3948e875b46452e19ada4139abd8734230e4124",
+      "src/quota/claude/README.md": "f7e0713b84294ffededaf75820f289561328e0f10b88c19371c50f41c33f7f86",
+      "src/quota/claude/response.ts": "c1898a4980b498e49cb4341c78ba072fd934ea326fcdd0d5999f285cde5961f2",
+      "src/quota/claude.ts": "7ec0a05837a634052c67be3a1147715c9ff060427ca77d679f9f5baf517c5baa",
+      "src/quota/claudeCredentials/common.ts": "8cc0754f50b263ca416ab872c2aa48e1f5050250485a538b13949f58429b9536",
+      "src/quota/claudeCredentials/index.ts": "b9e8cffc9fbc16ae3fcc31566cfaf147b779cb7515e99b8b794f7e2139bc154f",
+      "src/quota/claudeCredentials/mac.ts": "1eb90aefa1bdf695ecaeb9ee4cae5f2183590774a5998a0cd99201c6c236c854",
+      "src/quota/claudeCredentials/README.md": "6b3873662a8ecd8ae626fb61f9d0f5bf9f948369b235183a5fef0f93826e6816",
+      "src/quota/claudeCredentials/windows.ts": "8ebaf9becf71b9a777f1b39c844ec432556ec8b722d2bf572d25c5bdf837f97a",
+      "src/quota/codex/errors.ts": "3efd178e0f43f2dae367f49710fc99d4c30d9a246b975c41abd5aca85031a9f1",
+      "src/quota/codex/executable.ts": "e7652bd56d0cf0b0b2989b11bdb6b75403c545a02a5b709e7845e6affc6db2ef",
+      "src/quota/codex/README.md": "52d281b0f30d3e82f0e2684c7e0e36859eecf037c8e10f59ecbf03064be12863",
+      "src/quota/codex/response.ts": "46630a45b7ace600d0d2ceaf2fe2a3b29c7bfbc1b7b5b79513fa10ef8eae20ce",
+      "src/quota/codex/rpcSession.ts": "7f222eaeafcafef5145cdddcece7b3965200a9a5071eb2994f9799c90c1d92d1",
+      "src/quota/codex.ts": "1c7d19d391266f490ce672c0c8b578b13668281b60fa2b2327cc74dc919f5882",
+      "src/quota/index.ts": "bb4e279ce4f1be95235c4211275a938d44395d810c86147eef8a34b73c00fd7e",
+      "src/quota/providerState.ts": "1930bd183810e21e2eaccb3d8b197741845dfba9727583558755e8e8f371ab31",
+      "src/quota/README.md": "56c3ee7b3b5dcd508b7cc1eb171df6c35fb24dfc931760c0cfebd66cefb8f33a",
+      "src/quota/service.ts": "cd15cd2c0233f0eaea92ac2626f6c011910550fb9d5c9211581bc20bb9e05349",
+      "src/quota/types.ts": "8f1673a6d50d90b12145c486174dc9d83df57eaa120c4d9341ec355d3656ad6a",
+      "src/README.md": "fa3e610c7794238c0d58eb135fff0bc8574ad34458d4119b558d33c5859e0a3d",
+      "src/summary/client.ts": "ae9239a161f9303a95175ccd2f6dbd98b7c308747a973d8217e71bcc32d59767",
+      "src/summary/db/billing.ts": "7be85f9791a380d8961d28ec9fa041f79969598ae6d437bb2d3d48a25b8f28ec",
+      "src/summary/db/chart.ts": "68a6510fed96e3d1a82646a1b2bc9d8ffbb02bf60f0433119b549000d2c30572",
+      "src/summary/db/connection.ts": "4ef4459463789e5dd7bf73f8439f3956d487d9cd942cf3cc30226e13ffc276e6",
+      "src/summary/db/index.ts": "a7b76c7751222d895535edd28c6746433a031d0f219a870157099a9913173631",
+      "src/summary/db/manifest.ts": "834e4be31f6b1e1f26cc73fd9b7dafd0f909269eae6af601e49f155f9626859e",
+      "src/summary/db/migrations.ts": "fc54f71c0c1087a5665610c5bc930b883d8a0142d75a575ed2d7e510fa840bf6",
+      "src/summary/db/queries/common/filters.ts": "92c257050eec6b5919ac47acc5056118d3600b1ed11b354bf41907e300563dac",
+      "src/summary/db/queries/common/README.md": "8ae7447169954ed51acf3ecda44fae28dcef94ecb14dae08c61337c5e8628536",
+      "src/summary/db/queries/common/sorting.ts": "9a8570274ee25fb4a11be8632d9014214cfb339dc253e54a366c03d170197214",
+      "src/summary/db/queries/common/types.ts": "380fe59662d86fb03e678ebfc201e26a247ddad1cd9e2b3668372849954b46cd",
+      "src/summary/db/queries/raw/capabilities.ts": "e745e487bea22d64896e7688d53d0551882824608892dd24bf00e11084a830ee",
+      "src/summary/db/queries/raw/diagnostics.ts": "d18f8aa5c2343e8f9908276b395841a36103b9c61e96e8576ef627fab2048e21",
+      "src/summary/db/queries/raw/names.ts": "42dedf92524800adb7c43b14bdd8b2efcac598445e035ebdb6340511888f252c",
+      "src/summary/db/queries/raw/README.md": "6382e4a815de7e314e5c4994c9e9182785e398fdf11e21dbd7e800f32c14cf54",
+      "src/summary/db/queries/raw/source.ts": "53f4fd94a986dbaae55684a6f428b518dc6225e367b59839cdb44abd2625ebb3",
+      "src/summary/db/queries/raw/turns.ts": "67597de984a5bea51aa04475597b5bf08bf1534a885064130c1894d9288497c3",
+      "src/summary/db/queries/raw/usage.ts": "b69cbb09ec5fbef0f8a4a661e7416f554c26fde857f12e3956af9668136780a5",
+      "src/summary/db/queries/README.md": "a398fc83dc2bd24634c27ac613ee0cf7550a0964265fc58e88d2d954ad2ce8d4",
+      "src/summary/db/queries/rollup/metrics.ts": "9f05109758c9380da54c092230dff338ee6f6e414529b8c3752544e692aaf08a",
+      "src/summary/db/queries/rollup/README.md": "9c4a2c1ef3d37d560012f78bc7b0e4817fd1163cc230654508fd184d725dbe88",
+      "src/summary/db/queries/rollup/source.ts": "0ad54e1e803cd0600b662987105e31b732a0e63b6aef25a7d1d880381e89054b",
+      "src/summary/db/queries/rollup/usage.ts": "df9dbdd395a910001b214c262eb4de1484d98e284c908bc6fc5b75bfd1d7305f",
+      "src/summary/db/queries.ts": "c0fec656516861676bb6eb7c60acc1c1220e3d6ea8467760d305ca2bec106b4f",
+      "src/summary/db/reader.ts": "876f89a0034cac1d7361336aa714e322e25ac8b5dd8c4c93ea2ac233014e71de",
+      "src/summary/db/README.md": "1dd63ce7b35c4f934059adff0edc8bc1b9f60ee2a9bd0f817df3ace833bd183b",
+      "src/summary/db/rollup-queries.ts": "62de9a1b23d57cc105fcb77f4b100192d009fd18ba45c3b7c5231986e9524112",
+      "src/summary/db/rollup-state.ts": "5520606d4da922b080686e602942e5e3c5ff4b4cd0d58db138209f1ad93f591f",
+      "src/summary/db/rollups.ts": "53adfe148f49d337c2d938579047a0deaba8b30d0629f8e48f33bcbe22160b6b",
+      "src/summary/db/schema.ts": "feb5cd89af949e1591e184e563356abfc34c38b7c071263d2588edd249863605",
+      "src/summary/db/sessions.ts": "b4791041a8be14a23266273b4ffca3d69b4992ae8bcf7cb88afc65d440cf2174",
+      "src/summary/db/timezone.ts": "cde010d2db6a521638e143eb44cfef6588cd36deef15b0ea255848e9b167ae18",
+      "src/summary/db/types.ts": "efd6a874c07ca9208435f5871d3ca3b42b4b2f23a1e867c6849c0831706eac59",
+      "src/summary/db/validation.ts": "1f68f408fc09c90a6a722f5fa6d22a74f52d58c56fa8d83e7e37e22ce008cd9d",
+      "src/summary/jsonl.ts": "283e3e842446f2f23be734e436abc8be8429d45479d3b4b5b13d4bafdc1ee4e2",
+      "src/summary/lock.ts": "6459ec4d0599779ef402f1b24d814ed8256e634c5932c9d0c25a00cd27d80bea",
+      "src/summary/modelOrder.ts": "63d7983e78c494f5cda20bd375f53e02c3db4ed905659a03ba8afa986510cb55",
+      "src/summary/names.ts": "10ccce9b7173bfb0ffbf1d3018b6d2cbf8222631a88109fa12c7b4674b11a4bd",
+      "src/summary/parsers/capabilities.ts": "e0c1e8c1fe3fa47aba9cad34b087ffb55cfe8b832c06f2d8be7e15069b282856",
+      "src/summary/parsers/claude.ts": "b08f3c4070debd4bbc3f0d7da06ad4aa141d99c62e011bf3ad901ac454814581",
+      "src/summary/parsers/codex.ts": "6bce5598f3ecc03dfe1c2678db2f28ddf4c1ed7f4779e619344e2153651b12f5",
+      "src/summary/parsers/common.ts": "0794166d56d04bc16496440dae61123a5b9679adfc6259f7c2cbd22438290a65",
+      "src/summary/parsers/index.ts": "3d430e3a1ad30763533238b278f502b8323ed3481aa77ac2d50b1ca20be08c81",
+      "src/summary/parsers/README.md": "2364ca98782d9185d53ed2fff0456568e6948cb32146ecbf78c654175d1ea9ca",
+      "src/summary/pricing.ts": "ace8cc1a0bb1698cc8ead0edff57e2246339e5e79199b1bce2c28503bab67fc4",
+      "src/summary/README.md": "36b9c221caa22016a0c0c5b1bf9046d14c3aba66bf6bc730fcd54370b540079b",
+      "src/summary/refresh.ts": "a6b29b26e4a82a86b455ebcac83249e9420af86711961748491fc6bafc4de59c",
+      "src/summary/scanner.ts": "c061d0d23241f6a13c241f0f50dbf5dbb36b946ed2f00465cd2658898d3598da",
+      "src/summary/sourceFingerprint.ts": "38d1d47046398e4ab0599b90df3abf72983bd11ae2634d2148e23292921d2f19",
+      "src/summary/staging.ts": "f0c11bc38dedb97cadac1e20571325199738531a877fdf2d17e15abc06866502",
+      "src/summary/transport.ts": "dc21790255a2bce51a231645824481b8bec220d7c9541012506a97cd6c4ef7ea",
+      "src/summary/types.ts": "824fcda213868f551c50e7503ea262d3f370960557029260f48dfc018d98718e",
+      "src/summary/worker.ts": "48fe77347cfc58d4a21418244560c11994d35eb3a89470049762a1da5bf20c28",
+      "src/summary/zstd.ts": "b0f8eab00979b9e7d6d3f8616b56bb2f41ddd8b6dee1d4059f9fbc8aedd00586",
+      "src/ui/colors.ts": "105969be9f26c4e4b5f217ab0993e358afa6f46d3f39a678afa42b8fdd505d07",
+      "src/ui/colorSettings.ts": "96734a9ad9bda5f261449891245a2e40c0c4fa8a5a483706ea83786c6cc78d28",
+      "src/ui/dashboard.ts": "7333c503d4129a00041b87ca1dc83b92a4387a23bb1b44a811a7ba138fda85b7",
+      "src/ui/html.ts": "02fae316fce990224668a7e27da888ebf7d78891d8d1e5cfc8639c6495ac0fce",
+      "src/ui/presentation.ts": "c586a445296966884f08121759d9238a5ad82a23ff743ab2c24494e6333350a0",
+      "src/ui/quotaTooltip.ts": "a76b73b56db863ca408a40601d9d985fb574bd9ce541ca841484f9638653dcc0",
+      "src/ui/README.md": "94ca9b18912b2f0db21f1ec847bb76a9de93052e99b6061b0f975b8b202dc625",
+      "src/ui/statusBar.ts": "d60d0c78cd9e981215e24896d228dea89deca86c20ca91d8a19a1403e3633f04",
+      "src/ui/statusBarPresentation.ts": "5a50531a7caff3610dcf6188cfba821a90408fd6dfd5b7d9e135fc5ab76248b2",
+      "src/version.ts": "784b6aaef6fa632552d50fb0878c45e696c10ad8d7caecf3902ae4cc36dc4793"
+    },
+    "after": {
+      "src/app.ts": "5fa7a79afd4356aaab7cd3322221dc3544997f2ac72e5cf8fd634ce19fea79f9",
+      "src/claudeSettings.ts": "b1a75438a08df4a986aea30868431bf7d7734918998c3ede3a111530bcd94cad",
+      "src/configuration/reader.ts": "6bb8a9c1e555056dc6538cb992b18610495833ab262b34b4d8b8722a4d753915",
+      "src/configuration/README.md": "0bafb2622dd8df002e89ef045bae5633a4714d3cb1b8250537b07afaa3c61f3f",
+      "src/configuration/schema.ts": "302483826dd4750d3afff31598b39165c8f55ca408a47db908f2647b2cdfb0d6",
+      "src/configuration.ts": "aa80778c22f5b6d038b9110c3647ad86cee42327b2524a9f65d93d4052566d74",
+      "src/extension.ts": "5f4b769e88ae1c7b02cfe7445dbe9ad88a750280b38a43d32fa9a22f138802b1",
+      "src/localization/index.ts": "35f9872282db8951eda841a594847802bc64de6842fe5e81fb4e2289e83bcb55",
+      "src/localization/README.md": "3423e66515a8bcd4bd31f1e91da5bc88095154fdbc54c1c7ac195229489bb6f8",
+      "src/quota/base.ts": "be72adf71413ecc94bccc35f264f70978d3918187b5f403b5019e94db4675c17",
+      "src/quota/claude/httpBody.ts": "6e53aa050c4c747b6ca2a579b3948e875b46452e19ada4139abd8734230e4124",
+      "src/quota/claude/README.md": "f7e0713b84294ffededaf75820f289561328e0f10b88c19371c50f41c33f7f86",
+      "src/quota/claude/response.ts": "c1898a4980b498e49cb4341c78ba072fd934ea326fcdd0d5999f285cde5961f2",
+      "src/quota/claude.ts": "7ec0a05837a634052c67be3a1147715c9ff060427ca77d679f9f5baf517c5baa",
+      "src/quota/claudeCredentials/common.ts": "8cc0754f50b263ca416ab872c2aa48e1f5050250485a538b13949f58429b9536",
+      "src/quota/claudeCredentials/index.ts": "b9e8cffc9fbc16ae3fcc31566cfaf147b779cb7515e99b8b794f7e2139bc154f",
+      "src/quota/claudeCredentials/mac.ts": "1eb90aefa1bdf695ecaeb9ee4cae5f2183590774a5998a0cd99201c6c236c854",
+      "src/quota/claudeCredentials/README.md": "6b3873662a8ecd8ae626fb61f9d0f5bf9f948369b235183a5fef0f93826e6816",
+      "src/quota/claudeCredentials/windows.ts": "8ebaf9becf71b9a777f1b39c844ec432556ec8b722d2bf572d25c5bdf837f97a",
+      "src/quota/codex/errors.ts": "3efd178e0f43f2dae367f49710fc99d4c30d9a246b975c41abd5aca85031a9f1",
+      "src/quota/codex/executable.ts": "e7652bd56d0cf0b0b2989b11bdb6b75403c545a02a5b709e7845e6affc6db2ef",
+      "src/quota/codex/README.md": "52d281b0f30d3e82f0e2684c7e0e36859eecf037c8e10f59ecbf03064be12863",
+      "src/quota/codex/response.ts": "46630a45b7ace600d0d2ceaf2fe2a3b29c7bfbc1b7b5b79513fa10ef8eae20ce",
+      "src/quota/codex/rpcSession.ts": "7f222eaeafcafef5145cdddcece7b3965200a9a5071eb2994f9799c90c1d92d1",
+      "src/quota/codex.ts": "1c7d19d391266f490ce672c0c8b578b13668281b60fa2b2327cc74dc919f5882",
+      "src/quota/index.ts": "bb4e279ce4f1be95235c4211275a938d44395d810c86147eef8a34b73c00fd7e",
+      "src/quota/providerState.ts": "1930bd183810e21e2eaccb3d8b197741845dfba9727583558755e8e8f371ab31",
+      "src/quota/README.md": "56c3ee7b3b5dcd508b7cc1eb171df6c35fb24dfc931760c0cfebd66cefb8f33a",
+      "src/quota/service.ts": "cd15cd2c0233f0eaea92ac2626f6c011910550fb9d5c9211581bc20bb9e05349",
+      "src/quota/types.ts": "8f1673a6d50d90b12145c486174dc9d83df57eaa120c4d9341ec355d3656ad6a",
+      "src/README.md": "fa3e610c7794238c0d58eb135fff0bc8574ad34458d4119b558d33c5859e0a3d",
+      "src/summary/client.ts": "ae9239a161f9303a95175ccd2f6dbd98b7c308747a973d8217e71bcc32d59767",
+      "src/summary/db/billing.ts": "651ee228d1be6c2309d82aaced303accef65eff0a7341f255a055be6cdcb49f7",
+      "src/summary/db/chart.ts": "68a6510fed96e3d1a82646a1b2bc9d8ffbb02bf60f0433119b549000d2c30572",
+      "src/summary/db/connection.ts": "4ef4459463789e5dd7bf73f8439f3956d487d9cd942cf3cc30226e13ffc276e6",
+      "src/summary/db/index.ts": "a7b76c7751222d895535edd28c6746433a031d0f219a870157099a9913173631",
+      "src/summary/db/manifest.ts": "834e4be31f6b1e1f26cc73fd9b7dafd0f909269eae6af601e49f155f9626859e",
+      "src/summary/db/migrations.ts": "fc54f71c0c1087a5665610c5bc930b883d8a0142d75a575ed2d7e510fa840bf6",
+      "src/summary/db/queries/common/filters.ts": "92c257050eec6b5919ac47acc5056118d3600b1ed11b354bf41907e300563dac",
+      "src/summary/db/queries/common/README.md": "8ae7447169954ed51acf3ecda44fae28dcef94ecb14dae08c61337c5e8628536",
+      "src/summary/db/queries/common/sorting.ts": "9a8570274ee25fb4a11be8632d9014214cfb339dc253e54a366c03d170197214",
+      "src/summary/db/queries/common/types.ts": "380fe59662d86fb03e678ebfc201e26a247ddad1cd9e2b3668372849954b46cd",
+      "src/summary/db/queries/raw/capabilities.ts": "e745e487bea22d64896e7688d53d0551882824608892dd24bf00e11084a830ee",
+      "src/summary/db/queries/raw/diagnostics.ts": "d18f8aa5c2343e8f9908276b395841a36103b9c61e96e8576ef627fab2048e21",
+      "src/summary/db/queries/raw/names.ts": "42dedf92524800adb7c43b14bdd8b2efcac598445e035ebdb6340511888f252c",
+      "src/summary/db/queries/raw/README.md": "6382e4a815de7e314e5c4994c9e9182785e398fdf11e21dbd7e800f32c14cf54",
+      "src/summary/db/queries/raw/source.ts": "53f4fd94a986dbaae55684a6f428b518dc6225e367b59839cdb44abd2625ebb3",
+      "src/summary/db/queries/raw/turns.ts": "67597de984a5bea51aa04475597b5bf08bf1534a885064130c1894d9288497c3",
+      "src/summary/db/queries/raw/usage.ts": "b69cbb09ec5fbef0f8a4a661e7416f554c26fde857f12e3956af9668136780a5",
+      "src/summary/db/queries/README.md": "a398fc83dc2bd24634c27ac613ee0cf7550a0964265fc58e88d2d954ad2ce8d4",
+      "src/summary/db/queries/rollup/metrics.ts": "9f05109758c9380da54c092230dff338ee6f6e414529b8c3752544e692aaf08a",
+      "src/summary/db/queries/rollup/README.md": "9c4a2c1ef3d37d560012f78bc7b0e4817fd1163cc230654508fd184d725dbe88",
+      "src/summary/db/queries/rollup/source.ts": "0ad54e1e803cd0600b662987105e31b732a0e63b6aef25a7d1d880381e89054b",
+      "src/summary/db/queries/rollup/usage.ts": "df9dbdd395a910001b214c262eb4de1484d98e284c908bc6fc5b75bfd1d7305f",
+      "src/summary/db/queries.ts": "c0fec656516861676bb6eb7c60acc1c1220e3d6ea8467760d305ca2bec106b4f",
+      "src/summary/db/reader.ts": "876f89a0034cac1d7361336aa714e322e25ac8b5dd8c4c93ea2ac233014e71de",
+      "src/summary/db/README.md": "8c44efe5aa7cd76d26d3ad7d045d91c676a1fc96ebff013f5814de59ffd84580",
+      "src/summary/db/rollup-queries.ts": "62de9a1b23d57cc105fcb77f4b100192d009fd18ba45c3b7c5231986e9524112",
+      "src/summary/db/rollup-state.ts": "5520606d4da922b080686e602942e5e3c5ff4b4cd0d58db138209f1ad93f591f",
+      "src/summary/db/rollups.ts": "afdd1e4beb1fdb45e0cceb91444f6b568e87d055d6729d9ad45e0820d182eb73",
+      "src/summary/db/schema.ts": "feb5cd89af949e1591e184e563356abfc34c38b7c071263d2588edd249863605",
+      "src/summary/db/sessions.ts": "0202b69b54690e9e11e6ab4efe5964ec12d6d211541e7501a6e489a1c2b7f6f0",
+      "src/summary/db/timezone.ts": "cde010d2db6a521638e143eb44cfef6588cd36deef15b0ea255848e9b167ae18",
+      "src/summary/db/types.ts": "efd6a874c07ca9208435f5871d3ca3b42b4b2f23a1e867c6849c0831706eac59",
+      "src/summary/db/validation.ts": "1f68f408fc09c90a6a722f5fa6d22a74f52d58c56fa8d83e7e37e22ce008cd9d",
+      "src/summary/jsonl.ts": "283e3e842446f2f23be734e436abc8be8429d45479d3b4b5b13d4bafdc1ee4e2",
+      "src/summary/lock.ts": "6459ec4d0599779ef402f1b24d814ed8256e634c5932c9d0c25a00cd27d80bea",
+      "src/summary/modelOrder.ts": "63d7983e78c494f5cda20bd375f53e02c3db4ed905659a03ba8afa986510cb55",
+      "src/summary/names.ts": "10ccce9b7173bfb0ffbf1d3018b6d2cbf8222631a88109fa12c7b4674b11a4bd",
+      "src/summary/parsers/capabilities.ts": "e0c1e8c1fe3fa47aba9cad34b087ffb55cfe8b832c06f2d8be7e15069b282856",
+      "src/summary/parsers/claude.ts": "b08f3c4070debd4bbc3f0d7da06ad4aa141d99c62e011bf3ad901ac454814581",
+      "src/summary/parsers/codex.ts": "6bce5598f3ecc03dfe1c2678db2f28ddf4c1ed7f4779e619344e2153651b12f5",
+      "src/summary/parsers/common.ts": "0794166d56d04bc16496440dae61123a5b9679adfc6259f7c2cbd22438290a65",
+      "src/summary/parsers/index.ts": "3d430e3a1ad30763533238b278f502b8323ed3481aa77ac2d50b1ca20be08c81",
+      "src/summary/parsers/README.md": "2364ca98782d9185d53ed2fff0456568e6948cb32146ecbf78c654175d1ea9ca",
+      "src/summary/pricing.ts": "ace8cc1a0bb1698cc8ead0edff57e2246339e5e79199b1bce2c28503bab67fc4",
+      "src/summary/README.md": "36b9c221caa22016a0c0c5b1bf9046d14c3aba66bf6bc730fcd54370b540079b",
+      "src/summary/refresh.ts": "a6b29b26e4a82a86b455ebcac83249e9420af86711961748491fc6bafc4de59c",
+      "src/summary/scanner.ts": "c061d0d23241f6a13c241f0f50dbf5dbb36b946ed2f00465cd2658898d3598da",
+      "src/summary/sourceFingerprint.ts": "38d1d47046398e4ab0599b90df3abf72983bd11ae2634d2148e23292921d2f19",
+      "src/summary/staging.ts": "f0c11bc38dedb97cadac1e20571325199738531a877fdf2d17e15abc06866502",
+      "src/summary/transport.ts": "dc21790255a2bce51a231645824481b8bec220d7c9541012506a97cd6c4ef7ea",
+      "src/summary/types.ts": "824fcda213868f551c50e7503ea262d3f370960557029260f48dfc018d98718e",
+      "src/summary/worker.ts": "48fe77347cfc58d4a21418244560c11994d35eb3a89470049762a1da5bf20c28",
+      "src/summary/zstd.ts": "b0f8eab00979b9e7d6d3f8616b56bb2f41ddd8b6dee1d4059f9fbc8aedd00586",
+      "src/ui/colors.ts": "105969be9f26c4e4b5f217ab0993e358afa6f46d3f39a678afa42b8fdd505d07",
+      "src/ui/colorSettings.ts": "96734a9ad9bda5f261449891245a2e40c0c4fa8a5a483706ea83786c6cc78d28",
+      "src/ui/dashboard.ts": "7333c503d4129a00041b87ca1dc83b92a4387a23bb1b44a811a7ba138fda85b7",
+      "src/ui/html.ts": "02fae316fce990224668a7e27da888ebf7d78891d8d1e5cfc8639c6495ac0fce",
+      "src/ui/presentation.ts": "c586a445296966884f08121759d9238a5ad82a23ff743ab2c24494e6333350a0",
+      "src/ui/quotaTooltip.ts": "a76b73b56db863ca408a40601d9d985fb574bd9ce541ca841484f9638653dcc0",
+      "src/ui/README.md": "94ca9b18912b2f0db21f1ec847bb76a9de93052e99b6061b0f975b8b202dc625",
+      "src/ui/statusBar.ts": "d60d0c78cd9e981215e24896d228dea89deca86c20ca91d8a19a1403e3633f04",
+      "src/ui/statusBarPresentation.ts": "5a50531a7caff3610dcf6188cfba821a90408fd6dfd5b7d9e135fc5ab76248b2",
+      "src/version.ts": "784b6aaef6fa632552d50fb0878c45e696c10ad8d7caecf3902ae4cc36dc4793"
+    }
+  },
+  "revisions": {
+    "before": "929c0c4f7c0e141395501351ba29bb4cb82ee024",
+    "after": "929c0c4f7c0e141395501351ba29bb4cb82ee024"
+  },
+  "runnerSha256": "d63f29b594c9d3d6b78bd5beb644443e1c179da22ba53129f1a8c5a0b59395e4",
+  "helpersSha256": "fa19f5f9edd14c1045c9ae9e969bb21531f82f6262c4af4055fd80c5cf4adecb",
+  "environment": {
+    "node": "v24.14.1",
+    "sqlite": "3.51.2",
+    "parser": 14,
+    "cpu": "AMD Ryzen 5 7500F 6-Core Processor             ",
+    "platform": "win32"
+  },
+  "rawChecks": 432,
+  "summary": [
+    {
+      "scenario": "initial",
+      "before": {
+        "elapsedMs": {
+          "median": 13059.6369,
+          "min": 12308.620400000002,
+          "max": 13257.9444
+        },
+        "refreshMs": {
+          "median": 13028.692799999999,
+          "min": 12277.3042,
+          "max": 13223.4045
+        },
+        "firstQueryMs": {
+          "median": 31.316200000001118,
+          "min": 30.944100000000617,
+          "max": 34.53989999999976
+        },
+        "scanMs": {
+          "median": 116.70239999999998,
+          "min": 115.46699999999998,
+          "max": 119.7684
+        },
+        "parseMs": {
+          "median": 9107.2518,
+          "min": 8508.2544,
+          "max": 9178.5078
+        },
+        "prepareMs": {
+          "median": 1890.4646999999914,
+          "min": 1840.273200000016,
+          "max": 1987.5577000000067
+        },
+        "replaceMs": {
+          "median": 875.0939000000016,
+          "min": 834.990400000001,
+          "max": 899.1830999999761
+        },
+        "commitPhaseMs": {
+          "median": 3732.6497,
+          "min": 3647.3451999999997,
+          "max": 3996.9326999999994
+        },
+        "walBytes": {
+          "median": 4194192,
+          "min": 4194192,
+          "max": 4194192
+        },
+        "operations": {
+          "delete/turn_summary": {
+            "calls": {
+              "median": 398,
+              "min": 398,
+              "max": 398
+            },
+            "ms": {
+              "median": 13.286999999963598,
+              "min": 12.859399999986124,
+              "max": 13.396499999981756
+            }
+          },
+          "insert/turn_summary": {
+            "calls": {
+              "median": 1180,
+              "min": 1180,
+              "max": 1180
+            },
+            "ms": {
+              "median": 26.02160000001095,
+              "min": 24.76850000004015,
+              "max": 26.254899999981717
+            }
+          },
+          "delete/turn_model_usage": {
+            "calls": {
+              "median": 1180,
+              "min": 1180,
+              "max": 1180
+            },
+            "ms": {
+              "median": 5.098699999978635,
+              "min": 4.801999999986947,
+              "max": 5.1964000000407395
+            }
+          },
+          "insert/turn_model_usage": {
+            "calls": {
+              "median": 1180,
+              "min": 1180,
+              "max": 1180
+            },
+            "ms": {
+              "median": 8.18850000000748,
+              "min": 7.673200000017459,
+              "max": 8.335199999963152
+            }
+          },
+          "delete/turn_capability_usage": {
+            "calls": {
+              "median": 1180,
+              "min": 1180,
+              "max": 1180
+            },
+            "ms": {
+              "median": 4.250700000055076,
+              "min": 3.8369000000038795,
+              "max": 4.276499999998123
+            }
+          },
+          "insert/turn_capability_usage": {
+            "calls": {
+              "median": 1180,
+              "min": 1180,
+              "max": 1180
+            },
+            "ms": {
+              "median": 8.69449999997778,
+              "min": 8.172499999966021,
+              "max": 8.910299999952258
+            }
+          },
+          "insert/turn_costs": {
+            "calls": {
+              "median": 1180,
+              "min": 1180,
+              "max": 1180
+            },
+            "ms": {
+              "median": 19.78609999995024,
+              "min": 18.954000000037922,
+              "max": 19.930100000034145
+            }
+          }
+        }
+      },
+      "after": {
+        "elapsedMs": {
+          "median": 12972.435,
+          "min": 12964.626100000001,
+          "max": 13306.803100000001
+        },
+        "refreshMs": {
+          "median": 12940.727299999999,
+          "min": 12933.5226,
+          "max": 13274.2288
+        },
+        "firstQueryMs": {
+          "median": 31.70770000000084,
+          "min": 31.103500000001077,
+          "max": 32.57430000000022
+        },
+        "scanMs": {
+          "median": 115.9855,
+          "min": 108.7604,
+          "max": 127.2876
+        },
+        "parseMs": {
+          "median": 9194.2838,
+          "min": 8992.3276,
+          "max": 9390.441299999999
+        },
+        "prepareMs": {
+          "median": 1786.0826999999936,
+          "min": 1712.3453999999892,
+          "max": 2072.1021000000037
+        },
+        "replaceMs": {
+          "median": 804.8118,
+          "min": 795.4350000000047,
+          "max": 1011.5645999999847
+        },
+        "commitPhaseMs": {
+          "median": 3754.3243,
+          "min": 3620.9827000000005,
+          "max": 3837.6715999999997
+        },
+        "walBytes": {
+          "median": 4194192,
+          "min": 4194192,
+          "max": 4194192
+        },
+        "operations": {
+          "delete/turn_summary": {
+            "calls": {
+              "median": 398,
+              "min": 398,
+              "max": 398
+            },
+            "ms": {
+              "median": 11.997099999996692,
+              "min": 11.886600000014653,
+              "max": 12.451000000028614
+            }
+          },
+          "insert/turn_summary": {
+            "calls": {
+              "median": 1180,
+              "min": 1180,
+              "max": 1180
+            },
+            "ms": {
+              "median": 23.549200000046767,
+              "min": 23.15500000004249,
+              "max": 23.868500000016866
+            }
+          },
+          "insert/turn_capability_usage": {
+            "calls": {
+              "median": 1357,
+              "min": 1357,
+              "max": 1357
+            },
+            "ms": {
+              "median": 10.309199999990597,
+              "min": 10.257700000001932,
+              "max": 10.483899999984715
+            }
+          },
+          "insert/turn_model_usage": {
+            "calls": {
+              "median": 998,
+              "min": 998,
+              "max": 998
+            },
+            "ms": {
+              "median": 5.755299999971612,
+              "min": 5.632100000044375,
+              "max": 5.852000000018961
+            }
+          },
+          "insert/turn_costs": {
+            "calls": {
+              "median": 1180,
+              "min": 1180,
+              "max": 1180
+            },
+            "ms": {
+              "median": 17.492499999973006,
+              "min": 17.35020000003169,
+              "max": 17.971300000024712
+            }
+          }
+        }
+      },
+      "changePercent": -0.6677207082227521,
+      "fasterPairs": 1
+    },
+    {
+      "scenario": "unchanged",
+      "before": {
+        "elapsedMs": {
+          "median": 124.10859999999957,
+          "min": 122.98819999999796,
+          "max": 125.28600000000188
+        },
+        "refreshMs": {
+          "median": 122.99079999999958,
+          "min": 121.92249999999876,
+          "max": 124.13670000000093
+        },
+        "firstQueryMs": {
+          "median": 1.1177999999999884,
+          "min": 1.0656999999991967,
+          "max": 1.1493000000009488
+        },
+        "scanMs": {
+          "median": 102.75110000000132,
+          "min": 102.2549999999992,
+          "max": 104.36160000000018
+        },
+        "parseMs": {
+          "median": 14.471400000000358,
+          "min": 14.395199999999022,
+          "max": 14.846199999999953
+        },
+        "prepareMs": {
+          "median": 0,
+          "min": 0,
+          "max": 0
+        },
+        "replaceMs": {
+          "median": 0,
+          "min": 0,
+          "max": 0
+        },
+        "commitPhaseMs": {
+          "median": 1.9763000000002648,
+          "min": 1.9498999999996158,
+          "max": 2.0397999999986496
+        },
+        "walBytes": {
+          "median": 317272,
+          "min": 317272,
+          "max": 317272
+        },
+        "operations": {}
+      },
+      "after": {
+        "elapsedMs": {
+          "median": 125.87860000000182,
+          "min": 124.43089999999938,
+          "max": 140.91799999999785
+        },
+        "refreshMs": {
+          "median": 124.61590000000069,
+          "min": 123.34079999999994,
+          "max": 139.3215999999993
+        },
+        "firstQueryMs": {
+          "median": 1.2627000000011321,
+          "min": 1.0900999999994383,
+          "max": 1.596399999998539
+        },
+        "scanMs": {
+          "median": 103.14660000000003,
+          "min": 102.58880000000136,
+          "max": 119.54470000000038
+        },
+        "parseMs": {
+          "median": 14.786399999999048,
+          "min": 14.518400000000838,
+          "max": 14.889599999998609
+        },
+        "prepareMs": {
+          "median": 0,
+          "min": 0,
+          "max": 0
+        },
+        "replaceMs": {
+          "median": 0,
+          "min": 0,
+          "max": 0
+        },
+        "commitPhaseMs": {
+          "median": 1.9914000000007945,
+          "min": 1.9418000000005122,
+          "max": 2.0645999999997002
+        },
+        "walBytes": {
+          "median": 317272,
+          "min": 317272,
+          "max": 317272
+        },
+        "operations": {}
+      },
+      "changePercent": 1.4261703056857256,
+      "fasterPairs": 0
+    },
+    {
+      "scenario": "reparse-same",
+      "before": {
+        "elapsedMs": {
+          "median": 13043.577599999997,
+          "min": 12664.305600000002,
+          "max": 13259.0361
+        },
+        "refreshMs": {
+          "median": 13042.5147,
+          "min": 12663.170199999999,
+          "max": 13257.9537
+        },
+        "firstQueryMs": {
+          "median": 1.0823999999993248,
+          "min": 1.062899999997171,
+          "max": 1.1354000000028464
+        },
+        "scanMs": {
+          "median": 102.41389999999956,
+          "min": 100.60720000000038,
+          "max": 104.3830999999991
+        },
+        "parseMs": {
+          "median": 9038.779999999999,
+          "min": 8957.8685,
+          "max": 9073.424200000001
+        },
+        "prepareMs": {
+          "median": 1915.778699999948,
+          "min": 1640.574100000009,
+          "max": 2015.49010000001
+        },
+        "replaceMs": {
+          "median": 1022.4017999999505,
+          "min": 1010.8146999999917,
+          "max": 1049.7462999999443
+        },
+        "commitPhaseMs": {
+          "median": 3900.2449000000015,
+          "min": 3597.4789999999994,
+          "max": 4079.1345
+        },
+        "walBytes": {
+          "median": 4136512,
+          "min": 4136512,
+          "max": 4136512
+        },
+        "operations": {
+          "delete/turn_summary": {
+            "calls": {
+              "median": 398,
+              "min": 398,
+              "max": 398
+            },
+            "ms": {
+              "median": 12.578200000005381,
+              "min": 12.32730000004085,
+              "max": 12.806900000014139
+            }
+          },
+          "delete/usage_request_daily": {
+            "calls": {
+              "median": 398,
+              "min": 398,
+              "max": 398
+            },
+            "ms": {
+              "median": 7.046700000015335,
+              "min": 6.935799999957453,
+              "max": 7.0609000000276865
+            }
+          },
+          "insert/usage_request_daily": {
+            "calls": {
+              "median": 398,
+              "min": 398,
+              "max": 398
+            },
+            "ms": {
+              "median": 68.81179999999404,
+              "min": 68.52180000003318,
+              "max": 68.8258999999598
+            }
+          },
+          "delete/usage_model_daily": {
+            "calls": {
+              "median": 398,
+              "min": 398,
+              "max": 398
+            },
+            "ms": {
+              "median": 7.090199999969627,
+              "min": 6.898899999989226,
+              "max": 7.166699999979755
+            }
+          },
+          "insert/usage_model_daily": {
+            "calls": {
+              "median": 398,
+              "min": 398,
+              "max": 398
+            },
+            "ms": {
+              "median": 76.77229999998963,
+              "min": 76.76609999994253,
+              "max": 77.83270000001357
+            }
+          },
+          "insert/turn_costs": {
+            "calls": {
+              "median": 1180,
+              "min": 1180,
+              "max": 1180
+            },
+            "ms": {
+              "median": 21.767299999995885,
+              "min": 21.58709999997518,
+              "max": 21.95569999995496
+            }
+          }
+        }
+      },
+      "after": {
+        "elapsedMs": {
+          "median": 13291.387400000001,
+          "min": 13086.647200000003,
+          "max": 13339.374200000002
+        },
+        "refreshMs": {
+          "median": 13290.309899999998,
+          "min": 13085.547900000001,
+          "max": 13338.2251
+        },
+        "firstQueryMs": {
+          "median": 1.0993000000016764,
+          "min": 1.077500000003056,
+          "max": 1.1491000000023632
+        },
+        "scanMs": {
+          "median": 104.61189999999988,
+          "min": 100.07600000000093,
+          "max": 111.98819999999978
+        },
+        "parseMs": {
+          "median": 9025.111,
+          "min": 8965.400300000001,
+          "max": 9274.7545
+        },
+        "prepareMs": {
+          "median": 1909.8751000000084,
+          "min": 1776.5246999999836,
+          "max": 1932.2289999999994
+        },
+        "replaceMs": {
+          "median": 1146.4299999999675,
+          "min": 1075.396900000038,
+          "max": 1201.2091999999648
+        },
+        "commitPhaseMs": {
+          "median": 4004.4104000000007,
+          "min": 3908.114600000001,
+          "max": 4209.6889999999985
+        },
+        "walBytes": {
+          "median": 4227152,
+          "min": 4227152,
+          "max": 4227152
+        },
+        "operations": {
+          "delete/turn_summary": {
+            "calls": {
+              "median": 398,
+              "min": 398,
+              "max": 398
+            },
+            "ms": {
+              "median": 27.817099999972925,
+              "min": 24.746000000031927,
+              "max": 30.538200000015422
+            }
+          },
+          "delete/usage_request_daily": {
+            "calls": {
+              "median": 398,
+              "min": 398,
+              "max": 398
+            },
+            "ms": {
+              "median": 9.67090000000826,
+              "min": 8.488099999967744,
+              "max": 10.318199999990611
+            }
+          },
+          "insert/usage_request_daily": {
+            "calls": {
+              "median": 398,
+              "min": 398,
+              "max": 398
+            },
+            "ms": {
+              "median": 94.82719999993424,
+              "min": 89.23690000002534,
+              "max": 100.3148999999703
+            }
+          },
+          "delete/usage_model_daily": {
+            "calls": {
+              "median": 398,
+              "min": 398,
+              "max": 398
+            },
+            "ms": {
+              "median": 9.907299999977113,
+              "min": 9.122399999980189,
+              "max": 11.142599999948288
+            }
+          },
+          "insert/usage_model_daily": {
+            "calls": {
+              "median": 398,
+              "min": 398,
+              "max": 398
+            },
+            "ms": {
+              "median": 100.0341000000426,
+              "min": 96.53169999997044,
+              "max": 105.8283000000174
+            }
+          },
+          "insert/turn_summary": {
+            "calls": {
+              "median": 1180,
+              "min": 1180,
+              "max": 1180
+            },
+            "ms": {
+              "median": 26.94569999993837,
+              "min": 25.365999999950873,
+              "max": 27.23099999993792
+            }
+          },
+          "insert/turn_capability_usage": {
+            "calls": {
+              "median": 1357,
+              "min": 1357,
+              "max": 1357
+            },
+            "ms": {
+              "median": 11.425799999960873,
+              "min": 10.338899999995192,
+              "max": 12.456799999970826
+            }
+          },
+          "insert/turn_model_usage": {
+            "calls": {
+              "median": 998,
+              "min": 998,
+              "max": 998
+            },
+            "ms": {
+              "median": 6.055599999985134,
+              "min": 5.70699999999124,
+              "max": 6.539600000065548
+            }
+          },
+          "insert/turn_costs": {
+            "calls": {
+              "median": 1180,
+              "min": 1180,
+              "max": 1180
+            },
+            "ms": {
+              "median": 19.448799999976472,
+              "min": 17.77309999996214,
+              "max": 20.898799999991752
+            }
+          }
+        }
+      },
+      "changePercent": 1.899860663994546,
+      "fasterPairs": 1
+    },
+    {
+      "scenario": "codex-append",
+      "before": {
+        "elapsedMs": {
+          "median": 192.01109999999971,
+          "min": 170.66749999999956,
+          "max": 201.8680000000022
+        },
+        "refreshMs": {
+          "median": 190.98949999999968,
+          "min": 169.65769999999975,
+          "max": 200.82040000000052
+        },
+        "firstQueryMs": {
+          "median": 1.021600000000035,
+          "min": 1.0097999999998137,
+          "max": 1.0476000000016938
+        },
+        "scanMs": {
+          "median": 106.65089999999691,
+          "min": 102.63560000000143,
+          "max": 119.97530000000188
+        },
+        "parseMs": {
+          "median": 49.61860000000161,
+          "min": 47.51329999999871,
+          "max": 53.76090000000113
+        },
+        "prepareMs": {
+          "median": 5.8158000000003085,
+          "min": 5.526899999997113,
+          "max": 6.072100000001228
+        },
+        "replaceMs": {
+          "median": 5.81420000000071,
+          "min": 5.58350000000064,
+          "max": 5.860899999999674
+        },
+        "commitPhaseMs": {
+          "median": 16.31789999999819,
+          "min": 16.11200000000099,
+          "max": 18.50800000000163
+        },
+        "walBytes": {
+          "median": 420272,
+          "min": 420272,
+          "max": 420272
+        },
+        "operations": {
+          "insert/turn_costs": {
+            "calls": {
+              "median": 26,
+              "min": 26,
+              "max": 26
+            },
+            "ms": {
+              "median": 0.17669999999634456,
+              "min": 0.17629999999917345,
+              "max": 0.19240000000354485
+            }
+          },
+          "insert/turn_summary": {
+            "calls": {
+              "median": 1,
+              "min": 1,
+              "max": 1
+            },
+            "ms": {
+              "median": 0.05459999999948195,
+              "min": 0.05190000000220607,
+              "max": 0.07470000000103028
+            }
+          },
+          "delete/turn_model_usage": {
+            "calls": {
+              "median": 1,
+              "min": 1,
+              "max": 1
+            },
+            "ms": {
+              "median": 0.013400000003457535,
+              "min": 0.01299999999901047,
+              "max": 0.01840000000083819
+            }
+          },
+          "insert/turn_model_usage": {
+            "calls": {
+              "median": 1,
+              "min": 1,
+              "max": 1
+            },
+            "ms": {
+              "median": 0.019800000001851004,
+              "min": 0.01929999999993015,
+              "max": 0.027999999998428393
+            }
+          },
+          "delete/turn_capability_usage": {
+            "calls": {
+              "median": 1,
+              "min": 1,
+              "max": 1
+            },
+            "ms": {
+              "median": 0.00969999999870197,
+              "min": 0.009299999997892883,
+              "max": 0.01929999999993015
+            }
+          },
+          "insert/turn_capability_usage": {
+            "calls": {
+              "median": 1,
+              "min": 1,
+              "max": 1
+            },
+            "ms": {
+              "median": 0.019100000001344597,
+              "min": 0.019099999997706618,
+              "max": 0.02419999999983702
+            }
+          },
+          "delete/turn_summary": {
+            "calls": {
+              "median": 1,
+              "min": 1,
+              "max": 1
+            },
+            "ms": {
+              "median": 0.036400000000867294,
+              "min": 0.033699999999953434,
+              "max": 0.044899999997142004
+            }
+          },
+          "delete/usage_request_daily": {
+            "calls": {
+              "median": 1,
+              "min": 1,
+              "max": 1
+            },
+            "ms": {
+              "median": 0.03020000000105938,
+              "min": 0.027399999999033753,
+              "max": 0.03020000000105938
+            }
+          },
+          "insert/usage_request_daily": {
+            "calls": {
+              "median": 1,
+              "min": 1,
+              "max": 1
+            },
+            "ms": {
+              "median": 0.21119999999791617,
+              "min": 0.21010000000023865,
+              "max": 0.21440000000075088
+            }
+          },
+          "delete/usage_model_daily": {
+            "calls": {
+              "median": 1,
+              "min": 1,
+              "max": 1
+            },
+            "ms": {
+              "median": 0.023999999997613486,
+              "min": 0.023400000001856824,
+              "max": 0.024299999997310806
+            }
+          },
+          "insert/usage_model_daily": {
+            "calls": {
+              "median": 1,
+              "min": 1,
+              "max": 1
+            },
+            "ms": {
+              "median": 0.2404000000024098,
+              "min": 0.23960000000079162,
+              "max": 0.24980000000141445
+            }
+          }
+        }
+      },
+      "after": {
+        "elapsedMs": {
+          "median": 193.27900000000227,
+          "min": 189.23839999999836,
+          "max": 196.93769999999859
+        },
+        "refreshMs": {
+          "median": 192.18860000000132,
+          "min": 188.1867999999995,
+          "max": 195.84739999999874
+        },
+        "firstQueryMs": {
+          "median": 1.0902999999998428,
+          "min": 1.0515999999988708,
+          "max": 1.0904000000009546
+        },
+        "scanMs": {
+          "median": 105.2696999999971,
+          "min": 103.15129999999772,
+          "max": 105.4168000000027
+        },
+        "parseMs": {
+          "median": 67.12679999999818,
+          "min": 47.983100000001286,
+          "max": 69.49730000000272
+        },
+        "prepareMs": {
+          "median": 4.320000000003347,
+          "min": 4.269000000000233,
+          "max": 4.509200000000419
+        },
+        "replaceMs": {
+          "median": 5.939099999999598,
+          "min": 5.734599999999773,
+          "max": 6.005799999998999
+        },
+        "commitPhaseMs": {
+          "median": 15.772600000000239,
+          "min": 15.222600000000966,
+          "max": 16.409599999999045
+        },
+        "walBytes": {
+          "median": 506792,
+          "min": 506792,
+          "max": 506792
+        },
+        "operations": {
+          "delete/turn_summary": {
+            "calls": {
+              "median": 1,
+              "min": 1,
+              "max": 1
+            },
+            "ms": {
+              "median": 0.2213000000010652,
+              "min": 0.21679999999832944,
+              "max": 0.2386000000005879
+            }
+          },
+          "insert/turn_summary": {
+            "calls": {
+              "median": 26,
+              "min": 26,
+              "max": 26
+            },
+            "ms": {
+              "median": 0.2699000000102387,
+              "min": 0.2683999999972002,
+              "max": 0.2814999999754946
+            }
+          },
+          "insert/turn_capability_usage": {
+            "calls": {
+              "median": 27,
+              "min": 27,
+              "max": 27
+            },
+            "ms": {
+              "median": 0.13369999999486026,
+              "min": 0.13239999999495922,
+              "max": 0.13540000000648433
+            }
+          },
+          "insert/turn_model_usage": {
+            "calls": {
+              "median": 26,
+              "min": 26,
+              "max": 26
+            },
+            "ms": {
+              "median": 0.0698999999985972,
+              "min": 0.06510000001071603,
+              "max": 0.07060000000274158
+            }
+          },
+          "insert/turn_costs": {
+            "calls": {
+              "median": 26,
+              "min": 26,
+              "max": 26
+            },
+            "ms": {
+              "median": 0.20389999999679276,
+              "min": 0.18160000000352738,
+              "max": 0.25539999999818974
+            }
+          },
+          "delete/usage_request_daily": {
+            "calls": {
+              "median": 1,
+              "min": 1,
+              "max": 1
+            },
+            "ms": {
+              "median": 0.029099999999743886,
+              "min": 0.028500000000349246,
+              "max": 0.03110000000015134
+            }
+          },
+          "insert/usage_request_daily": {
+            "calls": {
+              "median": 1,
+              "min": 1,
+              "max": 1
+            },
+            "ms": {
+              "median": 0.37840000000142027,
+              "min": 0.37700000000040745,
+              "max": 0.39730000000054133
+            }
+          },
+          "delete/usage_model_daily": {
+            "calls": {
+              "median": 1,
+              "min": 1,
+              "max": 1
+            },
+            "ms": {
+              "median": 0.0713999999970838,
+              "min": 0.05549999999857391,
+              "max": 0.07819999999992433
+            }
+          },
+          "insert/usage_model_daily": {
+            "calls": {
+              "median": 1,
+              "min": 1,
+              "max": 1
+            },
+            "ms": {
+              "median": 0.39649999999892316,
+              "min": 0.3741999999983818,
+              "max": 0.41040000000066357
+            }
+          }
+        }
+      },
+      "changePercent": 0.6603264082141846,
+      "fasterPairs": 2
+    },
+    {
+      "scenario": "claude-append",
+      "before": {
+        "elapsedMs": {
+          "median": 139.78139999999985,
+          "min": 136.21610000000146,
+          "max": 141.16879999999946
+        },
+        "refreshMs": {
+          "median": 138.7445000000007,
+          "min": 135.1790000000001,
+          "max": 140.02509999999893
+        },
+        "firstQueryMs": {
+          "median": 1.0371000000013737,
+          "min": 1.0368999999991502,
+          "max": 1.1437000000005355
+        },
+        "scanMs": {
+          "median": 103.56160000000091,
+          "min": 101.78550000000178,
+          "max": 105.06689999999799
+        },
+        "parseMs": {
+          "median": 21.326999999997497,
+          "min": 17.778200000000652,
+          "max": 22.310699999998178
+        },
+        "prepareMs": {
+          "median": 2.342800000002171,
+          "min": 2.2391000000025088,
+          "max": 2.817800000000716
+        },
+        "replaceMs": {
+          "median": 3.207399999999325,
+          "min": 2.974099999999453,
+          "max": 4.0077000000019325
+        },
+        "commitPhaseMs": {
+          "median": 11.211100000000442,
+          "min": 9.103600000002189,
+          "max": 11.651200000000244
+        },
+        "walBytes": {
+          "median": 407912,
+          "min": 407912,
+          "max": 407912
+        },
+        "operations": {
+          "insert/turn_costs": {
+            "calls": {
+              "median": 3,
+              "min": 3,
+              "max": 3
+            },
+            "ms": {
+              "median": 0.06090000000040163,
+              "min": 0.0595000000030268,
+              "max": 0.0857999999934691
+            }
+          },
+          "insert/turn_summary": {
+            "calls": {
+              "median": 1,
+              "min": 1,
+              "max": 1
+            },
+            "ms": {
+              "median": 0.04400000000168802,
+              "min": 0.04379999999946449,
+              "max": 0.06300000000192085
+            }
+          },
+          "delete/turn_model_usage": {
+            "calls": {
+              "median": 1,
+              "min": 1,
+              "max": 1
+            },
+            "ms": {
+              "median": 0.010500000000320142,
+              "min": 0.010399999999208376,
+              "max": 0.021899999999732245
+            }
+          },
+          "insert/turn_model_usage": {
+            "calls": {
+              "median": 1,
+              "min": 1,
+              "max": 1
+            },
+            "ms": {
+              "median": 0.01630000000295695,
+              "min": 0.015800000001036096,
+              "max": 0.027000000001862645
+            }
+          },
+          "delete/turn_capability_usage": {
+            "calls": {
+              "median": 1,
+              "min": 1,
+              "max": 1
+            },
+            "ms": {
+              "median": 0.007700000001932494,
+              "min": 0.007300000001123408,
+              "max": 0.012300000002142042
+            }
+          },
+          "insert/turn_capability_usage": {
+            "calls": {
+              "median": 1,
+              "min": 1,
+              "max": 1
+            },
+            "ms": {
+              "median": 0.02239999999801512,
+              "min": 0.01540000000022701,
+              "max": 0.02419999999983702
+            }
+          },
+          "delete/turn_summary": {
+            "calls": {
+              "median": 1,
+              "min": 1,
+              "max": 1
+            },
+            "ms": {
+              "median": 0.04130000000077416,
+              "min": 0.029999999998835847,
+              "max": 0.046699999998963904
+            }
+          },
+          "delete/usage_request_daily": {
+            "calls": {
+              "median": 1,
+              "min": 1,
+              "max": 1
+            },
+            "ms": {
+              "median": 0.023099999998521525,
+              "min": 0.021000000000640284,
+              "max": 0.023099999998521525
+            }
+          },
+          "insert/usage_request_daily": {
+            "calls": {
+              "median": 1,
+              "min": 1,
+              "max": 1
+            },
+            "ms": {
+              "median": 0.21589999999923748,
+              "min": 0.21119999999791617,
+              "max": 0.22430000000167638
+            }
+          },
+          "delete/usage_model_daily": {
+            "calls": {
+              "median": 1,
+              "min": 1,
+              "max": 1
+            },
+            "ms": {
+              "median": 0.022700000001350418,
+              "min": 0.022599999996600673,
+              "max": 0.023699999997916166
+            }
+          },
+          "insert/usage_model_daily": {
+            "calls": {
+              "median": 1,
+              "min": 1,
+              "max": 1
+            },
+            "ms": {
+              "median": 0.23170000000027358,
+              "min": 0.22110000000247965,
+              "max": 0.24390000000130385
+            }
+          }
+        }
+      },
+      "after": {
+        "elapsedMs": {
+          "median": 144.300900000002,
+          "min": 139.64140000000043,
+          "max": 168.1934000000001
+        },
+        "refreshMs": {
+          "median": 143.21210000000065,
+          "min": 138.59690000000046,
+          "max": 166.94930000000022
+        },
+        "firstQueryMs": {
+          "median": 1.0888000000013562,
+          "min": 1.044499999999971,
+          "max": 1.2440999999998894
+        },
+        "scanMs": {
+          "median": 110.95759999999791,
+          "min": 108.48979999999938,
+          "max": 134.7488000000012
+        },
+        "parseMs": {
+          "median": 18.011999999998807,
+          "min": 17.414099999998143,
+          "max": 18.109400000001187
+        },
+        "prepareMs": {
+          "median": 2.571800000001531,
+          "min": 2.3044000000008964,
+          "max": 2.8277999999991152
+        },
+        "replaceMs": {
+          "median": 3.3515000000006694,
+          "min": 3.1334999999999127,
+          "max": 3.44629999999961
+        },
+        "commitPhaseMs": {
+          "median": 10.792600000000675,
+          "min": 9.956399999999121,
+          "max": 10.879700000001321
+        },
+        "walBytes": {
+          "median": 490312,
+          "min": 490312,
+          "max": 490312
+        },
+        "operations": {
+          "delete/turn_summary": {
+            "calls": {
+              "median": 1,
+              "min": 1,
+              "max": 1
+            },
+            "ms": {
+              "median": 0.06959999999889988,
+              "min": 0.06810000000041327,
+              "max": 0.07070000000021537
+            }
+          },
+          "insert/turn_summary": {
+            "calls": {
+              "median": 3,
+              "min": 3,
+              "max": 3
+            },
+            "ms": {
+              "median": 0.07740000000194414,
+              "min": 0.0684000000001106,
+              "max": 0.08409999999639695
+            }
+          },
+          "insert/turn_capability_usage": {
+            "calls": {
+              "median": 3,
+              "min": 3,
+              "max": 3
+            },
+            "ms": {
+              "median": 0.02929999999832944,
+              "min": 0.028199999997013947,
+              "max": 0.02930000000196742
+            }
+          },
+          "insert/turn_model_usage": {
+            "calls": {
+              "median": 3,
+              "min": 3,
+              "max": 3
+            },
+            "ms": {
+              "median": 0.025800000003073364,
+              "min": 0.023499999999330612,
+              "max": 0.026700000002165325
+            }
+          },
+          "insert/turn_costs": {
+            "calls": {
+              "median": 3,
+              "min": 3,
+              "max": 3
+            },
+            "ms": {
+              "median": 0.05230000000301516,
+              "min": 0.051200000001699664,
+              "max": 0.05319999999483116
+            }
+          },
+          "delete/usage_request_daily": {
+            "calls": {
+              "median": 1,
+              "min": 1,
+              "max": 1
+            },
+            "ms": {
+              "median": 0.028200000000651926,
+              "min": 0.0268999999971129,
+              "max": 0.046699999998963904
+            }
+          },
+          "insert/usage_request_daily": {
+            "calls": {
+              "median": 1,
+              "min": 1,
+              "max": 1
+            },
+            "ms": {
+              "median": 0.2800999999999476,
+              "min": 0.2776000000012573,
+              "max": 0.281699999999546
+            }
+          },
+          "delete/usage_model_daily": {
+            "calls": {
+              "median": 1,
+              "min": 1,
+              "max": 1
+            },
+            "ms": {
+              "median": 0.02839999999923748,
+              "min": 0.027399999999033753,
+              "max": 0.028500000000349246
+            }
+          },
+          "insert/usage_model_daily": {
+            "calls": {
+              "median": 1,
+              "min": 1,
+              "max": 1
+            },
+            "ms": {
+              "median": 0.26629999999931897,
+              "min": 0.25899999999819556,
+              "max": 0.28369999999995343
+            }
+          }
+        }
+      },
+      "changePercent": 3.2332627946222825,
+      "fasterPairs": 0
+    },
+    {
+      "scenario": "codex-extend",
+      "before": {
+        "elapsedMs": {
+          "median": 189.20939999999973,
+          "min": 185.08329999999842,
+          "max": 203.27600000000166
+        },
+        "refreshMs": {
+          "median": 188.09409999999843,
+          "min": 184.02490000000034,
+          "max": 202.08629999999903
+        },
+        "firstQueryMs": {
+          "median": 1.115300000001298,
+          "min": 1.0583999999980733,
+          "max": 1.189700000002631
+        },
+        "scanMs": {
+          "median": 109.95360000000073,
+          "min": 108.32760000000053,
+          "max": 122.76480000000083
+        },
+        "parseMs": {
+          "median": 52.962899999998626,
+          "min": 52.89009999999689,
+          "max": 54.1462999999967
+        },
+        "prepareMs": {
+          "median": 7.103699999999662,
+          "min": 5.756999999997788,
+          "max": 10.695200000001932
+        },
+        "replaceMs": {
+          "median": 6.256900000000314,
+          "min": 5.8245999999999185,
+          "max": 7.471400000002177
+        },
+        "commitPhaseMs": {
+          "median": 21.882000000001426,
+          "min": 17.241900000000896,
+          "max": 22.45310000000245
+        },
+        "walBytes": {
+          "median": 391432,
+          "min": 391432,
+          "max": 391432
+        },
+        "operations": {
+          "insert/turn_costs": {
+            "calls": {
+              "median": 26,
+              "min": 26,
+              "max": 26
+            },
+            "ms": {
+              "median": 0.2128999999986263,
+              "min": 0.1805999999960477,
+              "max": 0.2992000000012922
+            }
+          },
+          "update/turn_summary": {
+            "calls": {
+              "median": 1,
+              "min": 1,
+              "max": 1
+            },
+            "ms": {
+              "median": 0.06599999999889405,
+              "min": 0.05929999999716529,
+              "max": 0.07229999999981374
+            }
+          },
+          "delete/turn_model_usage": {
+            "calls": {
+              "median": 1,
+              "min": 1,
+              "max": 1
+            },
+            "ms": {
+              "median": 0.014100000000325963,
+              "min": 0.013199999997596024,
+              "max": 0.015599999998812564
+            }
+          },
+          "insert/turn_model_usage": {
+            "calls": {
+              "median": 1,
+              "min": 1,
+              "max": 1
+            },
+            "ms": {
+              "median": 0.019499999998515705,
+              "min": 0.018500000001949957,
+              "max": 0.02410000000236323
+            }
+          },
+          "delete/turn_capability_usage": {
+            "calls": {
+              "median": 1,
+              "min": 1,
+              "max": 1
+            },
+            "ms": {
+              "median": 0.010500000000320142,
+              "min": 0.010199999996984843,
+              "max": 0.012299999998504063
+            }
+          },
+          "insert/turn_capability_usage": {
+            "calls": {
+              "median": 1,
+              "min": 1,
+              "max": 1
+            },
+            "ms": {
+              "median": 0.01840000000083819,
+              "min": 0.016400000000430737,
+              "max": 0.021299999996699626
+            }
+          },
+          "delete/turn_summary": {
+            "calls": {
+              "median": 1,
+              "min": 1,
+              "max": 1
+            },
+            "ms": {
+              "median": 0.03299999999944703,
+              "min": 0.03269999999974971,
+              "max": 0.04170000000158325
+            }
+          },
+          "delete/usage_request_daily": {
+            "calls": {
+              "median": 1,
+              "min": 1,
+              "max": 1
+            },
+            "ms": {
+              "median": 0.030699999999342253,
+              "min": 0.029500000000552973,
+              "max": 0.03110000000015134
+            }
+          },
+          "insert/usage_request_daily": {
+            "calls": {
+              "median": 1,
+              "min": 1,
+              "max": 1
+            },
+            "ms": {
+              "median": 0.22959999999875436,
+              "min": 0.21260000000256696,
+              "max": 0.24569999999948777
+            }
+          },
+          "delete/usage_model_daily": {
+            "calls": {
+              "median": 1,
+              "min": 1,
+              "max": 1
+            },
+            "ms": {
+              "median": 0.033600000002479646,
+              "min": 0.03269999999974971,
+              "max": 0.03490000000238069
+            }
+          },
+          "insert/usage_model_daily": {
+            "calls": {
+              "median": 1,
+              "min": 1,
+              "max": 1
+            },
+            "ms": {
+              "median": 0.23289999999906286,
+              "min": 0.22079999999914435,
+              "max": 0.24460000000181026
+            }
+          }
+        }
+      },
+      "after": {
+        "elapsedMs": {
+          "median": 182.95750000000044,
+          "min": 181.22660000000178,
+          "max": 226.377199999999
+        },
+        "refreshMs": {
+          "median": 181.83719999999812,
+          "min": 180.03670000000056,
+          "max": 225.2344000000012
+        },
+        "firstQueryMs": {
+          "median": 1.1427999999978056,
+          "min": 1.1203000000023167,
+          "max": 1.1899000000012165
+        },
+        "scanMs": {
+          "median": 106.42079999999987,
+          "min": 104.0148999999983,
+          "max": 108.56369999999879
+        },
+        "parseMs": {
+          "median": 56.18790000000081,
+          "min": 49.96470000000045,
+          "max": 57.54959999999846
+        },
+        "prepareMs": {
+          "median": 5.9724999999998545,
+          "min": 5.645499999998719,
+          "max": 44.884399999999005
+        },
+        "replaceMs": {
+          "median": 6.115900000000693,
+          "min": 5.917600000000675,
+          "max": 6.595099999998638
+        },
+        "commitPhaseMs": {
+          "median": 18.342599999999948,
+          "min": 18.139400000000023,
+          "max": 56.85310000000027
+        },
+        "walBytes": {
+          "median": 465592,
+          "min": 465592,
+          "max": 465592
+        },
+        "operations": {
+          "delete/turn_summary": {
+            "calls": {
+              "median": 1,
+              "min": 1,
+              "max": 1
+            },
+            "ms": {
+              "median": 0.23449999999866122,
+              "min": 0.22920000000158325,
+              "max": 0.3220999999975902
+            }
+          },
+          "insert/turn_summary": {
+            "calls": {
+              "median": 26,
+              "min": 26,
+              "max": 26
+            },
+            "ms": {
+              "median": 0.28299999999580905,
+              "min": 0.26080000000001746,
+              "max": 0.3108000000102038
+            }
+          },
+          "insert/turn_capability_usage": {
+            "calls": {
+              "median": 27,
+              "min": 27,
+              "max": 27
+            },
+            "ms": {
+              "median": 0.15190000000075088,
+              "min": 0.13210000000253785,
+              "max": 0.1627000000080443
+            }
+          },
+          "insert/turn_model_usage": {
+            "calls": {
+              "median": 26,
+              "min": 26,
+              "max": 26
+            },
+            "ms": {
+              "median": 0.08719999999811989,
+              "min": 0.07120000000213622,
+              "max": 0.0918000000056054
+            }
+          },
+          "insert/turn_costs": {
+            "calls": {
+              "median": 26,
+              "min": 26,
+              "max": 26
+            },
+            "ms": {
+              "median": 0.21039999999993597,
+              "min": 0.18509999999878346,
+              "max": 0.22340000000258442
+            }
+          },
+          "delete/usage_request_daily": {
+            "calls": {
+              "median": 1,
+              "min": 1,
+              "max": 1
+            },
+            "ms": {
+              "median": 0.03269999999974971,
+              "min": 0.0319999999992433,
+              "max": 0.041799999999057036
+            }
+          },
+          "insert/usage_request_daily": {
+            "calls": {
+              "median": 1,
+              "min": 1,
+              "max": 1
+            },
+            "ms": {
+              "median": 0.3819999999977881,
+              "min": 0.3651000000027125,
+              "max": 0.38839999999981956
+            }
+          },
+          "delete/usage_model_daily": {
+            "calls": {
+              "median": 1,
+              "min": 1,
+              "max": 1
+            },
+            "ms": {
+              "median": 0.031299999998736894,
+              "min": 0.030599999998230487,
+              "max": 0.03320000000167056
+            }
+          },
+          "insert/usage_model_daily": {
+            "calls": {
+              "median": 1,
+              "min": 1,
+              "max": 1
+            },
+            "ms": {
+              "median": 0.38290000000051805,
+              "min": 0.36999999999898137,
+              "max": 0.4029000000009546
+            }
+          }
+        }
+      },
+      "changePercent": -3.304222728891537,
+      "fasterPairs": 2
+    }
+  ],
+  "workloads": [
+    {
+      "name": "period-day-30d/provider",
+      "rows": 35,
+      "total": 35,
+      "recent30Requests": 513,
+      "before": {
+        "median": 1.9578999999994267,
+        "min": 1.922099999999773,
+        "max": 1.9882999999990716
+      },
+      "after": {
+        "median": 2.0627000000004045,
+        "min": 1.9589000000014494,
+        "max": 2.1502999999993335
+      }
+    },
+    {
+      "name": "period-day-30d/model",
+      "rows": 52,
+      "total": 52,
+      "recent30Requests": 513,
+      "before": {
+        "median": 2.177400000000489,
+        "min": 2.1617999999998574,
+        "max": 2.2973999999994703
+      },
+      "after": {
+        "median": 2.21559999999954,
+        "min": 2.2031999999999243,
+        "max": 2.4301999999988766
+      }
+    },
+    {
+      "name": "period-month-30d/provider",
+      "rows": 3,
+      "total": 3,
+      "recent30Requests": 513,
+      "before": {
+        "median": 1.8261999999995169,
+        "min": 1.8022999999993772,
+        "max": 1.8361000000004424
+      },
+      "after": {
+        "median": 1.8804000000000087,
+        "min": 1.8603999999995722,
+        "max": 2.7643000000007305
+      }
+    },
+    {
+      "name": "period-month-30d/model",
+      "rows": 8,
+      "total": 8,
+      "recent30Requests": 513,
+      "before": {
+        "median": 2.0280000000002474,
+        "min": 1.9979999999995925,
+        "max": 2.423899999999776
+      },
+      "after": {
+        "median": 2.0812999999998283,
+        "min": 2.0024000000012165,
+        "max": 2.2233999999989464
+      }
+    },
+    {
+      "name": "project-sessions-all/provider",
+      "rows": 100,
+      "total": 150,
+      "recent30Requests": 513,
+      "before": {
+        "median": 1.2018000000007305,
+        "min": 1.1972999999998137,
+        "max": 1.2225999999991473
+      },
+      "after": {
+        "median": 1.2683000000015454,
+        "min": 1.201100000000224,
+        "max": 1.9614000000001397
+      }
+    },
+    {
+      "name": "project-sessions-all/model",
+      "rows": 100,
+      "total": 221,
+      "recent30Requests": 513,
+      "before": {
+        "median": 2.248600000000806,
+        "min": 2.2334000000009837,
+        "max": 2.255699999999706
+      },
+      "after": {
+        "median": 2.38169999999991,
+        "min": 2.2312999999994645,
+        "max": 2.6622999999999593
+      }
+    },
+    {
+      "name": "project-sessions-30d/provider",
+      "rows": 0,
+      "total": 0,
+      "recent30Requests": 513,
+      "before": {
+        "median": 0.8950000000004366,
+        "min": 0.8904999999995198,
+        "max": 0.9010999999991327
+      },
+      "after": {
+        "median": 0.91859999999906,
+        "min": 0.9068000000006577,
+        "max": 0.9585999999999331
+      }
+    },
+    {
+      "name": "project-sessions-30d/model",
+      "rows": 0,
+      "total": 0,
+      "recent30Requests": 513,
+      "before": {
+        "median": 0.9938000000001921,
+        "min": 0.9790000000011787,
+        "max": 1.0027000000009139
+      },
+      "after": {
+        "median": 1.0069000000003143,
+        "min": 1.0018999999992957,
+        "max": 1.0504000000000815
+      }
+    },
+    {
+      "name": "average-7d/provider",
+      "rows": 1,
+      "total": 1,
+      "recent30Requests": 513,
+      "before": {
+        "median": 1.2489000000005035,
+        "min": 1.2375000000010914,
+        "max": 1.274199999999837
+      },
+      "after": {
+        "median": 1.270699999999124,
+        "min": 1.2638000000006286,
+        "max": 1.3918999999987136
+      }
+    },
+    {
+      "name": "average-7d/model",
+      "rows": 1,
+      "total": 1,
+      "recent30Requests": 513,
+      "before": {
+        "median": 1.3507000000008702,
+        "min": 1.3480999999992491,
+        "max": 1.389999999999418
+      },
+      "after": {
+        "median": 1.3992999999991298,
+        "min": 1.3611999999993714,
+        "max": 1.4310999999997875
+      }
+    },
+    {
+      "name": "average-30d/provider",
+      "rows": 2,
+      "total": 2,
+      "recent30Requests": 513,
+      "before": {
+        "median": 1.6715999999996711,
+        "min": 1.6650000000008731,
+        "max": 1.6728999999995722
+      },
+      "after": {
+        "median": 1.672500000000582,
+        "min": 1.6675000000013824,
+        "max": 1.787000000000262
+      }
+    },
+    {
+      "name": "average-30d/model",
+      "rows": 7,
+      "total": 7,
+      "recent30Requests": 513,
+      "before": {
+        "median": 1.8566000000009808,
+        "min": 1.8500000000003638,
+        "max": 1.8586000000013883
+      },
+      "after": {
+        "median": 1.8757999999997992,
+        "min": 1.8632999999990716,
+        "max": 1.9375
+      }
+    }
+  ],
+  "samples": [
+    {
+      "variant": "before",
+      "pair": 0,
+      "scenario": "initial",
+      "refreshMs": 12277.3042,
+      "firstQueryMs": 31.316200000001118,
+      "elapsedMs": 12308.620400000002,
+      "scanMs": 119.7684,
+      "parseMs": 8508.2544,
+      "commitPhaseMs": 3647.3451999999997,
+      "startupMs": 1.9276999999999944,
+      "prepareMs": 1840.273200000016,
+      "replaceMs": 834.990400000001,
+      "replacements": 398,
+      "operations": {
+        "delete/turn_summary": {
+          "calls": 398,
+          "ms": 12.859399999986124
+        },
+        "insert/turn_summary": {
+          "calls": 1180,
+          "ms": 24.76850000004015
+        },
+        "delete/turn_model_usage": {
+          "calls": 1180,
+          "ms": 4.801999999986947
+        },
+        "insert/turn_model_usage": {
+          "calls": 1180,
+          "ms": 7.673200000017459
+        },
+        "delete/turn_capability_usage": {
+          "calls": 1180,
+          "ms": 3.8369000000038795
+        },
+        "insert/turn_capability_usage": {
+          "calls": 1180,
+          "ms": 8.172499999966021
+        },
+        "insert/turn_costs": {
+          "calls": 1180,
+          "ms": 18.954000000037922
+        }
+      },
+      "requests": 1180,
+      "tokens": 1607116410,
+      "discovered": 494,
+      "parsed": 494,
+      "reused": 0,
+      "bodyBytes": 280471904,
+      "factsSha256": "32a9cf1783a1377f8b61dbde9b70ee0f9bd360b2adfbc0bba2bc059729009fc5",
+      "aggregatesSha256": "69e4eee1b6848c9a3fdf0fed8cec3d3098c18764038df6d14801ecfe29b7c289",
+      "rawChecks": 10,
+      "workloads": [
+        {
+          "name": "period-day-30d/provider",
+          "timingMs": {
+            "median": 1.9578999999994267,
+            "min": 1.915499999999156,
+            "max": 2.0496000000002823
+          },
+          "rows": 35,
+          "total": 35,
+          "outputSha256": "0411cfbd44c7f79783690a7b0e8bdca49eff389d5d241112b5c6d7c6617df23e",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "period-day-30d/model",
+          "timingMs": {
+            "median": 2.177400000000489,
+            "min": 2.109099999999671,
+            "max": 3.6023999999997613
+          },
+          "rows": 52,
+          "total": 52,
+          "outputSha256": "03caebe72ec87322532279421eae08718d28ab482de44713beb095c9bde00002",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "period-month-30d/provider",
+          "timingMs": {
+            "median": 1.8022999999993772,
+            "min": 1.7947000000003754,
+            "max": 1.9372000000003027
+          },
+          "rows": 3,
+          "total": 3,
+          "outputSha256": "cbacfca614e5a526e90c999b7d6fd331ba019ce51a5afd8f96cb5a91abee15b2",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "period-month-30d/model",
+          "timingMs": {
+            "median": 1.9979999999995925,
+            "min": 1.9710999999988417,
+            "max": 2.0446000000010827
+          },
+          "rows": 8,
+          "total": 8,
+          "outputSha256": "2d4566323f7d9e36a098b61034ec78e1e84ffdd95daa8a5734c53c63c09959be",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "project-sessions-all/provider",
+          "timingMs": {
+            "median": 1.2225999999991473,
+            "min": 1.2139999999999418,
+            "max": 1.2532999999984895
+          },
+          "rows": 100,
+          "total": 150,
+          "outputSha256": "7641d2c2717192b291afc9e1cb4519d37001aa5a9291bced48999e4d4cbf70db",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "project-sessions-all/model",
+          "timingMs": {
+            "median": 2.248600000000806,
+            "min": 2.2247000000006665,
+            "max": 2.3224000000009255
+          },
+          "rows": 100,
+          "total": 221,
+          "outputSha256": "49e7518b8a4ee7ca3ca291d18427cc2aad9b2314e2df141eb7063a7a20ba96c8",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "project-sessions-30d/provider",
+          "timingMs": {
+            "median": 0.8904999999995198,
+            "min": 0.8544999999994616,
+            "max": 0.913300000000163
+          },
+          "rows": 0,
+          "total": 0,
+          "outputSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "project-sessions-30d/model",
+          "timingMs": {
+            "median": 1.0027000000009139,
+            "min": 0.9850999999998749,
+            "max": 1.043999999999869
+          },
+          "rows": 0,
+          "total": 0,
+          "outputSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "average-7d/provider",
+          "timingMs": {
+            "median": 1.2489000000005035,
+            "min": 1.2377999999989697,
+            "max": 1.339399999998932
+          },
+          "rows": 1,
+          "total": 1,
+          "outputSha256": "e562b4a9e61f1db780d27f4d8e24cb7da15c336c6f9b51048490923f999177bd",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "average-7d/model",
+          "timingMs": {
+            "median": 1.3480999999992491,
+            "min": 1.339799999999741,
+            "max": 1.5472000000008848
+          },
+          "rows": 1,
+          "total": 1,
+          "outputSha256": "bdf3f4e5dd7c235a52641eab1c4d7ebcd86524a262a9e457a1b022f2163f1b8d",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "average-30d/provider",
+          "timingMs": {
+            "median": 1.6728999999995722,
+            "min": 1.6491000000005442,
+            "max": 2.090300000001662
+          },
+          "rows": 2,
+          "total": 2,
+          "outputSha256": "09267e2dc1186cc5ff70f7cc31bb9f97ebd39ac7132e1f351fe546d17397bd1f",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "average-30d/model",
+          "timingMs": {
+            "median": 1.8566000000009808,
+            "min": 1.8325999999997293,
+            "max": 1.9469000000008236
+          },
+          "rows": 7,
+          "total": 7,
+          "outputSha256": "ee188076251f22cd2ec6fc742002718efa0974ac4bb6ffeb27fd6d850c960614",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        }
+      ],
+      "walBytes": 4194192
+    },
+    {
+      "variant": "before",
+      "pair": 0,
+      "scenario": "unchanged",
+      "refreshMs": 121.92249999999876,
+      "firstQueryMs": 1.0656999999991967,
+      "elapsedMs": 122.98819999999796,
+      "scanMs": 102.2549999999992,
+      "parseMs": 14.471400000000358,
+      "commitPhaseMs": 1.9763000000002648,
+      "startupMs": 3.216899999999441,
+      "prepareMs": 0,
+      "replaceMs": 0,
+      "replacements": 0,
+      "operations": {},
+      "requests": 1180,
+      "tokens": 1607116410,
+      "discovered": 494,
+      "parsed": 0,
+      "reused": 494,
+      "bodyBytes": 0,
+      "factsSha256": "32a9cf1783a1377f8b61dbde9b70ee0f9bd360b2adfbc0bba2bc059729009fc5",
+      "aggregatesSha256": "69e4eee1b6848c9a3fdf0fed8cec3d3098c18764038df6d14801ecfe29b7c289",
+      "rawChecks": 10,
+      "walBytes": 317272
+    },
+    {
+      "variant": "before",
+      "pair": 0,
+      "scenario": "reparse-same",
+      "refreshMs": 13042.5147,
+      "firstQueryMs": 1.062899999997171,
+      "elapsedMs": 13043.577599999997,
+      "scanMs": 100.60720000000038,
+      "parseMs": 9038.779999999999,
+      "commitPhaseMs": 3900.2449000000015,
+      "startupMs": 2.8703000000004977,
+      "prepareMs": 1915.778699999948,
+      "replaceMs": 1022.4017999999505,
+      "replacements": 398,
+      "operations": {
+        "delete/turn_summary": {
+          "calls": 398,
+          "ms": 12.32730000004085
+        },
+        "delete/usage_request_daily": {
+          "calls": 398,
+          "ms": 7.046700000015335
+        },
+        "insert/usage_request_daily": {
+          "calls": 398,
+          "ms": 68.81179999999404
+        },
+        "delete/usage_model_daily": {
+          "calls": 398,
+          "ms": 7.090199999969627
+        },
+        "insert/usage_model_daily": {
+          "calls": 398,
+          "ms": 77.83270000001357
+        },
+        "insert/turn_costs": {
+          "calls": 1180,
+          "ms": 21.95569999995496
+        }
+      },
+      "requests": 1180,
+      "tokens": 1607116410,
+      "discovered": 494,
+      "parsed": 494,
+      "reused": 0,
+      "bodyBytes": 280471904,
+      "factsSha256": "32a9cf1783a1377f8b61dbde9b70ee0f9bd360b2adfbc0bba2bc059729009fc5",
+      "aggregatesSha256": "69e4eee1b6848c9a3fdf0fed8cec3d3098c18764038df6d14801ecfe29b7c289",
+      "rawChecks": 10,
+      "walBytes": 4136512
+    },
+    {
+      "variant": "before",
+      "pair": 0,
+      "scenario": "codex-append",
+      "refreshMs": 169.65769999999975,
+      "firstQueryMs": 1.0097999999998137,
+      "elapsedMs": 170.66749999999956,
+      "scanMs": 102.63560000000143,
+      "parseMs": 47.51329999999871,
+      "commitPhaseMs": 16.11200000000099,
+      "startupMs": 3.393099999997503,
+      "prepareMs": 5.526899999997113,
+      "replaceMs": 5.860899999999674,
+      "replacements": 1,
+      "operations": {
+        "insert/turn_costs": {
+          "calls": 26,
+          "ms": 0.19240000000354485
+        },
+        "insert/turn_summary": {
+          "calls": 1,
+          "ms": 0.07470000000103028
+        },
+        "delete/turn_model_usage": {
+          "calls": 1,
+          "ms": 0.01840000000083819
+        },
+        "insert/turn_model_usage": {
+          "calls": 1,
+          "ms": 0.027999999998428393
+        },
+        "delete/turn_capability_usage": {
+          "calls": 1,
+          "ms": 0.01929999999993015
+        },
+        "insert/turn_capability_usage": {
+          "calls": 1,
+          "ms": 0.02419999999983702
+        },
+        "delete/turn_summary": {
+          "calls": 1,
+          "ms": 0.044899999997142004
+        },
+        "delete/usage_request_daily": {
+          "calls": 1,
+          "ms": 0.03020000000105938
+        },
+        "insert/usage_request_daily": {
+          "calls": 1,
+          "ms": 0.21010000000023865
+        },
+        "delete/usage_model_daily": {
+          "calls": 1,
+          "ms": 0.023999999997613486
+        },
+        "insert/usage_model_daily": {
+          "calls": 1,
+          "ms": 0.2404000000024098
+        }
+      },
+      "requests": 1181,
+      "tokens": 1607116540,
+      "discovered": 494,
+      "parsed": 1,
+      "reused": 493,
+      "bodyBytes": 601446,
+      "factsSha256": "6eedf105420b3d7f6ac71d017625ded25315fd854248b87ed3e8a8fc2542a947",
+      "aggregatesSha256": "df8c8d5316bbf64a3dcc63af2f59c69a217381ec45269414233fd0d0e1ec9fd7",
+      "rawChecks": 10,
+      "targetRequests": 25,
+      "walBytes": 420272
+    },
+    {
+      "variant": "before",
+      "pair": 0,
+      "scenario": "claude-append",
+      "refreshMs": 135.1790000000001,
+      "firstQueryMs": 1.0371000000013737,
+      "elapsedMs": 136.21610000000146,
+      "scanMs": 105.06689999999799,
+      "parseMs": 17.778200000000652,
+      "commitPhaseMs": 9.103600000002189,
+      "startupMs": 3.2260999999998603,
+      "prepareMs": 2.342800000002171,
+      "replaceMs": 2.974099999999453,
+      "replacements": 1,
+      "operations": {
+        "insert/turn_costs": {
+          "calls": 3,
+          "ms": 0.06090000000040163
+        },
+        "insert/turn_summary": {
+          "calls": 1,
+          "ms": 0.04379999999946449
+        },
+        "delete/turn_model_usage": {
+          "calls": 1,
+          "ms": 0.010399999999208376
+        },
+        "insert/turn_model_usage": {
+          "calls": 1,
+          "ms": 0.015800000001036096
+        },
+        "delete/turn_capability_usage": {
+          "calls": 1,
+          "ms": 0.007300000001123408
+        },
+        "insert/turn_capability_usage": {
+          "calls": 1,
+          "ms": 0.02239999999801512
+        },
+        "delete/turn_summary": {
+          "calls": 1,
+          "ms": 0.029999999998835847
+        },
+        "delete/usage_request_daily": {
+          "calls": 1,
+          "ms": 0.021000000000640284
+        },
+        "insert/usage_request_daily": {
+          "calls": 1,
+          "ms": 0.21119999999791617
+        },
+        "delete/usage_model_daily": {
+          "calls": 1,
+          "ms": 0.022700000001350418
+        },
+        "insert/usage_model_daily": {
+          "calls": 1,
+          "ms": 0.22110000000247965
+        }
+      },
+      "requests": 1182,
+      "tokens": 1607116670,
+      "discovered": 494,
+      "parsed": 1,
+      "reused": 493,
+      "bodyBytes": 6952,
+      "factsSha256": "5ecc4d2bbf5b076b12ad9db18dbc56ea28460695bd1ddecd68b82844b5e168ac",
+      "aggregatesSha256": "c77eaee621b85c0109ada528a986cf171e05845b1cc98181a25a7bc4684b579b",
+      "rawChecks": 10,
+      "targetRequests": 2,
+      "walBytes": 407912
+    },
+    {
+      "variant": "before",
+      "pair": 0,
+      "scenario": "codex-extend",
+      "refreshMs": 188.09409999999843,
+      "firstQueryMs": 1.115300000001298,
+      "elapsedMs": 189.20939999999973,
+      "scanMs": 108.32760000000053,
+      "parseMs": 54.1462999999967,
+      "commitPhaseMs": 22.45310000000245,
+      "startupMs": 3.160299999999552,
+      "prepareMs": 10.695200000001932,
+      "replaceMs": 5.8245999999999185,
+      "replacements": 1,
+      "operations": {
+        "insert/turn_costs": {
+          "calls": 26,
+          "ms": 0.1805999999960477
+        },
+        "update/turn_summary": {
+          "calls": 1,
+          "ms": 0.06599999999889405
+        },
+        "delete/turn_model_usage": {
+          "calls": 1,
+          "ms": 0.013199999997596024
+        },
+        "insert/turn_model_usage": {
+          "calls": 1,
+          "ms": 0.018500000001949957
+        },
+        "delete/turn_capability_usage": {
+          "calls": 1,
+          "ms": 0.010500000000320142
+        },
+        "insert/turn_capability_usage": {
+          "calls": 1,
+          "ms": 0.01840000000083819
+        },
+        "delete/turn_summary": {
+          "calls": 1,
+          "ms": 0.03269999999974971
+        },
+        "delete/usage_request_daily": {
+          "calls": 1,
+          "ms": 0.030699999999342253
+        },
+        "insert/usage_request_daily": {
+          "calls": 1,
+          "ms": 0.22959999999875436
+        },
+        "delete/usage_model_daily": {
+          "calls": 1,
+          "ms": 0.03269999999974971
+        },
+        "insert/usage_model_daily": {
+          "calls": 1,
+          "ms": 0.23289999999906286
+        }
+      },
+      "requests": 1182,
+      "tokens": 1607116696,
+      "discovered": 494,
+      "parsed": 1,
+      "reused": 493,
+      "bodyBytes": 601738,
+      "factsSha256": "aa845eaf71bc0f793620dee0395caa5ac9d37312559ad2950a84679cfa307a75",
+      "aggregatesSha256": "2c4d5bd4f5a6e8c68ecac49e1c62a322f4ab0711cb16c257faa56d47b904c698",
+      "rawChecks": 10,
+      "walBytes": 391432
+    },
+    {
+      "variant": "after",
+      "pair": 0,
+      "scenario": "initial",
+      "refreshMs": 12940.727299999999,
+      "firstQueryMs": 31.70770000000084,
+      "elapsedMs": 12972.435,
+      "scanMs": 108.7604,
+      "parseMs": 8992.3276,
+      "commitPhaseMs": 3837.6715999999997,
+      "startupMs": 1.9562999999999988,
+      "prepareMs": 2072.1021000000037,
+      "replaceMs": 795.4350000000047,
+      "replacements": 398,
+      "operations": {
+        "delete/turn_summary": {
+          "calls": 398,
+          "ms": 11.997099999996692
+        },
+        "insert/turn_summary": {
+          "calls": 1180,
+          "ms": 23.549200000046767
+        },
+        "insert/turn_capability_usage": {
+          "calls": 1357,
+          "ms": 10.257700000001932
+        },
+        "insert/turn_model_usage": {
+          "calls": 998,
+          "ms": 5.755299999971612
+        },
+        "insert/turn_costs": {
+          "calls": 1180,
+          "ms": 17.35020000003169
+        }
+      },
+      "requests": 1180,
+      "tokens": 1607116410,
+      "discovered": 494,
+      "parsed": 494,
+      "reused": 0,
+      "bodyBytes": 280471904,
+      "factsSha256": "32a9cf1783a1377f8b61dbde9b70ee0f9bd360b2adfbc0bba2bc059729009fc5",
+      "aggregatesSha256": "69e4eee1b6848c9a3fdf0fed8cec3d3098c18764038df6d14801ecfe29b7c289",
+      "rawChecks": 10,
+      "workloads": [
+        {
+          "name": "period-day-30d/provider",
+          "timingMs": {
+            "median": 2.0627000000004045,
+            "min": 1.9701999999997497,
+            "max": 2.177799999999479
+          },
+          "rows": 35,
+          "total": 35,
+          "outputSha256": "0411cfbd44c7f79783690a7b0e8bdca49eff389d5d241112b5c6d7c6617df23e",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "period-day-30d/model",
+          "timingMs": {
+            "median": 2.2031999999999243,
+            "min": 2.173800000000483,
+            "max": 3.26680000000124
+          },
+          "rows": 52,
+          "total": 52,
+          "outputSha256": "03caebe72ec87322532279421eae08718d28ab482de44713beb095c9bde00002",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "period-month-30d/provider",
+          "timingMs": {
+            "median": 1.8804000000000087,
+            "min": 1.8479999999999563,
+            "max": 1.9233000000003813
+          },
+          "rows": 3,
+          "total": 3,
+          "outputSha256": "cbacfca614e5a526e90c999b7d6fd331ba019ce51a5afd8f96cb5a91abee15b2",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "period-month-30d/model",
+          "timingMs": {
+            "median": 2.0812999999998283,
+            "min": 2.051100000000588,
+            "max": 2.1532999999999447
+          },
+          "rows": 8,
+          "total": 8,
+          "outputSha256": "2d4566323f7d9e36a098b61034ec78e1e84ffdd95daa8a5734c53c63c09959be",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "project-sessions-all/provider",
+          "timingMs": {
+            "median": 1.2683000000015454,
+            "min": 1.2548999999999069,
+            "max": 1.4210000000002765
+          },
+          "rows": 100,
+          "total": 150,
+          "outputSha256": "7641d2c2717192b291afc9e1cb4519d37001aa5a9291bced48999e4d4cbf70db",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "project-sessions-all/model",
+          "timingMs": {
+            "median": 2.38169999999991,
+            "min": 2.307699999999386,
+            "max": 2.441500000000815
+          },
+          "rows": 100,
+          "total": 221,
+          "outputSha256": "49e7518b8a4ee7ca3ca291d18427cc2aad9b2314e2df141eb7063a7a20ba96c8",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "project-sessions-30d/provider",
+          "timingMs": {
+            "median": 0.9585999999999331,
+            "min": 0.9390000000003056,
+            "max": 1.0718999999990046
+          },
+          "rows": 0,
+          "total": 0,
+          "outputSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "project-sessions-30d/model",
+          "timingMs": {
+            "median": 1.0504000000000815,
+            "min": 1.0383999999994558,
+            "max": 1.2712999999985186
+          },
+          "rows": 0,
+          "total": 0,
+          "outputSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "average-7d/provider",
+          "timingMs": {
+            "median": 1.3918999999987136,
+            "min": 1.289199999999255,
+            "max": 1.4735000000000582
+          },
+          "rows": 1,
+          "total": 1,
+          "outputSha256": "e562b4a9e61f1db780d27f4d8e24cb7da15c336c6f9b51048490923f999177bd",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "average-7d/model",
+          "timingMs": {
+            "median": 1.4310999999997875,
+            "min": 1.3959999999988213,
+            "max": 1.6998999999996158
+          },
+          "rows": 1,
+          "total": 1,
+          "outputSha256": "bdf3f4e5dd7c235a52641eab1c4d7ebcd86524a262a9e457a1b022f2163f1b8d",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "average-30d/provider",
+          "timingMs": {
+            "median": 1.787000000000262,
+            "min": 1.6944000000003143,
+            "max": 2.0663000000004104
+          },
+          "rows": 2,
+          "total": 2,
+          "outputSha256": "09267e2dc1186cc5ff70f7cc31bb9f97ebd39ac7132e1f351fe546d17397bd1f",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "average-30d/model",
+          "timingMs": {
+            "median": 1.9375,
+            "min": 1.9081000000005588,
+            "max": 2.282199999999648
+          },
+          "rows": 7,
+          "total": 7,
+          "outputSha256": "ee188076251f22cd2ec6fc742002718efa0974ac4bb6ffeb27fd6d850c960614",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        }
+      ],
+      "walBytes": 4194192
+    },
+    {
+      "variant": "after",
+      "pair": 0,
+      "scenario": "unchanged",
+      "refreshMs": 123.34079999999994,
+      "firstQueryMs": 1.0900999999994383,
+      "elapsedMs": 124.43089999999938,
+      "scanMs": 103.14660000000003,
+      "parseMs": 14.786399999999048,
+      "commitPhaseMs": 1.9914000000007945,
+      "startupMs": 3.4127000000007683,
+      "prepareMs": 0,
+      "replaceMs": 0,
+      "replacements": 0,
+      "operations": {},
+      "requests": 1180,
+      "tokens": 1607116410,
+      "discovered": 494,
+      "parsed": 0,
+      "reused": 494,
+      "bodyBytes": 0,
+      "factsSha256": "32a9cf1783a1377f8b61dbde9b70ee0f9bd360b2adfbc0bba2bc059729009fc5",
+      "aggregatesSha256": "69e4eee1b6848c9a3fdf0fed8cec3d3098c18764038df6d14801ecfe29b7c289",
+      "rawChecks": 10,
+      "walBytes": 317272
+    },
+    {
+      "variant": "after",
+      "pair": 0,
+      "scenario": "reparse-same",
+      "refreshMs": 13338.2251,
+      "firstQueryMs": 1.1491000000023632,
+      "elapsedMs": 13339.374200000002,
+      "scanMs": 100.07600000000093,
+      "parseMs": 9025.111,
+      "commitPhaseMs": 4209.6889999999985,
+      "startupMs": 3.336299999999028,
+      "prepareMs": 1932.2289999999994,
+      "replaceMs": 1201.2091999999648,
+      "replacements": 398,
+      "operations": {
+        "delete/turn_summary": {
+          "calls": 398,
+          "ms": 30.538200000015422
+        },
+        "delete/usage_request_daily": {
+          "calls": 398,
+          "ms": 10.318199999990611
+        },
+        "insert/usage_request_daily": {
+          "calls": 398,
+          "ms": 100.3148999999703
+        },
+        "delete/usage_model_daily": {
+          "calls": 398,
+          "ms": 11.142599999948288
+        },
+        "insert/usage_model_daily": {
+          "calls": 398,
+          "ms": 105.8283000000174
+        },
+        "insert/turn_summary": {
+          "calls": 1180,
+          "ms": 26.94569999993837
+        },
+        "insert/turn_capability_usage": {
+          "calls": 1357,
+          "ms": 12.456799999970826
+        },
+        "insert/turn_model_usage": {
+          "calls": 998,
+          "ms": 6.539600000065548
+        },
+        "insert/turn_costs": {
+          "calls": 1180,
+          "ms": 20.898799999991752
+        }
+      },
+      "requests": 1180,
+      "tokens": 1607116410,
+      "discovered": 494,
+      "parsed": 494,
+      "reused": 0,
+      "bodyBytes": 280471904,
+      "factsSha256": "32a9cf1783a1377f8b61dbde9b70ee0f9bd360b2adfbc0bba2bc059729009fc5",
+      "aggregatesSha256": "69e4eee1b6848c9a3fdf0fed8cec3d3098c18764038df6d14801ecfe29b7c289",
+      "rawChecks": 10,
+      "walBytes": 4227152
+    },
+    {
+      "variant": "after",
+      "pair": 0,
+      "scenario": "codex-append",
+      "refreshMs": 192.18860000000132,
+      "firstQueryMs": 1.0904000000009546,
+      "elapsedMs": 193.27900000000227,
+      "scanMs": 105.4168000000027,
+      "parseMs": 67.12679999999818,
+      "commitPhaseMs": 15.222600000000966,
+      "startupMs": 4.410599999999249,
+      "prepareMs": 4.320000000003347,
+      "replaceMs": 5.939099999999598,
+      "replacements": 1,
+      "operations": {
+        "delete/turn_summary": {
+          "calls": 1,
+          "ms": 0.21679999999832944
+        },
+        "insert/turn_summary": {
+          "calls": 26,
+          "ms": 0.2683999999972002
+        },
+        "insert/turn_capability_usage": {
+          "calls": 27,
+          "ms": 0.13239999999495922
+        },
+        "insert/turn_model_usage": {
+          "calls": 26,
+          "ms": 0.07060000000274158
+        },
+        "insert/turn_costs": {
+          "calls": 26,
+          "ms": 0.20389999999679276
+        },
+        "delete/usage_request_daily": {
+          "calls": 1,
+          "ms": 0.03110000000015134
+        },
+        "insert/usage_request_daily": {
+          "calls": 1,
+          "ms": 0.39730000000054133
+        },
+        "delete/usage_model_daily": {
+          "calls": 1,
+          "ms": 0.07819999999992433
+        },
+        "insert/usage_model_daily": {
+          "calls": 1,
+          "ms": 0.39649999999892316
+        }
+      },
+      "requests": 1181,
+      "tokens": 1607116540,
+      "discovered": 494,
+      "parsed": 1,
+      "reused": 493,
+      "bodyBytes": 601446,
+      "factsSha256": "6eedf105420b3d7f6ac71d017625ded25315fd854248b87ed3e8a8fc2542a947",
+      "aggregatesSha256": "df8c8d5316bbf64a3dcc63af2f59c69a217381ec45269414233fd0d0e1ec9fd7",
+      "rawChecks": 10,
+      "targetRequests": 25,
+      "walBytes": 506792
+    },
+    {
+      "variant": "after",
+      "pair": 0,
+      "scenario": "claude-append",
+      "refreshMs": 138.59690000000046,
+      "firstQueryMs": 1.044499999999971,
+      "elapsedMs": 139.64140000000043,
+      "scanMs": 108.48979999999938,
+      "parseMs": 17.414099999998143,
+      "commitPhaseMs": 9.956399999999121,
+      "startupMs": 2.731500000001688,
+      "prepareMs": 2.571800000001531,
+      "replaceMs": 3.44629999999961,
+      "replacements": 1,
+      "operations": {
+        "delete/turn_summary": {
+          "calls": 1,
+          "ms": 0.06959999999889988
+        },
+        "insert/turn_summary": {
+          "calls": 3,
+          "ms": 0.08409999999639695
+        },
+        "insert/turn_capability_usage": {
+          "calls": 3,
+          "ms": 0.028199999997013947
+        },
+        "insert/turn_model_usage": {
+          "calls": 3,
+          "ms": 0.025800000003073364
+        },
+        "insert/turn_costs": {
+          "calls": 3,
+          "ms": 0.05319999999483116
+        },
+        "delete/usage_request_daily": {
+          "calls": 1,
+          "ms": 0.0268999999971129
+        },
+        "insert/usage_request_daily": {
+          "calls": 1,
+          "ms": 0.2776000000012573
+        },
+        "delete/usage_model_daily": {
+          "calls": 1,
+          "ms": 0.028500000000349246
+        },
+        "insert/usage_model_daily": {
+          "calls": 1,
+          "ms": 0.28369999999995343
+        }
+      },
+      "requests": 1182,
+      "tokens": 1607116670,
+      "discovered": 494,
+      "parsed": 1,
+      "reused": 493,
+      "bodyBytes": 6952,
+      "factsSha256": "5ecc4d2bbf5b076b12ad9db18dbc56ea28460695bd1ddecd68b82844b5e168ac",
+      "aggregatesSha256": "c77eaee621b85c0109ada528a986cf171e05845b1cc98181a25a7bc4684b579b",
+      "rawChecks": 10,
+      "targetRequests": 2,
+      "walBytes": 490312
+    },
+    {
+      "variant": "after",
+      "pair": 0,
+      "scenario": "codex-extend",
+      "refreshMs": 225.2344000000012,
+      "firstQueryMs": 1.1427999999978056,
+      "elapsedMs": 226.377199999999,
+      "scanMs": 106.42079999999987,
+      "parseMs": 57.54959999999846,
+      "commitPhaseMs": 56.85310000000027,
+      "startupMs": 4.40400000000227,
+      "prepareMs": 44.884399999999005,
+      "replaceMs": 6.595099999998638,
+      "replacements": 1,
+      "operations": {
+        "delete/turn_summary": {
+          "calls": 1,
+          "ms": 0.3220999999975902
+        },
+        "insert/turn_summary": {
+          "calls": 26,
+          "ms": 0.3108000000102038
+        },
+        "insert/turn_capability_usage": {
+          "calls": 27,
+          "ms": 0.15190000000075088
+        },
+        "insert/turn_model_usage": {
+          "calls": 26,
+          "ms": 0.08719999999811989
+        },
+        "insert/turn_costs": {
+          "calls": 26,
+          "ms": 0.22340000000258442
+        },
+        "delete/usage_request_daily": {
+          "calls": 1,
+          "ms": 0.0319999999992433
+        },
+        "insert/usage_request_daily": {
+          "calls": 1,
+          "ms": 0.38839999999981956
+        },
+        "delete/usage_model_daily": {
+          "calls": 1,
+          "ms": 0.031299999998736894
+        },
+        "insert/usage_model_daily": {
+          "calls": 1,
+          "ms": 0.38290000000051805
+        }
+      },
+      "requests": 1182,
+      "tokens": 1607116696,
+      "discovered": 494,
+      "parsed": 1,
+      "reused": 493,
+      "bodyBytes": 601738,
+      "factsSha256": "aa845eaf71bc0f793620dee0395caa5ac9d37312559ad2950a84679cfa307a75",
+      "aggregatesSha256": "2c4d5bd4f5a6e8c68ecac49e1c62a322f4ab0711cb16c257faa56d47b904c698",
+      "rawChecks": 10,
+      "walBytes": 465592
+    },
+    {
+      "variant": "after",
+      "pair": 1,
+      "scenario": "initial",
+      "refreshMs": 13274.2288,
+      "firstQueryMs": 32.57430000000022,
+      "elapsedMs": 13306.803100000001,
+      "scanMs": 127.2876,
+      "parseMs": 9390.441299999999,
+      "commitPhaseMs": 3754.3243,
+      "startupMs": 2.158300000000004,
+      "prepareMs": 1712.3453999999892,
+      "replaceMs": 1011.5645999999847,
+      "replacements": 398,
+      "operations": {
+        "delete/turn_summary": {
+          "calls": 398,
+          "ms": 12.451000000028614
+        },
+        "insert/turn_summary": {
+          "calls": 1180,
+          "ms": 23.868500000016866
+        },
+        "insert/turn_capability_usage": {
+          "calls": 1357,
+          "ms": 10.483899999984715
+        },
+        "insert/turn_model_usage": {
+          "calls": 998,
+          "ms": 5.852000000018961
+        },
+        "insert/turn_costs": {
+          "calls": 1180,
+          "ms": 17.492499999973006
+        }
+      },
+      "requests": 1180,
+      "tokens": 1607116410,
+      "discovered": 494,
+      "parsed": 494,
+      "reused": 0,
+      "bodyBytes": 280471904,
+      "factsSha256": "32a9cf1783a1377f8b61dbde9b70ee0f9bd360b2adfbc0bba2bc059729009fc5",
+      "aggregatesSha256": "69e4eee1b6848c9a3fdf0fed8cec3d3098c18764038df6d14801ecfe29b7c289",
+      "rawChecks": 10,
+      "workloads": [
+        {
+          "name": "period-day-30d/provider",
+          "timingMs": {
+            "median": 2.1502999999993335,
+            "min": 1.9637000000002445,
+            "max": 2.4416000000001077
+          },
+          "rows": 35,
+          "total": 35,
+          "outputSha256": "0411cfbd44c7f79783690a7b0e8bdca49eff389d5d241112b5c6d7c6617df23e",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "period-day-30d/model",
+          "timingMs": {
+            "median": 2.4301999999988766,
+            "min": 2.1733000000003813,
+            "max": 3.5851999999995314
+          },
+          "rows": 52,
+          "total": 52,
+          "outputSha256": "03caebe72ec87322532279421eae08718d28ab482de44713beb095c9bde00002",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "period-month-30d/provider",
+          "timingMs": {
+            "median": 2.7643000000007305,
+            "min": 1.8506999999990512,
+            "max": 2.8634000000001834
+          },
+          "rows": 3,
+          "total": 3,
+          "outputSha256": "cbacfca614e5a526e90c999b7d6fd331ba019ce51a5afd8f96cb5a91abee15b2",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "period-month-30d/model",
+          "timingMs": {
+            "median": 2.2233999999989464,
+            "min": 2.0712000000003172,
+            "max": 2.593800000000556
+          },
+          "rows": 8,
+          "total": 8,
+          "outputSha256": "2d4566323f7d9e36a098b61034ec78e1e84ffdd95daa8a5734c53c63c09959be",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "project-sessions-all/provider",
+          "timingMs": {
+            "median": 1.9614000000001397,
+            "min": 1.4601999999995314,
+            "max": 2.079599999999118
+          },
+          "rows": 100,
+          "total": 150,
+          "outputSha256": "7641d2c2717192b291afc9e1cb4519d37001aa5a9291bced48999e4d4cbf70db",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "project-sessions-all/model",
+          "timingMs": {
+            "median": 2.6622999999999593,
+            "min": 2.3673999999991793,
+            "max": 3.7679000000007363
+          },
+          "rows": 100,
+          "total": 221,
+          "outputSha256": "49e7518b8a4ee7ca3ca291d18427cc2aad9b2314e2df141eb7063a7a20ba96c8",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "project-sessions-30d/provider",
+          "timingMs": {
+            "median": 0.91859999999906,
+            "min": 0.8938999999991211,
+            "max": 1.0205000000005384
+          },
+          "rows": 0,
+          "total": 0,
+          "outputSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "project-sessions-30d/model",
+          "timingMs": {
+            "median": 1.0018999999992957,
+            "min": 0.9884000000001834,
+            "max": 1.0331000000005588
+          },
+          "rows": 0,
+          "total": 0,
+          "outputSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "average-7d/provider",
+          "timingMs": {
+            "median": 1.2638000000006286,
+            "min": 1.2467999999989843,
+            "max": 1.285699999998542
+          },
+          "rows": 1,
+          "total": 1,
+          "outputSha256": "e562b4a9e61f1db780d27f4d8e24cb7da15c336c6f9b51048490923f999177bd",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "average-7d/model",
+          "timingMs": {
+            "median": 1.3992999999991298,
+            "min": 1.3682000000007974,
+            "max": 1.7318999999988591
+          },
+          "rows": 1,
+          "total": 1,
+          "outputSha256": "bdf3f4e5dd7c235a52641eab1c4d7ebcd86524a262a9e457a1b022f2163f1b8d",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "average-30d/provider",
+          "timingMs": {
+            "median": 1.672500000000582,
+            "min": 1.643500000000131,
+            "max": 1.7088999999996304
+          },
+          "rows": 2,
+          "total": 2,
+          "outputSha256": "09267e2dc1186cc5ff70f7cc31bb9f97ebd39ac7132e1f351fe546d17397bd1f",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "average-30d/model",
+          "timingMs": {
+            "median": 1.8632999999990716,
+            "min": 1.8312999999998283,
+            "max": 1.9290000000000873
+          },
+          "rows": 7,
+          "total": 7,
+          "outputSha256": "ee188076251f22cd2ec6fc742002718efa0974ac4bb6ffeb27fd6d850c960614",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        }
+      ],
+      "walBytes": 4194192
+    },
+    {
+      "variant": "after",
+      "pair": 1,
+      "scenario": "unchanged",
+      "refreshMs": 124.61590000000069,
+      "firstQueryMs": 1.2627000000011321,
+      "elapsedMs": 125.87860000000182,
+      "scanMs": 102.58880000000136,
+      "parseMs": 14.889599999998609,
+      "commitPhaseMs": 1.9418000000005122,
+      "startupMs": 5.1916999999994005,
+      "prepareMs": 0,
+      "replaceMs": 0,
+      "replacements": 0,
+      "operations": {},
+      "requests": 1180,
+      "tokens": 1607116410,
+      "discovered": 494,
+      "parsed": 0,
+      "reused": 494,
+      "bodyBytes": 0,
+      "factsSha256": "32a9cf1783a1377f8b61dbde9b70ee0f9bd360b2adfbc0bba2bc059729009fc5",
+      "aggregatesSha256": "69e4eee1b6848c9a3fdf0fed8cec3d3098c18764038df6d14801ecfe29b7c289",
+      "rawChecks": 10,
+      "walBytes": 317272
+    },
+    {
+      "variant": "after",
+      "pair": 1,
+      "scenario": "reparse-same",
+      "refreshMs": 13290.309899999998,
+      "firstQueryMs": 1.077500000003056,
+      "elapsedMs": 13291.387400000001,
+      "scanMs": 104.61189999999988,
+      "parseMs": 9274.7545,
+      "commitPhaseMs": 3908.114600000001,
+      "startupMs": 2.816000000000713,
+      "prepareMs": 1909.8751000000084,
+      "replaceMs": 1075.396900000038,
+      "replacements": 398,
+      "operations": {
+        "delete/turn_summary": {
+          "calls": 398,
+          "ms": 24.746000000031927
+        },
+        "delete/usage_request_daily": {
+          "calls": 398,
+          "ms": 8.488099999967744
+        },
+        "insert/usage_request_daily": {
+          "calls": 398,
+          "ms": 89.23690000002534
+        },
+        "delete/usage_model_daily": {
+          "calls": 398,
+          "ms": 9.122399999980189
+        },
+        "insert/usage_model_daily": {
+          "calls": 398,
+          "ms": 96.53169999997044
+        },
+        "insert/turn_summary": {
+          "calls": 1180,
+          "ms": 27.23099999993792
+        },
+        "insert/turn_capability_usage": {
+          "calls": 1357,
+          "ms": 10.338899999995192
+        },
+        "insert/turn_model_usage": {
+          "calls": 998,
+          "ms": 5.70699999999124
+        },
+        "insert/turn_costs": {
+          "calls": 1180,
+          "ms": 17.77309999996214
+        }
+      },
+      "requests": 1180,
+      "tokens": 1607116410,
+      "discovered": 494,
+      "parsed": 494,
+      "reused": 0,
+      "bodyBytes": 280471904,
+      "factsSha256": "32a9cf1783a1377f8b61dbde9b70ee0f9bd360b2adfbc0bba2bc059729009fc5",
+      "aggregatesSha256": "69e4eee1b6848c9a3fdf0fed8cec3d3098c18764038df6d14801ecfe29b7c289",
+      "rawChecks": 10,
+      "walBytes": 4227152
+    },
+    {
+      "variant": "after",
+      "pair": 1,
+      "scenario": "codex-append",
+      "refreshMs": 188.1867999999995,
+      "firstQueryMs": 1.0515999999988708,
+      "elapsedMs": 189.23839999999836,
+      "scanMs": 103.15129999999772,
+      "parseMs": 47.983100000001286,
+      "commitPhaseMs": 15.772600000000239,
+      "startupMs": 21.26970000000074,
+      "prepareMs": 4.269000000000233,
+      "replaceMs": 5.734599999999773,
+      "replacements": 1,
+      "operations": {
+        "delete/turn_summary": {
+          "calls": 1,
+          "ms": 0.2213000000010652
+        },
+        "insert/turn_summary": {
+          "calls": 26,
+          "ms": 0.2699000000102387
+        },
+        "insert/turn_capability_usage": {
+          "calls": 27,
+          "ms": 0.13369999999486026
+        },
+        "insert/turn_model_usage": {
+          "calls": 26,
+          "ms": 0.06510000001071603
+        },
+        "insert/turn_costs": {
+          "calls": 26,
+          "ms": 0.18160000000352738
+        },
+        "delete/usage_request_daily": {
+          "calls": 1,
+          "ms": 0.028500000000349246
+        },
+        "insert/usage_request_daily": {
+          "calls": 1,
+          "ms": 0.37700000000040745
+        },
+        "delete/usage_model_daily": {
+          "calls": 1,
+          "ms": 0.0713999999970838
+        },
+        "insert/usage_model_daily": {
+          "calls": 1,
+          "ms": 0.3741999999983818
+        }
+      },
+      "requests": 1181,
+      "tokens": 1607116540,
+      "discovered": 494,
+      "parsed": 1,
+      "reused": 493,
+      "bodyBytes": 601446,
+      "factsSha256": "6eedf105420b3d7f6ac71d017625ded25315fd854248b87ed3e8a8fc2542a947",
+      "aggregatesSha256": "df8c8d5316bbf64a3dcc63af2f59c69a217381ec45269414233fd0d0e1ec9fd7",
+      "rawChecks": 10,
+      "targetRequests": 25,
+      "walBytes": 506792
+    },
+    {
+      "variant": "after",
+      "pair": 1,
+      "scenario": "claude-append",
+      "refreshMs": 166.94930000000022,
+      "firstQueryMs": 1.2440999999998894,
+      "elapsedMs": 168.1934000000001,
+      "scanMs": 134.7488000000012,
+      "parseMs": 18.011999999998807,
+      "commitPhaseMs": 10.792600000000675,
+      "startupMs": 3.3901000000005297,
+      "prepareMs": 2.3044000000008964,
+      "replaceMs": 3.1334999999999127,
+      "replacements": 1,
+      "operations": {
+        "delete/turn_summary": {
+          "calls": 1,
+          "ms": 0.07070000000021537
+        },
+        "insert/turn_summary": {
+          "calls": 3,
+          "ms": 0.0684000000001106
+        },
+        "insert/turn_capability_usage": {
+          "calls": 3,
+          "ms": 0.02930000000196742
+        },
+        "insert/turn_model_usage": {
+          "calls": 3,
+          "ms": 0.023499999999330612
+        },
+        "insert/turn_costs": {
+          "calls": 3,
+          "ms": 0.051200000001699664
+        },
+        "delete/usage_request_daily": {
+          "calls": 1,
+          "ms": 0.028200000000651926
+        },
+        "insert/usage_request_daily": {
+          "calls": 1,
+          "ms": 0.2800999999999476
+        },
+        "delete/usage_model_daily": {
+          "calls": 1,
+          "ms": 0.027399999999033753
+        },
+        "insert/usage_model_daily": {
+          "calls": 1,
+          "ms": 0.25899999999819556
+        }
+      },
+      "requests": 1182,
+      "tokens": 1607116670,
+      "discovered": 494,
+      "parsed": 1,
+      "reused": 493,
+      "bodyBytes": 6952,
+      "factsSha256": "5ecc4d2bbf5b076b12ad9db18dbc56ea28460695bd1ddecd68b82844b5e168ac",
+      "aggregatesSha256": "c77eaee621b85c0109ada528a986cf171e05845b1cc98181a25a7bc4684b579b",
+      "rawChecks": 10,
+      "targetRequests": 2,
+      "walBytes": 490312
+    },
+    {
+      "variant": "after",
+      "pair": 1,
+      "scenario": "codex-extend",
+      "refreshMs": 180.03670000000056,
+      "firstQueryMs": 1.1899000000012165,
+      "elapsedMs": 181.22660000000178,
+      "scanMs": 108.56369999999879,
+      "parseMs": 49.96470000000045,
+      "commitPhaseMs": 18.342599999999948,
+      "startupMs": 3.15940000000046,
+      "prepareMs": 5.645499999998719,
+      "replaceMs": 5.917600000000675,
+      "replacements": 1,
+      "operations": {
+        "delete/turn_summary": {
+          "calls": 1,
+          "ms": 0.23449999999866122
+        },
+        "insert/turn_summary": {
+          "calls": 26,
+          "ms": 0.26080000000001746
+        },
+        "insert/turn_capability_usage": {
+          "calls": 27,
+          "ms": 0.13210000000253785
+        },
+        "insert/turn_model_usage": {
+          "calls": 26,
+          "ms": 0.07120000000213622
+        },
+        "insert/turn_costs": {
+          "calls": 26,
+          "ms": 0.18509999999878346
+        },
+        "delete/usage_request_daily": {
+          "calls": 1,
+          "ms": 0.03269999999974971
+        },
+        "insert/usage_request_daily": {
+          "calls": 1,
+          "ms": 0.3651000000027125
+        },
+        "delete/usage_model_daily": {
+          "calls": 1,
+          "ms": 0.030599999998230487
+        },
+        "insert/usage_model_daily": {
+          "calls": 1,
+          "ms": 0.36999999999898137
+        }
+      },
+      "requests": 1182,
+      "tokens": 1607116696,
+      "discovered": 494,
+      "parsed": 1,
+      "reused": 493,
+      "bodyBytes": 601738,
+      "factsSha256": "aa845eaf71bc0f793620dee0395caa5ac9d37312559ad2950a84679cfa307a75",
+      "aggregatesSha256": "2c4d5bd4f5a6e8c68ecac49e1c62a322f4ab0711cb16c257faa56d47b904c698",
+      "rawChecks": 10,
+      "walBytes": 465592
+    },
+    {
+      "variant": "before",
+      "pair": 1,
+      "scenario": "initial",
+      "refreshMs": 13028.692799999999,
+      "firstQueryMs": 30.944100000000617,
+      "elapsedMs": 13059.6369,
+      "scanMs": 115.46699999999998,
+      "parseMs": 9178.5078,
+      "commitPhaseMs": 3732.6497,
+      "startupMs": 2.055400000000006,
+      "prepareMs": 1890.4646999999914,
+      "replaceMs": 875.0939000000016,
+      "replacements": 398,
+      "operations": {
+        "delete/turn_summary": {
+          "calls": 398,
+          "ms": 13.286999999963598
+        },
+        "insert/turn_summary": {
+          "calls": 1180,
+          "ms": 26.02160000001095
+        },
+        "delete/turn_model_usage": {
+          "calls": 1180,
+          "ms": 5.1964000000407395
+        },
+        "insert/turn_model_usage": {
+          "calls": 1180,
+          "ms": 8.335199999963152
+        },
+        "delete/turn_capability_usage": {
+          "calls": 1180,
+          "ms": 4.276499999998123
+        },
+        "insert/turn_capability_usage": {
+          "calls": 1180,
+          "ms": 8.69449999997778
+        },
+        "insert/turn_costs": {
+          "calls": 1180,
+          "ms": 19.78609999995024
+        }
+      },
+      "requests": 1180,
+      "tokens": 1607116410,
+      "discovered": 494,
+      "parsed": 494,
+      "reused": 0,
+      "bodyBytes": 280471904,
+      "factsSha256": "32a9cf1783a1377f8b61dbde9b70ee0f9bd360b2adfbc0bba2bc059729009fc5",
+      "aggregatesSha256": "69e4eee1b6848c9a3fdf0fed8cec3d3098c18764038df6d14801ecfe29b7c289",
+      "rawChecks": 10,
+      "workloads": [
+        {
+          "name": "period-day-30d/provider",
+          "timingMs": {
+            "median": 1.922099999999773,
+            "min": 1.8942000000006374,
+            "max": 2.14049999999952
+          },
+          "rows": 35,
+          "total": 35,
+          "outputSha256": "0411cfbd44c7f79783690a7b0e8bdca49eff389d5d241112b5c6d7c6617df23e",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "period-day-30d/model",
+          "timingMs": {
+            "median": 2.1617999999998574,
+            "min": 2.0943999999999505,
+            "max": 3.238900000000285
+          },
+          "rows": 52,
+          "total": 52,
+          "outputSha256": "03caebe72ec87322532279421eae08718d28ab482de44713beb095c9bde00002",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "period-month-30d/provider",
+          "timingMs": {
+            "median": 1.8361000000004424,
+            "min": 1.7986000000000786,
+            "max": 2.5778000000009342
+          },
+          "rows": 3,
+          "total": 3,
+          "outputSha256": "cbacfca614e5a526e90c999b7d6fd331ba019ce51a5afd8f96cb5a91abee15b2",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "period-month-30d/model",
+          "timingMs": {
+            "median": 2.423899999999776,
+            "min": 2.0135000000009313,
+            "max": 3.308600000000297
+          },
+          "rows": 8,
+          "total": 8,
+          "outputSha256": "2d4566323f7d9e36a098b61034ec78e1e84ffdd95daa8a5734c53c63c09959be",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "project-sessions-all/provider",
+          "timingMs": {
+            "median": 1.1972999999998137,
+            "min": 1.190099999999802,
+            "max": 1.2128999999986263
+          },
+          "rows": 100,
+          "total": 150,
+          "outputSha256": "7641d2c2717192b291afc9e1cb4519d37001aa5a9291bced48999e4d4cbf70db",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "project-sessions-all/model",
+          "timingMs": {
+            "median": 2.255699999999706,
+            "min": 2.2171999999991385,
+            "max": 2.7119000000002416
+          },
+          "rows": 100,
+          "total": 221,
+          "outputSha256": "49e7518b8a4ee7ca3ca291d18427cc2aad9b2314e2df141eb7063a7a20ba96c8",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "project-sessions-30d/provider",
+          "timingMs": {
+            "median": 0.9010999999991327,
+            "min": 0.880699999999706,
+            "max": 1.3151999999990949
+          },
+          "rows": 0,
+          "total": 0,
+          "outputSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "project-sessions-30d/model",
+          "timingMs": {
+            "median": 0.9938000000001921,
+            "min": 0.9745999999995547,
+            "max": 1.3775000000005093
+          },
+          "rows": 0,
+          "total": 0,
+          "outputSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "average-7d/provider",
+          "timingMs": {
+            "median": 1.274199999999837,
+            "min": 1.23279999999977,
+            "max": 1.4187000000001717
+          },
+          "rows": 1,
+          "total": 1,
+          "outputSha256": "e562b4a9e61f1db780d27f4d8e24cb7da15c336c6f9b51048490923f999177bd",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "average-7d/model",
+          "timingMs": {
+            "median": 1.389999999999418,
+            "min": 1.3608000000003813,
+            "max": 1.7111000000004424
+          },
+          "rows": 1,
+          "total": 1,
+          "outputSha256": "bdf3f4e5dd7c235a52641eab1c4d7ebcd86524a262a9e457a1b022f2163f1b8d",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "average-30d/provider",
+          "timingMs": {
+            "median": 1.6715999999996711,
+            "min": 1.6499999999996362,
+            "max": 1.7026999999998225
+          },
+          "rows": 2,
+          "total": 2,
+          "outputSha256": "09267e2dc1186cc5ff70f7cc31bb9f97ebd39ac7132e1f351fe546d17397bd1f",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "average-30d/model",
+          "timingMs": {
+            "median": 1.8586000000013883,
+            "min": 1.8405999999995402,
+            "max": 2.021500000000742
+          },
+          "rows": 7,
+          "total": 7,
+          "outputSha256": "ee188076251f22cd2ec6fc742002718efa0974ac4bb6ffeb27fd6d850c960614",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        }
+      ],
+      "walBytes": 4194192
+    },
+    {
+      "variant": "before",
+      "pair": 1,
+      "scenario": "unchanged",
+      "refreshMs": 124.13670000000093,
+      "firstQueryMs": 1.1493000000009488,
+      "elapsedMs": 125.28600000000188,
+      "scanMs": 104.36160000000018,
+      "parseMs": 14.395199999999022,
+      "commitPhaseMs": 1.9498999999996158,
+      "startupMs": 3.4263000000009924,
+      "prepareMs": 0,
+      "replaceMs": 0,
+      "replacements": 0,
+      "operations": {},
+      "requests": 1180,
+      "tokens": 1607116410,
+      "discovered": 494,
+      "parsed": 0,
+      "reused": 494,
+      "bodyBytes": 0,
+      "factsSha256": "32a9cf1783a1377f8b61dbde9b70ee0f9bd360b2adfbc0bba2bc059729009fc5",
+      "aggregatesSha256": "69e4eee1b6848c9a3fdf0fed8cec3d3098c18764038df6d14801ecfe29b7c289",
+      "rawChecks": 10,
+      "walBytes": 317272
+    },
+    {
+      "variant": "before",
+      "pair": 1,
+      "scenario": "reparse-same",
+      "refreshMs": 12663.170199999999,
+      "firstQueryMs": 1.1354000000028464,
+      "elapsedMs": 12664.305600000002,
+      "scanMs": 104.3830999999991,
+      "parseMs": 8957.8685,
+      "commitPhaseMs": 3597.4789999999994,
+      "startupMs": 3.425600000000486,
+      "prepareMs": 1640.574100000009,
+      "replaceMs": 1010.8146999999917,
+      "replacements": 398,
+      "operations": {
+        "delete/turn_summary": {
+          "calls": 398,
+          "ms": 12.578200000005381
+        },
+        "delete/usage_request_daily": {
+          "calls": 398,
+          "ms": 7.0609000000276865
+        },
+        "insert/usage_request_daily": {
+          "calls": 398,
+          "ms": 68.8258999999598
+        },
+        "delete/usage_model_daily": {
+          "calls": 398,
+          "ms": 7.166699999979755
+        },
+        "insert/usage_model_daily": {
+          "calls": 398,
+          "ms": 76.76609999994253
+        },
+        "insert/turn_costs": {
+          "calls": 1180,
+          "ms": 21.58709999997518
+        }
+      },
+      "requests": 1180,
+      "tokens": 1607116410,
+      "discovered": 494,
+      "parsed": 494,
+      "reused": 0,
+      "bodyBytes": 280471904,
+      "factsSha256": "32a9cf1783a1377f8b61dbde9b70ee0f9bd360b2adfbc0bba2bc059729009fc5",
+      "aggregatesSha256": "69e4eee1b6848c9a3fdf0fed8cec3d3098c18764038df6d14801ecfe29b7c289",
+      "rawChecks": 10,
+      "walBytes": 4136512
+    },
+    {
+      "variant": "before",
+      "pair": 1,
+      "scenario": "codex-append",
+      "refreshMs": 190.98949999999968,
+      "firstQueryMs": 1.021600000000035,
+      "elapsedMs": 192.01109999999971,
+      "scanMs": 119.97530000000188,
+      "parseMs": 49.61860000000161,
+      "commitPhaseMs": 16.31789999999819,
+      "startupMs": 5.069199999998091,
+      "prepareMs": 5.8158000000003085,
+      "replaceMs": 5.58350000000064,
+      "replacements": 1,
+      "operations": {
+        "insert/turn_costs": {
+          "calls": 26,
+          "ms": 0.17669999999634456
+        },
+        "insert/turn_summary": {
+          "calls": 1,
+          "ms": 0.05459999999948195
+        },
+        "delete/turn_model_usage": {
+          "calls": 1,
+          "ms": 0.01299999999901047
+        },
+        "insert/turn_model_usage": {
+          "calls": 1,
+          "ms": 0.01929999999993015
+        },
+        "delete/turn_capability_usage": {
+          "calls": 1,
+          "ms": 0.00969999999870197
+        },
+        "insert/turn_capability_usage": {
+          "calls": 1,
+          "ms": 0.019099999997706618
+        },
+        "delete/turn_summary": {
+          "calls": 1,
+          "ms": 0.033699999999953434
+        },
+        "delete/usage_request_daily": {
+          "calls": 1,
+          "ms": 0.03020000000105938
+        },
+        "insert/usage_request_daily": {
+          "calls": 1,
+          "ms": 0.21440000000075088
+        },
+        "delete/usage_model_daily": {
+          "calls": 1,
+          "ms": 0.024299999997310806
+        },
+        "insert/usage_model_daily": {
+          "calls": 1,
+          "ms": 0.23960000000079162
+        }
+      },
+      "requests": 1181,
+      "tokens": 1607116540,
+      "discovered": 494,
+      "parsed": 1,
+      "reused": 493,
+      "bodyBytes": 601446,
+      "factsSha256": "6eedf105420b3d7f6ac71d017625ded25315fd854248b87ed3e8a8fc2542a947",
+      "aggregatesSha256": "df8c8d5316bbf64a3dcc63af2f59c69a217381ec45269414233fd0d0e1ec9fd7",
+      "rawChecks": 10,
+      "targetRequests": 25,
+      "walBytes": 420272
+    },
+    {
+      "variant": "before",
+      "pair": 1,
+      "scenario": "claude-append",
+      "refreshMs": 140.02509999999893,
+      "firstQueryMs": 1.1437000000005355,
+      "elapsedMs": 141.16879999999946,
+      "scanMs": 103.56160000000091,
+      "parseMs": 22.310699999998178,
+      "commitPhaseMs": 11.211100000000442,
+      "startupMs": 2.936699999998382,
+      "prepareMs": 2.2391000000025088,
+      "replaceMs": 3.207399999999325,
+      "replacements": 1,
+      "operations": {
+        "insert/turn_costs": {
+          "calls": 3,
+          "ms": 0.0595000000030268
+        },
+        "insert/turn_summary": {
+          "calls": 1,
+          "ms": 0.04400000000168802
+        },
+        "delete/turn_model_usage": {
+          "calls": 1,
+          "ms": 0.010500000000320142
+        },
+        "insert/turn_model_usage": {
+          "calls": 1,
+          "ms": 0.01630000000295695
+        },
+        "delete/turn_capability_usage": {
+          "calls": 1,
+          "ms": 0.007700000001932494
+        },
+        "insert/turn_capability_usage": {
+          "calls": 1,
+          "ms": 0.01540000000022701
+        },
+        "delete/turn_summary": {
+          "calls": 1,
+          "ms": 0.046699999998963904
+        },
+        "delete/usage_request_daily": {
+          "calls": 1,
+          "ms": 0.023099999998521525
+        },
+        "insert/usage_request_daily": {
+          "calls": 1,
+          "ms": 0.21589999999923748
+        },
+        "delete/usage_model_daily": {
+          "calls": 1,
+          "ms": 0.023699999997916166
+        },
+        "insert/usage_model_daily": {
+          "calls": 1,
+          "ms": 0.24390000000130385
+        }
+      },
+      "requests": 1182,
+      "tokens": 1607116670,
+      "discovered": 494,
+      "parsed": 1,
+      "reused": 493,
+      "bodyBytes": 6952,
+      "factsSha256": "5ecc4d2bbf5b076b12ad9db18dbc56ea28460695bd1ddecd68b82844b5e168ac",
+      "aggregatesSha256": "c77eaee621b85c0109ada528a986cf171e05845b1cc98181a25a7bc4684b579b",
+      "rawChecks": 10,
+      "targetRequests": 2,
+      "walBytes": 407912
+    },
+    {
+      "variant": "before",
+      "pair": 1,
+      "scenario": "codex-extend",
+      "refreshMs": 184.02490000000034,
+      "firstQueryMs": 1.0583999999980733,
+      "elapsedMs": 185.08329999999842,
+      "scanMs": 109.95360000000073,
+      "parseMs": 52.89009999999689,
+      "commitPhaseMs": 17.241900000000896,
+      "startupMs": 3.9331999999994878,
+      "prepareMs": 5.756999999997788,
+      "replaceMs": 6.256900000000314,
+      "replacements": 1,
+      "operations": {
+        "insert/turn_costs": {
+          "calls": 26,
+          "ms": 0.2128999999986263
+        },
+        "update/turn_summary": {
+          "calls": 1,
+          "ms": 0.05929999999716529
+        },
+        "delete/turn_model_usage": {
+          "calls": 1,
+          "ms": 0.014100000000325963
+        },
+        "insert/turn_model_usage": {
+          "calls": 1,
+          "ms": 0.019499999998515705
+        },
+        "delete/turn_capability_usage": {
+          "calls": 1,
+          "ms": 0.010199999996984843
+        },
+        "insert/turn_capability_usage": {
+          "calls": 1,
+          "ms": 0.016400000000430737
+        },
+        "delete/turn_summary": {
+          "calls": 1,
+          "ms": 0.03299999999944703
+        },
+        "delete/usage_request_daily": {
+          "calls": 1,
+          "ms": 0.029500000000552973
+        },
+        "insert/usage_request_daily": {
+          "calls": 1,
+          "ms": 0.21260000000256696
+        },
+        "delete/usage_model_daily": {
+          "calls": 1,
+          "ms": 0.033600000002479646
+        },
+        "insert/usage_model_daily": {
+          "calls": 1,
+          "ms": 0.22079999999914435
+        }
+      },
+      "requests": 1182,
+      "tokens": 1607116696,
+      "discovered": 494,
+      "parsed": 1,
+      "reused": 493,
+      "bodyBytes": 601738,
+      "factsSha256": "aa845eaf71bc0f793620dee0395caa5ac9d37312559ad2950a84679cfa307a75",
+      "aggregatesSha256": "2c4d5bd4f5a6e8c68ecac49e1c62a322f4ab0711cb16c257faa56d47b904c698",
+      "rawChecks": 10,
+      "walBytes": 391432
+    },
+    {
+      "variant": "before",
+      "pair": 2,
+      "scenario": "initial",
+      "refreshMs": 13223.4045,
+      "firstQueryMs": 34.53989999999976,
+      "elapsedMs": 13257.9444,
+      "scanMs": 116.70239999999998,
+      "parseMs": 9107.2518,
+      "commitPhaseMs": 3996.9326999999994,
+      "startupMs": 2.4991000000000057,
+      "prepareMs": 1987.5577000000067,
+      "replaceMs": 899.1830999999761,
+      "replacements": 398,
+      "operations": {
+        "delete/turn_summary": {
+          "calls": 398,
+          "ms": 13.396499999981756
+        },
+        "insert/turn_summary": {
+          "calls": 1180,
+          "ms": 26.254899999981717
+        },
+        "delete/turn_model_usage": {
+          "calls": 1180,
+          "ms": 5.098699999978635
+        },
+        "insert/turn_model_usage": {
+          "calls": 1180,
+          "ms": 8.18850000000748
+        },
+        "delete/turn_capability_usage": {
+          "calls": 1180,
+          "ms": 4.250700000055076
+        },
+        "insert/turn_capability_usage": {
+          "calls": 1180,
+          "ms": 8.910299999952258
+        },
+        "insert/turn_costs": {
+          "calls": 1180,
+          "ms": 19.930100000034145
+        }
+      },
+      "requests": 1180,
+      "tokens": 1607116410,
+      "discovered": 494,
+      "parsed": 494,
+      "reused": 0,
+      "bodyBytes": 280471904,
+      "factsSha256": "32a9cf1783a1377f8b61dbde9b70ee0f9bd360b2adfbc0bba2bc059729009fc5",
+      "aggregatesSha256": "69e4eee1b6848c9a3fdf0fed8cec3d3098c18764038df6d14801ecfe29b7c289",
+      "rawChecks": 10,
+      "workloads": [
+        {
+          "name": "period-day-30d/provider",
+          "timingMs": {
+            "median": 1.9882999999990716,
+            "min": 1.9263000000009924,
+            "max": 2.8216999999986
+          },
+          "rows": 35,
+          "total": 35,
+          "outputSha256": "0411cfbd44c7f79783690a7b0e8bdca49eff389d5d241112b5c6d7c6617df23e",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "period-day-30d/model",
+          "timingMs": {
+            "median": 2.2973999999994703,
+            "min": 2.115300000001298,
+            "max": 3.7289999999993597
+          },
+          "rows": 52,
+          "total": 52,
+          "outputSha256": "03caebe72ec87322532279421eae08718d28ab482de44713beb095c9bde00002",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "period-month-30d/provider",
+          "timingMs": {
+            "median": 1.8261999999995169,
+            "min": 1.7815000000009604,
+            "max": 1.881599999998798
+          },
+          "rows": 3,
+          "total": 3,
+          "outputSha256": "cbacfca614e5a526e90c999b7d6fd331ba019ce51a5afd8f96cb5a91abee15b2",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "period-month-30d/model",
+          "timingMs": {
+            "median": 2.0280000000002474,
+            "min": 1.9927999999999884,
+            "max": 2.0873000000010506
+          },
+          "rows": 8,
+          "total": 8,
+          "outputSha256": "2d4566323f7d9e36a098b61034ec78e1e84ffdd95daa8a5734c53c63c09959be",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "project-sessions-all/provider",
+          "timingMs": {
+            "median": 1.2018000000007305,
+            "min": 1.1875,
+            "max": 1.2111999999997352
+          },
+          "rows": 100,
+          "total": 150,
+          "outputSha256": "7641d2c2717192b291afc9e1cb4519d37001aa5a9291bced48999e4d4cbf70db",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "project-sessions-all/model",
+          "timingMs": {
+            "median": 2.2334000000009837,
+            "min": 2.212600000000748,
+            "max": 2.369699999999284
+          },
+          "rows": 100,
+          "total": 221,
+          "outputSha256": "49e7518b8a4ee7ca3ca291d18427cc2aad9b2314e2df141eb7063a7a20ba96c8",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "project-sessions-30d/provider",
+          "timingMs": {
+            "median": 0.8950000000004366,
+            "min": 0.8896999999997206,
+            "max": 1.0295999999998457
+          },
+          "rows": 0,
+          "total": 0,
+          "outputSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "project-sessions-30d/model",
+          "timingMs": {
+            "median": 0.9790000000011787,
+            "min": 0.9721000000008644,
+            "max": 1.132499999999709
+          },
+          "rows": 0,
+          "total": 0,
+          "outputSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "average-7d/provider",
+          "timingMs": {
+            "median": 1.2375000000010914,
+            "min": 1.2175999999999476,
+            "max": 1.2636999999995169
+          },
+          "rows": 1,
+          "total": 1,
+          "outputSha256": "e562b4a9e61f1db780d27f4d8e24cb7da15c336c6f9b51048490923f999177bd",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "average-7d/model",
+          "timingMs": {
+            "median": 1.3507000000008702,
+            "min": 1.3304000000007363,
+            "max": 1.3675999999995838
+          },
+          "rows": 1,
+          "total": 1,
+          "outputSha256": "bdf3f4e5dd7c235a52641eab1c4d7ebcd86524a262a9e457a1b022f2163f1b8d",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "average-30d/provider",
+          "timingMs": {
+            "median": 1.6650000000008731,
+            "min": 1.6556000000000495,
+            "max": 1.7767999999996391
+          },
+          "rows": 2,
+          "total": 2,
+          "outputSha256": "09267e2dc1186cc5ff70f7cc31bb9f97ebd39ac7132e1f351fe546d17397bd1f",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "average-30d/model",
+          "timingMs": {
+            "median": 1.8500000000003638,
+            "min": 1.827000000001135,
+            "max": 2.269800000000032
+          },
+          "rows": 7,
+          "total": 7,
+          "outputSha256": "ee188076251f22cd2ec6fc742002718efa0974ac4bb6ffeb27fd6d850c960614",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        }
+      ],
+      "walBytes": 4194192
+    },
+    {
+      "variant": "before",
+      "pair": 2,
+      "scenario": "unchanged",
+      "refreshMs": 122.99079999999958,
+      "firstQueryMs": 1.1177999999999884,
+      "elapsedMs": 124.10859999999957,
+      "scanMs": 102.75110000000132,
+      "parseMs": 14.846199999999953,
+      "commitPhaseMs": 2.0397999999986496,
+      "startupMs": 3.349099999999453,
+      "prepareMs": 0,
+      "replaceMs": 0,
+      "replacements": 0,
+      "operations": {},
+      "requests": 1180,
+      "tokens": 1607116410,
+      "discovered": 494,
+      "parsed": 0,
+      "reused": 494,
+      "bodyBytes": 0,
+      "factsSha256": "32a9cf1783a1377f8b61dbde9b70ee0f9bd360b2adfbc0bba2bc059729009fc5",
+      "aggregatesSha256": "69e4eee1b6848c9a3fdf0fed8cec3d3098c18764038df6d14801ecfe29b7c289",
+      "rawChecks": 10,
+      "walBytes": 317272
+    },
+    {
+      "variant": "before",
+      "pair": 2,
+      "scenario": "reparse-same",
+      "refreshMs": 13257.9537,
+      "firstQueryMs": 1.0823999999993248,
+      "elapsedMs": 13259.0361,
+      "scanMs": 102.41389999999956,
+      "parseMs": 9073.424200000001,
+      "commitPhaseMs": 4079.1345,
+      "startupMs": 2.969100000000253,
+      "prepareMs": 2015.49010000001,
+      "replaceMs": 1049.7462999999443,
+      "replacements": 398,
+      "operations": {
+        "delete/turn_summary": {
+          "calls": 398,
+          "ms": 12.806900000014139
+        },
+        "delete/usage_request_daily": {
+          "calls": 398,
+          "ms": 6.935799999957453
+        },
+        "insert/usage_request_daily": {
+          "calls": 398,
+          "ms": 68.52180000003318
+        },
+        "delete/usage_model_daily": {
+          "calls": 398,
+          "ms": 6.898899999989226
+        },
+        "insert/usage_model_daily": {
+          "calls": 398,
+          "ms": 76.77229999998963
+        },
+        "insert/turn_costs": {
+          "calls": 1180,
+          "ms": 21.767299999995885
+        }
+      },
+      "requests": 1180,
+      "tokens": 1607116410,
+      "discovered": 494,
+      "parsed": 494,
+      "reused": 0,
+      "bodyBytes": 280471904,
+      "factsSha256": "32a9cf1783a1377f8b61dbde9b70ee0f9bd360b2adfbc0bba2bc059729009fc5",
+      "aggregatesSha256": "69e4eee1b6848c9a3fdf0fed8cec3d3098c18764038df6d14801ecfe29b7c289",
+      "rawChecks": 10,
+      "walBytes": 4136512
+    },
+    {
+      "variant": "before",
+      "pair": 2,
+      "scenario": "codex-append",
+      "refreshMs": 200.82040000000052,
+      "firstQueryMs": 1.0476000000016938,
+      "elapsedMs": 201.8680000000022,
+      "scanMs": 106.65089999999691,
+      "parseMs": 53.76090000000113,
+      "commitPhaseMs": 18.50800000000163,
+      "startupMs": 21.89230000000316,
+      "prepareMs": 6.072100000001228,
+      "replaceMs": 5.81420000000071,
+      "replacements": 1,
+      "operations": {
+        "insert/turn_costs": {
+          "calls": 26,
+          "ms": 0.17629999999917345
+        },
+        "insert/turn_summary": {
+          "calls": 1,
+          "ms": 0.05190000000220607
+        },
+        "delete/turn_model_usage": {
+          "calls": 1,
+          "ms": 0.013400000003457535
+        },
+        "insert/turn_model_usage": {
+          "calls": 1,
+          "ms": 0.019800000001851004
+        },
+        "delete/turn_capability_usage": {
+          "calls": 1,
+          "ms": 0.009299999997892883
+        },
+        "insert/turn_capability_usage": {
+          "calls": 1,
+          "ms": 0.019100000001344597
+        },
+        "delete/turn_summary": {
+          "calls": 1,
+          "ms": 0.036400000000867294
+        },
+        "delete/usage_request_daily": {
+          "calls": 1,
+          "ms": 0.027399999999033753
+        },
+        "insert/usage_request_daily": {
+          "calls": 1,
+          "ms": 0.21119999999791617
+        },
+        "delete/usage_model_daily": {
+          "calls": 1,
+          "ms": 0.023400000001856824
+        },
+        "insert/usage_model_daily": {
+          "calls": 1,
+          "ms": 0.24980000000141445
+        }
+      },
+      "requests": 1181,
+      "tokens": 1607116540,
+      "discovered": 494,
+      "parsed": 1,
+      "reused": 493,
+      "bodyBytes": 601446,
+      "factsSha256": "6eedf105420b3d7f6ac71d017625ded25315fd854248b87ed3e8a8fc2542a947",
+      "aggregatesSha256": "df8c8d5316bbf64a3dcc63af2f59c69a217381ec45269414233fd0d0e1ec9fd7",
+      "rawChecks": 10,
+      "targetRequests": 25,
+      "walBytes": 420272
+    },
+    {
+      "variant": "before",
+      "pair": 2,
+      "scenario": "claude-append",
+      "refreshMs": 138.7445000000007,
+      "firstQueryMs": 1.0368999999991502,
+      "elapsedMs": 139.78139999999985,
+      "scanMs": 101.78550000000178,
+      "parseMs": 21.326999999997497,
+      "commitPhaseMs": 11.651200000000244,
+      "startupMs": 3.975299999998242,
+      "prepareMs": 2.817800000000716,
+      "replaceMs": 4.0077000000019325,
+      "replacements": 1,
+      "operations": {
+        "insert/turn_costs": {
+          "calls": 3,
+          "ms": 0.0857999999934691
+        },
+        "insert/turn_summary": {
+          "calls": 1,
+          "ms": 0.06300000000192085
+        },
+        "delete/turn_model_usage": {
+          "calls": 1,
+          "ms": 0.021899999999732245
+        },
+        "insert/turn_model_usage": {
+          "calls": 1,
+          "ms": 0.027000000001862645
+        },
+        "delete/turn_capability_usage": {
+          "calls": 1,
+          "ms": 0.012300000002142042
+        },
+        "insert/turn_capability_usage": {
+          "calls": 1,
+          "ms": 0.02419999999983702
+        },
+        "delete/turn_summary": {
+          "calls": 1,
+          "ms": 0.04130000000077416
+        },
+        "delete/usage_request_daily": {
+          "calls": 1,
+          "ms": 0.023099999998521525
+        },
+        "insert/usage_request_daily": {
+          "calls": 1,
+          "ms": 0.22430000000167638
+        },
+        "delete/usage_model_daily": {
+          "calls": 1,
+          "ms": 0.022599999996600673
+        },
+        "insert/usage_model_daily": {
+          "calls": 1,
+          "ms": 0.23170000000027358
+        }
+      },
+      "requests": 1182,
+      "tokens": 1607116670,
+      "discovered": 494,
+      "parsed": 1,
+      "reused": 493,
+      "bodyBytes": 6952,
+      "factsSha256": "5ecc4d2bbf5b076b12ad9db18dbc56ea28460695bd1ddecd68b82844b5e168ac",
+      "aggregatesSha256": "c77eaee621b85c0109ada528a986cf171e05845b1cc98181a25a7bc4684b579b",
+      "rawChecks": 10,
+      "targetRequests": 2,
+      "walBytes": 407912
+    },
+    {
+      "variant": "before",
+      "pair": 2,
+      "scenario": "codex-extend",
+      "refreshMs": 202.08629999999903,
+      "firstQueryMs": 1.189700000002631,
+      "elapsedMs": 203.27600000000166,
+      "scanMs": 122.76480000000083,
+      "parseMs": 52.962899999998626,
+      "commitPhaseMs": 21.882000000001426,
+      "startupMs": 4.470499999999447,
+      "prepareMs": 7.103699999999662,
+      "replaceMs": 7.471400000002177,
+      "replacements": 1,
+      "operations": {
+        "insert/turn_costs": {
+          "calls": 26,
+          "ms": 0.2992000000012922
+        },
+        "update/turn_summary": {
+          "calls": 1,
+          "ms": 0.07229999999981374
+        },
+        "delete/turn_model_usage": {
+          "calls": 1,
+          "ms": 0.015599999998812564
+        },
+        "insert/turn_model_usage": {
+          "calls": 1,
+          "ms": 0.02410000000236323
+        },
+        "delete/turn_capability_usage": {
+          "calls": 1,
+          "ms": 0.012299999998504063
+        },
+        "insert/turn_capability_usage": {
+          "calls": 1,
+          "ms": 0.021299999996699626
+        },
+        "delete/turn_summary": {
+          "calls": 1,
+          "ms": 0.04170000000158325
+        },
+        "delete/usage_request_daily": {
+          "calls": 1,
+          "ms": 0.03110000000015134
+        },
+        "insert/usage_request_daily": {
+          "calls": 1,
+          "ms": 0.24569999999948777
+        },
+        "delete/usage_model_daily": {
+          "calls": 1,
+          "ms": 0.03490000000238069
+        },
+        "insert/usage_model_daily": {
+          "calls": 1,
+          "ms": 0.24460000000181026
+        }
+      },
+      "requests": 1182,
+      "tokens": 1607116696,
+      "discovered": 494,
+      "parsed": 1,
+      "reused": 493,
+      "bodyBytes": 601738,
+      "factsSha256": "aa845eaf71bc0f793620dee0395caa5ac9d37312559ad2950a84679cfa307a75",
+      "aggregatesSha256": "2c4d5bd4f5a6e8c68ecac49e1c62a322f4ab0711cb16c257faa56d47b904c698",
+      "rawChecks": 10,
+      "walBytes": 391432
+    },
+    {
+      "variant": "after",
+      "pair": 2,
+      "scenario": "initial",
+      "refreshMs": 12933.5226,
+      "firstQueryMs": 31.103500000001077,
+      "elapsedMs": 12964.626100000001,
+      "scanMs": 115.9855,
+      "parseMs": 9194.2838,
+      "commitPhaseMs": 3620.9827000000005,
+      "startupMs": 2.258899999999997,
+      "prepareMs": 1786.0826999999936,
+      "replaceMs": 804.8118,
+      "replacements": 398,
+      "operations": {
+        "delete/turn_summary": {
+          "calls": 398,
+          "ms": 11.886600000014653
+        },
+        "insert/turn_summary": {
+          "calls": 1180,
+          "ms": 23.15500000004249
+        },
+        "insert/turn_capability_usage": {
+          "calls": 1357,
+          "ms": 10.309199999990597
+        },
+        "insert/turn_model_usage": {
+          "calls": 998,
+          "ms": 5.632100000044375
+        },
+        "insert/turn_costs": {
+          "calls": 1180,
+          "ms": 17.971300000024712
+        }
+      },
+      "requests": 1180,
+      "tokens": 1607116410,
+      "discovered": 494,
+      "parsed": 494,
+      "reused": 0,
+      "bodyBytes": 280471904,
+      "factsSha256": "32a9cf1783a1377f8b61dbde9b70ee0f9bd360b2adfbc0bba2bc059729009fc5",
+      "aggregatesSha256": "69e4eee1b6848c9a3fdf0fed8cec3d3098c18764038df6d14801ecfe29b7c289",
+      "rawChecks": 10,
+      "workloads": [
+        {
+          "name": "period-day-30d/provider",
+          "timingMs": {
+            "median": 1.9589000000014494,
+            "min": 1.9223999999994703,
+            "max": 2.2863999999990483
+          },
+          "rows": 35,
+          "total": 35,
+          "outputSha256": "0411cfbd44c7f79783690a7b0e8bdca49eff389d5d241112b5c6d7c6617df23e",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "period-day-30d/model",
+          "timingMs": {
+            "median": 2.21559999999954,
+            "min": 2.136899999999514,
+            "max": 3.274300000000949
+          },
+          "rows": 52,
+          "total": 52,
+          "outputSha256": "03caebe72ec87322532279421eae08718d28ab482de44713beb095c9bde00002",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "period-month-30d/provider",
+          "timingMs": {
+            "median": 1.8603999999995722,
+            "min": 1.816000000000713,
+            "max": 8.384100000001126
+          },
+          "rows": 3,
+          "total": 3,
+          "outputSha256": "cbacfca614e5a526e90c999b7d6fd331ba019ce51a5afd8f96cb5a91abee15b2",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "period-month-30d/model",
+          "timingMs": {
+            "median": 2.0024000000012165,
+            "min": 1.977100000000064,
+            "max": 2.1146000000007916
+          },
+          "rows": 8,
+          "total": 8,
+          "outputSha256": "2d4566323f7d9e36a098b61034ec78e1e84ffdd95daa8a5734c53c63c09959be",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "project-sessions-all/provider",
+          "timingMs": {
+            "median": 1.201100000000224,
+            "min": 1.176100000000588,
+            "max": 1.212999999999738
+          },
+          "rows": 100,
+          "total": 150,
+          "outputSha256": "7641d2c2717192b291afc9e1cb4519d37001aa5a9291bced48999e4d4cbf70db",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "project-sessions-all/model",
+          "timingMs": {
+            "median": 2.2312999999994645,
+            "min": 2.199399999999514,
+            "max": 2.626800000000003
+          },
+          "rows": 100,
+          "total": 221,
+          "outputSha256": "49e7518b8a4ee7ca3ca291d18427cc2aad9b2314e2df141eb7063a7a20ba96c8",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "project-sessions-30d/provider",
+          "timingMs": {
+            "median": 0.9068000000006577,
+            "min": 0.8798999999999069,
+            "max": 1.1463999999996304
+          },
+          "rows": 0,
+          "total": 0,
+          "outputSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "project-sessions-30d/model",
+          "timingMs": {
+            "median": 1.0069000000003143,
+            "min": 0.9959999999991851,
+            "max": 1.0874999999996362
+          },
+          "rows": 0,
+          "total": 0,
+          "outputSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "average-7d/provider",
+          "timingMs": {
+            "median": 1.270699999999124,
+            "min": 1.2515999999995984,
+            "max": 2.08179999999993
+          },
+          "rows": 1,
+          "total": 1,
+          "outputSha256": "e562b4a9e61f1db780d27f4d8e24cb7da15c336c6f9b51048490923f999177bd",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "average-7d/model",
+          "timingMs": {
+            "median": 1.3611999999993714,
+            "min": 1.3463000000010652,
+            "max": 1.395200000000841
+          },
+          "rows": 1,
+          "total": 1,
+          "outputSha256": "bdf3f4e5dd7c235a52641eab1c4d7ebcd86524a262a9e457a1b022f2163f1b8d",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "average-30d/provider",
+          "timingMs": {
+            "median": 1.6675000000013824,
+            "min": 1.6364999999987049,
+            "max": 1.6838000000007014
+          },
+          "rows": 2,
+          "total": 2,
+          "outputSha256": "09267e2dc1186cc5ff70f7cc31bb9f97ebd39ac7132e1f351fe546d17397bd1f",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        },
+        {
+          "name": "average-30d/model",
+          "timingMs": {
+            "median": 1.8757999999997992,
+            "min": 1.8370000000013533,
+            "max": 1.8835000000017317
+          },
+          "rows": 7,
+          "total": 7,
+          "outputSha256": "ee188076251f22cd2ec6fc742002718efa0974ac4bb6ffeb27fd6d850c960614",
+          "recent30Requests": 513,
+          "recent30Sessions": 167
+        }
+      ],
+      "walBytes": 4194192
+    },
+    {
+      "variant": "after",
+      "pair": 2,
+      "scenario": "unchanged",
+      "refreshMs": 139.3215999999993,
+      "firstQueryMs": 1.596399999998539,
+      "elapsedMs": 140.91799999999785,
+      "scanMs": 119.54470000000038,
+      "parseMs": 14.518400000000838,
+      "commitPhaseMs": 2.0645999999997002,
+      "startupMs": 3.1894999999985885,
+      "prepareMs": 0,
+      "replaceMs": 0,
+      "replacements": 0,
+      "operations": {},
+      "requests": 1180,
+      "tokens": 1607116410,
+      "discovered": 494,
+      "parsed": 0,
+      "reused": 494,
+      "bodyBytes": 0,
+      "factsSha256": "32a9cf1783a1377f8b61dbde9b70ee0f9bd360b2adfbc0bba2bc059729009fc5",
+      "aggregatesSha256": "69e4eee1b6848c9a3fdf0fed8cec3d3098c18764038df6d14801ecfe29b7c289",
+      "rawChecks": 10,
+      "walBytes": 317272
+    },
+    {
+      "variant": "after",
+      "pair": 2,
+      "scenario": "reparse-same",
+      "refreshMs": 13085.547900000001,
+      "firstQueryMs": 1.0993000000016764,
+      "elapsedMs": 13086.647200000003,
+      "scanMs": 111.98819999999978,
+      "parseMs": 8965.400300000001,
+      "commitPhaseMs": 4004.4104000000007,
+      "startupMs": 3.7387999999991735,
+      "prepareMs": 1776.5246999999836,
+      "replaceMs": 1146.4299999999675,
+      "replacements": 398,
+      "operations": {
+        "delete/turn_summary": {
+          "calls": 398,
+          "ms": 27.817099999972925
+        },
+        "delete/usage_request_daily": {
+          "calls": 398,
+          "ms": 9.67090000000826
+        },
+        "insert/usage_request_daily": {
+          "calls": 398,
+          "ms": 94.82719999993424
+        },
+        "delete/usage_model_daily": {
+          "calls": 398,
+          "ms": 9.907299999977113
+        },
+        "insert/usage_model_daily": {
+          "calls": 398,
+          "ms": 100.0341000000426
+        },
+        "insert/turn_summary": {
+          "calls": 1180,
+          "ms": 25.365999999950873
+        },
+        "insert/turn_capability_usage": {
+          "calls": 1357,
+          "ms": 11.425799999960873
+        },
+        "insert/turn_model_usage": {
+          "calls": 998,
+          "ms": 6.055599999985134
+        },
+        "insert/turn_costs": {
+          "calls": 1180,
+          "ms": 19.448799999976472
+        }
+      },
+      "requests": 1180,
+      "tokens": 1607116410,
+      "discovered": 494,
+      "parsed": 494,
+      "reused": 0,
+      "bodyBytes": 280471904,
+      "factsSha256": "32a9cf1783a1377f8b61dbde9b70ee0f9bd360b2adfbc0bba2bc059729009fc5",
+      "aggregatesSha256": "69e4eee1b6848c9a3fdf0fed8cec3d3098c18764038df6d14801ecfe29b7c289",
+      "rawChecks": 10,
+      "walBytes": 4227152
+    },
+    {
+      "variant": "after",
+      "pair": 2,
+      "scenario": "codex-append",
+      "refreshMs": 195.84739999999874,
+      "firstQueryMs": 1.0902999999998428,
+      "elapsedMs": 196.93769999999859,
+      "scanMs": 105.2696999999971,
+      "parseMs": 69.49730000000272,
+      "commitPhaseMs": 16.409599999999045,
+      "startupMs": 4.658200000001671,
+      "prepareMs": 4.509200000000419,
+      "replaceMs": 6.005799999998999,
+      "replacements": 1,
+      "operations": {
+        "delete/turn_summary": {
+          "calls": 1,
+          "ms": 0.2386000000005879
+        },
+        "insert/turn_summary": {
+          "calls": 26,
+          "ms": 0.2814999999754946
+        },
+        "insert/turn_capability_usage": {
+          "calls": 27,
+          "ms": 0.13540000000648433
+        },
+        "insert/turn_model_usage": {
+          "calls": 26,
+          "ms": 0.0698999999985972
+        },
+        "insert/turn_costs": {
+          "calls": 26,
+          "ms": 0.25539999999818974
+        },
+        "delete/usage_request_daily": {
+          "calls": 1,
+          "ms": 0.029099999999743886
+        },
+        "insert/usage_request_daily": {
+          "calls": 1,
+          "ms": 0.37840000000142027
+        },
+        "delete/usage_model_daily": {
+          "calls": 1,
+          "ms": 0.05549999999857391
+        },
+        "insert/usage_model_daily": {
+          "calls": 1,
+          "ms": 0.41040000000066357
+        }
+      },
+      "requests": 1181,
+      "tokens": 1607116540,
+      "discovered": 494,
+      "parsed": 1,
+      "reused": 493,
+      "bodyBytes": 601446,
+      "factsSha256": "6eedf105420b3d7f6ac71d017625ded25315fd854248b87ed3e8a8fc2542a947",
+      "aggregatesSha256": "df8c8d5316bbf64a3dcc63af2f59c69a217381ec45269414233fd0d0e1ec9fd7",
+      "rawChecks": 10,
+      "targetRequests": 25,
+      "walBytes": 506792
+    },
+    {
+      "variant": "after",
+      "pair": 2,
+      "scenario": "claude-append",
+      "refreshMs": 143.21210000000065,
+      "firstQueryMs": 1.0888000000013562,
+      "elapsedMs": 144.300900000002,
+      "scanMs": 110.95759999999791,
+      "parseMs": 18.109400000001187,
+      "commitPhaseMs": 10.879700000001321,
+      "startupMs": 3.259600000001228,
+      "prepareMs": 2.8277999999991152,
+      "replaceMs": 3.3515000000006694,
+      "replacements": 1,
+      "operations": {
+        "delete/turn_summary": {
+          "calls": 1,
+          "ms": 0.06810000000041327
+        },
+        "insert/turn_summary": {
+          "calls": 3,
+          "ms": 0.07740000000194414
+        },
+        "insert/turn_capability_usage": {
+          "calls": 3,
+          "ms": 0.02929999999832944
+        },
+        "insert/turn_model_usage": {
+          "calls": 3,
+          "ms": 0.026700000002165325
+        },
+        "insert/turn_costs": {
+          "calls": 3,
+          "ms": 0.05230000000301516
+        },
+        "delete/usage_request_daily": {
+          "calls": 1,
+          "ms": 0.046699999998963904
+        },
+        "insert/usage_request_daily": {
+          "calls": 1,
+          "ms": 0.281699999999546
+        },
+        "delete/usage_model_daily": {
+          "calls": 1,
+          "ms": 0.02839999999923748
+        },
+        "insert/usage_model_daily": {
+          "calls": 1,
+          "ms": 0.26629999999931897
+        }
+      },
+      "requests": 1182,
+      "tokens": 1607116670,
+      "discovered": 494,
+      "parsed": 1,
+      "reused": 493,
+      "bodyBytes": 6952,
+      "factsSha256": "5ecc4d2bbf5b076b12ad9db18dbc56ea28460695bd1ddecd68b82844b5e168ac",
+      "aggregatesSha256": "c77eaee621b85c0109ada528a986cf171e05845b1cc98181a25a7bc4684b579b",
+      "rawChecks": 10,
+      "targetRequests": 2,
+      "walBytes": 490312
+    },
+    {
+      "variant": "after",
+      "pair": 2,
+      "scenario": "codex-extend",
+      "refreshMs": 181.83719999999812,
+      "firstQueryMs": 1.1203000000023167,
+      "elapsedMs": 182.95750000000044,
+      "scanMs": 104.0148999999983,
+      "parseMs": 56.18790000000081,
+      "commitPhaseMs": 18.139400000000023,
+      "startupMs": 3.488900000000285,
+      "prepareMs": 5.9724999999998545,
+      "replaceMs": 6.115900000000693,
+      "replacements": 1,
+      "operations": {
+        "delete/turn_summary": {
+          "calls": 1,
+          "ms": 0.22920000000158325
+        },
+        "insert/turn_summary": {
+          "calls": 26,
+          "ms": 0.28299999999580905
+        },
+        "insert/turn_capability_usage": {
+          "calls": 27,
+          "ms": 0.1627000000080443
+        },
+        "insert/turn_model_usage": {
+          "calls": 26,
+          "ms": 0.0918000000056054
+        },
+        "insert/turn_costs": {
+          "calls": 26,
+          "ms": 0.21039999999993597
+        },
+        "delete/usage_request_daily": {
+          "calls": 1,
+          "ms": 0.041799999999057036
+        },
+        "insert/usage_request_daily": {
+          "calls": 1,
+          "ms": 0.3819999999977881
+        },
+        "delete/usage_model_daily": {
+          "calls": 1,
+          "ms": 0.03320000000167056
+        },
+        "insert/usage_model_daily": {
+          "calls": 1,
+          "ms": 0.4029000000009546
+        }
+      },
+      "requests": 1182,
+      "tokens": 1607116696,
+      "discovered": 494,
+      "parsed": 1,
+      "reused": 493,
+      "bodyBytes": 601738,
+      "factsSha256": "aa845eaf71bc0f793620dee0395caa5ac9d37312559ad2950a84679cfa307a75",
+      "aggregatesSha256": "2c4d5bd4f5a6e8c68ecac49e1c62a322f4ab0711cb16c257faa56d47b904c698",
+      "rawChecks": 10,
+      "walBytes": 465592
+    }
+  ]
+}
