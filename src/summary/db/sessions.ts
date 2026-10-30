@@ -5,13 +5,9 @@ import type { SqliteSession } from './connection';
 import type { BillingMode, SessionReplacement, TurnSummaryInput } from './types';
 import { nonnegative } from './validation';
 import { estimateCost, PRICING_VERSION } from '../pricing';
+import { SessionChanges, TURN_COLUMNS } from './sessionChanges';
 
-const TURN_INSERT = `INSERT INTO turn_summary (
-  provider, project_key, session_id, root_turn_id, request_title,
-  started_at_ms, completed_at_ms, duration_ms, duration_quality,
-  input_tokens, output_tokens, cache_write_input_tokens, cache_read_input_tokens, total_tokens, status, quality_flags,
-  diagnostic_file_id, diagnostic_offset, last_error, updated_at
-) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`;
+const TURN_INSERT = `INSERT INTO turn_summary (${TURN_COLUMNS}) VALUES (${TURN_COLUMNS.map(() => '?')})`;
 
 /**
  * 책임: 요청 요약의 숫자·캐시 불변식을 저장 전에 검증한다.
@@ -53,7 +49,7 @@ export class SessionStore {
 
   /**
    * 책임: 준비가 끝난 세션 묶음만 통계에 원자적으로 반영한다.
-   * 알고리즘: 대상·원본 참조를 검증하고 삭제 원본의 유효 요청을 보존한 뒤 나머지를 재삽입하며, 모델 합계 검증과 rollup 갱신도 함께 커밋한다.
+   * 알고리즘: 대상·원본 참조를 검증하고 큰 세션은 TEMP 차이에 따라 부분/일괄 반영하며, 작은 세션·원본 보존은 기존 일괄 경로와 함께 원자적으로 처리한다.
    */
   replaceSessions(replacement: SessionReplacement): void {
     this.database.transaction(() => {
@@ -67,14 +63,23 @@ export class SessionStore {
       };
       this.prepareRemovedFiles(replacement, existingFile, requireSession);
       this.preserveReplacementData(replacement);
-      this.database.connection.exec(`DELETE FROM turn_summary WHERE (provider, session_id) IN (
-        SELECT provider, session_id FROM db_replacement_sessions
-      ) AND id NOT IN (SELECT id FROM db_retained_turns)`);
       const now = this.replaceManifestFiles(replacement, existingFile, requireSession);
-      this.insertSummaries(replacement, hasSession, now);
+      const changes = new SessionChanges(this.database,turnValues);
+      const staged = changes.eligible(replacement);
+      let changed = true;
+      if (staged) {
+        changes.stage(replacement,now);
+        changed = changes.apply();
+      } else {
+        this.database.connection.exec(`DELETE FROM turn_summary WHERE (provider, session_id) IN (
+          SELECT provider, session_id FROM db_replacement_sessions
+        ) AND id NOT IN (SELECT id FROM db_retained_turns)`);
+        this.insertSummaries(replacement, hasSession, now);
+      }
       this.restoreCapabilitiesAndRemoveFiles(replacement, now);
-      this.database.rollups.refreshChangedSessions();
+      if (changed) this.database.rollups.refreshChangedSessions();
       this.cleanReplacementNames();
+      if (staged) changes.clear();
     });
   }
 

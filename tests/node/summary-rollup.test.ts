@@ -16,6 +16,7 @@ import { applySessionNames } from '../../src/summary/names';
 import type { SqliteSession } from '../../src/summary/db/connection';
 import { SummaryReader } from '../../src/summary/db/reader';
 import { UsageRollupStore } from '../../src/summary/db/rollups';
+import { buildRollupUsageQueries } from '../../src/summary/db/rollup-queries';
 
 const epoch = (local: string): number => Date.parse(`${local}+09:00`);
 const rollupTables = ['usage_request_daily', 'usage_model_daily', 'usage_rollup_meta'];
@@ -394,6 +395,61 @@ test('v10 upgrade preserves existing IDs, diagnostic/model/cost rows and lazily 
   assert.deepEqual(snapshot(reopened, factTables), facts);
   assert.deepEqual(snapshot(reopened, rollupTables), aggregates, 'Warm reopen reuses the stored materialization');
   oracle(reopened);
+});
+
+for (const version of [14, 15]) test(`v${version} month layout returns to session clustering without rewriting facts`, t => {
+  const files = disk(t), previous = files.open();
+  const file = metadata(), manifest = previous.observeFile(file, 'v13');
+  previous.replaceSessions({ sessions: [{ provider: 'claude', session_id: 'session-a' }], files: [{ ...file, id: manifest.id }], summaries: [
+    turn('before-month', '2026-09-30T23:59:00', 100, { diagnostic_file_id: manifest.id, model_usage: [model('A', 100)],
+      capability_usage: [{ category: 'skill', name: 'preserved', usage_count: 2 }], billing: 'api' }),
+    turn('after-month', '2026-10-01T00:01:00', 200, { model_usage: [model('A', 200)] }),
+    turn('unknown-month', null, 30),
+  ] });
+  oracle(previous, {}, 'month');
+  const facts = snapshot(previous, factTables);
+  // Recreate the experimental monthly cache; the migration must discard only derived data.
+  for (const table of ['usage_request_daily', 'usage_model_daily']) {
+    const info = previous.connection.prepare(`PRAGMA table_info(${table})`).all();
+    const columns = info.map(c => String(c.name));
+    previous.connection.exec(`CREATE TABLE ${table}_monthly (
+      ${info.map(c => `${c.name} ${c.type}${c.notnull ? ' NOT NULL' : ''}`).join(',')},
+      local_month TEXT NOT NULL CHECK(local_month=substr(local_day,1,7)),
+      PRIMARY KEY(local_month,provider,session_id,project_key,local_day${table.includes('model') ? ',model_key' : ''})) WITHOUT ROWID;
+      INSERT INTO ${table}_monthly SELECT ${columns},substr(local_day,1,7) FROM ${table};
+      DROP TABLE ${table}; ALTER TABLE ${table}_monthly RENAME TO ${table};`);
+  }
+  if (version === 15) previous.connection.exec(`CREATE TABLE usage_session_months (
+    provider TEXT NOT NULL,session_id TEXT NOT NULL,local_month TEXT NOT NULL,min_started_at_ms INTEGER,
+    PRIMARY KEY(provider,session_id,local_month)) WITHOUT ROWID;
+    INSERT INTO usage_session_months SELECT provider,session_id,local_month,min(min_started_at_ms)
+      FROM usage_request_daily GROUP BY provider,session_id,local_month;`);
+  previous.connection.exec(`UPDATE usage_rollup_meta SET format_version=${version-12}; PRAGMA user_version=${version}`);
+  previous.close();
+  const migrated = files.open();
+  assert.deepEqual(snapshot(migrated, factTables), facts);
+  assert.equal(migrated.connection.prepare('PRAGMA user_version').get()?.user_version, SCHEMA_VERSION);
+  assert.equal(migrated.connection.prepare("SELECT count(*) n FROM sqlite_master WHERE name='usage_session_months'").get()?.n,0);
+  assert.equal(migrated.connection.prepare('SELECT count(*) n FROM usage_request_daily').get()?.n, 0);
+  for (const table of ['usage_request_daily', 'usage_model_daily']) {
+    const pk = migrated.connection.prepare(`PRAGMA table_info(${table})`).all().filter(c => Number(c.pk) > 0).sort((a,b) => Number(a.pk)-Number(b.pk));
+    assert.deepEqual(pk.slice(0,2).map(c=>c.name), ['provider','session_id']);
+  }
+  const october = { fromMs: epoch('2026-10-01T00:00:00'), toMs: epoch('2026-11-01T00:00:00') };
+  for (const by of ['provider','model'] as const) for (const filter of [october, { ...october, unknownTime: 'exclude' as const },
+    { ...october, unknownTime: 'only' as const }, { ...october, fromMs: epoch('2026-10-01T00:00:30') }]) {
+    oracle(migrated, filter, 'month', 'Asia/Seoul', by);
+  }
+  assert.deepEqual(migrated.connection.prepare('SELECT DISTINCT local_day FROM usage_request_daily ORDER BY local_day').all().map(r => r.local_day), ['', '2026-09-30', '2026-10-01']);
+  assert.deepEqual(snapshot(migrated, factTables), facts);
+});
+
+test('v13 upgrade reuses the populated session-clustered cache without backfill', t => {
+  const files=disk(t),previous=files.open();
+  replace(previous,[turn('preserved','2026-10-01T00:00:00',200),turn('unknown',null,10)]);
+  oracle(previous);const before=snapshot(previous);previous.connection.exec('PRAGMA user_version=13');previous.close();
+  const migrated=files.open();assert.deepEqual(snapshot(migrated),before);oracle(migrated);
+  assert.deepEqual(snapshot(migrated),before);
 });
 
 test('a failure after request rollup refresh rolls back facts, model rollup, diagnostics, names and costs', t => {
