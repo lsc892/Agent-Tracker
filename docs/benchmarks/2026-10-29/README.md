@@ -3,6 +3,9 @@
 증분 저장 적용 직전·직후 워크트리를 각각 빌드하고 실제 대화 사본과 합성 10만 요청의 전체 갱신·DB 저장 비용을 비교한다.
 
 - [IncrementalRefresh-2026-10-29.md](IncrementalRefresh-2026-10-29.md): 시나리오별 결과·측정 범위·정확성 검증.
+- [StorageAB-2026-10-29.md](StorageAB-2026-10-29.md): 날짜·월 PK와 보조 인덱스 분리, SQL 묶음 비교, 파싱 상태 재사용과 세션 크기별 저장 A/B.
+- [StorageAB-2026-10-29.json](StorageAB-2026-10-29.json): 맞춤 SQL·실행 계획·전체 반복 표본·정확성 해시·소스 fingerprint.
+- [StorageLayoutBalanced-2026-10-29.json](StorageLayoutBalanced-2026-10-29.json): 기준 PK도 동일 입력 순서로 재작성해 대조한 최종 날짜·월 배치 결과.
 - [RefreshRollback-2026-10-29.md](RefreshRollback-2026-10-29.md): 현재 소스의 증분 저장 롤백, 실제/10,000건의 갱신 단계·INSERT/DELETE·주요 통계 조회 비교와 원인 분석, 증분 유지·복원으로 성능 권고를 정정한 후속 판단.
 - [IncrementalRefresh-2026-10-29.json](IncrementalRefresh-2026-10-29.json): 반복 표본·소스 해시·읽기량·WAL·결과 해시.
 - [IncrementalScale-100000-2026-10-29.md](IncrementalScale-100000-2026-10-29.md): 요청 10만 건의 세션 밀도별 전후 증감률 비교.

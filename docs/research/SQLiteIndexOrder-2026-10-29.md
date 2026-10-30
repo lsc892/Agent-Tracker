@@ -1,6 +1,6 @@
 # SQLite 복합 인덱스의 날짜·세션 순서를 정하는 방법
 
-조사: 2026-10-29, Asia/Seoul. SQLite 공식 자료와 Agent Tracker의 실제 SQL을 기준으로 정리했다.
+조사: 2026-10-29, Asia/Seoul. SQLite 공식 자료와 Agent Tracker의 실제 SQL을 기준으로 정리했다. 대응하는 [통제 A/B 보고서](../benchmarks/2026-10-29/StorageAB-2026-10-29.md)와 함께 읽는다.
 
 ## 먼저 읽을 자료
 
