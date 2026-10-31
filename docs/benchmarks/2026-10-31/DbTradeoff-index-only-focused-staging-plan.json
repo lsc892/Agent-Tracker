@@ -1,0 +1,111 @@
+{
+  "note": "Separate diagnostic on a fresh empty in-memory product TEMP schema; no time or loop/visit counters measured.",
+  "sqlite": "3.53.3",
+  "stagingSourceSha256": "f0c11bc38dedb97cadac1e20571325199738531a877fdf2d17e15abc06866502",
+  "queries": [
+    {
+      "sql": "UPDATE scan_files SET settled=1 WHERE EXISTS(SELECT 1 FROM component c\r\n        WHERE c.provider=scan_files.provider AND (c.session_id=scan_files.session_id OR c.session_id=scan_files.old_session))",
+      "plan": [
+        {
+          "id": 4,
+          "parent": 0,
+          "notused": 216,
+          "detail": "SCAN scan_files"
+        },
+        {
+          "id": 7,
+          "parent": 0,
+          "notused": 0,
+          "detail": "CORRELATED SCALAR SUBQUERY 1"
+        },
+        {
+          "id": 11,
+          "parent": 7,
+          "notused": 55,
+          "detail": "SEARCH c USING COVERING INDEX sqlite_autoindex_component_1 (provider=? AND session_id=?)"
+        }
+      ]
+    },
+    {
+      "sql": "DELETE FROM events WHERE file_id IN(SELECT f.id FROM scan_files f JOIN component c\r\n        ON c.provider=f.provider AND (c.session_id=f.session_id OR c.session_id=f.old_session))",
+      "plan": [
+        {
+          "id": 3,
+          "parent": 0,
+          "notused": 98,
+          "detail": "SEARCH events USING COVERING INDEX events_file (file_id=?)"
+        },
+        {
+          "id": 7,
+          "parent": 0,
+          "notused": 0,
+          "detail": "LIST SUBQUERY 1"
+        },
+        {
+          "id": 10,
+          "parent": 7,
+          "notused": 216,
+          "detail": "SCAN f"
+        },
+        {
+          "id": 12,
+          "parent": 7,
+          "notused": 55,
+          "detail": "SEARCH c USING COVERING INDEX sqlite_autoindex_component_1 (provider=? AND session_id=?)"
+        }
+      ]
+    },
+    {
+      "sql": "DELETE FROM flags WHERE file_id IN(SELECT f.id FROM scan_files f JOIN component c\r\n        ON c.provider=f.provider AND (c.session_id=f.session_id OR c.session_id=f.old_session))",
+      "plan": [
+        {
+          "id": 3,
+          "parent": 0,
+          "notused": 102,
+          "detail": "SEARCH flags USING COVERING INDEX sqlite_autoindex_flags_1 (file_id=?)"
+        },
+        {
+          "id": 7,
+          "parent": 0,
+          "notused": 0,
+          "detail": "LIST SUBQUERY 1"
+        },
+        {
+          "id": 10,
+          "parent": 7,
+          "notused": 216,
+          "detail": "SCAN f"
+        },
+        {
+          "id": 12,
+          "parent": 7,
+          "notused": 55,
+          "detail": "SEARCH c USING COVERING INDEX sqlite_autoindex_component_1 (provider=? AND session_id=?)"
+        }
+      ]
+    },
+    {
+      "sql": "DELETE FROM affected WHERE EXISTS(SELECT 1 FROM component c WHERE c.provider=affected.provider AND c.session_id=affected.session_id)",
+      "plan": [
+        {
+          "id": 3,
+          "parent": 0,
+          "notused": 216,
+          "detail": "SCAN affected"
+        },
+        {
+          "id": 6,
+          "parent": 0,
+          "notused": 0,
+          "detail": "CORRELATED SCALAR SUBQUERY 1"
+        },
+        {
+          "id": 10,
+          "parent": 6,
+          "notused": 39,
+          "detail": "SEARCH c USING COVERING INDEX sqlite_autoindex_component_1 (provider=? AND session_id=?)"
+        }
+      ]
+    }
+  ]
+}
