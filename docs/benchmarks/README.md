@@ -2,6 +2,7 @@
 
 벤치마크 보고서와 원시 결과를 실험 기준일(Asia/Seoul)의 `YYYY-MM-DD` 폴더에 보존한다. 같은 실험의 후속 고찰·보완 측정은 기준 실험과 함께 둔다.
 
+- [SUMMARY](SUMMARY.md): 파싱·조회·쓰기 병목을 순차적으로 줄인 과정과 실패·철회 이유, 같은 입력의 단계별 개선율·실행 계획·추가 저장 비용을 설명한다.
 - [2026-10-31](2026-10-31/README.md): 집계 월 PK 도입·철회와 세션 PK의 선택적 묶음 저장을 비교한 실제 쓰기 트랜잭션·시간·공간 증감률.
 - [2026-10-29](2026-10-29/README.md): 실제 로그·합성 10만 요청의 갱신 비교와 날짜·월 PK·SQL 묶음 비교·파싱 재사용·세션 크기별 저장 A/B.
 - [2026-10-27](2026-10-27/README.md): 현재 제품 저장 경로와 추가분 INSERT 시제품의 rowid A/B.
@@ -21,13 +22,13 @@ JSONL 파싱·요청 집계·SQL 조회의 성능 비교 결과를 보존한다.
 - [DateStorageSqliteRepro-2026-10-25.json](DateStorageSqliteRepro-2026-10-25.json): 날짜 선두 PK와 OR 계획에서 관측한 결과 누락의 최소 재현을 보존한다.
 - [DateStorageSqliteReproVSCode-2026-10-25.json](DateStorageSqliteReproVSCode-2026-10-25.json): 설치 VS Code의 SQLite 3.53.4에서도 같은 결과 누락이 발생하는지 대조한다.
 
-- [JsonlParsingBranches-2026-10-09.json](JsonlParsingBranches-2026-10-09.json): JSONL 파싱 방식별 비교 수치를 보존한다.
-- [JsonlReaderTradeoff.json](JsonlReaderTradeoff.json): JSONL 읽기 방식의 성능·자원 사용 비교를 보존한다.
-- [PerformanceReview-2026-10-08.json](PerformanceReview-2026-10-08.json): 인덱스·파싱·집계 성능 검토의 측정값을 보존한다.
-- [RequestTitleAB.json](RequestTitleAB.json): 요청 제목 집계 A/B 검증의 결과를 보존한다.
-- [RequestTitleTransactions.json](RequestTitleTransactions.json): 실제 요청 제목 갱신·트랜잭션의 측정값을 보존한다.
-- [RequestTitleTransactions.jsonl.gz](RequestTitleTransactions.jsonl.gz): 요청 제목 갱신 측정의 압축 실행 로그를 보존한다.
-- [SqlExplainBenchmark-2026-10-15.md](SqlExplainBenchmark-2026-10-15.md): 기존 SQL과 일별 rollup 비교의 해석과 선택 근거를 설명한다.
-- [SqlExplainBenchmark-2026-10-15.json](SqlExplainBenchmark-2026-10-15.json): SQL 조회 계획과 실행 성능 측정값을 보존한다.
-- [SqlRollupABBenchmark-2026-10-15.json](SqlRollupABBenchmark-2026-10-15.json): rollup 후보 간 A/B 측정값을 보존한다.
-- [SqlRollupProductBenchmark-2026-10-15.json](SqlRollupProductBenchmark-2026-10-15.json): 제품 rollup 적용 전후의 조회·갱신 비용을 보존한다.
+- [JsonlParsingBranches-2026-10-09.json](2026-10-09/JsonlParsingBranches-2026-10-09.json): JSONL 파싱 방식별 비교 수치를 보존한다.
+- [JsonlReaderTradeoff.json](2026-10-09/JsonlReaderTradeoff.json): JSONL 읽기 방식의 성능·자원 사용 비교를 보존한다.
+- [PerformanceReview-2026-10-08.json](2026-10-08/PerformanceReview-2026-10-08.json): 인덱스·파싱·집계 성능 검토의 측정값을 보존한다.
+- [RequestTitleAB.json](2026-10-08/RequestTitleAB.json): 요청 제목 집계 A/B 검증의 결과를 보존한다.
+- [RequestTitleTransactions.json](2026-10-08/RequestTitleTransactions.json): 실제 요청 제목 갱신·트랜잭션의 측정값을 보존한다.
+- [RequestTitleTransactions.jsonl.gz](2026-10-08/RequestTitleTransactions.jsonl.gz): 요청 제목 갱신 측정의 압축 실행 로그를 보존한다.
+- [SqlExplainBenchmark-2026-10-15.md](2026-10-15/SqlExplainBenchmark-2026-10-15.md): 기존 SQL과 일별 rollup 비교의 해석과 선택 근거를 설명한다.
+- [SqlExplainBenchmark-2026-10-15.json](2026-10-15/SqlExplainBenchmark-2026-10-15.json): SQL 조회 계획과 실행 성능 측정값을 보존한다.
+- [SqlRollupABBenchmark-2026-10-15.json](2026-10-15/SqlRollupABBenchmark-2026-10-15.json): rollup 후보 간 A/B 측정값을 보존한다.
+- [SqlRollupProductBenchmark-2026-10-15.json](2026-10-15/SqlRollupProductBenchmark-2026-10-15.json): 제품 rollup 적용 전후의 조회·갱신 비용을 보존한다.
