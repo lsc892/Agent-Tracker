@@ -2,6 +2,10 @@
 
 월 PK 도입 실험과 사용자 목표를 갱신 트랜잭션 단축으로 정정한 후속 비교를 보존한다. 현재 코드는 집계 세션 PK를 복원하고 큰 세션의 선택적 묶음 비교를 유지한다.
 
+- [QueryProfile-2026-10-31.md](QueryProfile-2026-10-31.md): 현재 제품의 비용·토큰·요청·이름·도구·진단 SQL 중 가장 느린 조회와 실행 계획을 조사한다.
+- [QueryProfile-2026-10-31.json](QueryProfile-2026-10-31.json): 설치 DB 사본과 합성 1만·10만 요청에서 측정한 SQL·계획·원시 표본.
+- [QueryProfile-requests-without-costs-2026-10-31.json](QueryProfile-requests-without-costs-2026-10-31.json): 비용 제외 요청 목록의 기준·모델·토큰 정렬을 보완 측정한 결과.
+
 - [StorageTransactions-2026-10-31.md](StorageTransactions-2026-10-31.md): 갱신 목표에 맞춘 월 PK 철회와 저장 호출·쓰기 트랜잭션의 직접 비교.
 - [StorageTransactions-2026-10-31.json](StorageTransactions-2026-10-31.json): 같은 PK의 일괄/묶음 저장과 같은 저장 방식의 세션/월 PK를 교차 비교한 원시 결과.
 - [StorageTransactions-sources-2026-10-31.zip](StorageTransactions-sources-2026-10-31.zip): 후속 비교의 제품 소스·빌드 snapshot.
