@@ -5,6 +5,9 @@
 - [QueryProfile-2026-10-31.md](QueryProfile-2026-10-31.md): 현재 제품의 비용·토큰·요청·이름·도구·진단 SQL 중 가장 느린 조회와 실행 계획을 조사한다.
 - [QueryProfile-2026-10-31.json](QueryProfile-2026-10-31.json): 설치 DB 사본과 합성 1만·10만 요청에서 측정한 SQL·계획·원시 표본.
 - [QueryProfile-requests-without-costs-2026-10-31.json](QueryProfile-requests-without-costs-2026-10-31.json): 비용 제외 요청 목록의 기준·모델·토큰 정렬을 보완 측정한 결과.
+- [WriteProfile-2026-10-31.md](WriteProfile-2026-10-31.md): 통계 진입의 최초 적재·재진입·요청 추가/변경에서 INSERT·UPDATE·TEMP·COMMIT 비용을 분리한다.
+- [WriteProfile-2026-10-31.json](WriteProfile-2026-10-31.json): 실제 로그 사본과 합성 1만·10만 요청의 구간 표본·개별 SQL 누적/최대 실행 시간·직접 변경 행 수.
+- [WriteProfile-detail-fixed-2026-10-31.json](WriteProfile-detail-fixed-2026-10-31.json): 일회성 statement를 보관하지 않도록 계측기를 보완한 10만 요청 최초 적재의 최종 상세 SQL 시간.
 
 - [StorageTransactions-2026-10-31.md](StorageTransactions-2026-10-31.md): 갱신 목표에 맞춘 월 PK 철회와 저장 호출·쓰기 트랜잭션의 직접 비교.
 - [StorageTransactions-2026-10-31.json](StorageTransactions-2026-10-31.json): 같은 PK의 일괄/묶음 저장과 같은 저장 방식의 세션/월 PK를 교차 비교한 원시 결과.
