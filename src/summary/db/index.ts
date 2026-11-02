@@ -1,9 +1,10 @@
+// 통계 DB의 파일 관리·세션 저장·결제·조회 기능을 공통 API로 묶는다.
 import type { DatabaseSync } from 'node:sqlite';
 import type { NameQuery, NameResult } from '../types';
 import type {
-  BillingMode, CapabilityCategory, CapabilityPage, ChartMetric, CumulativeRow, DiagnosticsPage, FileMetadata,
+  BillingMode, CapabilityCategory, CapabilityPage, ChartMetric, DiagnosticsPage, FileMetadata,
   KeysetPage, ManifestRow, OffsetPage, ProcessingStatus, Provider, SessionReplacement, SummaryFilter,
-  TurnSummaryRow, UsageChart, UsageGrouping, UsageRow, UsageSort,
+  TurnSummaryRow, UsagePage, UsageGrouping, UsageRow, UsageSort,
 } from './types';
 import { SqliteSession, type SqliteSessionOptions } from './connection';
 import { ManifestStore } from './manifest';
@@ -15,7 +16,7 @@ export * from './types';
 export { usageChartFromPage } from './chart';
 export { periodBounds } from './timezone';
 
-/** Stable worker/scanner API. All components share one connection and transaction owner. */
+/** 하나의 DB 연결을 공유하는 저장소들을 구성하고 통계 작업을 위임한다. */
 export class SummaryDatabase {
   readonly connection: DatabaseSync;
   private readonly sqlite: SqliteSession;
@@ -105,10 +106,6 @@ export class SummaryDatabase {
     return this.reader.queryCapabilities(filter, category, offset, limit);
   }
 
-  queryCumulative(filter: SummaryFilter, by: 'provider' | 'model', offset = 0): { rows: CumulativeRow[]; total: number; by: 'provider' | 'model' } {
-    return this.reader.queryCumulative(filter, by, offset);
-  }
-
   queryUsageCount(filter: SummaryFilter = {}, groupBy: UsageGrouping = 'total', timezone = 'UTC', by: 'provider' | 'model' = 'provider'): number {
     return this.reader.queryUsageCount(filter, groupBy, timezone, by);
   }
@@ -117,9 +114,10 @@ export class SummaryDatabase {
     return this.reader.queryUsage(filter, groupBy, timezone, page, by);
   }
 
-  queryUsageChart(filter: SummaryFilter, groupBy: UsageGrouping | 'all' | 'turn', timezone: string, metric: ChartMetric,
-    by: 'provider' | 'model' = 'provider', page: OffsetPage & { afterId?: number; tableSort?: UsageSort } = {}): UsageChart {
-    return this.reader.queryUsageChart(filter, groupBy, timezone, metric, by, page);
+  queryUsagePage(filter: SummaryFilter = {}, groupBy: UsageGrouping | 'all' | 'turn' = 'total', timezone = 'UTC',
+    page: OffsetPage & { afterId?: number; sortBy?: ChartMetric; tableSort?: UsageSort } = {},
+    by: 'provider' | 'model' = 'provider'): UsagePage {
+    return this.reader.queryUsagePage(filter, groupBy, timezone, page, by);
   }
 
   diagnostics(page: KeysetPage & { afterSummaryId?: number; offset?: number; providers?: Provider[] } = {}): DiagnosticsPage {

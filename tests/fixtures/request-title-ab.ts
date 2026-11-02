@@ -1,3 +1,4 @@
+// 제목 집계 SQL 대안을 비교할 합성 입력·검증·공간 조회 도구를 제공한다.
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { SummaryDatabase } from '../../src/summary/db';

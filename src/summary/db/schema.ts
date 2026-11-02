@@ -1,9 +1,13 @@
+// 통계 DB의 테이블·인덱스·버전과 기존 스키마 변환 SQL을 정의한다.
 import { SCHEMA_ROLLUP_SQL } from './rollup-state';
 
 export { SCHEMA_ROLLUP_SQL } from './rollup-state';
-export const SCHEMA_VERSION = 12;
+export const SCHEMA_VERSION = 16;
 
-/** Only non-Windows discovery uses device/inode to recognize moved files. */
+/**
+ * 책임: 파일 이동 판정에 필요한 플랫폼별 identity 인덱스를 구성한다.
+ * 알고리즘: device·inode를 이동 판정에 쓰지 않는 Windows는 인덱스를 제거하고 다른 운영체제에서는 제공자·device·inode 인덱스를 생성한다.
+ */
 export function manifestIdentityIndexSql(platform: NodeJS.Platform): string {
   return platform === 'win32' ? 'DROP INDEX IF EXISTS idx_manifest_identity;'
     : 'CREATE INDEX IF NOT EXISTS idx_manifest_identity ON manifest(provider, dev, inode);';
@@ -105,6 +109,8 @@ CREATE TABLE IF NOT EXISTS manifest (
   dev TEXT,
   inode TEXT,
   parser_version INTEGER NOT NULL DEFAULT 0,
+  source_identity TEXT,
+  content_hash TEXT,
   capabilities_collected INTEGER NOT NULL DEFAULT 0 CHECK(capabilities_collected IN (0,1)),
   source_missing INTEGER NOT NULL DEFAULT 0 CHECK(source_missing IN (0,1)),
   last_seen_scan_id TEXT,
@@ -118,6 +124,7 @@ CREATE TABLE IF NOT EXISTS manifest (
 ${manifestIdentityIndexSql(process.platform)}
 CREATE INDEX IF NOT EXISTS idx_manifest_root_id ON manifest(provider, source_root, id);
 CREATE INDEX IF NOT EXISTS idx_manifest_session ON manifest(provider, session_id, id);
+CREATE INDEX IF NOT EXISTS idx_manifest_source ON manifest(provider, source_identity, id);
 ${NAMES_SQL}
 ${TURN_SUMMARY_SQL}
 ${TURN_SUMMARY_INDEX_SQL}

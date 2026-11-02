@@ -1,3 +1,4 @@
+// 제목 집계 SQL 대안이 모든 요약 열과 기대 제목을 보존하는지 검증한다.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';

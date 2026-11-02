@@ -1,3 +1,4 @@
+// 메모리에 고정한 JSONL 입력으로 파싱 분기 변경 전후의 속도와 메모리를 비교한다.
 const assert = require('node:assert/strict');
 const { fork, execFileSync } = require('node:child_process');
 const { createHash } = require('node:crypto');
@@ -8,7 +9,7 @@ const { performance } = require('node:perf_hooks');
 const root = resolve(__dirname, '../..');
 const cache = join(root, 'tests/.cache/jsonl-parsing-branches-20261009');
 const setupPath = join(cache, 'setup.json');
-const legacyPath = join(root, 'docs/benchmarks/JsonlReaderTradeoff.json');
+const legacyPath = join(root, 'docs/benchmarks/2026-10-09/JsonlReaderTradeoff.json');
 const manifestPath = join(root, 'tests/.cache/jsonl-reader/manifest.json');
 const sha = value => createHash('sha256').update(value).digest('hex');
 const canonicalSha = value => sha(value.toString('utf8').replace(/\r\n/g, '\n'));
@@ -29,7 +30,6 @@ async function prepare() {
   const manifest = JSON.parse(manifestBytes);
   const legacy = await fs.readFile(legacyPath);
   await fs.writeFile(join(cache, 'previous-report.json'), legacy, { flag: 'wx' });
-  await fs.writeFile(join(cache, 'previous-report.md'), await fs.readFile(join(root, 'docs/JsonlReaderTradeoff.md')), { flag: 'wx' });
   await fs.writeFile(join(cache, 'input-manifest.json'), manifestBytes, { flag: 'wx' });
   const branches = {};
   for (const [variant, suffix] of [['before', 'before'], ['after', 'after']]) {
@@ -215,10 +215,10 @@ async function compare() {
   for (const branch of Object.values(setup.branches)) {
     assert.equal(sha(await fs.readFile(join(branch.directory, 'src/summary/jsonl.ts'))), branch.sourceSha256);
   }
-  const output = resolve(root, option('--output', 'docs/benchmarks/JsonlParsingBranches-2026-10-09.json'));
+  const output = resolve(root, option('--output', 'docs/benchmarks/2026-10-09/JsonlParsingBranches-2026-10-09.json'));
   const report = { recordedAtSeoul: seoulTime(), node: process.version, platform: process.platform, arch: process.arch, pairs,
     originalBranchPreserved: setup.originalBranch,
-    previousMeasurement: { path: 'docs/benchmarks/JsonlReaderTradeoff.json', sha256: setup.legacyReportSha256, preserved: true },
+    previousMeasurement: { path: 'docs/benchmarks/2026-10-09/JsonlReaderTradeoff.json', sha256: setup.legacyReportSha256, preserved: true },
     inputManifestSha256: setup.inputManifestSha256,
     branches: Object.fromEntries(Object.entries(setup.branches).map(([key, value]) => [key, {
       branch: value.branch, commit: value.commit, sourceSha256: value.sourceSha256,

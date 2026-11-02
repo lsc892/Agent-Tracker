@@ -1,3 +1,4 @@
+// 통계 DB의 저장 입력·조회 필터·페이지·집계·진단 타입을 정의한다.
 export type Provider = 'claude' | 'codex';
 export type ProcessingStatus = 'processing' | 'done' | 'error' | 'interrupted';
 export type DurationQuality = 'exact' | 'derived' | 'approximate' | 'missing';
@@ -5,7 +6,7 @@ export type BillingMode = 'subscription' | 'api' | 'unknown';
 export type CapabilityCategory = 'skill' | 'subagent' | 'plugin' | 'model';
 export interface CapabilityUsageInput { category: CapabilityCategory; name: string; usage_count: number }
 export interface CapabilityRow extends CapabilityUsageInput { provider: Provider; percentage: number }
-export interface CapabilityPage { rows: CapabilityRow[]; chartRows: CapabilityRow[]; total: number; totalUses: number; maxUses: number }
+export interface CapabilityPage { rows: CapabilityRow[]; total: number; totalUses: number; maxUses: number }
 export interface CostFields {
   cost_usd?: number | null;
   unknown_costs?: number;
@@ -22,12 +23,17 @@ export interface FileMetadata {
   dev: string | null;
   inode: string | null;
   parser_version: number;
+  /** Parsed source thread/role and SHA-256 of the accepted raw file snapshot. */
+  source_identity?: string | null;
+  content_hash?: string | null;
   /** 0 when Skill counts were skipped; re-enable rebuilds these sources. */
   capabilities_collected?: 0 | 1;
 }
 
 export interface ManifestRow extends FileMetadata {
   id: number;
+  source_identity: string | null;
+  content_hash: string | null;
   source_missing: 0 | 1;
   last_seen_scan_id: string | null;
   processing_status: ProcessingStatus;
@@ -76,13 +82,6 @@ export interface ModelUsageInput {
   cache_read_input_tokens: number | null;
 }
 
-export interface CumulativeRow extends Omit<ModelUsageInput, 'model'>, CostFields {
-  /** null identifies a request without model metadata or recorded token usage. */
-  model: string | null;
-  provider: Provider;
-  total_tokens: number;
-}
-
 export interface TurnSummaryRow extends Required<Omit<TurnSummaryInput, 'model_usage' | 'capability_usage' | 'billing'>>, CostFields {
   id: number;
   /** Eligibility for chart display, without removing a row from its table page. */
@@ -105,6 +104,8 @@ export interface SessionReplacement {
   summaries: Iterable<TurnSummaryInput>;
   files: Iterable<FileMetadata & { id: number }>;
   removedFileIds?: Iterable<number>;
+  /** Verified replacements of missing source snapshots; bypass deleted-source retention. */
+  reconnectedFiles?: Iterable<{ old_id: number; new_id: number }>;
 }
 
 export interface SummaryFilter {
@@ -140,6 +141,8 @@ export interface UsageSort {
   key: typeof USAGE_SORT_KEYS[number];
   direction: 'asc' | 'desc';
 }
+export interface UsagePage { rows: UsageRow[] | TurnSummaryRow[]; total: number }
+
 export interface UsageChart {
   by?: 'provider' | 'model';
   rows: UsageRow[] | TurnSummaryRow[];

@@ -1,0 +1,211 @@
+{
+  "environment": {
+    "node": "v24.14.1",
+    "sqlite": "3.51.2",
+    "platform": "win32",
+    "arch": "x64"
+  },
+  "rawFacts": 1000,
+  "storedSessionDayRows": 110,
+  "integrity": [
+    {
+      "integrity_check": "ok"
+    }
+  ],
+  "mismatchObserved": true,
+  "expected": [
+    {
+      "provider": "claude",
+      "local_day": "",
+      "turns": 10
+    },
+    {
+      "provider": "claude",
+      "local_day": "2026-09-23",
+      "turns": 10
+    },
+    {
+      "provider": "claude",
+      "local_day": "2026-09-25",
+      "turns": 10
+    },
+    {
+      "provider": "claude",
+      "local_day": "2026-09-27",
+      "turns": 10
+    },
+    {
+      "provider": "codex",
+      "local_day": "2026-09-22",
+      "turns": 10
+    },
+    {
+      "provider": "codex",
+      "local_day": "2026-09-24",
+      "turns": 20
+    },
+    {
+      "provider": "codex",
+      "local_day": "2026-09-26",
+      "turns": 10
+    }
+  ],
+  "results": {
+    "orPrimaryPlan": [
+      {
+        "provider": "claude",
+        "local_day": "2026-09-23",
+        "turns": 10
+      },
+      {
+        "provider": "claude",
+        "local_day": "2026-09-25",
+        "turns": 10
+      },
+      {
+        "provider": "claude",
+        "local_day": "2026-09-27",
+        "turns": 10
+      },
+      {
+        "provider": "codex",
+        "local_day": "2026-09-22",
+        "turns": 10
+      },
+      {
+        "provider": "codex",
+        "local_day": "2026-09-24",
+        "turns": 20
+      },
+      {
+        "provider": "codex",
+        "local_day": "2026-09-26",
+        "turns": 10
+      }
+    ],
+    "forcedSecondary": [
+      {
+        "provider": "claude",
+        "local_day": "",
+        "turns": 10
+      },
+      {
+        "provider": "claude",
+        "local_day": "2026-09-23",
+        "turns": 10
+      },
+      {
+        "provider": "claude",
+        "local_day": "2026-09-25",
+        "turns": 10
+      },
+      {
+        "provider": "claude",
+        "local_day": "2026-09-27",
+        "turns": 10
+      },
+      {
+        "provider": "codex",
+        "local_day": "2026-09-22",
+        "turns": 10
+      },
+      {
+        "provider": "codex",
+        "local_day": "2026-09-24",
+        "turns": 20
+      },
+      {
+        "provider": "codex",
+        "local_day": "2026-09-26",
+        "turns": 10
+      }
+    ],
+    "disjointUnion": [
+      {
+        "provider": "claude",
+        "local_day": "",
+        "turns": 10
+      },
+      {
+        "provider": "claude",
+        "local_day": "2026-09-23",
+        "turns": 10
+      },
+      {
+        "provider": "claude",
+        "local_day": "2026-09-25",
+        "turns": 10
+      },
+      {
+        "provider": "claude",
+        "local_day": "2026-09-27",
+        "turns": 10
+      },
+      {
+        "provider": "codex",
+        "local_day": "2026-09-22",
+        "turns": 10
+      },
+      {
+        "provider": "codex",
+        "local_day": "2026-09-24",
+        "turns": 20
+      },
+      {
+        "provider": "codex",
+        "local_day": "2026-09-26",
+        "turns": 10
+      }
+    ]
+  },
+  "expectedSha256": "796b6b6980fd9a71b0e4c4c5b2aa17e6635b75b3605a8d790f7e87a436e0f323",
+  "plans": {
+    "or": [
+      "MULTI-INDEX OR",
+      "INDEX 1",
+      "SEARCH t USING PRIMARY KEY (local_day>? AND local_day<?)",
+      "INDEX 2",
+      "SEARCH t USING PRIMARY KEY (local_day=? AND provider=?)",
+      "USE TEMP B-TREE FOR GROUP BY"
+    ],
+    "forcedSecondary": [
+      "SEARCH t USING INDEX project_day (provider=?)",
+      "USE TEMP B-TREE FOR GROUP BY"
+    ],
+    "disjointUnion": [
+      "CO-ROUTINE (subquery-2)",
+      "COMPOUND QUERY",
+      "LEFT-MOST SUBQUERY",
+      "SEARCH t USING PRIMARY KEY (local_day>? AND local_day<?)",
+      "UNION ALL",
+      "SEARCH t USING PRIMARY KEY (local_day=? AND provider=?)",
+      "SCAN (subquery-2)",
+      "USE TEMP B-TREE FOR GROUP BY"
+    ]
+  },
+  "reproduction": {
+    "tableSql": "CREATE TABLE t (\n  provider TEXT NOT NULL, project_key TEXT NOT NULL, session_id TEXT NOT NULL,\n  local_day TEXT NOT NULL, turn_count INTEGER NOT NULL,\n  PRIMARY KEY(local_day,provider,session_id,project_key)\n) WITHOUT ROWID;\nCREATE INDEX project_day ON t(provider,project_key,local_day);\nCREATE INDEX session_idx ON t(provider,session_id);",
+    "orSql": "SELECT provider,local_day,SUM(turn_count) AS turns FROM t WHERE provider IN (?,?) AND ((local_day<>'' AND local_day>=? AND local_day<?) OR local_day='') GROUP BY provider,local_day ORDER BY provider,local_day",
+    "values": [
+      "claude",
+      "codex",
+      "2026-09-22",
+      "2026-09-28"
+    ],
+    "unionSql": "SELECT provider,local_day,SUM(turn_count) AS turns FROM (\n  SELECT * FROM t WHERE provider IN (?,?) AND local_day<>'' AND local_day>=? AND local_day<?\n  UNION ALL SELECT * FROM t WHERE provider IN (?,?) AND local_day=''\n) GROUP BY provider,local_day ORDER BY provider,local_day",
+    "unionValues": [
+      "claude",
+      "codex",
+      "2026-09-22",
+      "2026-09-28",
+      "claude",
+      "codex"
+    ]
+  },
+  "conclusion": "Observed result difference is a query-planner/runtime-specific correctness finding, not a performance improvement. It reproduces in a fresh in-memory table without product queries, caches, migrations, or private data. No upstream root-cause claim.",
+  "references": [
+    "https://www.sqlite.org/withoutrowid.html",
+    "https://www.sqlite.org/queryplanner.html#or_connected_terms_in_the_where_clause"
+  ],
+  "sourceSha256": "3ad52b38fd1f9b33605ee22268fe9066f7eeb251def01007cac7c5dac0a77214"
+}

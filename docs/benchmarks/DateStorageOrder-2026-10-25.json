@@ -1,0 +1,2278 @@
+{
+  "createdAtSeoul": "2026-10-25 18:59:01",
+  "environment": {
+    "node": "v24.14.1",
+    "platform": "win32",
+    "arch": "x64",
+    "cpu": "AMD Ryzen 5 7500F 6-Core Processor             ",
+    "logicalCpus": 12,
+    "sourceSha256": {
+      "src/summary/db/schema.ts": "feb5cd89af949e1591e184e563356abfc34c38b7c071263d2588edd249863605",
+      "src/summary/db/queries.ts": "ed80a927214eb77d27952c00edf3ffe4225c1fb8bfa4715674fab640975b61ec",
+      "src/summary/db/sorting.ts": "825ce5fadfb4e9c85a2df79455c4845e27886893a4f5fb6f558a8b062ebca2bc"
+    }
+  },
+  "options": {
+    "sizes": [
+      1000,
+      100000
+    ],
+    "samples": 9,
+    "warmup": 3,
+    "output": "C:\\Users\\safi2\\Documents\\GitHub\\Agent-Tracker\\docs\\benchmarks\\DateStorageOrder-2026-10-25.json"
+  },
+  "references": [
+    {
+      "url": "https://www.sqlite.org/expridx.html",
+      "reason": "Expression indexes must match the query expression; algebraic equivalence does not suffice."
+    },
+    {
+      "url": "https://www.sqlite.org/optoverview.html#order_by_optimizations",
+      "reason": "The planner balances WHERE search and ORDER BY index cost; partial prefixes can still require sorting."
+    },
+    {
+      "url": "https://www.sqlite.org/queryplanner.html",
+      "reason": "Secondary indexes carry rowid as the tie-breaker; sorting/index search behavior."
+    }
+  ],
+  "method": {
+    "samples": 9,
+    "warmup": 3,
+    "readTiming": "actual current queryUsagePage turn API; rows + count + prepare + SAVEPOINT snapshot. Each sample averages >=16ms batches (1000-call cap). AB/BA alternates. Warm SQLite and OS cache; no worker IPC or UI rendering.",
+    "fixture": "same sql-rollup seed; 100 turns/session; explicit original ids preserved, unknown times and timestamp ties included; copies of identical checkpointed DB",
+    "minimalIndexProbe": "three candidate index definitions are tested separately with EXPLAIN and dbstat before copying the fixture; only one chosen index exists in the timed candidate",
+    "writeTiming": "actual replaceSessions transaction+commit, same 100-turn session, checkpoint excluded, rollups not materialized; warmup may reuse pages",
+    "storage": "checkpointed dbstat object allocation plus page/freelist/file sizes before writes; WAL byte counts are file lengths, not physical I/O",
+    "caveats": [
+      "provider-basis latest sort index only; model unknown-order expressions do not fully match",
+      "arbitrary header sorts, deep offsets, provider selectivity and cold caches may behave differently",
+      "index creation time is one observation, not a sampled A/B result",
+      "fixture probe drop leaves recyclable free pages equally in both copies; live bytes and index dbstat bytes distinguish allocation from physical file length",
+      "product source and installed/private DBs are unchanged"
+    ]
+  },
+  "datasets": [
+    {
+      "rawRows": 1000,
+      "turnsPerSession": 100,
+      "unknownTimeRows": 10,
+      "sqliteVersion": "3.51.2",
+      "schemaVersion": 13,
+      "probes": [
+        {
+          "name": "single-null-implicit-id",
+          "expression": "(started_at_ms IS NULL),started_at_ms DESC,provider",
+          "plan": [
+            "SEARCH t USING INTEGER PRIMARY KEY (rowid>?)",
+            "SEARCH s USING PRIMARY KEY (provider=? AND session_id=?)",
+            "SEARCH p USING PRIMARY KEY (project_key=?)",
+            "CORRELATED SCALAR SUBQUERY 1",
+            "SEARCH m USING PRIMARY KEY (turn_id=?)",
+            "CORRELATED SCALAR SUBQUERY 1",
+            "SEARCH m USING PRIMARY KEY (turn_id=?)",
+            "USE TEMP B-TREE FOR ORDER BY"
+          ],
+          "indexBytes": 28672,
+          "avoidsTempSort": false
+        },
+        {
+          "name": "double-null-implicit-id",
+          "expression": "(started_at_ms IS NULL),(started_at_ms IS NULL),started_at_ms DESC,provider",
+          "plan": [
+            "SCAN t USING INDEX bench_date_order_probe",
+            "SEARCH s USING PRIMARY KEY (provider=? AND session_id=?)",
+            "SEARCH p USING PRIMARY KEY (project_key=?)",
+            "CORRELATED SCALAR SUBQUERY 1",
+            "SEARCH m USING PRIMARY KEY (turn_id=?)",
+            "CORRELATED SCALAR SUBQUERY 1",
+            "SEARCH m USING PRIMARY KEY (turn_id=?)"
+          ],
+          "indexBytes": 28672,
+          "avoidsTempSort": true
+        },
+        {
+          "name": "double-null-explicit-id",
+          "expression": "(started_at_ms IS NULL),(started_at_ms IS NULL),started_at_ms DESC,provider,id",
+          "plan": [
+            "SCAN t USING INDEX bench_date_order_probe",
+            "SEARCH s USING PRIMARY KEY (provider=? AND session_id=?)",
+            "SEARCH p USING PRIMARY KEY (project_key=?)",
+            "CORRELATED SCALAR SUBQUERY 1",
+            "SEARCH m USING PRIMARY KEY (turn_id=?)",
+            "CORRELATED SCALAR SUBQUERY 1",
+            "SEARCH m USING PRIMARY KEY (turn_id=?)"
+          ],
+          "indexBytes": 32768,
+          "avoidsTempSort": true
+        }
+      ],
+      "chosenIndex": {
+        "sql": "CREATE INDEX bench_summary_ui_date_order ON turn_summary((started_at_ms IS NULL),(started_at_ms IS NULL),started_at_ms DESC,provider)",
+        "indexCreationMs": 1.6420000000000101,
+        "reason": "single NULL expression failed to match duplicated ORDER BY; duplicate expression matched. Explicit id omitted because the implicit rowid ASC tie-break matched and uses fewer bytes."
+      },
+      "storage": [
+        {
+          "variant": "current",
+          "pageSize": 4096,
+          "pageCount": 107,
+          "freePages": 8,
+          "allocatedBytes": 438272,
+          "liveAllocatedBytes": 405504,
+          "fileBytes": 438272,
+          "objects": [
+            {
+              "name": "idx_manifest_root_id",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "idx_manifest_session",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "idx_manifest_source",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "idx_summary_period",
+              "bytes": 24576,
+              "pages": 6,
+              "payloadBytes": 17312,
+              "unusedBytes": 4196
+            },
+            {
+              "name": "idx_summary_project_period",
+              "bytes": 49152,
+              "pages": 12,
+              "payloadBytes": 36312,
+              "unusedBytes": 9700
+            },
+            {
+              "name": "idx_usage_model_daily_day",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "idx_usage_model_daily_project_day",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "idx_usage_request_daily_day",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "idx_usage_request_daily_project_day",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "manifest",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "projects",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 150,
+              "unusedBytes": 3923
+            },
+            {
+              "name": "session_billing",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "sessions",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 275,
+              "unusedBytes": 3783
+            },
+            {
+              "name": "sqlite_autoindex_manifest_1",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "sqlite_autoindex_turn_summary_1",
+              "bytes": 45056,
+              "pages": 11,
+              "payloadBytes": 32262,
+              "unusedBytes": 9666
+            },
+            {
+              "name": "sqlite_schema",
+              "bytes": 16384,
+              "pages": 4,
+              "payloadBytes": 8723,
+              "unusedBytes": 7403
+            },
+            {
+              "name": "sqlite_stat1",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 252,
+              "unusedBytes": 3812
+            },
+            {
+              "name": "turn_capability_usage",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "turn_costs",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "turn_model_usage",
+              "bytes": 57344,
+              "pages": 14,
+              "payloadBytes": 43248,
+              "unusedBytes": 10443
+            },
+            {
+              "name": "turn_summary",
+              "bytes": 139264,
+              "pages": 34,
+              "payloadBytes": 125480,
+              "unusedBytes": 8314
+            },
+            {
+              "name": "usage_model_daily",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "usage_request_daily",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "usage_rollup_meta",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            }
+          ]
+        },
+        {
+          "variant": "expression-date-order-index",
+          "pageSize": 4096,
+          "pageCount": 107,
+          "freePages": 1,
+          "allocatedBytes": 438272,
+          "liveAllocatedBytes": 434176,
+          "fileBytes": 438272,
+          "objects": [
+            {
+              "name": "bench_summary_ui_date_order",
+              "bytes": 28672,
+              "pages": 7,
+              "payloadBytes": 19312,
+              "unusedBytes": 6280
+            },
+            {
+              "name": "idx_manifest_root_id",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "idx_manifest_session",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "idx_manifest_source",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "idx_summary_period",
+              "bytes": 24576,
+              "pages": 6,
+              "payloadBytes": 17312,
+              "unusedBytes": 4196
+            },
+            {
+              "name": "idx_summary_project_period",
+              "bytes": 49152,
+              "pages": 12,
+              "payloadBytes": 36312,
+              "unusedBytes": 9700
+            },
+            {
+              "name": "idx_usage_model_daily_day",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "idx_usage_model_daily_project_day",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "idx_usage_request_daily_day",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "idx_usage_request_daily_project_day",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "manifest",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "projects",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 150,
+              "unusedBytes": 3923
+            },
+            {
+              "name": "session_billing",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "sessions",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 275,
+              "unusedBytes": 3783
+            },
+            {
+              "name": "sqlite_autoindex_manifest_1",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "sqlite_autoindex_turn_summary_1",
+              "bytes": 45056,
+              "pages": 11,
+              "payloadBytes": 32262,
+              "unusedBytes": 9666
+            },
+            {
+              "name": "sqlite_schema",
+              "bytes": 16384,
+              "pages": 4,
+              "payloadBytes": 8908,
+              "unusedBytes": 7213
+            },
+            {
+              "name": "sqlite_stat1",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 311,
+              "unusedBytes": 3749
+            },
+            {
+              "name": "turn_capability_usage",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "turn_costs",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "turn_model_usage",
+              "bytes": 57344,
+              "pages": 14,
+              "payloadBytes": 43248,
+              "unusedBytes": 10443
+            },
+            {
+              "name": "turn_summary",
+              "bytes": 139264,
+              "pages": 34,
+              "payloadBytes": 125480,
+              "unusedBytes": 8314
+            },
+            {
+              "name": "usage_model_daily",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "usage_request_daily",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "usage_rollup_meta",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            }
+          ]
+        }
+      ],
+      "extraIndexBytes": 28672,
+      "extraLiveAllocatedBytes": 28672,
+      "reads": [
+        {
+          "name": "turn-latest-all",
+          "by": "provider",
+          "filter": {
+            "providers": [
+              "claude",
+              "codex"
+            ],
+            "excludeEmptyUsage": true
+          },
+          "page": {
+            "limit": 100,
+            "offset": 0,
+            "tableSort": {
+              "key": "period",
+              "direction": "desc"
+            }
+          },
+          "totalRows": 1000,
+          "returnedRows": 100,
+          "fullSortedResultSha256": "95bee6d89abb47980828a4f4954bdcbfb2a7c5e6b7c106c9ca8676ac2528e46f",
+          "variants": [
+            {
+              "variant": "current",
+              "latency": {
+                "medianMs": 1.537572727272728,
+                "p10Ms": 1.3391748717948733,
+                "p90Ms": 1.6950039999999968,
+                "minMs": 1.2878076923076924,
+                "maxMs": 1.7613799999999968,
+                "samplesMs": [
+                  1.537572727272728,
+                  1.3520166666666686,
+                  1.2878076923076924,
+                  1.6078000000000003,
+                  1.5841272727272724,
+                  1.6784099999999966,
+                  1.4572454545454538,
+                  1.7613799999999968,
+                  1.4921499999999999
+                ]
+              },
+              "iterationsPerSample": [
+                11,
+                12,
+                13,
+                10,
+                11,
+                10,
+                11,
+                10,
+                12
+              ],
+              "speedup": 1,
+              "reductionPercent": 0,
+              "plans": {
+                "rows": [
+                  "SEARCH t USING INTEGER PRIMARY KEY (rowid>?)",
+                  "SEARCH s USING PRIMARY KEY (provider=? AND session_id=?)",
+                  "SEARCH p USING PRIMARY KEY (project_key=?)",
+                  "CORRELATED SCALAR SUBQUERY 1",
+                  "SEARCH m USING PRIMARY KEY (turn_id=?)",
+                  "CORRELATED SCALAR SUBQUERY 1",
+                  "SEARCH m USING PRIMARY KEY (turn_id=?)",
+                  "USE TEMP B-TREE FOR ORDER BY"
+                ],
+                "count": [
+                  "SEARCH t USING COVERING INDEX idx_summary_project_period (provider=?)"
+                ]
+              }
+            },
+            {
+              "variant": "expression-date-order-index",
+              "latency": {
+                "medianMs": 0.4859424242424244,
+                "p10Ms": 0.4586708571428573,
+                "p90Ms": 0.6304353846153847,
+                "minMs": 0.4580057142857145,
+                "maxMs": 0.6556999999999994,
+                "samplesMs": [
+                  0.4859424242424244,
+                  0.4580057142857145,
+                  0.45883714285714305,
+                  0.4760058823529413,
+                  0.5811464285714294,
+                  0.5791500000000005,
+                  0.624119230769231,
+                  0.4706799999999995,
+                  0.6556999999999994
+                ]
+              },
+              "iterationsPerSample": [
+                33,
+                35,
+                35,
+                34,
+                28,
+                28,
+                26,
+                35,
+                25
+              ],
+              "speedup": 3.164104738683346,
+              "reductionPercent": 68.39548363319597,
+              "plans": {
+                "rows": [
+                  "SCAN t USING INDEX bench_summary_ui_date_order",
+                  "SEARCH s USING PRIMARY KEY (provider=? AND session_id=?)",
+                  "SEARCH p USING PRIMARY KEY (project_key=?)",
+                  "CORRELATED SCALAR SUBQUERY 1",
+                  "SEARCH m USING PRIMARY KEY (turn_id=?)",
+                  "CORRELATED SCALAR SUBQUERY 1",
+                  "SEARCH m USING PRIMARY KEY (turn_id=?)"
+                ],
+                "count": [
+                  "SEARCH t USING COVERING INDEX idx_summary_project_period (provider=?)"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "turn-latest-claude",
+          "by": "provider",
+          "filter": {
+            "providers": [
+              "claude",
+              "codex"
+            ],
+            "excludeEmptyUsage": true,
+            "provider": "claude"
+          },
+          "page": {
+            "limit": 100,
+            "offset": 0,
+            "tableSort": {
+              "key": "period",
+              "direction": "desc"
+            }
+          },
+          "totalRows": 500,
+          "returnedRows": 100,
+          "fullSortedResultSha256": "a2bf36531022eacf9a11dbc435d5e39bd472e13c7f8546136de9c56a0f4d9811",
+          "variants": [
+            {
+              "variant": "current",
+              "latency": {
+                "medianMs": 1.0029062499999952,
+                "p10Ms": 0.9281133333333312,
+                "p90Ms": 1.1569514285714295,
+                "minMs": 0.9268555555555559,
+                "maxMs": 1.2004714285714289,
+                "samplesMs": [
+                  1.1460714285714297,
+                  1.0792666666666682,
+                  1.1185599999999984,
+                  1.2004714285714289,
+                  0.9331722222222223,
+                  0.9837529411764696,
+                  0.9284277777777751,
+                  0.9268555555555559,
+                  1.0029062499999952
+                ]
+              },
+              "iterationsPerSample": [
+                14,
+                15,
+                15,
+                14,
+                18,
+                17,
+                18,
+                18,
+                16
+              ],
+              "speedup": 1,
+              "reductionPercent": 0,
+              "plans": {
+                "rows": [
+                  "SEARCH s USING PRIMARY KEY (provider=?)",
+                  "SEARCH t USING INDEX sqlite_autoindex_turn_summary_1 (provider=? AND session_id=?)",
+                  "SEARCH p USING PRIMARY KEY (project_key=?)",
+                  "CORRELATED SCALAR SUBQUERY 1",
+                  "SEARCH m USING PRIMARY KEY (turn_id=?)",
+                  "CORRELATED SCALAR SUBQUERY 1",
+                  "SEARCH m USING PRIMARY KEY (turn_id=?)",
+                  "USE TEMP B-TREE FOR ORDER BY"
+                ],
+                "count": [
+                  "SEARCH t USING COVERING INDEX idx_summary_project_period (provider=?)"
+                ]
+              }
+            },
+            {
+              "variant": "expression-date-order-index",
+              "latency": {
+                "medianMs": 1.0229411764705874,
+                "p10Ms": 0.9538164705882333,
+                "p90Ms": 1.1860281318681347,
+                "minMs": 0.9308000000000018,
+                "maxMs": 1.2469692307692308,
+                "samplesMs": [
+                  1.1688214285714278,
+                  1.0970466666666652,
+                  1.2469692307692308,
+                  1.0229411764705874,
+                  1.0054124999999985,
+                  0.9595705882352912,
+                  0.9308000000000018,
+                  0.9604705882352926,
+                  1.1707928571428607
+                ]
+              },
+              "iterationsPerSample": [
+                14,
+                15,
+                13,
+                17,
+                16,
+                17,
+                18,
+                17,
+                14
+              ],
+              "speedup": 0.9804143904542802,
+              "reductionPercent": -1.9976868695944727,
+              "plans": {
+                "rows": [
+                  "SEARCH s USING PRIMARY KEY (provider=?)",
+                  "SEARCH t USING INDEX sqlite_autoindex_turn_summary_1 (provider=? AND session_id=?)",
+                  "SEARCH p USING PRIMARY KEY (project_key=?)",
+                  "CORRELATED SCALAR SUBQUERY 1",
+                  "SEARCH m USING PRIMARY KEY (turn_id=?)",
+                  "CORRELATED SCALAR SUBQUERY 1",
+                  "SEARCH m USING PRIMARY KEY (turn_id=?)",
+                  "USE TEMP B-TREE FOR ORDER BY"
+                ],
+                "count": [
+                  "SEARCH t USING COVERING INDEX idx_summary_project_period (provider=?)"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "turn-week-provider",
+          "by": "provider",
+          "filter": {
+            "providers": [
+              "claude",
+              "codex"
+            ],
+            "excludeEmptyUsage": true,
+            "fromMs": 1789609140001,
+            "toMs": 1790213940001
+          },
+          "page": {
+            "limit": 100,
+            "offset": 0,
+            "tableSort": {
+              "key": "period",
+              "direction": "desc"
+            }
+          },
+          "totalRows": 99,
+          "returnedRows": 99,
+          "fullSortedResultSha256": "d72b0da0d008977f0f6301ca4c5b5392067271e614ed7b7957eb818b32217657",
+          "variants": [
+            {
+              "variant": "current",
+              "latency": {
+                "medianMs": 0.47397352941176424,
+                "p10Ms": 0.4488576576576586,
+                "p90Ms": 0.496620984848484,
+                "minMs": 0.4427216216216229,
+                "maxMs": 0.5152624999999986,
+                "samplesMs": [
+                  0.4919606060606053,
+                  0.46866285714285955,
+                  0.47397352941176424,
+                  0.45128611111111167,
+                  0.5152624999999986,
+                  0.4427216216216229,
+                  0.4503916666666675,
+                  0.4892303030303055,
+                  0.491724242424239
+                ]
+              },
+              "iterationsPerSample": [
+                33,
+                35,
+                34,
+                36,
+                32,
+                37,
+                36,
+                33,
+                33
+              ],
+              "speedup": 1,
+              "reductionPercent": 0,
+              "plans": {
+                "rows": [
+                  "SEARCH t USING INDEX idx_summary_period (started_at_ms>? AND started_at_ms<?)",
+                  "SEARCH s USING PRIMARY KEY (provider=? AND session_id=?)",
+                  "SEARCH p USING PRIMARY KEY (project_key=?)",
+                  "CORRELATED SCALAR SUBQUERY 1",
+                  "SEARCH m USING PRIMARY KEY (turn_id=?)",
+                  "CORRELATED SCALAR SUBQUERY 1",
+                  "SEARCH m USING PRIMARY KEY (turn_id=?)",
+                  "USE TEMP B-TREE FOR ORDER BY"
+                ],
+                "count": [
+                  "SEARCH t USING COVERING INDEX idx_summary_period (started_at_ms>? AND started_at_ms<?)"
+                ]
+              }
+            },
+            {
+              "variant": "expression-date-order-index",
+              "latency": {
+                "medianMs": 0.4288368421052628,
+                "p10Ms": 0.4086057661038167,
+                "p90Ms": 0.458155428571431,
+                "minMs": 0.39618780487804856,
+                "maxMs": 0.46147428571428656,
+                "samplesMs": [
+                  0.4288368421052628,
+                  0.46147428571428656,
+                  0.41967692307692533,
+                  0.4573257142857171,
+                  0.43002105263157747,
+                  0.42559499999999845,
+                  0.41171025641025877,
+                  0.39618780487804856,
+                  0.4563166666666676
+                ]
+              },
+              "iterationsPerSample": [
+                38,
+                35,
+                39,
+                35,
+                38,
+                40,
+                39,
+                41,
+                36
+              ],
+              "speedup": 1.105253753583565,
+              "reductionPercent": 9.523039685891188,
+              "plans": {
+                "rows": [
+                  "SEARCH t USING INDEX bench_summary_ui_date_order (ANY(<expr>) AND ANY(<expr>) AND started_at_ms>? AND started_at_ms<?)",
+                  "SEARCH s USING PRIMARY KEY (provider=? AND session_id=?)",
+                  "SEARCH p USING PRIMARY KEY (project_key=?)",
+                  "CORRELATED SCALAR SUBQUERY 1",
+                  "SEARCH m USING PRIMARY KEY (turn_id=?)",
+                  "CORRELATED SCALAR SUBQUERY 1",
+                  "SEARCH m USING PRIMARY KEY (turn_id=?)"
+                ],
+                "count": [
+                  "SEARCH t USING COVERING INDEX idx_summary_period (started_at_ms>? AND started_at_ms<?)"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "turn-latest-all-model",
+          "by": "model",
+          "filter": {
+            "providers": [
+              "claude",
+              "codex"
+            ],
+            "excludeEmptyUsage": true
+          },
+          "page": {
+            "limit": 100,
+            "offset": 0,
+            "tableSort": {
+              "key": "period",
+              "direction": "desc"
+            }
+          },
+          "totalRows": 1192,
+          "returnedRows": 100,
+          "fullSortedResultSha256": "8764a98fa2d6ba6b70c2a4a3fb3c8e6a43f5ae442ceefb14baddbcaab34cfcda",
+          "variants": [
+            {
+              "variant": "current",
+              "latency": {
+                "medianMs": 1.815822222222222,
+                "p10Ms": 1.7270760000000065,
+                "p90Ms": 2.3102557142857028,
+                "minMs": 1.7083399999999984,
+                "maxMs": 2.4980285714285793,
+                "samplesMs": [
+                  1.815822222222222,
+                  1.7317600000000084,
+                  1.7083399999999984,
+                  2.1025874999999985,
+                  1.8107999999999973,
+                  1.9911888888889027,
+                  1.7473200000000133,
+                  2.2633124999999836,
+                  2.4980285714285793
+                ]
+              },
+              "iterationsPerSample": [
+                9,
+                10,
+                10,
+                8,
+                9,
+                9,
+                10,
+                8,
+                7
+              ],
+              "speedup": 1,
+              "reductionPercent": 0,
+              "plans": {
+                "rows": [
+                  "SEARCH t USING INTEGER PRIMARY KEY (rowid>?)",
+                  "SEARCH s USING PRIMARY KEY (provider=? AND session_id=?)",
+                  "SEARCH p USING PRIMARY KEY (project_key=?)",
+                  "SEARCH m USING PRIMARY KEY (turn_id=?) LEFT-JOIN",
+                  "USE TEMP B-TREE FOR ORDER BY"
+                ],
+                "count": [
+                  "SEARCH t USING COVERING INDEX idx_summary_project_period (provider=?)",
+                  "SEARCH m USING PRIMARY KEY (turn_id=?) LEFT-JOIN"
+                ]
+              }
+            },
+            {
+              "variant": "expression-date-order-index",
+              "latency": {
+                "medianMs": 1.9050777777777563,
+                "p10Ms": 1.8199066666666517,
+                "p90Ms": 2.1765150000000006,
+                "minMs": 1.815444444444438,
+                "maxMs": 2.2888749999999902,
+                "samplesMs": [
+                  2.056487500000003,
+                  1.8815888888889023,
+                  1.8267222222222144,
+                  1.815444444444438,
+                  1.8210222222222052,
+                  1.9050777777777563,
+                  2.0185499999999763,
+                  2.148425000000003,
+                  2.2888749999999902
+                ]
+              },
+              "iterationsPerSample": [
+                8,
+                9,
+                9,
+                9,
+                9,
+                9,
+                8,
+                8,
+                8
+              ],
+              "speedup": 0.9531486028567036,
+              "reductionPercent": -4.915434697472887,
+              "plans": {
+                "rows": [
+                  "SEARCH t USING INTEGER PRIMARY KEY (rowid>?)",
+                  "SEARCH s USING PRIMARY KEY (provider=? AND session_id=?)",
+                  "SEARCH p USING PRIMARY KEY (project_key=?)",
+                  "SEARCH m USING PRIMARY KEY (turn_id=?) LEFT-JOIN",
+                  "USE TEMP B-TREE FOR ORDER BY"
+                ],
+                "count": [
+                  "SEARCH t USING COVERING INDEX idx_summary_project_period (provider=?)",
+                  "SEARCH m USING PRIMARY KEY (turn_id=?) LEFT-JOIN"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "turn-week-model",
+          "by": "model",
+          "filter": {
+            "providers": [
+              "claude",
+              "codex"
+            ],
+            "excludeEmptyUsage": true,
+            "fromMs": 1789609140001,
+            "toMs": 1790213940001
+          },
+          "page": {
+            "limit": 100,
+            "offset": 0,
+            "tableSort": {
+              "key": "period",
+              "direction": "desc"
+            }
+          },
+          "totalRows": 118,
+          "returnedRows": 100,
+          "fullSortedResultSha256": "0147958189ffb89f4729aa34ec54f6b1868733143fa8ed2f6a0814c62a936bbe",
+          "variants": [
+            {
+              "variant": "current",
+              "latency": {
+                "medianMs": 0.6956999999999979,
+                "p10Ms": 0.6043866666666636,
+                "p90Ms": 0.8528357894736855,
+                "minMs": 0.599592592592587,
+                "maxMs": 0.8616315789473734,
+                "samplesMs": [
+                  0.8616315789473734,
+                  0.6748333333333297,
+                  0.6055851851851828,
+                  0.8506368421052637,
+                  0.828004999999996,
+                  0.6779458333333347,
+                  0.599592592592587,
+                  0.7401454545454581,
+                  0.6956999999999979
+                ]
+              },
+              "iterationsPerSample": [
+                19,
+                24,
+                27,
+                19,
+                20,
+                24,
+                27,
+                22,
+                23
+              ],
+              "speedup": 1,
+              "reductionPercent": 0,
+              "plans": {
+                "rows": [
+                  "SEARCH t USING INDEX idx_summary_period (started_at_ms>? AND started_at_ms<?)",
+                  "SEARCH s USING PRIMARY KEY (provider=? AND session_id=?)",
+                  "SEARCH p USING PRIMARY KEY (project_key=?)",
+                  "SEARCH m USING PRIMARY KEY (turn_id=?) LEFT-JOIN",
+                  "USE TEMP B-TREE FOR ORDER BY"
+                ],
+                "count": [
+                  "SEARCH t USING COVERING INDEX idx_summary_period (started_at_ms>? AND started_at_ms<?)",
+                  "SEARCH m USING PRIMARY KEY (turn_id=?) LEFT-JOIN"
+                ]
+              }
+            },
+            {
+              "variant": "expression-date-order-index",
+              "latency": {
+                "medianMs": 0.7178826086956475,
+                "p10Ms": 0.6426146153846188,
+                "p90Ms": 0.8645718266253906,
+                "minMs": 0.6275653846153878,
+                "maxMs": 0.9455117647058908,
+                "samplesMs": [
+                  0.6275653846153878,
+                  0.7802190476190519,
+                  0.6498759999999948,
+                  0.7178826086956475,
+                  0.6692208333333269,
+                  0.7834666666666679,
+                  0.6463769230769265,
+                  0.9455117647058908,
+                  0.8443368421052654
+                ]
+              },
+              "iterationsPerSample": [
+                26,
+                21,
+                25,
+                23,
+                24,
+                21,
+                26,
+                17,
+                19
+              ],
+              "speedup": 0.9690999497313995,
+              "reductionPercent": -3.1885307885079373,
+              "plans": {
+                "rows": [
+                  "SEARCH t USING INDEX idx_summary_period (started_at_ms>? AND started_at_ms<?)",
+                  "SEARCH s USING PRIMARY KEY (provider=? AND session_id=?)",
+                  "SEARCH p USING PRIMARY KEY (project_key=?)",
+                  "SEARCH m USING PRIMARY KEY (turn_id=?) LEFT-JOIN",
+                  "USE TEMP B-TREE FOR ORDER BY"
+                ],
+                "count": [
+                  "SEARCH t USING COVERING INDEX idx_summary_period (started_at_ms>? AND started_at_ms<?)",
+                  "SEARCH m USING PRIMARY KEY (turn_id=?) LEFT-JOIN"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "writes": {
+        "scenario": "actual replaceSessions, same 100-turn session, unmaterialized rollups",
+        "inputTurns": 100,
+        "variants": [
+          {
+            "variant": "current",
+            "latency": {
+              "medianMs": 3.942600000000084,
+              "p10Ms": 3.6505399999998644,
+              "p90Ms": 4.102359999999953,
+              "minMs": 3.5503000000001066,
+              "maxMs": 4.123399999999947,
+              "samplesMs": [
+                3.5503000000001066,
+                3.675599999999804,
+                4.018900000000031,
+                3.6836000000000695,
+                4.097099999999955,
+                3.8318000000001575,
+                4.123399999999947,
+                3.942600000000084,
+                3.9694999999999254
+              ]
+            },
+            "walBytes": [
+              107152,
+              107152,
+              107152,
+              107152,
+              107152,
+              107152,
+              107152,
+              107152,
+              107152
+            ],
+            "addedMedianMs": 0,
+            "increasePercent": 0
+          },
+          {
+            "variant": "expression-date-order-index",
+            "latency": {
+              "medianMs": 3.4651000000001204,
+              "p10Ms": 3.248400000000038,
+              "p90Ms": 3.822460000000137,
+              "minMs": 3.130000000000109,
+              "maxMs": 3.8827000000001135,
+              "samplesMs": [
+                3.3776000000000295,
+                3.8827000000001135,
+                3.3936999999998534,
+                3.8074000000001433,
+                3.4651000000001204,
+                3.4730999999999312,
+                3.27800000000002,
+                3.130000000000109,
+                3.615099999999984
+              ]
+            },
+            "walBytes": [
+              107152,
+              107152,
+              107152,
+              107152,
+              107152,
+              107152,
+              107152,
+              107152,
+              107152
+            ],
+            "addedMedianMs": -0.4774999999999636,
+            "increasePercent": -12.11129711357869
+          }
+        ]
+      },
+      "validation": "all sorted SQL results and public first-page/count values matched before timing; public first pages/counts matched again after replacement writes"
+    },
+    {
+      "rawRows": 100000,
+      "turnsPerSession": 100,
+      "unknownTimeRows": 991,
+      "sqliteVersion": "3.51.2",
+      "schemaVersion": 13,
+      "probes": [
+        {
+          "name": "single-null-implicit-id",
+          "expression": "(started_at_ms IS NULL),started_at_ms DESC,provider",
+          "plan": [
+            "SEARCH t USING INTEGER PRIMARY KEY (rowid>?)",
+            "SEARCH s USING PRIMARY KEY (provider=? AND session_id=?)",
+            "SEARCH p USING PRIMARY KEY (project_key=?)",
+            "CORRELATED SCALAR SUBQUERY 1",
+            "SEARCH m USING PRIMARY KEY (turn_id=?)",
+            "CORRELATED SCALAR SUBQUERY 1",
+            "SEARCH m USING PRIMARY KEY (turn_id=?)",
+            "USE TEMP B-TREE FOR ORDER BY"
+          ],
+          "indexBytes": 2232320,
+          "avoidsTempSort": false
+        },
+        {
+          "name": "double-null-implicit-id",
+          "expression": "(started_at_ms IS NULL),(started_at_ms IS NULL),started_at_ms DESC,provider",
+          "plan": [
+            "SCAN t USING INDEX bench_date_order_probe",
+            "SEARCH p USING PRIMARY KEY (project_key=?)",
+            "SEARCH s USING PRIMARY KEY (provider=? AND session_id=?)",
+            "CORRELATED SCALAR SUBQUERY 1",
+            "SEARCH m USING PRIMARY KEY (turn_id=?)",
+            "CORRELATED SCALAR SUBQUERY 1",
+            "SEARCH m USING PRIMARY KEY (turn_id=?)"
+          ],
+          "indexBytes": 2330624,
+          "avoidsTempSort": true
+        },
+        {
+          "name": "double-null-explicit-id",
+          "expression": "(started_at_ms IS NULL),(started_at_ms IS NULL),started_at_ms DESC,provider,id",
+          "plan": [
+            "SCAN t USING INDEX bench_date_order_probe",
+            "SEARCH p USING PRIMARY KEY (project_key=?)",
+            "SEARCH s USING PRIMARY KEY (provider=? AND session_id=?)",
+            "CORRELATED SCALAR SUBQUERY 1",
+            "SEARCH m USING PRIMARY KEY (turn_id=?)",
+            "CORRELATED SCALAR SUBQUERY 1",
+            "SEARCH m USING PRIMARY KEY (turn_id=?)"
+          ],
+          "indexBytes": 2703360,
+          "avoidsTempSort": true
+        }
+      ],
+      "chosenIndex": {
+        "sql": "CREATE INDEX bench_summary_ui_date_order ON turn_summary((started_at_ms IS NULL),(started_at_ms IS NULL),started_at_ms DESC,provider)",
+        "indexCreationMs": 57.91319999999996,
+        "reason": "single NULL expression failed to match duplicated ORDER BY; duplicate expression matched. Explicit id omitted because the implicit rowid ASC tie-break matched and uses fewer bytes."
+      },
+      "storage": [
+        {
+          "variant": "current",
+          "pageSize": 4096,
+          "pageCount": 8210,
+          "freePages": 660,
+          "allocatedBytes": 33628160,
+          "liveAllocatedBytes": 30924800,
+          "fileBytes": 33628160,
+          "objects": [
+            {
+              "name": "idx_manifest_root_id",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "idx_manifest_session",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "idx_manifest_source",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "idx_summary_period",
+              "bytes": 2334720,
+              "pages": 570,
+              "payloadBytes": 1811159,
+              "unusedBytes": 216725
+            },
+            {
+              "name": "idx_summary_project_period",
+              "bytes": 4595712,
+              "pages": 1122,
+              "payloadBytes": 3761159,
+              "unusedBytes": 521093
+            },
+            {
+              "name": "idx_usage_model_daily_day",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "idx_usage_model_daily_project_day",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "idx_usage_request_daily_day",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "idx_usage_request_daily_project_day",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "manifest",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "projects",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 620,
+              "unusedBytes": 3408
+            },
+            {
+              "name": "session_billing",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "sessions",
+              "bytes": 45056,
+              "pages": 11,
+              "payloadBytes": 31280,
+              "unusedBytes": 10648
+            },
+            {
+              "name": "sqlite_autoindex_manifest_1",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "sqlite_autoindex_turn_summary_1",
+              "bytes": 4415488,
+              "pages": 1078,
+              "payloadBytes": 3694995,
+              "unusedBytes": 407561
+            },
+            {
+              "name": "sqlite_schema",
+              "bytes": 16384,
+              "pages": 4,
+              "payloadBytes": 8723,
+              "unusedBytes": 7403
+            },
+            {
+              "name": "sqlite_stat1",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 272,
+              "unusedBytes": 3792
+            },
+            {
+              "name": "turn_capability_usage",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "turn_costs",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "turn_model_usage",
+              "bytes": 5443584,
+              "pages": 1329,
+              "payloadBytes": 4422450,
+              "unusedBytes": 656134
+            },
+            {
+              "name": "turn_summary",
+              "bytes": 14004224,
+              "pages": 3419,
+              "payloadBytes": 12987910,
+              "unusedBytes": 291631
+            },
+            {
+              "name": "usage_model_daily",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "usage_request_daily",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "usage_rollup_meta",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            }
+          ]
+        },
+        {
+          "variant": "expression-date-order-index",
+          "pageSize": 4096,
+          "pageCount": 8210,
+          "freePages": 91,
+          "allocatedBytes": 33628160,
+          "liveAllocatedBytes": 33255424,
+          "fileBytes": 33628160,
+          "objects": [
+            {
+              "name": "bench_summary_ui_date_order",
+              "bytes": 2330624,
+              "pages": 569,
+              "payloadBytes": 2011159,
+              "unusedBytes": 12641
+            },
+            {
+              "name": "idx_manifest_root_id",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "idx_manifest_session",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "idx_manifest_source",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "idx_summary_period",
+              "bytes": 2334720,
+              "pages": 570,
+              "payloadBytes": 1811159,
+              "unusedBytes": 216725
+            },
+            {
+              "name": "idx_summary_project_period",
+              "bytes": 4595712,
+              "pages": 1122,
+              "payloadBytes": 3761159,
+              "unusedBytes": 521093
+            },
+            {
+              "name": "idx_usage_model_daily_day",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "idx_usage_model_daily_project_day",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "idx_usage_request_daily_day",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "idx_usage_request_daily_project_day",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "manifest",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "projects",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 620,
+              "unusedBytes": 3408
+            },
+            {
+              "name": "session_billing",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "sessions",
+              "bytes": 45056,
+              "pages": 11,
+              "payloadBytes": 31280,
+              "unusedBytes": 10648
+            },
+            {
+              "name": "sqlite_autoindex_manifest_1",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "sqlite_autoindex_turn_summary_1",
+              "bytes": 4415488,
+              "pages": 1078,
+              "payloadBytes": 3694995,
+              "unusedBytes": 407561
+            },
+            {
+              "name": "sqlite_schema",
+              "bytes": 16384,
+              "pages": 4,
+              "payloadBytes": 8909,
+              "unusedBytes": 7212
+            },
+            {
+              "name": "sqlite_stat1",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 339,
+              "unusedBytes": 3721
+            },
+            {
+              "name": "turn_capability_usage",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "turn_costs",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "turn_model_usage",
+              "bytes": 5443584,
+              "pages": 1329,
+              "payloadBytes": 4422450,
+              "unusedBytes": 656134
+            },
+            {
+              "name": "turn_summary",
+              "bytes": 14004224,
+              "pages": 3419,
+              "payloadBytes": 12987910,
+              "unusedBytes": 291631
+            },
+            {
+              "name": "usage_model_daily",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "usage_request_daily",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            },
+            {
+              "name": "usage_rollup_meta",
+              "bytes": 4096,
+              "pages": 1,
+              "payloadBytes": 0,
+              "unusedBytes": 4088
+            }
+          ]
+        }
+      ],
+      "extraIndexBytes": 2330624,
+      "extraLiveAllocatedBytes": 2330624,
+      "reads": [
+        {
+          "name": "turn-latest-all",
+          "by": "provider",
+          "filter": {
+            "providers": [
+              "claude",
+              "codex"
+            ],
+            "excludeEmptyUsage": true
+          },
+          "page": {
+            "limit": 100,
+            "offset": 0,
+            "tableSort": {
+              "key": "period",
+              "direction": "desc"
+            }
+          },
+          "totalRows": 100000,
+          "returnedRows": 100,
+          "fullSortedResultSha256": "200569ae0daffbd2627b2d366c53ff7247360f7939a56c16da3534a48db6289b",
+          "variants": [
+            {
+              "variant": "current",
+              "latency": {
+                "medianMs": 45.65729999999985,
+                "p10Ms": 44.718220000000116,
+                "p90Ms": 48.18760000000039,
+                "minMs": 44.6199000000006,
+                "maxMs": 50.590000000000146,
+                "samplesMs": [
+                  44.74279999999999,
+                  47.587000000000444,
+                  45.602499999999964,
+                  47.54740000000038,
+                  47.39460000000054,
+                  50.590000000000146,
+                  45.65729999999985,
+                  44.6199000000006,
+                  44.987599999999475
+                ]
+              },
+              "iterationsPerSample": [
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1
+              ],
+              "speedup": 1,
+              "reductionPercent": 0,
+              "plans": {
+                "rows": [
+                  "SEARCH t USING INTEGER PRIMARY KEY (rowid>?)",
+                  "SEARCH s USING PRIMARY KEY (provider=? AND session_id=?)",
+                  "SEARCH p USING PRIMARY KEY (project_key=?)",
+                  "CORRELATED SCALAR SUBQUERY 1",
+                  "SEARCH m USING PRIMARY KEY (turn_id=?)",
+                  "CORRELATED SCALAR SUBQUERY 1",
+                  "SEARCH m USING PRIMARY KEY (turn_id=?)",
+                  "USE TEMP B-TREE FOR ORDER BY"
+                ],
+                "count": [
+                  "SEARCH t USING COVERING INDEX idx_summary_project_period (provider=?)"
+                ]
+              }
+            },
+            {
+              "variant": "expression-date-order-index",
+              "latency": {
+                "medianMs": 6.513733333333221,
+                "p10Ms": 6.270053333333211,
+                "p90Ms": 6.901266666666682,
+                "minMs": 6.231866666666671,
+                "maxMs": 7.207133333333331,
+                "samplesMs": [
+                  7.207133333333331,
+                  6.752866666666705,
+                  6.82480000000002,
+                  6.513733333333221,
+                  6.468433333333451,
+                  6.279599999999846,
+                  6.415166666666664,
+                  6.231866666666671,
+                  6.774233333333238
+                ]
+              },
+              "iterationsPerSample": [
+                3,
+                3,
+                3,
+                3,
+                3,
+                3,
+                3,
+                3,
+                3
+              ],
+              "speedup": 7.009390416146497,
+              "reductionPercent": 85.7334241548816,
+              "plans": {
+                "rows": [
+                  "SCAN t USING INDEX bench_summary_ui_date_order",
+                  "SEARCH p USING PRIMARY KEY (project_key=?)",
+                  "SEARCH s USING PRIMARY KEY (provider=? AND session_id=?)",
+                  "CORRELATED SCALAR SUBQUERY 1",
+                  "SEARCH m USING PRIMARY KEY (turn_id=?)",
+                  "CORRELATED SCALAR SUBQUERY 1",
+                  "SEARCH m USING PRIMARY KEY (turn_id=?)"
+                ],
+                "count": [
+                  "SEARCH t USING COVERING INDEX idx_summary_project_period (provider=?)"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "turn-latest-claude",
+          "by": "provider",
+          "filter": {
+            "providers": [
+              "claude",
+              "codex"
+            ],
+            "excludeEmptyUsage": true,
+            "provider": "claude"
+          },
+          "page": {
+            "limit": 100,
+            "offset": 0,
+            "tableSort": {
+              "key": "period",
+              "direction": "desc"
+            }
+          },
+          "totalRows": 50000,
+          "returnedRows": 100,
+          "fullSortedResultSha256": "746136a816b9c452528c7c9a0698221d0b8d19c033a88b0c01cb12435edd0ab5",
+          "variants": [
+            {
+              "variant": "current",
+              "latency": {
+                "medianMs": 20.24669999999969,
+                "p10Ms": 20.108359999999994,
+                "p90Ms": 22.13410000000058,
+                "minMs": 20.02179999999953,
+                "maxMs": 23.111700000000383,
+                "samplesMs": [
+                  20.02179999999953,
+                  20.1866,
+                  20.13000000000011,
+                  20.147100000000137,
+                  20.804599999999482,
+                  21.88970000000063,
+                  20.54059999999936,
+                  23.111700000000383,
+                  20.24669999999969
+                ]
+              },
+              "iterationsPerSample": [
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1
+              ],
+              "speedup": 1,
+              "reductionPercent": 0,
+              "plans": {
+                "rows": [
+                  "SEARCH s USING PRIMARY KEY (provider=?)",
+                  "SEARCH t USING INDEX sqlite_autoindex_turn_summary_1 (provider=? AND session_id=?)",
+                  "SEARCH p USING PRIMARY KEY (project_key=?)",
+                  "CORRELATED SCALAR SUBQUERY 1",
+                  "SEARCH m USING PRIMARY KEY (turn_id=?)",
+                  "CORRELATED SCALAR SUBQUERY 1",
+                  "SEARCH m USING PRIMARY KEY (turn_id=?)",
+                  "USE TEMP B-TREE FOR ORDER BY"
+                ],
+                "count": [
+                  "SEARCH t USING COVERING INDEX idx_summary_project_period (provider=?)"
+                ]
+              }
+            },
+            {
+              "variant": "expression-date-order-index",
+              "latency": {
+                "medianMs": 20.41280000000006,
+                "p10Ms": 19.70366000000031,
+                "p90Ms": 21.972959999999695,
+                "minMs": 19.621499999999287,
+                "maxMs": 23.531200000000354,
+                "samplesMs": [
+                  20.41280000000006,
+                  20.070799999999508,
+                  20.79619999999977,
+                  19.621499999999287,
+                  20.38249999999971,
+                  20.921300000000883,
+                  23.531200000000354,
+                  19.724200000000565,
+                  21.58339999999953
+                ]
+              },
+              "iterationsPerSample": [
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1
+              ],
+              "speedup": 0.9918629487380286,
+              "reductionPercent": -0.8203806052362816,
+              "plans": {
+                "rows": [
+                  "SEARCH s USING PRIMARY KEY (provider=?)",
+                  "SEARCH t USING INDEX sqlite_autoindex_turn_summary_1 (provider=? AND session_id=?)",
+                  "SEARCH p USING PRIMARY KEY (project_key=?)",
+                  "CORRELATED SCALAR SUBQUERY 1",
+                  "SEARCH m USING PRIMARY KEY (turn_id=?)",
+                  "CORRELATED SCALAR SUBQUERY 1",
+                  "SEARCH m USING PRIMARY KEY (turn_id=?)",
+                  "USE TEMP B-TREE FOR ORDER BY"
+                ],
+                "count": [
+                  "SEARCH t USING COVERING INDEX idx_summary_project_period (provider=?)"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "turn-week-provider",
+          "by": "provider",
+          "filter": {
+            "providers": [
+              "claude",
+              "codex"
+            ],
+            "excludeEmptyUsage": true,
+            "fromMs": 1789954740001,
+            "toMs": 1790559540001
+          },
+          "page": {
+            "limit": 100,
+            "offset": 0,
+            "tableSort": {
+              "key": "period",
+              "direction": "desc"
+            }
+          },
+          "totalRows": 7723,
+          "returnedRows": 100,
+          "fullSortedResultSha256": "a03d5d9a3e865cf25460790b76197451c9be674240bfadccabe0233eb9d850b2",
+          "variants": [
+            {
+              "variant": "current",
+              "latency": {
+                "medianMs": 5.772633333333336,
+                "p10Ms": 5.413694999999764,
+                "p90Ms": 6.025786666666621,
+                "minMs": 5.278874999999971,
+                "maxMs": 6.184799999999996,
+                "samplesMs": [
+                  6.184799999999996,
+                  5.754933333333308,
+                  5.278874999999971,
+                  5.772633333333336,
+                  5.5594999999999954,
+                  5.80033333333328,
+                  5.447399999999713,
+                  5.879200000000007,
+                  5.986033333333277
+                ]
+              },
+              "iterationsPerSample": [
+                3,
+                3,
+                4,
+                3,
+                3,
+                3,
+                3,
+                3,
+                3
+              ],
+              "speedup": 1,
+              "reductionPercent": 0,
+              "plans": {
+                "rows": [
+                  "SCAN p",
+                  "SEARCH t USING INDEX idx_summary_project_period (provider=? AND project_key=? AND started_at_ms>? AND started_at_ms<?)",
+                  "SEARCH s USING PRIMARY KEY (provider=? AND session_id=?)",
+                  "CORRELATED SCALAR SUBQUERY 1",
+                  "SEARCH m USING PRIMARY KEY (turn_id=?)",
+                  "CORRELATED SCALAR SUBQUERY 1",
+                  "SEARCH m USING PRIMARY KEY (turn_id=?)",
+                  "USE TEMP B-TREE FOR ORDER BY"
+                ],
+                "count": [
+                  "SEARCH t USING COVERING INDEX idx_summary_period (started_at_ms>? AND started_at_ms<?)"
+                ]
+              }
+            },
+            {
+              "variant": "expression-date-order-index",
+              "latency": {
+                "medianMs": 0.7297909090909177,
+                "p10Ms": 0.7227739130434518,
+                "p90Ms": 0.8330620779220899,
+                "minMs": 0.7175391304347652,
+                "maxMs": 1.1577285714285088,
+                "samplesMs": [
+                  0.7518954545454851,
+                  0.7175391304347652,
+                  0.7492772727272577,
+                  0.7273954545454547,
+                  0.7297909090909177,
+                  1.1577285714285088,
+                  0.7240826086956235,
+                  0.7295590909091267,
+                  0.7415318181818459
+                ]
+              },
+              "iterationsPerSample": [
+                22,
+                23,
+                22,
+                22,
+                22,
+                14,
+                23,
+                22,
+                22
+              ],
+              "speedup": 7.909982518861685,
+              "reductionPercent": 87.35774702895414,
+              "plans": {
+                "rows": [
+                  "SEARCH t USING INDEX bench_summary_ui_date_order (ANY(<expr>) AND ANY(<expr>) AND started_at_ms>? AND started_at_ms<?)",
+                  "SEARCH s USING PRIMARY KEY (provider=? AND session_id=?)",
+                  "SEARCH p USING PRIMARY KEY (project_key=?)",
+                  "CORRELATED SCALAR SUBQUERY 1",
+                  "SEARCH m USING PRIMARY KEY (turn_id=?)",
+                  "CORRELATED SCALAR SUBQUERY 1",
+                  "SEARCH m USING PRIMARY KEY (turn_id=?)"
+                ],
+                "count": [
+                  "SEARCH t USING COVERING INDEX idx_summary_period (started_at_ms>? AND started_at_ms<?)"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "turn-latest-all-model",
+          "by": "model",
+          "filter": {
+            "providers": [
+              "claude",
+              "codex"
+            ],
+            "excludeEmptyUsage": true
+          },
+          "page": {
+            "limit": 100,
+            "offset": 0,
+            "tableSort": {
+              "key": "period",
+              "direction": "desc"
+            }
+          },
+          "totalRows": 119192,
+          "returnedRows": 100,
+          "fullSortedResultSha256": "930fce199a3a79a95c715e79f78f3d881278055e4f8417cd5452f19eb1be01de",
+          "variants": [
+            {
+              "variant": "current",
+              "latency": {
+                "medianMs": 96.83779999999933,
+                "p10Ms": 96.28126000000047,
+                "p90Ms": 99.3339,
+                "minMs": 96.08269999999902,
+                "maxMs": 100.39589999999953,
+                "samplesMs": [
+                  97.60540000000037,
+                  97.65250000000015,
+                  100.39589999999953,
+                  96.83779999999933,
+                  96.33090000000084,
+                  96.35369999999966,
+                  96.36290000000008,
+                  96.08269999999902,
+                  99.06840000000011
+                ]
+              },
+              "iterationsPerSample": [
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1
+              ],
+              "speedup": 1,
+              "reductionPercent": 0,
+              "plans": {
+                "rows": [
+                  "SEARCH t USING INTEGER PRIMARY KEY (rowid>?)",
+                  "SEARCH s USING PRIMARY KEY (provider=? AND session_id=?)",
+                  "SEARCH p USING PRIMARY KEY (project_key=?)",
+                  "SEARCH m USING PRIMARY KEY (turn_id=?) LEFT-JOIN",
+                  "USE TEMP B-TREE FOR ORDER BY"
+                ],
+                "count": [
+                  "SEARCH t USING COVERING INDEX idx_summary_project_period (provider=?)",
+                  "SEARCH m USING PRIMARY KEY (turn_id=?) LEFT-JOIN"
+                ]
+              }
+            },
+            {
+              "variant": "expression-date-order-index",
+              "latency": {
+                "medianMs": 96.78789999999935,
+                "p10Ms": 96.0729999999996,
+                "p90Ms": 100.30059999999904,
+                "minMs": 95.9922000000006,
+                "maxMs": 103.10539999999855,
+                "samplesMs": [
+                  96.78789999999935,
+                  96.09319999999934,
+                  99.36549999999988,
+                  96.97839999999997,
+                  96.6229000000003,
+                  99.59939999999915,
+                  95.9922000000006,
+                  103.10539999999855,
+                  96.5601999999999
+                ]
+              },
+              "iterationsPerSample": [
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1,
+                1
+              ],
+              "speedup": 1.0005155603128075,
+              "reductionPercent": 0.0515294647337905,
+              "plans": {
+                "rows": [
+                  "SEARCH t USING INTEGER PRIMARY KEY (rowid>?)",
+                  "SEARCH s USING PRIMARY KEY (provider=? AND session_id=?)",
+                  "SEARCH p USING PRIMARY KEY (project_key=?)",
+                  "SEARCH m USING PRIMARY KEY (turn_id=?) LEFT-JOIN",
+                  "USE TEMP B-TREE FOR ORDER BY"
+                ],
+                "count": [
+                  "SEARCH t USING COVERING INDEX idx_summary_project_period (provider=?)",
+                  "SEARCH m USING PRIMARY KEY (turn_id=?) LEFT-JOIN"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "turn-week-model",
+          "by": "model",
+          "filter": {
+            "providers": [
+              "claude",
+              "codex"
+            ],
+            "excludeEmptyUsage": true,
+            "fromMs": 1789954740001,
+            "toMs": 1790559540001
+          },
+          "page": {
+            "limit": 100,
+            "offset": 0,
+            "tableSort": {
+              "key": "period",
+              "direction": "desc"
+            }
+          },
+          "totalRows": 9204,
+          "returnedRows": 100,
+          "fullSortedResultSha256": "10ac7e2b51da10effdcf3ebcb78a5dd12ed09fc304461aadb1ec5a505cdf44de",
+          "variants": [
+            {
+              "variant": "current",
+              "latency": {
+                "medianMs": 10.340049999999792,
+                "p10Ms": 9.790300000000025,
+                "p90Ms": 10.940010000000076,
+                "minMs": 9.70510000000013,
+                "maxMs": 11.148650000000089,
+                "samplesMs": [
+                  10.887850000000071,
+                  10.72020000000066,
+                  11.148650000000089,
+                  10.340049999999792,
+                  10.566000000000713,
+                  10.309250000000247,
+                  9.70510000000013,
+                  9.922199999999975,
+                  9.811599999999999
+                ]
+              },
+              "iterationsPerSample": [
+                2,
+                2,
+                2,
+                2,
+                2,
+                2,
+                2,
+                2,
+                2
+              ],
+              "speedup": 1,
+              "reductionPercent": 0,
+              "plans": {
+                "rows": [
+                  "SCAN p",
+                  "SEARCH t USING INDEX idx_summary_project_period (provider=? AND project_key=? AND started_at_ms>? AND started_at_ms<?)",
+                  "SEARCH s USING PRIMARY KEY (provider=? AND session_id=?)",
+                  "SEARCH m USING PRIMARY KEY (turn_id=?) LEFT-JOIN",
+                  "USE TEMP B-TREE FOR ORDER BY"
+                ],
+                "count": [
+                  "SEARCH t USING COVERING INDEX idx_summary_period (started_at_ms>? AND started_at_ms<?)",
+                  "SEARCH m USING PRIMARY KEY (turn_id=?) LEFT-JOIN"
+                ]
+              }
+            },
+            {
+              "variant": "expression-date-order-index",
+              "latency": {
+                "medianMs": 10.293800000000374,
+                "p10Ms": 10.057540000000516,
+                "p90Ms": 14.172799999999553,
+                "minMs": 9.888899999999921,
+                "maxMs": 16.505199999999604,
+                "samplesMs": [
+                  13.589699999999539,
+                  10.286000000000058,
+                  10.31854999999996,
+                  9.888899999999921,
+                  10.551449999999932,
+                  10.173100000000886,
+                  10.293800000000374,
+                  16.505199999999604,
+                  10.099700000000666
+                ]
+              },
+              "iterationsPerSample": [
+                2,
+                2,
+                2,
+                2,
+                2,
+                2,
+                2,
+                1,
+                2
+              ],
+              "speedup": 1.0044929957838131,
+              "reductionPercent": 0.4472899067162972,
+              "plans": {
+                "rows": [
+                  "SCAN p",
+                  "SEARCH t USING INDEX idx_summary_project_period (provider=? AND project_key=? AND started_at_ms>? AND started_at_ms<?)",
+                  "SEARCH s USING PRIMARY KEY (provider=? AND session_id=?)",
+                  "SEARCH m USING PRIMARY KEY (turn_id=?) LEFT-JOIN",
+                  "USE TEMP B-TREE FOR ORDER BY"
+                ],
+                "count": [
+                  "SEARCH t USING COVERING INDEX idx_summary_period (started_at_ms>? AND started_at_ms<?)",
+                  "SEARCH m USING PRIMARY KEY (turn_id=?) LEFT-JOIN"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "writes": {
+        "scenario": "actual replaceSessions, same 100-turn session, unmaterialized rollups",
+        "inputTurns": 100,
+        "variants": [
+          {
+            "variant": "current",
+            "latency": {
+              "medianMs": 3.361700000001292,
+              "p10Ms": 3.325400000000082,
+              "p90Ms": 3.45304000000142,
+              "minMs": 3.29660000000149,
+              "maxMs": 3.5192000000006374,
+              "samplesMs": [
+                3.5192000000006374,
+                3.4365000000016153,
+                3.4056000000000495,
+                3.337500000001455,
+                3.29660000000149,
+                3.361700000001292,
+                3.3325999999997293,
+                3.3698999999996886,
+                3.3413999999993393
+              ]
+            },
+            "walBytes": [
+              135992,
+              135992,
+              135992,
+              135992,
+              135992,
+              135992,
+              135992,
+              135992,
+              135992
+            ],
+            "addedMedianMs": 0,
+            "increasePercent": 0
+          },
+          {
+            "variant": "expression-date-order-index",
+            "latency": {
+              "medianMs": 3.796200000000681,
+              "p10Ms": 3.631359999999768,
+              "p90Ms": 4.013500000000204,
+              "minMs": 3.5763999999999214,
+              "maxMs": 4.596300000001065,
+              "samplesMs": [
+                3.665899999999965,
+                3.8677999999999884,
+                3.827400000000125,
+                3.6450999999997293,
+                3.5763999999999214,
+                3.854699999999866,
+                3.7074999999986176,
+                3.796200000000681,
+                4.596300000001065
+              ]
+            },
+            "walBytes": [
+              177192,
+              177192,
+              177192,
+              177192,
+              177192,
+              177192,
+              177192,
+              177192,
+              177192
+            ],
+            "addedMedianMs": 0.4344999999993888,
+            "increasePercent": 12.925008180361775
+          }
+        ]
+      },
+      "validation": "all sorted SQL results and public first-page/count values matched before timing; public first pages/counts matched again after replacement writes"
+    }
+  ]
+}

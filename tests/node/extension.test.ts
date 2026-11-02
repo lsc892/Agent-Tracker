@@ -1,3 +1,4 @@
+// VS Code와 서비스를 모사해 확장 명령·설정·화면·종료 연결을 검증한다.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -58,6 +59,7 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
   let diagnostics = 0;
   let initializations = 0;
   let quotaDisposals = 0;
+  let failQuotaSubscription = false;
   let summaryDisposals = 0;
   let cancellations = 0;
   let clears = 0;
@@ -75,6 +77,7 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
   const uri = (fsPath: string): { fsPath: string; toString(): string } => ({ fsPath, toString: () => fsPath });
   const disposable: Disposable = { dispose() {} };
   const activeColorTheme = { kind: 2 };
+  /** 확장 검증에 필요한 Markdown 누적과 일반 텍스트 이스케이프를 모사한다. */
   class MarkdownString {
     value = '';
     appendMarkdown(value: string) { this.value += value; return this; }
@@ -129,11 +132,16 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
       },
     },
   };
+  /** quota 상태와 설정·갱신·종료 호출을 기록해 확장 연결을 검증한다. */
   class FakeQuota {
     constructor(private readonly providers: { id: string }[], options: {refreshPolicy: string; pollingSeconds: number}) {
       policies.push(options.refreshPolicy); pollingIntervals.push(options.pollingSeconds);
     }
-    start() {} setFocused() {} subscribe() { return disposable; }
+    start() {} setFocused() {}
+    subscribe() {
+      if (failQuotaSubscription) throw new Error('Quota subscription failed');
+      return disposable;
+    }
     setPollingInterval(seconds: number) { pollingIntervals.push(seconds); }
     setRefreshPolicy(policy: string) { policies.push(policy); }
     async dispose() { quotaDisposals++; }
@@ -151,6 +159,7 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     getStates() { return this.providers.map(provider => this.getState(provider.id)); }
     async refresh(provider: string, force: boolean) { refreshes.push({ provider, force }); }
   }
+  /** 요약 조회·갱신·설정·취소·종료 호출을 기록해 확장 연결을 검증한다. */
   class FakeSummary {
     async setDeletedSourceRetentionEnabled(enabled:boolean) {retentionSwitches.push(enabled);await this.cancelRefresh();}
     async setCapabilityCollectionEnabled(enabled:boolean) {collectionSwitches.push(enabled);await this.cancelRefresh();}
@@ -170,7 +179,11 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
   }
   Module._load = function(request, parent, isMain) {
     if (request === 'vscode') return vscode;
-    if (request === './quota') return { QuotaService: FakeQuota, ClaudeQuotaProvider: class { id = 'claude'; }, CodexQuotaProvider: class { id = 'codex'; } };
+    if (request === './quota') return { QuotaService: FakeQuota, ClaudeQuotaProvider:
+      /** Claude quota 제공자 식별자를 제공해 확장 서비스 구성을 모사한다. */
+      class { id = 'claude'; }, CodexQuotaProvider:
+      /** Codex quota 제공자 식별자를 제공해 확장 서비스 구성을 모사한다. */
+      class { id = 'codex'; } };
     if (request === './summary/client') return { SummaryClient: FakeSummary };
     return original.call(this, request, parent, isMain);
   };
@@ -224,7 +237,8 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     assert.equal(scans,0,'changing colors does not scan transcripts');assert.equal(refreshes.length,0,'changing colors does not query quota');
 
     assert.equal(items[0].command, 'agentTracker.toggleQuotaTooltip', 'the renderer uses this command to toggle the native card');
-    assert.equal(items[0].accessibilityInformation?.label, 'Claude: 5시간 - 77% 남음\nCodex: 5시간 - 77% 남음\n클릭하여 열기/닫기');
+    const hoverSummary = 'Codex: 7일 - 8% 남음, 5시간 - 77% 남음\nClaude: 7일 - 8% 남음, 5시간 - 77% 남음\n클릭해서 사용량 창 켜기';
+    assert.equal(items[0].accessibilityInformation?.label, hoverSummary);
     await click(items[0].command);
     assert.deepEqual(externalCommands.at(-1), { command: 'workbench.action.showHover', arguments: [] }, 'an unpatched renderer can still open the focused hover');
     assert.equal(commands.has('agentTracker.toggleQuota'), false);
@@ -275,6 +289,7 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     assert.deepEqual(configUpdates, [{ key: 'display.detail', value: 'compact', target: 1 }]);
     assert.doesNotMatch(items[0].text!,/7일|92%/);
     assert.equal(items[0].text!.match(/5시간/g)?.length,2);
+    assert.equal(items[0].accessibilityInformation?.label, hoverSummary, 'compact status keeps the detailed hover summary');
     assert.equal(tooltip().value.match(/wk !\[/g)?.length, 2, 'compact status still shows every window in the hover');
     await cardAction('agentTracker.setStatusBarDetail', 'detailed');
     assert.equal(items[0].text!.match(/7일/g)?.length, 2);
@@ -444,6 +459,9 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     for (const subscription of subscriptions) subscription.dispose();
     assert.equal(quotaDisposals, 4);
     assert.equal(summaryDisposals, 1);
+    assert.equal(commands.size, 0, 'shutdown unregisters commands');
+    assert.equal(configuration.size(), 0, 'shutdown unregisters configuration events');
+    assert.equal(focus.size(), 0, 'shutdown unregisters window focus events');
     assert.equal(panels[0].disposed, true);
     assert.ok(items.every(item => item.disposed));
     assert.equal(themes.size(), 0);
@@ -453,6 +471,23 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     assert.equal(initializations, 1, 'disabled statistics do not start the worker on activation');
     await click('agentTracker.openUsage');
     assert.equal(scans, beforeSkillSwitch+1);
+    // VS Code may dispose the context before calling deactivate(). Both paths
+    // must share the same asynchronous shutdown without disposing twice.
+    for (const subscription of subscriptions) subscription.dispose();
+    await extension.deactivate();
+    assert.equal(quotaDisposals, 5);
+    assert.equal(summaryDisposals, 2);
+    assert.equal(commands.size, 0);
+
+    failQuotaSubscription = true;
+    await assert.rejects(extension.activate({
+      globalStorageUri: uri(storage), extensionUri: uri(process.cwd()), subscriptions,
+    } as unknown as import('vscode').ExtensionContext), /Quota subscription failed/);
+    assert.equal(quotaDisposals, 6, 'activation failure closes the partially initialized quota service');
+    assert.equal(summaryDisposals, 3, 'activation failure closes the partially initialized summary client');
+    assert.ok(items.every(item => item.disposed));
+    assert.equal(themes.size(), 0);
+    assert.equal(commands.size, 0);
   } finally {
     await extension?.deactivate();
     for (const subscription of subscriptions) subscription.dispose();

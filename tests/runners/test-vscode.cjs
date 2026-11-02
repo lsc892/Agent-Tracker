@@ -1,3 +1,4 @@
+// 격리된 VS Code 테스트 호스트와 합성 로그를 준비해 확장 스모크 검증을 실행한다.
 const { mkdir, mkdtemp, rm, writeFile } = require('node:fs/promises');
 const { join, resolve } = require('node:path');
 const { existsSync } = require('node:fs');

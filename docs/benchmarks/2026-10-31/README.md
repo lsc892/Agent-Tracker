@@ -1,0 +1,23 @@
+# 2026-10-31
+
+월 PK 도입 실험과 사용자 목표를 갱신 트랜잭션 단축으로 정정한 후속 비교를 보존한다. 현재 코드는 집계 세션 PK를 복원하고 큰 세션의 선택적 묶음 비교를 유지한다.
+
+- [QueryProfile-2026-10-31.md](QueryProfile-2026-10-31.md): 현재 제품의 비용·토큰·요청·이름·도구·진단 SQL 중 가장 느린 조회와 실행 계획을 조사한다.
+- [QueryProfile-2026-10-31.json](QueryProfile-2026-10-31.json): 설치 DB 사본과 합성 1만·10만 요청에서 측정한 SQL·계획·원시 표본.
+- [QueryProfile-requests-without-costs-2026-10-31.json](QueryProfile-requests-without-costs-2026-10-31.json): 비용 제외 요청 목록의 기준·모델·토큰 정렬을 보완 측정한 결과.
+- [WriteProfile-2026-10-31.md](WriteProfile-2026-10-31.md): 통계 진입의 최초 적재·재진입·요청 추가/변경에서 INSERT·UPDATE·TEMP·COMMIT 비용을 분리한다.
+- [WriteProfile-2026-10-31.json](WriteProfile-2026-10-31.json): 실제 로그 사본과 합성 1만·10만 요청의 구간 표본·개별 SQL 누적/최대 실행 시간·직접 변경 행 수.
+- [WriteProfile-detail-fixed-2026-10-31.json](WriteProfile-detail-fixed-2026-10-31.json): 일회성 statement를 보관하지 않도록 계측기를 보완한 10만 요청 최초 적재의 최종 상세 SQL 시간.
+
+- [StorageTransactions-2026-10-31.md](StorageTransactions-2026-10-31.md): 갱신 목표에 맞춘 월 PK 철회와 저장 호출·쓰기 트랜잭션의 직접 비교.
+- [StorageTransactions-2026-10-31.json](StorageTransactions-2026-10-31.json): 같은 PK의 일괄/묶음 저장과 같은 저장 방식의 세션/월 PK를 교차 비교한 원시 결과.
+- [StorageTransactions-sources-2026-10-31.zip](StorageTransactions-sources-2026-10-31.zip): 후속 비교의 제품 소스·빌드 snapshot.
+
+- [StorageProduct-2026-10-31.md](StorageProduct-2026-10-31.md): 케이스별 시간·영속 공간·TEMP·WAL 트레이드오프와 구현 선택 근거.
+- [StorageProduct-final-2026-10-31.json](StorageProduct-final-2026-10-31.json): 최종 schema v15·세션/월 목록·1,000건 기준 선택적 묶음 비교의 완전한 제품 측정.
+- [StorageProduct-sources-2026-10-31.zip](StorageProduct-sources-2026-10-31.zip): 전후 제품 소스·빌드 snapshot. DB 사본·원본 로그는 포함하지 않는다.
+- [StorageProduct-month-2026-10-31.json](StorageProduct-month-2026-10-31.json): 최초 월 PK 적용의 제품 대조.
+- [StorageProduct-hybrid-2026-10-31.json](StorageProduct-hybrid-2026-10-31.json): 최초 월 PK와 300건 기준 묶음 비교. 세션 갱신 전체 스캔 회귀를 확인한 진단 결과.
+- [StorageProduct-candidate300-2026-10-31.json](StorageProduct-candidate300-2026-10-31.json): 월 prefix 삭제 보완 후 300건 임계값 후보를 평가한 결과.
+- [StorageProduct-preDirectory-2026-10-31.json](StorageProduct-preDirectory-2026-10-31.json): 1,000건 임계값을 적용했지만 세션·월 목록을 도입하기 전 결과. 세션 조회 회귀의 진단 근거.
+- [StorageProduct-directoryV1-2026-10-31.json](StorageProduct-directoryV1-2026-10-31.json): 세션 조회를 보완했지만 월 목록 갱신의 IN 조건이 넓은 범위를 읽던 중간 결과. 최종 구현은 작은 월 키부터 PK를 탐색한다.

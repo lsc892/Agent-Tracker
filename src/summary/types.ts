@@ -1,3 +1,4 @@
+// 통계 API의 설정·조회 결과와 제공자 공통 파싱 이벤트 타입을 정의한다.
 export type Provider = 'claude' | 'codex';
 export interface SourceRoot { provider: Provider; path: string; dataHome?: string }
 export interface SummaryOptions {
@@ -34,8 +35,6 @@ export interface UsageQuery {
   afterId?: number;
   chartMetric?: import('./db/types').ChartMetric;
   chartBy?: 'provider' | 'model';
-  cumulativeBy?: 'provider' | 'model';
-  cumulativeOffset?: number;
 }
 export interface NameQuery {
   kind: 'project' | 'session';
@@ -81,7 +80,6 @@ export interface UsageResult {
   total: number;
   coverage: import('./db/types').DiagnosticsPage['counts'];
   chart?: import('./db/types').UsageChart;
-  cumulative?: { rows: import('./db/types').CumulativeRow[]; total: number; by: 'provider' | 'model' };
 }
 export type DiagnosticsResult = import('./db/types').DiagnosticsPage & { lastRefresh?: RefreshResult };
 export interface TokenVector {

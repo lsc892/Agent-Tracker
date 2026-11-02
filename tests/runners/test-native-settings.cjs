@@ -1,3 +1,4 @@
+// 언어별 VS Code 테스트 호스트를 준비해 기본 설정 화면 검증을 실행한다.
 const { mkdir, mkdtemp, writeFile, copyFile } = require('node:fs/promises');
 const { existsSync } = require('node:fs');
 const { join, resolve } = require('node:path');

@@ -7,8 +7,8 @@
   "manifest.configureColor": "Agent Tracker：ステータスバーの色を選択",
   "manifest.clearData": "Agent Tracker：統計計算データを削除",
   "manifest.languageCategory": "言語",
-  "manifest.languageAuto": "VS Code の表示言語に従う",
   "manifest.languageDescription": "拡張機能の表示言語を選択します。既定では VS Code の表示言語に従います。未対応言語と不足する翻訳は韓国語を使います。コマンドパレットと VS Code 設定の説明は VS Code の表示言語に従います。",
+  "manifest.languageAuto": "VS Code の表示言語に従う",
   "manifest.tracking": "追跡と更新",
   "manifest.claudeEnabled": "Claude Code を追跡します。オフにすると使用量の取得と元のログの収集を停止し、統計から非表示にします。既存の計算データは保持されます。",
   "manifest.codexEnabled": "Codex を追跡します。オフにすると使用量の取得と元のログの収集を停止し、統計から非表示にします。既存の計算データは保持されます。",
@@ -49,6 +49,6 @@
   "manifest.data": "データとログ",
   "manifest.dataHome": "Claude と Codex データの共通親フォルダーです。配下の `.claude` と `.codex` を使います。デフォルトの `~` はユーザーホームです。ユーザー設定で全体に指定し、すべてのワークスペースの使用量取得・統計・Claude ログ保持期間に適用します。",
   "manifest.cleanupDays": "Claude Code 会話ログの自動削除期間（日）です。1以上の値を指定すると Claude データホームの `settings.json` に `cleanupPeriodDays` を反映します。`null` は既存設定を保持し、Claude の既定値は30日です。起動時に Claude Code が削除し、削除済みのログは復元できません。",
-  "manifest.codexExecutable": "Codex CLI 実行ファイルのパスまたは PATH コマンドです。",
-  "manifest.retainDeletedSourceUsage": "既知のモデルに実際のトークン使用量があり、有効なセッションに紐づくリクエストは、元ファイルの削除後も集計をDBに保持します。時間の欠落、品質警告、リクエスト失敗、再解析エラーがあっても保持します。一部の元ファイルがない間は既存リクエストの最後の集計を維持し、新規リクエストの収集は継続します。オフにすると次回の統計更新時に削除を反映します。[使用量データを削除](command:agentTracker.clearUsageData)は保持した履歴も削除します。"
+  "manifest.retainDeletedSourceUsage": "既知のモデルに実際のトークン使用量があり、有効なセッションに紐づくリクエストは、元ファイルの削除後も集計をDBに保持します。時間の欠落、品質警告、リクエスト失敗、再解析エラーがあっても保持します。一部の元ファイルがない間は既存リクエストの最後の集計を維持し、新規リクエストの収集は継続します。オフにすると次回の統計更新時に削除を反映します。[使用量データを削除](command:agentTracker.clearUsageData)は保持した履歴も削除します。",
+  "manifest.codexExecutable": "Codex CLI 実行ファイルのパスまたは PATH コマンドです。"
 }

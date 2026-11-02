@@ -1,5 +1,6 @@
+// 로그 파싱 결과와 세션 연결 관계를 임시 저장해 요청별 집계 후보를 만든다.
 import type { DatabaseSync, StatementSync } from 'node:sqlite';
-import type { FileMetadata, TurnSummaryInput, ModelUsageInput, CapabilityUsageInput } from './db/types';
+import type { FileMetadata, ManifestRow, TurnSummaryInput, ModelUsageInput, CapabilityUsageInput } from './db/types';
 import type { ParsedIdentity, ParseEvent, Provider } from './types';
 
 export interface StagedFile extends FileMetadata {
@@ -18,7 +19,39 @@ export interface StagedFile extends FileMetadata {
   forked_from_id: string | null;
 }
 
-/** All corpus-sized work lives in SQLite's file-backed TEMP store. */
+interface PreparedTurn {
+  cursor: number; provider: Provider; session_id: string; root_id: string;
+  started: number | null; completed_at: number | null; last_assistant: number | null; completed: number;
+  explicit_duration: number | null; lifecycle: number; file_id: number; byte_offset: number; has_main: number;
+  latest_status: TurnSummaryInput['status'] | null; latest_status_at: number | null;
+  latest_status_quality: TurnSummaryInput['duration_quality'] | null;
+  project_key: string; project_name: string; input_tokens: number; output_tokens: number;
+  billing: import('./db/types').BillingMode; cache_read_input_tokens: number; cache_write_input_tokens: number;
+  flags: string | null; request_title: string | null;
+}
+
+function summaryTiming(row: PreparedTurn): {
+  status: TurnSummaryInput['status']; completedAt: number | null;
+  duration: number | null; quality: TurnSummaryInput['duration_quality'];
+} {
+  const status = row.latest_status ?? (row.completed ? 'completed' : 'in_progress');
+  let completedAt: number | null = null;
+  if (status !== 'in_progress') completedAt = row.latest_status !== null ? row.latest_status_at : row.completed_at;
+  if (status !== 'in_progress' && row.explicit_duration !== null) {
+    return { status, completedAt, duration: row.explicit_duration, quality: 'exact' };
+  }
+  if (row.started !== null && completedAt !== null && completedAt >= row.started) {
+    const lifecycle = row.latest_status !== null ? row.latest_status_quality === 'derived' : row.lifecycle;
+    return { status, completedAt, duration: completedAt - row.started,
+      quality: status === 'completed' && lifecycle ? 'derived' : 'approximate' };
+  }
+  if (status === 'completed' && row.started !== null && row.last_assistant !== null && row.last_assistant >= row.started) {
+    return { status, completedAt, duration: row.last_assistant - row.started, quality: 'approximate' };
+  }
+  return { status, completedAt, duration: null, quality: 'missing' };
+}
+
+/** SQLite 임시 테이블에서 파싱 이벤트·세션 계보·중복 제거·집계 후보를 관리한다. */
 export class SummaryStaging {
   private readonly insertEvent: StatementSync;
   private readonly insertFlag: StatementSync;
@@ -29,6 +62,7 @@ export class SummaryStaging {
         id INTEGER PRIMARY KEY, provider TEXT NOT NULL, source_root TEXT NOT NULL, path TEXT NOT NULL,
         session_id TEXT, old_session TEXT, size_bytes INTEGER NOT NULL, mtime_ms REAL NOT NULL,
         dev TEXT, inode TEXT, parser_version INTEGER NOT NULL, capabilities_collected INTEGER NOT NULL, changed INTEGER NOT NULL,
+        source_identity TEXT, content_hash TEXT, reconnection_checked INTEGER NOT NULL DEFAULT 0,
         parsed INTEGER NOT NULL DEFAULT 0, removed INTEGER NOT NULL DEFAULT 0, failed INTEGER NOT NULL DEFAULT 0,
         settled INTEGER NOT NULL DEFAULT 0,
         project_key TEXT, project_name TEXT, session_name TEXT, thread_id TEXT, parent_thread_id TEXT, forked_from_id TEXT, is_main INTEGER DEFAULT 1
@@ -36,6 +70,8 @@ export class SummaryStaging {
       CREATE INDEX temp.scan_session ON scan_files(provider,session_id,id);
       CREATE INDEX temp.scan_old_session ON scan_files(provider,old_session,id);
       CREATE INDEX temp.scan_thread ON scan_files(provider,thread_id);
+      CREATE INDEX temp.scan_source ON scan_files(provider,source_identity);
+      CREATE TEMP TABLE source_reconnections(old_id INTEGER PRIMARY KEY,new_id INTEGER NOT NULL);
       CREATE TEMP TABLE affected(provider TEXT NOT NULL, session_id TEXT NOT NULL, PRIMARY KEY(provider,session_id));
       CREATE TEMP TABLE links(provider TEXT NOT NULL, a TEXT NOT NULL,b TEXT NOT NULL, PRIMARY KEY(provider,a,b));
       CREATE TEMP TABLE component(provider TEXT NOT NULL,session_id TEXT NOT NULL,PRIMARY KEY(provider,session_id));
@@ -65,9 +101,11 @@ export class SummaryStaging {
 
   addFile(file: FileMetadata & { id: number }, oldSession: string | null, changed: boolean, removed = false): void {
     this.connection.prepare(`INSERT OR REPLACE INTO scan_files
-      (id,provider,source_root,path,session_id,old_session,size_bytes,mtime_ms,dev,inode,parser_version,capabilities_collected,changed,removed)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(file.id,file.provider,file.source_root,file.path,file.session_id,oldSession,
-      file.size_bytes,file.mtime_ms,file.dev,file.inode,file.parser_version,Number(this.collectCapabilities),Number(changed),Number(removed));
+      (id,provider,source_root,path,session_id,old_session,size_bytes,mtime_ms,dev,inode,parser_version,capabilities_collected,changed,removed,
+        source_identity,content_hash)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(file.id,file.provider,file.source_root,file.path,file.session_id,oldSession,
+      file.size_bytes,file.mtime_ms,file.dev,file.inode,file.parser_version,Number(this.collectCapabilities),Number(changed),Number(removed),
+      file.source_identity ?? null,file.content_hash ?? null);
     if (changed && oldSession) this.affect(file.provider,oldSession);
   }
   affect(provider: Provider, session: string): void {
@@ -101,7 +139,10 @@ export class SummaryStaging {
       capability?.category ?? null,capability?.name ?? null,capability?.eventId ?? null,turn?.title ?? null);
     if ('flags' in event) for (const flag of event.flags ?? []) this.flag(fileId,event.rootId,flag);
   }
-  /** A bounded synchronous TEMP-only transaction; persistent tables and file I/O stay outside. */
+  /**
+   * 책임: 청크 하나의 파싱 결과를 적은 트랜잭션 비용으로 적재한다.
+   * 알고리즘: 동기 파싱 콜백의 TEMP 쓰기만 DEFERRED 트랜잭션으로 묶고 오류 시 롤백하며 파일 I/O와 영속 쓰기는 밖에서 수행한다.
+   */
   batchEvents(parseRows: () => void): void {
     this.connection.exec('BEGIN DEFERRED');
     try { parseRows();this.connection.exec('COMMIT'); }
@@ -111,6 +152,37 @@ export class SummaryStaging {
     this.insertFlag.run(fileId,root,flag);
   }
   fail(fileId: number): void { this.connection.prepare('UPDATE scan_files SET failed=1 WHERE id=?').run(fileId); }
+
+  acceptFingerprint(fileId: number, identity: string | null, hash: string | null): void {
+    this.connection.prepare('UPDATE scan_files SET source_identity=?,content_hash=? WHERE id=?').run(identity,hash,fileId);
+  }
+
+  /** Page accepted snapshots of the same source, excluding paths already observed in this scan. */
+  *moveCandidates(file: StagedFile, scanId: string): Generator<ManifestRow> {
+    let after = 0;
+    const query = this.connection.prepare(`SELECT m.* FROM manifest m WHERE m.provider=? AND m.source_identity=? AND m.id>?
+      AND m.id<>? AND m.session_id IS NOT NULL AND m.content_hash IS NOT NULL AND m.size_bytes>0 AND m.size_bytes<=?
+      AND (m.last_seen_scan_id IS NULL OR m.last_seen_scan_id<>?)
+      AND NOT EXISTS(SELECT 1 FROM source_reconnections r WHERE r.old_id=m.id) ORDER BY m.id LIMIT 100`);
+    while (true) {
+      const rows = query.all(file.provider,file.source_identity!,after,file.id,file.size_bytes,scanId) as unknown as ManifestRow[];
+      if (!rows.length) return;
+      for (const row of rows) { after=row.id;yield row; }
+    }
+  }
+
+  reconnectSource(previous: ManifestRow, current: StagedFile): void {
+    this.addFile(previous,previous.session_id,true,true);
+    this.connection.prepare('INSERT INTO source_reconnections VALUES (?,?)').run(previous.id,current.id);
+    if (previous.session_id !== current.session_id) {
+      this.connection.prepare('INSERT OR IGNORE INTO links VALUES (?,?,?)').run(current.provider,previous.session_id,current.session_id);
+    }
+  }
+
+  reconnectedFiles(): Iterable<{old_id:number;new_id:number}> {
+    return this.connection.prepare(`SELECT r.old_id,r.new_id FROM source_reconnections r JOIN scan_files f ON f.id=r.old_id
+      JOIN component c ON c.provider=f.provider AND c.session_id=f.old_session`).iterate() as unknown as Iterable<{old_id:number;new_id:number}>;
+  }
 
   *files(sql: string, parameters: (string | number)[] = []): Generator<StagedFile> {
     let after = 0;
@@ -122,6 +194,10 @@ export class SummaryStaging {
     }
   }
 
+  /**
+   * 책임: 함께 교체해야 하는 이전·현재 세션의 묶음을 선택한다.
+   * 알고리즘: 영향받은 첫 세션에서 시작해 재귀 CTE로 links의 양방향 연결 성분을 찾아 component 테이블에 저장한다.
+   */
   nextComponent(): boolean {
     this.connection.exec('DELETE FROM component');
     const first = this.connection.prepare('SELECT provider,session_id FROM affected ORDER BY provider,session_id LIMIT 1').get() as {provider:string;session_id:string}|undefined;
@@ -149,33 +225,89 @@ export class SummaryStaging {
     return this.connection.prepare('SELECT provider,session_id FROM component').iterate() as unknown as Iterable<{provider:Provider;session_id:string}>;
   }
 
-  /** Resolve descendant thread trees on disk, after provider metadata has been parsed. */
+  /**
+   * 책임: 파싱한 부모·자식 thread를 같은 논리 세션으로 연결한다.
+   * 알고리즘: TEMP 방문 상태·스택으로 부모를 먼저 해소하고 같은 최종 세션의 부모 후보만 채택하며, 순환 경로는 재배정하지 않는다.
+   */
   resolveLineage(): void {
-    for (let pass = 0; pass < 128; pass++) {
-      this.connection.exec(`DROP TABLE IF EXISTS temp.lineage;
-        CREATE TEMP TABLE lineage AS SELECT f.id,f.provider,f.session_id previous,min(p.session_id) target
-        FROM scan_files f JOIN scan_files p ON p.provider=f.provider AND p.thread_id=f.parent_thread_id
-        WHERE f.provider='codex' AND f.removed=0 AND p.removed=0 AND p.failed=0 AND p.parsed=1
-        GROUP BY f.id HAVING count(DISTINCT p.session_id)=1 AND target<>f.session_id;
-        INSERT OR IGNORE INTO affected SELECT provider,target FROM lineage;
-        INSERT OR IGNORE INTO affected SELECT provider,previous FROM lineage;
-        INSERT OR IGNORE INTO links SELECT provider,previous,target FROM lineage;
-        UPDATE scan_files SET session_id=(SELECT target FROM lineage WHERE lineage.id=scan_files.id)
-          WHERE id IN (SELECT id FROM lineage);`);
-      const changed = this.connection.prepare('SELECT count(*) count FROM lineage').get() as {count:number};
-      if (!changed.count) break;
-      if (pass === 127) {
-        this.connection.exec(`INSERT OR IGNORE INTO flags SELECT id,'*','missing-parent-agent' FROM scan_files WHERE parent_thread_id IS NOT NULL`);
+    this.connection.exec(`CREATE TEMP TABLE lineage (
+        id INTEGER PRIMARY KEY,previous TEXT NOT NULL,target TEXT,state INTEGER NOT NULL,missing INTEGER NOT NULL
+      );
+      CREATE INDEX temp.lineage_state ON lineage(state,id);
+      CREATE TEMP TABLE lineage_stack (
+        depth INTEGER PRIMARY KEY,file_id INTEGER NOT NULL,last_parent INTEGER NOT NULL DEFAULT 0,
+        target TEXT,ambiguous INTEGER NOT NULL DEFAULT 0,blocked INTEGER NOT NULL DEFAULT 0
+      );
+      INSERT INTO lineage
+        SELECT id,session_id,CASE WHEN terminal THEN session_id END,CASE WHEN terminal THEN 2 ELSE 0 END,
+          parent_thread_id IS NOT NULL AND terminal
+        FROM (SELECT f.*,parent_thread_id IS NULL OR NOT EXISTS(
+          SELECT 1 FROM scan_files p WHERE p.provider='codex' AND p.thread_id=f.parent_thread_id
+            AND p.parsed=1 AND p.removed=0 AND p.failed=0) terminal
+          FROM scan_files f WHERE f.provider='codex' AND f.removed=0 AND f.thread_id IS NOT NULL AND f.session_id IS NOT NULL);
+      WITH ready AS MATERIALIZED (
+        SELECT child.id,CASE WHEN count(DISTINCT parent.target)=1 THEN min(parent.target) ELSE child.previous END target
+        FROM lineage child JOIN scan_files f ON f.id=child.id
+        JOIN scan_files p ON p.provider='codex' AND p.thread_id=f.parent_thread_id
+          AND p.parsed=1 AND p.removed=0 AND p.failed=0
+        JOIN lineage parent ON parent.id=p.id WHERE child.state=0
+        GROUP BY child.id HAVING min(parent.state)=2
+      ) UPDATE lineage SET state=2,target=ready.target FROM ready WHERE lineage.id=ready.id;`);
+    const nextFile = this.connection.prepare('SELECT id FROM lineage WHERE state=0 ORDER BY id LIMIT 1');
+    const visit = this.connection.prepare('UPDATE lineage SET state=1 WHERE id=?');
+    const push = this.connection.prepare('INSERT INTO lineage_stack(file_id) VALUES (?)');
+    const top = this.connection.prepare(`SELECT s.*,f.parent_thread_id,l.previous FROM lineage_stack s
+      JOIN scan_files f ON f.id=s.file_id JOIN lineage l ON l.id=s.file_id ORDER BY depth DESC LIMIT 1`);
+    const parent = this.connection.prepare(`SELECT l.id,l.state,l.target FROM scan_files p JOIN lineage l ON l.id=p.id
+      WHERE p.provider='codex' AND p.thread_id=? AND p.parsed=1 AND p.removed=0 AND p.failed=0 AND p.id>?
+      ORDER BY p.id LIMIT 1`);
+    const advance = this.connection.prepare(`UPDATE lineage_stack SET last_parent=?,target=?,ambiguous=?,blocked=? WHERE depth=?`);
+    const finish = this.connection.prepare('UPDATE lineage SET state=2,target=? WHERE id=?');
+    const pop = this.connection.prepare('DELETE FROM lineage_stack WHERE depth=?');
+    while (true) {
+      const next = nextFile.get() as {id:number}|undefined;
+      if (!next) break;
+      visit.run(next.id);push.run(next.id);
+      while (true) {
+        const frame = top.get() as {depth:number;file_id:number;last_parent:number;target:string|null;
+          ambiguous:number;blocked:number;parent_thread_id:string;previous:string}|undefined;
+        if (!frame) break;
+        const candidate = parent.get(frame.parent_thread_id,frame.last_parent) as {id:number;state:number;target:string|null}|undefined;
+        if (candidate?.state === 0) {
+          visit.run(candidate.id);push.run(candidate.id);
+          continue;
+        }
+        if (candidate) {
+          // A visiting parent is a back edge. Its cycle and dependent path must keep their own identities.
+          advance.run(candidate.id,frame.target ?? candidate.target,
+            Number(Boolean(frame.ambiguous || frame.target !== null && candidate.target !== null && frame.target !== candidate.target)),
+            Number(Boolean(frame.blocked || candidate.state === 1 || candidate.target === null)),frame.depth);
+          continue;
+        }
+        // A missing/ambiguous ancestor still has a known metadata session for descendants to use.
+        let target = frame.ambiguous ? frame.previous : frame.target;
+        if (frame.blocked) target = null;
+        finish.run(target,frame.file_id);
+        pop.run(frame.depth);
       }
     }
-    this.connection.exec(`DROP TABLE IF EXISTS temp.lineage;
+    this.connection.exec(`INSERT OR IGNORE INTO affected SELECT 'codex',target FROM lineage WHERE target<>previous;
+      INSERT OR IGNORE INTO affected SELECT 'codex',previous FROM lineage WHERE target<>previous;
+      INSERT OR IGNORE INTO links SELECT 'codex',previous,target FROM lineage WHERE target<>previous;
+      UPDATE scan_files SET session_id=(SELECT target FROM lineage WHERE lineage.id=scan_files.id)
+        WHERE id IN(SELECT id FROM lineage WHERE target<>previous);
+      DELETE FROM flags WHERE flag='missing-parent-agent';
+      INSERT OR IGNORE INTO flags SELECT l.id,'*','missing-parent-agent' FROM lineage l JOIN scan_files f ON f.id=l.id
+        WHERE f.parent_thread_id IS NOT NULL AND f.parsed=1 AND (l.missing=1 OR l.target IS NULL);
+      DROP TABLE lineage_stack;DROP TABLE lineage;
       DELETE FROM events WHERE schema_kind='legacy' AND file_id IN (SELECT file_id FROM events WHERE schema_kind='current');
-      INSERT OR IGNORE INTO flags SELECT f.id,'*','missing-parent-agent' FROM scan_files f
-        WHERE f.provider='codex' AND f.parent_thread_id IS NOT NULL AND f.parsed=1
-        AND NOT EXISTS(SELECT 1 FROM scan_files p WHERE p.provider=f.provider AND p.thread_id=f.parent_thread_id AND p.parsed=1 AND p.removed=0);`);
+    `);
   }
 
-  /** Only identical, ordered legacy events from a referenced parent constitute an inherited prefix. */
+  /**
+   * 책임: fork에 복사된 과거 사용량을 중복 집계에서 제외한다.
+   * 알고리즘: 참조된 부모와 자식의 legacy 이벤트를 순서대로 비교해 동일한 연속 접두사만 확인하고 대응하는 토큰·도구 이벤트를 제거한다.
+   */
   excludeVerifiedPrefixes(): void {
     this.connection.exec('CREATE TEMP TABLE IF NOT EXISTS inherited(event_id INTEGER PRIMARY KEY,parent_event_id INTEGER NOT NULL); DELETE FROM inherited;');
     for (const file of this.files("provider='codex' AND parsed=1 AND removed=0 AND failed=0 AND (forked_from_id IS NOT NULL OR parent_thread_id IS NOT NULL)")) {
@@ -216,7 +348,10 @@ export class SummaryStaging {
       DROP TABLE inherited_roots; DROP TABLE inherited;`);
   }
 
-  /** Window functions select whole response vectors, never independent component maxima. */
+  /**
+   * 책임: 연결 성분의 중복 응답을 정리해 요청별 집계 후보를 만든다.
+   * 알고리즘: 윈도 함수로 응답별 전체 토큰 벡터 하나와 최신 요청 상태를 고르고 주 요청·subagent 사용량을 합쳐 prepared_turns에 저장한다.
+   */
   prepareSummaries(): void {
     this.connection.exec(`
       DROP TABLE IF EXISTS temp.component_events;
@@ -300,6 +435,10 @@ export class SummaryStaging {
     `);
   }
 
+  /**
+   * 책임: 집계 후보를 저장용 요청 요약으로 변환한다.
+   * 알고리즘: rowid 기준 100행씩 읽고 명시 duration·수명주기 차이·마지막 응답 시각 순으로 시간을 결정하며 품질 플래그와 모델별 내역을 연결한다.
+   */
   *summaries(): Generator<TurnSummaryInput> {
     let after = 0;
     const sessionName = this.connection.prepare(`SELECT coalesce(
@@ -310,23 +449,9 @@ export class SummaryStaging {
       const rows = this.connection.prepare('SELECT rowid AS cursor,* FROM prepared_turns WHERE rowid>? ORDER BY rowid LIMIT 100').all(after);
       if (!rows.length) return;
       for (const raw of rows) {
-        const row = raw as unknown as {cursor:number;provider:Provider;session_id:string;root_id:string;started:number|null;completed_at:number|null;
-          last_assistant:number|null;completed:number;explicit_duration:number|null;lifecycle:number;file_id:number;byte_offset:number;has_main:number;
-          latest_status:TurnSummaryInput['status']|null;latest_status_at:number|null;latest_status_quality:TurnSummaryInput['duration_quality']|null;
-          project_key:string;project_name:string;input_tokens:number;output_tokens:number;billing:import('./db/types').BillingMode;
-          cache_read_input_tokens:number;cache_write_input_tokens:number;flags:string|null;request_title:string|null};
+        const row = raw as unknown as PreparedTurn;
         after = row.cursor;
-        let duration: number | null = null;
-        let quality: TurnSummaryInput['duration_quality'] = 'missing';
-        const status = row.latest_status ?? (row.completed ? 'completed' : 'in_progress');
-        const completedAt = status === 'in_progress' ? null : row.latest_status !== null ? row.latest_status_at : row.completed_at;
-        if (status !== 'in_progress' && row.explicit_duration !== null) { duration = row.explicit_duration; quality = 'exact'; }
-        else if (row.started !== null && completedAt !== null && completedAt >= row.started) {
-          const lifecycle = row.latest_status !== null ? row.latest_status_quality === 'derived' : row.lifecycle;
-          duration = completedAt - row.started; quality = status === 'completed' && lifecycle ? 'derived' : 'approximate';
-        } else if (status === 'completed' && row.started !== null && row.last_assistant !== null && row.last_assistant >= row.started) {
-          duration = row.last_assistant - row.started; quality = 'approximate';
-        }
+        const { status, completedAt, duration, quality } = summaryTiming(row);
         const flags = new Set((row.flags ?? '').split(',').filter(Boolean));
         if (quality === 'missing') flags.add('duration-missing');
         if (quality === 'approximate') flags.add('duration-approximate');
@@ -366,8 +491,9 @@ export class SummaryStaging {
   }
 
   close(): void {
-    this.connection.exec(`DROP TABLE IF EXISTS temp.prepared_turns; DROP TABLE IF EXISTS temp.winners; DROP TABLE IF EXISTS temp.capability_winners; DROP TABLE IF EXISTS temp.component_events;
+    this.connection.exec(`DROP TABLE IF EXISTS temp.lineage_stack; DROP TABLE IF EXISTS temp.lineage;
+      DROP TABLE IF EXISTS temp.prepared_turns; DROP TABLE IF EXISTS temp.winners; DROP TABLE IF EXISTS temp.capability_winners; DROP TABLE IF EXISTS temp.component_events;
       DROP TABLE temp.flags; DROP TABLE temp.events; DROP TABLE temp.component; DROP TABLE temp.links;
-      DROP TABLE temp.affected; DROP TABLE temp.scan_files; DROP TABLE temp.session_names;`);
+      DROP TABLE temp.affected; DROP TABLE temp.scan_files; DROP TABLE temp.session_names; DROP TABLE temp.source_reconnections;`);
   }
 }

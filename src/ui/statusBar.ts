@@ -1,3 +1,4 @@
+// quota 상태를 VS Code 상태바 항목과 새로고침 버튼에 반영한다.
 import { t } from '../localization';
 import * as vscode from 'vscode';
 import type { TrackerConfiguration } from '../configuration';
@@ -7,9 +8,9 @@ import { createQuotaTooltip } from './quotaTooltip';
 import { statusForeground } from './colors';
 export { statusBarPresentation, remainingBar } from './statusBarPresentation';
 
-type StatusSettings = Pick<TrackerConfiguration, 'percentage' | 'detail' | 'claude' | 'codex' | 'usageEnabled' | 'colorMode' | 'customColor'>;
+type StatusSettings = Pick<TrackerConfiguration, 'display' | 'claude' | 'codex' | 'usage'>;
 
-/** One quota card with native click pinning, followed by its refresh button. */
+/** quota 상태바 항목·툴팁·새로고침 버튼과 남은 시간의 주기적 표시를 관리한다. */
 export class QuotaStatusBar implements vscode.Disposable {
   private readonly quota = vscode.window.createStatusBarItem('agentTracker.quota', vscode.StatusBarAlignment.Right, -1000);
   private readonly refresh = vscode.window.createStatusBarItem('agentTracker.refreshQuota', vscode.StatusBarAlignment.Right, -1001);
@@ -30,22 +31,26 @@ export class QuotaStatusBar implements vscode.Disposable {
     this.clock.unref();
   }
 
+  /**
+   * 책임: 현재 설정에 맞는 상태바 텍스트·quota 카드·새로고침 상태를 반영한다.
+   * 알고리즘: 활성·표시 설정으로 제공자를 선택해 순서대로 조합하고 공통 색상·접근성 설명·갱신 아이콘을 적용하며 표시 대상이 없으면 항목을 숨긴다.
+   */
   update(states: readonly QuotaState[], settings: StatusSettings): void {
     this.quota.name = t('status.name');
     this.refresh.name = t('status.refreshName');
     this.refresh.tooltip = t('status.refreshTooltip');
     this.refresh.accessibilityInformation = { label: t('status.refreshAccessible'), role: 'button' };
     this.latest = { states, settings };
-    const color = statusForeground(settings.colorMode, settings.customColor);
+    const color = statusForeground(settings.display.colorMode, settings.display.customColor);
     this.quota.color = color;
     this.refresh.color = color;
     const tracked = states.filter(state => settings[state.provider].enabled);
     const visible = ['claude', 'codex'].flatMap(provider => tracked.filter(state => state.provider === provider && (state.provider === 'claude' || settings.codex.showStatusBar)));
-    const views = visible.map(state => statusBarPresentation(state, settings.percentage, settings.detail));
+    const views = visible.map(state => statusBarPresentation(state, settings.display.percentage, settings.display.detail));
     this.quota.text = views.map(view => view.text).join('  │  ');
     this.quota.tooltip = createQuotaTooltip(tracked, settings);
-    // The renderer uses this plain-text preview for automatic hover; the Markdown
-    // tooltip remains the full quota UI opened by the native click toggle.
+    // Mouse hover and the native click toggle share the Markdown card above.
+    // Keep the plain-text quota summary available to screen readers.
     this.quota.accessibilityInformation = { label: quotaHoverSummary(tracked), role: 'button' };
     this.refresh.text = tracked.some(state => state.refreshing) ? '$(sync~spin)' : '$(refresh)';
     if (visible.length) {

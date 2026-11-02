@@ -37,3 +37,11 @@ not log in to either provider. The optional workbench click-toggle patch is a
 separate local setup step documented in the repository.
 
 Source and full documentation: [Agent Tracker](https://github.com/lsc892/Agent-Tracker).
+
+## 소스 역할
+
+VSIX를 동봉한 npm 설치 CLI와 공개 패키지 구성을 관리한다.
+
+- [cli.cjs](cli.cjs) — 동봉 VSIX의 무결성을 확인해 VS Code에 설치하고 설치 버전을 검증한다.
+- [manifest.json](manifest.json) — 공개 npm 설치 패키지의 이름·실행 명령·포함 파일 기본값을 정의한다.
+- [package.cjs](package.cjs) — 현재 VSIX와 설치 CLI를 검증된 파일 목록의 공개 npm 패키지로 구성한다.

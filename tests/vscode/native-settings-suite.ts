@@ -1,3 +1,4 @@
+// 실제 VS Code의 설정 번역과 기본 설정 편집기 열기를 검증한다.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';

@@ -1,3 +1,4 @@
+// 제목 인덱스 트랜잭션 벤치마크의 실제 갱신·전후 대조·보고를 검증한다.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
@@ -12,7 +13,7 @@ test('transaction benchmark measures the actual refresh and verifies before/afte
     const report = join(directory, 'report.md');
     await promisify(execFile)(process.execPath, [resolve(__dirname, '../../../tests/benchmarks/summary-transactions.cjs'),
       '--pairs', '1', '--report', report], { timeout:60000, windowsHide:true });
-    const lines = (await readFile(join(directory, 'benchmarks/report.jsonl'), 'utf8')).trim().split('\n')
+    const lines = (await readFile(join(directory, 'report.jsonl'), 'utf8')).trim().split('\n')
       .map(line => JSON.parse(line));
     assert.equal(lines[0].input, 'fixture');
     assert.equal(lines[0].inventory[0].files, 1);

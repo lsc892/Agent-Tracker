@@ -1,0 +1,2090 @@
+{
+  "createdAtSeoul": "2026-10-31 17:15:37",
+  "environment": {
+    "node": "v24.19.0",
+    "cpu": "Intel(R) Core(TM) i5-8250U CPU @ 1.60GHz",
+    "platform": "win32",
+    "sqlite": "3.53.3",
+    "sourceSha256": {
+      "dist/src/summary/db/queries.js": "b2371822278676139857f1704e74bf19f05848c9af8c5cfd0528b068a24e6473",
+      "dist/src/summary/db/queries/common/filters.js": "34dbcbcdc3db48610300756341bfca636957081100c9e1a98fbaf9c607393e27",
+      "dist/src/summary/db/queries/common/sorting.js": "78f4d900954fc8d1042b6d92277479a5235b6e8c059f10546a3c261e9e1eeab7",
+      "dist/src/summary/db/queries/common/types.js": "b0d2bc4142d0c62d43f996aaeb64f22c4889ac853f8a3765758b505d972d0149",
+      "dist/src/summary/db/queries/raw/capabilities.js": "17f9445a4b29de38186b65cfef2312b66c974311cb0d6e3b37360fdd9e9af2eb",
+      "dist/src/summary/db/queries/raw/diagnostics.js": "1188d828a9f6489f0c38fb8d37a39029ad5bbed80747fab67149a6c7b1e65a4f",
+      "dist/src/summary/db/queries/raw/names.js": "b6b2379aac9fad1d91b19130cddd25a08706ab99c9bf66c6a27e19de76ec9f7f",
+      "dist/src/summary/db/queries/raw/source.js": "d4cfb8de86635eca7328841b00dfbb7904f5fcf7af7ddb747e7197d31658fce6",
+      "dist/src/summary/db/queries/raw/turns.js": "5672efb611e02a964f1f9fcfda875a3f3ae5d99e7e3f2d42c50215545e7f65ce",
+      "dist/src/summary/db/queries/raw/usage.js": "e175467bb919f7c9f3730e65e40242696bc3c6630dbe9b9fc4da51f27ea7385b",
+      "dist/src/summary/db/queries/rollup/metrics.js": "a319799b77e20cbeeabfbd6b11ae22a86de8ef7129037945fb10205aec2e0d95",
+      "dist/src/summary/db/queries/rollup/source.js": "9c2f3d59a0d56b61293b1455585528379707a27cd74d5003fae282023b82988d",
+      "dist/src/summary/db/queries/rollup/usage.js": "7427f555ccfac3675f66483529a36c5ee07243dd3fa753ba7cea0dc8d1169b32",
+      "dist/src/summary/db/rollup-queries.js": "1dd5ef2c1f0fdf31bc7fa2b896f1b5434d4acbef690567af0e64636081ab937e",
+      "src/summary/db/queries.ts": "11ae07ef0dcf165955ad9b521756316a4b3a4ad73482158cea2da431df36019c",
+      "src/summary/db/queries/common/filters.ts": "8242430d32552807e68b35c9f63a9ee2966265627756c6c29bb0fb3cd202943a",
+      "src/summary/db/queries/common/sorting.ts": "63c9d899f83834012f761a4005ae16924566cea712aca9eb28d3220631bc4318",
+      "src/summary/db/queries/common/types.ts": "38d3fba70005de09f74396fe916c63a77cf7a4ead2c9f6b7a7509cf61150de6a",
+      "src/summary/db/queries/raw/capabilities.ts": "17d228205c1f7b7160401800dd75cfe51dfb86449b3d0006846a3a6c35b3e2fe",
+      "src/summary/db/queries/raw/diagnostics.ts": "70893e69eaf177d53663307abc87618c3c6ff5ebcacd12d50aab8d6521eb3178",
+      "src/summary/db/queries/raw/names.ts": "1f65ece88979e7fad5b8546557aa3460eb53c29a19b97302e0a2a1be2c98e260",
+      "src/summary/db/queries/raw/source.ts": "bd5167d8289839521467e186a582c4f94b54ad3fd5bf589c2863eb6978540a52",
+      "src/summary/db/queries/raw/turns.ts": "6bf0080ad017e6f0cdb2544112f0077a231fe80c10d3ed862cdddd3abafb89d5",
+      "src/summary/db/queries/raw/usage.ts": "57c6376cf0f44923050f460a946a8464b3b8f71aa3829b4279df37fbf4557531",
+      "src/summary/db/queries/rollup/metrics.ts": "1e23104b679a3d402364b4c6cdd1e1f1a2ace234a5ba9fb1f0a24cfd843f7e8b",
+      "src/summary/db/queries/rollup/source.ts": "764a8a01378fc4c1c43e979e3de61f747d13ba599596cd329cdc2b0820a3eed3",
+      "src/summary/db/queries/rollup/usage.ts": "3079a8537d1a0d1b811bfb600c6edcd3a0def4ee5fa926ae1113c9053140d4f6",
+      "src/summary/db/rollup-queries.ts": "8ce7602a597339dc64aa822af43c4fe7c388fd342bd83f4cd1dbab55040cf395",
+      "tests/benchmarks/query-source-files.cjs": "7f0906e6ef5b746e55c079496b0b8f26c36e0b08d6225cd038aa57c8afaab2b0",
+      "src/summary/db/reader.ts": "876f89a0034cac1d7361336aa714e322e25ac8b5dd8c4c93ea2ac233014e71de",
+      "src/summary/db/schema.ts": "3d265a956eec888fb6b5c05206fafdb92df23677c24904b440360a6d19de3870",
+      "src/summary/db/rollup-state.ts": "5520606d4da922b080686e602942e5e3c5ff4b4cd0d58db138209f1ad93f591f",
+      "tests/benchmarks/query-profile.cjs": "ee44b048e3e777153e41a9a5d2b9f4c298faa12a5ad9dff468788dc507ac4dab"
+    }
+  },
+  "method": {
+    "samples": 9,
+    "warmup": 2,
+    "limit": 100,
+    "offset": 0,
+    "timezone": "Asia/Seoul",
+    "cacheKiB": 4096,
+    "tempStore": "FILE",
+    "timing": "Prepared SQL execution and JS row materialization; separate full public API validation for five slowest pages. Warm cache, no OS cache reset.",
+    "statistics": "Product constructor optimize only; no forced ANALYZE.",
+    "scope": "Supplement: request detail SQL without costs (provider/model; period/tokens/model sorts).",
+    "synthetic": "Existing deterministic SQL fixture: 10 requests/session, 20 projects, 90-day spread; add cost, capability and manifest rows. Not a parsing benchmark."
+  },
+  "datasets": [
+    {
+      "label": "installed-snapshot",
+      "requests": 1030,
+      "modelRows": 924,
+      "sessions": 279,
+      "projects": 14,
+      "sourceFiles": 362,
+      "capabilityRows": 1350,
+      "costRows": 1030,
+      "requestDailyRows": 306,
+      "modelDailyRows": 366,
+      "rollupMetaBeforeFirstRead": {
+        "timezone": "Asia/Seoul",
+        "format_version": 1
+      },
+      "firstReadMs": 5.354500000000002,
+      "firstReadIncludesRollupBuild": false,
+      "queries": [
+        {
+          "name": "turns-provider-sort-period-no-costs",
+          "mode": "raw",
+          "resultSha256": "77d965d87d121766502eb768a12e625e51969e26929d5798fd3f90a25aded8a7",
+          "iterationsPerSample": 2,
+          "bundle": {
+            "medianMs": 4.724400000000003,
+            "minMs": 4.063149999999979,
+            "maxMs": 5.353900000000024,
+            "samplesMs": [
+              4.724400000000003,
+              4.063149999999979,
+              4.347700000000017,
+              4.743050000000011,
+              5.353900000000024,
+              4.752100000000027,
+              4.686550000000011,
+              4.327750000000009,
+              4.752350000000007
+            ]
+          },
+          "parts": [
+            {
+              "role": "rows",
+              "method": "all",
+              "sql": "SELECT\n        *,\n        (total_tokens > 0 OR has_model = 1) AS has_recorded_usage\n      FROM (\n    SELECT\n      t.*,\n      p.project_name,\n      s.session_name\n    FROM (\n    SELECT\n      t.*,\n      EXISTS(\n        SELECT 1\n        FROM turn_model_usage m\n        WHERE m.turn_id = t.id AND m.model <> ''\n      ) AS has_model\n    FROM turn_summary t\n  ) t\n    JOIN projects p ON p.project_key = t.project_key\n    JOIN sessions s ON s.provider = t.provider AND s.session_id = t.session_id\n  ) AS turn_summary\n      WHERE provider IN (?,?) AND id > ?\n      ORDER BY started_at_ms IS NULL, started_at_ms IS NULL, started_at_ms DESC, provider, id\n      LIMIT ?\n      OFFSET ?",
+              "parameters": [
+                "claude",
+                "codex",
+                0,
+                100,
+                0
+              ],
+              "timing": {
+                "medianMs": 4.629450000000006,
+                "minMs": 3.993499999999983,
+                "maxMs": 5.267450000000011,
+                "samplesMs": [
+                  4.629450000000006,
+                  3.993499999999983,
+                  4.266700000000014,
+                  4.641400000000004,
+                  5.267450000000011,
+                  4.676700000000025,
+                  4.610250000000008,
+                  4.25385,
+                  4.660750000000007
+                ]
+              },
+              "returnedRows": 100,
+              "plan": [
+                "SEARCH t USING INTEGER PRIMARY KEY (rowid>?)",
+                "SEARCH s USING PRIMARY KEY (provider=? AND session_id=?)",
+                "SEARCH p USING PRIMARY KEY (project_key=?)",
+                "CORRELATED SCALAR SUBQUERY 1",
+                "SEARCH m USING PRIMARY KEY (turn_id=?)",
+                "CORRELATED SCALAR SUBQUERY 1",
+                "SEARCH m USING PRIMARY KEY (turn_id=?)",
+                "USE TEMP B-TREE FOR ORDER BY"
+              ]
+            },
+            {
+              "role": "count",
+              "method": "get",
+              "sql": "SELECT COUNT(*) AS count\n      FROM (\n    SELECT\n      t.*,\n      EXISTS(\n        SELECT 1\n        FROM turn_model_usage m\n        WHERE m.turn_id = t.id AND m.model <> ''\n      ) AS has_model\n    FROM turn_summary t\n  ) AS turn_summary\n      WHERE provider IN (?,?)",
+              "parameters": [
+                "claude",
+                "codex"
+              ],
+              "timing": {
+                "medianMs": 0.08100000000000307,
+                "minMs": 0.06964999999999577,
+                "maxMs": 0.10165000000000646,
+                "samplesMs": [
+                  0.0949499999999972,
+                  0.06964999999999577,
+                  0.08100000000000307,
+                  0.10165000000000646,
+                  0.08645000000001346,
+                  0.07540000000000191,
+                  0.07630000000000337,
+                  0.07390000000000896,
+                  0.09159999999999968
+                ]
+              },
+              "returnedRows": 1,
+              "plan": [
+                "SEARCH t USING COVERING INDEX idx_summary_project_period (provider=?)"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "turns-provider-sort-tokens-no-costs",
+          "mode": "raw",
+          "resultSha256": "ea2c41486d0496e05fb1c7798e32f5204700f6fcf40b0a513fd6fa784ea309c5",
+          "iterationsPerSample": 2,
+          "bundle": {
+            "medianMs": 2.677750000000003,
+            "minMs": 2.4080500000000313,
+            "maxMs": 2.969149999999985,
+            "samplesMs": [
+              2.52090000000004,
+              2.6787499999999795,
+              2.969149999999985,
+              2.4551999999999907,
+              2.7799499999999853,
+              2.489250000000027,
+              2.4080500000000313,
+              2.7404999999999973,
+              2.677750000000003
+            ]
+          },
+          "parts": [
+            {
+              "role": "rows",
+              "method": "all",
+              "sql": "SELECT\n        *,\n        (total_tokens > 0 OR has_model = 1) AS has_recorded_usage\n      FROM (\n    SELECT\n      t.*,\n      p.project_name,\n      s.session_name\n    FROM (\n    SELECT\n      t.*,\n      EXISTS(\n        SELECT 1\n        FROM turn_model_usage m\n        WHERE m.turn_id = t.id AND m.model <> ''\n      ) AS has_model\n    FROM turn_summary t\n  ) t\n    JOIN projects p ON p.project_key = t.project_key\n    JOIN sessions s ON s.provider = t.provider AND s.session_id = t.session_id\n  ) AS turn_summary\n      WHERE provider IN (?,?) AND id > ?\n      ORDER BY started_at_ms IS NULL, total_tokens IS NULL, total_tokens DESC, started_at_ms IS NULL, started_at_ms DESC, provider, id\n      LIMIT ?\n      OFFSET ?",
+              "parameters": [
+                "claude",
+                "codex",
+                0,
+                100,
+                0
+              ],
+              "timing": {
+                "medianMs": 2.5716500000000053,
+                "minMs": 2.3503000000000043,
+                "maxMs": 2.8912500000000136,
+                "samplesMs": [
+                  2.4570500000000095,
+                  2.5716500000000053,
+                  2.8912500000000136,
+                  2.3769000000000062,
+                  2.7039999999999793,
+                  2.4189500000000237,
+                  2.3503000000000043,
+                  2.649199999999979,
+                  2.6141999999999825
+                ]
+              },
+              "returnedRows": 100,
+              "plan": [
+                "SEARCH t USING INTEGER PRIMARY KEY (rowid>?)",
+                "SEARCH s USING PRIMARY KEY (provider=? AND session_id=?)",
+                "SEARCH p USING PRIMARY KEY (project_key=?)",
+                "CORRELATED SCALAR SUBQUERY 1",
+                "SEARCH m USING PRIMARY KEY (turn_id=?)",
+                "CORRELATED SCALAR SUBQUERY 1",
+                "SEARCH m USING PRIMARY KEY (turn_id=?)",
+                "USE TEMP B-TREE FOR ORDER BY"
+              ]
+            },
+            {
+              "role": "count",
+              "method": "get",
+              "sql": "SELECT COUNT(*) AS count\n      FROM (\n    SELECT\n      t.*,\n      EXISTS(\n        SELECT 1\n        FROM turn_model_usage m\n        WHERE m.turn_id = t.id AND m.model <> ''\n      ) AS has_model\n    FROM turn_summary t\n  ) AS turn_summary\n      WHERE provider IN (?,?)",
+              "parameters": [
+                "claude",
+                "codex"
+              ],
+              "timing": {
+                "medianMs": 0.07595000000000596,
+                "minMs": 0.05775000000002706,
+                "maxMs": 0.10709999999997422,
+                "samplesMs": [
+                  0.0638500000000306,
+                  0.10709999999997422,
+                  0.07789999999997121,
+                  0.0782999999999845,
+                  0.07595000000000596,
+                  0.07030000000000314,
+                  0.05775000000002706,
+                  0.09130000000001814,
+                  0.06355000000002065
+                ]
+              },
+              "returnedRows": 1,
+              "plan": [
+                "SEARCH t USING COVERING INDEX idx_summary_project_period (provider=?)"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "turns-provider-sort-model-no-costs",
+          "mode": "raw",
+          "resultSha256": "2aea17cb63be6bdd2725167981652ada3eb46b82ad19e665bf813cfcc1d9b729",
+          "iterationsPerSample": 2,
+          "bundle": {
+            "medianMs": 4.9862999999999715,
+            "minMs": 4.406950000000023,
+            "maxMs": 5.651750000000021,
+            "samplesMs": [
+              4.84220000000002,
+              4.9862999999999715,
+              4.941200000000038,
+              5.468500000000006,
+              4.406950000000023,
+              4.865600000000029,
+              5.531700000000001,
+              5.651750000000021,
+              5.557699999999954
+            ]
+          },
+          "parts": [
+            {
+              "role": "rows",
+              "method": "all",
+              "sql": "SELECT\n        *,\n        (total_tokens > 0 OR has_model = 1) AS has_recorded_usage\n      FROM (\n    SELECT\n      t.*,\n      p.project_name,\n      s.session_name\n    FROM (\n    SELECT\n      t.*,\n      EXISTS(\n        SELECT 1\n        FROM turn_model_usage m\n        WHERE m.turn_id = t.id AND m.model <> ''\n      ) AS has_model\n    FROM turn_summary t\n  ) t\n    JOIN projects p ON p.project_key = t.project_key\n    JOIN sessions s ON s.provider = t.provider AND s.session_id = t.session_id\n  ) AS turn_summary\n      WHERE provider IN (?,?) AND id > ?\n      ORDER BY started_at_ms IS NULL, provider IS NULL, provider DESC, started_at_ms IS NULL, started_at_ms DESC, provider, id\n      LIMIT ?\n      OFFSET ?",
+              "parameters": [
+                "claude",
+                "codex",
+                0,
+                100,
+                0
+              ],
+              "timing": {
+                "medianMs": 4.906800000000004,
+                "minMs": 4.335800000000006,
+                "maxMs": 5.55125000000001,
+                "samplesMs": [
+                  4.761550000000028,
+                  4.906800000000004,
+                  4.866450000000015,
+                  5.386400000000009,
+                  4.335800000000006,
+                  4.774749999999983,
+                  5.432350000000014,
+                  5.55125000000001,
+                  5.466099999999983
+                ]
+              },
+              "returnedRows": 100,
+              "plan": [
+                "SEARCH t USING INTEGER PRIMARY KEY (rowid>?)",
+                "SEARCH s USING PRIMARY KEY (provider=? AND session_id=?)",
+                "SEARCH p USING PRIMARY KEY (project_key=?)",
+                "CORRELATED SCALAR SUBQUERY 1",
+                "SEARCH m USING PRIMARY KEY (turn_id=?)",
+                "CORRELATED SCALAR SUBQUERY 1",
+                "SEARCH m USING PRIMARY KEY (turn_id=?)",
+                "USE TEMP B-TREE FOR ORDER BY"
+              ]
+            },
+            {
+              "role": "count",
+              "method": "get",
+              "sql": "SELECT COUNT(*) AS count\n      FROM (\n    SELECT\n      t.*,\n      EXISTS(\n        SELECT 1\n        FROM turn_model_usage m\n        WHERE m.turn_id = t.id AND m.model <> ''\n      ) AS has_model\n    FROM turn_summary t\n  ) AS turn_summary\n      WHERE provider IN (?,?)",
+              "parameters": [
+                "claude",
+                "codex"
+              ],
+              "timing": {
+                "medianMs": 0.08209999999999695,
+                "minMs": 0.07115000000001714,
+                "maxMs": 0.10050000000001091,
+                "samplesMs": [
+                  0.08064999999999145,
+                  0.07949999999996749,
+                  0.07475000000002296,
+                  0.08209999999999695,
+                  0.07115000000001714,
+                  0.09085000000004584,
+                  0.09934999999998695,
+                  0.10050000000001091,
+                  0.09159999999997126
+                ]
+              },
+              "returnedRows": 1,
+              "plan": [
+                "SEARCH t USING COVERING INDEX idx_summary_project_period (provider=?)"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "turns-model-sort-period-no-costs",
+          "mode": "raw",
+          "resultSha256": "614d1bc382ce8d70f6d8c61f07e80252f7bf715203901c54c4de339e6620982c",
+          "iterationsPerSample": 2,
+          "bundle": {
+            "medianMs": 4.210100000000068,
+            "minMs": 4.0993499999999585,
+            "maxMs": 5.178999999999917,
+            "samplesMs": [
+              4.199649999999991,
+              4.1778500000000065,
+              4.487250000000017,
+              4.138650000000041,
+              4.210100000000068,
+              4.509650000000022,
+              5.178999999999917,
+              4.0993499999999585,
+              5.025899999999979
+            ]
+          },
+          "parts": [
+            {
+              "role": "rows",
+              "method": "all",
+              "sql": "SELECT\n        *,\n        (total_tokens > 0 OR has_model = 1) AS has_recorded_usage\n      FROM (\n    SELECT\n      t.*,\n      p.project_name,\n      s.session_name\n    FROM (\n    SELECT\n      t.id,\n      t.provider,\n      t.project_key,\n      t.session_id,\n      t.root_turn_id,\n      t.request_title,\n      coalesce(m.model, '') <> '' AS has_model,\n      t.started_at_ms,\n      t.completed_at_ms,\n      t.duration_ms,\n      t.duration_quality,\n      t.status,\n      t.quality_flags,\n      t.diagnostic_file_id,\n      t.diagnostic_offset,\n      t.last_error,\n      t.updated_at,\n      CASE\n  WHEN coalesce(m.model, '') = ''\n    AND coalesce(m.input_tokens + m.output_tokens, t.total_tokens) = 0\n  THEN NULL\n  ELSE coalesce(m.model, '')\nEND AS model,\n      \n  coalesce(m.input_tokens, t.input_tokens) AS input_tokens,\n  coalesce(m.output_tokens, t.output_tokens) AS output_tokens,\n  CASE\n    WHEN m.turn_id IS NULL THEN t.cache_write_input_tokens\n    ELSE m.cache_write_input_tokens\n  END AS cache_write_input_tokens,\n  CASE\n    WHEN m.turn_id IS NULL THEN t.cache_read_input_tokens\n    ELSE m.cache_read_input_tokens\n  END AS cache_read_input_tokens,\n      coalesce(m.input_tokens + m.output_tokens, t.total_tokens) AS total_tokens\n    FROM turn_summary t\n    LEFT JOIN turn_model_usage m ON m.turn_id = t.id\n    \n  ) t\n    JOIN projects p ON p.project_key = t.project_key\n    JOIN sessions s ON s.provider = t.provider AND s.session_id = t.session_id\n  ) AS turn_summary\n      WHERE provider IN (?,?) AND id > ?\n      ORDER BY (started_at_ms IS NULL OR coalesce(model, '') = ''), started_at_ms IS NULL, coalesce(model, '') = '', started_at_ms IS NULL, started_at_ms DESC, provider, model, id\n      LIMIT ?\n      OFFSET ?",
+              "parameters": [
+                "claude",
+                "codex",
+                0,
+                100,
+                0
+              ],
+              "timing": {
+                "medianMs": 3.923500000000047,
+                "minMs": 3.851449999999943,
+                "maxMs": 4.871299999999962,
+                "samplesMs": [
+                  3.8712500000000034,
+                  3.920099999999991,
+                  4.230350000000044,
+                  3.889850000000024,
+                  3.923500000000047,
+                  4.194700000000012,
+                  4.871299999999962,
+                  3.851449999999943,
+                  4.6647499999999695
+                ]
+              },
+              "returnedRows": 100,
+              "plan": [
+                "SEARCH t USING INTEGER PRIMARY KEY (rowid>?)",
+                "SEARCH m USING PRIMARY KEY (turn_id=?) LEFT-JOIN",
+                "SEARCH s USING PRIMARY KEY (provider=? AND session_id=?)",
+                "SEARCH p USING PRIMARY KEY (project_key=?)",
+                "USE TEMP B-TREE FOR ORDER BY"
+              ]
+            },
+            {
+              "role": "count",
+              "method": "get",
+              "sql": "SELECT COUNT(*) AS count\n      FROM (\n    SELECT\n      t.id,\n      t.provider,\n      t.project_key,\n      t.session_id,\n      t.root_turn_id,\n      t.request_title,\n      coalesce(m.model, '') <> '' AS has_model,\n      t.started_at_ms,\n      t.completed_at_ms,\n      t.duration_ms,\n      t.duration_quality,\n      t.status,\n      t.quality_flags,\n      t.diagnostic_file_id,\n      t.diagnostic_offset,\n      t.last_error,\n      t.updated_at,\n      CASE\n  WHEN coalesce(m.model, '') = ''\n    AND coalesce(m.input_tokens + m.output_tokens, t.total_tokens) = 0\n  THEN NULL\n  ELSE coalesce(m.model, '')\nEND AS model,\n      \n  coalesce(m.input_tokens, t.input_tokens) AS input_tokens,\n  coalesce(m.output_tokens, t.output_tokens) AS output_tokens,\n  CASE\n    WHEN m.turn_id IS NULL THEN t.cache_write_input_tokens\n    ELSE m.cache_write_input_tokens\n  END AS cache_write_input_tokens,\n  CASE\n    WHEN m.turn_id IS NULL THEN t.cache_read_input_tokens\n    ELSE m.cache_read_input_tokens\n  END AS cache_read_input_tokens,\n      coalesce(m.input_tokens + m.output_tokens, t.total_tokens) AS total_tokens\n    FROM turn_summary t\n    LEFT JOIN turn_model_usage m ON m.turn_id = t.id\n    \n  ) AS turn_summary\n      WHERE provider IN (?,?)",
+              "parameters": [
+                "claude",
+                "codex"
+              ],
+              "timing": {
+                "medianMs": 0.2866000000000213,
+                "minMs": 0.24790000000001555,
+                "maxMs": 0.3611500000000092,
+                "samplesMs": [
+                  0.3283999999999878,
+                  0.2577500000000157,
+                  0.25689999999997326,
+                  0.248800000000017,
+                  0.2866000000000213,
+                  0.3149500000000103,
+                  0.30769999999995434,
+                  0.24790000000001555,
+                  0.3611500000000092
+                ]
+              },
+              "returnedRows": 1,
+              "plan": [
+                "SEARCH t USING COVERING INDEX idx_summary_project_period (provider=?)",
+                "SEARCH m USING PRIMARY KEY (turn_id=?) LEFT-JOIN"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "turns-model-sort-tokens-no-costs",
+          "mode": "raw",
+          "resultSha256": "57772b16fc874dd27a76fc3cb18452afbb99192469546738b9c914334f32df4b",
+          "iterationsPerSample": 2,
+          "bundle": {
+            "medianMs": 3.564300000000003,
+            "minMs": 3.0741499999999746,
+            "maxMs": 4.331250000000011,
+            "samplesMs": [
+              4.25485000000009,
+              4.331250000000011,
+              4.318800000000067,
+              3.988399999999956,
+              3.316100000000006,
+              3.2791500000000156,
+              3.0741499999999746,
+              3.474050000000034,
+              3.564300000000003
+            ]
+          },
+          "parts": [
+            {
+              "role": "rows",
+              "method": "all",
+              "sql": "SELECT\n        *,\n        (total_tokens > 0 OR has_model = 1) AS has_recorded_usage\n      FROM (\n    SELECT\n      t.*,\n      p.project_name,\n      s.session_name\n    FROM (\n    SELECT\n      t.id,\n      t.provider,\n      t.project_key,\n      t.session_id,\n      t.root_turn_id,\n      t.request_title,\n      coalesce(m.model, '') <> '' AS has_model,\n      t.started_at_ms,\n      t.completed_at_ms,\n      t.duration_ms,\n      t.duration_quality,\n      t.status,\n      t.quality_flags,\n      t.diagnostic_file_id,\n      t.diagnostic_offset,\n      t.last_error,\n      t.updated_at,\n      CASE\n  WHEN coalesce(m.model, '') = ''\n    AND coalesce(m.input_tokens + m.output_tokens, t.total_tokens) = 0\n  THEN NULL\n  ELSE coalesce(m.model, '')\nEND AS model,\n      \n  coalesce(m.input_tokens, t.input_tokens) AS input_tokens,\n  coalesce(m.output_tokens, t.output_tokens) AS output_tokens,\n  CASE\n    WHEN m.turn_id IS NULL THEN t.cache_write_input_tokens\n    ELSE m.cache_write_input_tokens\n  END AS cache_write_input_tokens,\n  CASE\n    WHEN m.turn_id IS NULL THEN t.cache_read_input_tokens\n    ELSE m.cache_read_input_tokens\n  END AS cache_read_input_tokens,\n      coalesce(m.input_tokens + m.output_tokens, t.total_tokens) AS total_tokens\n    FROM turn_summary t\n    LEFT JOIN turn_model_usage m ON m.turn_id = t.id\n    \n  ) t\n    JOIN projects p ON p.project_key = t.project_key\n    JOIN sessions s ON s.provider = t.provider AND s.session_id = t.session_id\n  ) AS turn_summary\n      WHERE provider IN (?,?) AND id > ?\n      ORDER BY (started_at_ms IS NULL OR coalesce(model, '') = ''), started_at_ms IS NULL, coalesce(model, '') = '', total_tokens IS NULL, total_tokens DESC, started_at_ms IS NULL, started_at_ms DESC, provider, model, id\n      LIMIT ?\n      OFFSET ?",
+              "parameters": [
+                "claude",
+                "codex",
+                0,
+                100,
+                0
+              ],
+              "timing": {
+                "medianMs": 3.316250000000025,
+                "minMs": 2.830949999999973,
+                "maxMs": 3.9765499999999747,
+                "samplesMs": [
+                  3.8981000000000563,
+                  3.9765499999999747,
+                  3.9659000000000333,
+                  3.7287000000000035,
+                  2.993949999999984,
+                  3.0173000000000343,
+                  2.830949999999973,
+                  3.2290500000000293,
+                  3.316250000000025
+                ]
+              },
+              "returnedRows": 100,
+              "plan": [
+                "SEARCH t USING INTEGER PRIMARY KEY (rowid>?)",
+                "SEARCH m USING PRIMARY KEY (turn_id=?) LEFT-JOIN",
+                "SEARCH s USING PRIMARY KEY (provider=? AND session_id=?)",
+                "SEARCH p USING PRIMARY KEY (project_key=?)",
+                "USE TEMP B-TREE FOR ORDER BY"
+              ]
+            },
+            {
+              "role": "count",
+              "method": "get",
+              "sql": "SELECT COUNT(*) AS count\n      FROM (\n    SELECT\n      t.id,\n      t.provider,\n      t.project_key,\n      t.session_id,\n      t.root_turn_id,\n      t.request_title,\n      coalesce(m.model, '') <> '' AS has_model,\n      t.started_at_ms,\n      t.completed_at_ms,\n      t.duration_ms,\n      t.duration_quality,\n      t.status,\n      t.quality_flags,\n      t.diagnostic_file_id,\n      t.diagnostic_offset,\n      t.last_error,\n      t.updated_at,\n      CASE\n  WHEN coalesce(m.model, '') = ''\n    AND coalesce(m.input_tokens + m.output_tokens, t.total_tokens) = 0\n  THEN NULL\n  ELSE coalesce(m.model, '')\nEND AS model,\n      \n  coalesce(m.input_tokens, t.input_tokens) AS input_tokens,\n  coalesce(m.output_tokens, t.output_tokens) AS output_tokens,\n  CASE\n    WHEN m.turn_id IS NULL THEN t.cache_write_input_tokens\n    ELSE m.cache_write_input_tokens\n  END AS cache_write_input_tokens,\n  CASE\n    WHEN m.turn_id IS NULL THEN t.cache_read_input_tokens\n    ELSE m.cache_read_input_tokens\n  END AS cache_read_input_tokens,\n      coalesce(m.input_tokens + m.output_tokens, t.total_tokens) AS total_tokens\n    FROM turn_summary t\n    LEFT JOIN turn_model_usage m ON m.turn_id = t.id\n    \n  ) AS turn_summary\n      WHERE provider IN (?,?)",
+              "parameters": [
+                "claude",
+                "codex"
+              ],
+              "timing": {
+                "medianMs": 0.26184999999998126,
+                "minMs": 0.24320000000000164,
+                "maxMs": 0.35675000000003365,
+                "samplesMs": [
+                  0.35675000000003365,
+                  0.35470000000003665,
+                  0.35290000000003374,
+                  0.2596999999999525,
+                  0.3221500000000219,
+                  0.26184999999998126,
+                  0.24320000000000164,
+                  0.24500000000000455,
+                  0.2480499999999779
+                ]
+              },
+              "returnedRows": 1,
+              "plan": [
+                "SEARCH t USING COVERING INDEX idx_summary_project_period (provider=?)",
+                "SEARCH m USING PRIMARY KEY (turn_id=?) LEFT-JOIN"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "turns-model-sort-model-no-costs",
+          "mode": "raw",
+          "resultSha256": "d682bd20028bec2ffafcf22aa3c763c66f1e267a592941c47ac4acd7cf32f4a6",
+          "iterationsPerSample": 1,
+          "bundle": {
+            "medianMs": 9.405399999999872,
+            "minMs": 7.965200000000095,
+            "maxMs": 10.508299999999963,
+            "samplesMs": [
+              9.699799999999982,
+              7.965200000000095,
+              10.280399999999986,
+              10.508299999999963,
+              9.628399999999942,
+              8.971099999999979,
+              9.241799999999898,
+              9.405399999999872,
+              8.301099999999906
+            ]
+          },
+          "parts": [
+            {
+              "role": "rows",
+              "method": "all",
+              "sql": "SELECT\n        *,\n        (total_tokens > 0 OR has_model = 1) AS has_recorded_usage\n      FROM (\n    SELECT\n      t.*,\n      p.project_name,\n      s.session_name\n    FROM (\n    SELECT\n      t.id,\n      t.provider,\n      t.project_key,\n      t.session_id,\n      t.root_turn_id,\n      t.request_title,\n      coalesce(m.model, '') <> '' AS has_model,\n      t.started_at_ms,\n      t.completed_at_ms,\n      t.duration_ms,\n      t.duration_quality,\n      t.status,\n      t.quality_flags,\n      t.diagnostic_file_id,\n      t.diagnostic_offset,\n      t.last_error,\n      t.updated_at,\n      CASE\n  WHEN coalesce(m.model, '') = ''\n    AND coalesce(m.input_tokens + m.output_tokens, t.total_tokens) = 0\n  THEN NULL\n  ELSE coalesce(m.model, '')\nEND AS model,\n      \n  coalesce(m.input_tokens, t.input_tokens) AS input_tokens,\n  coalesce(m.output_tokens, t.output_tokens) AS output_tokens,\n  CASE\n    WHEN m.turn_id IS NULL THEN t.cache_write_input_tokens\n    ELSE m.cache_write_input_tokens\n  END AS cache_write_input_tokens,\n  CASE\n    WHEN m.turn_id IS NULL THEN t.cache_read_input_tokens\n    ELSE m.cache_read_input_tokens\n  END AS cache_read_input_tokens,\n      coalesce(m.input_tokens + m.output_tokens, t.total_tokens) AS total_tokens\n    FROM turn_summary t\n    LEFT JOIN turn_model_usage m ON m.turn_id = t.id\n    \n  ) t\n    JOIN projects p ON p.project_key = t.project_key\n    JOIN sessions s ON s.provider = t.provider AND s.session_id = t.session_id\n  ) AS turn_summary\n      WHERE provider IN (?,?) AND id > ?\n      ORDER BY (started_at_ms IS NULL OR coalesce(model, '') = ''), started_at_ms IS NULL, coalesce(model, '') = '', agent_tracker_model_release(model) IS NULL, agent_tracker_model_release(model) DESC, agent_tracker_model_key(model) DESC, started_at_ms IS NULL, started_at_ms DESC, provider, model, id\n      LIMIT ?\n      OFFSET ?",
+              "parameters": [
+                "claude",
+                "codex",
+                0,
+                100,
+                0
+              ],
+              "timing": {
+                "medianMs": 9.145599999999945,
+                "minMs": 7.7017000000000735,
+                "maxMs": 10.236999999999966,
+                "samplesMs": [
+                  9.383899999999926,
+                  7.7017000000000735,
+                  10.015499999999975,
+                  10.236999999999966,
+                  9.369500000000016,
+                  8.66229999999996,
+                  8.983799999999974,
+                  9.145599999999945,
+                  8.041699999999992
+                ]
+              },
+              "returnedRows": 100,
+              "plan": [
+                "SEARCH t USING INTEGER PRIMARY KEY (rowid>?)",
+                "SEARCH m USING PRIMARY KEY (turn_id=?) LEFT-JOIN",
+                "SEARCH s USING PRIMARY KEY (provider=? AND session_id=?)",
+                "SEARCH p USING PRIMARY KEY (project_key=?)",
+                "USE TEMP B-TREE FOR ORDER BY"
+              ]
+            },
+            {
+              "role": "count",
+              "method": "get",
+              "sql": "SELECT COUNT(*) AS count\n      FROM (\n    SELECT\n      t.id,\n      t.provider,\n      t.project_key,\n      t.session_id,\n      t.root_turn_id,\n      t.request_title,\n      coalesce(m.model, '') <> '' AS has_model,\n      t.started_at_ms,\n      t.completed_at_ms,\n      t.duration_ms,\n      t.duration_quality,\n      t.status,\n      t.quality_flags,\n      t.diagnostic_file_id,\n      t.diagnostic_offset,\n      t.last_error,\n      t.updated_at,\n      CASE\n  WHEN coalesce(m.model, '') = ''\n    AND coalesce(m.input_tokens + m.output_tokens, t.total_tokens) = 0\n  THEN NULL\n  ELSE coalesce(m.model, '')\nEND AS model,\n      \n  coalesce(m.input_tokens, t.input_tokens) AS input_tokens,\n  coalesce(m.output_tokens, t.output_tokens) AS output_tokens,\n  CASE\n    WHEN m.turn_id IS NULL THEN t.cache_write_input_tokens\n    ELSE m.cache_write_input_tokens\n  END AS cache_write_input_tokens,\n  CASE\n    WHEN m.turn_id IS NULL THEN t.cache_read_input_tokens\n    ELSE m.cache_read_input_tokens\n  END AS cache_read_input_tokens,\n      coalesce(m.input_tokens + m.output_tokens, t.total_tokens) AS total_tokens\n    FROM turn_summary t\n    LEFT JOIN turn_model_usage m ON m.turn_id = t.id\n    \n  ) AS turn_summary\n      WHERE provider IN (?,?)",
+              "parameters": [
+                "claude",
+                "codex"
+              ],
+              "timing": {
+                "medianMs": 0.26350000000002183,
+                "minMs": 0.2579999999999245,
+                "maxMs": 0.315900000000056,
+                "samplesMs": [
+                  0.315900000000056,
+                  0.26350000000002183,
+                  0.26490000000001146,
+                  0.27129999999999654,
+                  0.25889999999992597,
+                  0.3088000000000193,
+                  0.2579999999999245,
+                  0.2597999999999274,
+                  0.25939999999991414
+                ]
+              },
+              "returnedRows": 1,
+              "plan": [
+                "SEARCH t USING COVERING INDEX idx_summary_project_period (provider=?)",
+                "SEARCH m USING PRIMARY KEY (turn_id=?) LEFT-JOIN"
+              ]
+            }
+          ]
+        }
+      ],
+      "apiChecks": [
+        {
+          "name": "turns-model-sort-model-no-costs",
+          "timing": {
+            "medianMs": 9.634799999999927,
+            "minMs": 8.267200000000003,
+            "maxMs": 12.676500000000033,
+            "samplesMs": [
+              8.360500000000002,
+              9.465199999999982,
+              9.634799999999927,
+              10.17999999999995,
+              11.573199999999929,
+              12.676500000000033,
+              8.446800000000053,
+              8.267200000000003,
+              10.38390000000004
+            ]
+          }
+        },
+        {
+          "name": "turns-provider-sort-model-no-costs",
+          "timing": {
+            "medianMs": 6.003799999999956,
+            "minMs": 5.818899999999985,
+            "maxMs": 6.551799999999957,
+            "samplesMs": [
+              6.16579999999999,
+              6.551799999999957,
+              6.018100000000004,
+              5.892700000000104,
+              5.877299999999991,
+              6.068300000000022,
+              5.916299999999978,
+              6.003799999999956,
+              5.818899999999985
+            ]
+          }
+        },
+        {
+          "name": "turns-provider-sort-period-no-costs",
+          "timing": {
+            "medianMs": 4.595299999999952,
+            "minMs": 4.161799999999971,
+            "maxMs": 5.731999999999971,
+            "samplesMs": [
+              4.595299999999952,
+              4.521399999999971,
+              5.731999999999971,
+              5.312200000000075,
+              5.421600000000012,
+              4.230399999999918,
+              4.262899999999945,
+              4.161799999999971,
+              5.189500000000066
+            ]
+          }
+        },
+        {
+          "name": "turns-model-sort-period-no-costs",
+          "timing": {
+            "medianMs": 6.0620000000001255,
+            "minMs": 5.293599999999969,
+            "maxMs": 6.557000000000016,
+            "samplesMs": [
+              6.04340000000002,
+              6.222300000000018,
+              6.012600000000134,
+              6.070699999999988,
+              5.293599999999969,
+              6.0620000000001255,
+              6.557000000000016,
+              6.054300000000012,
+              6.073499999999967
+            ]
+          }
+        },
+        {
+          "name": "turns-model-sort-tokens-no-costs",
+          "timing": {
+            "medianMs": 4.689300000000003,
+            "minMs": 3.447200000000066,
+            "maxMs": 5.158799999999928,
+            "samplesMs": [
+              5.087500000000091,
+              4.689300000000003,
+              5.158799999999928,
+              4.005800000000136,
+              3.4784000000001924,
+              3.447200000000066,
+              3.5700999999999112,
+              4.92859999999996,
+              4.713199999999915
+            ]
+          }
+        }
+      ],
+      "coverageApi": {
+        "medianMs": 0.9411999999999807,
+        "minMs": 0.9153000000001157,
+        "maxMs": 1.1717000000001008,
+        "samplesMs": [
+          1.1717000000001008,
+          0.9675000000002001,
+          0.9581000000000586,
+          0.9395999999999276,
+          0.9346000000000458,
+          0.9421999999999571,
+          0.9411999999999807,
+          0.9153000000001157,
+          0.9257000000000062
+        ]
+      }
+    },
+    {
+      "label": "synthetic-10000",
+      "requests": 10000,
+      "modelRows": 11829,
+      "sessions": 1000,
+      "projects": 20,
+      "sourceFiles": 1000,
+      "capabilityRows": 1428,
+      "costRows": 10000,
+      "requestDailyRows": 1100,
+      "modelDailyRows": 2238,
+      "rollupMetaBeforeFirstRead": null,
+      "firstReadMs": 388.03430000000003,
+      "firstReadIncludesRollupBuild": true,
+      "queries": [
+        {
+          "name": "turns-provider-sort-period-no-costs",
+          "mode": "raw",
+          "resultSha256": "a9ff63bdbd48366aa875f169b8ff27e2a9c93179f2058774abf6ed541dd114d0",
+          "iterationsPerSample": 1,
+          "bundle": {
+            "medianMs": 11.242500000000064,
+            "minMs": 10.226200000000063,
+            "maxMs": 11.416299999999865,
+            "samplesMs": [
+              11.252700000000232,
+              11.416299999999865,
+              10.226200000000063,
+              11.242500000000064,
+              11.233899999999949,
+              10.880799999999908,
+              11.172399999999925,
+              11.36349999999993,
+              11.404599999999846
+            ]
+          },
+          "parts": [
+            {
+              "role": "rows",
+              "method": "all",
+              "sql": "SELECT\n        *,\n        (total_tokens > 0 OR has_model = 1) AS has_recorded_usage\n      FROM (\n    SELECT\n      t.*,\n      p.project_name,\n      s.session_name\n    FROM (\n    SELECT\n      t.*,\n      EXISTS(\n        SELECT 1\n        FROM turn_model_usage m\n        WHERE m.turn_id = t.id AND m.model <> ''\n      ) AS has_model\n    FROM turn_summary t\n  ) t\n    JOIN projects p ON p.project_key = t.project_key\n    JOIN sessions s ON s.provider = t.provider AND s.session_id = t.session_id\n  ) AS turn_summary\n      WHERE provider IN (?,?) AND id > ?\n      ORDER BY started_at_ms IS NULL, started_at_ms IS NULL, started_at_ms DESC, provider, id\n      LIMIT ?\n      OFFSET ?",
+              "parameters": [
+                "claude",
+                "codex",
+                0,
+                100,
+                0
+              ],
+              "timing": {
+                "medianMs": 10.54040000000009,
+                "minMs": 9.525000000000091,
+                "maxMs": 10.69439999999986,
+                "samplesMs": [
+                  10.545000000000073,
+                  10.620699999999943,
+                  9.525000000000091,
+                  10.54040000000009,
+                  10.528999999999996,
+                  10.179599999999937,
+                  10.434999999999945,
+                  10.638099999999895,
+                  10.69439999999986
+                ]
+              },
+              "returnedRows": 100,
+              "plan": [
+                "SEARCH t USING INTEGER PRIMARY KEY (rowid>?)",
+                "SEARCH s USING PRIMARY KEY (provider=? AND session_id=?)",
+                "SEARCH p USING PRIMARY KEY (project_key=?)",
+                "CORRELATED SCALAR SUBQUERY 1",
+                "SEARCH m USING PRIMARY KEY (turn_id=?)",
+                "CORRELATED SCALAR SUBQUERY 1",
+                "SEARCH m USING PRIMARY KEY (turn_id=?)",
+                "USE TEMP B-TREE FOR ORDER BY"
+              ]
+            },
+            {
+              "role": "count",
+              "method": "get",
+              "sql": "SELECT COUNT(*) AS count\n      FROM (\n    SELECT\n      t.*,\n      EXISTS(\n        SELECT 1\n        FROM turn_model_usage m\n        WHERE m.turn_id = t.id AND m.model <> ''\n      ) AS has_model\n    FROM turn_summary t\n  ) AS turn_summary\n      WHERE provider IN (?,?)",
+              "parameters": [
+                "claude",
+                "codex"
+              ],
+              "timing": {
+                "medianMs": 0.707700000000159,
+                "minMs": 0.7011999999999716,
+                "maxMs": 0.7955999999999221,
+                "samplesMs": [
+                  0.707700000000159,
+                  0.7955999999999221,
+                  0.7011999999999716,
+                  0.7020999999999731,
+                  0.7048999999999523,
+                  0.7011999999999716,
+                  0.7373999999999796,
+                  0.725400000000036,
+                  0.7101999999999862
+                ]
+              },
+              "returnedRows": 1,
+              "plan": [
+                "SEARCH t USING COVERING INDEX idx_summary_project_period (provider=?)"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "turns-provider-sort-tokens-no-costs",
+          "mode": "raw",
+          "resultSha256": "6714b17d0c050a1fc533bcf4a6fbeb802e9148ec2f0e338c064494d86ec03b58",
+          "iterationsPerSample": 1,
+          "bundle": {
+            "medianMs": 25.50649999999996,
+            "minMs": 21.05490000000009,
+            "maxMs": 28.647000000000162,
+            "samplesMs": [
+              28.647000000000162,
+              28.579499999999825,
+              26.604800000000523,
+              21.465000000000146,
+              21.89549999999963,
+              21.05490000000009,
+              22.717399999999998,
+              28.284400000000005,
+              25.50649999999996
+            ]
+          },
+          "parts": [
+            {
+              "role": "rows",
+              "method": "all",
+              "sql": "SELECT\n        *,\n        (total_tokens > 0 OR has_model = 1) AS has_recorded_usage\n      FROM (\n    SELECT\n      t.*,\n      p.project_name,\n      s.session_name\n    FROM (\n    SELECT\n      t.*,\n      EXISTS(\n        SELECT 1\n        FROM turn_model_usage m\n        WHERE m.turn_id = t.id AND m.model <> ''\n      ) AS has_model\n    FROM turn_summary t\n  ) t\n    JOIN projects p ON p.project_key = t.project_key\n    JOIN sessions s ON s.provider = t.provider AND s.session_id = t.session_id\n  ) AS turn_summary\n      WHERE provider IN (?,?) AND id > ?\n      ORDER BY started_at_ms IS NULL, total_tokens IS NULL, total_tokens DESC, started_at_ms IS NULL, started_at_ms DESC, provider, id\n      LIMIT ?\n      OFFSET ?",
+              "parameters": [
+                "claude",
+                "codex",
+                0,
+                100,
+                0
+              ],
+              "timing": {
+                "medianMs": 25.053300000000036,
+                "minMs": 20.60019999999986,
+                "maxMs": 27.92430000000013,
+                "samplesMs": [
+                  27.92430000000013,
+                  27.859699999999975,
+                  26.14960000000019,
+                  21.01369999999997,
+                  21.36339999999973,
+                  20.60019999999986,
+                  21.995499999999993,
+                  27.510099999999966,
+                  25.053300000000036
+                ]
+              },
+              "returnedRows": 100,
+              "plan": [
+                "SEARCH t USING INTEGER PRIMARY KEY (rowid>?)",
+                "SEARCH s USING PRIMARY KEY (provider=? AND session_id=?)",
+                "SEARCH p USING PRIMARY KEY (project_key=?)",
+                "CORRELATED SCALAR SUBQUERY 1",
+                "SEARCH m USING PRIMARY KEY (turn_id=?)",
+                "CORRELATED SCALAR SUBQUERY 1",
+                "SEARCH m USING PRIMARY KEY (turn_id=?)",
+                "USE TEMP B-TREE FOR ORDER BY"
+              ]
+            },
+            {
+              "role": "count",
+              "method": "get",
+              "sql": "SELECT COUNT(*) AS count\n      FROM (\n    SELECT\n      t.*,\n      EXISTS(\n        SELECT 1\n        FROM turn_model_usage m\n        WHERE m.turn_id = t.id AND m.model <> ''\n      ) AS has_model\n    FROM turn_summary t\n  ) AS turn_summary\n      WHERE provider IN (?,?)",
+              "parameters": [
+                "claude",
+                "codex"
+              ],
+              "timing": {
+                "medianMs": 0.5320999999999003,
+                "minMs": 0.4513000000001739,
+                "maxMs": 0.7743000000000393,
+                "samplesMs": [
+                  0.7227000000000317,
+                  0.7197999999998501,
+                  0.4552000000003318,
+                  0.4513000000001739,
+                  0.5320999999999003,
+                  0.4547000000002299,
+                  0.7219000000000051,
+                  0.7743000000000393,
+                  0.45319999999992433
+                ]
+              },
+              "returnedRows": 1,
+              "plan": [
+                "SEARCH t USING COVERING INDEX idx_summary_project_period (provider=?)"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "turns-provider-sort-model-no-costs",
+          "mode": "raw",
+          "resultSha256": "a9ff63bdbd48366aa875f169b8ff27e2a9c93179f2058774abf6ed541dd114d0",
+          "iterationsPerSample": 1,
+          "bundle": {
+            "medianMs": 11.486300000000028,
+            "minMs": 9.383000000000266,
+            "maxMs": 11.924799999999777,
+            "samplesMs": [
+              11.254499999999553,
+              11.615400000000136,
+              9.383000000000266,
+              11.53309999999965,
+              11.791000000000167,
+              10.089800000000196,
+              11.486300000000028,
+              11.924799999999777,
+              11.309600000000046
+            ]
+          },
+          "parts": [
+            {
+              "role": "rows",
+              "method": "all",
+              "sql": "SELECT\n        *,\n        (total_tokens > 0 OR has_model = 1) AS has_recorded_usage\n      FROM (\n    SELECT\n      t.*,\n      p.project_name,\n      s.session_name\n    FROM (\n    SELECT\n      t.*,\n      EXISTS(\n        SELECT 1\n        FROM turn_model_usage m\n        WHERE m.turn_id = t.id AND m.model <> ''\n      ) AS has_model\n    FROM turn_summary t\n  ) t\n    JOIN projects p ON p.project_key = t.project_key\n    JOIN sessions s ON s.provider = t.provider AND s.session_id = t.session_id\n  ) AS turn_summary\n      WHERE provider IN (?,?) AND id > ?\n      ORDER BY started_at_ms IS NULL, provider IS NULL, provider DESC, started_at_ms IS NULL, started_at_ms DESC, provider, id\n      LIMIT ?\n      OFFSET ?",
+              "parameters": [
+                "claude",
+                "codex",
+                0,
+                100,
+                0
+              ],
+              "timing": {
+                "medianMs": 11.032000000000153,
+                "minMs": 8.921499999999924,
+                "maxMs": 11.208900000000085,
+                "samplesMs": [
+                  10.807299999999941,
+                  11.16840000000002,
+                  8.921499999999924,
+                  11.080099999999675,
+                  11.200400000000172,
+                  9.446199999999862,
+                  11.032000000000153,
+                  11.208900000000085,
+                  10.85530000000017
+                ]
+              },
+              "returnedRows": 100,
+              "plan": [
+                "SEARCH t USING INTEGER PRIMARY KEY (rowid>?)",
+                "SEARCH s USING PRIMARY KEY (provider=? AND session_id=?)",
+                "SEARCH p USING PRIMARY KEY (project_key=?)",
+                "CORRELATED SCALAR SUBQUERY 1",
+                "SEARCH m USING PRIMARY KEY (turn_id=?)",
+                "CORRELATED SCALAR SUBQUERY 1",
+                "SEARCH m USING PRIMARY KEY (turn_id=?)",
+                "USE TEMP B-TREE FOR ORDER BY"
+              ]
+            },
+            {
+              "role": "count",
+              "method": "get",
+              "sql": "SELECT COUNT(*) AS count\n      FROM (\n    SELECT\n      t.*,\n      EXISTS(\n        SELECT 1\n        FROM turn_model_usage m\n        WHERE m.turn_id = t.id AND m.model <> ''\n      ) AS has_model\n    FROM turn_summary t\n  ) AS turn_summary\n      WHERE provider IN (?,?)",
+              "parameters": [
+                "claude",
+                "codex"
+              ],
+              "timing": {
+                "medianMs": 0.4542999999998756,
+                "minMs": 0.4470000000001164,
+                "maxMs": 0.7158999999996922,
+                "samplesMs": [
+                  0.44719999999961146,
+                  0.4470000000001164,
+                  0.46150000000034197,
+                  0.45299999999997453,
+                  0.5905999999999949,
+                  0.6436000000003332,
+                  0.4542999999998756,
+                  0.7158999999996922,
+                  0.4542999999998756
+                ]
+              },
+              "returnedRows": 1,
+              "plan": [
+                "SEARCH t USING COVERING INDEX idx_summary_project_period (provider=?)"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "turns-model-sort-period-no-costs",
+          "mode": "raw",
+          "resultSha256": "5ce5e3e2dcdc80a7f2561e8aa16499ffccf474e588e8c09d77291bcbc42c5b5c",
+          "iterationsPerSample": 1,
+          "bundle": {
+            "medianMs": 23.623699999999644,
+            "minMs": 18.204799999999977,
+            "maxMs": 28.981500000000324,
+            "samplesMs": [
+              25.393299999999726,
+              28.981500000000324,
+              22.915800000000218,
+              23.70430000000033,
+              22.34820000000036,
+              23.108799999999974,
+              23.623699999999644,
+              18.204799999999977,
+              24.17330000000038
+            ]
+          },
+          "parts": [
+            {
+              "role": "rows",
+              "method": "all",
+              "sql": "SELECT\n        *,\n        (total_tokens > 0 OR has_model = 1) AS has_recorded_usage\n      FROM (\n    SELECT\n      t.*,\n      p.project_name,\n      s.session_name\n    FROM (\n    SELECT\n      t.id,\n      t.provider,\n      t.project_key,\n      t.session_id,\n      t.root_turn_id,\n      t.request_title,\n      coalesce(m.model, '') <> '' AS has_model,\n      t.started_at_ms,\n      t.completed_at_ms,\n      t.duration_ms,\n      t.duration_quality,\n      t.status,\n      t.quality_flags,\n      t.diagnostic_file_id,\n      t.diagnostic_offset,\n      t.last_error,\n      t.updated_at,\n      CASE\n  WHEN coalesce(m.model, '') = ''\n    AND coalesce(m.input_tokens + m.output_tokens, t.total_tokens) = 0\n  THEN NULL\n  ELSE coalesce(m.model, '')\nEND AS model,\n      \n  coalesce(m.input_tokens, t.input_tokens) AS input_tokens,\n  coalesce(m.output_tokens, t.output_tokens) AS output_tokens,\n  CASE\n    WHEN m.turn_id IS NULL THEN t.cache_write_input_tokens\n    ELSE m.cache_write_input_tokens\n  END AS cache_write_input_tokens,\n  CASE\n    WHEN m.turn_id IS NULL THEN t.cache_read_input_tokens\n    ELSE m.cache_read_input_tokens\n  END AS cache_read_input_tokens,\n      coalesce(m.input_tokens + m.output_tokens, t.total_tokens) AS total_tokens\n    FROM turn_summary t\n    LEFT JOIN turn_model_usage m ON m.turn_id = t.id\n    \n  ) t\n    JOIN projects p ON p.project_key = t.project_key\n    JOIN sessions s ON s.provider = t.provider AND s.session_id = t.session_id\n  ) AS turn_summary\n      WHERE provider IN (?,?) AND id > ?\n      ORDER BY (started_at_ms IS NULL OR coalesce(model, '') = ''), started_at_ms IS NULL, coalesce(model, '') = '', started_at_ms IS NULL, started_at_ms DESC, provider, model, id\n      LIMIT ?\n      OFFSET ?",
+              "parameters": [
+                "claude",
+                "codex",
+                0,
+                100,
+                0
+              ],
+              "timing": {
+                "medianMs": 19.447700000000168,
+                "minMs": 14.415800000000218,
+                "maxMs": 25.294800000000123,
+                "samplesMs": [
+                  18.55659999999989,
+                  25.294800000000123,
+                  19.447700000000168,
+                  19.67410000000018,
+                  18.559000000000196,
+                  19.684699999999793,
+                  19.395899999999983,
+                  14.415800000000218,
+                  20.51180000000022
+                ]
+              },
+              "returnedRows": 100,
+              "plan": [
+                "SEARCH t USING INTEGER PRIMARY KEY (rowid>?)",
+                "SEARCH s USING PRIMARY KEY (provider=? AND session_id=?)",
+                "SEARCH p USING PRIMARY KEY (project_key=?)",
+                "SEARCH m USING PRIMARY KEY (turn_id=?) LEFT-JOIN",
+                "USE TEMP B-TREE FOR ORDER BY"
+              ]
+            },
+            {
+              "role": "count",
+              "method": "get",
+              "sql": "SELECT COUNT(*) AS count\n      FROM (\n    SELECT\n      t.id,\n      t.provider,\n      t.project_key,\n      t.session_id,\n      t.root_turn_id,\n      t.request_title,\n      coalesce(m.model, '') <> '' AS has_model,\n      t.started_at_ms,\n      t.completed_at_ms,\n      t.duration_ms,\n      t.duration_quality,\n      t.status,\n      t.quality_flags,\n      t.diagnostic_file_id,\n      t.diagnostic_offset,\n      t.last_error,\n      t.updated_at,\n      CASE\n  WHEN coalesce(m.model, '') = ''\n    AND coalesce(m.input_tokens + m.output_tokens, t.total_tokens) = 0\n  THEN NULL\n  ELSE coalesce(m.model, '')\nEND AS model,\n      \n  coalesce(m.input_tokens, t.input_tokens) AS input_tokens,\n  coalesce(m.output_tokens, t.output_tokens) AS output_tokens,\n  CASE\n    WHEN m.turn_id IS NULL THEN t.cache_write_input_tokens\n    ELSE m.cache_write_input_tokens\n  END AS cache_write_input_tokens,\n  CASE\n    WHEN m.turn_id IS NULL THEN t.cache_read_input_tokens\n    ELSE m.cache_read_input_tokens\n  END AS cache_read_input_tokens,\n      coalesce(m.input_tokens + m.output_tokens, t.total_tokens) AS total_tokens\n    FROM turn_summary t\n    LEFT JOIN turn_model_usage m ON m.turn_id = t.id\n    \n  ) AS turn_summary\n      WHERE provider IN (?,?)",
+              "parameters": [
+                "claude",
+                "codex"
+              ],
+              "timing": {
+                "medianMs": 3.78899999999976,
+                "minMs": 3.4241000000001804,
+                "maxMs": 6.836699999999837,
+                "samplesMs": [
+                  6.836699999999837,
+                  3.686700000000201,
+                  3.4681000000000495,
+                  4.03020000000015,
+                  3.7892000000001644,
+                  3.4241000000001804,
+                  4.227799999999661,
+                  3.78899999999976,
+                  3.66150000000016
+                ]
+              },
+              "returnedRows": 1,
+              "plan": [
+                "SEARCH t USING COVERING INDEX idx_summary_project_period (provider=?)",
+                "SEARCH m USING PRIMARY KEY (turn_id=?) LEFT-JOIN"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "turns-model-sort-tokens-no-costs",
+          "mode": "raw",
+          "resultSha256": "e5e237496bf45ea4dc3292cbb221ab85ee1523c15459ce712b045a3e687adb2f",
+          "iterationsPerSample": 1,
+          "bundle": {
+            "medianMs": 37.27990000000045,
+            "minMs": 30.43229999999994,
+            "maxMs": 39.954699999999775,
+            "samplesMs": [
+              37.27990000000045,
+              30.43229999999994,
+              37.24549999999954,
+              37.67750000000024,
+              38.00719999999956,
+              36.20759999999973,
+              39.954699999999775,
+              31.384399999999914,
+              38.59989999999971
+            ]
+          },
+          "parts": [
+            {
+              "role": "rows",
+              "method": "all",
+              "sql": "SELECT\n        *,\n        (total_tokens > 0 OR has_model = 1) AS has_recorded_usage\n      FROM (\n    SELECT\n      t.*,\n      p.project_name,\n      s.session_name\n    FROM (\n    SELECT\n      t.id,\n      t.provider,\n      t.project_key,\n      t.session_id,\n      t.root_turn_id,\n      t.request_title,\n      coalesce(m.model, '') <> '' AS has_model,\n      t.started_at_ms,\n      t.completed_at_ms,\n      t.duration_ms,\n      t.duration_quality,\n      t.status,\n      t.quality_flags,\n      t.diagnostic_file_id,\n      t.diagnostic_offset,\n      t.last_error,\n      t.updated_at,\n      CASE\n  WHEN coalesce(m.model, '') = ''\n    AND coalesce(m.input_tokens + m.output_tokens, t.total_tokens) = 0\n  THEN NULL\n  ELSE coalesce(m.model, '')\nEND AS model,\n      \n  coalesce(m.input_tokens, t.input_tokens) AS input_tokens,\n  coalesce(m.output_tokens, t.output_tokens) AS output_tokens,\n  CASE\n    WHEN m.turn_id IS NULL THEN t.cache_write_input_tokens\n    ELSE m.cache_write_input_tokens\n  END AS cache_write_input_tokens,\n  CASE\n    WHEN m.turn_id IS NULL THEN t.cache_read_input_tokens\n    ELSE m.cache_read_input_tokens\n  END AS cache_read_input_tokens,\n      coalesce(m.input_tokens + m.output_tokens, t.total_tokens) AS total_tokens\n    FROM turn_summary t\n    LEFT JOIN turn_model_usage m ON m.turn_id = t.id\n    \n  ) t\n    JOIN projects p ON p.project_key = t.project_key\n    JOIN sessions s ON s.provider = t.provider AND s.session_id = t.session_id\n  ) AS turn_summary\n      WHERE provider IN (?,?) AND id > ?\n      ORDER BY (started_at_ms IS NULL OR coalesce(model, '') = ''), started_at_ms IS NULL, coalesce(model, '') = '', total_tokens IS NULL, total_tokens DESC, started_at_ms IS NULL, started_at_ms DESC, provider, model, id\n      LIMIT ?\n      OFFSET ?",
+              "parameters": [
+                "claude",
+                "codex",
+                0,
+                100,
+                0
+              ],
+              "timing": {
+                "medianMs": 33.32849999999962,
+                "minMs": 26.322900000000118,
+                "maxMs": 34.592099999999846,
+                "samplesMs": [
+                  33.19600000000037,
+                  26.322900000000118,
+                  33.32849999999962,
+                  33.776800000000094,
+                  33.98999999999978,
+                  32.57539999999972,
+                  34.592099999999846,
+                  28.195999999999913,
+                  34.47809999999981
+                ]
+              },
+              "returnedRows": 100,
+              "plan": [
+                "SEARCH t USING INTEGER PRIMARY KEY (rowid>?)",
+                "SEARCH s USING PRIMARY KEY (provider=? AND session_id=?)",
+                "SEARCH p USING PRIMARY KEY (project_key=?)",
+                "SEARCH m USING PRIMARY KEY (turn_id=?) LEFT-JOIN",
+                "USE TEMP B-TREE FOR ORDER BY"
+              ]
+            },
+            {
+              "role": "count",
+              "method": "get",
+              "sql": "SELECT COUNT(*) AS count\n      FROM (\n    SELECT\n      t.id,\n      t.provider,\n      t.project_key,\n      t.session_id,\n      t.root_turn_id,\n      t.request_title,\n      coalesce(m.model, '') <> '' AS has_model,\n      t.started_at_ms,\n      t.completed_at_ms,\n      t.duration_ms,\n      t.duration_quality,\n      t.status,\n      t.quality_flags,\n      t.diagnostic_file_id,\n      t.diagnostic_offset,\n      t.last_error,\n      t.updated_at,\n      CASE\n  WHEN coalesce(m.model, '') = ''\n    AND coalesce(m.input_tokens + m.output_tokens, t.total_tokens) = 0\n  THEN NULL\n  ELSE coalesce(m.model, '')\nEND AS model,\n      \n  coalesce(m.input_tokens, t.input_tokens) AS input_tokens,\n  coalesce(m.output_tokens, t.output_tokens) AS output_tokens,\n  CASE\n    WHEN m.turn_id IS NULL THEN t.cache_write_input_tokens\n    ELSE m.cache_write_input_tokens\n  END AS cache_write_input_tokens,\n  CASE\n    WHEN m.turn_id IS NULL THEN t.cache_read_input_tokens\n    ELSE m.cache_read_input_tokens\n  END AS cache_read_input_tokens,\n      coalesce(m.input_tokens + m.output_tokens, t.total_tokens) AS total_tokens\n    FROM turn_summary t\n    LEFT JOIN turn_model_usage m ON m.turn_id = t.id\n    \n  ) AS turn_summary\n      WHERE provider IN (?,?)",
+              "parameters": [
+                "claude",
+                "codex"
+              ],
+              "timing": {
+                "medianMs": 4.017199999999775,
+                "minMs": 3.1884000000000015,
+                "maxMs": 5.362599999999929,
+                "samplesMs": [
+                  4.083900000000085,
+                  4.109399999999823,
+                  3.9169999999999163,
+                  3.9007000000001426,
+                  4.017199999999775,
+                  3.6322000000000116,
+                  5.362599999999929,
+                  3.1884000000000015,
+                  4.121799999999894
+                ]
+              },
+              "returnedRows": 1,
+              "plan": [
+                "SEARCH t USING COVERING INDEX idx_summary_project_period (provider=?)",
+                "SEARCH m USING PRIMARY KEY (turn_id=?) LEFT-JOIN"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "turns-model-sort-model-no-costs",
+          "mode": "raw",
+          "resultSha256": "066f3ac4511c57bdf6add58c28ed222228d5b4b88c42f1bf0bb62025078ca925",
+          "iterationsPerSample": 1,
+          "bundle": {
+            "medianMs": 60.12570000000005,
+            "minMs": 55.55169999999998,
+            "maxMs": 67.57619999999997,
+            "samplesMs": [
+              58.85699999999997,
+              55.55169999999998,
+              60.42549999999983,
+              57.59949999999981,
+              55.97779999999966,
+              60.12570000000005,
+              65.16330000000016,
+              67.57619999999997,
+              62.7525999999998
+            ]
+          },
+          "parts": [
+            {
+              "role": "rows",
+              "method": "all",
+              "sql": "SELECT\n        *,\n        (total_tokens > 0 OR has_model = 1) AS has_recorded_usage\n      FROM (\n    SELECT\n      t.*,\n      p.project_name,\n      s.session_name\n    FROM (\n    SELECT\n      t.id,\n      t.provider,\n      t.project_key,\n      t.session_id,\n      t.root_turn_id,\n      t.request_title,\n      coalesce(m.model, '') <> '' AS has_model,\n      t.started_at_ms,\n      t.completed_at_ms,\n      t.duration_ms,\n      t.duration_quality,\n      t.status,\n      t.quality_flags,\n      t.diagnostic_file_id,\n      t.diagnostic_offset,\n      t.last_error,\n      t.updated_at,\n      CASE\n  WHEN coalesce(m.model, '') = ''\n    AND coalesce(m.input_tokens + m.output_tokens, t.total_tokens) = 0\n  THEN NULL\n  ELSE coalesce(m.model, '')\nEND AS model,\n      \n  coalesce(m.input_tokens, t.input_tokens) AS input_tokens,\n  coalesce(m.output_tokens, t.output_tokens) AS output_tokens,\n  CASE\n    WHEN m.turn_id IS NULL THEN t.cache_write_input_tokens\n    ELSE m.cache_write_input_tokens\n  END AS cache_write_input_tokens,\n  CASE\n    WHEN m.turn_id IS NULL THEN t.cache_read_input_tokens\n    ELSE m.cache_read_input_tokens\n  END AS cache_read_input_tokens,\n      coalesce(m.input_tokens + m.output_tokens, t.total_tokens) AS total_tokens\n    FROM turn_summary t\n    LEFT JOIN turn_model_usage m ON m.turn_id = t.id\n    \n  ) t\n    JOIN projects p ON p.project_key = t.project_key\n    JOIN sessions s ON s.provider = t.provider AND s.session_id = t.session_id\n  ) AS turn_summary\n      WHERE provider IN (?,?) AND id > ?\n      ORDER BY (started_at_ms IS NULL OR coalesce(model, '') = ''), started_at_ms IS NULL, coalesce(model, '') = '', agent_tracker_model_release(model) IS NULL, agent_tracker_model_release(model) DESC, agent_tracker_model_key(model) DESC, started_at_ms IS NULL, started_at_ms DESC, provider, model, id\n      LIMIT ?\n      OFFSET ?",
+              "parameters": [
+                "claude",
+                "codex",
+                0,
+                100,
+                0
+              ],
+              "timing": {
+                "medianMs": 56.1292999999996,
+                "minMs": 51.54729999999972,
+                "maxMs": 62.928899999999885,
+                "samplesMs": [
+                  54.745600000000195,
+                  52.44849999999997,
+                  56.1292999999996,
+                  54.31089999999995,
+                  51.54729999999972,
+                  56.79489999999987,
+                  60.43260000000009,
+                  62.928899999999885,
+                  58.05649999999969
+                ]
+              },
+              "returnedRows": 100,
+              "plan": [
+                "SEARCH t USING INTEGER PRIMARY KEY (rowid>?)",
+                "SEARCH s USING PRIMARY KEY (provider=? AND session_id=?)",
+                "SEARCH p USING PRIMARY KEY (project_key=?)",
+                "SEARCH m USING PRIMARY KEY (turn_id=?) LEFT-JOIN",
+                "USE TEMP B-TREE FOR ORDER BY"
+              ]
+            },
+            {
+              "role": "count",
+              "method": "get",
+              "sql": "SELECT COUNT(*) AS count\n      FROM (\n    SELECT\n      t.id,\n      t.provider,\n      t.project_key,\n      t.session_id,\n      t.root_turn_id,\n      t.request_title,\n      coalesce(m.model, '') <> '' AS has_model,\n      t.started_at_ms,\n      t.completed_at_ms,\n      t.duration_ms,\n      t.duration_quality,\n      t.status,\n      t.quality_flags,\n      t.diagnostic_file_id,\n      t.diagnostic_offset,\n      t.last_error,\n      t.updated_at,\n      CASE\n  WHEN coalesce(m.model, '') = ''\n    AND coalesce(m.input_tokens + m.output_tokens, t.total_tokens) = 0\n  THEN NULL\n  ELSE coalesce(m.model, '')\nEND AS model,\n      \n  coalesce(m.input_tokens, t.input_tokens) AS input_tokens,\n  coalesce(m.output_tokens, t.output_tokens) AS output_tokens,\n  CASE\n    WHEN m.turn_id IS NULL THEN t.cache_write_input_tokens\n    ELSE m.cache_write_input_tokens\n  END AS cache_write_input_tokens,\n  CASE\n    WHEN m.turn_id IS NULL THEN t.cache_read_input_tokens\n    ELSE m.cache_read_input_tokens\n  END AS cache_read_input_tokens,\n      coalesce(m.input_tokens + m.output_tokens, t.total_tokens) AS total_tokens\n    FROM turn_summary t\n    LEFT JOIN turn_model_usage m ON m.turn_id = t.id\n    \n  ) AS turn_summary\n      WHERE provider IN (?,?)",
+              "parameters": [
+                "claude",
+                "codex"
+              ],
+              "timing": {
+                "medianMs": 4.296200000000226,
+                "minMs": 3.1032000000000153,
+                "maxMs": 4.73070000000007,
+                "samplesMs": [
+                  4.111399999999776,
+                  3.1032000000000153,
+                  4.296200000000226,
+                  3.2885999999998603,
+                  4.430499999999938,
+                  3.330800000000181,
+                  4.73070000000007,
+                  4.647300000000087,
+                  4.696100000000115
+                ]
+              },
+              "returnedRows": 1,
+              "plan": [
+                "SEARCH t USING COVERING INDEX idx_summary_project_period (provider=?)",
+                "SEARCH m USING PRIMARY KEY (turn_id=?) LEFT-JOIN"
+              ]
+            }
+          ]
+        }
+      ],
+      "apiChecks": [
+        {
+          "name": "turns-model-sort-model-no-costs",
+          "timing": {
+            "medianMs": 57.994799999999486,
+            "minMs": 55.328199999999924,
+            "maxMs": 64.40419999999995,
+            "samplesMs": [
+              56.7833999999998,
+              59.727200000000266,
+              57.994799999999486,
+              56.63169999999991,
+              55.74839999999949,
+              55.328199999999924,
+              63.724200000000565,
+              64.40419999999995,
+              64.15430000000015
+            ]
+          }
+        },
+        {
+          "name": "turns-model-sort-tokens-no-costs",
+          "timing": {
+            "medianMs": 43.45159999999942,
+            "minMs": 37.3165999999992,
+            "maxMs": 44.16859999999997,
+            "samplesMs": [
+              42.13810000000012,
+              43.45159999999942,
+              42.469200000000455,
+              37.3165999999992,
+              44.16859999999997,
+              43.74189999999999,
+              44.074900000000525,
+              43.63670000000002,
+              42.855900000000474
+            ]
+          }
+        },
+        {
+          "name": "turns-provider-sort-tokens-no-costs",
+          "timing": {
+            "medianMs": 32.220400000000154,
+            "minMs": 26.605499999999665,
+            "maxMs": 36.436900000000605,
+            "samplesMs": [
+              32.77440000000024,
+              31.79739999999947,
+              32.38810000000012,
+              27.288700000000063,
+              32.21980000000076,
+              32.220400000000154,
+              32.34650000000056,
+              26.605499999999665,
+              36.436900000000605
+            ]
+          }
+        },
+        {
+          "name": "turns-model-sort-period-no-costs",
+          "timing": {
+            "medianMs": 27.950800000000527,
+            "minMs": 19.26630000000023,
+            "maxMs": 30.749700000000303,
+            "samplesMs": [
+              30.749700000000303,
+              28.318599999999606,
+              28.894499999999425,
+              28.613899999999376,
+              19.26630000000023,
+              25.112299999999777,
+              27.679000000000087,
+              26.185999999999694,
+              27.950800000000527
+            ]
+          }
+        },
+        {
+          "name": "turns-provider-sort-model-no-costs",
+          "timing": {
+            "medianMs": 13.572499999999309,
+            "minMs": 12.54870000000028,
+            "maxMs": 18.07250000000022,
+            "samplesMs": [
+              18.07250000000022,
+              13.88760000000002,
+              13.207999999999629,
+              13.280700000000252,
+              12.74160000000029,
+              13.572499999999309,
+              13.587400000000343,
+              12.54870000000028,
+              14.588699999999335
+            ]
+          }
+        }
+      ],
+      "coverageApi": {
+        "medianMs": 6.1878999999999,
+        "minMs": 5.3226000000004206,
+        "maxMs": 6.8641999999999825,
+        "samplesMs": [
+          6.518500000000131,
+          5.978399999999965,
+          6.24369999999999,
+          6.494999999999891,
+          6.1878999999999,
+          5.3226000000004206,
+          5.341699999999946,
+          6.8641999999999825,
+          5.986899999999878
+        ]
+      }
+    },
+    {
+      "label": "synthetic-100000",
+      "requests": 100000,
+      "modelRows": 118292,
+      "sessions": 10000,
+      "projects": 20,
+      "sourceFiles": 10000,
+      "capabilityRows": 14285,
+      "costRows": 100000,
+      "requestDailyRows": 10991,
+      "modelDailyRows": 22386,
+      "rollupMetaBeforeFirstRead": null,
+      "firstReadMs": 4727.848600000001,
+      "firstReadIncludesRollupBuild": true,
+      "queries": [
+        {
+          "name": "turns-provider-sort-period-no-costs",
+          "mode": "raw",
+          "resultSha256": "baefb1e5c54c3ffb9891ec729eb0f43d1e738d6c173debfbe1e24df4d4f39373",
+          "iterationsPerSample": 1,
+          "bundle": {
+            "medianMs": 255.96520000000237,
+            "minMs": 251.10609999999724,
+            "maxMs": 278.39600000000064,
+            "samplesMs": [
+              260.08580000000075,
+              251.10609999999724,
+              253.3244999999988,
+              255.9359000000004,
+              255.43730000000141,
+              255.96520000000237,
+              261.6118999999999,
+              278.39600000000064,
+              272.33060000000114
+            ]
+          },
+          "parts": [
+            {
+              "role": "rows",
+              "method": "all",
+              "sql": "SELECT\n        *,\n        (total_tokens > 0 OR has_model = 1) AS has_recorded_usage\n      FROM (\n    SELECT\n      t.*,\n      p.project_name,\n      s.session_name\n    FROM (\n    SELECT\n      t.*,\n      EXISTS(\n        SELECT 1\n        FROM turn_model_usage m\n        WHERE m.turn_id = t.id AND m.model <> ''\n      ) AS has_model\n    FROM turn_summary t\n  ) t\n    JOIN projects p ON p.project_key = t.project_key\n    JOIN sessions s ON s.provider = t.provider AND s.session_id = t.session_id\n  ) AS turn_summary\n      WHERE provider IN (?,?) AND id > ?\n      ORDER BY started_at_ms IS NULL, started_at_ms IS NULL, started_at_ms DESC, provider, id\n      LIMIT ?\n      OFFSET ?",
+              "parameters": [
+                "claude",
+                "codex",
+                0,
+                100,
+                0
+              ],
+              "timing": {
+                "medianMs": 244.03390000000218,
+                "minMs": 236.82749999999942,
+                "maxMs": 259.92299999999886,
+                "samplesMs": [
+                  246.53110000000015,
+                  236.82749999999942,
+                  241.16589999999997,
+                  244.00990000000093,
+                  241.9991000000009,
+                  244.03390000000218,
+                  249.4277000000002,
+                  259.92299999999886,
+                  259.54019999999946
+                ]
+              },
+              "returnedRows": 100,
+              "plan": [
+                "SEARCH t USING INDEX idx_summary_project_period (provider=?)",
+                "SEARCH s USING PRIMARY KEY (provider=? AND session_id=?)",
+                "SEARCH p USING PRIMARY KEY (project_key=?)",
+                "CORRELATED SCALAR SUBQUERY 1",
+                "SEARCH m USING PRIMARY KEY (turn_id=?)",
+                "CORRELATED SCALAR SUBQUERY 1",
+                "SEARCH m USING PRIMARY KEY (turn_id=?)",
+                "USE TEMP B-TREE FOR ORDER BY"
+              ]
+            },
+            {
+              "role": "count",
+              "method": "get",
+              "sql": "SELECT COUNT(*) AS count\n      FROM (\n    SELECT\n      t.*,\n      EXISTS(\n        SELECT 1\n        FROM turn_model_usage m\n        WHERE m.turn_id = t.id AND m.model <> ''\n      ) AS has_model\n    FROM turn_summary t\n  ) AS turn_summary\n      WHERE provider IN (?,?)",
+              "parameters": [
+                "claude",
+                "codex"
+              ],
+              "timing": {
+                "medianMs": 12.790400000001682,
+                "minMs": 11.925999999999476,
+                "maxMs": 18.473000000001775,
+                "samplesMs": [
+                  13.554700000000594,
+                  14.278599999997823,
+                  12.158599999998842,
+                  11.925999999999476,
+                  13.438200000000506,
+                  11.931300000000192,
+                  12.184199999999691,
+                  18.473000000001775,
+                  12.790400000001682
+                ]
+              },
+              "returnedRows": 1,
+              "plan": [
+                "SEARCH t USING COVERING INDEX idx_summary_project_period (provider=?)"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "turns-provider-sort-tokens-no-costs",
+          "mode": "raw",
+          "resultSha256": "1b140ed01e631b3b7b7d636e67868a1365fb77f1986ee3e702410e02a859d08c",
+          "iterationsPerSample": 1,
+          "bundle": {
+            "medianMs": 250.40160000000105,
+            "minMs": 242.4506999999976,
+            "maxMs": 264.9969999999994,
+            "samplesMs": [
+              245.2371000000021,
+              251.9288000000015,
+              250.70479999999952,
+              246.19970000000103,
+              242.4506999999976,
+              250.40160000000105,
+              251.85320000000138,
+              264.9969999999994,
+              247.46600000000035
+            ]
+          },
+          "parts": [
+            {
+              "role": "rows",
+              "method": "all",
+              "sql": "SELECT\n        *,\n        (total_tokens > 0 OR has_model = 1) AS has_recorded_usage\n      FROM (\n    SELECT\n      t.*,\n      p.project_name,\n      s.session_name\n    FROM (\n    SELECT\n      t.*,\n      EXISTS(\n        SELECT 1\n        FROM turn_model_usage m\n        WHERE m.turn_id = t.id AND m.model <> ''\n      ) AS has_model\n    FROM turn_summary t\n  ) t\n    JOIN projects p ON p.project_key = t.project_key\n    JOIN sessions s ON s.provider = t.provider AND s.session_id = t.session_id\n  ) AS turn_summary\n      WHERE provider IN (?,?) AND id > ?\n      ORDER BY started_at_ms IS NULL, total_tokens IS NULL, total_tokens DESC, started_at_ms IS NULL, started_at_ms DESC, provider, id\n      LIMIT ?\n      OFFSET ?",
+              "parameters": [
+                "claude",
+                "codex",
+                0,
+                100,
+                0
+              ],
+              "timing": {
+                "medianMs": 237.10060000000158,
+                "minMs": 230.3878999999979,
+                "maxMs": 249.91449999999895,
+                "samplesMs": [
+                  233.34720000000016,
+                  238.61000000000058,
+                  237.10060000000158,
+                  233.803100000001,
+                  230.3878999999979,
+                  238.6165000000001,
+                  240.01800000000003,
+                  249.91449999999895,
+                  234.52370000000155
+                ]
+              },
+              "returnedRows": 100,
+              "plan": [
+                "SEARCH t USING INDEX idx_summary_project_period (provider=?)",
+                "SEARCH s USING PRIMARY KEY (provider=? AND session_id=?)",
+                "SEARCH p USING PRIMARY KEY (project_key=?)",
+                "CORRELATED SCALAR SUBQUERY 1",
+                "SEARCH m USING PRIMARY KEY (turn_id=?)",
+                "CORRELATED SCALAR SUBQUERY 1",
+                "SEARCH m USING PRIMARY KEY (turn_id=?)",
+                "USE TEMP B-TREE FOR ORDER BY"
+              ]
+            },
+            {
+              "role": "count",
+              "method": "get",
+              "sql": "SELECT COUNT(*) AS count\n      FROM (\n    SELECT\n      t.*,\n      EXISTS(\n        SELECT 1\n        FROM turn_model_usage m\n        WHERE m.turn_id = t.id AND m.model <> ''\n      ) AS has_model\n    FROM turn_summary t\n  ) AS turn_summary\n      WHERE provider IN (?,?)",
+              "parameters": [
+                "claude",
+                "codex"
+              ],
+              "timing": {
+                "medianMs": 12.396600000000035,
+                "minMs": 11.785100000000966,
+                "maxMs": 15.082500000000437,
+                "samplesMs": [
+                  11.889900000001944,
+                  13.31880000000092,
+                  13.604199999997945,
+                  12.396600000000035,
+                  12.062799999999697,
+                  11.785100000000966,
+                  11.83520000000135,
+                  15.082500000000437,
+                  12.942299999998795
+                ]
+              },
+              "returnedRows": 1,
+              "plan": [
+                "SEARCH t USING COVERING INDEX idx_summary_project_period (provider=?)"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "turns-provider-sort-model-no-costs",
+          "mode": "raw",
+          "resultSha256": "baefb1e5c54c3ffb9891ec729eb0f43d1e738d6c173debfbe1e24df4d4f39373",
+          "iterationsPerSample": 1,
+          "bundle": {
+            "medianMs": 279.6223000000027,
+            "minMs": 264.98039999999673,
+            "maxMs": 285.45720000000074,
+            "samplesMs": [
+              279.4099000000024,
+              270.91829999999754,
+              279.6223000000027,
+              266.71990000000005,
+              282.4449999999997,
+              285.45720000000074,
+              282.3629000000037,
+              264.98039999999673,
+              284.1183999999994
+            ]
+          },
+          "parts": [
+            {
+              "role": "rows",
+              "method": "all",
+              "sql": "SELECT\n        *,\n        (total_tokens > 0 OR has_model = 1) AS has_recorded_usage\n      FROM (\n    SELECT\n      t.*,\n      p.project_name,\n      s.session_name\n    FROM (\n    SELECT\n      t.*,\n      EXISTS(\n        SELECT 1\n        FROM turn_model_usage m\n        WHERE m.turn_id = t.id AND m.model <> ''\n      ) AS has_model\n    FROM turn_summary t\n  ) t\n    JOIN projects p ON p.project_key = t.project_key\n    JOIN sessions s ON s.provider = t.provider AND s.session_id = t.session_id\n  ) AS turn_summary\n      WHERE provider IN (?,?) AND id > ?\n      ORDER BY started_at_ms IS NULL, provider IS NULL, provider DESC, started_at_ms IS NULL, started_at_ms DESC, provider, id\n      LIMIT ?\n      OFFSET ?",
+              "parameters": [
+                "claude",
+                "codex",
+                0,
+                100,
+                0
+              ],
+              "timing": {
+                "medianMs": 267.3057000000008,
+                "minMs": 253.10429999999906,
+                "maxMs": 273.2926000000007,
+                "samplesMs": [
+                  267.3057000000008,
+                  255.65799999999945,
+                  265.77540000000226,
+                  254.372800000001,
+                  269.5182999999997,
+                  273.2926000000007,
+                  268.52240000000165,
+                  253.10429999999906,
+                  268.96889999999985
+                ]
+              },
+              "returnedRows": 100,
+              "plan": [
+                "SEARCH t USING INDEX idx_summary_project_period (provider=?)",
+                "SEARCH s USING PRIMARY KEY (provider=? AND session_id=?)",
+                "SEARCH p USING PRIMARY KEY (project_key=?)",
+                "CORRELATED SCALAR SUBQUERY 1",
+                "SEARCH m USING PRIMARY KEY (turn_id=?)",
+                "CORRELATED SCALAR SUBQUERY 1",
+                "SEARCH m USING PRIMARY KEY (turn_id=?)",
+                "USE TEMP B-TREE FOR ORDER BY"
+              ]
+            },
+            {
+              "role": "count",
+              "method": "get",
+              "sql": "SELECT COUNT(*) AS count\n      FROM (\n    SELECT\n      t.*,\n      EXISTS(\n        SELECT 1\n        FROM turn_model_usage m\n        WHERE m.turn_id = t.id AND m.model <> ''\n      ) AS has_model\n    FROM turn_summary t\n  ) AS turn_summary\n      WHERE provider IN (?,?)",
+              "parameters": [
+                "claude",
+                "codex"
+              ],
+              "timing": {
+                "medianMs": 12.926699999999983,
+                "minMs": 11.876099999997678,
+                "maxMs": 15.260299999998097,
+                "samplesMs": [
+                  12.104200000001583,
+                  15.260299999998097,
+                  13.84690000000046,
+                  12.347099999999045,
+                  12.926699999999983,
+                  12.164600000000064,
+                  13.840500000002066,
+                  11.876099999997678,
+                  15.149499999999534
+                ]
+              },
+              "returnedRows": 1,
+              "plan": [
+                "SEARCH t USING COVERING INDEX idx_summary_project_period (provider=?)"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "turns-model-sort-period-no-costs",
+          "mode": "raw",
+          "resultSha256": "1c87385d5924c070766a924b473a0bfad7bbc59be819ce8c123d944bfb658fc6",
+          "iterationsPerSample": 1,
+          "bundle": {
+            "medianMs": 445.91140000000087,
+            "minMs": 434.0518000000011,
+            "maxMs": 460.5540000000001,
+            "samplesMs": [
+              460.5540000000001,
+              447.4435000000012,
+              434.0518000000011,
+              453.7824000000037,
+              445.6697000000022,
+              456.3906999999999,
+              445.91140000000087,
+              441.6206999999995,
+              439.26940000000104
+            ]
+          },
+          "parts": [
+            {
+              "role": "rows",
+              "method": "all",
+              "sql": "SELECT\n        *,\n        (total_tokens > 0 OR has_model = 1) AS has_recorded_usage\n      FROM (\n    SELECT\n      t.*,\n      p.project_name,\n      s.session_name\n    FROM (\n    SELECT\n      t.id,\n      t.provider,\n      t.project_key,\n      t.session_id,\n      t.root_turn_id,\n      t.request_title,\n      coalesce(m.model, '') <> '' AS has_model,\n      t.started_at_ms,\n      t.completed_at_ms,\n      t.duration_ms,\n      t.duration_quality,\n      t.status,\n      t.quality_flags,\n      t.diagnostic_file_id,\n      t.diagnostic_offset,\n      t.last_error,\n      t.updated_at,\n      CASE\n  WHEN coalesce(m.model, '') = ''\n    AND coalesce(m.input_tokens + m.output_tokens, t.total_tokens) = 0\n  THEN NULL\n  ELSE coalesce(m.model, '')\nEND AS model,\n      \n  coalesce(m.input_tokens, t.input_tokens) AS input_tokens,\n  coalesce(m.output_tokens, t.output_tokens) AS output_tokens,\n  CASE\n    WHEN m.turn_id IS NULL THEN t.cache_write_input_tokens\n    ELSE m.cache_write_input_tokens\n  END AS cache_write_input_tokens,\n  CASE\n    WHEN m.turn_id IS NULL THEN t.cache_read_input_tokens\n    ELSE m.cache_read_input_tokens\n  END AS cache_read_input_tokens,\n      coalesce(m.input_tokens + m.output_tokens, t.total_tokens) AS total_tokens\n    FROM turn_summary t\n    LEFT JOIN turn_model_usage m ON m.turn_id = t.id\n    \n  ) t\n    JOIN projects p ON p.project_key = t.project_key\n    JOIN sessions s ON s.provider = t.provider AND s.session_id = t.session_id\n  ) AS turn_summary\n      WHERE provider IN (?,?) AND id > ?\n      ORDER BY (started_at_ms IS NULL OR coalesce(model, '') = ''), started_at_ms IS NULL, coalesce(model, '') = '', started_at_ms IS NULL, started_at_ms DESC, provider, model, id\n      LIMIT ?\n      OFFSET ?",
+              "parameters": [
+                "claude",
+                "codex",
+                0,
+                100,
+                0
+              ],
+              "timing": {
+                "medianMs": 361.97350000000006,
+                "minMs": 350.3806000000004,
+                "maxMs": 373.96900000000096,
+                "samplesMs": [
+                  373.9435999999987,
+                  365.4804000000004,
+                  350.3806000000004,
+                  373.96900000000096,
+                  361.2927000000018,
+                  361.97350000000006,
+                  362.70170000000144,
+                  358.16400000000067,
+                  357.84140000000116
+                ]
+              },
+              "returnedRows": 100,
+              "plan": [
+                "SEARCH t USING INDEX idx_summary_project_period (provider=?)",
+                "SEARCH s USING PRIMARY KEY (provider=? AND session_id=?)",
+                "SEARCH p USING PRIMARY KEY (project_key=?)",
+                "SEARCH m USING PRIMARY KEY (turn_id=?) LEFT-JOIN",
+                "USE TEMP B-TREE FOR ORDER BY"
+              ]
+            },
+            {
+              "role": "count",
+              "method": "get",
+              "sql": "SELECT COUNT(*) AS count\n      FROM (\n    SELECT\n      t.id,\n      t.provider,\n      t.project_key,\n      t.session_id,\n      t.root_turn_id,\n      t.request_title,\n      coalesce(m.model, '') <> '' AS has_model,\n      t.started_at_ms,\n      t.completed_at_ms,\n      t.duration_ms,\n      t.duration_quality,\n      t.status,\n      t.quality_flags,\n      t.diagnostic_file_id,\n      t.diagnostic_offset,\n      t.last_error,\n      t.updated_at,\n      CASE\n  WHEN coalesce(m.model, '') = ''\n    AND coalesce(m.input_tokens + m.output_tokens, t.total_tokens) = 0\n  THEN NULL\n  ELSE coalesce(m.model, '')\nEND AS model,\n      \n  coalesce(m.input_tokens, t.input_tokens) AS input_tokens,\n  coalesce(m.output_tokens, t.output_tokens) AS output_tokens,\n  CASE\n    WHEN m.turn_id IS NULL THEN t.cache_write_input_tokens\n    ELSE m.cache_write_input_tokens\n  END AS cache_write_input_tokens,\n  CASE\n    WHEN m.turn_id IS NULL THEN t.cache_read_input_tokens\n    ELSE m.cache_read_input_tokens\n  END AS cache_read_input_tokens,\n      coalesce(m.input_tokens + m.output_tokens, t.total_tokens) AS total_tokens\n    FROM turn_summary t\n    LEFT JOIN turn_model_usage m ON m.turn_id = t.id\n    \n  ) AS turn_summary\n      WHERE provider IN (?,?)",
+              "parameters": [
+                "claude",
+                "codex"
+              ],
+              "timing": {
+                "medianMs": 83.45669999999882,
+                "minMs": 79.81340000000273,
+                "maxMs": 94.41719999999987,
+                "samplesMs": [
+                  86.61040000000139,
+                  81.96310000000085,
+                  83.67120000000068,
+                  79.81340000000273,
+                  84.37700000000041,
+                  94.41719999999987,
+                  83.20969999999943,
+                  83.45669999999882,
+                  81.42799999999988
+                ]
+              },
+              "returnedRows": 1,
+              "plan": [
+                "SEARCH t USING COVERING INDEX idx_summary_project_period (provider=?)",
+                "SEARCH m USING PRIMARY KEY (turn_id=?) LEFT-JOIN"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "turns-model-sort-tokens-no-costs",
+          "mode": "raw",
+          "resultSha256": "0e7c42b2c2579c41e68fe5a75b27091d80c34986e59cedb38a71ea4a75df2f42",
+          "iterationsPerSample": 1,
+          "bundle": {
+            "medianMs": 473.9174999999959,
+            "minMs": 447.47649999999703,
+            "maxMs": 500.5728999999992,
+            "samplesMs": [
+              473.9174999999959,
+              470.870600000002,
+              447.47649999999703,
+              467.00649999999587,
+              481.02150000000256,
+              476.53310000000783,
+              464.4360000000015,
+              498.3402999999962,
+              500.5728999999992
+            ]
+          },
+          "parts": [
+            {
+              "role": "rows",
+              "method": "all",
+              "sql": "SELECT\n        *,\n        (total_tokens > 0 OR has_model = 1) AS has_recorded_usage\n      FROM (\n    SELECT\n      t.*,\n      p.project_name,\n      s.session_name\n    FROM (\n    SELECT\n      t.id,\n      t.provider,\n      t.project_key,\n      t.session_id,\n      t.root_turn_id,\n      t.request_title,\n      coalesce(m.model, '') <> '' AS has_model,\n      t.started_at_ms,\n      t.completed_at_ms,\n      t.duration_ms,\n      t.duration_quality,\n      t.status,\n      t.quality_flags,\n      t.diagnostic_file_id,\n      t.diagnostic_offset,\n      t.last_error,\n      t.updated_at,\n      CASE\n  WHEN coalesce(m.model, '') = ''\n    AND coalesce(m.input_tokens + m.output_tokens, t.total_tokens) = 0\n  THEN NULL\n  ELSE coalesce(m.model, '')\nEND AS model,\n      \n  coalesce(m.input_tokens, t.input_tokens) AS input_tokens,\n  coalesce(m.output_tokens, t.output_tokens) AS output_tokens,\n  CASE\n    WHEN m.turn_id IS NULL THEN t.cache_write_input_tokens\n    ELSE m.cache_write_input_tokens\n  END AS cache_write_input_tokens,\n  CASE\n    WHEN m.turn_id IS NULL THEN t.cache_read_input_tokens\n    ELSE m.cache_read_input_tokens\n  END AS cache_read_input_tokens,\n      coalesce(m.input_tokens + m.output_tokens, t.total_tokens) AS total_tokens\n    FROM turn_summary t\n    LEFT JOIN turn_model_usage m ON m.turn_id = t.id\n    \n  ) t\n    JOIN projects p ON p.project_key = t.project_key\n    JOIN sessions s ON s.provider = t.provider AND s.session_id = t.session_id\n  ) AS turn_summary\n      WHERE provider IN (?,?) AND id > ?\n      ORDER BY (started_at_ms IS NULL OR coalesce(model, '') = ''), started_at_ms IS NULL, coalesce(model, '') = '', total_tokens IS NULL, total_tokens DESC, started_at_ms IS NULL, started_at_ms DESC, provider, model, id\n      LIMIT ?\n      OFFSET ?",
+              "parameters": [
+                "claude",
+                "codex",
+                0,
+                100,
+                0
+              ],
+              "timing": {
+                "medianMs": 387.767399999997,
+                "minMs": 359.3304999999964,
+                "maxMs": 409.09539999999834,
+                "samplesMs": [
+                  387.767399999997,
+                  385.4936000000016,
+                  359.3304999999964,
+                  382.93909999999596,
+                  397.05020000000513,
+                  389.2159000000029,
+                  377.8807000000015,
+                  409.09539999999834,
+                  405.62369999999646
+                ]
+              },
+              "returnedRows": 100,
+              "plan": [
+                "SEARCH t USING INDEX idx_summary_project_period (provider=?)",
+                "SEARCH s USING PRIMARY KEY (provider=? AND session_id=?)",
+                "SEARCH p USING PRIMARY KEY (project_key=?)",
+                "SEARCH m USING PRIMARY KEY (turn_id=?) LEFT-JOIN",
+                "USE TEMP B-TREE FOR ORDER BY"
+              ]
+            },
+            {
+              "role": "count",
+              "method": "get",
+              "sql": "SELECT COUNT(*) AS count\n      FROM (\n    SELECT\n      t.id,\n      t.provider,\n      t.project_key,\n      t.session_id,\n      t.root_turn_id,\n      t.request_title,\n      coalesce(m.model, '') <> '' AS has_model,\n      t.started_at_ms,\n      t.completed_at_ms,\n      t.duration_ms,\n      t.duration_quality,\n      t.status,\n      t.quality_flags,\n      t.diagnostic_file_id,\n      t.diagnostic_offset,\n      t.last_error,\n      t.updated_at,\n      CASE\n  WHEN coalesce(m.model, '') = ''\n    AND coalesce(m.input_tokens + m.output_tokens, t.total_tokens) = 0\n  THEN NULL\n  ELSE coalesce(m.model, '')\nEND AS model,\n      \n  coalesce(m.input_tokens, t.input_tokens) AS input_tokens,\n  coalesce(m.output_tokens, t.output_tokens) AS output_tokens,\n  CASE\n    WHEN m.turn_id IS NULL THEN t.cache_write_input_tokens\n    ELSE m.cache_write_input_tokens\n  END AS cache_write_input_tokens,\n  CASE\n    WHEN m.turn_id IS NULL THEN t.cache_read_input_tokens\n    ELSE m.cache_read_input_tokens\n  END AS cache_read_input_tokens,\n      coalesce(m.input_tokens + m.output_tokens, t.total_tokens) AS total_tokens\n    FROM turn_summary t\n    LEFT JOIN turn_model_usage m ON m.turn_id = t.id\n    \n  ) AS turn_summary\n      WHERE provider IN (?,?)",
+              "parameters": [
+                "claude",
+                "codex"
+              ],
+              "timing": {
+                "medianMs": 86.55529999999999,
+                "minMs": 83.97129999999743,
+                "maxMs": 94.94920000000275,
+                "samplesMs": [
+                  86.15009999999893,
+                  85.37700000000041,
+                  88.14600000000064,
+                  84.0673999999999,
+                  83.97129999999743,
+                  87.31720000000496,
+                  86.55529999999999,
+                  89.24489999999787,
+                  94.94920000000275
+                ]
+              },
+              "returnedRows": 1,
+              "plan": [
+                "SEARCH t USING COVERING INDEX idx_summary_project_period (provider=?)",
+                "SEARCH m USING PRIMARY KEY (turn_id=?) LEFT-JOIN"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "turns-model-sort-model-no-costs",
+          "mode": "raw",
+          "resultSha256": "8bbf64d2dd3674a866642ed7b15111cbbc51ac958cd7cffe74b930e1a371a60f",
+          "iterationsPerSample": 1,
+          "bundle": {
+            "medianMs": 885.412799999991,
+            "minMs": 851.3415999999997,
+            "maxMs": 942.1368000000002,
+            "samplesMs": [
+              923.0593000000008,
+              893.8960999999981,
+              879.9795000000013,
+              851.3415999999997,
+              885.412799999991,
+              881.8413,
+              877.013100000011,
+              886.3531999999977,
+              942.1368000000002
+            ]
+          },
+          "parts": [
+            {
+              "role": "rows",
+              "method": "all",
+              "sql": "SELECT\n        *,\n        (total_tokens > 0 OR has_model = 1) AS has_recorded_usage\n      FROM (\n    SELECT\n      t.*,\n      p.project_name,\n      s.session_name\n    FROM (\n    SELECT\n      t.id,\n      t.provider,\n      t.project_key,\n      t.session_id,\n      t.root_turn_id,\n      t.request_title,\n      coalesce(m.model, '') <> '' AS has_model,\n      t.started_at_ms,\n      t.completed_at_ms,\n      t.duration_ms,\n      t.duration_quality,\n      t.status,\n      t.quality_flags,\n      t.diagnostic_file_id,\n      t.diagnostic_offset,\n      t.last_error,\n      t.updated_at,\n      CASE\n  WHEN coalesce(m.model, '') = ''\n    AND coalesce(m.input_tokens + m.output_tokens, t.total_tokens) = 0\n  THEN NULL\n  ELSE coalesce(m.model, '')\nEND AS model,\n      \n  coalesce(m.input_tokens, t.input_tokens) AS input_tokens,\n  coalesce(m.output_tokens, t.output_tokens) AS output_tokens,\n  CASE\n    WHEN m.turn_id IS NULL THEN t.cache_write_input_tokens\n    ELSE m.cache_write_input_tokens\n  END AS cache_write_input_tokens,\n  CASE\n    WHEN m.turn_id IS NULL THEN t.cache_read_input_tokens\n    ELSE m.cache_read_input_tokens\n  END AS cache_read_input_tokens,\n      coalesce(m.input_tokens + m.output_tokens, t.total_tokens) AS total_tokens\n    FROM turn_summary t\n    LEFT JOIN turn_model_usage m ON m.turn_id = t.id\n    \n  ) t\n    JOIN projects p ON p.project_key = t.project_key\n    JOIN sessions s ON s.provider = t.provider AND s.session_id = t.session_id\n  ) AS turn_summary\n      WHERE provider IN (?,?) AND id > ?\n      ORDER BY (started_at_ms IS NULL OR coalesce(model, '') = ''), started_at_ms IS NULL, coalesce(model, '') = '', agent_tracker_model_release(model) IS NULL, agent_tracker_model_release(model) DESC, agent_tracker_model_key(model) DESC, started_at_ms IS NULL, started_at_ms DESC, provider, model, id\n      LIMIT ?\n      OFFSET ?",
+              "parameters": [
+                "claude",
+                "codex",
+                0,
+                100,
+                0
+              ],
+              "timing": {
+                "medianMs": 796.053399999997,
+                "minMs": 763.6604000000007,
+                "maxMs": 852.2576000000045,
+                "samplesMs": [
+                  830.4665999999997,
+                  807.7675999999992,
+                  793.4746999999988,
+                  763.6604000000007,
+                  797.4407999999967,
+                  790.7496000000028,
+                  789.9088000000047,
+                  796.053399999997,
+                  852.2576000000045
+                ]
+              },
+              "returnedRows": 100,
+              "plan": [
+                "SEARCH t USING INDEX idx_summary_project_period (provider=?)",
+                "SEARCH s USING PRIMARY KEY (provider=? AND session_id=?)",
+                "SEARCH p USING PRIMARY KEY (project_key=?)",
+                "SEARCH m USING PRIMARY KEY (turn_id=?) LEFT-JOIN",
+                "USE TEMP B-TREE FOR ORDER BY"
+              ]
+            },
+            {
+              "role": "count",
+              "method": "get",
+              "sql": "SELECT COUNT(*) AS count\n      FROM (\n    SELECT\n      t.id,\n      t.provider,\n      t.project_key,\n      t.session_id,\n      t.root_turn_id,\n      t.request_title,\n      coalesce(m.model, '') <> '' AS has_model,\n      t.started_at_ms,\n      t.completed_at_ms,\n      t.duration_ms,\n      t.duration_quality,\n      t.status,\n      t.quality_flags,\n      t.diagnostic_file_id,\n      t.diagnostic_offset,\n      t.last_error,\n      t.updated_at,\n      CASE\n  WHEN coalesce(m.model, '') = ''\n    AND coalesce(m.input_tokens + m.output_tokens, t.total_tokens) = 0\n  THEN NULL\n  ELSE coalesce(m.model, '')\nEND AS model,\n      \n  coalesce(m.input_tokens, t.input_tokens) AS input_tokens,\n  coalesce(m.output_tokens, t.output_tokens) AS output_tokens,\n  CASE\n    WHEN m.turn_id IS NULL THEN t.cache_write_input_tokens\n    ELSE m.cache_write_input_tokens\n  END AS cache_write_input_tokens,\n  CASE\n    WHEN m.turn_id IS NULL THEN t.cache_read_input_tokens\n    ELSE m.cache_read_input_tokens\n  END AS cache_read_input_tokens,\n      coalesce(m.input_tokens + m.output_tokens, t.total_tokens) AS total_tokens\n    FROM turn_summary t\n    LEFT JOIN turn_model_usage m ON m.turn_id = t.id\n    \n  ) AS turn_summary\n      WHERE provider IN (?,?)",
+              "parameters": [
+                "claude",
+                "codex"
+              ],
+              "timing": {
+                "medianMs": 87.9719999999943,
+                "minMs": 86.1284999999989,
+                "maxMs": 92.59270000000106,
+                "samplesMs": [
+                  92.59270000000106,
+                  86.1284999999989,
+                  86.50480000000243,
+                  87.68119999999908,
+                  87.9719999999943,
+                  91.09169999999722,
+                  87.10430000000633,
+                  90.29980000000069,
+                  89.87919999999576
+                ]
+              },
+              "returnedRows": 1,
+              "plan": [
+                "SEARCH t USING COVERING INDEX idx_summary_project_period (provider=?)",
+                "SEARCH m USING PRIMARY KEY (turn_id=?) LEFT-JOIN"
+              ]
+            }
+          ]
+        }
+      ],
+      "apiChecks": [
+        {
+          "name": "turns-model-sort-model-no-costs",
+          "timing": {
+            "medianMs": 888.6814000000013,
+            "minMs": 841.6434000000008,
+            "maxMs": 908.998599999999,
+            "samplesMs": [
+              866.3709000000017,
+              852.1392999999953,
+              895.8949000000066,
+              894.3062999999966,
+              908.998599999999,
+              888.6814000000013,
+              907.7600999999995,
+              872.9544000000024,
+              841.6434000000008
+            ]
+          }
+        },
+        {
+          "name": "turns-model-sort-tokens-no-costs",
+          "timing": {
+            "medianMs": 478.33179999999993,
+            "minMs": 433.86470000000554,
+            "maxMs": 501.33950000000186,
+            "samplesMs": [
+              433.86470000000554,
+              474.97810000000027,
+              464.44540000000416,
+              489.0858999999982,
+              477.315300000002,
+              501.33950000000186,
+              478.33179999999993,
+              484.05249999999796,
+              482.3747000000003
+            ]
+          }
+        },
+        {
+          "name": "turns-model-sort-period-no-costs",
+          "timing": {
+            "medianMs": 487.20320000000356,
+            "minMs": 449.97410000000673,
+            "maxMs": 624.9035999999978,
+            "samplesMs": [
+              479.5795999999973,
+              496.97520000000077,
+              485.2839000000022,
+              624.9035999999978,
+              584.6236000000063,
+              522.7544999999955,
+              449.97410000000673,
+              470.4415000000008,
+              487.20320000000356
+            ]
+          }
+        },
+        {
+          "name": "turns-provider-sort-model-no-costs",
+          "timing": {
+            "medianMs": 278.8214000000007,
+            "minMs": 261.3969999999972,
+            "maxMs": 300.61359999999695,
+            "samplesMs": [
+              273.2810999999929,
+              275.93520000000717,
+              278.8214000000007,
+              261.3969999999972,
+              272.0139000000054,
+              296.6901999999973,
+              300.61359999999695,
+              292.3945999999996,
+              281.6137000000017
+            ]
+          }
+        },
+        {
+          "name": "turns-provider-sort-period-no-costs",
+          "timing": {
+            "medianMs": 260.11350000000675,
+            "minMs": 251.1663000000117,
+            "maxMs": 265.28280000000086,
+            "samplesMs": [
+              251.1663000000117,
+              253.40009999999893,
+              264.0243999999948,
+              260.11350000000675,
+              262.6496000000043,
+              262.50900000000547,
+              255.03859999999986,
+              265.28280000000086,
+              256.25100000000384
+            ]
+          }
+        }
+      ],
+      "coverageApi": {
+        "medianMs": 147.48579999999492,
+        "minMs": 139.8350000000064,
+        "maxMs": 168.48820000000705,
+        "samplesMs": [
+          142.3817999999883,
+          144.95739999999932,
+          140.62489999999525,
+          139.8350000000064,
+          147.48579999999492,
+          161.13830000000598,
+          166.00899999999092,
+          168.48820000000705,
+          163.34919999999693
+        ]
+      }
+    }
+  ]
+}

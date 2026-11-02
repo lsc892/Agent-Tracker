@@ -1,3 +1,4 @@
+// 세션·프로젝트 이름의 우선순위·식별자·저장·필터·페이지를 검증한다.
 import test, { type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync, appendFileSync, readFileSync, unlinkSync } from 'node:fs';

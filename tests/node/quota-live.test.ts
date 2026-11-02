@@ -1,3 +1,4 @@
+// 합성 응답과 로컬 대역으로 실계정 QA 도구의 대조·오류·정리를 검증한다.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { mkdtemp, readdir, rm } from 'node:fs/promises';

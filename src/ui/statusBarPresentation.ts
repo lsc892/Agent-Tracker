@@ -1,5 +1,7 @@
+// quota 상태를 상태바 문구·잔량 아이콘·접근성 설명으로 변환한다.
 import { t } from '../localization';
 import type { QuotaState, QuotaWindow } from '../quota/types';
+import type { DisplayPercentage, DisplayDetail } from '../configuration/schema';
 
 /** StatusBarItem accepts contributed font icons, rather than SVG or HTML. */
 export function remainingBar(usedPercent: number): string {
@@ -17,20 +19,24 @@ function resetTime(window: QuotaWindow, now: number): string {
   return hours ? t('duration.hoursMinutes', { value0: hours, value1: minutes % 60 }) : t('duration.minutes', { value0: minutes });
 }
 
-/** A short, plain-text preview, also used as the status item's accessible label. */
+/** A detailed accessible label, independent of the status bar's display mode. */
 export function quotaHoverSummary(states: readonly QuotaState[], now = Date.now()): string {
-  const lines = (['claude', 'codex'] as const).map(provider => {
+  const lines = (['codex', 'claude'] as const).map(provider => {
     const state = states.find(value => value.provider === provider);
     if (!state) return undefined;
-    return statusBarPresentation(state, 'remaining', 'compact', now, true).accessibleText;
+    return statusBarPresentation(state, 'remaining', 'detailed', now, true).accessibleText;
   }).filter((line): line is string => line !== undefined);
   return [...lines, t('status.toggleHint')].join('\n');
 }
 
+/**
+ * 책임: quota 상태를 짧은 상태바 문구와 접근성 설명으로 변환한다.
+ * 알고리즘: 기본 Codex 한도와 5시간·7일 창을 우선 선택하고 표시 모드에 맞춰 사용·잔여 백분율·초기화 시간·오래된 값 표시를 조합한다.
+ */
 export function statusBarPresentation(
   state: QuotaState,
-  percentage: 'used' | 'remaining',
-  detail: 'compact' | 'detailed',
+  percentage: DisplayPercentage,
+  detail: DisplayDetail,
   now = Date.now(),
   hover = false,
 ): { text: string; accessibleText: string } {
@@ -47,16 +53,14 @@ export function statusBarPresentation(
     ?? mainWindows.find(window => window.windowDurationMins === 300);
   const sevenDay = mainWindows.find(window => window.id === 'seven_day')
     ?? mainWindows.find(window => window.windowDurationMins === 10080);
-  const selected = detail === 'compact'
-    ? fiveHour ? [fiveHour] : []
-    : fiveHour || sevenDay ? [sevenDay, fiveHour].filter((window): window is QuotaWindow => window !== undefined) : mainWindows.slice(0, 2);
+  const selected = selectStatusWindows(detail, fiveHour, sevenDay, mainWindows);
   if (!selected.length) return { text: t('status.missingFiveHour', { value0: icon }), accessibleText: t('status.missingFiveHourAccessible', { value0: name }) };
   const values = selected.map(window => {
     const used = Math.max(0, Math.min(100, window.usedPercent));
     const percent = Math.round(percentage === 'remaining' ? 100 - used : used);
     const label = t(percentage === 'remaining' ? 'quota.remainingPercentage' : 'quota.usedPercentage', { value0: percent });
     const resets = resetTime(window, now);
-    const period = window.windowDurationMins === 300 ? t('status.fiveHour') : window.windowDurationMins === 10080 ? t('status.sevenDay') : window.label;
+    const period = windowPeriod(window);
     return {
       text: `${period} ${remainingBar(used)} ${label}${resets ? ` ${resets}` : ''}`,
       accessibleText: `${period}${hover ? ' -' : ':'} ${label}${resets ? t(hover ? 'status.resetUntil' : 'status.resetSuffix', { value0: resets }) : ''}`,
@@ -67,4 +71,16 @@ export function statusBarPresentation(
     text: `${icon} ${values.map(value => value.text).join(' · ')}${stale ? ' $(history)' : ''}`,
     accessibleText: `${name}: ${values.map(value => value.accessibleText).join(', ')}${stale ? t('status.staleSuffix') : ''}`,
   };
+}
+
+function selectStatusWindows(detail: DisplayDetail, fiveHour: QuotaWindow | undefined, sevenDay: QuotaWindow | undefined, mainWindows: readonly QuotaWindow[]): QuotaWindow[] {
+  if (detail === 'compact') return fiveHour ? [fiveHour] : [];
+  if (fiveHour || sevenDay) return [sevenDay, fiveHour].filter((window): window is QuotaWindow => window !== undefined);
+  return mainWindows.slice(0, 2);
+}
+
+function windowPeriod(window: QuotaWindow): string {
+  if (window.windowDurationMins === 300) return t('status.fiveHour');
+  if (window.windowDurationMins === 10080) return t('status.sevenDay');
+  return window.label;
 }

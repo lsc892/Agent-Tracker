@@ -1,3 +1,4 @@
+// 분리된 자식 프로세스에서 원본·롤업 쿼리의 RSS와 결과 일치를 비교한다.
 // Fresh-process query memory observations, separate from full-result correctness runs.
 const assert = require('node:assert/strict');
 const { fork } = require('node:child_process');
@@ -10,6 +11,7 @@ const { SummaryDatabase } = require('../../dist/src/summary/db');
 const { buildUsageQuery, buildUsageCountQuery } = require('../../dist/src/summary/db/queries');
 const { seed } = require('./sql-rollup.cjs');
 const rollup = require('./sql-rollup-prototype.cjs');
+const { querySourceFiles } = require('./query-source-files.cjs');
 
 const root = resolve(__dirname, '../..');
 const variants = ['current', 'session-day-rollup'];
@@ -68,7 +70,7 @@ function runWorker(path, variant, name) {
 }
 
 async function main() {
-  const output = resolve(process.argv[2] || join(root, 'docs/benchmarks/SqlRollupABBenchmark-2026-10-15.json'));
+  const output = resolve(process.argv[2] || join(root, 'docs/benchmarks/2026-10-15/SqlRollupABBenchmark-2026-10-15.json'));
   const report = JSON.parse(await readFile(output, 'utf8'));
   const directory = await mkdtemp(join(tmpdir(), 'agent-tracker-rollup-memory-'));
   const result = {
@@ -81,7 +83,7 @@ async function main() {
   };
   try {
     for (const path of ['tests/benchmarks/sql-rollup-memory.cjs', 'tests/benchmarks/sql-rollup.cjs',
-      'tests/benchmarks/sql-rollup-prototype.cjs', 'src/summary/db/queries.ts']) {
+      'tests/benchmarks/sql-rollup-prototype.cjs', ...querySourceFiles()]) {
       result.sourceSha256[path] = sha(await readFile(join(root, path)));
     }
     for (const size of result.options.sizes) {

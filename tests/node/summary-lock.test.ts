@@ -1,3 +1,4 @@
+// 프로세스·스레드 간 요약 갱신 잠금의 대기·취소·강제 종료 복구를 검증한다.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fork, type ChildProcess } from 'node:child_process';
@@ -51,7 +52,7 @@ test('a killed lock owner and terminated waiter release OS locks without deletin
     await within(states[1 - winner].acquired);
     await workers[1 - winner].terminate();
     const release = await acquireRefreshLock(databasePath);
-    await release(); await release();
+    release(); release();
     const lock = new DatabaseSync(`${databasePath}.refresh-lock.sqlite`);
     try { assert.equal(lock.prepare("SELECT count(*) n FROM sqlite_master WHERE type='table'").get()!.n, 0); }
     finally { lock.close(); }
@@ -74,7 +75,7 @@ test('waiting for a refresh lock is cancellable and leaves the active owner inta
     const competitor = new DatabaseSync(`${databasePath}.refresh-lock.sqlite`);
     try { competitor.exec('PRAGMA busy_timeout=0'); assert.throws(() => competitor.exec('BEGIN EXCLUSIVE'), /locked/); }
     finally { competitor.close(); }
-  } finally { await release(); await rm(directory, { recursive: true, force: true }); }
+  } finally { release(); await rm(directory, { recursive: true, force: true }); }
 });
 
 test('refresh locking leaves summary writes available and ignores legacy owner files', async () => {
@@ -89,5 +90,5 @@ test('refresh locking leaves summary writes available and ignores legacy owner f
       size_bytes: 0, mtime_ms: 0, dev: null, inode: null, parser_version: 1 }, 'test');
     assert.equal(database.diagnostics().counts.files, 1);
     assert.equal(await readFile(`${databasePath}.lock`, 'utf8'), '');
-  } finally { await release(); database.close(); await rm(directory, { recursive: true, force: true }); }
+  } finally { release(); database.close(); await rm(directory, { recursive: true, force: true }); }
 });

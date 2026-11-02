@@ -1,3 +1,4 @@
+// 제공자 간 공통 quota 데이터·상태·오류 계약과 정규화 도우미를 정의한다.
 import { t, type LocalizedMessage } from '../localization';
 
 export type QuotaProviderId = 'claude' | 'codex';
@@ -26,7 +27,7 @@ export interface QuotaSnapshot {
 export type QuotaErrorCode = 'authentication' | 'unsupported-account' | 'rate-limit' |
   'network' | 'timeout' | 'cancelled' | 'protocol' | 'process' | 'unavailable';
 
-/** Messages are controlled by us, never copied from credential, HTTP, or RPC bodies. */
+/** 외부 응답 본문을 노출하지 않는 quota 오류 코드·메시지·재시도 지연을 전달한다. */
 export class QuotaError extends Error {
   readonly translation?: LocalizedMessage;
   constructor(

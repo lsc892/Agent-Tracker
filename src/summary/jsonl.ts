@@ -1,11 +1,13 @@
+// 일반·Zstd JSONL 로그를 메모리 상한과 이미지 본문 제거 정책에 맞춰 읽는다.
 import { open } from 'node:fs/promises';
 import { zstdChunks, ZstdError } from './zstd';
 
+/** 통계 처리 오류의 코드와 원본 바이트 위치를 전달한다. */
 export class SummaryError extends Error {
   constructor(public readonly code: string, public readonly offset = 0) { super(code); }
 }
 
-/** Keeps bounded JSON blocks while discarding inline image bodies before JSON.parse. */
+/** 이미지 Base64 본문을 제외한 JSON 한 행을 메모리 상한 안에서 구성한다. */
 class JsonlLine {
   private readonly blocks: Buffer[] = [];
   private block: Buffer;
@@ -22,6 +24,10 @@ class JsonlLine {
     this.block = Buffer.allocUnsafe(Math.min(1024, maxBytes));
   }
 
+  /**
+   * 책임: 행의 일반 구간을 빠르게 복사하고 문자열 경계를 추적한다.
+   * 알고리즘: 다음 따옴표·역슬래시 위치를 재사용해 구간 단위로 이동하고, 이미지 탐지·이스케이프 구간만 바이트 단위로 처리한다.
+   */
   append(chunk: Buffer, start: number, end: number): void {
     this.bytes += end - start;
     // Cache the next delimiter: searching the entire remaining chunk for an absent
@@ -42,13 +48,15 @@ class JsonlLine {
       if (quote < index) quote = find(34, index);
       if (escape < index) escape = find(92, index);
       const boundary = this.inString ? Math.min(quote, escape) : quote;
-      if (boundary > index) {
-        if (this.image) {
-          // Discard without retaining Base64; JSON.parse cannot check these bytes.
-          if (/[\x00-\x1f]/.test(chunk.toString('latin1', index, boundary))) throw new SummaryError('parse-error', this.offset);
-        } else this.retain(chunk, index, boundary);
-        index = boundary;
-      } else this.appendByte(chunk[index++]);
+      if (boundary <= index) {
+        this.appendByte(chunk[index++]);
+        continue;
+      }
+      if (this.image) {
+        // Discard without retaining Base64; JSON.parse cannot check these bytes.
+        if (/[\x00-\x1f]/.test(chunk.toString('latin1', index, boundary))) throw new SummaryError('parse-error', this.offset);
+      } else this.retain(chunk, index, boundary);
+      index = boundary;
     }
   }
 
@@ -70,43 +78,68 @@ class JsonlLine {
     this.used = 0;
   }
 
+  /**
+   * 책임: 버리는 이미지 문자열까지 JSON 문자열 문법을 검증한다.
+   * 알고리즘: 문자열·escape·유니코드 잔여 길이를 상태로 갱신하고, 이미지 본문은 제어 문자와 잘못된 escape를 거부하며 저장을 생략한다.
+   */
   private appendByte(byte: number): void {
-    let retain = true;
-    if (this.inString) {
-      if (this.image) {
-        // JSON.parse cannot validate discarded bytes. Preserve its string escape/control checks here.
-        retain = false;
-        if (byte < 32) throw new SummaryError('parse-error', this.offset);
-        if (this.unicode) {
-          if (!((byte >= 48 && byte <= 57) || (byte >= 65 && byte <= 70) || (byte >= 97 && byte <= 102))) {
-            throw new SummaryError('parse-error', this.offset);
-          }
-          this.unicode--;
-        } else if (this.escaped) {
-          if (byte === 117) this.unicode = 4;
-          else if (![34, 47, 92, 98, 102, 110, 114, 116].includes(byte)) throw new SummaryError('parse-error', this.offset);
-          this.escaped = false;
-        } else if (byte === 92) this.escaped = true;
-        else if (byte === 34) { this.inString = false; this.image = false; retain = true; }
-      } else if (this.escaped) { this.escaped = false; this.probe = undefined; }
-      else if (byte === 92) { this.escaped = true; this.probe = undefined; }
-      else if (byte === 34) { this.inString = false; this.probe = undefined; }
-      else if (this.probe !== undefined) {
-        this.probe += String.fromCharCode(byte);
-        const prefix = 'data:image/';
-        if ((this.probe.length <= prefix.length && !prefix.startsWith(this.probe.toLowerCase())) || this.probe.length > 256) {
-          this.probe = undefined;
-        } else if (byte === 44) {
-          this.image = /^data:image\/[^,]+;base64,$/i.test(this.probe);
-          this.probe = undefined;
-        }
-      }
-    } else if (byte === 34) { this.inString = true; this.probe = ''; }
-    if (!retain) return;
+    if (!this.trackStringByte(byte)) return;
     if (this.length >= this.maxBytes) throw new SummaryError('line-byte-budget-exceeded', this.offset);
     if (this.used === this.block.length) this.nextBlock();
     this.block[this.used++] = byte;
     this.length++;
+  }
+
+  /** Advance string state and report whether this byte belongs in the retained JSON. */
+  private trackStringByte(byte: number): boolean {
+    if (!this.inString) {
+      if (byte === 34) { this.inString = true; this.probe = ''; }
+      return true;
+    }
+    if (this.image) return this.trackImageByte(byte);
+    if (this.escaped) { this.escaped = false; this.probe = undefined; return true; }
+    switch (byte) {
+      case 92: this.escaped = true; this.probe = undefined; break;
+      case 34: this.inString = false; this.probe = undefined; break;
+      default: if (this.probe !== undefined) this.probeImage(byte, this.probe);
+    }
+    return true;
+  }
+
+  private probeImage(byte: number, probe: string): void {
+    const next = probe + String.fromCharCode(byte);
+    this.probe = next;
+    const prefix = 'data:image/';
+    if ((next.length <= prefix.length && !prefix.startsWith(next.toLowerCase())) || next.length > 256) {
+      this.probe = undefined;
+      return;
+    }
+    if (byte !== 44) return;
+    this.image = /^data:image\/[^,]+;base64,$/i.test(next);
+    this.probe = undefined;
+  }
+
+  private trackImageByte(byte: number): boolean {
+    // JSON.parse cannot validate discarded bytes. Preserve its string escape/control checks here.
+    if (byte < 32) throw new SummaryError('parse-error', this.offset);
+    if (this.unicode) {
+      if (!((byte >= 48 && byte <= 57) || (byte >= 65 && byte <= 70) || (byte >= 97 && byte <= 102))) {
+        throw new SummaryError('parse-error', this.offset);
+      }
+      this.unicode--;
+      return false;
+    }
+    if (this.escaped) {
+      if (byte === 117) this.unicode = 4;
+      else if (![34, 47, 92, 98, 102, 110, 114, 116].includes(byte)) throw new SummaryError('parse-error', this.offset);
+      this.escaped = false;
+      return false;
+    }
+    switch (byte) {
+      case 92: this.escaped = true; return false;
+      case 34: this.inString = false; this.image = false; return true;
+      default: return false;
+    }
   }
 
   text(): string {
@@ -115,12 +148,17 @@ class JsonlLine {
   }
 }
 
-/** Reads the observed snapshot, streaming .jsonl.zst in memory. Row offsets refer to decoded JSONL. */
+/**
+ * 책임: 관측한 크기까지만 로그를 읽고 행과 원본 위치를 전달한다.
+ * 알고리즘: 64KiB 이하 청크를 개행으로 나누고 필요 시 이미지 제거·Zstd 해제를 적용하며, 미완성 마지막 행은 다음 갱신까지 유예한다.
+ */
 export async function readJsonl(
   path: string,
   size: number,
   onRow: (row: Record<string, unknown>, offset: number) => void | boolean,
   options: { maxLineBytes?: number; signal?: AbortSignal; isCancelled?: () => boolean; onBytes?: (bytes: number) => void;
+    /** Raw file bytes, before image filtering or decompression; valid only during the callback. */
+    onChunk?: (chunk: Buffer) => void;
     /** Synchronous processing of at most one chunk; file reads stay outside the callback. */
     processBatch?: (parseRows: () => void) => void } = {},
 ): Promise<{ partialLine: boolean; bytes: number; rows: number }> {
@@ -139,6 +177,7 @@ export async function readJsonl(
       const { bytesRead } = await file.read(chunk, 0, Math.min(chunk.length, size - read), read);
       if (!bytesRead) throw new SummaryError('file-truncated-during-read', read);
       read += bytesRead;
+      options.onChunk?.(chunk.subarray(0, bytesRead));
       options.onBytes?.(bytesRead);
       // The decoder can prefetch; it must not see a buffer overwritten by the next file read.
       yield compressed ? Buffer.from(chunk.subarray(0, bytesRead)) : chunk.subarray(0, bytesRead);

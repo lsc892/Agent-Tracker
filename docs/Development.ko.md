@@ -74,6 +74,8 @@ npm run restore:vscode         # 원본 복원
 
 ## 표시 언어
 
+개발 시 설정은 [공통 설정 정의](../src/configuration/schema.ts)의 해당 영역에 추가합니다. 키·기본값·선택지·설명·category를 선언하면 읽기와 타입에 자동 반영되며 `npm run localization:sync`로 VS Code 설정 등록을 생성합니다. 생성된 `package.json`의 `contributes.configuration`을 직접 수정하지 않습니다. 경로·시간대 등 파생 처리는 [설정 변환](../src/configuration.ts)에 구현하고 기능 사용처를 연결한 뒤 `npm run check`로 확인합니다.
+
 확장 설정의 **언어 → Language**에서 표시 언어를 지정합니다. 기본은 VS Code 표시 언어를 따르고, 한국어·영어·중국어 간체·일본어·스페인어·프랑스어를 지원합니다. 열린 화면과 상태 표시줄은 변경에 즉시 반영되며 지원하지 않는 언어와 누락된 번역은 한국어를 사용합니다. 명령 팔레트와 VS Code 설정 설명은 VS Code 표시 언어를 따릅니다. 구조·추가 방법은 [로컬라이징 문서](research/Localization.md)에 있습니다.
 
 ## 로그인과 경로
@@ -179,9 +181,9 @@ npm run benchmark:transactions # 합성 JSONL의 실제 집계·DB 교체 transa
 
 대량 benchmark는 `BENCHMARK_FILES`, `BENCHMARK_TURNS` 환경 변수로 조절합니다. 결과는 `tests/results/benchmarks/summary.json`에 남으며 실제 개인 대화 기록은 사용하지 않습니다. quota 자원 측정 옵션과 한계는 [측정 안내](QuotaBenchmark.md)를 참고하세요.
 
-제목 A/B는 같은 2,000개 요청을 긴 세션과 여러 제공자·세션에 배치하고, 워밍업 후 순서를 교차해 20쌍을 비교합니다. 정확성은 `node:test`에서 현재 제품 SQL과 두 후보의 전체 집계 결과를 대조하며, 성능 실행은 시간·TEMP 할당·process RSS를 별도 보고서로 남깁니다. `--cases`, `--pairs`, `--warmups`로 규모를 조절하고 `--report docs/RequestTitleAB.md`로 Markdown과 원시 JSON을 보관할 수 있습니다. 조건과 측정 결과는 [제목 A/B 보고서](RequestTitleAB.md)를 참고하세요.
+제목 A/B는 같은 2,000개 요청을 긴 세션과 여러 제공자·세션에 배치하고, 워밍업 후 순서를 교차해 20쌍을 비교합니다. 정확성은 `node:test`에서 현재 제품 SQL과 두 후보의 전체 집계 결과를 대조하며, 성능 실행은 시간·TEMP 할당·process RSS를 별도 보고서로 남깁니다. `--cases`, `--pairs`, `--warmups`로 규모를 조절하고 `--report docs/benchmarks/2026-10-08/RequestTitleAB.md`로 Markdown과 원시 JSON을 보관할 수 있습니다. 조건과 측정 결과는 [제목 A/B 보고서](benchmarks/2026-10-08/RequestTitleAB.md)를 참고하세요.
 
-제품은 A(TEMP partial index)를 사용합니다. `npm run benchmark:transactions -- --real --pairs 3 --report docs/RequestTitleTransactions.md`는 실제 로컬 대화내역을 고정 사본으로 읽고, 무인덱스 대조군과 A의 최초·전체 재집계·변경 없는 갱신을 비교합니다. 전체 시간과 실제 transaction 시간, TEMP 페이지·RSS·결과 동등성을 Markdown·JSON·JSONL로 남깁니다. 원본과 설치된 확장 DB는 수정하지 않으며 사본·실험 DB는 종료 후 삭제합니다. `--real`을 생략하면 개인 파일을 읽지 않는 합성 검증입니다. 선택 근거와 복잡도·측정 한계는 [실제 transaction 보고서](RequestTitleTransactions.md)를 참고하세요.
+제품은 A(TEMP partial index)를 사용합니다. `npm run benchmark:transactions -- --real --pairs 3 --report docs/benchmarks/2026-10-08/RequestTitleTransactions.md`는 실제 로컬 대화내역을 고정 사본으로 읽고, 무인덱스 대조군과 A의 최초·전체 재집계·변경 없는 갱신을 비교합니다. 전체 시간과 실제 transaction 시간, TEMP 페이지·RSS·결과 동등성을 Markdown·JSON·JSONL로 남깁니다. 원본과 설치된 확장 DB는 수정하지 않으며 사본·실험 DB는 종료 후 삭제합니다. `--real`을 생략하면 개인 파일을 읽지 않는 합성 검증입니다. 선택 근거와 복잡도·측정 한계는 [실제 transaction 보고서](benchmarks/2026-10-08/RequestTitleTransactions.md)를 참고하세요.
 
 `$quota-qa` 또는 [quota-qa 스킬](../.agents/skills/quota-qa/SKILL.md)로 실제 계정 검증을 실행합니다. `test:quota:live`는 Claude의 OAuth usage 응답과 Codex의 실제 App Server 응답을 동일 응답 기준으로 제품 provider와 대조하고 사용/남음 표시 반올림·잔량 막대·Codex 프로세스 종료도 검사합니다. 결과는 `tests/results/quota-live.json`에 남으며 토큰·계정 식별자는 저장하지 않습니다. 두 제공자 중 하나라도 인증 오류·429·timeout·불일치이면 종료 코드 1입니다. 429는 자동 재시도하지 않습니다. 일반 `check`와 CI는 합성 입력으로 QA 도구를 검사하며 실제 계정을 호출하지 않습니다. 설치된 VS Code나 제공자 웹 화면의 대조는 별도 검증입니다.
 
@@ -189,7 +191,7 @@ npm run benchmark:transactions # 합성 JSONL의 실제 집계·DB 교체 transa
 
 `test:vscode`는 별도 프로필과 합성 로그를 `tests/.cache/vscode/`에 만듭니다. Windows에서는 설치된 VS Code를 우선 사용하고, 그 외에는 테스트용 VS Code를 다운로드합니다. `VSCODE_TEST_VERSION`으로 다운로드 버전을, `VSCODE_EXECUTABLE`로 실행 파일을 지정할 수 있습니다. Linux의 화면 없는 환경에서는 `xvfb-run -a npm run test:vscode`를 실행합니다. 결과는 `tests/results/vscode-smoke.json`에 기록합니다.
 
-`test:toggle`은 패치가 적용된 설치를 읽기 전용으로 확인하고 격리된 창에서 실제 마우스 이동·클릭과 키보드 입력을 보냅니다. hover 지연을 100ms로 설정하고 1.5초 동안 관찰해 요약 호버와 전체 카드가 분리되는지, 카드가 열린 동안 요약이 숨겨지는지, 반복 클릭으로 닫은 카드가 다시 열리지 않는지 검증합니다. 결과와 화면은 `tests/results/statusbar-toggle.json`, `statusbar-toggle.png`에 기록합니다. 패치가 없는 설치에서는 `node tests/vscode/statusbar-toggle.cjs --baseline`으로 클릭 시 카드가 닫힌 뒤 다시 생성되는 기존 버그를 재현하고 `statusbar-toggle-baseline.json`에 기록할 수 있습니다.
+`test:toggle`은 패치가 적용된 설치를 읽기 전용으로 확인하고 격리된 창에서 실제 마우스 이동·클릭과 키보드 입력을 보냅니다. hover 지연을 100ms로 설정해 호버 시 전체 카드 표시와 이탈 시 닫힘, 클릭 고정 후 이탈 시 유지, 재클릭 닫기와 재진입 시 임시 호버 복원을 검증합니다. 반복 클릭 후에는 1.5초 동안 관찰해 닫힌 카드가 저절로 다시 열리지 않는지도 확인합니다. 결과와 화면은 `tests/results/statusbar-toggle.json`, `statusbar-toggle.png`에 기록합니다. 패치가 없는 설치에서는 `node tests/vscode/statusbar-toggle.cjs --baseline`으로 클릭 시 카드가 닫힌 뒤 다시 생성되는 기존 버그를 재현하고 `statusbar-toggle-baseline.json`에 기록할 수 있습니다.
 
 PR CI는 Windows·Linux·macOS, Node 22·24의 단위·통합 테스트와 Linux의 최소 지원 VS Code 1.101.0·stable 실제 확장 호스트 테스트를 구성했습니다. verify job과 버전 tag는 검증을 거쳐 VSIX와 npx 설치용 npm tarball을 artifact로 보관합니다. npm과 Marketplace 자동 게시 단계는 포함하지 않습니다.
 

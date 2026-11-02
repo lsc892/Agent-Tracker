@@ -1,3 +1,4 @@
+// 원본 집계와 세션·일별 롤업 시제품의 정확성·읽기·쓰기·공간을 비교한다.
 const assert = require('node:assert/strict');
 const { createHash } = require('node:crypto');
 const { readFileSync, statSync } = require('node:fs');
@@ -12,6 +13,7 @@ const { SCHEMA_VERSION } = require('../../dist/src/summary/db/schema');
 const { calendarPeriod, periodBounds } = require('../../dist/src/summary/db/timezone');
 const { describe, workloads, prepared, execute, stats } = require('./sql-explain.cjs');
 const rollup = require('./sql-rollup-prototype.cjs');
+const { querySourceFiles } = require('./query-source-files.cjs');
 
 const root = resolve(__dirname, '../..');
 const sha = input => createHash('sha256').update(input).digest('hex');
@@ -21,7 +23,7 @@ const round = value => typeof value === 'number' && !Number.isInteger(value) ? N
 const canonical = value => JSON.stringify(value, (_key, raw) => round(raw));
 
 function optionsFor(args) {
-  const options = { sizes:[280,100000],turnsPerSession:[10,100],samples:3,warmup:1,output:resolve(root,'docs/benchmarks/SqlRollupABBenchmark-2026-10-15.json'),worstCase:true };
+  const options = { sizes:[280,100000],turnsPerSession:[10,100],samples:3,warmup:1,output:resolve(root,'docs/benchmarks/2026-10-15/SqlRollupABBenchmark-2026-10-15.json'),worstCase:true };
   for (const arg of args) {
     if (arg.startsWith('--sizes=')) options.sizes=arg.slice(8).split(',').map(Number);
     else if (arg.startsWith('--turns-per-session=')) options.turnsPerSession=arg.slice(20).split(',').map(Number);
@@ -293,7 +295,7 @@ async function main() {
   const options=optionsFor(process.argv.slice(2));
   const directory=await mkdtemp(join(tmpdir(),'agent-tracker-sql-rollup-'));
   const report={createdAtSeoul:seoulTime(),environment:{node:process.version,cpu:cpus()[0]?.model,logicalCpus:cpus().length,platform:process.platform,arch:process.arch,schema:SCHEMA_VERSION,
-    sourceSha256:Object.fromEntries(['src/summary/db/queries.ts','src/summary/db/schema.ts','src/summary/db/timezone.ts','src/summary/db/sessions.ts','tests/benchmarks/sql-rollup.cjs','tests/benchmarks/sql-rollup-prototype.cjs'].map(path=>[path,sha(readFileSync(join(root,path)))]))},
+    sourceSha256:Object.fromEntries(['src/summary/db/schema.ts','src/summary/db/timezone.ts','src/summary/db/sessions.ts','tests/benchmarks/sql-rollup.cjs','tests/benchmarks/sql-rollup-prototype.cjs',...querySourceFiles()].map(path=>[path,sha(readFileSync(join(root,path)))]))},
     method:{...options,output:undefined,pageLimit:100,offset:0,timezone:rollup.TIMEZONE,statistics:'ANALYZE on both isolated variants',cacheKiB:4096,tempStore:'FILE',
       scope:'prepared SQL rows materialization + group COUNT; excludes prepare, EXPLAIN, fixtures, initial rollup build, full correctness comparison, IPC/UI/parsing; alternating warm-cache variants',
       sampleReason:'3 independent timed samples with at least one warmup; slow current full-history SQL and complete-group correctness execute additional untimed SQL',

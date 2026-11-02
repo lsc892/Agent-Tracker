@@ -1,3 +1,4 @@
+// 컴파일된 Node 테스트를 수집·실행하고 JUnit 결과를 저장한다.
 const { readdirSync, mkdirSync } = require('node:fs');
 const { join } = require('node:path');
 const { spawnSync } = require('node:child_process');

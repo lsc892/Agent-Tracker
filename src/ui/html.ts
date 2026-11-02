@@ -1,10 +1,16 @@
+// 통계·진단·색상 설정 Webview의 초기 HTML과 실행 자원 경계를 구성한다.
 import { getLocale, localizationScripts, t } from '../localization';
 import { escapeHtml } from './presentation';
+import { settingDefinitions } from '../configuration/schema';
 
 function pageSizeInput(id: string): string {
   return `<label class="page-size"><span data-i18n="dashboard.rowsPerPage">${escapeHtml(t('dashboard.rowsPerPage'))}</span><input id="${id}" type="number" min="1" max="1000" step="1" value="100" required inputmode="numeric" data-i18n-title="dashboard.pageSizeHelp" title="${escapeHtml(t('dashboard.pageSizeHelp'))}"></label>`;
 }
 
+/**
+ * 책임: 색상 설정 입력과 미리 보기에 필요한 초기 화면을 만든다.
+ * 알고리즘: 공통 기본 색상·번역 문구를 escape해 폼에 넣고 CSP와 nonce로 연결된 로컬 스크립트만 실행하게 한다.
+ */
 export function colorSettingsHtml(scriptUri:string,styleUri:string,cspSource:string,nonce:string):string {
   return `<!DOCTYPE html><html lang="${escapeHtml(getLocale())}"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${escapeHtml(cspSource)}; script-src 'nonce-${escapeHtml(nonce)}';">
@@ -13,7 +19,7 @@ export function colorSettingsHtml(scriptUri:string,styleUri:string,cspSource:str
 <main><form id="color-settings" class="color-settings">
 <label><span data-i18n="color.mode">${escapeHtml(t('color.mode'))}</span><select id="color-mode"><option value="automatic" data-i18n="common.automatic">${escapeHtml(t('common.automatic'))}</option><option value="white" data-i18n="color.white">${escapeHtml(t('color.white'))}</option><option value="black" data-i18n="color.black">${escapeHtml(t('color.black'))}</option><option value="custom" data-i18n="color.custom">${escapeHtml(t('color.custom'))}</option></select></label>
 <p class="muted note"><span data-i18n="color.automaticHelp">${escapeHtml(t('color.automaticHelp'))}</span></p>
-<div class="color-inputs"><label><span data-i18n="color.picker">${escapeHtml(t('color.picker'))}</span><input id="color-picker" type="color" value="#ffffff" data-i18n-aria-label="color.pickerAccessible" aria-label="${escapeHtml(t('color.pickerAccessible'))}"></label><label><span data-i18n="color.hex">${escapeHtml(t('color.hex'))}</span><input id="color-hex" type="text" value="#ffffff" data-i18n-placeholder="color.hexPlaceholder" placeholder="${escapeHtml(t('color.hexPlaceholder'))}" maxlength="9" spellcheck="false" autocomplete="off"></label></div>
+<div class="color-inputs"><label><span data-i18n="color.picker">${escapeHtml(t('color.picker'))}</span><input id="color-picker" type="color" value="${settingDefinitions.display.customColor.default}" data-i18n-aria-label="color.pickerAccessible" aria-label="${escapeHtml(t('color.pickerAccessible'))}"></label><label><span data-i18n="color.hex">${escapeHtml(t('color.hex'))}</span><input id="color-hex" type="text" value="${settingDefinitions.display.customColor.default}" data-i18n-placeholder="color.hexPlaceholder" placeholder="${escapeHtml(t('color.hexPlaceholder'))}" maxlength="9" spellcheck="false" autocomplete="off"></label></div>
 <label><span data-i18n="color.opacity">${escapeHtml(t('color.opacity'))}</span> <output id="color-opacity-value">100%</output><input id="color-opacity" type="range" min="0" max="255" value="255" step="1"></label>
 <p class="muted note"><span data-i18n="color.inputHelp">${escapeHtml(t('color.inputHelp'))}</span></p>
 <p class="muted"><span data-i18n="color.preview">${escapeHtml(t('color.preview'))}</span></p><div id="color-preview" class="color-preview"><span data-i18n="color.previewText">${escapeHtml(t('color.previewText'))}</span></div>
@@ -22,6 +28,10 @@ export function colorSettingsHtml(scriptUri:string,styleUri:string,cspSource:str
 </form></main>${localizationScripts(scriptUri, nonce)}<script nonce="${escapeHtml(nonce)}" src="${escapeHtml(scriptUri)}"></script></body></html>`;
 }
 
+/**
+ * 책임: 통계 화면의 초기 HTML과 실행 자원 경계를 구성한다.
+ * 알고리즘: 번역·외부 속성 값을 HTML escape하고 CSP로 자원을 차단한 뒤 nonce를 가진 로컬 스크립트와 스타일만 연결한다.
+ */
 export function dashboardHtml(scriptUri: string, styleUri: string, cspSource: string, nonce: string): string {
   return `<!DOCTYPE html>
 <html lang="${escapeHtml(getLocale())}"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -64,6 +74,10 @@ ${(['skill','subagent','plugin','model'] as const).map(category=>`<section class
 </main>${localizationScripts(scriptUri, nonce)}<script nonce="${escapeHtml(nonce)}" src="${escapeHtml(scriptUri)}"></script></body></html>`;
 }
 
+/**
+ * 책임: 저장된 파일·요청 진단을 보여 줄 초기 화면을 구성한다.
+ * 알고리즘: 진단 표·페이지 조작 영역과 번역을 조립하고 속성 escape·CSP·nonce를 적용해 로컬 자원만 연결한다.
+ */
 export function diagnosticsHtml(scriptUri: string, styleUri: string, cspSource: string, nonce: string): string {
   return `<!DOCTYPE html>
 <html lang="${escapeHtml(getLocale())}"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">

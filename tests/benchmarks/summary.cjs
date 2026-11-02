@@ -1,3 +1,4 @@
+// 합성 대화 로그로 최초·재사용·추가 갱신의 요약 처리 성능을 측정한다.
 const { mkdtemp, mkdir, open, writeFile, rm } = require('node:fs/promises');
 const { tmpdir } = require('node:os');
 const { join, resolve } = require('node:path');

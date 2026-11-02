@@ -1,16 +1,20 @@
+// quota 제공자의 파싱·통신·취소와 서비스의 갱신·만료·재시도를 검증한다.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { readFileSync } from 'node:fs';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { ClaudeCliCredentials, ClaudeQuotaProvider, CodexQuotaProvider, parseClaudeQuota,
+import { BaseQuotaProvider, WindowsClaudeCredentials, ClaudeQuotaProvider, CodexQuotaProvider, parseClaudeQuota,
   parseCodexQuota, parseRetryAfter, QuotaError, QuotaService,
-  type QuotaClock, type QuotaProvider, type QuotaSnapshot } from '../../src/quota';
+  type QuotaClock, type QuotaProvider, type QuotaReadContext, type QuotaSnapshot } from '../../src/quota';
 
+const { version: extensionVersion } = JSON.parse(readFileSync(join(__dirname, '../../../package.json'), 'utf8')) as { version: string };
 const signal = () => new AbortController().signal;
 const snapshot = (now: number, used = 25): QuotaSnapshot => ({ provider: 'claude', fetchedAt: now,
   windows: [{ id: '5h', label: '5h', usedPercent: used, current: used, maximum: 100, resetsAt: now - 1, windowDurationMins: 300 }] });
 
+/** 가상 시각과 타이머를 제어해 quota 갱신·만료·재시도를 검증한다. */
 class FakeClock implements QuotaClock {
   time = 1_000_000;
   serial = 0;
@@ -41,6 +45,56 @@ function deferred<T>(): { promise: Promise<T>; resolve(value: T): void } {
   const promise = new Promise<T>(done => { resolve = done; });
   return { promise, resolve };
 }
+
+test('the quota base cancels every active read and waits for cleanup before disposal completes', async () => {
+  const cleanup = deferred<void>();
+  let started = 0;
+  let cancelled = 0;
+  /** 취소와 정리 완료를 지연시켜 quota 제공자의 종료 대기를 검증한다. */
+  class Provider extends BaseQuotaProvider {
+    readonly id = 'claude' as const;
+    protected readonly closedMessage = { key: 'quota.claudeCancelled' } as const;
+
+    protected async readQuota(context: QuotaReadContext): Promise<QuotaSnapshot> {
+      started++;
+      await new Promise<void>(resolve => context.signal.addEventListener('abort', () => {
+        cancelled++;
+        resolve();
+      }, { once: true }));
+      await cleanup.promise;
+      throw new QuotaError('cancelled', 'Cancelled');
+    }
+  }
+  const provider = new Provider();
+  const first = assert.rejects(provider.read({ signal: signal() }), { code: 'cancelled' });
+  const second = assert.rejects(provider.read({ signal: signal() }), { code: 'cancelled' });
+  await settle();
+  assert.equal(started, 2);
+  const closing = provider.dispose();
+  assert.equal(provider.dispose(), closing);
+  let closed = false;
+  void closing.then(() => { closed = true; });
+  await settle();
+  assert.equal(cancelled, 2);
+  assert.equal(closed, false, 'provider cleanup remains part of the read lifetime');
+  await assert.rejects(provider.read({ signal: signal() }), { code: 'cancelled' });
+  cleanup.resolve();
+  await Promise.all([first, second, closing]);
+  await assert.rejects(provider.read({ signal: signal() }), { code: 'cancelled' });
+  assert.equal(started, 2, 'closed providers do not start additional reads');
+});
+
+test('the quota base releases failed reads even when provider code throws synchronously', async () => {
+  /** 동기 조회 예외를 발생시켜 quota 제공자의 활성 작업 정리를 검증한다. */
+  class Provider extends BaseQuotaProvider {
+    readonly id = 'claude' as const;
+    protected readonly closedMessage = { key: 'quota.claudeCancelled' } as const;
+    protected readQuota(): Promise<QuotaSnapshot> { throw new Error('Read failed'); }
+  }
+  const provider = new Provider();
+  await assert.rejects(provider.read({ signal: signal() }), /Read failed/);
+  await provider.dispose();
+});
 
 test('manual refresh policy skips startup, focus and timers and can switch live', async () => {
   const clock = new FakeClock();
@@ -130,6 +184,51 @@ test('inactive activation defers first read until focus; automatic joins and man
   await service.dispose();
 });
 
+test('refreshes requested by synchronous observers share the active cycle, including during a rerun', async () => {
+  const clock = new FakeClock();
+  const replies = [deferred<QuotaSnapshot>(), deferred<QuotaSnapshot>(), deferred<QuotaSnapshot>()];
+  let reads = 0;
+  let active = 0;
+  let maxActive = 0;
+  let startupRefresh: Promise<void> | undefined;
+  let rerunRefresh: Promise<void> | undefined;
+  const service = new QuotaService([{ id: 'claude', read: async context => {
+    const index = reads++;
+    active++;
+    maxActive = Math.max(maxActive, active);
+    try {
+      assert.ok(index < replies.length, 'observer requests must not start extra reads');
+      if (index === 1) context.onSnapshot?.(snapshot(clock.now(), 40));
+      return await replies[index].promise;
+    } finally { active--; }
+  } }], { clock, refreshPolicy: 'manual' });
+  service.subscribe(([state]) => {
+    if (state.refreshing && state.snapshot === null && !startupRefresh) startupRefresh = service.refresh('claude', true);
+    if (state.snapshot?.windows[0].usedPercent === 40 && !rerunRefresh) rerunRefresh = service.refresh('claude', true);
+  });
+  try {
+    const running = service.refresh('claude', true);
+    assert.equal(startupRefresh, running);
+    await settle();
+    assert.equal(reads, 1);
+    replies[0].resolve(snapshot(clock.now(), 20));
+    await settle();
+    assert.equal(reads, 2);
+    assert.equal(rerunRefresh, running);
+    replies[1].resolve(snapshot(clock.now(), 40));
+    await settle();
+    assert.equal(reads, 3);
+    replies[2].resolve(snapshot(clock.now(), 60));
+    await running;
+    assert.equal(maxActive, 1);
+    assert.equal(service.getState('claude').snapshot?.windows[0].usedPercent, 60);
+    assert.equal(service.getState('claude').refreshing, false);
+  } finally {
+    for (const reply of replies) reply.resolve(snapshot(clock.now()));
+    await service.dispose();
+  }
+});
+
 test('failed focus retries back off per provider; forced manual refresh bypasses Retry-After', async () => {
   const clock = new FakeClock();
   let reads = 0;
@@ -181,6 +280,34 @@ test('failed snapshots expire at 30 minutes or 24 hours, retain last success tim
   }
 });
 
+test('the expiry timer notifies listeners in manual unfocused mode without polling or a state read', async () => {
+  const clock = new FakeClock();
+  let fail = false;
+  let reads = 0;
+  const seen: string[] = [];
+  const service = new QuotaService([{ id: 'claude', read: async () => {
+    reads++;
+    if (fail) throw new QuotaError('network', 'safe error');
+    return snapshot(clock.now());
+  } }], { clock });
+  service.subscribe(([state]) => seen.push(state.status));
+  try {
+    service.start();
+    await settle();
+    fail = true;
+    await service.refresh('claude', true);
+    service.setRefreshPolicy('manual');
+    service.setFocused(false);
+    assert.equal(clock.tasks.size, 1);
+    await clock.advance(1_800_000 - 1);
+    assert.equal(seen.at(-1), 'stale');
+    await clock.advance(1);
+    assert.equal(seen.at(-1), 'unavailable');
+    assert.equal(reads, 2);
+    assert.equal(clock.tasks.size, 0);
+  } finally { await service.dispose(); }
+});
+
 test('switching to a non-subscription account invalidates the previous quota snapshot', async () => {
   const clock = new FakeClock();
   let changed = false;
@@ -209,6 +336,46 @@ test('long polling intervals respect the Node timer delay bound without refreshi
   assert.equal(reads, 1);
   assert.equal([...clock.tasks.values()][0].at - clock.now(), 2_147_483_647);
   await service.dispose();
+});
+
+test('provider and listener mutations cannot change accepted notification or completed quota snapshots', async () => {
+  const update = snapshot(1_000_000, 33);
+  const completion = deferred<QuotaSnapshot>();
+  const provider: QuotaProvider = { id: 'claude', read: context => {
+    context.onSnapshot?.(update);
+    return completion.promise;
+  } };
+  const service = new QuotaService([provider]);
+  const seen: number[] = [];
+  service.subscribe(([state]) => {
+    if (state.snapshot) state.snapshot.windows[0].usedPercent = 999;
+  });
+  service.subscribe(([state]) => {
+    if (state.snapshot) seen.push(state.snapshot.windows[0].usedPercent);
+  });
+  try {
+    const reading = service.refresh('claude', true);
+    await settle();
+    assert.equal(service.getState('claude').refreshing, true);
+    assert.equal(service.getState('claude').snapshot?.windows[0].usedPercent, 33);
+    update.windows[0].usedPercent = 77;
+    assert.equal(service.getState('claude').snapshot?.windows[0].usedPercent, 33);
+
+    const completed = snapshot(1_000_001, 66);
+    completion.resolve(completed);
+    await reading;
+    completed.windows[0].usedPercent = 88;
+    const state = service.getState('claude');
+    assert.equal(state.refreshing, false);
+    assert.equal(state.status, 'ready');
+    assert.equal(state.snapshot?.windows[0].usedPercent, 66);
+    assert.ok(seen.includes(33));
+    assert.ok(seen.includes(66));
+    assert.equal(seen.includes(999), false);
+  } finally {
+    completion.resolve(snapshot(1_000_001, 66));
+    await service.dispose();
+  }
 });
 
 test('notifications update immediately; listener failures do not affect cleanup; disposal cancels reads', async () => {
@@ -258,12 +425,28 @@ test('Claude parses all quota windows and reset timezones without inventing miss
   assert.throws(() => parseClaudeQuota({ future: [] }, 1), { code: 'unavailable' });
 });
 
+test('Claude accepts more than 100 valid windows and still validates fields beyond that count', async () => {
+  const usage = Object.fromEntries(Array.from({ length: 101 }, (_, index) =>
+    [`custom_${index}`, { utilization: index, resets_at: null }]));
+  const provider = new ClaudeQuotaProvider({ credentials: { getAccessToken: async () => 'synthetic-token' },
+    fetch: async () => Response.json(usage) });
+  try {
+    const result = await provider.read({ signal: signal() });
+    assert.equal(result.windows.length, 101);
+    assert.deepEqual(result.windows.map(window => window.id), Object.keys(usage));
+    assert.equal(result.windows[100].usedPercent, 100);
+    assert.throws(() => parseClaudeQuota({ ...usage, invalid: { utilization: -1 } }, 1), (error: unknown) =>
+      error instanceof QuotaError && error.translation?.key === 'quota.claudeInvalidPercentage');
+  } finally { await provider.dispose(); }
+});
+
 test('Claude re-reads credentials once on 401, does not expose response secrets, honors Retry-After', async () => {
   const refreshes: boolean[] = [];
   let requests = 0;
   const provider = new ClaudeQuotaProvider({ credentials: { getAccessToken: async refresh => { refreshes.push(refresh); return 'fixture-token'; } },
     fetch: async (_url, init) => {
       assert.equal(new Headers(init?.headers).get('authorization'), 'Bearer fixture-token');
+      assert.equal(new Headers(init?.headers).get('user-agent'), `agent-tracker/${extensionVersion}`);
       requests++;
       return requests === 1 ? new Response('secret-body', { status: 401 }) : Response.json({ five_hour: { utilization: 5, resets_at: null } });
     } });
@@ -274,6 +457,48 @@ test('Claude re-reads credentials once on 401, does not expose response secrets,
   const limited = new ClaudeQuotaProvider({ credentials: { getAccessToken: async () => 'secret' }, fetch: async () => new Response('secret', { status: 429, headers: { 'Retry-After': '120' } }) });
   await assert.rejects(limited.read({ signal: signal() }), { code: 'rate-limit', retryAfterMs: 120_000 });
   assert.equal(parseRetryAfter('Sat, 03 Oct 2026 06:00:00 GMT', Date.parse('2026-10-03T05:59:00Z')), 60_000);
+});
+
+test('Claude classifies HTTP failures without retrying or reading their response bodies', async () => {
+  for (const [status, code, key] of [
+    [403, 'authentication', 'quota.claudeAccessDenied'],
+    [500, 'network', 'quota.claudeHttpFailed'],
+  ] as const) {
+    const refreshes: boolean[] = [];
+    let discarded = 0;
+    const provider = new ClaudeQuotaProvider({
+      credentials: { getAccessToken: async refresh => { refreshes.push(refresh); return 'synthetic-token'; } },
+      fetch: async () => new Response(new ReadableStream({
+        pull() { throw new Error('secret-response-body'); },
+        cancel() { discarded++; },
+      }, { highWaterMark: 0 }), { status }),
+    });
+    try {
+      await assert.rejects(provider.read({ signal: signal() }), (error: unknown) =>
+        error instanceof QuotaError && error.code === code && error.translation?.key === key && !error.message.includes('secret'));
+      assert.deepEqual(refreshes, [false]);
+      assert.equal(discarded, 1);
+    } finally { await provider.dispose(); }
+  }
+});
+
+test('Claude skips HTTP when cancelled while waiting for credentials', async () => {
+  const controller = new AbortController();
+  const credentialStarted = deferred<void>();
+  const token = deferred<string>();
+  let requests = 0;
+  const provider = new ClaudeQuotaProvider({
+    credentials: { getAccessToken: async () => { credentialStarted.resolve(); return token.promise; } },
+    fetch: async () => { requests++; return Response.json({ five_hour: { utilization: 5 } }); },
+  });
+  const pending = provider.read({ signal: controller.signal });
+  const rejected = assert.rejects(pending, { code: 'cancelled' });
+  await credentialStarted.promise;
+  controller.abort();
+  token.resolve('private-token');
+  await rejected;
+  assert.equal(requests, 0);
+  await provider.dispose();
 });
 
 test('Claude HTTP status remains authoritative when cancelling an errored response body', async () => {
@@ -296,7 +521,7 @@ test('Claude HTTP status remains authoritative when cancelling an errored respon
 test('Claude credentials use configured CLI home and report safe guidance for unreadable or malformed files', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'agent-tracker-quota-'));
   try {
-    const credentials = new ClaudeCliCredentials(directory);
+    const credentials = new WindowsClaudeCredentials(directory);
     await assert.rejects(credentials.getAccessToken(false, signal()), { code: 'authentication' });
     await writeFile(join(directory, '.credentials.json'), JSON.stringify({ claudeAiOauth: { accessToken: 'synthetic-token' } }));
     assert.equal(await credentials.getAccessToken(false, signal()), 'synthetic-token');
@@ -335,6 +560,61 @@ test('Codex prefers multi-bucket data, uses dynamic durations, seconds reset and
   assert.throws(() => parseCodexQuota({ rateLimits: bucket(99, 300), rateLimitsByLimitId: {} }, 1), { code: 'unavailable' });
   assert.throws(() => parseCodexQuota({ rateLimits: bucket(99, 300), rateLimitsByLimitId: [] }, 1), { code: 'protocol' });
   assert.throws(() => parseCodexQuota({ rateLimits: { primary: { usedPercent: NaN } } }, 1), { code: 'protocol' });
+});
+
+test('Codex preserves bucket and primary-secondary order with metadata and missing windows', () => {
+  const limitId = 'i'.repeat(105);
+  const limitName = 'n'.repeat(105);
+  const reachedType = 'r'.repeat(105);
+  const result = parseCodexQuota({ rateLimitsByLimitId: {
+    named: { limitId, limitName, rateLimitReachedType: reachedType,
+      primary: { usedPercent: 10, windowDurationMins: 300 },
+      secondary: { usedPercent: 20, windowDurationMins: 10080 } },
+    noWindows: {},
+    secondaryOnly: { primary: null, secondary: { usedPercent: 30, windowDurationMins: 60 } },
+    codex: { primary: { usedPercent: 40, windowDurationMins: 90 } },
+  } }, 123);
+  assert.equal(result.fetchedAt, 123);
+  assert.deepEqual(result.windows.map(window => [window.id, window.usedPercent, window.label]), [
+    [`${limitId.slice(0, 100)}:primary`, 10, `${limitName.slice(0, 100)} 5h`],
+    [`${limitId.slice(0, 100)}:secondary`, 20, `${limitName.slice(0, 100)} 7d`],
+    ['secondaryOnly:secondary', 30, 'secondaryOnly 1h'],
+    ['codex:primary', 40, '90m'],
+  ]);
+  for (const window of result.windows.slice(0, 2)) {
+    assert.equal(window.limitId, limitId.slice(0, 100));
+    assert.equal(window.limitName, limitName.slice(0, 100));
+    assert.equal(window.rateLimitReachedType, reachedType.slice(0, 100));
+  }
+  assert.equal(result.windows[2].limitName, undefined);
+  assert.equal(result.windows[2].rateLimitReachedType, undefined);
+});
+
+test('Codex rejects malformed later windows and buckets after earlier valid usage', () => {
+  const valid = { primary: { usedPercent: 10, windowDurationMins: 300 } };
+  assert.throws(() => parseCodexQuota({ rateLimitsByLimitId: {
+    first: { ...valid, secondary: { usedPercent: 'invalid' } },
+  } }, 1), { code: 'protocol' });
+  assert.throws(() => parseCodexQuota({ rateLimitsByLimitId: {
+    first: valid, malformedLater: null,
+  } }, 1), { code: 'protocol' });
+});
+
+test('Codex accepts more than 100 valid windows and still validates later fields', () => {
+  const rateLimitsByLimitId = Object.fromEntries(Array.from({ length: 101 }, (_, index) =>
+    [`limit_${index}`, { primary: { usedPercent: index, windowDurationMins: 300, resetsAt: 1700000000 } }]));
+  const result = parseCodexQuota({ rateLimitsByLimitId }, 1);
+  assert.equal(result.windows.length, 101);
+  assert.deepEqual(result.windows.map(window => window.id), Object.keys(rateLimitsByLimitId).map(id => `${id}:primary`));
+  assert.equal(result.windows[100].usedPercent, 100);
+  for (const invalid of [
+    { usedPercent: -1 },
+    { usedPercent: 1, windowDurationMins: 0 },
+    { usedPercent: 1, resetsAt: 'invalid' },
+  ]) {
+    assert.throws(() => parseCodexQuota({ rateLimitsByLimitId: { ...rateLimitsByLimitId, invalid: { primary: invalid } } }, 1),
+      { code: 'protocol' });
+  }
 });
 
 test('Codex retains the reserve name independently of its identifier and single-bucket label', () => {
@@ -378,21 +658,54 @@ test('Codex short-lived subprocess handshakes, reads once, forwards notification
   const directory = await mkdtemp(join(tmpdir(), 'agent-tracker-quota-'));
   const log = join(directory, 'protocol.json');
   const events: string[] = [];
-  const received: number[] = [];
+  const received: QuotaSnapshot[] = [];
+  let now = 1_000;
   try {
     const provider = new CodexQuotaProvider({ executable: process.execPath, args: [fixture], dataHome: directory,
-      env: { QUOTA_FIXTURE_MODE: 'notification', QUOTA_FIXTURE_LOG: log }, onLifecycle: event => events.push(event.event) });
-    const result = await provider.read({ signal: signal(), onSnapshot: value => received.push(value.windows[0].usedPercent) });
+      env: { QUOTA_FIXTURE_MODE: 'notification', QUOTA_FIXTURE_LOG: log }, now: () => now++,
+      onLifecycle: event => events.push(event.event), onPhase: event => events.push(event.phase) });
+    const result = await provider.read({ signal: signal(), onSnapshot: value => received.push(value) });
     assert.equal(result.windows[0].usedPercent, 43);
+    assert.equal(result.fetchedAt, 1_001);
     assert.deepEqual(result.rateLimitResetCredits, { availableCount: 2, nextExpiresAt: 1700600000000 });
-    assert.deepEqual(received, [42]);
-    assert.deepEqual(events, ['started', 'stopped']);
-    const recorded = JSON.parse(await readFile(log, 'utf8')) as { methods: string[]; pid: number; dataHome: string };
+    assert.deepEqual(received.map(value => [value.windows[0].usedPercent, value.fetchedAt]), [[42, 1_000]]);
+    assert.equal(now, 1_002, 'only accepted notifications and the quota response read the snapshot clock');
+    assert.deepEqual(events, ['started', 'initialized', 'account-read', 'quota-read', 'stopped']);
+    const recorded = JSON.parse(await readFile(log, 'utf8')) as { methods: string[]; pid: number; dataHome: string; clientInfo: { version: string } };
     assert.deepEqual(recorded.methods, ['initialize', 'initialized', 'account/read', 'account/rateLimits/read']);
+    assert.equal(recorded.clientInfo.version, extensionVersion);
     assert.equal(recorded.dataHome, directory);
     assert.throws(() => process.kill(recorded.pid, 0));
     await provider.dispose();
   } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+test('Codex ignores unrelated messages and rejects server requests before forwarding verified quota updates', async () => {
+  const received: number[] = [];
+  const provider = new CodexQuotaProvider({ executable: process.execPath, args: [fixture],
+    env: { QUOTA_FIXTURE_MODE: 'server-messages' }, timeoutMs: 5000 });
+  try {
+    const result = await provider.read({ signal: signal(), onSnapshot: value => received.push(value.windows[0].usedPercent) });
+    assert.equal(result.windows[0].usedPercent, 43);
+    assert.deepEqual(received, [42]);
+  } finally { await provider.dispose(); }
+});
+
+test('Codex classifies RPC failures using statusCode, status, then the RPC code without exposing server details', async () => {
+  for (const [error, code] of [
+    [{ code: 429, data: { statusCode: 401, status: 500 } }, 'authentication'],
+    [{ code: 429, data: { status: 403 } }, 'authentication'],
+    [{ code: 401, data: { statusCode: 429 } }, 'rate-limit'],
+    [{ code: 403 }, 'authentication'],
+    [{ code: -32603 }, 'protocol'],
+  ] as const) {
+    const provider = new CodexQuotaProvider({ executable: process.execPath, args: [fixture],
+      env: { QUOTA_FIXTURE_MODE: 'rpc-error', QUOTA_FIXTURE_RPC_ERROR: JSON.stringify(error) }, timeoutMs: 5000 });
+    try {
+      await assert.rejects(provider.read({ signal: signal() }), (error: unknown) =>
+        error instanceof QuotaError && error.code === code && !error.message.includes('secret'));
+    } finally { await provider.dispose(); }
+  }
 });
 
 for (const [mode, code] of [['api-key', 'unsupported-account'], ['logged-out', 'authentication'], ['rpc-error', 'rate-limit'],

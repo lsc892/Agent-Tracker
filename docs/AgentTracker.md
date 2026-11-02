@@ -38,6 +38,30 @@ Codex sessions/**/*.jsonl ──┘                              │
 
 두 경로는 분리한다. 상태 표시줄 quota 갱신이 JSONL 전체 통계 갱신을 유발해서는 안 된다.
 
+`extension.ts`는 `AgentTrackerApp`의 시작·종료를 호출한다. `app.ts`가 서비스 구성, 명령·이벤트 등록, 감시 시작을 순서대로 수행하고 설정 변경을 직렬 큐로 적용한다. 변경 사항 판별과 적용은 별도 메서드로 나누며, 종료 시 명령·이벤트·UI를 해제하고 진행 중인 설정·데이터 삭제·서비스 종료를 기다린다. 초기화 실패 시 이미 만든 리소스도 정리한다.
+
+Claude·Codex quota 제공자는 `BaseQuotaProvider` 추상 클래스를 상속한다. 공통 `read()`는 조회별 취소 신호와 진행 중 Promise를 소유하고 `readQuota(context)`를 호출해 같은 `QuotaSnapshot` 계약으로 사용량을 반환한다. 공통 `dispose()`는 추가 조회를 차단하고 모든 조회를 취소한 뒤 제공자의 정리가 끝날 때까지 기다리며 중복 호출은 같은 Promise를 반환한다. 인증·HTTP/RPC·응답 정규화와 timeout 시작 시점은 각 제공자에 둔다. 특히 Codex의 process 종료 확인은 조회의 일부로 유지한다. `QuotaProvider` 인터페이스는 서비스의 의존 계약으로 유지한다.
+
+제공자의 `readQuota()`는 조회·재시도·timeout·취소·정리 순서를 조율한다. [codex.ts](../src/quota/codex.ts)는 실행·handshake·계정 검증·한도 조회를 연결하고, [codex/rpcSession.ts](../src/quota/codex/rpcSession.ts)의 `RpcSession`이 child·stream·decoder·요청 ID·대기 Promise와 종료 수명을 함께 소유한다. [codex/response.ts](../src/quota/codex/response.ts)는 한도·reset credit 해석, [codex/executable.ts](../src/quota/codex/executable.ts)는 실행 파일 탐색, [codex/errors.ts](../src/quota/codex/errors.ts)는 공유 오류 생성을 맡는다. 내부 모듈은 provider 진입점을 역참조하지 않는다.
+
+Codex 제공자 내부에서는 실행 환경·세션 준비, 초기화, 계정 확인, quota 응답 처리, 오류 분류와 종료 확인을 같은 클래스의 private 메소드로 나눈다. `readQuota()`는 조회별 timeout·알림 허용 상태와 단계 순서를 소유한다. 계정 검증 직후 알림을 허용하고 quota 응답 뒤 process 종료까지 기다린 다음 취소를 다시 확인하며, 실패 경로도 같은 세션을 정리한다.
+
+Codex 응답의 [parseCodexQuota()](../src/quota/codex/response.ts#L15)는 응답 확인·창 목록 변환·빈 결과 거부·선택 credit·snapshot 조립을 연결한다. [창 목록 변환](../src/quota/codex/response.ts#L25)은 한도 묶음을 한 번 순회하고, [묶음 해석](../src/quota/codex/response.ts#L37)은 공통 식별자·이름을 확정한 뒤 primary·secondary 처리를 순서대로 호출한다. [창 추가](../src/quota/codex/response.ts#L47)는 없는 창을 건너뛰고 검증된 창에 표시 정보를 연결해 기존 결과 배열에 바로 쓴다. 별도 한도별 결과 배열이나 중첩 창 순회를 두지 않으며 기존 입력 우선순위·검증·출력 순서를 유지한다.
+
+[claude.ts](../src/quota/claude.ts)는 인증·요청·401 재확인 1회·HTTP 상태 분류와 Retry-After를 조율한다. [claude/httpBody.ts](../src/quota/claude/httpBody.ts)는 제한된 본문 읽기와 reader 해제, [claude/response.ts](../src/quota/claude/response.ts)는 quota 창 검증·정규화를 맡는다. 기존 제공자 파일과 [quota 공개 진입점](../src/quota/index.ts)의 클래스·options·parser·실행 파일 탐색 export를 유지한다. Claude HTTP 본문과 Codex RPC 메시지의 기존 크기 제한을 유지하며 두 파서 모두 별도의 창 개수 상한 없이 유효한 창을 변환한다. HTTP User-Agent와 RPC 초기화 정보의 버전은 공통 모듈에서 `package.json`의 실제 확장 버전을 읽어 사용한다.
+
+[QuotaService](../src/quota/service.ts)는 provider 목록·진행 중 조회·취소·강제 재실행·focus·갱신 정책·poll 시각·단일 timer·구독자를 소유한다. `refresh()`는 중복 요청과 갱신 조건을 판단하고 조회 사이클에 위임하며, 마지막 재실행 확인과 `running` 해제는 같은 비동기 흐름에서 처리한다. 성공·알림·실패는 [ProviderQuotaState](../src/quota/providerState.ts)에 전달한다. 이 상태 객체가 provider 하나의 snapshot·마지막 성공 시각·오류·실패 횟수·재시도 가능 시각을 단독 소유하며 수용·backoff·만료·화면 상태 복제를 수행한다. 서비스는 상태 필드를 직접 수정하지 않고, 상태 객체는 provider·timer·listener를 호출하지 않는다.
+
+포커스 복귀·재시도·snapshot 보존 정책 상수는 상태 파일에, timer 최대 지연은 서비스에 둔다. 실패 snapshot의 일반 오류 30분·rate limit 오류 24시간 보존 기간은 상태 파일의 `snapshotRetentionMs()`에서 선택해 예약과 실제 만료가 공유한다. 시계는 callback으로 지연 조회해 기존 guard와 읽기 시점을 유지하고, 구독자마다 snapshot을 복제한다.
+
+새 quota 제공자는 `BaseQuotaProvider`를 상속하고 `id`, 종료 안내 `closedMessage`, `readQuota()`를 구현한다. `readQuota()`는 전달받은 `signal`을 따르고 사용량·조회 시각·reset 시각을 기존 snapshot 규약으로 정규화해야 한다. 제공자 ID 타입·설정과 `AgentTrackerApp`의 생성 목록, 제공자별 UI도 함께 확장한다. 로컬 대화 통계까지 지원하려면 별도의 로그 파서와 통계 provider 연동이 필요하다.
+
+`SummaryClient`는 기존 공개 API를 유지하면서 `WorkerTransport`와 `RefreshController`에 위임한다. transport는 Worker 지연 생성·요청 ID·응답/오류·진행 알림·최대 5초의 종료 대기를 소유하고, refresh controller는 중복 갱신 병합·공유 메모리 취소·데이터 삭제 직렬화를 맡는다. 조회·설정은 진행 중 삭제를 기다리며 종료 후에는 Worker를 새로 만들지 않는다. 내부 종료용 `dispose` 요청은 종료 상태에서도 허용해 DB를 먼저 닫는다.
+
+[Worker](../src/summary/worker.ts)는 같은 Promise 큐 안에서 메시지 종류를 분배하고 token·capability 조회를 별도 함수로 수행한다. DB 지연 생성·취소·refresh와 쓰기 잠금의 await·finally 경계를 유지한다. [JSONL](../src/summary/jsonl.ts)은 일반 문자열·이미지 prefix·버리는 이미지의 escape 상태와 바이트 보존을 구분하고, [staging](../src/summary/staging.ts)은 요청별 상태·완료 시각·시간 품질을 같은 파일의 함수에서 판정한다. [통계 SQL](../src/summary/db/queries/README.md)은 공통 정책·원본 조회·롤업 조회 폴더와 책임별 파일로 구분하며 기존 SQL·바인딩 순서를 유지한다.
+
+[화면 메시지 파서](../src/ui/presentation.ts)는 종류별 파서를 선택하고 사용량의 필수 제어값과 선택 표현·대상·epoch·달력 범위를 구분한다. 제어값 오류는 메시지를 거부하고 잘못된 선택 필터는 생략한다. [quota 카드](../src/ui/quotaTooltip.ts)는 제공자 창·credit·조회 상태를 순서대로 조립하고, [Webview](../media/dashboard.js)는 날짜 검증·요청 구성·표 머리글/행·state 갱신을 같은 파일의 함수로 연결한다.
+
 현재 quota는 서버 조회 결과를 사용하고, 과거 token 통계는 manifest에서 변경 session을 찾아 요청·모델·비용 집계를 함께 갱신한다.
 
 확장 대표 아이콘은 `package.json`의 `icon`에 지정한 `resource/icon/AgentTracker_Icon.png`를 사용한다. 같은 PNG를 VSIX에 포함해 VS Code 확장 목록과 상세 화면에 표시한다.
@@ -76,10 +100,14 @@ Authorization: Bearer <Claude OAuth access token>
 
 provider가 백분율만 반환하면 현재 사용량은 `usedPercent`, 최대 사용량은 `100%`로 표시한다. 조회 실패 시 마지막 성공 snapshot과 시각을 유지하고 오래된 값·갱신 실패 안내를 함께 표시한다. 성공 이력이 없거나 유지 기한이 지났으면 `조회 불가`로 표시한다.
 
+인증은 `ClaudeCredentialSource` 인터페이스를 구현하는 `WindowsClaudeCredentials`·`MacClaudeCredentials`로 분리하고 `claudeCredentials/` 아래 OS별 파일에 둔다. `createClaudeCredentials()` 한 곳에서 OS에 맞는 구현을 생성하며 `ClaudeQuotaProvider`는 토큰 조회 계약만 사용한다. Windows와 Linux는 파일 인증 구현을 공유하고 macOS도 파일을 우선 읽는다. macOS의 기본 `~/.claude`에서 파일 읽기에 실패한 경우에만 Keychain을 시도하며, 사용자 지정 경로와 읽기에 성공한 파일의 JSON·토큰 검증 실패에는 Keychain을 사용하지 않는다. 경로 결정·파일 종류와 크기 제한·토큰 검증은 공통 함수로 재사용하며 `401` 재조회도 같은 OS 구현에서 인증 정보를 다시 읽는다.
+
+macOS의 `getAccessToken()`은 원문 조회·토큰 검증·참조 정리를 연결하고 `readCredentialText()`가 파일 우선 조회와 Keychain 사용 조건을 결정한다. Keychain 실행 실패는 전용 읽기 함수에서 공통 로그인 안내로 연결한다. Claude의 `readQuota()`는 재시도·HTTP 상태·timeout·취소 정책을 유지하고 `requestUsage()`가 인증 정보를 읽어 HTTP 요청 한 번을 보낸다. 요청은 `await`로 완료를 기다린 뒤 `finally`에서 토큰 참조를 해제한다.
+
 보안 규칙:
 
 - OAuth token을 SQLite, log, telemetry에 기록하지 않는다.
-- token은 요청 직전 메모리에서만 사용하고 응답 후 참조를 폐기한다.
+- token은 HTTP 요청을 만드는 지역 변수로 사용하고 서비스 상태에 보관하지 않는다. 지역 변수에 `undefined`를 대입하는 메모리 소거 절차는 두지 않는다.
 - credential 접근 실패 시 사용자에게 Claude Code 로그인을 안내하되 로그인 정보를 직접 요구하지 않는다.
 - `401`은 credential refresh 경로를 한 번만 시도하고, 자동 조회의 `429`는 `Retry-After` 또는 지수 backoff를 따른다. 명시적인 수동 강제 조회의 예외는 3.3을 따른다.
 
@@ -162,7 +190,7 @@ manual refresh
 
 ### 3.4 상태 표시줄과 카드형 툴팁
 
-상태 표시줄 오른쪽에 Claude·Codex 통합 사용량 항목과 새로고침 버튼을 배치한다. 통합 항목 안에서는 Claude가 왼쪽, Codex가 오른쪽이다. 로컬 VS Code에 클릭 전용 패치를 적용하면 사용량 항목 클릭으로 `StatusBarItem.tooltip`의 `MarkdownString` 카드를 바로 위에 열어 유지하고 재클릭으로 닫는다. 마우스를 올리거나 포커스만 주어서는 자동으로 열리지 않는다. 바깥 클릭이나 Esc로도 닫으며, 그 뒤 한 번 클릭으로 다시 열린다. 하단 quota 패널이나 별도 창은 만들지 않는다.
+상태 표시줄 오른쪽에 Claude·Codex 통합 사용량 항목과 새로고침 버튼을 배치한다. 통합 항목 안에서는 Claude가 왼쪽, Codex가 오른쪽이다. 마우스를 올리면 `StatusBarItem.tooltip`의 `MarkdownString` 사용량 카드가 바로 위에 나타나고, 항목과 카드에서 마우스를 옮기면 닫힌다. 로컬 VS Code에 클릭 토글 패치를 적용하면 클릭으로 같은 카드를 고정해 마우스 이탈 뒤에도 유지하고 재클릭으로 닫는다. 고정 중에는 자동 호버가 카드를 교체하지 않으며, 닫은 뒤 다시 마우스를 올리면 임시 호버 카드가 나타난다. 바깥 클릭이나 Esc로도 닫으며, 그 뒤 한 번 클릭으로 다시 고정할 수 있다. 상태 표시줄의 상세/압축 설정은 카드 내용에 영향을 주지 않는다. Codex·Claude 순서의 주간·5시간 잔량과 초기화 시간 텍스트 요약은 접근성 label에 유지한다. 하단 quota 패널이나 별도 창은 만들지 않는다.
 
 클릭 명령은 `agentTracker.toggleQuotaTooltip`이다. `tools/vscode/statusbar-toggle.cjs`가 Agent Tracker의 이 명령만 내부 `ToggleTooltipCommand` 객체로 변환한다. 공개 API의 기능은 아니므로 확장 설치·활성화와 패치 적용을 구분한다. 원본 백업과 복원 명령을 제공하며 VS Code 업데이트 뒤 재적용한다. 패치가 없는 설치에서는 기본 호버와 클릭 열기 경로를 사용한다.
 
@@ -212,13 +240,15 @@ Agent Tracker의 VS Code 설정은 다음 순서의 소제목과 목차 하위 �
 | 사용량 통계 | 통계 사용 여부, Skill 집계, API 추정 비용, 빈 사용량 제외, 시간대 |
 | 데이터 및 로그 | 공통 상위 데이터 홈, Claude 로그 보존 기간, Codex CLI 실행 파일 |
 
-`package.json`의 `contributes.configuration`을 여섯 카테고리의 배열로 등록한다. 설정은 총 20개이며 데이터 위치는 `agentTracker.dataHome` 하나로 지정한다. 카드·통계 화면·명령 팔레트의 설정 열기는 `@ext:AgentTracker.agent-tracker`로 필터링한 VS Code Settings를 연다. 카테고리·설명·선택지는 VS Code의 현재 표시 언어로 번역하며 비율의 사용률·남은 비율과 표시 방식의 압축·상세 선택지도 번역한다. 별도의 전체 설정 Webview는 제공하지 않는다. 설정 키·기본값·scope·입력 제약과 VS Code의 사용자·작업공간 저장 및 초기화 동작을 유지한다. 설정 화면을 여는 것만으로 quota 조회·원본 재집계를 실행하지 않는다. [VS Code 설정 카테고리와 정렬 규칙](https://code.visualstudio.com/api/references/contribution-points#contributesconfiguration)
+`package.json`의 `contributes.configuration`을 여섯 카테고리의 배열로 등록한다. 설정은 총 21개이며 데이터 위치는 `agentTracker.dataHome` 하나로 지정한다. 카드·통계 화면·명령 팔레트의 설정 열기는 `@ext:AgentTracker.agent-tracker`로 필터링한 VS Code Settings를 연다. 카테고리·설명·선택지는 VS Code의 현재 표시 언어로 번역하며 비율의 사용률·남은 비율과 표시 방식의 압축·상세 선택지도 번역한다. 별도의 전체 설정 Webview는 제공하지 않는다. 설정 키·기본값·scope·입력 제약과 VS Code의 사용자·작업공간 저장 및 초기화 동작을 유지한다. 설정 화면을 여는 것만으로 quota 조회·원본 재집계를 실행하지 않는다. [VS Code 설정 카테고리와 정렬 규칙](https://code.visualstudio.com/api/references/contribution-points#contributesconfiguration)
+
+설정 원본은 `src/configuration/schema.ts`의 `settingDefinitions`이며 키는 중첩 경로에서 만들고 기본값·선택지·입력 제약·category·설명도 같은 항목에서 관리한다. `tools/configuration.cjs`는 컴파일 전 원본 schema만 메모리에서 변환해 전체 설정 manifest를 구성하며 `tools/localization.cjs`가 동기화하거나 오래된 생성물을 검사한다. 언어 선택지만 `localization/languages.json`에서 확장한다. 실행 시에는 같은 정의를 순회해 설정을 한 번씩 읽고 `configuration.ts`가 표시·통계·제공자별 정규화와 경로 파생을 수행한다. 내부 객체는 `display`·`quota`·`usage`·`claude`·`codex`로 묶고 타입은 공통 정의와 반환값에서 추론한다. 매번 새 스냅샷을 만들어 이전 설정과 비교하며 앱이 최신 설정을 소유한다. 단순 설정은 해당 영역의 정의만 추가하면 읽기·타입·설정 UI에 반영되고, 파생값이나 기능의 실제 처리는 별도 구현한다.
 
 ### 3.8 표시 언어와 번역 리소스
 
 통계의 시작일·종료일 입력칸은 표시 언어와 관계없이 `year-month-day`를 안내하고 `YYYY-MM-DD` 값을 사용한다. 직접 입력과 기본 달력 선택을 함께 제공하며 유효하지 않은 날짜는 조회하지 않는다.
 
-`agentTracker.language`는 기본 `auto`로 VS Code 표시 언어를 따르며 여섯 언어를 명시적으로 지정할 수 있다. 확장의 실행 중 문구는 명시적 언어·VS Code 표시 언어·한국어 fallback 순서로 결정한다. 한국어 JSON을 원문과 번역 키의 기준으로 둔다. 상태 표시줄·카드·안내와 열린 통계·데이터 확인·색상 화면을 현재 언어로 다시 표시한다. 숫자·날짜도 언어를 따르며 집계 시간대·원본 이름·진단 코드는 보존한다. 언어 전환은 서버 조회나 원본 재집계를 유발하지 않는다.
+`agentTracker.language`는 기본 `auto`로 VS Code 표시 언어를 따르며 여섯 언어를 명시적으로 지정할 수 있다. 확장의 실행 중 문구는 명시적 언어를 우선하고 `auto`일 때 VS Code 표시 언어를 사용하며, 지원하지 않는 언어는 영어로 fallback한다. 지역 태그는 지원하는 기본 언어로 묶는다. 누락된 번역 키는 한국어로 fallback하며 한국어 JSON을 원문과 번역 키의 기준으로 둔다. 상태 표시줄·카드·안내와 열린 통계·데이터 확인·색상 화면을 현재 언어로 다시 표시한다. 숫자·날짜도 언어를 따르며 집계 시간대·원본 이름·진단 코드는 보존한다. 언어 전환은 서버 조회나 원본 재집계를 유발하지 않는다.
 
 기능별 키를 가진 언어별 JSON과 공통 i18next 계층을 사용한다. 언어 목록·번역 원본·`package.nls` 생성물은 루트의 `localization/`에 모으고 `localization/languages.json`에서 설정 선택지·manifest 번역·패키지 리소스를 생성한다. 실행용 JSON은 `dist/localization/`에서 읽는다. VS Code가 요구하는 루트의 `package.nls*.json`은 패키징·VS Code 테스트·F5 디버깅 동안만 복사하고 작업 뒤 원래 상태로 복원한다. 번역 키·변수·누락과 화면 코드의 한국어 문자열을 검사한다. 명령 팔레트·VS Code Settings의 카테고리·설명·선택지는 VS Code 표시 언어를 따르며 확장 Language 설정과 독립적이다. 기본 `package.nls.json`은 영어로 생성하고 한국어는 `package.nls.ko.json`으로 제공한다. 지원하지 않는 VS Code 언어의 정적 manifest 문구는 영어로 fallback한다. 추가 절차와 구현 근거는 [로컬라이징 문서](./research/Localization.md)에 기록한다.
 
@@ -255,7 +285,7 @@ Claude credential·로그 보존 설정은 `<dataHome>/.claude`, Codex App Serve
 manifest 전체를 메모리에 적재하지 않는다. 파일 metadata 전수조사는 유지하되 발견·조회·비교는 최대 `n`개씩 처리한다. 진단용 정보는 상태·처리 위치·기록 시각·오류 네 column으로 제한한다.
 
 ```text
-id                  // 내부 파일 식별자; 경로 이동에도 유지하며 디버깅에서 참조
+id                  // 내부 파일 식별자; dev/inode 이동 최적화는 유지하고 내용 검증 연결은 새 위치의 id 사용
 provider            // 로그 제공자: claude 또는 codex
 source_root         // 정규화된 소속 로그 루트; 삭제 판정 범위를 제한
 path                // 정규화된 JSONL 파일 경로; provider와 함께 유일한 조회 key
@@ -265,6 +295,8 @@ mtime_ms            // 그 범위를 정할 때 확인한 파일 수정 시각(U
 dev                 // 파일이 위치한 장치 식별자; inode와 함께 파일 동일성 판단
 inode               // 장치 내 파일 식별자; 신뢰할 수 있을 때만 이동 감지에 사용
 parser_version      // 마지막 정상 반영에 사용한 parser 버전; 다르면 해당 session 재집계
+source_identity     // 파싱된 thread id와 main 여부; 같은 세션의 다른 원본을 구분
+content_hash        // 마지막 정상 반영한 원본 byte 범위의 SHA-256; 본문은 저장하지 않음
 source_missing      // 삭제를 확인했지만 사용량 이력을 보존 중인 원본이면 1; 복원 후 정상 반영하면 0
 last_seen_scan_id   // 파일 존재를 마지막으로 확인한 scan ID; 파싱 성공 여부와 독립
 processing_status   // processing / done / error / interrupted; 최근 시도의 상태
@@ -304,9 +336,17 @@ new / previous error or interruption
 moved
   path는 달라졌지만 신뢰 가능한 dev/inode가 동일
   → 같은 파일 id로 path와 source_root 갱신; 내용·session 귀속 변화는 별도 판정
+
+reconnected
+  이전 경로가 실제로 없고 provider·source_identity가 같은 정상 원본 후보가 새 위치에 하나 있음
+  새 원본이 이전 정상 byte 범위 전체를 SHA-256 검증으로 포함함
+  → 새 위치의 manifest id를 유지하고 이전 행은 세션 통계 반영 transaction에서 삭제
+     다른 누락 원본이 없으면 기존 요청도 현재 원본으로 다시 집계
 ```
 
-Windows나 일부 filesystem에서 `dev/inode`가 `0`, 누락, 반복 충돌이면 이동 최적화를 사용하지 않고 `removed + new`로 처리한다.
+Windows는 dev/inode 이동 최적화를 사용하지 않는다. 그 외 운영체제도 dev/inode가 0·누락·모호하면 새 경로를 신규 행으로 발견한다. 이후 모든 운영체제에서 정상 파싱된 source_identity와 content_hash로 누락 원본의 연결을 검증한다. 전체 탐색과 초기 파싱이 끝난 뒤 연결을 판정하므로 session_id만 같은 main·subagent나 여러 정상 복사본을 임의로 합치지 않는다. 현재 탐색 루트 밖의 이전 원본도 실제 ENOENT와 내용 포함을 확인하면 연결하며, 다른 제외 원본의 읽기 실패는 기존 보존 정책을 따른다.
+
+content_hash는 이미지 생략·Zstd 해제 전 원본 byte를 스트리밍하며 계산한다. 같은 크기는 저장된 해시를 비교하고, 새 원본이 더 크면 이전 크기까지의 prefix와 새 원본 전체를 고정 크기 버퍼로 재검증해 append를 허용한다. 재검증 I/O도 읽은 byte 통계에 포함한다. 연결된 이전 행은 보존 대상에서 제외하고, 다른 원본 누락으로 유지되는 요청의 진단 파일 참조는 새 행으로 옮긴다. 파싱·취소·연결 성분 실패나 DB 반영 실패에서는 기존 통계와 이전 행을 보존한다. 내용이 다르거나 정상 새 원본이 여러 개여서 연결이 모호한 경우에도 기존 누락 보존을 유지한다.
 
 agent 실행 중 조회는 읽기 시작 시 확인한 파일 크기까지 처리한다. JSONL 마지막 줄이 newline 없이 끝나면 보류한다. 완료 신호가 아직 없는 요청은 진행 중으로 표시한다. 이후의 순수 append는 다음 화면 진입·수동 새로 고침에 반영한다. 마지막 줄 보류와 실행 중 요청은 오류가 아니다.
 
@@ -315,6 +355,8 @@ response별 증분 상태를 영속화하지 않으므로 append도 tail만 더�
 ### 4.4 transaction과 오류 처리
 
 누계 갱신은 Usage 화면 진입 또는 사용자 새로 고침으로 시작한다. 파일 조사와 방문 기록은 최대 n개씩 수행하고, 통계의 확정 단위는 논리 session이다. 하나의 session에는 main과 여러 subagent 파일이 함께 속할 수 있다. 파일의 session 귀속이 바뀌면 이전·새 session을 같은 반영 단위로 묶는다.
+
+`refreshSummary()`는 같은 호출 수명 안의 지역 함수로 원본 발견·부재 판정·파싱·영향 세션 확대·연결 성분 저장을 구분한다. 저장 가능한 성분의 반영 실패와 이미 파싱에 실패한 성분의 이전 값 보존은 별도 경계로 유지하며, 모든 단계는 기존 staging·잠금·취소·진행 상태를 공유한다. 파일과 summary iterator를 배열로 펼치지 않고 순차 처리한다.
 
 아래 절차는 각 문제에 대한 처리 기준이다. scan ID, 이번 실행의 대상 루트와 순회 완료 여부는 worker의 실행 상태로만 관리한다. 임시 작업 목록과 집계 결과는 디스크 staging에 두고 종료 시 폐기한다. 요청·모델·비용 결과와 이름·정상 metadata·삭제는 session transaction으로 함께 반영한다.
 
@@ -354,7 +396,7 @@ response별 증분 상태를 영속화하지 않으므로 append도 tail만 더�
 1. 같은 process에서 같은 DB의 누계 갱신 요청은 진행 중인 한 작업으로 합친다.
 2. 여러 VS Code 창이 DB를 공유하면 process 간 lock을 획득한 작업만 갱신한다. 다른 창의 갱신은 lock이 해제될 때까지 대기한다.
 3. lock은 파일 조사부터 삭제 판정·재집계·결과 반영·임시 작업 정리까지 갱신 전체에 적용한다. 각 session의 write transaction은 그 안에서 필요한 때만 연다.
-4. 작업 종료·오류·정상 취소 시 lock을 해제한다.
+4. 작업 종료·오류·정상 취소 시 동기 `release()`로 잠금 전용 SQLite 트랜잭션을 종료하고 연결을 닫는다. 잠금 획득 대기는 취소 가능한 비동기로 유지한다.
 
 **처리 결과**: 한 DB에 대한 조사·집계 작업이 직렬 실행된다. SQLite transaction은 한 반영 단위의 DB 변경을 보호하고, process 간 lock은 transaction 밖의 파일 조사·staging까지 포함한 갱신 순서를 보호한다.
 
@@ -499,6 +541,8 @@ agent_role = parent_thread_id가 없으면 main, 있으면 subagent
 
 파일의 첫 `session_meta`가 소유 thread를 정한다. fork 로그 안에 복제된 다른 thread의 부모 `session_meta`는 소유 식별자·프로젝트·lineage를 덮어쓰지 않는다. 같은 thread의 반복 metadata는 기존 부모·fork·프로젝트 정보를 유지하면서 제공된 제목 등을 갱신한다.
 
+부모 세션 연결은 파일 기반 TEMP 방문 상태와 스택을 사용하는 그래프 순회로 계산한다. 부모를 먼저 해소하고, 같은 thread의 여러 정상 소스가 같은 최종 세션을 가리킬 때만 자식을 재배정한다. 조상 누락·모호한 부모에서는 확인된 현재 세션 정보를 유지하며 자식도 이를 사용할 수 있다. 순환과 그 순환에 의존하는 경로는 임의로 재배정하지 않고 `missing-parent-agent`를 남긴다. 반복 횟수 상한과 전체 그래프의 메모리 적재는 두지 않는다. parser version 14는 다음 통계 갱신에서 기존 원본도 한 번 재파싱해 변경된 연결 판정을 반영한다.
+
 예외로, 파일 전체에 `root_turn_id`가 없는 구형 subagent는 `thread_id`를 독립 `session_id`로 사용하고 자체 `turn_id`로 요청을 구분한다. 요청 식별자가 없는 usage-only 기록은 thread에 하나의 안정적인 요청 id를 부여한다. 해당 thread의 token·시간을 자체 대화에 집계하고 `standalone-subagent` 품질 flag를 남긴다. 원래 부모·fork 정보는 복제 이력의 중복 검증에 사용하며, 명시적인 `root_turn_id`가 있는 subagent는 부모 요청 합산을 유지한다.
 
 forked child가 부모의 token prefix를 복제한 구형 로그는 verified lineage prefix만 제외한다. 부모를 찾을 수 없으면 임의로 차감하지 않고 `missing-parent`를 표시한다.
@@ -609,7 +653,7 @@ PRAGMA foreign_keys = ON;
 PRAGMA journal_mode = WAL;
 
 CREATE TABLE manifest (
-  id                  INTEGER PRIMARY KEY,                   -- 경로 이동에도 유지하는 내부 파일 id
+  id                  INTEGER PRIMARY KEY,                   -- 내부 파일 id; 내용 검증 연결 시 새 위치의 id 유지
   provider            TEXT NOT NULL,                          -- claude / codex
   source_root         TEXT NOT NULL,                          -- 정규화된 소속 로그 루트; 삭제 범위 구분
   path                TEXT NOT NULL,                          -- 정규화된 JSONL 파일 경로
@@ -619,6 +663,8 @@ CREATE TABLE manifest (
   dev                 TEXT,                                   -- 장치 식별자; inode와 묶어서 비교
   inode               TEXT,                                   -- 장치 내 파일 식별자; 신뢰 가능한 경우 이동 감지
   parser_version      INTEGER NOT NULL DEFAULT 0,             -- 마지막 정상 반영한 parser 버전; 미처리는 0
+  source_identity     TEXT,                                   -- 파싱된 thread id·main 여부; 이전 DB는 NULL
+  content_hash        TEXT,                                   -- 정상 반영 원본 byte 범위의 SHA-256; 이전 DB는 NULL
   capabilities_collected INTEGER NOT NULL DEFAULT 0           -- Skill 횟수까지 정상 집계했으면 1; OFF 처리·이전 DB는 0
                         CHECK(capabilities_collected IN (0,1)),
   source_missing      INTEGER NOT NULL DEFAULT 0              -- 원본 삭제 후 요청 snapshot을 보존 중이면 1
@@ -640,6 +686,9 @@ CREATE INDEX idx_manifest_root_id
 
 CREATE INDEX idx_manifest_session
   ON manifest(provider, session_id, id);                    -- 재집계할 session의 원본 파일 page 조회
+
+CREATE INDEX idx_manifest_source
+  ON manifest(provider, source_identity, id);               -- 내용 검증 연결 후보를 page 조회; 모든 운영체제
 
 CREATE TABLE projects (
   project_key        TEXT PRIMARY KEY,
@@ -690,9 +739,9 @@ CREATE INDEX idx_summary_project_period
 
 ```
 
-조회 인덱스는 날짜 범위와 provider·프로젝트·날짜 범위를 유지한다. 세션 조회·교체는 `UNIQUE(provider, session_id, root_turn_id)`의 앞 두 키를 사용하고 별도 `idx_summary_session`은 두지 않는다. 세션으로 좁힌 요청의 `id`순 페이지 조회에는 임시 정렬이 추가될 수 있다. 비용 미포함 전체·프로젝트·세션·일·월 집계와 누계는 아래의 일별 rollup을 사용하고, 요청별 상세·비용 포함 조회는 기존 요청·모델 SQL을 사용한다. 결과 캐시는 추가하지 않는다. manifest의 루트·세션 인덱스는 증분 수집에 유지하고, 이동 탐지에 사용하는 identity 인덱스는 Windows에서 제거하며 Linux·macOS에서는 유지한다.
+조회 인덱스는 날짜 범위와 provider·프로젝트·날짜 범위를 유지한다. 세션 조회·교체는 `UNIQUE(provider, session_id, root_turn_id)`의 앞 두 키를 사용하고 별도 `idx_summary_session`은 두지 않는다. 세션으로 좁힌 요청의 `id`순 페이지 조회에는 임시 정렬이 추가될 수 있다. 비용 미포함 전체·프로젝트·세션·일·월 집계는 아래의 일별 rollup을 사용하고, 요청별 상세·비용 포함 조회는 기존 요청·모델 SQL을 사용한다. 결과 캐시는 추가하지 않는다. manifest의 루트·세션 인덱스는 증분 수집에 유지하고, 이동 탐지에 사용하는 identity 인덱스는 Windows에서 제거하며 Linux·macOS에서는 유지한다.
 
-schema v11은 원본 요청·모델 행을 보존하면서 다음 파생 표를 추가한다.
+schema v16은 갱신 비용을 우선해 일별 집계를 기존 세션 선두 PK와 집계 형식 v1로 복원한다. 월 PK의 요청 본체 적용은 검증하지 않았으며, 기존 월 PK 실험은 일별 집계에만 적용했던 변경이다.
 
 | 표 | 저장 단위와 내용 | 인덱스 |
 | --- | --- | --- |
@@ -700,15 +749,19 @@ schema v11은 원본 요청·모델 행을 보존하면서 다음 파생 표를 
 | `usage_model_daily` | 같은 단위에 모델별 상태 추가. NULL 모델과 빈 모델명은 서로 다른 model_key로 저장 | 요청 표와 같은 PK에 model_key 추가, 같은 두 보조 인덱스 |
 | `usage_rollup_meta` | singleton=1, 현재 시간대, 집계 형식 버전 | singleton PK |
 
-상태에는 전체 토큰 합계·건수와 완료 표본 및 사용량이 기록된 완료 표본의 합계·건수를 따로 저장한다. cache의 알려진 표본 수, duration의 유효 표본 합계·건수, 품질·미상 시각·오류 건수와 최종 갱신 시각도 보존한다. 평균은 `SUM(완료 표본 합계) / SUM(같은 표본 건수)`로 계산하며 일별 평균을 단순 평균하지 않는다. 다중 모델 turn은 각 모델에 한 번씩 포함하므로 모델 건수를 합쳐 전체 요청 수로 사용하지 않는다. 미상 시각은 빈 local_day, 이름은 projects·sessions를 조회해 최신 값을 사용한다.
+합계·완료 표본·분모·품질·미상 시각·최종 갱신 시각을 보존한다. 평균은 같은 표본의 합계/건수로 병합한다. 다중 모델의 건수를 전체 요청 수로 합치지 않는다. 미상 시각은 빈 local_day로 저장하고 이름은 projects·sessions에서 읽는다. 월은 local_day의 앞 7자로 계산하며 별도 월 컬럼·세션/월 목록은 두지 않는다.
 
-DB당 선택한 시간대 하나의 집계만 유지한다. 처음 집계할 때 저장된 facts로 구축하고 시간대가 바뀌면 같은 두 표를 하나의 transaction에서 다시 구축한다. 완전한 현지 날짜는 rollup, 경계 날짜의 일부 시간은 원본 SQL로 집계해 중복 없이 병합한다. DST의 23·25시간 날짜도 현지 경계를 따른다. 누계는 활성 시간대를 재사용해 UTC와 설정 시간대 사이의 반복 구축을 피한다. 범위 역전·지원 캘린더 밖의 시각·비용 포함은 기존 SQL로 처리하며, `isTransaction`이 없는 Node 22.15도 기존 SQL을 사용한다.
+DB당 시간대 하나의 집계만 유지하며 첫 집계·시간대 변경 때 두 표를 같은 transaction에서 구축한다. 완전한 현지 날짜는 rollup, 부분 경계는 원본 SQL로 중복 없이 병합한다. DST의 23·25시간 날짜도 현지 경계를 따른다. 범위 역전·지원 캘린더 밖의 시각·비용 포함·isTransaction이 없는 Node 22.15는 원본 SQL을 사용한다.
 
-이미 구축된 집계는 세션 교체·삭제·프로젝트 이동 시 영향받은 세션만 기존 facts 교체 transaction 안에서 다시 계산한다. 파일 오류 진단으로 `last_error`가 바뀔 때도 같은 transaction에서 해당 세션의 오류 건수를 갱신하고 초기화는 facts와 집계를 함께 지운다. warm 조회는 deferred read transaction에서 시간대 확인과 집계 조회를 같은 snapshot으로 처리한다. 구축은 writer transaction에서 재확인한 뒤 수행하며, 호출자가 연 transaction에서 시간대가 다르면 raw SQL을 사용한다.
+실제 변경 시 대상 세션의 일별 행을 세션 PK 범위로 삭제하고 현재 facts에서 해당 세션 전체의 합계·분모·MIN/MAX를 다시 계산한다. 날짜·프로젝트·모델 이동의 이전 기여도 제거한다. 큰 세션의 동일 snapshot은 집계 쓰기도 생략한다. 진단 오류 갱신·초기화는 facts와 집계를 같은 transaction에서 반영한다. warm 조회는 deferred read transaction으로 준비 확인과 조회의 snapshot을 유지하고 재구축은 writer transaction에서 재확인한다.
 
 DB 모듈은 변경 이유별로 책임을 나눈다. `src/summary/db/index.ts`의 `SummaryDatabase`는 기존 worker·scanner API를 구성요소에 연결하는 facade다. `connection.ts`의 `SqliteSession`이 연결·PRAGMA·statement cache·transaction·optimize·close를 소유하고, `migrations.ts`는 schema 버전별 갱신을 처리한다. `manifest.ts`는 파일 발견·방문·진단·iterator, `sessions.ts`는 요청·모델·capability와 정상 metadata의 원자적 세션 교체, `billing.ts`는 비용 분류·재계산을 맡는다. 모든 구성요소는 하나의 `SqliteSession`을 공유하며 세션 교체 중 비용 반영도 같은 transaction에서 실행한다.
 
-`reader.ts`는 조회 실행·페이지·결과 변환과 rollup/raw 경로 선택, `queries.ts`는 기존 facts SQL 생성, `validation.ts`는 공통 수치·페이지 검증을 맡는다. `rollup-state.ts`는 병합 가능한 상태와 schema, `rollup-queries.ts`는 일별 상태·raw 경계의 SQL, `rollups.ts`는 구축·세션별 갱신·조회 snapshot을 맡는다. 목록과 개수는 같은 필터·그룹 정의를 사용하고 모델 해석은 공통 facts 표현식을 재사용한다. SQL 구조와 바인딩을 함께 반환하며 시간대·기간·ID는 SQL 문자열에 삽입하지 않는다. 집계 표본·NULL·미상 정렬과 기존 원본 인덱스를 보존한다.
+`SessionStore.replaceSessions()`는 대상·삭제 원본 준비, 보존 대상 분리, manifest 반영, 요청·자식·비용 반영, rollup 갱신과 이름 정리를 하나의 `BEGIN IMMEDIATE`/`COMMIT`으로 묶는다. `sessionChanges.ts`는 교체 대상 세션이 각각 기존 1,000건 이상이고 삭제 원본·Skill 보존 처리가 없는 경우 요청·모델·Skill을 TEMP에 한 번 적재해 JOIN·양방향 EXCEPT로 비교한다. 변경·추가·삭제 요청의 합이 기존 요청 수의 10% 이하이면서 최대 32건이면 해당 요청·달라진 자식·비용만 반영하고 기존 행 ID를 유지한다. 더 많으면 검증한 TEMP snapshot을 일괄 교체한다. 최초 저장·작은 세션·큰 세션과 작은 세션의 혼합 묶음·보존 처리는 기존 스트리밍 일괄 경로를 사용한다. 입력은 한 번씩 소비하고 JS에 전체 요청 map을 만들지 않으며 TEMP 데이터는 반영 후 비운다. `preserveCapabilities`는 삭제 전에 저장한 Skill 값을 논리 요청 키로 복원한다. 어느 단계가 실패해도 facts·집계·metadata를 함께 rollback한다.
+
+입력에 `updated_at`이 있으면 그 값을 사용하고 생략되면 실제 변경·일괄 재삽입 시각으로 기록한다. 부분 반영 경로의 변경 없는 요청은 이전 시각을 유지한다. 집계의 최종 갱신 시각은 마지막 정상 반영 시각이며 파일 재검사 시각은 manifest.recorded_at으로 확인한다. manifest로 변경 없는 세션을 재사용하고 변경 세션은 원본을 다시 읽는 정책을 유지한다. 월 PK 실험 이력은 [단계별 비교](benchmarks/2026-10-31/StorageProduct-2026-10-31.md)에 보존하고, 갱신 지연을 기준으로 세션 PK를 복원한 결과는 [쓰기 트랜잭션 비교](benchmarks/2026-10-31/StorageTransactions-2026-10-31.md)에 기록한다.
+
+`reader.ts`는 조회 실행·페이지·결과 변환과 rollup/raw 경로 선택, `validation.ts`는 공통 수치·페이지 검증을 맡는다. [queries/](../src/summary/db/queries/README.md)는 `common/`의 타입·필터·정렬, `raw/`의 원본·통계·요청·이름·도구·진단, `rollup/`의 최종 조회·일별 소스·병합 지표로 나눈다. 기존 `queries.ts`와 `rollup-queries.ts`는 공개 함수·타입만 재노출하며 내부 구현은 필요한 파일을 직접 참조한다. `rollup-state.ts`는 병합 가능한 상태와 schema, `rollups.ts`는 구축·세션별 갱신·조회 snapshot을 맡는다. SQL은 역할별 구역에서 절·목록·CASE·서브쿼리를 여러 줄로 표현한다. 실제 통계 worker는 `queryUsagePage()` 한 번으로 페이지 행과 전체 개수를 같은 snapshot에서 읽고, 반환된 행으로 도표를 만든다. 요청별·비용 포함·구버전 Node의 raw 조회도 같은 페이지 계약을 사용하며 별도의 도표 조회 메서드와 누계 요청·응답 계약은 두지 않는다. 목록과 개수는 같은 필터·그룹 정의를 사용하고 모델 해석은 공통 facts 표현식을 재사용한다. SQL 구조와 바인딩을 함께 반환하며 시간대·기간·ID는 SQL 문자열에 삽입하지 않는다. 집계 표본·NULL·미상 정렬과 기존 원본 인덱스를 보존한다.
 
 SQLite 조회 계획용 통계는 DB 열기에서 `PRAGMA main.optimize=0x10002`, 첫 스캔 완료와 이후 24시간 이상 지난 스캔 완료 및 연결 종료에서 `PRAGMA main.optimize`로 수집한다. `main`만 지정하여 TEMP 파싱 테이블은 분석하지 않는다. 새 인덱스 생성·기존 인덱스 정리 뒤에도 열기 시 통계 수집이 적용되며, 다른 운영체제에서 복사한 같은 schema version의 DB도 열 때 identity 인덱스를 현재 플랫폼에 맞춘다. 통계 수집은 선택적 유지보수여서 실패가 스캔·연결 정리를 실패시키지 않고 다음 실행 시점에 다시 시도한다. `PRAGMA optimize`는 평균 결과 캐시가 아니라 필요한 `ANALYZE`를 선택하는 SQLite 기능이다. [SQLite 권고](https://www.sqlite.org/lang_analyze.html).
 
@@ -716,7 +769,7 @@ SQLite 조회 계획용 통계는 DB 열기에서 `PRAGMA main.optimize=0x10002`
 
 Claude는 main JSONL의 custom-title을 ai-title보다 우선한다. Codex는 읽기 전용 state_N.sqlite의 threads.name/title을 session_index.jsonl의 thread_name보다 우선하고 session_meta 제목을 보완 경로로 사용한다. metadata는 디스크 TEMP에 묶음 처리하며 통계 화면 진입 시 제목만 바뀐 세션도 갱신한다. metadata를 읽을 수 없으면 기존 제목을 유지한다. 프로젝트명·세션명 필터는 클릭해 이름 목록을 열고 스크롤해 선택하는 방식으로 제공하며, 선택 즉시 표·도표를 ID와 제공자로 정확히 조회한다. 목록이나 세션별 행에는 프로젝트명과 세션 시작 시각을 함께 표시하고 tooltip으로 전체 경로·ID를 확인한다.
 
-schema v1·v2는 기존 이름을 projects로 옮기고 요청 ID·통계·manifest 참조를 보존한 채 전환한다. 세션 제목은 다음 scan에서 채운다. 이름 metadata와 summary 교체는 같은 transaction에 반영하며, 참조하는 summary가 없어진 이름 행은 정리한다. `root_turn_id`는 요청 식별자다. schema v9에서 미사용 `turn_index` 컬럼과 순번 생성·저장 코드를 제거했고 v10은 별도 세션 인덱스와 Windows의 identity 인덱스를 제거했다. v11은 빈 rollup 표·인덱스만 추가하고 실제 구축은 첫 집계 조회 때 수행한다. 현재 v12는 manifest에 기본 0의 `source_missing`을 추가한다. 기존 DB의 요청 ID·제목·시각·토큰·진단 참조와 모델·비용·Skill 횟수를 보존하며 migration 실패 시 schema version까지 원복한다. 이 전환 자체로 원본 로그를 다시 스캔하지 않는다. 사용자 요청별 표는 DB 행 `id`순이고 모델별은 같은 요청 안에서 `model`순을 추가한다. 논리 session에 속하는 모든 파일을 읽어야 재집계할 수 있으므로 summary를 파일 하나의 자식 row로 두거나 삭제 cascade하지 않는다.
+schema v1·v2는 기존 이름을 projects로 옮기고 요청 ID·통계·manifest 참조를 보존한 채 전환한다. 세션 제목은 다음 scan에서 채운다. 이름 metadata와 summary 교체는 같은 transaction에 반영하며, 참조하는 summary가 없어진 이름 행은 정리한다. `root_turn_id`는 요청 식별자다. schema v9에서 미사용 `turn_index` 컬럼과 순번 생성·저장 코드를 제거했고 v10은 별도 세션 인덱스와 Windows의 identity 인덱스를 제거했다. v11은 빈 rollup 표·인덱스만 추가하고 실제 구축은 첫 집계 조회 때 수행한다. v12는 manifest에 기본 0의 `source_missing`을 추가하고 v13은 nullable `source_identity`·`content_hash`와 원본 식별자 인덱스를 추가했다. 현재 v16은 세션 PK·집계 형식 v1을 사용한다. 월 PK 실험의 v14·v15 DB는 파생 집계·세션/월 목록만 폐기하고 첫 조회에 재구축한다. v13의 기존 집계는 그대로 재사용한다. 기존 DB의 요청 ID·제목·시각·토큰·진단 참조와 모델·비용·Skill 횟수는 보존하며 migration 실패 시 schema version까지 원복한다. v13의 식별자·해시 backfill은 다음 통계 갱신에서 수행하고, v16의 집계 복원은 원본 로그를 다시 읽지 않는다. 이미 누락돼 해시가 없는 과거 행은 추정해서 연결·삭제하지 않는다. 사용자 요청별 표는 DB 행 `id`순이고 모델별은 같은 요청 안에서 `model`순을 추가한다. 논리 session에 속하는 모든 파일을 읽어야 재집계할 수 있으므로 summary를 파일 하나의 자식 row로 두거나 삭제 cascade하지 않는다.
 
 ### 8.1 사용자에게 보여 줄 turn summary
 
@@ -762,7 +815,7 @@ Skill 통계의 집계 대상·기간/비율 기준·분류별 사용 기준에 
 
 통계를 `토큰 / Skill` 구역으로 전환한다. Skill은 스킬·서브에이전트·플러그인·모델을 각각 별도 표로 표시하고 토큰과 같은 제공자·프로젝트·세션·기간 필터를 사용한다. 토큰의 일·월별 조회 단위는 Skill 구역에서 숨기며, 선택 범위 전체의 횟수를 보여 준다. 기간은 요청 시작일 기준이고 날짜 필터가 있으면 시작 시각 미상 요청은 제외한다. 구역 선택은 Webview state에 보존한다.
 
-Skill은 각 표 안의 비율 막대에서 상대 사용량을 표시한다. worker는 분류별 `chartRows`를 최대 20개씩 함께 반환해 표 페이지와 무관한 최다 사용 횟수 기준을 유지한다. 첫 표 페이지에서는 이미 조회한 행을 재사용하며 이후 페이지에서도 해당 분류 전체 횟수의 비율 분모를 유지한다. 빈 결과는 각 표에 기록 없음 안내를 표시한다. 이전 Webview state의 Skill 도표 분류·지표 값은 사용하지 않는다.
+Skill은 각 표 안의 비율 막대에서 상대 사용량을 표시한다. worker는 분류별 현재 페이지와 전체 범위의 `maxUses`·`totalUses`를 반환하며, 화면은 이 값으로 페이지에 독립적인 최대 막대와 비율을 계산한다. 별도의 상위 20개 조회·`chartRows`와 구형 응답 fallback은 두지 않는다. 빈 결과는 각 표에 기록 없음 안내를 표시한다. 이전 Webview state의 Skill 도표 분류·지표 값은 사용하지 않는다.
 
 `agentTracker.usage.skillsEnabled`는 기본 true로 사용자 지시 여부와 관계없이 AI의 호출 기록을 포함한다. 지시·자율 여부를 프롬프트 본문으로 추정하거나 구분 저장하지 않는다. OFF에서는 진행 중인 수집을 취소하고 worker의 Skill 호출 인식·모델 응답 횟수 합산과 Skill 조회를 중단한다. 토큰·모델별 토큰·API 비용·quota 기능은 유지한다. Skill 화면은 기존 표를 비우고 OFF 안내와 설정 열기 버튼을 제공한다.
 
@@ -787,7 +840,7 @@ Codex `response_item`의 function/custom tool 호출과 `exec` 안의 정적인 
 
 보존할 요청의 기존 행 ID·모델별 토큰·비용·Skill 횟수·프로젝트/세션 이름과 결제 방식을 함께 유지하고, 관련 manifest는 `source_missing=1`로 남긴다. 데이터 확인 화면은 원본 삭제·집계 보존 상태를 표시한다. 보존 대상이 없는 요청·파일은 기존 재집계·삭제 규칙을 따른다. 이미 삭제 표시한 파일만 계속 없고 다른 변경이 없으면 원본 본문을 다시 읽지 않는다.
 
-일부 원본이 없으면 해당 세션의 기존 보존 대상 요청은 마지막 집계 snapshot을 유지한다. 남은 원본만으로 같은 요청의 누락 기여량·중복 범위를 복원할 수 없으므로 덮어쓰거나 단순 합산하지 않는다. 같은 연결 component에서 세션 귀속이 달라진 동일 요청도 이중 저장하지 않으며 새로운 요청은 계속 수집한다. 누락된 원본이 모두 복원되어 성공적으로 재집계되면 `source_missing`을 해제하고 전체 snapshot을 교체한다. 다른 경로의 새 복사본만으로 누락 원본의 모든 기여가 복구되었다고 추측하지 않는다. 원본이 없는 동안 같은 요청에 추가된 사용량은 전체 원본 복원 전까지 마지막 snapshot에 반영하지 못한다.
+일부 원본이 없으면 해당 세션의 기존 보존 대상 요청은 마지막 집계 snapshot을 유지한다. 남은 원본만으로 같은 요청의 누락 기여량·중복 범위를 복원할 수 없으므로 덮어쓰거나 단순 합산하지 않는다. 같은 연결 component에서 세션 귀속이 달라진 동일 요청도 이중 저장하지 않으며 새로운 요청은 계속 수집한다. 누락된 원본이 모두 복원되거나 다른 경로에서 원본 식별자·전체 byte prefix의 SHA-256으로 연결을 검증해 성공적으로 재집계되면 전체 snapshot을 교체한다. 연결된 이전 manifest는 삭제하고 새 위치의 행을 유지한다. session_id나 이름만 일치하는 복사본은 복원으로 추측하지 않는다. 검증되지 않은 누락 원본이 남으면 기존 요청의 추가 사용량 반영을 유예한다.
 
 옵션 변경은 진행 중인 갱신을 취소하고 다음 통계 진입·명시적 새로 고침부터 적용한다. OFF에서는 이전 보존 이력에도 원본 삭제를 반영한다. **통계 계산 데이터 삭제**는 보존된 요청과 삭제된 원본의 manifest도 함께 지운다. 원본이 없는 이력은 이 작업 이후 재구축할 수 없다. 원본 파일 내용과 전체 대화 본문을 별도로 복제하지 않는다.
 
@@ -838,6 +891,8 @@ GROUP BY provider, project_key, session_id;
 schema version 2는 기존 `turn_summary`의 행·id·manifest 참조를 보존하며 `failed` 상태를 추가한다. parser version 4는 변경되지 않은 원본도 다음 통계 갱신에서 재파싱해 기존 시간과 실패 분류를 보정한다.
 
 ### 8.3 사용량 도표
+
+`media/dashboard.js`의 동일 IIFE에서 `renderChart()`가 범례·배치·축·범주·막대 조립을 순서대로 호출한다. 막대는 [성분과 상세 설명 조립](../media/dashboard.js#L536), [가로·세로 및 모델·제공자 레이블 조립](../media/dashboard.js#L558)을 구분하며 레이블 분기는 조기 반환으로 표현한다. `updateUsage()`는 Skill·요청·집계 표를 구분하고 토큰 페이지와 품질 안내를 이어 갱신한다. 배치 값은 지역 객체로 전달하며 기존 상태 소유권과 `renderUsage()`의 스크롤 복원 범위를 유지한다. 호스트의 `parseDashboardMessage()`는 메시지 종류를 선택하고 같은 파일의 비공개 `parseUsageMessage()`가 사용량 조회 필드를 검증한다. 필수 제어값 오류의 전체 거부와 잘못된 선택 필터 생략을 구분한다.
 
 사용량 통계 표 위의 총 토큰·평균 토큰 도표는 `Input / Output / Cache Write / Cache Read`를 각각 VS Code 테마의 파랑·주황·보라·초록으로 구분해 쌓은 누적 막대로 표시한다. 제공자에 관계없이 같은 토큰 항목은 같은 색상을 사용하며 모든 구간은 불투명하게 표시한다. 도표 위의 토큰 구성 범례는 이 순서의 이름과 막대에 적용한 색상을 함께 표시하고 좁은 화면에서는 줄바꿈한다. 구성이 미확인인 막대가 있으면 회색 ‘구성 미확인’을 범례에 추가한다. 제공자별·모델별의 총 토큰·평균 토큰 도표에서 같은 범례를 사용하며, 평균 시간·요청 수와 빈 결과에서는 범례를 비우고 숨긴다. 총 토큰 막대는 항목별 총량, 평균 토큰 막대는 항목별 완료 요청 평균을 쌓는다. Input은 cache read/write를 제외한 화면 표시 값을 사용한다. 별도의 ‘토큰 구성’ 지표는 두지 않는다.
 
@@ -898,9 +953,9 @@ Extension Host 메모리에 유지하는 값:
 
 SQLite query는 기간과 project/session filter를 먼저 적용하고 turn_summary는 page 단위로 가져온다. 기본 page size는 100으로 한다. 통계의 도표·표 하단에는 `페이지당 행 수` 숫자 입력칸을 이전 버튼 바로 왼쪽에 배치하고 페이지 이동 조작 전체를 오른쪽에 모은다. 1~1,000 사이 정수를 직접 입력하고 Enter 또는 입력칸 이탈로 적용하며 빈 값·소수·범위 밖 값은 입력 오류를 표시하고 조회하지 않는다. 토큰 도표와 표는 같은 값을 공유하고, Skill 네 분류는 각각 독립적인 값을 사용한다. 개수 변경은 해당 표만 첫 페이지로 되돌리며 기간·대상·정렬을 유지하고 원본 로그를 다시 읽지 않는다. 적용한 개수는 기존 조회 선택과 함께 Webview state에 보존하며 `초기화`는 모두 100행으로 되돌린다. 프로젝트·세션 이름 목록과 데이터 확인의 조회 크기는 기존 100개를 유지한다.
 
-집계 조회의 주 입력은 요청 facts `K`행에서 선택된 일별 상태 `r`행과 부분 날짜의 raw 입력 `B`행으로 줄어든다. 범위 탐색·주 순회 모델은 `O(log N + K)`에서 `O(log R + r + B)`로 바뀌지만 GROUP BY·정렬 비용은 별도로 남는다. 추가 영속 공간은 실제 요청·모델 일별 조합 수 `O(R + Rm)`이다. 세션·날짜·모델 조합이 매 turn마다 달라지면 집계 행 수도 facts와 비슷해져 최악의 선형 비용은 유지된다. 최초 구축·시간대 변경에는 전체 재집계, 세션 변경에는 해당 세션 재집계와 추가 인덱스·WAL 비용이 생긴다. 소량·좁은 기간은 고정 경계 계산 비용으로 느려질 수 있으며 자동 임계값·결과 캐시는 추가하지 않았다. 실제 제품 경로의 전후 시간·공간·transaction 비교는 [SQL 측정 보고서](benchmarks/SqlExplainBenchmark-2026-10-15.md)에 둔다.
+집계 조회의 주 입력은 요청 facts `K`행에서 선택된 일별 상태 `r`행과 부분 날짜의 raw 입력 `B`행으로 줄어든다. 범위 탐색·주 순회 모델은 `O(log N + K)`에서 `O(log R + r + B)`로 바뀌지만 GROUP BY·정렬 비용은 별도로 남는다. 추가 영속 공간은 실제 요청·모델 일별 조합 수 `O(R + Rm)`이다. 세션·날짜·모델 조합이 매 turn마다 달라지면 집계 행 수도 facts와 비슷해져 최악의 선형 비용은 유지된다. 최초 구축·시간대 변경에는 전체 재집계, 세션 변경에는 해당 세션 재집계와 추가 인덱스·WAL 비용이 생긴다. 소량·좁은 기간은 고정 경계 계산 비용으로 느려질 수 있으며 자동 임계값·결과 캐시는 추가하지 않았다. 실제 제품 경로의 전후 시간·공간·transaction 비교는 [SQL 측정 보고서](benchmarks/2026-10-15/SqlExplainBenchmark-2026-10-15.md)에 둔다.
 
-요청 제목은 component 재집계 때 `component_events(root_id,id) WHERE is_main=1 AND request_title IS NOT NULL` TEMP partial index로 탐색한다. provider·session 조건을 유지하며 가장 먼저 기록된 메인 제목을 선택한다. 인덱스는 component 테이블 재생성·staging 종료 시 사라지고 영속 DB에는 추가하지 않는다. 별도 JS 제목 Map을 만들지 않으며 준비된 요청도 100행씩 읽는다. `prepareSummaries`는 영속 교체 transaction 전에 실행하고 실제 `replaceSessions`의 BEGIN IMMEDIATE/COMMIT 구간과 별도로 측정한다. FILE TEMP는 page cache를 사용하므로 전체 process 메모리의 고정 상한으로 해석하지 않는다. 제목 탐색의 복잡도 모델과 실제 고정 원본의 구현 전후 transaction 기록은 [측정 보고서](RequestTitleTransactions.md)에 둔다.
+요청 제목은 component 재집계 때 `component_events(root_id,id) WHERE is_main=1 AND request_title IS NOT NULL` TEMP partial index로 탐색한다. provider·session 조건을 유지하며 가장 먼저 기록된 메인 제목을 선택한다. 인덱스는 component 테이블 재생성·staging 종료 시 사라지고 영속 DB에는 추가하지 않는다. 별도 JS 제목 Map을 만들지 않으며 준비된 요청도 100행씩 읽는다. `prepareSummaries`는 영속 교체 transaction 전에 실행하고 실제 `replaceSessions`의 BEGIN IMMEDIATE/COMMIT 구간과 별도로 측정한다. FILE TEMP는 page cache를 사용하므로 전체 process 메모리의 고정 상한으로 해석하지 않는다. 제목 탐색의 복잡도 모델과 실제 고정 원본의 구현 전후 transaction 기록은 [측정 보고서](benchmarks/2026-10-08/RequestTitleTransactions.md)에 둔다.
 
 SQLite 자체보다 주의할 부분은 VS Code extension 배포 방식이다.
 
@@ -931,7 +986,7 @@ SQLite 자체보다 주의할 부분은 VS Code extension 배포 방식이다.
 
 SQLite 사용 자체가 고정 메모리를 보장하지 않는다. worker의 discovery 목록·중복 검증 작업량·DB page cache도 측정하고, corpus 전체를 host에 반환하지 않도록 batch/page 경계를 지킨다.
 
-JSONL reader는 바이트별 JS 처리 대신 일반 줄의 직접 파싱과 연속 Buffer 구간 처리를 사용한다. 읽은 원본 byte N에 대한 시간 O(N), chunk C와 보관 줄 한도 K에 대한 reader 보조 공간 O(C + min(L,K))는 유지한다. 이미지 검사에는 C 이내의 임시 Latin-1 문자열을 사용하며, row 객체·adapter·DB 메모리는 별도다. 파싱의 규모는 JSONL 행 수·원본/보관 byte·최대 줄 크기로 비교한다. 동일한 RAM 입력으로 I/O·adapter·DB를 제외한 적용 전후 브랜치 측정은 [파싱 전용 보고서](JsonlParsingBranches-2026-10-09.md)에 둔다. 이전 reader+adapter 및 전체 갱신 측정은 [기존 트레이드오프 보고서](benchmarks/JsonlReaderTradeoff.json)에 원본 그대로 보존한다. parser version과 집계 결과를 유지하므로 이 최적화만으로 정상 파일 전체를 강제 재파싱하지 않는다.
+JSONL reader는 바이트별 JS 처리 대신 일반 줄의 직접 파싱과 연속 Buffer 구간 처리를 사용한다. 읽은 원본 byte N에 대한 시간 O(N), chunk C와 보관 줄 한도 K에 대한 reader 보조 공간 O(C + min(L,K))는 유지한다. 이미지 검사에는 C 이내의 임시 Latin-1 문자열을 사용하며, row 객체·adapter·DB 메모리는 별도다. 파싱의 규모는 JSONL 행 수·원본/보관 byte·최대 줄 크기로 비교한다. 동일한 RAM 입력으로 I/O·adapter·DB를 제외한 적용 전후 브랜치 측정은 [파싱 전용 보고서](benchmarks/2026-10-09/JsonlParsingBranches-2026-10-09.md)에 둔다. 이전 reader+adapter 및 전체 갱신 측정은 [기존 트레이드오프 보고서](benchmarks/2026-10-09/JsonlReaderTradeoff.json)에 원본 그대로 보존한다. parser version과 집계 결과를 유지하므로 이 최적화만으로 정상 파일 전체를 강제 재파싱하지 않는다.
 
 ## 11. 검증 및 시뮬레이션
 
@@ -1056,7 +1111,7 @@ last successful session update
 각 기능을 구현할 때 fixture 기반 테스트를 함께 작성한다. 상세 검증 항목과 자동 실행·패키징 정책은 [CI/CD 계획](./CI-CD.md)에서 관리한다.
 
 1. VS Code extension scaffold와 StatusBar/Webview command
-2. `QuotaService`와 provider adapter interface
+2. `QuotaService`와 provider 계약, `BaseQuotaProvider` 추상 클래스
 3. 짧은 Codex App Server 실행, handshake, account/read, rateLimits read, 모든 경로의 종료 처리
 4. Claude quota adapter와 조회 실패 fallback
 5. SQLite worker와 migration
@@ -1072,7 +1127,7 @@ last successful session update
 - extension 활성화만으로 JSONL 전체 scan이 발생하지 않는다.
 - 조회 중 provider notification은 수신 즉시 반영하고 활성 창의 정기 조회는 제공자별 기본 15분 간격으로 수행한다. 조회 사이 Codex App Server는 상주하지 않는다.
 - 상태바 사용량 항목 안에서 Claude는 왼쪽, Codex는 오른쪽이고, 바로 위 툴팁에서 quota·reset·마지막 성공 갱신 시각을 볼 수 있다.
-- 클릭하면 Markdown Quota 카드가 뜨고 제공자별 새로 고침·상세/압축 설정·확장 관리·사용량 통계 링크를 사용할 수 있다. 패치한 로컬 VS Code에서는 자동 호버 억제, 클릭 유지·재클릭 닫기, 닫은 뒤 재호버 억제와 바깥 클릭·Esc 후 재열기를 실제 UI에서 검증한다.
+- 호버하면 상태 표시줄의 상세/압축 설정과 관계없이 제공자별 주간·5시간 남은 비율·초기화 카운트다운과 사용량 창 열기 안내를 표시한다. 클릭하면 Markdown Quota 카드가 뜨고 공통 새로고침·상세/압축 설정·설정·사용량 통계 링크를 사용할 수 있다. 패치한 로컬 VS Code에서는 상세 요약 호버, 클릭 유지·재클릭 닫기, 닫은 뒤 요약 복원과 바깥 클릭·Esc 후 재열기를 실제 UI에서 검증한다.
 - 누계 refresh에서 변경 없는 session의 파일 body는 다시 읽지 않는다.
 - 전체 경로·manifest·파싱 결과를 메모리에 적재하지 않고 n개·byte 예산·DB 조회 page 경계를 지킨다.
 - 영속 table은 manifest·projects·sessions·turn_summary·turn_model_usage·turn_costs·session_billing·turn_capability_usage이고, session summary·모델별 토큰·비용·Skill 횟수와 이름·정상 metadata·삭제는 함께 commit한다. 부재 판정은 전체 순회 성공 후 수행한다.

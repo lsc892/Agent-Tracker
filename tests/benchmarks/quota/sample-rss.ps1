@@ -1,3 +1,4 @@
+# Windows 대상 프로세스의 작업 집합과 CPU 사용 시간을 주기적으로 전달한다.
 param([int]$SampleMilliseconds = 50)
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'

@@ -1,0 +1,4 @@
+interface:
+  display_name: "책임 문서 정리"
+  short_description: "폴더 README와 파일·클래스의 책임을 한 줄로 설명"
+  default_prompt: "$document-responsibilities로 폴더 README와 파일·클래스의 한 줄 책임 설명을 정리해줘."

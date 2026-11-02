@@ -1,3 +1,4 @@
+// 요약 DB의 스키마·마이그레이션·교체·조회·진단 일관성을 검증한다.
 import assert from 'node:assert/strict';
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -256,6 +257,35 @@ test('v11 migration adds source presence without changing stored usage or markin
   } finally { db.close(); }
 });
 
+test('v12 migration preserves statistics and adds nullable source fingerprints with their lookup index', t => {
+  const parent=realpathSync(tmpdir());
+  const directory=mkdtempSync(join(parent,'agent-tracker-fingerprint-migration-'));
+  const dbPath=join(directory,'summary.sqlite');
+  t.after(()=>{
+    const target=resolve(directory);
+    assert.equal(resolve(target,'..'),parent);
+    assert.ok(target.split(sep).at(-1)?.startsWith('agent-tracker-fingerprint-migration-'));
+    rmSync(target,{recursive:true,force:true});
+  });
+  const initial=new SummaryDatabase(dbPath);
+  const id=seed(initial);
+  const before=initial.queryTurns();
+  initial.connection.exec(`DROP INDEX idx_manifest_source;
+    ALTER TABLE manifest DROP COLUMN source_identity; ALTER TABLE manifest DROP COLUMN content_hash;
+    PRAGMA user_version=12;`);
+  initial.close();
+  const migrated=new SummaryDatabase(dbPath);
+  try {
+    assert.equal(migrated.connection.prepare('PRAGMA user_version').get()?.user_version,SCHEMA_VERSION);
+    assert.deepEqual(migrated.queryTurns(),before);
+    const source=migrated.findManifest('claude',metadata().path)!;
+    assert.equal(source.id,id);assert.equal(source.source_missing,0);
+    assert.equal(source.source_identity,null);assert.equal(source.content_hash,null);
+    assert.deepEqual(migrated.connection.prepare('PRAGMA index_info(idx_manifest_source)').all().map(row=>row.name),['provider','source_identity','id']);
+    assert.deepEqual(migrated.connection.prepare('PRAGMA foreign_key_check').all(),[]);
+  } finally {migrated.close();}
+});
+
 test('migration rechecks the version after another window finishes the transition', t => {
   const parent = realpathSync(tmpdir());
   const directory = mkdtempSync(join(parent,'agent-tracker-db-race-'));
@@ -272,6 +302,7 @@ test('migration rechecks the version after another window finishes the transitio
   legacy.prepare(`INSERT INTO turn_summary (${keys.join(',')}) VALUES (${keys.map(()=>'?').join(',')})`).run(...Object.values(row));
   legacy.close();
   let raceInjected = false;
+  /** 마이그레이션 잠금 직전 다른 연결의 완료를 끼워 넣어 경쟁 상황을 재현한다. */
   class WaitingSession extends SqliteSession {
     override transaction<T>(action: ()=>T): T {
       // Simulate the other opener committing after our initial version read, before our lock is acquired.

@@ -1,3 +1,4 @@
+// Claude·Codex 파서의 토큰·요청 수명·시간·하위 에이전트 해석을 검증한다.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ClaudeParserAdapter, CodexCurrentParserAdapter, claudeTokens,codexTokens } from '../../src/summary/parsers';

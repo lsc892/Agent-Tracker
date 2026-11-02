@@ -1,3 +1,4 @@
+// VS Code 상태바의 quota 카드 토글 패치를 검사·적용·복원한다.
 const { existsSync, readFileSync, writeFileSync, renameSync, unlinkSync, statSync, realpathSync } = require('node:fs');
 const { dirname, join, resolve } = require('node:path');
 const { createHash } = require('node:crypto');
@@ -6,7 +7,8 @@ const { spawnSync } = require('node:child_process');
 const command = 'agentTracker.toggleQuotaTooltip';
 const extensionId = 'AgentTracker.agent-tracker';
 const checksumKey = 'vs/workbench/workbench.desktop.main.js';
-const begin = '/*agent-tracker:statusbar-toggle:v4*/';
+const begin = '/*agent-tracker:statusbar-toggle:v5*/';
+const dividedPreviewBegin = '/*agent-tracker:statusbar-toggle:v4*/';
 const previewBegin = '/*agent-tracker:statusbar-toggle:v3*/';
 const clickOnlyBegin = '/*agent-tracker:statusbar-toggle:v2*/';
 const legacyBegin = '/*agent-tracker:statusbar-toggle:v1*/';
@@ -14,8 +16,7 @@ const end = '/*agent-tracker:statusbar-toggle:end*/';
 const hash = value => createHash('sha256').update(value).digest('hex');
 const checksum = value => createHash('sha256').update(value).digest('base64').replace(/=+$/, '');
 
-// Serialized into the renderer. Keep this function self-contained and scoped to
-// one status item: the original delegate is shared by the rest of the status bar.
+// Preserve the historical v3/v4 function verbatim to verify upgrades safely.
 function configureQuotaHover(item, summary) {
   item._agentTrackerSummary = summary;
   if (item._agentTrackerHoverConfigured) return;
@@ -43,7 +44,34 @@ function configureQuotaHover(item, summary) {
   } });
 }
 
-// Keep the v3 hover function unchanged so upgrades can verify its exact payload.
+/**
+ * 책임: 호버와 클릭에 같은 quota 카드를 사용하고 클릭 고정 상태를 유지한다.
+ * 알고리즘: 원래 Markdown과 자동 hover 수명을 위임하되 sticky 카드가 있을 때만 자동 재진입을 막는다.
+ */
+function configureQuotaCardHover(item) {
+  item._agentTrackerQuotaHover = true;
+  if (item._agentTrackerCardHoverConfigured) return;
+  item._agentTrackerCardHoverConfigured = true;
+  const delegate = item.hoverDelegate;
+  item.hoverDelegate = {
+    get delay() { return delegate.delay; },
+    get placement() { return delegate.placement; },
+    get showNativeHover() { return delegate.showNativeHover; },
+    showHover(options, focus) {
+      if (item._agentTrackerQuotaHover && !focus && item.hoverService.getStickyHover(item.container)) return undefined;
+      return delegate.showHover(options, focus);
+    },
+    onDidHideHover() { delegate.onDidHideHover?.(); },
+  };
+  const stop = event => {
+    if (item._agentTrackerQuotaHover && item.hoverService.getStickyHover(item.container)) event.stopImmediatePropagation();
+  };
+  for (const type of ['mouseover', 'focus']) item.container.addEventListener(type, stop, { capture: true });
+  item._register({ dispose() {
+    for (const type of ['mouseover', 'focus']) item.container.removeEventListener(type, stop, { capture: true });
+  } });
+}
+
 function configureQuotaDividers(item) {
   const document = item.container.ownerDocument;
   const id = 'agent-tracker-quota-divider-style';
@@ -54,13 +82,17 @@ function configureQuotaDividers(item) {
   document.head.appendChild(style);
 }
 
+/**
+ * 책임: 지원하는 workbench 코드에 quota 클릭 토글 패치만 생성한다.
+ * 알고리즘: 유일한 심볼·연결 지점을 검증하고 정확히 알려진 기존 payload만 해제·승격해 새 주입 코드를 만들며 알 수 없는 수정은 거부한다.
+ */
 function patchSource(source) {
   const symbols = [...source.matchAll(/\b([\w$]+)\s*=\s*\{\s*id:\s*["']statusBar\.entry\.toggleTooltip["'],\s*title:\s*["']["']\s*\}/g)];
   if (symbols.length !== 1) throw new Error('내장 ToggleTooltipCommand를 유일하게 찾을 수 없습니다. 지원하지 않는 VS Code 빌드입니다.');
   let original = source;
   const markers = [...source.matchAll(/\/\*agent-tracker:statusbar-toggle:v\d+\*\//g)];
   if (markers.length || source.includes(end)) {
-    if (markers.length !== 1 || source.split(end).length !== 2 || ![begin, previewBegin, clickOnlyBegin, legacyBegin].includes(markers[0][0])) throw new Error('토글 패치 표식이 손상되었습니다.');
+    if (markers.length !== 1 || source.split(end).length !== 2 || ![begin, dividedPreviewBegin, previewBegin, clickOnlyBegin, legacyBegin].includes(markers[0][0])) throw new Error('토글 패치 표식이 손상되었습니다.');
     const start = markers[0].index, finish = source.indexOf(end);
     if (finish < start) throw new Error('토글 패치 표식 순서가 잘못되었습니다.');
     original = source.slice(0, start) + source.slice(finish + end.length);
@@ -75,18 +107,20 @@ function patchSource(source) {
   // Keep the exact v2 injection to safely recognize upgrades and restore backups.
   const clickOnly = `if(!this._agentTrackerClickOnly){this._agentTrackerClickOnly=true;const stop=event=>{if(this.entry?.extensionId===${JSON.stringify(extensionId)}&&this.entry?.command===${symbols[0][1]})event.stopImmediatePropagation();};for(const type of ["mouseover","focus"])this.container.addEventListener(type,stop,{capture:true});this._register({dispose:()=>{for(const type of ["mouseover","focus"])this.container.removeEventListener(type,stop,{capture:true});}});}`;
   const configureSource = configureQuotaHover.toString().replace(/\r\n/g, '\n');
+  const cardSource = configureQuotaCardHover.toString().replace(/\r\n/g, '\n');
   const dividerSource = configureQuotaDividers.toString().replace(/\r\n/g, '\n');
   const previewInjection = `if(${condition}){(${configureSource})(this,${argument}.ariaLabel??${argument}.name??"");${mapping}}else{this._agentTrackerSummary=undefined;}`;
-  const injection = `${begin}if(${condition}){(${configureSource})(this,${argument}.ariaLabel??${argument}.name??"");${mapping}(${dividerSource})(this);}else{this._agentTrackerSummary=undefined;}${end}`;
+  const injection = `${begin}if(${condition}){(${cardSource})(this);${mapping}(${dividerSource})(this);}else{this._agentTrackerQuotaHover=false;}${end}`;
   const position = target.index + target[0].length;
   const patched = original.slice(0, position) + injection + original.slice(position);
   const legacy = original.slice(0, position) + `${legacyBegin}if(${condition}){${mapping}}${end}` + original.slice(position);
   const clickOnlySource = original.slice(0, position) + `${clickOnlyBegin}if(${condition}){${mapping}${clickOnly}}${end}` + original.slice(position);
   const preview = original.slice(0, position) + `${previewBegin}${previewInjection}${end}` + original.slice(position);
+  const dividedPreview = original.slice(0, position) + `${dividedPreviewBegin}if(${condition}){(${configureSource})(this,${argument}.ariaLabel??${argument}.name??"");${mapping}(${dividerSource})(this);}else{this._agentTrackerSummary=undefined;}${end}` + original.slice(position);
   // Recognize exact historical payloads so a publisher change retains restore backups.
-  const previousPublisher = [patched, legacy, clickOnlySource, preview].map(value =>
+  const previousPublisher = [patched, legacy, clickOnlySource, preview, dividedPreview].map(value =>
     value.replaceAll(JSON.stringify(extensionId), JSON.stringify('agent-tracker.agent-tracker')));
-  if (![original, patched, legacy, clickOnlySource, preview, ...previousPublisher].includes(source)) throw new Error('기존 토글 패치가 예상 코드와 다릅니다. 자동으로 덮어쓰지 않습니다.');
+  if (![original, patched, legacy, clickOnlySource, preview, dividedPreview, ...previousPublisher].includes(source)) throw new Error('기존 토글 패치가 예상 코드와 다릅니다. 자동으로 덮어쓰지 않습니다.');
   return { original, patched, alreadyPatched: source === patched, upgradeRequired: source !== original && source !== patched };
 }
 
@@ -100,6 +134,10 @@ function appRootFromInstallation(root, launcher = join(root, 'bin', 'code.cmd'))
   }
 }
 
+/**
+ * 책임: 패치할 VS Code의 실제 앱 디렉터리를 찾는다.
+ * 알고리즘: 명시 app root·CLI·실행 파일을 우선하고 기본 설치 후보를 검사하며 버전별 설치 경로는 launcher와 product.json으로 확인한다.
+ */
 function resolveAppRoot(options = {}) {
   if (options.appRoot) return realpathSync(resolve(options.appRoot));
   if (options.cli) {
@@ -134,11 +172,31 @@ function atomicWrite(path, contents) {
 }
 
 function backup(path, contents) {
-  if (existsSync(path)) {
-    if (hash(readFileSync(path)) !== hash(contents)) throw new Error(`기존 백업과 원본이 다릅니다: ${path}`);
-  } else writeFileSync(path, contents, { flag: 'wx' });
+  if (!existsSync(path)) { writeFileSync(path, contents, { flag: 'wx' }); return; }
+  if (hash(readFileSync(path)) !== hash(contents)) throw new Error(`기존 백업과 원본이 다릅니다: ${path}`);
 }
 
+function restoreWorkbench(target, productPath, source, productSource, state) {
+  if (!state) throw new Error('복원할 토글 패치 백업이 없습니다.');
+  const original = readFileSync(`${target}.agent-tracker-toggle.bak`);
+  const originalProduct = readFileSync(`${productPath}.agent-tracker-toggle.bak`);
+  if (hash(original) !== state.originalHash || hash(originalProduct) !== state.originalProductHash) throw new Error('백업 무결성 검증 실패.');
+  const restored = hash(source) === state.originalHash && hash(productSource) === state.originalProductHash;
+  if (restored) return 'already-restored';
+  if (![state.originalHash, state.patchedHash, state.previousHash].includes(hash(source)) || ![state.originalProductHash, state.patchedProductHash, state.previousProductHash].includes(hash(productSource))) throw new Error('패치 이후 파일이 변경되어 자동 복원을 중단합니다.');
+  try {
+    atomicWrite(target, original);
+    atomicWrite(productPath, originalProduct);
+  } catch (error) {
+    atomicWrite(target, source); atomicWrite(productPath, productSource); throw error;
+  }
+  return 'restored';
+}
+
+/**
+ * 책임: workbench 패치·복원의 무결성과 복구 가능한 상태를 관리한다.
+ * 알고리즘: 대상·해시·백업·구문을 검증하고 변경 전 양쪽 기대 상태를 기록한 뒤 파일과 checksum을 교체하며 실패하면 이전 상태로 되돌린다.
+ */
 function operate(options = {}) {
   const appRoot = resolveAppRoot(options);
   const target = join(appRoot, 'out', ...checksumKey.split('/'));
@@ -153,19 +211,7 @@ function operate(options = {}) {
   const productBackup = `${productPath}.agent-tracker-toggle.bak`;
   const state = existsSync(statePath) ? JSON.parse(readFileSync(statePath, 'utf8')) : undefined;
   if (options.restore) {
-    if (!state) throw new Error('복원할 토글 패치 백업이 없습니다.');
-    const original = readFileSync(sourceBackup), originalProduct = readFileSync(productBackup);
-    if (hash(original) !== state.originalHash || hash(originalProduct) !== state.originalProductHash) throw new Error('백업 무결성 검증 실패.');
-    const restored = hash(source) === state.originalHash && hash(productSource) === state.originalProductHash;
-    if (restored) return { status: 'already-restored', appRoot, version: manifest.version };
-    if (![state.originalHash, state.patchedHash, state.previousHash].includes(hash(source)) || ![state.originalProductHash, state.patchedProductHash, state.previousProductHash].includes(hash(productSource))) throw new Error('패치 이후 파일이 변경되어 자동 복원을 중단합니다.');
-    try {
-      atomicWrite(target, original);
-      atomicWrite(productPath, originalProduct);
-    } catch (error) {
-      atomicWrite(target, source); atomicWrite(productPath, productSource); throw error;
-    }
-    return { status: 'restored', appRoot, version: manifest.version };
+    return { status: restoreWorkbench(target, productPath, source, productSource, state), appRoot, version: manifest.version };
   }
   const result = patchSource(source);
   if (result.alreadyPatched) {
@@ -203,13 +249,15 @@ function main(args) {
   const options = {};
   for (let index = 0; index < args.length; index++) {
     const arg = args[index];
-    if (arg === '--restore') options.restore = true;
-    else if (arg === '--check') options.check = true;
-    else if (arg === '--app-root' || arg === '--executable' || arg === '--cli') {
-      const value = args[++index];
-      if (!value || value.startsWith('--')) throw new Error(`${arg} 값이 필요합니다.`);
-      options[arg === '--app-root' ? 'appRoot' : arg === '--cli' ? 'cli' : 'executable'] = value;
-    } else throw new Error(`알 수 없는 옵션: ${arg}`);
+    switch (arg) {
+      case '--restore': options.restore = true; continue;
+      case '--check': options.check = true; continue;
+      case '--app-root': case '--executable': case '--cli': break;
+      default: throw new Error(`알 수 없는 옵션: ${arg}`);
+    }
+    const value = args[++index];
+    if (!value || value.startsWith('--')) throw new Error(`${arg} 값이 필요합니다.`);
+    options[arg === '--app-root' ? 'appRoot' : arg.slice(2)] = value;
   }
   if (options.restore && options.check) throw new Error('--restore와 --check는 함께 사용할 수 없습니다.');
   console.log(JSON.stringify(operate(options), null, 2));

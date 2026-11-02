@@ -1,7 +1,9 @@
+// 번역 사전·사용처를 검증하고 manifest 번역과 실행용 다국어 자산을 동기화한다.
 'use strict';
 const fs = require('node:fs');
 const path = require('node:path');
 const ts = require('typescript');
+const { configurationManifest } = require('./configuration.cjs');
 const root = path.join(__dirname, '..');
 const check = process.argv.includes('--check');
 const read = file => JSON.parse(fs.readFileSync(path.join(root, file), 'utf8'));
@@ -12,12 +14,15 @@ const localePattern = /^[a-z]{2,3}(?:-[a-z0-9]+)*$/;
 function write(file, value) {
   const target = path.join(root, file);
   const expected = JSON.stringify(value, null, 2) + '\n';
-  if (check) {
-    if (!fs.existsSync(target) || fs.readFileSync(target, 'utf8').replaceAll('\r\n', '\n') !== expected) throw new Error(`${file} is stale. Run npm run localization:sync.`);
-  } else fs.writeFileSync(target, expected);
+  if (!check) { fs.writeFileSync(target, expected); return; }
+  if (!fs.existsSync(target) || fs.readFileSync(target, 'utf8').replaceAll('\r\n', '\n') !== expected) throw new Error(`${file} is stale. Run npm run localization:sync.`);
 }
 const catalogs = new Map();
 const localeIds = new Set();
+/**
+ * 책임: 지원 언어 사전의 완전성과 치환 규칙을 검증한다.
+ * 알고리즘: 언어 ID·별칭 중복, 원문과의 키 집합·placeholder 일치, 빈 번역·미번역 한글을 검사한 뒤 유효 사전만 등록한다.
+ */
 for (const language of languages) {
   if (!localePattern.test(language.locale) || localeIds.has(language.locale)
     || !Array.isArray(language.vscodeLocales) || !language.vscodeLocales.every(alias => localePattern.test(alias))) {
@@ -35,13 +40,7 @@ for (const language of languages) {
   catalogs.set(language.locale, catalog);
 }
 const pkg = read('package.json');
-const category = { id: 'agentTracker.localization', title: '%manifest.languageCategory%', order: 0, properties: {
-  'agentTracker.language': { type: 'string', default: 'auto', scope: 'window',
-    enum: ['auto', ...languages.map(language => language.locale)],
-    enumItemLabels: ['%manifest.languageAuto%', ...languages.map(language => language.label)],
-    markdownDescription: '%manifest.languageDescription%' },
-} };
-pkg.contributes.configuration = [category, ...pkg.contributes.configuration.filter(section => section.id !== category.id)];
+pkg.contributes.configuration = configurationManifest(languages);
 write('package.json', pkg);
 const manifestKeys = [...new Set(JSON.stringify(pkg).match(/%[\w.]+%/g))].map(token => token.slice(1, -1));
 for (const language of languages) {
@@ -59,17 +58,33 @@ function files(dir) {
   return fs.readdirSync(path.join(root, dir), {withFileTypes: true}).flatMap(item => item.isDirectory()
     ? files(`${dir}/${item.name}`) : [`${dir}/${item.name}`]);
 }
+/**
+ * 책임: 실행 코드와 HTML의 번역 사용이 사전과 일치하는지 확인한다.
+ * 알고리즘: TypeScript AST로 UI 문자열·t 호출·QuotaError의 키와 인자를 검사하고 HTML의 data-i18n 참조도 사전에 대조한다.
+ */
 for (const file of [...files('src'), ...files('media')].filter(file => /\.(ts|js)$/.test(file) && !file.includes('localization/') && !file.endsWith('i18next.js'))) {
   const source = fs.readFileSync(path.join(root, file), 'utf8');
   const tree = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
   function validateUsage(key, variables) {
     if (!Object.hasOwn(base, key)) throw new Error(`${file}: unknown translation key ${key}`);
-    if (!variables || ts.isObjectLiteralExpression(variables)) {
-      const names = variables ? variables.properties.map(property => property.name?.getText(tree)).sort().join(',') : '';
-      const expected = placeholders(base[key]).replace(/[{}]/g, '');
-      if (names !== expected) throw new Error(`${file}: mismatched arguments for ${key}`);
-    }
+    if (variables && !ts.isObjectLiteralExpression(variables)) return;
+    const names = variables ? variables.properties.map(property => property.name?.getText(tree)).sort().join(',') : '';
+    const expected = placeholders(base[key]).replace(/[{}]/g, '');
+    if (names !== expected) throw new Error(`${file}: mismatched arguments for ${key}`);
   }
+  function validateQuotaErrorUsage(node) {
+    if (!(ts.isNewExpression(node) && node.expression.getText(tree) === 'QuotaError' && node.arguments?.[1]
+      && ts.isObjectLiteralExpression(node.arguments[1]))) return;
+    const properties = node.arguments[1].properties;
+    const key = properties.find(property => ts.isPropertyAssignment(property) && property.name.getText(tree) === 'key');
+    const values = properties.find(property => ts.isPropertyAssignment(property) && property.name.getText(tree) === 'values');
+    if (!key || !ts.isStringLiteral(key.initializer)) return;
+    validateUsage(key.initializer.text, values?.initializer);
+  }
+  /**
+   * 책임: 소스 안의 번역 호출과 UI 문자열을 구문 단위로 검사한다.
+   * 알고리즘: AST를 재귀 순회해 문자열의 미이관 한글을 찾고 t·QuotaError의 리터럴 키와 치환 인자를 원문 사전과 대조한다.
+   */
   function walk(node) {
     if ((ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)
       || ts.isTemplateHead(node) || ts.isTemplateMiddle(node) || ts.isTemplateTail(node))
@@ -80,15 +95,7 @@ for (const file of [...files('src'), ...files('media')].filter(file => /\.(ts|js
       const key = node.arguments[0].text;
       validateUsage(key, node.arguments[1]);
     }
-    if (ts.isNewExpression(node) && node.expression.getText(tree) === 'QuotaError' && node.arguments?.[1]
-      && ts.isObjectLiteralExpression(node.arguments[1])) {
-      const properties = node.arguments[1].properties;
-      const key = properties.find(property => ts.isPropertyAssignment(property) && property.name.getText(tree) === 'key');
-      const values = properties.find(property => ts.isPropertyAssignment(property) && property.name.getText(tree) === 'values');
-      if (key && ts.isStringLiteral(key.initializer)) {
-        validateUsage(key.initializer.text, values?.initializer);
-      }
-    }
+    validateQuotaErrorUsage(node);
     ts.forEachChild(node, walk);
   }
   walk(tree);

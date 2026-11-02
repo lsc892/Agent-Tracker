@@ -1,3 +1,4 @@
+// 대시보드의 이름 선택·Skill 표·페이지·설정·응답 동기화를 검증한다.
 import { createTranslator } from '../../src/localization';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -7,6 +8,7 @@ import { Script } from 'node:vm';
 import { dashboardHtml } from '../../src/ui/html';
 import { parseDashboardMessage } from '../../src/ui/presentation';
 
+/** 이름 선택과 Skill 표 검증에 필요한 DOM 상태·자식·이벤트를 모사한다. */
 class Element {
   constructor(readonly tagName = '') {}
   private text = '';
@@ -102,7 +104,7 @@ test('Skill statistics keep the four tables and descriptions without the removed
 test('Skill off clears cached counts, shows settings guidance and leaves token statistics available',()=>{
   const {get,messages,receive}=view({section:'skills'});
   const rows=[{provider:'codex',name:'commit',usage_count:3,percentage:100}];
-  const page={rows,chartRows:rows,total:1,totalUses:3};
+  const page={rows,total:1,totalUses:3,maxUses:3};
   receive({type:'usage',result:{capabilitiesEnabled:true,capabilities:{skill:page,subagent:page,plugin:page,model:page},rows:[],total:0}});
   assert.match(get('skill-table').textContent,/commit/);
   receive({type:'state',timezone:'UTC',capabilitiesEnabled:false});
@@ -129,7 +131,7 @@ test('reset returns query controls and chart grouping to defaults while retainin
   const query = messages.at(-1)?.query;
   assert.equal(query?.groupBy,'day');assert.equal(query?.chartMetric,'tokens');
   for (const name of ['provider','sessionId','projectKey','fromDay','toDay']) assert.equal(query?.[name],undefined);
-  assert.equal(query?.offset,0);assert.equal(query?.chartBy,'provider');assert.equal(query?.cumulativeBy,undefined);
+  assert.equal(query?.offset,0);assert.equal(query?.chartBy,'provider');
   assert.equal(get('cost-note').hidden,false);assert.equal(get('project-options').hidden,true);
   assert.equal(get('billing-control').hidden,true);assert.equal(get('project-name').textContent,'전체 프로젝트');
   assert.equal(get('session-name').textContent,'전체 세션');
@@ -233,7 +235,7 @@ test('every capability table paints ratios relative to the full-scope leader acr
   const {get,receive}=view({section:'skills'});
   const leader={provider:'claude',name:'leader',usage_count:200,percentage:20};
   const second={provider:'codex',name:'second',usage_count:100,percentage:10};
-  const page={rows:[leader,second],chartRows:[leader,second],total:105,totalUses:1000};
+  const page={rows:[leader,second],total:105,totalUses:1000,maxUses:200};
   const sendPage=(value:typeof page)=>receive({type:'usage',result:{capabilities:Object.fromEntries(['skill','subagent','plugin','model'].map(category=>[category,value])),rows:[],total:0}});
   const fills=(category:string)=>get(`${category}-table`).children[0].children[1].children.map(row=>row.children[3].children[0].children[0].children[2]);
   sendPage(page);

@@ -1,3 +1,4 @@
+// 설정 manifest 번역의 완전성과 임시 배치·복원을 검증한다.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';

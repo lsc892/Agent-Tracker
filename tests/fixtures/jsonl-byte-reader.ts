@@ -1,12 +1,14 @@
+// JSONL 리더의 경계·오류 비교를 위한 독립 바이트 단위 기준 구현을 제공한다.
 // Frozen product reader from 3f5b49b3 for differential boundary/error tests.
 // Keep this independent of the candidate; it is never imported by production code.
 import { open } from 'node:fs/promises';
 
+/** 기준 JSONL 리더의 오류 코드와 원본 바이트 위치를 전달한다. */
 export class SummaryError extends Error {
   constructor(public readonly code: string, public readonly offset = 0) { super(code); }
 }
 
-/** Keeps bounded JSON blocks while discarding inline image bodies before JSON.parse. */
+/** 이미지 본문을 생략하며 제한된 크기의 JSONL 한 줄을 바이트 단위로 구성한다. */
 class JsonlLine {
   private readonly blocks: Buffer[] = [];
   private block: Buffer;

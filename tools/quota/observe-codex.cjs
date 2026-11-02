@@ -1,6 +1,6 @@
+// Codex RPC를 중계하며 quota 기대 값과 자식 프로세스 수명 증거만 기록한다.
 'use strict';
 
-// Transparent stdio observer: only quota fields and lifecycle evidence leave memory.
 const { spawn } = require('node:child_process');
 const { writeFileSync } = require('node:fs');
 const { StringDecoder } = require('node:string_decoder');
@@ -17,6 +17,10 @@ function save() {
   catch { process.exitCode = 1; }
 }
 save();
+/**
+ * 책임: 중계하는 RPC에서 검증용 정보만 관찰한다.
+ * 알고리즘: UTF-8 청크를 1MiB 제한 개행 버퍼로 파싱해 소비자에 전달하고 원문 대신 프로토콜 오류 코드만 증거에 남긴다.
+ */
 function observe(stream, consume) {
   const decoder = new StringDecoder('utf8');
   let buffer = '';
@@ -34,10 +38,9 @@ function observe(stream, consume) {
   });
 }
 observe(process.stdin, message => {
-  if (allowedMethods.has(message.method)) {
-    evidence.methods.push(message.method);
-    if (message.id != null) pending.set(message.id, message.method);
-  } else evidence.errorCode = 'unexpected-rpc';
+  if (!allowedMethods.has(message.method)) { evidence.errorCode = 'unexpected-rpc'; return; }
+  evidence.methods.push(message.method);
+  if (message.id != null) pending.set(message.id, message.method);
 });
 observe(child.stdout, message => {
   const method = pending.get(message.id);
@@ -46,7 +49,9 @@ observe(child.stdout, message => {
   if (method === 'account/read') {
     const type = message.result?.account?.type;
     evidence.accountType = ['chatgpt', 'chatgptAuthTokens', 'apiKey'].includes(type) ? type : 'other';
-  } else if (method === 'account/rateLimits/read' && message.result) {
+    return;
+  }
+  if (method === 'account/rateLimits/read' && message.result) {
     evidence.expected = expectedCodex(message.result);
   }
 });

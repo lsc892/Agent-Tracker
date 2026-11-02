@@ -1,3 +1,4 @@
+// npm 설치 CLI와 패키지의 VSIX 무결성·실행 인자·설치 확인을 검증한다.
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';

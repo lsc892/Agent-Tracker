@@ -1,3 +1,5 @@
+// 공개 DB API의 롤업 조회·갱신·시간대·마이그레이션 일관성을 검증한다.
+import { queryChart } from '../fixtures/usage-chart';
 import assert from 'node:assert/strict';
 import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -8,12 +10,13 @@ import {
   SummaryDatabase, periodBounds, type ChartMetric, type FileMetadata, type ModelUsageInput,
   type SummaryFilter, type TurnSummaryInput, type UsageGrouping, type UsageRow,
 } from '../../src/summary/db';
-import { buildModelCumulativeQueries, buildUsageCountQuery, buildUsageQuery, type UsageBasis } from '../../src/summary/db/queries';
+import { buildUsageCountQuery, buildUsageQuery, type UsageBasis } from '../../src/summary/db/queries';
 import { SCHEMA_VERSION } from '../../src/summary/db/schema';
 import { applySessionNames } from '../../src/summary/names';
 import type { SqliteSession } from '../../src/summary/db/connection';
 import { SummaryReader } from '../../src/summary/db/reader';
 import { UsageRollupStore } from '../../src/summary/db/rollups';
+import { buildRollupUsageQueries } from '../../src/summary/db/rollup-queries';
 
 const epoch = (local: string): number => Date.parse(`${local}+09:00`);
 const rollupTables = ['usage_request_daily', 'usage_model_daily', 'usage_rollup_meta'];
@@ -109,7 +112,7 @@ test('public usage rolls completed turn sums and counts across days without aver
       avg_tokens_per_turn: 75, avg_input_tokens: 75, avg_output_tokens: 0,
     });
   }
-  const chart = db.queryUsageChart({}, 'day', 'Asia/Seoul', 'averageTokens');
+  const chart = queryChart(db, {}, 'day', 'Asia/Seoul', 'averageTokens');
   assert.deepEqual(chart.rows, daily, 'Charts use the same product aggregate route');
   assert.equal(chart.total, 2);
 });
@@ -394,6 +397,61 @@ test('v10 upgrade preserves existing IDs, diagnostic/model/cost rows and lazily 
   oracle(reopened);
 });
 
+for (const version of [14, 15]) test(`v${version} month layout returns to session clustering without rewriting facts`, t => {
+  const files = disk(t), previous = files.open();
+  const file = metadata(), manifest = previous.observeFile(file, 'v13');
+  previous.replaceSessions({ sessions: [{ provider: 'claude', session_id: 'session-a' }], files: [{ ...file, id: manifest.id }], summaries: [
+    turn('before-month', '2026-09-30T23:59:00', 100, { diagnostic_file_id: manifest.id, model_usage: [model('A', 100)],
+      capability_usage: [{ category: 'skill', name: 'preserved', usage_count: 2 }], billing: 'api' }),
+    turn('after-month', '2026-10-01T00:01:00', 200, { model_usage: [model('A', 200)] }),
+    turn('unknown-month', null, 30),
+  ] });
+  oracle(previous, {}, 'month');
+  const facts = snapshot(previous, factTables);
+  // Recreate the experimental monthly cache; the migration must discard only derived data.
+  for (const table of ['usage_request_daily', 'usage_model_daily']) {
+    const info = previous.connection.prepare(`PRAGMA table_info(${table})`).all();
+    const columns = info.map(c => String(c.name));
+    previous.connection.exec(`CREATE TABLE ${table}_monthly (
+      ${info.map(c => `${c.name} ${c.type}${c.notnull ? ' NOT NULL' : ''}`).join(',')},
+      local_month TEXT NOT NULL CHECK(local_month=substr(local_day,1,7)),
+      PRIMARY KEY(local_month,provider,session_id,project_key,local_day${table.includes('model') ? ',model_key' : ''})) WITHOUT ROWID;
+      INSERT INTO ${table}_monthly SELECT ${columns},substr(local_day,1,7) FROM ${table};
+      DROP TABLE ${table}; ALTER TABLE ${table}_monthly RENAME TO ${table};`);
+  }
+  if (version === 15) previous.connection.exec(`CREATE TABLE usage_session_months (
+    provider TEXT NOT NULL,session_id TEXT NOT NULL,local_month TEXT NOT NULL,min_started_at_ms INTEGER,
+    PRIMARY KEY(provider,session_id,local_month)) WITHOUT ROWID;
+    INSERT INTO usage_session_months SELECT provider,session_id,local_month,min(min_started_at_ms)
+      FROM usage_request_daily GROUP BY provider,session_id,local_month;`);
+  previous.connection.exec(`UPDATE usage_rollup_meta SET format_version=${version-12}; PRAGMA user_version=${version}`);
+  previous.close();
+  const migrated = files.open();
+  assert.deepEqual(snapshot(migrated, factTables), facts);
+  assert.equal(migrated.connection.prepare('PRAGMA user_version').get()?.user_version, SCHEMA_VERSION);
+  assert.equal(migrated.connection.prepare("SELECT count(*) n FROM sqlite_master WHERE name='usage_session_months'").get()?.n,0);
+  assert.equal(migrated.connection.prepare('SELECT count(*) n FROM usage_request_daily').get()?.n, 0);
+  for (const table of ['usage_request_daily', 'usage_model_daily']) {
+    const pk = migrated.connection.prepare(`PRAGMA table_info(${table})`).all().filter(c => Number(c.pk) > 0).sort((a,b) => Number(a.pk)-Number(b.pk));
+    assert.deepEqual(pk.slice(0,2).map(c=>c.name), ['provider','session_id']);
+  }
+  const october = { fromMs: epoch('2026-10-01T00:00:00'), toMs: epoch('2026-11-01T00:00:00') };
+  for (const by of ['provider','model'] as const) for (const filter of [october, { ...october, unknownTime: 'exclude' as const },
+    { ...october, unknownTime: 'only' as const }, { ...october, fromMs: epoch('2026-10-01T00:00:30') }]) {
+    oracle(migrated, filter, 'month', 'Asia/Seoul', by);
+  }
+  assert.deepEqual(migrated.connection.prepare('SELECT DISTINCT local_day FROM usage_request_daily ORDER BY local_day').all().map(r => r.local_day), ['', '2026-09-30', '2026-10-01']);
+  assert.deepEqual(snapshot(migrated, factTables), facts);
+});
+
+test('v13 upgrade reuses the populated session-clustered cache without backfill', t => {
+  const files=disk(t),previous=files.open();
+  replace(previous,[turn('preserved','2026-10-01T00:00:00',200),turn('unknown',null,10)]);
+  oracle(previous);const before=snapshot(previous);previous.connection.exec('PRAGMA user_version=13');previous.close();
+  const migrated=files.open();assert.deepEqual(snapshot(migrated),before);oracle(migrated);
+  assert.deepEqual(snapshot(migrated),before);
+});
+
 test('a failure after request rollup refresh rolls back facts, model rollup, diagnostics, names and costs', t => {
   const db = fixture(t);
   const file = metadata();
@@ -468,26 +526,6 @@ test('metadata-only session renames immediately affect rollup dimensions and nam
   assert.deepEqual(snapshot(db, rollupTables), before, 'Names remain normalized instead of duplicating them in rollups');
 });
 
-test('cumulative product queries reuse the active timezone without rebuilding local-day rollups', t => {
-  const db = fixture(t, [
-    turn('a', '2026-10-01T00:00:00', 100, { model_usage: [model('A', 100)] }),
-    turn('b', '2026-10-02T00:00:00', 30, { model_usage: [model('A', 20), model('B', 10)] }),
-    turn('unknown', null, 1),
-  ]);
-  oracle(db, {}, 'day', 'Asia/Seoul');
-  const before = snapshot(db, rollupTables);
-  for (const filter of [{}, { fromMs: epoch('2026-10-01T12:00:00'), unknownTime: 'include' as const }]) {
-    const provider = buildUsageQuery(filter, 'total', 'UTC', 'provider');
-    const providerRows = db.connection.prepare(provider.sql).all(...provider.values, 100, 0).map(row => ({ ...row, model: '' }));
-    assert.deepEqual(db.queryCumulative(filter, 'provider'), { rows: providerRows, total: providerRows.length, by: 'provider' });
-    const models = buildModelCumulativeQueries(filter);
-    const modelRows = db.connection.prepare(models.rows.sql).all(...models.rows.values, 0).map(row => ({ ...row }));
-    const modelCount = db.connection.prepare(models.count.sql).get(...models.count.values)?.count;
-    assert.deepEqual(db.queryCumulative(filter, 'model'), { rows: modelRows, total: modelCount, by: 'model' });
-  }
-  assert.deepEqual(snapshot(db, rollupTables), before, 'Worker cumulative reads do not alternate UTC and local materializations');
-});
-
 test('two WAL connections can alternate timezones and update sessions without mixing their snapshots', t => {
   const files = disk(t);
   const writer = files.open();
@@ -521,9 +559,81 @@ test('Node 22.15 without isTransaction retains correct raw reads and supports ca
   for (const timezone of ['UTC', 'Asia/Seoul', 'America/New_York']) {
     const query = buildUsageQuery({}, 'day', timezone, 'provider');
     assert.deepEqual(reader.queryUsage({}, 'day', timezone), db.connection.prepare(query.sql).all(...query.values, 100, 0));
+    const page = reader.queryUsagePage({}, 'day', timezone);
+    assert.deepEqual(page.rows, reader.queryUsage({}, 'day', timezone));
+    assert.equal(page.total, 1);
     db.transaction(() => expect(reader.queryUsage()[0], { total_tokens: 100, turn_count: 1 }));
+    db.transaction(() => assert.equal(reader.queryUsagePage({}, 'turn', timezone).rows[0].total_tokens, 100));
   }
   oracle(db);
+});
+
+test('page rows and counts keep one snapshot across concurrent WAL writes for raw, rollup and legacy reads', t => {
+  const files = disk(t), writer = files.open(), db = files.open();
+  const original = turn('original', '2026-10-01T13:00:00', 100, { model_usage: [model('A', 100)] });
+  const added = turn('added', '2026-10-02T13:00:00', 200, {
+    project_key: '/rollup/other', project_name: 'Other', model_usage: [model('B', 200)],
+  });
+  const cases: { group: UsageGrouping | 'turn'; filter: SummaryFilter; by: UsageBasis }[] = [
+    { group: 'turn', filter: { includeCosts: true }, by: 'provider' },
+    { group: 'project', filter: { includeCosts: true }, by: 'model' },
+    { group: 'day', filter: {}, by: 'provider' },
+    { group: 'day', filter: { fromMs: epoch('2026-10-01T12:00:00') }, by: 'model' },
+  ];
+  for (const legacy of [false, true]) for (const { group, filter, by } of cases) {
+    replace(writer, [original]);
+    writer.queryUsagePage({}, 'day', 'Asia/Seoul');
+    const prepare = db.connection.prepare;
+    let injected = false;
+    db.connection.prepare = function(sql) {
+      const statement = prepare.call(this, sql);
+      if (/\bLIMIT\s+\?\s+OFFSET\s+\?/.test(sql)) {
+        const all = statement.all;
+        statement.all = function(...values) {
+          const rows = Reflect.apply(all, this, values);
+          if (!injected) { injected = true; replace(writer, [original, added]); }
+          return rows;
+        };
+      }
+      return statement;
+    };
+    try {
+      const compatible = { connection: {
+        prepare: db.connection.prepare.bind(db.connection), exec: db.connection.exec.bind(db.connection),
+      } } as unknown as SqliteSession;
+      Object.assign(compatible, { rollups: new UsageRollupStore(compatible) });
+      const reader = legacy ? new SummaryReader(compatible) : db;
+      const page = reader.queryUsagePage(filter, group, 'Asia/Seoul', {}, by);
+      assert.ok(injected, 'Writer commits after the page rows are selected');
+      assert.equal(page.rows.length, 1);assert.equal(page.total, 1);
+      assert.equal(page.rows[0].total_tokens, 100);
+      assert.equal(reader.queryUsagePage(filter, group, 'Asia/Seoul', {}, by).total, 2, 'Next page sees the committed write');
+    } finally { db.connection.prepare = prepare; }
+  }
+});
+
+test('legacy page count failures release their savepoint and preserve the caller transaction', t => {
+  const db = fixture(t, [turn('same', '2026-10-01T12:00:00', 100)]);
+  const count = buildUsageCountQuery({ includeCosts: true }, 'project', 'UTC', 'provider');
+  let failCount = true;
+  const compatible = { connection: {
+    prepare: (sql: string) => {
+      if (failCount && sql === count.sql) throw new Error('injected page count failure');
+      return db.connection.prepare(sql);
+    },
+    exec: db.connection.exec.bind(db.connection),
+  } } as unknown as SqliteSession;
+  const reader = new SummaryReader(compatible);
+  db.transaction(() => {
+    db.connection.exec("UPDATE projects SET project_name = 'Caller change'");
+    assert.throws(() => reader.queryUsagePage({ includeCosts: true }, 'project'), /injected page count failure/);
+    assert.equal(db.connection.isTransaction, true);
+    assert.equal(db.connection.prepare('SELECT project_name FROM projects').get()?.project_name, 'Caller change');
+    failCount = false;
+    assert.equal(reader.queryUsagePage({ includeCosts: true }, 'project').total, 1);
+  });
+  assert.equal(db.connection.isTransaction, false);
+  assert.equal(reader.queryUsagePage({}, 'turn').total, 1, 'The connection remains usable after the caller commits');
 });
 
 test('extreme stored years retain numeric date filtering through raw fallback and allow later ingestion', t => {

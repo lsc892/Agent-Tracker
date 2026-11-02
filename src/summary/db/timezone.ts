@@ -1,21 +1,25 @@
+// 지정 시간대의 일·월 집계 키와 해당 기간의 UTC 경계를 계산한다.
 const formatters = new Map<string, Intl.DateTimeFormat>();
 
 function formatter(timezone: string): Intl.DateTimeFormat {
-  let value = formatters.get(timezone);
-  if (!value) {
-    value = new Intl.DateTimeFormat('en-CA', {
-      timeZone: timezone,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    });
-    // Bound this cache even when callers repeatedly change arbitrary timezones.
-    if (formatters.size >= 16) formatters.delete(formatters.keys().next().value!);
-    formatters.set(timezone, value);
-  }
+  const cached = formatters.get(timezone);
+  if (cached) return cached;
+  const value = new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  // Bound this cache even when callers repeatedly change arbitrary timezones.
+  if (formatters.size >= 16) formatters.delete(formatters.keys().next().value!);
+  formatters.set(timezone, value);
   return value;
 }
 
+/**
+ * 책임: UTC 시각을 지정 시간대의 일·월 집계 키로 변환한다.
+ * 알고리즘: 최대 16개로 제한한 Intl formatter cache에서 날짜 요소를 얻어 연·월·일 문자열을 조합한다.
+ */
 export function calendarPeriod(timestamp: number, timezone: string, unit: 'day' | 'month'): string {
   const parts = formatter(timezone).formatToParts(new Date(timestamp));
   const part = (name: Intl.DateTimeFormatPartTypes): string => parts.find(item => item.type === name)!.value;
@@ -23,7 +27,10 @@ export function calendarPeriod(timestamp: number, timezone: string, unit: 'day' 
   return unit === 'month' ? month : `${month}-${part('day')}`;
 }
 
-/** Convert local calendar boundaries, including 23/25-hour DST days, to a UTC range. */
+/**
+ * 책임: DST와 자정 오프셋 변화를 포함한 현지 기간의 UTC 경계를 구한다.
+ * 알고리즘: 달력 입력을 검증한 뒤 시작일·다음 경계일 각각의 전후 36시간에서 현지 날짜가 바뀌는 첫 밀리초를 이진 탐색한다.
+ */
 export function periodBounds(period: string, timezone: string): { fromMs: number; toMs: number } {
   formatter(timezone); // Validate even if there are no rows to query.
   const match = /^(\d{4})-(\d{2})(?:-(\d{2}))?$/.exec(period);

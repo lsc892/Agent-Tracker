@@ -7,8 +7,8 @@
   "manifest.configureColor": "Agent Tracker：选择状态栏颜色",
   "manifest.clearData": "Agent Tracker：删除统计数据",
   "manifest.languageCategory": "语言",
-  "manifest.languageAuto": "跟随 VS Code 显示语言",
   "manifest.languageDescription": "选择扩展界面语言。默认跟随 VS Code 显示语言。不支持的语言和缺失翻译使用韩语。命令面板和 VS Code 设置说明跟随 VS Code 显示语言。",
+  "manifest.languageAuto": "跟随 VS Code 显示语言",
   "manifest.tracking": "跟踪与刷新",
   "manifest.claudeEnabled": "跟踪 Claude Code。关闭后停止使用量查询和原始日志收集，并从统计中隐藏。现有统计数据会保留。",
   "manifest.codexEnabled": "跟踪 Codex。关闭后停止使用量查询和原始日志收集，并从统计中隐藏。现有统计数据会保留。",
@@ -49,6 +49,6 @@
   "manifest.data": "数据与日志",
   "manifest.dataHome": "Claude 和 Codex 数据的共同上级目录，使用其下的 `.claude` 和 `.codex`。默认 `~` 为用户主目录。在用户设置中全局指定，适用于所有工作区的订阅使用量、统计和 Claude 日志保留期。",
   "manifest.cleanupDays": "Claude Code 对话日志的自动删除期限（天）。大于等于1时，将 `cleanupPeriodDays` 写入 Claude 数据目录的 `settings.json`。`null` 保留现有设置；Claude 默认30天。Claude Code 启动时删除日志，已删除的日志无法恢复。",
-  "manifest.codexExecutable": "Codex CLI 可执行文件路径或 PATH 命令。",
-  "manifest.retainDeletedSourceUsage": "当已知模型有实际令牌用量且请求关联到有效会话时，源文件删除后仍在数据库中保留统计。时间缺失、质量警告、请求失败和重新解析错误不影响保留。部分源文件缺失时，现有请求保留最后一次统计，并继续收集新请求。关闭后将在下次刷新统计时应用删除。[清除用量数据](command:agentTracker.clearUsageData)也会删除保留的历史记录。"
+  "manifest.retainDeletedSourceUsage": "当已知模型有实际令牌用量且请求关联到有效会话时，源文件删除后仍在数据库中保留统计。时间缺失、质量警告、请求失败和重新解析错误不影响保留。部分源文件缺失时，现有请求保留最后一次统计，并继续收集新请求。关闭后将在下次刷新统计时应用删除。[清除用量数据](command:agentTracker.clearUsageData)也会删除保留的历史记录。",
+  "manifest.codexExecutable": "Codex CLI 可执行文件路径或 PATH 命令。"
 }

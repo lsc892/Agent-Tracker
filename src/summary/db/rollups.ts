@@ -1,3 +1,4 @@
+// 원본 요청과 일치하도록 활성 시간대의 일별 사전 집계를 구축·갱신한다.
 import type { SqliteSession } from './connection';
 import type { Provider } from './types';
 import { aggregateUsageSource } from './rollup-queries';
@@ -8,7 +9,7 @@ interface RollupMetadata { timezone: string; format_version: number }
 const MIN_CALENDAR_TIME = Date.parse('0002-01-03T00:00:00Z');
 const MAX_CALENDAR_TIME = Date.parse('9998-12-29T00:00:00Z');
 
-/** One materialized timezone per database; daily contributions follow facts in the same transaction. */
+/** DB에서 활성 시간대 하나의 일별 사전 집계를 구축하고 세션 변경을 반영한다. */
 export class UsageRollupStore {
   constructor(private readonly database: SqliteSession) {}
 
@@ -26,31 +27,27 @@ export class UsageRollupStore {
   }
 
   /**
-   * Check the active timezone and execute reads in the same snapshot. Warm readers use
-   * a deferred transaction, never a writer lock. Caller-owned transactions are reused;
-   * a timezone mismatch there selects raw SQL rather than upgrading a stale snapshot.
+   * 책임: 사전 집계의 준비 상태 확인과 실제 조회에 같은 snapshot을 보장한다.
+   * 알고리즘: DEFERRED 읽기로 시간대·형식을 확인하고 재구축이 필요할 때만 쓰기 트랜잭션으로 재확인하며, 기존 트랜잭션·미지원 환경은 raw로 대체한다.
    */
-  read<T>(timezone: string | undefined, action: (ready: boolean, timezone: string) => T): T {
+  read<T>(timezone: string, action: (ready: boolean) => T): T {
     const connection = this.database.connection;
     // DatabaseSync.isTransaction arrived in Node 22.16; retain raw reads on 22.15.
-    if (typeof connection.isTransaction !== 'boolean') return action(false, timezone ?? 'UTC');
-    const current = (): { ready: boolean; timezone: string; supported: boolean } => {
+    if (typeof connection.isTransaction !== 'boolean') return action(false);
+    const current = (): { ready: boolean; supported: boolean } => {
       const metadata = this.metadata();
-      const selected = timezone ?? metadata?.timezone ?? 'UTC';
-      return { ready: metadata?.format_version === ROLLUP_FORMAT_VERSION && metadata.timezone === selected,
-        timezone: selected, supported: this.calendarSupported() };
+      return { ready: metadata?.format_version === ROLLUP_FORMAT_VERSION && metadata.timezone === timezone,
+        supported: this.calendarSupported() };
     };
     if (connection.isTransaction) {
       const state = current();
-      return action(state.ready && state.supported, state.timezone);
+      return action(state.ready && state.supported);
     }
     connection.exec('BEGIN');
-    let selected: string;
     try {
       const state = current();
-      selected = state.timezone;
       if (state.ready || !state.supported) {
-        const result = action(state.ready && state.supported, selected);
+        const result = action(state.ready && state.supported);
         connection.exec('COMMIT');
         return result;
       }
@@ -62,18 +59,21 @@ export class UsageRollupStore {
     return this.database.transaction(() => {
       // A different window may have rebuilt while we waited for BEGIN IMMEDIATE.
       const metadata = this.metadata();
-      if (timezone === undefined) selected = metadata?.timezone ?? selected;
-      if (!this.calendarSupported()) return action(false, selected);
-      if (metadata?.format_version !== ROLLUP_FORMAT_VERSION || metadata.timezone !== selected) {
-        this.clear();
-        for (const by of ['provider', 'model'] as const) {
-          this.database.statement(`INSERT INTO ${ROLLUP_TABLES[by]} ${aggregateUsageSource(by)}`).run(selected);
-        }
-        this.database.statement('INSERT INTO usage_rollup_meta(singleton, timezone, format_version) VALUES (1, ?, ?)')
-          .run(selected, ROLLUP_FORMAT_VERSION);
+      if (!this.calendarSupported()) return action(false);
+      if (metadata?.format_version !== ROLLUP_FORMAT_VERSION || metadata.timezone !== timezone) {
+        this.rebuild(timezone);
       }
-      return action(true, selected);
+      return action(true);
     });
+  }
+
+  private rebuild(timezone: string): void {
+    this.clear();
+    for (const by of ['provider', 'model'] as const) {
+      this.database.statement(`INSERT INTO ${ROLLUP_TABLES[by]} ${aggregateUsageSource(by)}`).run(timezone);
+    }
+    this.database.statement('INSERT INTO usage_rollup_meta(singleton, timezone, format_version) VALUES (1, ?, ?)')
+      .run(timezone, ROLLUP_FORMAT_VERSION);
   }
 
   /** Reuses the installer session set before it is cleared; old dates/projects are deleted too. */
@@ -85,6 +85,10 @@ export class UsageRollupStore {
     this.refresh('provider = ? AND session_id = ?', [provider, sessionId]);
   }
 
+  /**
+   * 책임: 변경된 세션의 이전 날짜·프로젝트 기여분까지 교체한다.
+   * 알고리즘: 활성 시간대·형식을 검증한 뒤 대상 세션의 provider·model 일별 행을 지우고 현재 facts로 다시 집계한다.
+   */
   private refresh(where: string, values: string[]): void {
     const metadata = this.metadata();
     if (!metadata || metadata.format_version !== ROLLUP_FORMAT_VERSION) return;

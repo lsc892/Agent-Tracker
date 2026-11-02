@@ -1,3 +1,4 @@
+// 독립 합성 데이터로 롤업 시제품의 평균·필터·집계 의미를 검증한다.
 // Deterministic semantic/rollback checks independent of benchmark timing.
 const assert = require('node:assert/strict');
 const { createHash } = require('node:crypto');
@@ -87,7 +88,7 @@ function runValidation() {
 if(require.main===module) {
   const result=runValidation();
   if(process.argv[2]==='--append') {
-    const path=resolve(__dirname,'../../docs/benchmarks/SqlRollupABBenchmark-2026-10-15.json');
+    const path=resolve(__dirname,'../../docs/benchmarks/2026-10-15/SqlRollupABBenchmark-2026-10-15.json');
     const report=JSON.parse(readFileSync(path,'utf8'));
     report.supplementaryValidation=result;
     writeFileSync(path,JSON.stringify(report,null,2)+'\n');

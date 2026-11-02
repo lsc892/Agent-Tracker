@@ -1,3 +1,4 @@
+// Codex의 별도 제목 메타데이터를 수집해 저장된 세션 이름에 반영한다.
 import { lstat, readdir } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -6,7 +7,10 @@ import { displayName, string } from './parsers/common';
 import type { SummaryStaging } from './staging';
 import type { SourceRoot } from './types';
 
-/** Read provider-owned title metadata into disk staging, without loading a session list in memory. */
+/**
+ * 책임: 원본 대화 재파싱 없이 제공자 소유의 세션 제목을 수집한다.
+ * 알고리즘: Codex index를 스트리밍하고 최신 state DB를 읽기 전용으로 100행씩 조회하며, DB 제목에 더 높은 우선순위를 주어 TEMP에 병합한다.
+ */
 export async function readSessionNames(staging: SummaryStaging, roots: SourceRoot[], isCancelled: () => boolean): Promise<void> {
   const homes = new Set(roots.filter(root => root.provider === 'codex')
     .map(root => resolve(root.dataHome ?? dirname(root.path))));
@@ -55,7 +59,10 @@ export async function readSessionNames(staging: SummaryStaging, roots: SourceRoo
   }
 }
 
-/** Renames are independent of token changes, so unchanged transcripts need no body reads. */
+/**
+ * 책임: 토큰 변경과 독립적으로 저장된 세션 제목을 최신화한다.
+ * 알고리즘: TEMP의 제공자·세션 ID와 연결해 제목이 다른 sessions 행만 UPDATE한다.
+ */
 export function applySessionNames(connection: DatabaseSync): void {
   connection.exec(`UPDATE sessions SET session_name=(SELECT n.session_name FROM session_names n
     WHERE n.provider=sessions.provider AND n.session_id=sessions.session_id)

@@ -7,8 +7,8 @@
   "manifest.configureColor": "Agent Tracker: Choose Status Bar Color",
   "manifest.clearData": "Agent Tracker: Delete Statistics Data",
   "manifest.languageCategory": "Language",
-  "manifest.languageAuto": "Follow VS Code display language",
   "manifest.languageDescription": "Choose the extension UI language. By default, follows the VS Code display language. Unsupported languages and missing translations use Korean. Command Palette and VS Code settings descriptions follow the VS Code display language.",
+  "manifest.languageAuto": "Follow VS Code display language",
   "manifest.tracking": "Tracking and Refresh",
   "manifest.claudeEnabled": "Track Claude Code. Turning this off stops usage lookups and original log collection, and hides Claude from statistics. Existing statistics data is preserved.",
   "manifest.codexEnabled": "Track Codex. Turning this off stops usage lookups and original log collection, and hides Codex from statistics. Existing statistics data is preserved.",
@@ -49,6 +49,6 @@
   "manifest.data": "Data and Logs",
   "manifest.dataHome": "Shared parent folder for Claude and Codex data. Uses `.claude` and `.codex` under this folder. The default `~` is your home directory. Set globally in user settings; applies to subscription usage lookups, statistics, and Claude log retention in all workspaces.",
   "manifest.cleanupDays": "Automatic deletion period for Claude Code conversation logs, in days. A value of at least 1 writes `cleanupPeriodDays` to `settings.json` in the Claude data home. `null` preserves existing settings; Claude defaults to 30 days. Claude Code deletes logs on startup. Already deleted logs cannot be recovered.",
-  "manifest.codexExecutable": "Codex CLI executable path or command on PATH.",
-  "manifest.retainDeletedSourceUsage": "Keep request statistics in the database after source deletion when a known model has positive token usage and the request is linked to a valid session. Missing timing, quality warnings, failed requests, and reparse errors do not prevent retention. While sources are missing, existing requests keep their last snapshot and new requests are still collected. Turning this off applies deletions on the next statistics refresh. [Clear usage data](command:agentTracker.clearUsageData) also removes retained history."
+  "manifest.retainDeletedSourceUsage": "Keep request statistics in the database after source deletion when a known model has positive token usage and the request is linked to a valid session. Missing timing, quality warnings, failed requests, and reparse errors do not prevent retention. While sources are missing, existing requests keep their last snapshot and new requests are still collected. Turning this off applies deletions on the next statistics refresh. [Clear usage data](command:agentTracker.clearUsageData) also removes retained history.",
+  "manifest.codexExecutable": "Codex CLI executable path or command on PATH."
 }

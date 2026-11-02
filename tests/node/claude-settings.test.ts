@@ -1,3 +1,4 @@
+// Claude 로그 보존 기간 설정의 갱신·보존·입력 검증을 확인한다.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, writeFile, rm, stat } from 'node:fs/promises';

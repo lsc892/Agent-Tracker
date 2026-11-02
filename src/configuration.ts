@@ -1,82 +1,83 @@
+// 설정 값을 정규화해 서비스 설정과 제공자별 로그 경로를 구성한다.
 import { createTranslator, resolveLocale } from './localization';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { readSettingValues, type SettingsReader } from './configuration/reader';
+import { settingDefinitions, type ConfigurationValues } from './configuration/schema';
 import type { SourceRoot } from './summary/types';
-import { colorMode, normalizeHexColor, type StatusColorMode } from './ui/colors';
+import { colorMode, normalizeHexColor } from './ui/colors';
 
-export interface SettingsReader { get<T>(key: string, fallback: T): T }
-export interface TrackerConfiguration {
-  language: string;
-  locale: string;
-  dataHome: string;
-  percentage: 'used' | 'remaining';
-  detail: 'compact' | 'detailed';
-  colorMode: StatusColorMode;
-  customColor: string | undefined;
-  refreshPolicy: 'automatic' | 'manual';
-  pollingSeconds: number;
-  usageEnabled: boolean;
-  skillsEnabled: boolean;
-  retainDeletedSourceUsage: boolean;
-  showApiCosts: boolean;
-  excludeEmptyUsage: boolean;
-  claude: { enabled: boolean; dataHome: string; cleanupPeriodDays: number | null };
-  codex: { enabled: boolean; dataHome: string; executable: string; showStatusBar: boolean; showReserve: boolean; showResetCredits: boolean };
-  roots: SourceRoot[];
-  timezone: string;
-  timezoneWarning?: string;
-}
+export type { SettingsReader } from './configuration/reader';
+export type TrackerConfiguration = ReturnType<typeof readConfiguration>;
 
 export function expandPath(value: string): string {
   return resolve(homedir(), value === '~' ? homedir() : /^~[/\\]/.test(value) ? join(homedir(), value.slice(2)) : value);
 }
 
-export function readConfiguration(settings: SettingsReader, editorLanguage = 'ko'): TrackerConfiguration {
-  const language = settings.get('language', 'auto');
-  const locale = resolveLocale(language, editorLanguage);
-  const dataHome = expandPath(settings.get('dataHome', '~').trim() || '~');
-  const claudeHome = join(dataHome, '.claude');
-  const codexHome = join(dataHome, '.codex');
-  const enabled = { claude: settings.get('claude.enabled', true), codex: settings.get('codex.enabled', true) };
-  const cleanup = settings.get<unknown>('claude.cleanupPeriodDays', null);
+function readDisplaySettings(display: ConfigurationValues['display']) {
+  return { ...display, colorMode: colorMode(display.colorMode), customColor: normalizeHexColor(display.customColor) };
+}
+
+/**
+ * 책임: 통계에 사용할 시간대를 검증하고 경고를 만든다.
+ * 알고리즘: 공백을 제거한 시간대를 Intl로 검증하고, 유효하지 않으면 시스템 시간대와 번역된 경고로 대체한다.
+ */
+function readUsageSettings(usage: ConfigurationValues['usage'], locale: string) {
   let timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
   let timezoneWarning: string | undefined;
-  const configuredTimezone = settings.get<unknown>('usage.timezone', '');
-  if (configuredTimezone !== '' && configuredTimezone !== undefined) {
-    try {
-      if (typeof configuredTimezone !== 'string') throw new TypeError('Invalid timezone');
-      const selected = configuredTimezone.trim();
-      if (selected) {
-        new Intl.DateTimeFormat('en', { timeZone: selected }).format(0);
-        timezone = selected;
-      }
-    } catch {
-      timezoneWarning = String(createTranslator(locale).t('configuration.invalidTimezone', { value0: timezone }));
+  const configuredTimezone: unknown = usage.timezone;
+  if (configuredTimezone === '' || configuredTimezone === undefined) return { ...usage, timezone, timezoneWarning };
+  try {
+    if (typeof configuredTimezone !== 'string') throw new TypeError('Invalid timezone');
+    const selected = configuredTimezone.trim();
+    if (selected) {
+      new Intl.DateTimeFormat('en', { timeZone: selected }).format(0);
+      timezone = selected;
     }
+  } catch {
+    timezoneWarning = String(createTranslator(locale).t('configuration.invalidTimezone', { value0: timezone }));
   }
+  return { ...usage, timezone, timezoneWarning };
+}
+
+/**
+ * 책임: 공통 데이터 홈에서 제공자별 경로와 보존 기간을 확정한다.
+ * 알고리즘: 상위 경로에 .claude·.codex를 붙이고 보존 기간은 안전한 양의 정수일 때만 적용한다.
+ */
+function readProviderSettings(values: ConfigurationValues, dataHome: string) {
+  const cleanup = values.claude.cleanupPeriodDays;
   return {
-    language, locale,
+    claude: { ...values.claude, dataHome: join(dataHome, '.claude'),
+      cleanupPeriodDays: typeof cleanup === 'number' && Number.isSafeInteger(cleanup)
+        && cleanup >= settingDefinitions.claude.cleanupPeriodDays.minimum ? cleanup : null },
+    codex: { ...values.codex, dataHome: join(dataHome, '.codex') },
+  };
+}
+
+function buildSourceRoots(providers: ReturnType<typeof readProviderSettings>): SourceRoot[] {
+  return [
+    { provider: 'claude' as const, path: join(providers.claude.dataHome, 'projects'), dataHome: providers.claude.dataHome },
+    ...['sessions', 'archived_sessions'].map(directory => ({ provider: 'codex' as const,
+      path: join(providers.codex.dataHome, directory), dataHome: providers.codex.dataHome })),
+  ].filter(root => providers[root.provider].enabled);
+}
+
+/**
+ * 책임: 서비스가 사용할 독립적인 설정 스냅샷을 만든다.
+ * 알고리즘: 공통 정의에서 값을 한 번씩 읽고 언어·경로·색상·시간대를 정규화한 뒤 활성 제공자의 로그 루트를 파생한다.
+ */
+export function readConfiguration(settings: SettingsReader, editorLanguage = 'ko') {
+  const values = readSettingValues(settings);
+  const locale = resolveLocale(values.language, editorLanguage);
+  const dataHome = expandPath(values.dataHome.trim() || settingDefinitions.dataHome.default);
+  const providers = readProviderSettings(values, dataHome);
+  return {
+    ...values,
+    locale,
     dataHome,
-    percentage: settings.get('display.percentage', 'used'),
-    detail: settings.get('display.detail', 'detailed'),
-    colorMode: colorMode(settings.get<unknown>('display.colorMode', 'automatic')),
-    customColor: normalizeHexColor(settings.get<unknown>('display.customColor', '#ffffff')),
-    refreshPolicy: settings.get('quota.refreshPolicy', 'automatic'),
-    pollingSeconds: settings.get('quota.pollingIntervalSeconds', 900),
-    usageEnabled: settings.get('usage.enabled', true),
-    skillsEnabled: settings.get('usage.skillsEnabled', true),
-    retainDeletedSourceUsage: settings.get('usage.retainDeletedSourceUsage', true),
-    showApiCosts: settings.get('usage.showApiCosts', false),
-    excludeEmptyUsage: settings.get('usage.excludeEmptyUsage', true),
-    claude: { enabled: enabled.claude, dataHome: claudeHome,
-      cleanupPeriodDays: typeof cleanup === 'number' && Number.isSafeInteger(cleanup) && cleanup >= 1 ? cleanup : null },
-    codex: { enabled: enabled.codex, dataHome: codexHome, executable: settings.get('codex.executable', 'codex'),
-      showStatusBar: settings.get('codex.showStatusBar', true), showReserve: settings.get('codex.showReserve', false),
-      showResetCredits: settings.get('codex.showResetCredits', true) },
-    roots: [
-      { provider: 'claude' as const, path: join(claudeHome, 'projects'), dataHome: claudeHome },
-      ...['sessions', 'archived_sessions'].map(directory => ({ provider: 'codex' as const, path: join(codexHome, directory), dataHome: codexHome })),
-    ].filter(root => enabled[root.provider]),
-    timezone, timezoneWarning,
+    display: readDisplaySettings(values.display),
+    usage: readUsageSettings(values.usage, locale),
+    ...providers,
+    roots: buildSourceRoots(providers),
   };
 }
