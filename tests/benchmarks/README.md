@@ -2,6 +2,9 @@
 
 요약·JSONL·SQL·quota 처리의 정확성과 성능을 비교하는 도구를 모은다.
 
+- [inline-cost-ab.cjs](inline-cost-ab.cjs) — 비용 분리 v16과 통합 시제품 v17의 워크트리에서 같은 DB 사본의 조회·요청 추가·쓰기 트랜잭션·파일 공간을 비교한다. 제품은 분리 방식을 유지한다.
+- [cost-storage.cjs](cost-storage.cjs) — 비용 통합 실험에서 schema v16/v17의 비용을 같은 논리 열로 읽는다. 기존 제품·과거 측정값은 변경하지 않는다.
+
 - [date-storage-profile.cjs](date-storage-profile.cjs) — 설치 DB의 스키마·행 수·인덱스 공간을 읽기 전용으로 조사한다.
 - [date-storage-raw.cjs](date-storage-raw.cjs) — 날짜순 입력과 요청 날짜 인덱스 후보의 정확성·읽기·쓰기·저장 공간을 비교한다.
 - [date-storage-rollup.cjs](date-storage-rollup.cjs) — 일별 집계 기본 키 순서와 세션 보완 인덱스 후보를 비교한다.
