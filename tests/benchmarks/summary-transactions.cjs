@@ -235,7 +235,7 @@ async function worker() {
   const originalReplace = database.replaceSessions;
   connection.exec = function(sql) {
     const trimmed = sql.trim();
-    if (trimmed.includes('CREATE TEMP TABLE component_events AS')) {
+    if (/(?:CREATE TEMP TABLE component_events AS|INSERT INTO component_events)/.test(trimmed)) {
       assert.ok(sql.includes('component_request_title'), 'Compile the production title-index implementation first');
       sql = variant === 'baseline' ? withoutTitleIndex(sql) : sql;
       sqlText = sql;
@@ -274,11 +274,13 @@ async function worker() {
         sum(CASE WHEN is_main=1 AND request_title IS NOT NULL THEN 1 ELSE 0 END) titleCandidates FROM component_events`).get();
       const requests = connection.prepare('SELECT count(*) requests FROM prepared_turns').get().requests;
       const sessions = connection.prepare('SELECT count(*) sessions FROM component').get().sessions;
-      const plan = connection.prepare(`EXPLAIN QUERY PLAN ${sqlText.split('CREATE TEMP TABLE prepared_turns AS')[1]}`).all()
+      const plan = connection.prepare(`EXPLAIN QUERY PLAN ${sqlText.split(/(?:CREATE TEMP TABLE prepared_turns AS|INSERT INTO prepared_turns)/)[1]}`).all()
         .map(row => String(row.detail));
       const indexBytes = space.objects.find(row => row.name === 'component_request_title')?.bytes ?? 0;
       assert.equal(plan.some(detail => detail.includes('component_request_title')), variant === 'partial-index');
-      const baselineHash = sha(withoutTitleIndex(sqlText));
+      const baselineHash = sha(withoutTitleIndex(sqlText).replace(
+        /DELETE FROM (component_events|winners|capability_winners|prepared_turns); INSERT INTO \1/g,
+        'CREATE TEMP TABLE $1 AS'));
       if (baselineSqlSha256) assert.equal(baselineSqlSha256, baselineHash); else baselineSqlSha256 = baselineHash;
       emit({ kind:'prepare', scenario, component, insideExplicitTransaction:false, elapsedMs, before, after,
         ...dimensions, requests, sessions, indexBytes, tempLiveBytes:space.liveBytes,
@@ -370,7 +372,7 @@ function markdown(report, documentPath, jsonPath, logPath) {
 
 ## 선택과 근거
 
-사용자는 개인용·간헐적 통계 갱신에서 상시 인덱스 유지보다 갱신 중 메모리를 우선하여 **A: TEMP partial index**를 선택했다. 제목이 있는 메인 이벤트만 \`component_events(root_id,id) WHERE is_main=1 AND request_title IS NOT NULL\`로 인덱싱하며, 기존 최초 제목 선택 SQL을 유지한다. 제목 Map을 추가하지 않고 SQLite의 FILE TEMP와 기존 100행 단위 결과 읽기를 사용한다. component 재생성·staging 종료 시 인덱스가 제거되며 영속 schema·parser version은 변경하지 않는다.
+사용자는 개인용·간헐적 통계 갱신에서 상시 인덱스 유지보다 갱신 중 메모리를 우선하여 **A: TEMP partial index**를 선택했다. 제목이 있는 메인 이벤트만 \`component_events(root_id,id) WHERE is_main=1 AND request_title IS NOT NULL\`로 인덱싱하며, 기존 최초 제목 선택 SQL을 유지한다. 제목 Map을 추가하지 않고 SQLite의 FILE TEMP와 기존 100행 단위 결과 읽기를 사용한다. 갱신 안에서 component 내용만 교체하며 인덱스를 재사용하고 staging 종료 시 제거한다. 영속 schema·parser version은 변경하지 않는다.
 
 검토한 B는 기존 roots 집계에 최초 제목 이벤트 ID를 포함한 뒤 events의 기본 키로 제목을 JOIN한다. B도 JS HashSet/Map을 사용하지 않는다. [앞선 2,000개 A/B 실험](${link(resolve(__dirname, '../../docs/benchmarks/2026-10-08/RequestTitleAB.md'))})에서 B는 집계 시간과 TEMP live 공간이 적었고 A는 관측 RSS가 작았다. 그 RSS 차이는 fixture·결과 검증까지 포함한 process 값이므로 알고리즘 고유 메모리 차이로 확정하지 않는다. 이번에는 **최적화 전 무인덱스 SQL과 실제 구현 A**를 동일한 원본으로 비교했다. B와 A 비교 수치에 이번 결과를 섞지 않는다.
 
@@ -398,7 +400,7 @@ FILE TEMP에도 RAM page cache가 있다. main/TEMP cache 각 4 MiB는 전체 pr
 - JSONL ${report.inventory.reduce((sum, root) => sum + root.files, 0)}개, ${report.inventory.reduce((sum, root) => sum + root.bytes, 0)} bytes. 파일별 크기를 고정하여 64 KiB씩 복사하고 동일 사본을 모든 실행에서 재사용했다. 활성 대화가 추가되어도 비교 입력은 달라지지 않는다.
 - 기본 제공자 데이터 홈/환경 변수의 roots를 사용했다. Codex session_index와 threads의 id/title/name만 사본에 포함하고 credential·네트워크·실계정 quota는 사용하지 않는다. 원본과 설치된 확장 DB는 수정하지 않는다. 입력 사본과 실험 DB는 완료 후 삭제한다.
 - 쌍마다 독립 process·새 DB를 사용하고 baseline→A, A→baseline 순서를 교차한다. initial은 빈 DB, rebuild는 manifest parser version만 0으로 만들어 기존 정상 통계를 전체 교체, unchanged는 바로 이어 변경 없이 갱신한다. source body를 바꾸는 증분 append 실험은 이번 범위에 포함하지 않았다.
-- baseline은 실제 제품 prepareSummaries SQL에서 새 인덱스 생성문만 제거한 대조군이다. 나머지 SQL hash를 모든 실행에서 대조한다. 이전 schema/parser의 과거 측정과 직접 비교하지 않는다. 명시적 워밍업·OS cache 비우기는 수행하지 않았다.
+- baseline은 실제 제품 prepareSummaries SQL에서 새 인덱스 생성문만 제거한 대조군이다. 첫 생성과 이후 내용 교체를 같은 논리 SQL로 정규화한 hash를 모든 실행에서 대조한다. 이전 schema/parser의 과거 측정과 직접 비교하지 않는다. 명시적 워밍업·OS cache 비우기는 수행하지 않았다.
 - prepareSummaries는 명시적 교체 transaction **밖**의 집계 준비다. 로그의 transaction은 실제 BEGIN IMMEDIATE/DEFERRED부터 COMMIT/ROLLBACK까지의 시간이며, replace-sessions와 TEMP parse batch를 구분한다. 전체 refresh는 파싱·공통 집계·교체·측정 관찰 비용을 포함한다.
 - work는 전체 시간에서 관찰 함수의 직접 실행 시간을 뺀 참고값이다. 관찰 쿼리가 cache·계획·메모리에 주는 간접 영향은 제거할 수 없다. 주요 비교는 같은 관찰을 수행한 전체 시간과 prepare/교체 구간이다.
 - TEMP allocated는 page_count×page_size, live는 dbstat 및 할당 페이지에서 빈 페이지를 뺀 값이다. 논리적 SQLite 페이지 공간이며 실제 TEMP 파일의 디스크 쓰기량·물리 파일 크기와 같다고 보장하지 않는다. SQL 정렬 내부 scratch 공간은 이 값에 모두 포함되지 않는다.

@@ -113,6 +113,38 @@ test('bounded TEMP event batches leave the persistent database available to anot
   } finally { staging.close();writer.close();database.close();await rm(directory,{recursive:true,force:true}); }
 });
 
+test('consecutive component aggregates keep shared request ids, empty usage, titles and capabilities isolated',() => withStaging((staging,database) => {
+  for (const [id,session] of [[1,'a'],[2,'b'],[3,'c']] as const) {
+    codexFile(staging,id,session);
+    staging.event(id,{kind:'turn',rootId:'shared-request',isMain:true,offset:0,title:`Title ${session}`});
+  }
+  staging.event(1,{kind:'usage',rootId:'shared-request',responseId:'shared-response',requestId:null,
+    threadId:'a',turnId:'shared-request',model:'gpt-5.4',billingMode:'subscription',offset:1,
+    tokens:{input:10,output:2,cacheRead:0,cacheWrite:0,reasoning:0}});
+  staging.event(1,{kind:'capability',rootId:'shared-request',threadId:'a',eventId:'same-event',
+    category:'skill',name:'first-only',offset:2});
+  staging.event(3,{kind:'usage',rootId:'shared-request',responseId:'shared-response',requestId:null,
+    threadId:'c',turnId:'shared-request',model:'gpt-5.4',billingMode:'api',offset:1,
+    tokens:{input:20,output:3,cacheRead:5,cacheWrite:0,reasoning:0}});
+  const rows = [];
+  while (staging.nextComponent()) {
+    staging.prepareSummaries();
+    const componentRows = [...staging.summaries()];
+    assert.equal(componentRows.length,1);
+    const row=componentRows[0];
+    rows.push({session:row.session_id,title:row.request_title,tokens:row.total_tokens,billing:row.billing,
+      skills:[...(row.capability_usage ?? [])].filter(usage=>usage.category==='skill').map(usage=>usage.name),
+      models:[...(row.model_usage ?? [])].map(model=>[model.model,model.input_tokens,model.output_tokens])});
+    staging.finishComponent();
+  }
+  assert.deepEqual(rows,[
+    {session:'a',title:'Title a',tokens:12,billing:'subscription',skills:['first-only'],models:[['gpt-5.4',10,2]]},
+    {session:'b',title:'Title b',tokens:0,billing:'unknown',skills:[],models:[]},
+    {session:'c',title:'Title c',tokens:23,billing:'api',skills:[],models:[['gpt-5.4',20,3]]},
+  ]);
+  assert.equal(database.connection.prepare('SELECT count(*) n FROM events').get()?.n,0);
+}));
+
 test('JSONL batch processing keeps chunk boundaries without changing offsets or trailing-line deferral',async () => {
   const directory = await mkdtemp(join(tmpdir(),'agent-tracker-jsonl-batch-'));
   const path = join(directory,'synthetic.jsonl');

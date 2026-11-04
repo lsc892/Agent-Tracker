@@ -34,10 +34,15 @@ function captureSql(staging: SummaryStaging): string {
   const connection = staging.connection;
   const original = connection.exec;
   const statements: string[] = [];
-  connection.exec = sql => { statements.push(sql); };
-  try { staging.prepareSummaries(); } finally { connection.exec = original; }
+  const captured = new Error('SQL captured without executing');
+  connection.exec = sql => { statements.push(sql);throw captured; };
+  try { staging.prepareSummaries(); }
+  catch (error) { if (error !== captured) throw error; }
+  finally { connection.exec = original; }
   assert.equal(statements.length, 1, 'prepareSummaries changed; update the benchmark adapter');
-  return statements[0];
+  // Individual title variants are replayed against the same fixture; each starts empty.
+  return statements[0].replace(/CREATE TEMP TABLE (component_events|winners|capability_winners|prepared_turns) AS/g,
+    'DROP TABLE IF EXISTS temp.$1; CREATE TEMP TABLE $1 AS');
 }
 
 function replaceOnce(sql: string, before: string, after: string): string {
@@ -47,7 +52,7 @@ function replaceOnce(sql: string, before: string, after: string): string {
 
 /** Reconstruct the pre-index SQL so later benchmarks retain an identical control. */
 export function withoutTitleIndex(sql: string): string {
-  const index = /\n      CREATE INDEX temp\.component_request_title ON component_events\(root_id,id\)\r?\n        WHERE is_main=1 AND request_title IS NOT NULL;/g;
+  const index = /\n      CREATE INDEX(?: IF NOT EXISTS)? temp\.component_request_title ON component_events\(root_id,id\)\r?\n        WHERE is_main=1 AND request_title IS NOT NULL;/g;
   const matches = sql.match(index) ?? [];
   assert.ok(matches.length <= 1, 'Duplicate title index in production SQL');
   const result = sql.replace(index, '');
@@ -59,9 +64,9 @@ export function withoutTitleIndex(sql: string): string {
 export function titleVariantSql(original: string, variant: TitleVariant): string {
   original = withoutTitleIndex(original);
   if (variant === 'partial-index') {
-    const anchor = 'CREATE INDEX temp.component_events_turn ON component_events(kind,thread_id,turn_id,id);';
+    const anchor = 'CREATE INDEX IF NOT EXISTS temp.component_events_turn ON component_events(kind,thread_id,turn_id,id);';
     return replaceOnce(original, anchor, `${anchor}
-      CREATE INDEX temp.component_request_title ON component_events(root_id,id)
+      CREATE INDEX IF NOT EXISTS temp.component_request_title ON component_events(root_id,id)
         WHERE is_main=1 AND request_title IS NOT NULL;`);
   }
   const titleLookup = `(SELECT e.request_title FROM component_events e JOIN scan_files sf ON sf.id=e.file_id

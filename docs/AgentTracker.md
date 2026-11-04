@@ -955,7 +955,9 @@ SQLite query는 기간과 project/session filter를 먼저 적용하고 turn_sum
 
 집계 조회의 주 입력은 요청 facts `K`행에서 선택된 일별 상태 `r`행과 부분 날짜의 raw 입력 `B`행으로 줄어든다. 범위 탐색·주 순회 모델은 `O(log N + K)`에서 `O(log R + r + B)`로 바뀌지만 GROUP BY·정렬 비용은 별도로 남는다. 추가 영속 공간은 실제 요청·모델 일별 조합 수 `O(R + Rm)`이다. 세션·날짜·모델 조합이 매 turn마다 달라지면 집계 행 수도 facts와 비슷해져 최악의 선형 비용은 유지된다. 최초 구축·시간대 변경에는 전체 재집계, 세션 변경에는 해당 세션 재집계와 추가 인덱스·WAL 비용이 생긴다. 소량·좁은 기간은 고정 경계 계산 비용으로 느려질 수 있으며 자동 임계값·결과 캐시는 추가하지 않았다. 실제 제품 경로의 전후 시간·공간·transaction 비교는 [SQL 측정 보고서](benchmarks/2026-10-15/SqlExplainBenchmark-2026-10-15.md)에 둔다.
 
-요청 제목은 component 재집계 때 `component_events(root_id,id) WHERE is_main=1 AND request_title IS NOT NULL` TEMP partial index로 탐색한다. provider·session 조건을 유지하며 가장 먼저 기록된 메인 제목을 선택한다. 인덱스는 component 테이블 재생성·staging 종료 시 사라지고 영속 DB에는 추가하지 않는다. 별도 JS 제목 Map을 만들지 않으며 준비된 요청도 100행씩 읽는다. `prepareSummaries`는 영속 교체 transaction 전에 실행하고 실제 `replaceSessions`의 BEGIN IMMEDIATE/COMMIT 구간과 별도로 측정한다. FILE TEMP는 page cache를 사용하므로 전체 process 메모리의 고정 상한으로 해석하지 않는다. 제목 탐색의 복잡도 모델과 실제 고정 원본의 구현 전후 transaction 기록은 [측정 보고서](benchmarks/2026-10-08/RequestTitleTransactions.md)에 둔다.
+요청 제목은 component 재집계 때 `component_events(root_id,id) WHERE is_main=1 AND request_title IS NOT NULL` TEMP partial index로 탐색한다. provider·session 조건을 유지하며 가장 먼저 기록된 메인 제목을 선택한다. 별도 JS 제목 Map을 만들지 않으며 준비된 요청도 100행씩 읽는다. `prepareSummaries`는 영속 교체 transaction 전에 실행하고 실제 `replaceSessions`의 BEGIN IMMEDIATE/COMMIT 구간과 별도로 측정한다. FILE TEMP는 page cache를 사용하므로 전체 process 메모리의 고정 상한으로 해석하지 않는다. 제목 탐색의 복잡도 모델과 실제 고정 원본의 구현 전후 transaction 기록은 [측정 보고서](benchmarks/2026-10-08/RequestTitleTransactions.md)에 둔다.
+
+`component_events`·`winners`·`capability_winners`·`prepared_turns`와 해당 TEMP 인덱스는 한 번의 갱신에서 재사용한다. 첫 component만 표를 생성하고 다음 component는 각 표의 행을 비운 뒤 `INSERT ... SELECT`로 현재 성분만 집계한다. 제목 인덱스를 포함한 인덱스는 기존 정의를 유지하고 staging 종료 시 표와 함께 제거한다. 반복 스키마 변경을 줄여 세션 저장에 사용하는 statement의 재준비 부담도 줄이며, 같은 요청 ID·빈 사용량·제목·모델·Skill이 다른 성분으로 섞이지 않도록 한다. 영속 schema·parser version은 바꾸지 않으므로 이 최적화 자체가 전체 재파싱을 유발하지 않는다. 전체 원본 읽기와 영향 세션 재파싱 규칙은 유지한다.
 
 SQLite 자체보다 주의할 부분은 VS Code extension 배포 방식이다.
 
