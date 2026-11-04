@@ -3,6 +3,7 @@
 요약·JSONL·SQL·quota 처리의 정확성과 성능을 비교하는 도구를 모은다.
 
 - [simple-index-ab.cjs](simple-index-ab.cjs) — 같은 제품 빌드와 DB 사본에서 세션/제공자 시간 인덱스와 세션 최초 시각 조회의 작은 SQL 조정 후보를 비교한다. 제품 스키마와 쿼리는 변경하지 않는다.
+- [session-time-index-ab.cjs](session-time-index-ab.cjs) — SQL 변경 없이 세션 시간 인덱스 하나의 전체 갱신·쓰기 트랜잭션·DB/WAL 크기와 최초 인덱스 생성 비용을 실제 로그 사본과 합성 1만 요청으로 비교한다.
 - [inline-cost-ab.cjs](inline-cost-ab.cjs) — 비용 분리 v16과 통합 시제품 v17의 워크트리에서 같은 DB 사본의 조회·요청 추가·쓰기 트랜잭션·파일 공간을 비교한다. 제품은 분리 방식을 유지한다.
 - [cost-storage.cjs](cost-storage.cjs) — 비용 통합 실험에서 schema v16/v17의 비용을 같은 논리 열로 읽는다. 기존 제품·과거 측정값은 변경하지 않는다.
 
