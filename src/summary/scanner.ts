@@ -339,12 +339,14 @@ export async function refreshSummary(
     if (retainDeletedSourceUsage) {
       // Surviving subagents cannot recreate a deleted main request. Keep the stored
       // usable snapshot instead of inventing a replacement from orphaned events.
-      database.connection.exec(`DELETE FROM prepared_turns WHERE has_main=0 AND EXISTS(
+      database.connection.exec(`DELETE FROM prepared_turns WHERE has_main=0
+          AND (provider,session_id) IN (SELECT provider,session_id FROM component) AND EXISTS(
             SELECT 1 FROM scan_files f WHERE f.provider=prepared_turns.provider
               AND f.old_session=prepared_turns.session_id AND f.removed=1)`);
     }
     // Rootless subagents already have independent sessions; unresolved explicit roots remain diagnostics.
-    const orphan = database.connection.prepare('SELECT file_id,byte_offset FROM prepared_turns WHERE has_main=0 LIMIT 1').get() as {file_id:number;byte_offset:number}|undefined;
+    const orphan = database.connection.prepare(`SELECT file_id,byte_offset FROM prepared_turns WHERE has_main=0
+      AND (provider,session_id) IN (SELECT provider,session_id FROM component) LIMIT 1`).get() as {file_id:number;byte_offset:number}|undefined;
     if (orphan) {
       const file = database.connection.prepare('SELECT * FROM scan_files WHERE id=?').get(orphan.file_id) as unknown as StagedFile;
       failFile(file,new SummaryError('missing-root-turn',orphan.byte_offset));

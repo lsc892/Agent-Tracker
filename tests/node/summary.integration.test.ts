@@ -710,3 +710,35 @@ test('cancellation after one session commits does not mark that successful sessi
   assert.equal(rows.find(row=>row.session_id==='session-b')!.total_tokens,200);
   assert.equal(database.findManifest('claude',b)!.processing_status,'interrupted');
 }));
+
+test('a later batch orphan does not prevent an earlier healthy component from committing',async () => fixture(async(database,options,root)=>{
+  const codexOptions={...options,roots:[{provider:'codex' as const,path:root}]};
+  const valid=join(root,'a.jsonl'),orphan=join(root,'z.jsonl');
+  await writeFile(valid,jsonl([codexMeta('a'),codexStart('request'),currentUsage('a','request','request',100)]));
+  await writeFile(orphan,jsonl([codexMeta('z','missing'),codexStart('child','missing-request'),
+    currentUsage('z','child','missing-request',50)]));
+  const result=await refreshSummary(database,codexOptions);
+  assert.equal(result.failed,1);assert.equal(result.interrupted,false);
+  assert.equal(database.findManifest('codex',valid)!.processing_status,'done');
+  assert.equal(database.findManifest('codex',orphan)!.last_error,'missing-root-turn');
+  assert.equal(database.queryTurns().length,1);assert.equal(database.queryTurns()[0].total_tokens,100);
+}));
+
+test('a middle batch commit failure preserves its old snapshot and still commits the later component',async () => fixture(async(database,options,root)=>{
+  const sources=['a','b','c'].map(name=>({name,path:join(root,`${name}.jsonl`),session:`session-${name}`}));
+  for (const source of sources) await writeFile(source.path,jsonl([user('same-request',source.session),response(100,'same-request')]));
+  await refreshSummary(database,options);database.queryUsage();
+  for (const source of sources) await writeFile(source.path,jsonl([user('same-request',source.session),response(200,'same-request')]));
+  database.connection.exec(`CREATE TEMP TRIGGER reject_middle BEFORE INSERT ON main.turn_summary
+    WHEN NEW.session_id='session-b' BEGIN SELECT RAISE(ABORT,'reject middle'); END;`);
+  const result=await refreshSummary(database,options);
+  assert.equal(result.failed,1);assert.equal(result.interrupted,false);
+  const rows=database.queryTurns();
+  for (const source of sources) {
+    assert.equal(rows.find(row=>row.session_id===source.session)!.total_tokens,source.name==='b'?200:300);
+    assert.equal(database.findManifest('claude',source.path)!.processing_status,source.name==='b'?'error':'done');
+  }
+  assert.equal(database.queryUsage()[0].total_tokens,800);
+  assert.deepEqual(database.connection.prepare('PRAGMA foreign_key_check').all(),[]);
+  assert.equal(database.connection.prepare("SELECT count(*) n FROM sqlite_temp_master WHERE name='summary_batch'").get()?.n,0);
+}));

@@ -3,6 +3,11 @@ import type { DatabaseSync, StatementSync } from 'node:sqlite';
 import type { FileMetadata, ManifestRow, TurnSummaryInput, ModelUsageInput, CapabilityUsageInput } from './db/types';
 import type { ParsedIdentity, ParseEvent, Provider } from './types';
 
+const CONNECTED_SESSIONS = `WITH RECURSIVE connected(session_id) AS (
+  SELECT ? UNION SELECT CASE WHEN links.a=connected.session_id THEN links.b ELSE links.a END
+  FROM links JOIN connected ON links.a=connected.session_id OR links.b=connected.session_id WHERE links.provider=?
+)`;
+
 export interface StagedFile extends FileMetadata {
   id: number;
   old_session: string | null;
@@ -57,6 +62,7 @@ export class SummaryStaging {
   private readonly insertFlag: StatementSync;
   private readonly insertAffected: StatementSync;
   private preparedTablesCreated = false;
+  private summaryBatchCreated = false;
   constructor(readonly connection: DatabaseSync, private readonly collectCapabilities = true) {
     connection.exec(`
       CREATE TEMP TABLE scan_files (
@@ -203,10 +209,8 @@ export class SummaryStaging {
     this.connection.exec('DELETE FROM component');
     const first = this.connection.prepare('SELECT provider,session_id FROM affected ORDER BY provider,session_id LIMIT 1').get() as {provider:string;session_id:string}|undefined;
     if (!first) return false;
-    this.connection.prepare(`INSERT INTO component WITH RECURSIVE connected(session_id) AS (
-      SELECT ? UNION SELECT CASE WHEN links.a=connected.session_id THEN links.b ELSE links.a END
-      FROM links JOIN connected ON links.a=connected.session_id OR links.b=connected.session_id WHERE links.provider=?
-    ) SELECT ?,session_id FROM connected`).run(first.session_id,first.provider,first.provider);
+    this.connection.prepare(`${CONNECTED_SESSIONS} INSERT INTO component SELECT ?,session_id FROM connected`)
+      .run(first.session_id,first.provider,first.provider);
     return true;
   }
   finishComponent(): void {
@@ -350,17 +354,50 @@ export class SummaryStaging {
   }
 
   /**
-   * 책임: 연결 성분의 중복 응답을 정리해 요청별 집계 후보를 만든다.
-   * 알고리즘: 갱신 안에서 임시 집계 표·인덱스를 재사용하고 내용을 비운 뒤 응답 중복·최신 상태·주 요청과 subagent 사용량을 다시 집계한다.
+   * 책임: 함께 준비할 수 있는 정상 연결 성분의 요청 집계를 재사용한다.
+   * 알고리즘: 앞 32개 영향 세션의 연결 성분을 TEMP에서 확장하고 실패한 성분은 제외하며, 한 성분만 남으면 기존 집계 경로를 사용한다.
    */
   prepareSummaries(): void {
+    if (this.summaryBatchCreated && !this.connection.prepare(`SELECT 1 FROM component c WHERE NOT EXISTS(
+      SELECT 1 FROM summary_batch b WHERE b.provider=c.provider AND b.session_id=c.session_id) LIMIT 1`).get()) return;
+    const seeds = this.connection.prepare(`SELECT a.provider,a.session_id FROM (
+        SELECT provider,session_id FROM affected ORDER BY provider,session_id LIMIT 32
+      ) a WHERE NOT EXISTS(SELECT 1 FROM component c WHERE c.provider=a.provider AND c.session_id=a.session_id)`)
+      .all() as {provider:Provider;session_id:string}[];
+    if (!seeds.length) {
+      if (this.summaryBatchCreated) this.connection.exec('DELETE FROM summary_batch');
+      this.prepareSummaryTables('component');
+      return;
+    }
+    if (!this.summaryBatchCreated) {
+      this.connection.exec(`CREATE TEMP TABLE summary_batch(
+        provider TEXT NOT NULL,session_id TEXT NOT NULL,PRIMARY KEY(provider,session_id)) WITHOUT ROWID`);
+      this.summaryBatchCreated = true;
+    }
+    this.connection.exec('DELETE FROM summary_batch; INSERT INTO summary_batch SELECT * FROM component');
+    const contains = this.connection.prepare('SELECT 1 FROM summary_batch WHERE provider=? AND session_id=?');
+    const addComponent = this.connection.prepare(`${CONNECTED_SESSIONS}
+      INSERT OR IGNORE INTO summary_batch SELECT ?,session_id FROM connected WHERE NOT EXISTS(
+        SELECT 1 FROM scan_files f JOIN connected c ON f.session_id=c.session_id OR f.old_session=c.session_id
+        WHERE f.provider=? AND f.failed=1)`);
+    for (const seed of seeds) {
+      if (!contains.get(seed.provider,seed.session_id)) {
+        addComponent.run(seed.session_id,seed.provider,seed.provider,seed.provider);
+      }
+    }
+    this.prepareSummaryTables('summary_batch');
+    this.connection.exec('CREATE INDEX IF NOT EXISTS temp.prepared_turns_session ON prepared_turns(provider,session_id)');
+  }
+
+  /** 선택한 세션들의 중복 응답·상태·주 요청과 subagent 사용량을 TEMP에 집계한다. */
+  private prepareSummaryTables(sessions: 'component' | 'summary_batch'): void {
     // Repeated TEMP schema changes also invalidate statements used by session storage.
-    // Keep the schema for this refresh, but replace every component's rows completely.
+    // Keep the schema for this refresh, replacing all rows for each preparation group.
     const populate = (table: string): string => this.preparedTablesCreated
       ? `DELETE FROM ${table}; INSERT INTO ${table}`
       : `CREATE TEMP TABLE ${table} AS`;
     this.connection.exec(`
-      ${populate('component_events')} SELECT e.* FROM component c
+      ${populate('component_events')} SELECT e.* FROM ${sessions} c
         CROSS JOIN scan_files f ON f.provider=c.provider AND f.session_id=c.session_id
         CROSS JOIN events e ON e.file_id=f.id WHERE f.removed=0 AND f.failed=0;
       CREATE INDEX IF NOT EXISTS temp.component_events_response ON component_events(kind,response_id,request_id);
@@ -444,12 +481,14 @@ export class SummaryStaging {
    */
   *summaries(): Generator<TurnSummaryInput> {
     let after = 0;
+    const scope = this.summaryBatchCreated
+      ? 'AND (provider,session_id) IN (SELECT provider,session_id FROM component)' : '';
     const sessionName = this.connection.prepare(`SELECT coalesce(
       (SELECT session_name FROM session_names WHERE provider=? AND session_id=?),
       (SELECT session_name FROM scan_files WHERE provider=? AND session_id=? AND is_main=1
         AND removed=0 AND failed=0 AND session_name IS NOT NULL ORDER BY id DESC LIMIT 1)) AS name`);
     while (true) {
-      const rows = this.connection.prepare('SELECT rowid AS cursor,* FROM prepared_turns WHERE rowid>? ORDER BY rowid LIMIT 100').all(after);
+      const rows = this.connection.prepare(`SELECT rowid AS cursor,* FROM prepared_turns WHERE rowid>? ${scope} ORDER BY rowid LIMIT 100`).all(after);
       if (!rows.length) return;
       for (const raw of rows) {
         const row = raw as unknown as PreparedTurn;
@@ -495,6 +534,7 @@ export class SummaryStaging {
 
   close(): void {
     this.connection.exec(`DROP TABLE IF EXISTS temp.lineage_stack; DROP TABLE IF EXISTS temp.lineage;
+      DROP TABLE IF EXISTS temp.summary_batch;
       DROP TABLE IF EXISTS temp.prepared_turns; DROP TABLE IF EXISTS temp.winners; DROP TABLE IF EXISTS temp.capability_winners; DROP TABLE IF EXISTS temp.component_events;
       DROP TABLE temp.flags; DROP TABLE temp.events; DROP TABLE temp.component; DROP TABLE temp.links;
       DROP TABLE temp.affected; DROP TABLE temp.scan_files; DROP TABLE temp.session_names; DROP TABLE temp.source_reconnections;`);
