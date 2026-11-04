@@ -56,6 +56,7 @@ export class SummaryStaging {
   private readonly insertEvent: StatementSync;
   private readonly insertFlag: StatementSync;
   private readonly insertAffected: StatementSync;
+  private preparedTablesCreated = false;
   constructor(readonly connection: DatabaseSync, private readonly collectCapabilities = true) {
     connection.exec(`
       CREATE TEMP TABLE scan_files (
@@ -350,20 +351,23 @@ export class SummaryStaging {
 
   /**
    * 책임: 연결 성분의 중복 응답을 정리해 요청별 집계 후보를 만든다.
-   * 알고리즘: 윈도 함수로 응답별 전체 토큰 벡터 하나와 최신 요청 상태를 고르고 주 요청·subagent 사용량을 합쳐 prepared_turns에 저장한다.
+   * 알고리즘: 갱신 안에서 임시 집계 표·인덱스를 재사용하고 내용을 비운 뒤 응답 중복·최신 상태·주 요청과 subagent 사용량을 다시 집계한다.
    */
   prepareSummaries(): void {
+    // Repeated TEMP schema changes also invalidate statements used by session storage.
+    // Keep the schema for this refresh, but replace every component's rows completely.
+    const populate = (table: string): string => this.preparedTablesCreated
+      ? `DELETE FROM ${table}; INSERT INTO ${table}`
+      : `CREATE TEMP TABLE ${table} AS`;
     this.connection.exec(`
-      DROP TABLE IF EXISTS temp.component_events;
-      CREATE TEMP TABLE component_events AS SELECT e.* FROM component c
+      ${populate('component_events')} SELECT e.* FROM component c
         CROSS JOIN scan_files f ON f.provider=c.provider AND f.session_id=c.session_id
         CROSS JOIN events e ON e.file_id=f.id WHERE f.removed=0 AND f.failed=0;
-      CREATE INDEX temp.component_events_response ON component_events(kind,response_id,request_id);
-      CREATE INDEX temp.component_events_turn ON component_events(kind,thread_id,turn_id,id);
-      CREATE INDEX temp.component_request_title ON component_events(root_id,id)
+      CREATE INDEX IF NOT EXISTS temp.component_events_response ON component_events(kind,response_id,request_id);
+      CREATE INDEX IF NOT EXISTS temp.component_events_turn ON component_events(kind,thread_id,turn_id,id);
+      CREATE INDEX IF NOT EXISTS temp.component_request_title ON component_events(root_id,id)
         WHERE is_main=1 AND request_title IS NOT NULL;
-      DROP TABLE IF EXISTS temp.winners;
-      CREATE TEMP TABLE winners AS
+      ${populate('winners')}
       WITH candidates AS (
         SELECT e.*,f.provider,f.session_id,
           CASE WHEN f.provider='claude' AND e.request_id IS NULL THEN
@@ -379,13 +383,12 @@ export class SummaryStaging {
           CASE WHEN provider='claude' THEN '' ELSE turn_id END
           ORDER BY input+output DESC,id DESC) rank FROM candidates
       ) SELECT * FROM ranked WHERE rank=1;
-      CREATE INDEX temp.winners_root ON winners(provider,session_id,root_id);
-      CREATE INDEX temp.winners_turn ON winners(provider,session_id,thread_id,turn_id);
-      DROP TABLE IF EXISTS temp.capability_winners;
-      CREATE TEMP TABLE capability_winners AS
+      CREATE INDEX IF NOT EXISTS temp.winners_root ON winners(provider,session_id,root_id);
+      CREATE INDEX IF NOT EXISTS temp.winners_turn ON winners(provider,session_id,thread_id,turn_id);
+      ${populate('capability_winners')}
         SELECT DISTINCT f.provider,f.session_id,e.root_id,e.thread_id,e.event_key,e.category,e.name
         FROM component_events e JOIN scan_files f ON f.id=e.file_id WHERE e.kind='capability';
-      CREATE INDEX temp.capability_winners_root ON capability_winners(provider,session_id,root_id);
+      CREATE INDEX IF NOT EXISTS temp.capability_winners_root ON capability_winners(provider,session_id,root_id);
       INSERT OR IGNORE INTO flags SELECT file_id,root_id,'missing-request-id' FROM winners
         WHERE provider='claude' AND canonical_request IS NULL;
       INSERT OR IGNORE INTO flags SELECT e.file_id,e.root_id,'token-total-mismatch'
@@ -394,8 +397,7 @@ export class SummaryStaging {
           WHERE x.kind='check' AND y.provider=f.provider AND y.session_id=f.session_id AND x.thread_id=e.thread_id AND x.turn_id=e.turn_id)
           AND (e.input<>coalesce((SELECT sum(w.input) FROM winners w WHERE w.provider=f.provider AND w.session_id=f.session_id AND w.thread_id=e.thread_id AND w.turn_id=e.turn_id),0)
             OR e.output<>coalesce((SELECT sum(w.output) FROM winners w WHERE w.provider=f.provider AND w.session_id=f.session_id AND w.thread_id=e.thread_id AND w.turn_id=e.turn_id),0));
-      DROP TABLE IF EXISTS temp.prepared_turns;
-      CREATE TEMP TABLE prepared_turns AS
+      ${populate('prepared_turns')}
       WITH source_outcomes AS (
         SELECT f.provider,f.session_id,e.root_id,e.status,e.status_at,e.duration_quality,e.id,
           max(e.status_at) OVER(PARTITION BY e.file_id,e.root_id) ordering_at,
@@ -433,6 +435,7 @@ export class SummaryStaging {
       LEFT JOIN outcomes o ON o.provider=r.provider AND o.session_id=r.session_id AND o.root_id=r.root_id AND o.rank=1
       WHERE o.status IS NULL OR o.status<>'aborted';
     `);
+    this.preparedTablesCreated = true;
   }
 
   /**
