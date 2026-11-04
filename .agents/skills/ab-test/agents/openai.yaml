@@ -1,0 +1,4 @@
+interface:
+  display_name: "성능 A/B 테스트"
+  short_description: "가정을 세우고 현재·1만·100건의 실제 성능을 비교해 기록"
+  default_prompt: "$ab-test로 성능 개선 가정과 후보를 정하고 현재 데이터·10,000건·100건에서 직접 비교해 결과 표와 핵심 분석을 Markdown으로 기록해줘."
