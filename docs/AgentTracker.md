@@ -957,7 +957,9 @@ SQLite query는 기간과 project/session filter를 먼저 적용하고 turn_sum
 
 요청 제목은 component 재집계 때 `component_events(root_id,id) WHERE is_main=1 AND request_title IS NOT NULL` TEMP partial index로 탐색한다. provider·session 조건을 유지하며 가장 먼저 기록된 메인 제목을 선택한다. 별도 JS 제목 Map을 만들지 않으며 준비된 요청도 100행씩 읽는다. `prepareSummaries`는 영속 교체 transaction 전에 실행하고 실제 `replaceSessions`의 BEGIN IMMEDIATE/COMMIT 구간과 별도로 측정한다. FILE TEMP는 page cache를 사용하므로 전체 process 메모리의 고정 상한으로 해석하지 않는다. 제목 탐색의 복잡도 모델과 실제 고정 원본의 구현 전후 transaction 기록은 [측정 보고서](benchmarks/2026-10-08/RequestTitleTransactions.md)에 둔다.
 
-`component_events`·`winners`·`capability_winners`·`prepared_turns`와 해당 TEMP 인덱스는 한 번의 갱신에서 재사용한다. 첫 component만 표를 생성하고 다음 component는 각 표의 행을 비운 뒤 `INSERT ... SELECT`로 현재 성분만 집계한다. 제목 인덱스를 포함한 인덱스는 기존 정의를 유지하고 staging 종료 시 표와 함께 제거한다. 반복 스키마 변경을 줄여 세션 저장에 사용하는 statement의 재준비 부담도 줄이며, 같은 요청 ID·빈 사용량·제목·모델·Skill이 다른 성분으로 섞이지 않도록 한다. 영속 schema·parser version은 바꾸지 않으므로 이 최적화 자체가 전체 재파싱을 유발하지 않는다. 전체 원본 읽기와 영향 세션 재파싱 규칙은 유지한다.
+`component_events`·`winners`·`capability_winners`·`prepared_turns`와 해당 TEMP 인덱스는 한 번의 갱신에서 재사용한다. 1개 연결 성분만 있으면 해당 성분을 바로 집계하며 묶음용 표·인덱스는 만들지 않는다. 여러 성분이 있으면 영향 세션 목록의 앞 32개 seed에서 연결 성분 전체를 확장하고, 실패한 성분을 제외한 세션 키를 디스크 TEMP `summary_batch`에 모아 한 번에 집계한다. 다음 성분이 준비된 묶음에 있으면 집계 SQL을 다시 실행하지 않고, 새 묶음이 필요할 때만 각 집계 표를 비워 다시 채운다. 32는 seed 개수로, 연결 성분·이벤트 행 수의 상한은 아니다. 전체 연결 그래프·요청을 JS Map으로 적재하지 않는다.
+
+현재 `component`는 저장·취소·실패 보존의 경계로 유지한다. 고아 요청 검사·삭제 원본의 rootless 요청 제외·100행 단위 요약 출력은 현재 성분에 한정하며 모델·Skill도 제공자·세션·요청 키로 구분한다. 묶음 결과에는 `(provider,session_id)` TEMP 인덱스를 둔다. 한 성분의 반영 실패가 다음 정상 성분의 준비 결과를 없애지 않으며, 취소 뒤 다음 갱신에서 재사용할 이벤트 캐시는 남기지 않는다. 모든 staging 표·인덱스는 종료 시 제거한다. 영속 schema·parser version, 원본 읽기·변경 파일 선별·영향 세션 재파싱과 세션별 transaction은 유지한다. [선행 A/B](benchmarks/2026-11-04/TempBatchAB-2026-11-04.md)의 실제 로그 재파싱은 5.3% 개선됐으며 단일 성분은 재사용 이득이 없어 직접 경로를 선택했다.
 
 SQLite 자체보다 주의할 부분은 VS Code extension 배포 방식이다.
 

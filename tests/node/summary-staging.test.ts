@@ -145,6 +145,85 @@ test('consecutive component aggregates keep shared request ids, empty usage, tit
   assert.equal(database.connection.prepare('SELECT count(*) n FROM events').get()?.n,0);
 }));
 
+test('summary batches prepare 70 independent components in three passes without changing the active component',() => withStaging((staging,database) => {
+  for (let id=1;id<=70;id++) {
+    codexFile(staging,id,`session-${String(id).padStart(2,'0')}`);
+    staging.event(id,{kind:'turn',rootId:'same-request',isMain:true,offset:0,title:`Request ${id}`});
+  }
+  const execute=database.connection.exec.bind(database.connection);
+  let passes=0;
+  database.connection.exec=sql=>{
+    if (/SELECT e\.\* FROM (?:component|summary_batch) c/.test(sql)) passes++;
+    return execute(sql);
+  };
+  let count=0;
+  while (staging.nextComponent()) {
+    const current=[...staging.componentSessions()];
+    staging.prepareSummaries();
+    assert.deepEqual([...staging.componentSessions()],current);
+    const rows=[...staging.summaries()];
+    assert.equal(rows.length,1);
+    assert.equal(rows[0].session_id,current[0].session_id);
+    assert.equal(rows[0].request_title,`Request ${++count}`);
+    staging.finishComponent();
+  }
+  assert.equal(count,70);assert.equal(passes,3);
+  assert.equal(database.connection.prepare('SELECT count(*) n FROM events').get()?.n,0);
+}));
+
+test('one connected component keeps the direct path even with many linked session identities',() => withStaging((staging,database) => {
+  codexFile(staging,1,'root');
+  staging.event(1,{kind:'turn',rootId:'request',isMain:true,offset:0});
+  for (let id=1;id<=40;id++) {
+    staging.affect('codex',`old-${id}`);
+    database.connection.prepare('INSERT INTO links VALUES (?,?,?)').run('codex',`old-${id}`,'root');
+  }
+  assert.equal(staging.nextComponent(),true);
+  assert.equal([...staging.componentSessions()].length,41);
+  staging.prepareSummaries();
+  assert.equal([...staging.summaries()].length,1);
+  assert.equal(database.connection.prepare(`SELECT count(*) n FROM sqlite_temp_master
+    WHERE name IN ('summary_batch','prepared_turns_session')`).get()?.n,0);
+  staging.finishComponent();assert.equal(staging.nextComponent(),false);
+}));
+
+test('look-ahead excludes a whole failed component and keeps the following healthy component',() => withStaging((staging,database) => {
+  for (const [id,session] of [[1,'a'],[2,'b'],[3,'c'],[4,'d']] as const) {
+    codexFile(staging,id,session,null,{failed:id===3});
+    staging.event(id,{kind:'turn',rootId:'request',isMain:true,offset:0});
+  }
+  database.connection.prepare('INSERT INTO links VALUES (?,?,?)').run('codex','b','c');
+  assert.equal(staging.nextComponent(),true);staging.prepareSummaries();
+  assert.deepEqual(database.connection.prepare('SELECT session_id FROM summary_batch ORDER BY session_id').all()
+    .map(row=>row.session_id),['a','d']);
+  assert.equal([...staging.summaries()][0].session_id,'a');
+  staging.finishComponent();assert.equal(staging.nextComponent(),true);
+  assert.equal(staging.componentFailed(),true);staging.finishComponent();
+  assert.equal(staging.nextComponent(),true);staging.prepareSummaries();
+  assert.equal([...staging.summaries()][0].session_id,'d');
+}));
+
+test('closing batch staging removes its tables and a new single-component staging stays direct',() => {
+  const database=new SummaryDatabase(':memory:');
+  try {
+    const batch=new SummaryStaging(database.connection);
+    for (let id=1;id<=2;id++) {
+      codexFile(batch,id,`session-${id}`);
+      batch.event(id,{kind:'turn',rootId:'request',isMain:true,offset:0});
+    }
+    batch.nextComponent();batch.prepareSummaries();batch.close();
+    assert.equal(database.connection.prepare(`SELECT count(*) n FROM sqlite_temp_master
+      WHERE name IN ('summary_batch','prepared_turns','prepared_turns_session','component_events','winners','capability_winners')`).get()?.n,0);
+    const single=new SummaryStaging(database.connection);
+    try {
+      codexFile(single,1,'single');single.event(1,{kind:'turn',rootId:'request',isMain:true,offset:0});
+      single.nextComponent();single.prepareSummaries();
+      assert.equal([...single.summaries()][0].session_id,'single');
+      assert.equal(database.connection.prepare("SELECT count(*) n FROM sqlite_temp_master WHERE name='summary_batch'").get()?.n,0);
+    } finally {single.close();}
+  } finally {database.close();}
+});
+
 test('JSONL batch processing keeps chunk boundaries without changing offsets or trailing-line deferral',async () => {
   const directory = await mkdtemp(join(tmpdir(),'agent-tracker-jsonl-batch-'));
   const path = join(directory,'synthetic.jsonl');

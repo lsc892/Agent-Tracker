@@ -2,6 +2,7 @@
 
 요약·JSONL·SQL·quota 처리의 정확성과 성능을 비교하는 도구를 모은다.
 
+- [temp-batch-ab.cjs](temp-batch-ab.cjs) — `--before=<빌드된 이전 소스> --after=<빌드된 이후 소스>`의 고정 사본에서 현재 로그 전체·1만·100요청의 TEMP 집계를 비교한다. 준비 3회 뒤 AB/BA 10쌍의 전체 재파싱·요청 한 건 추가·조회와 독립 JS 평균 검증을 기록한다. `--synthetic-only`는 합성 두 규모, `--smoke`는 100건 한 쌍만 실행한다.
 - [simple-index-ab.cjs](simple-index-ab.cjs) — 같은 제품 빌드와 DB 사본에서 세션/제공자 시간 인덱스와 세션 최초 시각 조회의 작은 SQL 조정 후보를 비교한다. 제품 스키마와 쿼리는 변경하지 않는다.
 - [session-time-index-ab.cjs](session-time-index-ab.cjs) — SQL 변경 없이 세션 시간 인덱스 하나의 전체 갱신·쓰기 트랜잭션·DB/WAL 크기와 최초 인덱스 생성 비용을 실제 로그 사본과 합성 1만 요청으로 비교한다.
 - [inline-cost-ab.cjs](inline-cost-ab.cjs) — 비용 분리 v16과 통합 시제품 v17의 워크트리에서 같은 DB 사본의 조회·요청 추가·쓰기 트랜잭션·파일 공간을 비교한다. 제품은 분리 방식을 유지한다.
