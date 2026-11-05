@@ -165,3 +165,49 @@ test('chunk cancellation and truncation still stop before another parsing batch'
     }), { code: 'file-truncated-during-read', offset: 64 * 1024 });
   });
 });
+
+test('unfinished ordinary lines keep UTF-8 bytes across reused chunks and emit only after LF', async () => {
+  const prefix = '{"text":"';
+  // Split a three-byte character at the first read boundary, then span several more chunks.
+  const first = prefix + 'x'.repeat(64 * 1024 - Buffer.byteLength(prefix) - 1) + '한글 😀'.repeat(20000) + '"}\r\n';
+  const partial = '{"unfinished":"' + 'z'.repeat(70 * 1024);
+  await fixture(first + '{"next":true}\n' + partial, async (path, size) => {
+    const rows: { row: Record<string, unknown>; offset: number }[] = [];
+    let batches = 0;
+    const result = await readJsonl(path, size, (row, offset) => { rows.push({ row, offset }); }, {
+      processBatch: parse => {
+        batches++; parse();
+        if (batches * 64 * 1024 < Buffer.byteLength(first)) assert.equal(rows.length, 0);
+      },
+    });
+    assert.deepEqual(rows, [{ row: JSON.parse(first), offset: 0 }, { row: { next: true }, offset: Buffer.byteLength(first) }]);
+    assert.deepEqual(result, { rows: 2, bytes: size, partialLine: true });
+    assert.deepEqual(await observed(readJsonl, path, size), await observed(readByteJsonl, path, size));
+  });
+});
+
+test('an image discovered after buffered ordinary chunks preserves the retained budget and validation', async () => {
+  const prefix = '{"text":"' + 'x'.repeat(150 * 1024) + '","image":"data:image/png;base64,';
+  for (const ending of ['AA"}\n', 'AA\\q"}\n']) {
+    const source = prefix + 'A'.repeat(300 * 1024) + ending;
+    await fixture(source, async (path, size) => {
+      for (const budget of [128 * 1024, 160 * 1024]) {
+        assert.deepEqual(await observed(readJsonl, path, size, budget), await observed(readByteJsonl, path, size, budget));
+      }
+    });
+  }
+});
+
+test('chunk-wide decoding preserves source byte offsets even when UTF-8 replacement changes string length', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'agent-tracker-jsonl-'));
+  const path = join(directory, 'source.jsonl');
+  const first = Buffer.concat([Buffer.from('{"text":"'), Buffer.from([0xff, 0xc3]), Buffer.from('"}\r\n')]);
+  const second = Buffer.from('{"next":"한글 😀"}\n');
+  try {
+    await writeFile(path, Buffer.concat([first, second]));
+    const rows: { row: Record<string, unknown>; offset: number }[] = [];
+    await readJsonl(path, first.length + second.length, (row, offset) => { rows.push({ row, offset }); });
+    assert.deepEqual(rows, [{ row: JSON.parse(first.toString('utf8')), offset: 0 },
+      { row: { next: '한글 😀' }, offset: first.length }]);
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});

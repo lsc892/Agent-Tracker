@@ -215,11 +215,13 @@ function summarize(trials) {
 
 async function main() {
   const options = { smoke: false, syntheticOnly: false, before: '', after: root,
+    hypothesis: 'Batch up to 32 affected seed sessions into one TEMP aggregation pass while retaining component-local commits.',
     output: resolve(root, 'tests/results/benchmarks/temp-batch-ab.json') };
   for (const arg of process.argv.slice(2)) {
     if (arg.startsWith('--output=')) options.output = resolve(arg.slice(9));
     else if (arg.startsWith('--before=')) options.before = resolve(arg.slice(9));
     else if (arg.startsWith('--after=')) options.after = resolve(arg.slice(8));
+    else if (arg.startsWith('--hypothesis=')) options.hypothesis = arg.slice(13);
     else if (arg === '--smoke') options.smoke = true;
     else if (arg === '--synthetic-only') options.syntheticOnly = true;
     else throw new Error(`Unknown option: ${arg}`);
@@ -230,7 +232,7 @@ async function main() {
   assert.ok(!fs.existsSync(options.output), 'Choose a new output path');
   const cache = join(root, 'tests/.cache'); await mkdir(cache, { recursive: true });
   const directory = await mkdtemp(join(cache, 'temp-batch-'));
-  const report = { startedAtSeoul: seoul(), hypothesis: 'Batch up to 32 affected seed sessions into one TEMP aggregation pass while retaining component-local commits.',
+  const report = { startedAtSeoul: seoul(), hypothesis: options.hypothesis,
     pairs: options.smoke ? 1 : 10, warmups: options.smoke ? 0 : 3, readSamples: 1,
     environment: { node: process.version, cpu: cpus()[0]?.model, platform: process.platform, timezone,
       tempStore: 'FILE', cacheKiB: 4096, mmapBytes: 0 },
