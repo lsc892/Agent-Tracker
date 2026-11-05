@@ -9,7 +9,7 @@
 - [CI-CD.md](CI-CD.md): 자동 검증과 릴리스 산출물 생성 절차를 설명한다.
 - [QuotaBenchmark.md](QuotaBenchmark.md): Codex App Server의 시간·메모리 측정 방법을 설명한다.
 - [OrcaQuotaComparison.md](OrcaQuotaComparison.md): Orca와 quota 조회·초기화 시각 처리 방식을 비교한다.
-- [research/](research/README.md): UI와 다국어 지원의 조사·설계 근거를 둔다.
+- [research/](research/README.md): UI·다국어·JSONL 파싱·저장소 갱신과 조회의 조사·설계 근거를 둔다.
 - [benchmarks/](benchmarks/README.md): 날짜별 폴더에 성능 비교 보고서·원시 결과·검증용 산출물을 보존한다.
 - [PerformanceReview.md](benchmarks/2026-10-08/PerformanceReview.md): SQLite 인덱스·JSONL 파싱·Skill 집계의 성능 검토를 기록한다.
 - [JsonlParsingBranches-2026-10-09.md](benchmarks/2026-10-09/JsonlParsingBranches-2026-10-09.md): JSONL 파싱 방식별 비교와 선택 근거를 기록한다.
