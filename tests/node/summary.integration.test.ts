@@ -730,7 +730,9 @@ test('a middle batch commit failure preserves its old snapshot and still commits
   await refreshSummary(database,options);database.queryUsage();
   for (const source of sources) await writeFile(source.path,jsonl([user('same-request',source.session),response(200,'same-request')]));
   database.connection.exec(`CREATE TEMP TRIGGER reject_middle BEFORE INSERT ON main.turn_summary
-    WHEN NEW.session_id='session-b' BEGIN SELECT RAISE(ABORT,'reject middle'); END;`);
+    WHEN NEW.session_id='session-b' BEGIN SELECT RAISE(ABORT,'reject middle'); END;
+    CREATE TEMP TRIGGER reject_middle_update BEFORE UPDATE ON main.turn_summary
+    WHEN NEW.session_id='session-b' AND NEW.input_tokens<>OLD.input_tokens BEGIN SELECT RAISE(ABORT,'reject middle'); END;`);
   const result=await refreshSummary(database,options);
   assert.equal(result.failed,1);assert.equal(result.interrupted,false);
   const rows=database.queryTurns();

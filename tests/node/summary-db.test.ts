@@ -7,13 +7,14 @@ import { test, type TestContext } from 'node:test';
 import { DatabaseSync } from 'node:sqlite';
 import { SummaryDatabase, periodBounds, type FileMetadata, type TurnSummaryInput } from '../../src/summary/db';
 import { SqliteSession } from '../../src/summary/db/connection';
-import { SCHEMA_SQL, SCHEMA_VERSION, SCHEMA_MODEL_SQL, SCHEMA_CAPABILITY_SQL, SCHEMA_ROLLUP_SQL, manifestIdentityIndexSql } from '../../src/summary/db/schema';
+import { SCHEMA_SQL, SCHEMA_VERSION, SCHEMA_MODEL_SQL, SCHEMA_CAPABILITY_SQL, SCHEMA_ROLLUP_SQL, SCHEMA_METADATA_SQL, manifestIdentityIndexSql } from '../../src/summary/db/schema';
 
-const v9Schema = `${SCHEMA_SQL.replace(SCHEMA_ROLLUP_SQL, '')}
+const v9Schema = `${SCHEMA_SQL.replace(SCHEMA_ROLLUP_SQL, '').replace(SCHEMA_METADATA_SQL, '')}
 CREATE INDEX idx_summary_session ON turn_summary(provider, session_id);
 CREATE INDEX IF NOT EXISTS idx_manifest_identity ON manifest(provider, dev, inode);`;
 const summaryTables = ['manifest', 'projects', 'session_billing', 'sessions', 'turn_capability_usage',
-  'turn_costs', 'turn_model_usage', 'turn_summary', 'usage_model_daily', 'usage_request_daily', 'usage_rollup_meta'];
+  'turn_costs', 'turn_metadata', 'turn_metadata_capabilities', 'turn_metadata_dependencies', 'turn_metadata_models', 'turn_model_usage', 'turn_summary',
+  'usage_model_daily', 'usage_request_daily', 'usage_rollup_meta'];
 const v8Schema = v9Schema
   .replace('  request_title TEXT,', '  request_title TEXT,\n  turn_index INTEGER NOT NULL,')
   .replace('ON turn_summary(provider, session_id);', 'ON turn_summary(provider, session_id, turn_index);');
@@ -231,7 +232,7 @@ test('v11 migration adds source presence without changing stored usage or markin
     rmSync(target,{recursive:true,force:true});
   });
   const legacy=new DatabaseSync(dbPath);
-  legacy.exec(SCHEMA_SQL.replace('  source_missing INTEGER NOT NULL DEFAULT 0 CHECK(source_missing IN (0,1)),',''));
+  legacy.exec(SCHEMA_SQL.replace(SCHEMA_METADATA_SQL, '').replace('  source_missing INTEGER NOT NULL DEFAULT 0 CHECK(source_missing IN (0,1)),',''));
   legacy.exec(`PRAGMA user_version=11;
     INSERT INTO projects VALUES ('/synthetic/project-a','Project');
     INSERT INTO sessions VALUES ('claude','session-a','Retained session');

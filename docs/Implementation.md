@@ -27,7 +27,7 @@
 | `src/summary/scanner.ts`, `jsonl.ts`, `lock.ts` | bounded 순회·스트리밍·파일 잠금 |
 | `src/summary/parsers/` | Claude·Codex current/legacy 정규화 |
 | `src/summary/staging.ts` | 디스크 임시 테이블, 중복 제거·lineage·root 요청 합산 |
-| `src/summary/db/` | 두 영속 테이블, transaction, 페이지·시간대 집계 |
+| `src/summary/db/` | 영속 통계·turn metadata, transaction, 페이지·시간대 집계 |
 | `src/ui/`, `media/` | Quota Markdown 툴팁, Usage·Diagnostics Webview |
 | `tools/vscode/statusbar-toggle.cjs` | 로컬 VS Code 내장 클릭 토글 연결, 백업·무결성 검사·복원 |
 | `tests/vscode/statusbar-toggle.cjs` | 격리된 실제 VS Code의 클릭·닫기·재열기 검증 |
@@ -42,7 +42,7 @@
 - 원본 삭제 후 사용량 보존은 기본 ON이며 데이터 설정에서 바꿉니다. 모델별 양수 사용량과 유효 세션·요청 ID가 있는 저장 요청은 경고·실패·재파싱 오류와 관계없이 모델·비용·Skill 행까지 유지합니다. schema v12의 manifest.source_missing으로 삭제를 기록하고, 일부 원본이 없으면 기존 요청 snapshot을 고정해 누락·중복 합산을 피하며 새 요청은 계속 수집합니다. 누락 원본이 모두 복원되면 교체하고, OFF의 다음 갱신 또는 명시적 데이터 삭제는 보존 이력도 제거합니다.
 - 이벤트 삽입은 JSONL 64 KiB chunk마다 동기 TEMP transaction으로 묶고 고정 SQL의 prepared statement를 재사용합니다. 파일 읽기는 transaction 밖에서 수행하며, TEMP 처리 중 다른 연결의 영속 DB 쓰기를 막지 않는지 검증했습니다. 세션 교체 시 삭제는 요청 UNIQUE 인덱스 `(provider, session_id, root_turn_id)`의 앞 두 키를 사용합니다. schema v10은 별도 세션 인덱스와 Windows에서 미사용인 identity 인덱스를 제거하고 날짜·프로젝트 및 manifest 루트·세션 인덱스를 유지합니다.
 - schema v16은 갱신 지연을 우선해 일별 집계를 세션 PK `(provider,session_id,project_key,local_day[,model_key])`와 형식 v1로 복원합니다. 월 컬럼·세션/월 목록·월 prefix 추적을 제거하고 대상 세션 범위만 삭제·재집계합니다. v13 캐시는 재사용하며 실험 버전 v14·v15는 facts·ID·비용·Skill을 보존하고 파생 캐시만 재구축합니다.
-- 교체 대상 세션이 각각 기존 1,000건 이상이고 원본 삭제·Skill 보존 처리가 없으면 TEMP에 요청·모델·Skill을 한 번 적재해 집합 비교합니다. 변경 요청이 전체의 10% 이하이면서 최대 32건이면 변경 행만 반영하고, 더 많으면 TEMP snapshot을 일괄 교체합니다. 작은 세션·최초 저장·보존 경로는 기존 스트리밍 일괄 교체를 사용합니다. 변경이 없는 큰 세션은 facts·비용·집계 쓰기를 생략하며, 변경 시에는 영향 날짜 차감 대신 대상 세션의 일별 상태를 정확히 재집계합니다.
+- schema v17은 요청별 fingerprint·확정 집계와 응답·누계 의존 키를 `turn_metadata`와 자식 테이블에 저장합니다. 변경·연결 파일은 기존처럼 처음부터 전수 파싱하고, 입력이 달라진 요청과 같은 응답·누계 그룹의 요청만 기존 winner SQL로 재계산합니다. 정상 캐시 경로는 그 요청·모델·Skill만 비교해 달라진 facts·비용을 반영하며 변경 없는 ID·updated_at을 유지합니다. 최초 저장·원본 삭제·Skill 보존은 기존 세션 snapshot 경로를 사용합니다. metadata·manifest·통계는 함께 commit/rollback하며 실제 facts 변경 시 대상 세션의 일별 상태를 정확히 재집계합니다. 기존 DB는 통계를 보존한 채 다음 실제 재파싱에서 metadata를 채웁니다.
 - 조회 계획용 통계는 DB 열기, 첫 스캔 완료, 이후 24시간 이상 지난 스캔 완료, 연결 종료에서 `PRAGMA main.optimize`로 수집하며 열기에는 `0x10002`를 지정합니다. TEMP 파싱 테이블을 분석하지 않으며 유지보수 실패는 스캔·종료에 영향을 주지 않습니다.
 - 갱신 직렬화에는 `${dbPath}.refresh-lock.sqlite`의 `BEGIN EXCLUSIVE`를 사용합니다. 이 파일에는 테이블·데이터가 없고 실제 통계 DB의 쓰기 transaction과 분리됩니다. `busy_timeout=0`과 취소 가능한 비동기 대기를 사용하며 연결 종료·worker 종료·process 종료 시 해제됩니다. 기존 JSON owner 파일 방식의 빈 파일 잔류와 stale lock 삭제 경쟁을 없앴고, 이전 `.lock` 파일은 읽거나 삭제하지 않습니다. 새 잠금 파일은 재사용을 위해 남깁니다.
 

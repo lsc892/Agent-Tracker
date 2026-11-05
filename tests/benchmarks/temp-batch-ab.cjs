@@ -300,8 +300,10 @@ async function main() {
   }
 }
 
-if (process.argv[2] === '--worker') worker(...process.argv.slice(3)).then(() => process.disconnect(), error => {
+if (require.main === module && process.argv[2] === '--worker') worker(...process.argv.slice(3)).then(() => process.disconnect(), error => {
   process.send({ kind: 'failure', code: error.code ?? error.name, message: String(error.message).split('\n')[0].slice(0, 160) });
   process.exitCode = 1; process.disconnect();
 });
 else if (require.main === module) main().catch(error => { console.error(error.message); process.exitCode = 1; });
+
+module.exports = { allUsage, canonical, digest, fingerprints, independentCheck, stats };
