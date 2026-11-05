@@ -17,6 +17,7 @@
 
 - [jsonl-parsing-branches.cjs](jsonl-parsing-branches.cjs) — 메모리에 고정한 JSONL 입력으로 파싱 분기 변경 전후의 속도와 메모리를 비교한다.
 - [jsonl-reader.cjs](jsonl-reader.cjs) — 기준·후보 JSONL 리더의 결과 일치와 읽기·전체 갱신 성능을 비교한다.
+- [jsonl-chunks-ab.cjs](jsonl-chunks-ab.cjs) — `--before=<이전 빌드> --after=<이후 빌드> --output=<새 JSON>`으로 청크 단위 디코딩·분할을 비교한다. 100·1만 짧은 줄, 청크보다 긴 줄, 대형 이미지의 기대 결과·원본 offset·시간·메모리를 AB/BA 10쌍으로 검증한다. 실제 갱신·추가·평균 조회는 `temp-batch-ab.cjs --hypothesis=<비교 가정>`을 재사용한다.
 - [quota](quota/) — quota 조회 시나리오와 운영체제별 자원 샘플러로 시간·메모리를 측정한다.
 - [query-source-files.cjs](query-source-files.cjs) — 벤치마크 fingerprint에 기록할 공개 쿼리 진입점·분리된 구현·선택적 컴파일 파일 경로를 수집한다.
 - [query-profile.cjs](query-profile.cjs) — 설치 DB 사본과 합성 1만·10만 요청에서 현재 조회 SQL의 실행 시간·계획과 가장 느린 공개 API를 측정한다.
