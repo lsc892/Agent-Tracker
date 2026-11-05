@@ -353,7 +353,13 @@ export async function refreshSummary(
       return;
     }
     try {
-      database.replaceSessions({sessions:staging.componentSessions(),summaries:staging.summaries(),
+      const partial = collectCapabilities && !database.connection.prepare(`SELECT 1 FROM scan_files
+        WHERE removed=1 AND ${componentPredicate} LIMIT 1`).get()
+        && Boolean(database.connection.prepare(`SELECT 1 FROM turn_metadata m JOIN component c
+          ON c.provider=m.provider AND c.session_id=m.session_id LIMIT 1`).get());
+      database.replaceSessions({sessions:staging.componentSessions(),summaries:staging.summaries(!partial),
+        changedTurns:partial ? staging.changedTurns() : undefined,
+        commitMetadata:() => staging.commitMetadata(),
         preserveCapabilities:!collectCapabilities,
         retainDeletedSourceUsage,
         reconnectedFiles:staging.reconnectedFiles(),

@@ -2,6 +2,7 @@
 import type { DatabaseSync, StatementSync } from 'node:sqlite';
 import type { FileMetadata, ManifestRow, TurnSummaryInput, ModelUsageInput, CapabilityUsageInput } from './db/types';
 import type { ParsedIdentity, ParseEvent, Provider } from './types';
+import { SummaryMetadata } from './metadata';
 
 const CONNECTED_SESSIONS = `WITH RECURSIVE connected(session_id) AS (
   SELECT ? UNION SELECT CASE WHEN links.a=connected.session_id THEN links.b ELSE links.a END
@@ -24,7 +25,7 @@ export interface StagedFile extends FileMetadata {
   forked_from_id: string | null;
 }
 
-interface PreparedTurn {
+export interface PreparedTurn {
   cursor: number; provider: Provider; session_id: string; root_id: string;
   started: number | null; completed_at: number | null; last_assistant: number | null; completed: number;
   explicit_duration: number | null; lifecycle: number; file_id: number; byte_offset: number; has_main: number;
@@ -61,6 +62,7 @@ export class SummaryStaging {
   private readonly insertEvent: StatementSync;
   private readonly insertFlag: StatementSync;
   private readonly insertAffected: StatementSync;
+  private readonly metadata: SummaryMetadata;
   private preparedTablesCreated = false;
   private summaryBatchCreated = false;
   constructor(readonly connection: DatabaseSync, private readonly collectCapabilities = true) {
@@ -104,6 +106,7 @@ export class SummaryStaging {
       request_title) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
     this.insertFlag = connection.prepare('INSERT OR IGNORE INTO flags VALUES (?,?,?)');
     this.insertAffected = connection.prepare('INSERT OR IGNORE INTO affected VALUES (?,?)');
+    this.metadata = new SummaryMetadata(connection,collectCapabilities);
   }
 
   addFile(file: FileMetadata & { id: number }, oldSession: string | null, changed: boolean, removed = false): void {
@@ -386,11 +389,11 @@ export class SummaryStaging {
       }
     }
     this.prepareSummaryTables('summary_batch');
-    this.connection.exec('CREATE INDEX IF NOT EXISTS temp.prepared_turns_session ON prepared_turns(provider,session_id)');
   }
 
   /** 선택한 세션들의 중복 응답·상태·주 요청과 subagent 사용량을 TEMP에 집계한다. */
   private prepareSummaryTables(sessions: 'component' | 'summary_batch'): void {
+    this.metadata.prepare(sessions);
     // Repeated TEMP schema changes also invalidate statements used by session storage.
     // Keep the schema for this refresh, replacing all rows for each preparation group.
     const populate = (table: string): string => this.preparedTablesCreated
@@ -399,7 +402,7 @@ export class SummaryStaging {
     this.connection.exec(`
       ${populate('component_events')} SELECT e.* FROM ${sessions} c
         CROSS JOIN scan_files f ON f.provider=c.provider AND f.session_id=c.session_id
-        CROSS JOIN events e ON e.file_id=f.id WHERE f.removed=0 AND f.failed=0;
+        CROSS JOIN events e ON e.file_id=f.id WHERE f.removed=0 AND f.failed=0 AND ${this.metadata.dirtyPredicate('f','e')};
       CREATE INDEX IF NOT EXISTS temp.component_events_response ON component_events(kind,response_id,request_id);
       CREATE INDEX IF NOT EXISTS temp.component_events_turn ON component_events(kind,thread_id,turn_id,id);
       CREATE INDEX IF NOT EXISTS temp.component_request_title ON component_events(root_id,id)
@@ -471,6 +474,7 @@ export class SummaryStaging {
         (SELECT sf.id FROM scan_files sf WHERE sf.provider=r.provider AND sf.session_id=r.session_id AND sf.is_main=1 AND sf.removed=0 ORDER BY sf.id LIMIT 1),r.file_id)
       LEFT JOIN outcomes o ON o.provider=r.provider AND o.session_id=r.session_id AND o.root_id=r.root_id AND o.rank=1
       WHERE o.status IS NULL OR o.status<>'aborted';
+      CREATE UNIQUE INDEX IF NOT EXISTS temp.prepared_turns_key ON prepared_turns(provider,session_id,root_id);
     `);
     this.preparedTablesCreated = true;
   }
@@ -479,7 +483,7 @@ export class SummaryStaging {
    * 책임: 집계 후보를 저장용 요청 요약으로 변환한다.
    * 알고리즘: rowid 기준 100행씩 읽고 명시 duration·수명주기 차이·마지막 응답 시각 순으로 시간을 결정하며 품질 플래그와 모델별 내역을 연결한다.
    */
-  *summaries(): Generator<TurnSummaryInput> {
+  *summaries(includeUnchanged = false): Generator<TurnSummaryInput> {
     let after = 0;
     const scope = this.summaryBatchCreated
       ? 'AND (provider,session_id) IN (SELECT provider,session_id FROM component)' : '';
@@ -489,7 +493,7 @@ export class SummaryStaging {
         AND removed=0 AND failed=0 AND session_name IS NOT NULL ORDER BY id DESC LIMIT 1)) AS name`);
     while (true) {
       const rows = this.connection.prepare(`SELECT rowid AS cursor,* FROM prepared_turns WHERE rowid>? ${scope} ORDER BY rowid LIMIT 100`).all(after);
-      if (!rows.length) return;
+      if (!rows.length) break;
       for (const raw of rows) {
         const row = raw as unknown as PreparedTurn;
         after = row.cursor;
@@ -511,7 +515,26 @@ export class SummaryStaging {
           diagnostic_offset:flags.size ? row.byte_offset : null };
       }
     }
+    if (includeUnchanged) for (const row of this.metadata.unchangedTurns()) {
+      const { status, completedAt, duration, quality } = summaryTiming(row);
+      const flags = new Set((row.flags ?? '').split(',').filter(Boolean));
+      if (quality === 'missing') flags.add('duration-missing');
+      if (quality === 'approximate') flags.add('duration-approximate');
+      const name = sessionName.get(row.provider,row.session_id,row.provider,row.session_id)?.name as string | null;
+      yield { provider:row.provider,project_key:row.project_key,project_name:row.project_name,session_id:row.session_id,session_name:name,
+        root_turn_id:row.root_id,request_title:row.request_title,started_at_ms:row.started,completed_at_ms:completedAt,
+        duration_ms:duration,duration_quality:quality,input_tokens:row.input_tokens,output_tokens:row.output_tokens,
+        cache_read_input_tokens:row.cache_read_input_tokens,cache_write_input_tokens:row.cache_write_input_tokens,
+        model_usage:this.metadata.models(row),capability_usage:this.collectCapabilities ? this.metadata.capabilities(row) : undefined,
+        billing:row.billing,total_tokens:row.input_tokens+row.output_tokens,status,
+        quality_flags:[...flags].join(',') || null,diagnostic_file_id:flags.size ? row.file_id : null,
+        diagnostic_offset:flags.size ? row.byte_offset : null };
+    }
   }
+
+  changedTurns(): Iterable<{provider:Provider;session_id:string;root_turn_id:string}> { return this.metadata.changedTurns(); }
+
+  commitMetadata(): void { this.metadata.commit(); }
 
   private *modelUsage(provider: Provider, session: string, root: string): Generator<ModelUsageInput> {
     for (const row of this.connection.prepare(`SELECT coalesce(model,'') AS model,
@@ -533,6 +556,7 @@ export class SummaryStaging {
   }
 
   close(): void {
+    this.metadata.close();
     this.connection.exec(`DROP TABLE IF EXISTS temp.lineage_stack; DROP TABLE IF EXISTS temp.lineage;
       DROP TABLE IF EXISTS temp.summary_batch;
       DROP TABLE IF EXISTS temp.prepared_turns; DROP TABLE IF EXISTS temp.winners; DROP TABLE IF EXISTS temp.capability_winners; DROP TABLE IF EXISTS temp.component_events;

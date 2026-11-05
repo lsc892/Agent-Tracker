@@ -20,12 +20,15 @@ export class SessionChanges {
   private oldCount = 0;
   private changedCount = 0;
   private replaceAll = true;
+  private partial = false;
   constructor(private readonly database: SqliteSession,
     private readonly values: (row: TurnSummaryInput, now: string) => SQLInputValue[]) {}
 
   eligible(replacement: SessionReplacement): boolean {
+    this.partial = replacement.changedTurns !== undefined;
     if (replacement.preserveCapabilities) return false;
     if (this.database.statement('SELECT 1 FROM db_removed_files UNION ALL SELECT 1 FROM db_retained_turns LIMIT 1').get()) return false;
+    if (this.partial) return true;
     const counts = this.database.statement(`SELECT min(n) AS smallest,sum(n) AS total FROM (
       SELECT r.provider,r.session_id,count(t.id) AS n FROM db_replacement_sessions r
       LEFT JOIN turn_summary t ON t.provider=r.provider AND t.session_id=r.session_id GROUP BY r.provider,r.session_id)`).get();
@@ -49,9 +52,11 @@ export class SessionChanges {
     this.clear();
     const insert = this.database.statement(`INSERT INTO session_next VALUES(${Array(TURN_COLUMNS.length + 5).fill('?')})`);
     const hasSession = this.database.statement('SELECT 1 FROM db_replacement_sessions WHERE provider=? AND session_id=?');
+    const hasTurn = this.partial ? this.database.statement('SELECT 1 FROM db_replacement_turns WHERE provider=? AND session_id=? AND root_turn_id=?') : undefined;
     let seq = 0;
     for (const row of replacement.summaries) {
       if (!hasSession.get(row.provider,row.session_id)) throw new Error('Summary is outside the replacement session group');
+      if (hasTurn && !hasTurn.get(row.provider,row.session_id,row.root_turn_id)) throw new Error('Summary is outside the changed request set');
       if (row.project_name === null) throw new Error('Project name cannot be null');
       insert.run(seq,Number(row.updated_at !== undefined),row.project_name,row.session_name?.trim() || null,row.billing ?? null,...this.values(row,now));
       this.stageModels(row,seq);
@@ -66,7 +71,7 @@ export class SessionChanges {
     const changed = this.database.statement(`SELECT (SELECT count(*) FROM session_matches WHERE changed)
       +(SELECT count(*) FROM session_removed) AS n`).get();
     this.changedCount = Number(changed?.n ?? 0);
-    this.replaceAll = this.changedCount > Math.min(MAX_CHANGED_TURNS,Math.floor(this.oldCount / 10));
+    this.replaceAll = !this.partial && this.changedCount > Math.min(MAX_CHANGED_TURNS,Math.floor(this.oldCount / 10));
   }
 
   private stageModels(row: TurnSummaryInput, seq: number): void {
@@ -107,8 +112,10 @@ export class SessionChanges {
       LEFT JOIN session_billing b ON b.provider=n.provider AND b.session_id=n.session_id LEFT JOIN turn_costs c ON c.turn_id=t.id`)
       .run(PRICING_VERSION);
     connection.exec(`CREATE UNIQUE INDEX temp.session_matches_seq ON session_matches(seq);
-      INSERT INTO session_removed SELECT id FROM turn_summary WHERE (provider,session_id) IN
-        (SELECT provider,session_id FROM db_replacement_sessions) AND id NOT IN (SELECT old_id FROM session_matches WHERE old_id IS NOT NULL);`);
+      INSERT INTO session_removed SELECT id FROM turn_summary WHERE ${this.partial
+        ? '(provider,session_id,root_turn_id) IN (SELECT provider,session_id,root_turn_id FROM db_replacement_turns)'
+        : '(provider,session_id) IN (SELECT provider,session_id FROM db_replacement_sessions)'}
+        AND id NOT IN (SELECT old_id FROM session_matches WHERE old_id IS NOT NULL);`);
   }
 
   apply(): boolean {

@@ -62,12 +62,28 @@ export class SessionStore {
         }
       };
       this.prepareRemovedFiles(replacement, existingFile, requireSession);
+      if (replacement.changedTurns) {
+        this.database.connection.exec(`CREATE TEMP TABLE IF NOT EXISTS db_replacement_turns (
+          provider TEXT NOT NULL,session_id TEXT NOT NULL,root_turn_id TEXT NOT NULL,
+          PRIMARY KEY(provider,session_id,root_turn_id)) WITHOUT ROWID;
+          DELETE FROM db_replacement_turns;`);
+        const addTurn = this.database.statement('INSERT OR IGNORE INTO db_replacement_turns VALUES (?,?,?)');
+        for (const turn of replacement.changedTurns) {
+          requireSession(turn.provider,turn.session_id);
+          addTurn.run(turn.provider,turn.session_id,turn.root_turn_id);
+        }
+      }
       this.preserveReplacementData(replacement);
       const now = this.replaceManifestFiles(replacement, existingFile, requireSession);
       const changes = new SessionChanges(this.database,turnValues);
       const staged = changes.eligible(replacement);
+      if (replacement.changedTurns && !staged) throw new Error('Partial request replacement cannot preserve removed sources or capabilities');
+      const unchanged = replacement.changedTurns !== undefined
+        && !this.database.statement('SELECT 1 FROM db_replacement_turns LIMIT 1').get();
       let changed = true;
-      if (staged) {
+      if (unchanged) {
+        changed = false;
+      } else if (staged) {
         changes.stage(replacement,now);
         changed = changes.apply();
       } else {
@@ -78,8 +94,10 @@ export class SessionStore {
       }
       this.restoreCapabilitiesAndRemoveFiles(replacement, now);
       if (changed) this.database.rollups.refreshChangedSessions();
+      replacement.commitMetadata?.();
       this.cleanReplacementNames();
-      if (staged) changes.clear();
+      if (staged && !unchanged) changes.clear();
+      if (replacement.changedTurns) this.database.connection.exec('DELETE FROM db_replacement_turns');
     });
   }
 
@@ -133,7 +151,9 @@ export class SessionStore {
     // Row-value IN lets SQLite seek the request UNIQUE index by its session prefix;
     // a correlated EXISTS scans every stored turn for each replaced session.
     this.database.connection.exec(`INSERT OR IGNORE INTO db_replacement_projects SELECT project_key FROM turn_summary
-        WHERE (provider,session_id) IN (SELECT provider,session_id FROM db_replacement_sessions)`);
+        WHERE ${replacement.changedTurns
+          ? '(provider,session_id,root_turn_id) IN (SELECT provider,session_id,root_turn_id FROM db_replacement_turns)'
+          : '(provider,session_id) IN (SELECT provider,session_id FROM db_replacement_sessions)'}`);
     if (replacement.preserveCapabilities) this.database.connection.exec(`
         CREATE TEMP TABLE IF NOT EXISTS db_saved_capabilities (
           provider TEXT NOT NULL,session_id TEXT NOT NULL,root_turn_id TEXT NOT NULL,

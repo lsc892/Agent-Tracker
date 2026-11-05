@@ -106,6 +106,10 @@ export interface SessionReplacement {
   removedFileIds?: Iterable<number>;
   /** Verified replacements of missing source snapshots; bypass deleted-source retention. */
   reconnectedFiles?: Iterable<{ old_id: number; new_id: number }>;
+  /** Complete replacement snapshots for only these request keys; other requests stay unchanged. */
+  changedTurns?: Iterable<SessionRef & { root_turn_id: string }>;
+  /** Publish derived metadata in the same transaction as the accepted source and request facts. */
+  commitMetadata?: () => void;
 }
 
 export interface SummaryFilter {

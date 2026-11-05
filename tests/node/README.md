@@ -30,6 +30,7 @@ Node 테스트 러너로 파서·DB·quota·설정·UI와 배포 도구의 회�
 - [statusbar-toggle.test.ts](statusbar-toggle.test.ts) — VS Code 상태바 패치의 토글·카드·체크섬·백업·복원을 검증한다.
 - [summary-db.test.ts](summary-db.test.ts) — 요약 DB의 스키마·마이그레이션·교체·조회·진단 일관성을 검증한다.
 - [summary-lock.test.ts](summary-lock.test.ts) — 프로세스·스레드 간 요약 갱신 잠금의 대기·취소·강제 종료 복구를 검증한다.
+- [summary-metadata.test.ts](summary-metadata.test.ts) — 전수 파싱 뒤 계산 재사용·winner 재귀속·부분 반영·오류 복구와 metadata 정리를 검증한다.
 - [summary-rollup.test.ts](summary-rollup.test.ts) — 공개 DB API의 롤업 조회·갱신·시간대·마이그레이션 일관성을 검증한다.
 - [summary-staging.test.ts](summary-staging.test.ts) — 요약 임시 저장소의 계보 해석과 제한된 배치 트랜잭션을 검증한다.
 - [summary.integration.test.ts](summary.integration.test.ts) — 로그 탐색부터 파싱·세션 연결·요약 저장까지의 통합 동작을 검증한다.

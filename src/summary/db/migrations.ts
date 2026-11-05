@@ -2,7 +2,7 @@
 import type { DatabaseSync } from 'node:sqlite';
 import {
   SCHEMA_SQL, SCHEMA_VERSION, SCHEMA_LEGACY_MIGRATION_SQL, SCHEMA_CACHE_MIGRATION_SQL,
-  SCHEMA_MODEL_SQL, SCHEMA_CAPABILITY_SQL, SCHEMA_ROLLUP_SQL, SCHEMA_TURN_INDEX_MIGRATION_SQL, manifestIdentityIndexSql,
+  SCHEMA_MODEL_SQL, SCHEMA_CAPABILITY_SQL, SCHEMA_ROLLUP_SQL, SCHEMA_METADATA_SQL, SCHEMA_TURN_INDEX_MIGRATION_SQL, manifestIdentityIndexSql,
 } from './schema';
 
 function initialMigrationSql(version: number): string {
@@ -42,6 +42,7 @@ export function migrateSchema(connection: DatabaseSync, transaction: (action: ()
           DROP TABLE IF EXISTS usage_rollup_meta; DROP TABLE IF EXISTS usage_session_months;`);
       }
       connection.exec(SCHEMA_ROLLUP_SQL);
+      connection.exec(SCHEMA_METADATA_SQL);
       if (!connection.prepare('PRAGMA table_info(manifest)').all().some(column => column.name === 'capabilities_collected')) {
         connection.exec('ALTER TABLE manifest ADD COLUMN capabilities_collected INTEGER NOT NULL DEFAULT 0 CHECK(capabilities_collected IN (0,1))');
       }

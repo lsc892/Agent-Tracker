@@ -35,7 +35,10 @@ function captureSql(staging: SummaryStaging): string {
   const original = connection.exec;
   const statements: string[] = [];
   const captured = new Error('SQL captured without executing');
-  connection.exec = sql => { statements.push(sql);throw captured; };
+  connection.exec = sql => {
+    if (!sql.includes('CREATE TEMP TABLE prepared_turns AS')) return Reflect.apply(original,connection,[sql]);
+    statements.push(sql);throw captured;
+  };
   try { staging.prepareSummaries(); }
   catch (error) { if (error !== captured) throw error; }
   finally { connection.exec = original; }
