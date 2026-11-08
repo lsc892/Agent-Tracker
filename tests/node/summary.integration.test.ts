@@ -8,7 +8,7 @@ import { SummaryDatabase } from '../../src/summary/db';
 import { PARSER_VERSION, refreshSummary } from '../../src/summary/scanner';
 import { SummaryClient } from '../../src/summary/client';
 import type { SummaryOptions } from '../../src/summary/types';
-import { acquireRefreshLock } from '../../src/summary/lock';
+import { acquireRefreshLock } from '../../src/summary/scanner/lock';
 import { constants, zstdCompressSync } from 'node:zlib';
 
 const jsonl = (rows: unknown[]): string => rows.map(row => JSON.stringify(row)).join('\n') + '\n';
@@ -699,8 +699,8 @@ test('cancellation after one session commits does not mark that successful sessi
   for(const [path,session,prompt] of [[a,'session-a','prompt-a'],[b,'session-b','prompt-b']]) {
     await writeFile(path,jsonl([user(prompt,session),response(200,prompt)]));
   }
-  const controller=new AbortController();const original=database.replaceSessions.bind(database);
-  database.replaceSessions=replacement=>{original(replacement);controller.abort();};
+  const controller=new AbortController();const original=database.replaceMemory.bind(database);
+  database.replaceMemory=replacement=>{original(replacement);controller.abort();};
   const result=await refreshSummary(database,options,controller.signal);
   assert.equal(result.interrupted,true);
   assert.equal(database.findManifest('claude',a)!.processing_status,'done');

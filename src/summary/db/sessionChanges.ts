@@ -3,7 +3,7 @@ import type { SQLInputValue } from 'node:sqlite';
 import type { SqliteSession } from './connection';
 import type { SessionReplacement, TurnSummaryInput } from './types';
 import { nonnegative } from './validation';
-import { estimateCost, PRICING_VERSION } from '../pricing';
+import { estimateCost, PRICING_VERSION } from '../models/pricing';
 
 export const TURN_COLUMNS = `provider,project_key,session_id,root_turn_id,request_title,started_at_ms,completed_at_ms,
   duration_ms,duration_quality,input_tokens,output_tokens,cache_write_input_tokens,cache_read_input_tokens,total_tokens,

@@ -13,6 +13,7 @@ const { createGzip } = require('node:zlib');
 const { DatabaseSync } = require('node:sqlite');
 const { SummaryDatabase } = require('../../dist/src/summary/db');
 const { SummaryStaging } = require('../../dist/src/summary/staging');
+const memoryAggregation = require('../../dist/src/summary/aggregation/memoryAggregate');
 const { refreshSummary, PARSER_VERSION } = require('../../dist/src/summary/scanner');
 const { SCHEMA_VERSION } = require('../../dist/src/summary/db/schema');
 const { readConfiguration } = require('../../dist/src/configuration');
@@ -214,15 +215,15 @@ async function worker() {
       counters.maxTempAllocatedBytes = Math.max(counters.maxTempAllocatedBytes, value.temp.allocatedBytes);
       counters.maxObservedRssBytes = Math.max(counters.maxObservedRssBytes, value.rssBytes);
     }
-    if (record.kind === 'prepare') {
+    if (record.kind === 'prepare' || record.kind === 'memory-aggregate') {
       counters.prepareMs += record.elapsedMs;
       for (const [key, value] of [['maxIndexBytes', record.indexBytes], ['maxEvents', record.events],
         ['maxTitleCandidates', record.titleCandidates], ['maxRequests', record.requests]]) {
-        counters[key] = Math.max(counters[key], value);
+        counters[key] = Math.max(counters[key], value ?? 0);
       }
     } else if (record.kind === 'transaction') {
       counters.transactions++;
-      if (record.purpose === 'replace-sessions') counters.replacementMs += record.elapsedMs;
+      if (record.purpose === 'replace-sessions' || record.purpose === 'replace-memory') counters.replacementMs += record.elapsedMs;
     }
     if (record.kind === 'refresh') Object.assign(record, counters);
     const line = JSON.stringify({ variant, pair:Number(pairText), ...record }) + '\n';
@@ -231,8 +232,10 @@ async function worker() {
   };
   const originalExec = connection.exec;
   const originalPrepare = SummaryStaging.prototype.prepareSummaries;
-  const originalBatch = SummaryStaging.prototype.batchEvents;
+  const originalLoad = SummaryStaging.prototype.loadEvents;
   const originalReplace = database.replaceSessions;
+  const originalMemoryReplace = database.replaceMemory;
+  const originalAggregate = memoryAggregation.aggregateMemory;
   connection.exec = function(sql) {
     const trimmed = sql.trim();
     if (/(?:CREATE TEMP TABLE component_events AS|INSERT INTO component_events)/.test(trimmed)) {
@@ -256,9 +259,9 @@ async function worker() {
     }
     return result;
   };
-  SummaryStaging.prototype.batchEvents = function(action) {
-    const previous = purpose; purpose = 'temp-parse-batch';
-    try { return originalBatch.call(this, action); } finally { purpose = previous; }
+  SummaryStaging.prototype.loadEvents = function() {
+    const previous = purpose; purpose = 'temp-map-load';
+    try { return originalLoad.call(this); } finally { purpose = previous; }
   };
   SummaryStaging.prototype.prepareSummaries = function() {
     component++;
@@ -290,6 +293,24 @@ async function worker() {
   database.replaceSessions = function(replacement) {
     const previous = purpose; purpose = 'replace-sessions';
     try { return originalReplace.call(database, replacement); } finally { purpose = previous; }
+  };
+  database.replaceMemory = function(replacement) {
+    const previous = purpose; purpose = 'replace-memory';
+    try { return originalMemoryReplace.call(database,replacement); } finally { purpose = previous; }
+  };
+  memoryAggregation.aggregateMemory = function(files,...args) {
+    if(!files.length)return originalAggregate.call(this,files,...args);
+    component++;
+    assert.equal(transaction,undefined,'Memory aggregation must precede final persistence');
+    const before=observe(()=>resources(database)),start=performance.now();
+    const result=originalAggregate.call(this,files,...args),elapsedMs=performance.now()-start;
+    const after=observe(()=>resources(database));
+    observe(()=>emit({kind:'memory-aggregate',scenario,component,insideExplicitTransaction:false,elapsedMs,before,after,
+      requests:result.summaries.length,events:files.reduce((n,file)=>n+file.events.length,0),
+      titleCandidates:files.reduce((n,file)=>n+file.events.filter(event=>event.kind==='turn'&&event.isMain&&event.title!=null).length,0),
+      sessions:new Set(files.map(file=>JSON.stringify([file.provider,file.session_id]))).size,
+      indexBytes:0,usesTitleIndex:false}));
+    return result;
   };
   try {
     for (scenario of SCENARIOS) {
@@ -331,7 +352,8 @@ async function worker() {
       records:records.map(record => ({ variant, pair:Number(pairText), ...record })) });
   } finally {
     connection.exec = originalExec; SummaryStaging.prototype.prepareSummaries = originalPrepare;
-    SummaryStaging.prototype.batchEvents = originalBatch; database.replaceSessions = originalReplace;
+    SummaryStaging.prototype.loadEvents = originalLoad; database.replaceSessions = originalReplace;
+    database.replaceMemory = originalMemoryReplace; memoryAggregation.aggregateMemory = originalAggregate;
     closeSync(logFile); database.close();
   }
 }
@@ -359,6 +381,16 @@ function markdown(report, documentPath, jsonPath, logPath) {
   const ms = value => value.toFixed(3);
   const mib = value => (value / 1048576).toFixed(2);
   const rows = report.results.map(row => `| ${row.scenario} | ${row.variant} | ${ms(row.elapsedMs)} | ${ms(row.workMs)} | ${ms(row.prepareMs)} | ${ms(row.replacementMs)} | ${mib(row.maxTempAllocatedBytes)} | ${mib(row.maxObservedRssBytes)} | ${row.processPeakRssBytes === null ? '미지원' : mib(row.processPeakRssBytes)} |`);
+  if (report.pipeline === 'memory') return `# Memory aggregation transaction audit
+
+SQL title-index comparison is not applicable to the active memory pipeline. Both historical labels run the same implementation and verify identical requests, titles, tokens, models and diagnostics. No SQL preparation or title index is created. Aggregation is measured before the final permanent-write transaction.
+
+| Scenario | Historical label | Refresh ms | Work ms | Memory aggregation ms | Final transaction ms | TEMP MiB | RSS MiB | Process peak RSS MiB |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+${rows.join('\n')}
+
+Raw summaries: [JSON](${link(jsonPath)}). Actual transactions: [JSONL](${link(logPath)}).
+`;
   const comparisons = SCENARIOS.map(scenario => {
     const pairs = Array.from({ length:report.pairs }, (_, pair) => {
       const samples = report.samples.filter(row => row.pair === pair && row.scenario === scenario);
@@ -480,15 +512,13 @@ async function main() {
       result.processPeakRssBytes = samples.every(sample => sample.processPeakRssBytes !== null) ? median(samples.map(sample => sample.processPeakRssBytes)) : null;
       return result;
     }));
-    const report = { recordedAtSeoul:seoulTime(), input:options.real ? 'real' : 'fixture', pairs:options.pairs,
+    const report = { recordedAtSeoul:seoulTime(), input:options.real ? 'real' : 'fixture', pairs:options.pairs,pipeline:'memory',
       environment:{ node:process.version, sqlite:trials[0].sqlite, schema:SCHEMA_VERSION, parser:PARSER_VERSION,
         platform:process.platform, arch:process.arch, cpu:cpus()[0]?.model, logicalCpus:cpus().length },
       inventory:snapshot.inventory, inputSha256:snapshot.fingerprint, inputSha256Scope:'conversation JSONL only; frozen title metadata excluded',
       baselineSqlSha256:trials[0].baselineSqlSha256,
-      complexityModel:{ scope:'additional title lookup per component; analytical, not empirically proven Big-O',
-        dimensions:{ E:'component events', T:'main events with non-null title', R:'prepared requests', K:'same-root candidates checked for provider/session' },
-        baselineTime:'worst-case O(R*E), sorting excluded', indexTime:'O(E + T log T + R log T + sum(K_r))',
-        indexSpace:'O(T * key width) TEMP B-tree', commonTempSpace:'approximately O(E * row width)', logBufferMaxBytes:65536 },
+      complexityModel:{scope:'SQL title-index A/B is not applicable to the active memory pipeline',
+        titleSelection:'first title selected during memory aggregation; no SQL title index',logBufferMaxBytes:65536},
       results, samples:records };
     const documentPath = options.report;
     const output = dirname(documentPath);

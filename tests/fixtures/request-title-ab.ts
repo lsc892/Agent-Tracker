@@ -145,8 +145,9 @@ export function createTitleFixture(directory: string, scenario: TitleScenario, c
       database.connection.exec(`INSERT OR IGNORE INTO component
         SELECT provider,session_id FROM scan_files WHERE failed=0 AND removed=0;`);
     });
+    const originalSql=captureSql(active);
     const eventCount = (database.connection.prepare('SELECT count(*) count FROM events').get() as {count:number}).count;
-    return { database, staging:active, expected, eventCount, originalSql:captureSql(active) };
+    return { database, staging:active, expected, eventCount, originalSql };
   } catch (error) { staging?.close(); database.close(); throw error; }
 }
 

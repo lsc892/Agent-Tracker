@@ -109,7 +109,7 @@ flowchart LR
   D --> S[영속 세션 교체]
 ```
 
-관련 코드: [JSONL reader](../../../src/summary/jsonl.ts), [scanner](../../../src/summary/scanner.ts), [staging](../../../src/summary/staging.ts), [worker](../../../src/summary/worker.ts).
+관련 코드: [JSONL reader](../../../src/summary/jsonl/index.ts), [scanner](../../../src/summary/scanner/index.ts), [staging](../../../src/summary/staging/index.ts), [worker](../../../src/summary/client/worker.ts).
 
 summary worker는 하나이며 파일을 순서대로 처리한다. 8개 논리 CPU가 있어도 파싱·동기 SQL이 자동으로 8개 코어에 나뉘지는 않는다. 파일 읽기는 비동기지만 JS reader·adapter·SQLite는 해당 worker에서 실행된다.
 
@@ -205,7 +205,7 @@ category는 `skill`, `subagent`, `plugin`, `model`이다. 원본 툴 명령과 �
 | plugin | `mcp__server__tool`의 server 부분, plugin 경로 또는 skill 접두사 |
 | model | 중복 제거를 통과한 모델 응답/사용량 이벤트 수 |
 
-Codex `exec` 안의 정적 `tools.xxx(...)`도 탐색한다. 문자열과 주석은 건너뛰며 코드를 실행하지 않는다. 툴 호출 ID와 wrapper 내 index를 사용해 중복 이벤트를 제거하고, 요청별·종류별·이름별 횟수로 압축한다. 모델 횟수는 요청 수·토큰 수와 다른 단위다. fork의 검증된 복사 이력도 중복 제거한다. 근거: [staging.ts](../../../src/summary/staging.ts)의 capability winners와 capabilityUsage.
+Codex `exec` 안의 정적 `tools.xxx(...)`도 탐색한다. 문자열과 주석은 건너뛰며 코드를 실행하지 않는다. 툴 호출 ID와 wrapper 내 index를 사용해 중복 이벤트를 제거하고, 요청별·종류별·이름별 횟수로 압축한다. 모델 횟수는 요청 수·토큰 수와 다른 단위다. fork의 검증된 복사 이력도 중복 제거한다. 근거: [staging.ts](../../../src/summary/staging/index.ts)의 capability winners와 capabilityUsage.
 
 ### 통계 계산
 

@@ -1,4 +1,5 @@
 // 실제 refreshSummary의 연결 성분별 TEMP 집계와 32 seed 앞보기 집계를 고정 입력에서 비교한다.
+const { summaryPath } = require('./summary-paths.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { mkdir, mkdtemp, cp, copyFile, writeFile, readFile, rm, truncate, utimes } = require('node:fs/promises');
@@ -228,7 +229,7 @@ async function main() {
   }
   assert.ok(options.before, 'Pass --before=<built baseline checkout> and optionally --after=<built candidate checkout>');
   const inputs = { A: options.before, B: options.after };
-  for (const input of Object.values(inputs)) assert.ok(fs.existsSync(join(input, 'dist/src/summary/scanner.js')), 'Build both inputs first');
+  for (const input of Object.values(inputs)) assert.ok(fs.existsSync(summaryPath(input, "dist/src/summary/scanner/index.js")), 'Build both inputs first');
   assert.ok(!fs.existsSync(options.output), 'Choose a new output path');
   const cache = join(root, 'tests/.cache'); await mkdir(cache, { recursive: true });
   const directory = await mkdtemp(join(cache, 'temp-batch-'));

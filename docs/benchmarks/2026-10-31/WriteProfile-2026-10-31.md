@@ -9,7 +9,7 @@
 ## 진입 경로
 
 1. [Dashboard 진입](../../../src/ui/dashboard.ts)에서 `refreshUsage()`를 호출한다. Worker가 `refreshSummary()`를 실행하고 완료 후 기본 일별·제공자별 페이지를 조회한다.
-2. [스캐너](../../../src/summary/scanner.ts)는 파일을 탐색하며 manifest를 등록하거나 `last_seen_scan_id`를 UPDATE한다. 바뀐 원본만 읽어 파싱 이벤트를 TEMP 테이블에 넣고, 세션별 통계를 준비한다.
+2. [스캐너](../../../src/summary/scanner/index.ts)는 파일을 탐색하며 manifest를 등록하거나 `last_seen_scan_id`를 UPDATE한다. 바뀐 원본만 읽어 파싱 이벤트를 TEMP 테이블에 넣고, 세션별 통계를 준비한다.
 3. [세션 저장](../../../src/summary/db/sessions.ts)은 manifest·프로젝트·세션·요청·모델·도구·비용을 반영한다. 측정한 작은 세션은 기존 요청을 DELETE한 뒤 전체 요청을 INSERT한다. 1,000요청 이상인 세션의 선택적 차이 반영은 이번 입력의 대상 세션에 적용되지 않는다.
 4. 일별 사전 집계가 이미 있으면 영향 세션을 재집계한다. 집계가 없는 최초 상태라면 [첫 조회](../../../src/summary/db/rollups.ts)에서 `usage_request_daily`·`usage_model_daily`에 `INSERT ... SELECT`를 수행한다.
 

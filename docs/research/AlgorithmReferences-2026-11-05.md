@@ -26,7 +26,7 @@
 
 현재의 증분 처리는 **변경 없는 세션을 건너뛰는 것**이 중심이다. ‘추가된 바이트만 읽기’나 ‘변경 행의 증감분만 집계에 반영하기’까지 구현한 것은 아니다. 아래에서는 **현재 대응**과 **추가 후보**를 구분한다.
 
-현재 구조의 근거: [JSONL reader](../../src/summary/jsonl.ts), [scanner](../../src/summary/scanner.ts), [staging](../../src/summary/staging.ts), [세션 저장](../../src/summary/db/sessions.ts), [부분 저장 판정](../../src/summary/db/sessionChanges.ts), [rollup 갱신](../../src/summary/db/rollups.ts), [집계 조회 선택](../../src/summary/db/reader.ts).
+현재 구조의 근거: [JSONL reader](../../src/summary/jsonl/index.ts), [scanner](../../src/summary/scanner/index.ts), [staging](../../src/summary/staging/index.ts), [세션 저장](../../src/summary/db/sessions.ts), [부분 저장 판정](../../src/summary/db/sessionChanges.ts), [rollup 갱신](../../src/summary/db/rollups.ts), [집계 조회 선택](../../src/summary/db/reader.ts).
 
 ## 1. Claude·Codex JSONL 파싱에 직접 대응하는 레퍼런스
 
@@ -47,7 +47,7 @@
 3. 완성된 두 번째 행을 처리하고 문자열을 버린다.
 ```
 
-**현재 코드 연결:** [readJsonl](../../src/summary/jsonl.ts)은 최대 64 KiB 청크를 읽고, 일반적인 짧은 행은 곧바로 `JSON.parse()`에 전달한다. 여러 청크에 걸친 행과 이미지 포함 행에만 별도 구성기를 사용한다. 기본 보관 줄 예산은 4 MiB다.
+**현재 코드 연결:** [readJsonl](../../src/summary/jsonl/index.ts)은 최대 64 KiB 청크를 읽고, 일반적인 짧은 행은 곧바로 `JSON.parse()`에 전달한다. 여러 청크에 걸친 행과 이미지 포함 행에만 별도 구성기를 사용한다. 기본 보관 줄 예산은 4 MiB다.
 
 **이점·제약:** 순차 바이트 스캔은 여전히 O(N)이지만 파일 전체를 보관할 필요가 없다. 보조 공간은 청크와 보관 중인 최대 줄 크기에 좌우된다. 반환 JSON 객체·adapter·SQLite의 메모리까지 이 상한에 포함되는 것은 아니다.
 
@@ -196,7 +196,7 @@ On-Demand: 구조 탐색 → 해당 경로 접근 → input 숫자를 변환
 이미지 data URI 포함 줄  → 문자열 문법을 추적하며 Base64 본문 제거 → JSON.parse
 ```
 
-현재 구현은 `JSON.parse()`를 바꾸기보다 그 앞의 줄 구성·복사·버리는 값의 보관 비용을 줄였다. 따옴표/역슬래시 탐색 위치를 재사용해 같은 남은 구간을 반복 검색하지 않는 것도 포함된다. [현재 reader](../../src/summary/jsonl.ts)
+현재 구현은 `JSON.parse()`를 바꾸기보다 그 앞의 줄 구성·복사·버리는 값의 보관 비용을 줄였다. 따옴표/역슬래시 탐색 위치를 재사용해 같은 남은 구간을 반복 검색하지 않는 것도 포함된다. [현재 reader](../../src/summary/jsonl/index.ts)
 
 기존 저장소의 2026-10-09 보고서는 고정된 실제 입력 53,271행의 **파싱 구간만** 4,941.028→1,718.516 ms(중앙값)로 줄었다고 기록한다. 당시 adapter·파일 I/O·SQLite는 제외했다. 이번 조사에서 새로 실행한 측정이나 전체 갱신 속도가 아니다. [기존 JSONL 파싱 비교](../benchmarks/2026-10-09/JsonlParsingBranches-2026-10-09.md)
 
@@ -217,7 +217,7 @@ Dirty flag는 **어디가 달라졌는지 표시하는 방법**이다. 표시된
 
 현재 방식은 **영향 세션만 다시 계산하는 증분 처리**다. `SUM += delta`를 사용하는 행 단위 IVM과 구분해야 한다. `processing_position='committed'`는 진단 상태이며 append byte cursor가 아니다.
 
-현재 코드: [scanner.ts](../../src/summary/scanner.ts), [staging.ts](../../src/summary/staging.ts), [sessions.ts](../../src/summary/db/sessions.ts), [sessionChanges.ts](../../src/summary/db/sessionChanges.ts), [rollups.ts](../../src/summary/db/rollups.ts).
+현재 코드: [scanner.ts](../../src/summary/scanner/index.ts), [staging.ts](../../src/summary/staging/index.ts), [sessions.ts](../../src/summary/db/sessions.ts), [sessionChanges.ts](../../src/summary/db/sessionChanges.ts), [rollups.ts](../../src/summary/db/rollups.ts).
 
 ### 3.1 Dirty Flag + 변경 키 집합: 같은 대상을 여러 번 계산하지 않기
 

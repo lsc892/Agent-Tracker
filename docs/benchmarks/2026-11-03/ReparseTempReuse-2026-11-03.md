@@ -83,7 +83,7 @@ TEMP는 기존과 같이 FILE이며 한 갱신이 끝나면 표와 인덱스를 
 - [실제 로그](ReparseTempReuse-real-2026-11-03.md), [실제 원시 JSON](ReparseTempReuse-real-2026-11-03.json)
 - [1만·100요청/세션](ReparseTempReuse-short-2026-11-03.md), [원시 JSON](ReparseTempReuse-short-2026-11-03.json)
 - [1만·1,000요청/세션](ReparseTempReuse-long-2026-11-03.md), [원시 JSON](ReparseTempReuse-long-2026-11-03.json)
-- [제품 변경](../../../src/summary/staging.ts), [전후 실행기](../../../tests/benchmarks/incremental-refresh.cjs)
+- [제품 변경](../../../src/summary/staging/index.ts), [전후 실행기](../../../tests/benchmarks/incremental-refresh.cjs)
 
 ```powershell
 node tests/benchmarks/incremental-refresh.cjs --before=<변경 전 빌드 경로> --after=. --real --pairs=3 --warmups=1 --report=<새 보고서 경로>.md

@@ -11,7 +11,7 @@ import { SummaryDatabase, type TurnSummaryInput, type UsageRow, type TurnSummary
 import { SummaryClient } from '../../src/summary/client';
 import { parseDashboardMessage } from '../../src/ui/presentation';
 import { buildUsageQuery } from '../../src/summary/db/queries';
-import { modelRelease } from '../../src/summary/modelOrder';
+import { modelRelease } from '../../src/summary/models/modelOrder';
 import { USAGE_SORT_KEYS, type UsageSort } from '../../src/summary/db/types';
 
 const start = Date.parse('2026-01-01T00:00:00Z');

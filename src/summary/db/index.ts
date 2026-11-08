@@ -11,6 +11,7 @@ import { ManifestStore } from './manifest';
 import { SessionStore } from './sessions';
 import { SessionBillingStore } from './billing';
 import { SummaryReader } from './reader';
+import { MemoryStore, type MemoryReplacement } from './memoryStore';
 
 export * from './types';
 export { usageChartFromPage } from './chart';
@@ -80,6 +81,10 @@ export class SummaryDatabase {
 
   replaceSessions(replacement: SessionReplacement): void {
     return this.sessions.replaceSessions(replacement);
+  }
+
+  replaceMemory(replacement: MemoryReplacement): void {
+    return new MemoryStore(this.sqlite,this.billing).replace(replacement);
   }
 
   queryNames(query: NameQuery): NameResult {

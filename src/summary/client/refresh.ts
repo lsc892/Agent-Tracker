@@ -1,6 +1,6 @@
 // 통계 갱신·취소·삭제 요청의 중복과 실행 순서를 관리한다.
 import { WorkerTransport } from './transport';
-import type { RefreshResult, SourceRoot } from './types';
+import type { RefreshResult, SourceRoot } from '../types';
 
 export interface RefreshOptions {
   roots?: SourceRoot[];

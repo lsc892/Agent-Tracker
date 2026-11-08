@@ -2,10 +2,10 @@
 import { lstat, readdir } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { readJsonl } from './jsonl';
-import { displayName, string } from './parsers/common';
-import type { SummaryStaging } from './staging';
-import type { SourceRoot } from './types';
+import { readJsonl } from '../jsonl';
+import { displayName, string } from '../parsers/common';
+import type { SummaryStaging } from './index';
+import type { SourceRoot } from '../types';
 
 /**
  * 책임: 원본 대화 재파싱 없이 제공자 소유의 세션 제목을 수집한다.
