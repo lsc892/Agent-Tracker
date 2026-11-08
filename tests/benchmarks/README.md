@@ -2,6 +2,8 @@
 
 요약·JSONL·SQL·quota 처리의 정확성과 성능을 비교하는 도구를 모은다.
 
+- [dto-greedy-ab.cjs](dto-greedy-ab.cjs) — 전체 DTO 캐시 API가 있던 `3b99d1a` 시점의 체크아웃에서 빌드한 뒤 `node --no-warnings tests/benchmarks/dto-greedy-ab.cjs --output=<새 JSON>`으로 실제 사본·1만·100요청의 원본 보존/Map 없는 배열 대조군을 준비 3쌍·AB/BA 10쌍 비교한다. 실제 갱신·COMMIT, 전체 DTO 집계, 일/월/세션/프로젝트 조회와 독립 평균 검증, 별도 프로세스 heap 표본을 기록한다. `--smoke`는 100요청만 실행한다. [후보](dto-greedy-candidate.cjs)와 [정합성 테스트](dto-greedy-ab.test.cjs)는 패자 영구 폐기·DTO 직접 덮어쓰기의 반례도 검사한다. 정합성 테스트도 같은 이전 체크아웃에서 `node --test tests/benchmarks/dto-greedy-ab.test.cjs`로 실행한다. 제품 소스는 변경하지 않는다.
+
 - [summary-paths.cjs](summary-paths.cjs) — 책임별 폴더로 이동한 현재 summary 파일과 과거 고정 제품의 파일 경로를 함께 해석한다. 이전 측정 입력·원시 결과는 바꾸지 않는다.
 
 - [jsonl-memory-ab.cjs](jsonl-memory-ab.cjs) — `--before=<고정 SQL> --after=<고정 메모리 집계> --current-snapshot=<고정 snapshot.json> --output=<새 JSON>`으로 파일 DTO 재사용·메모리 최종 집계·직접 영속 저장을 비교한다. 실제·1만·100요청에서 준비 3쌍·AB/BA 10쌍과 DB 재개방·SQL seed 전환·정합성·TEMP 생성 0회를 검사한다. `--multi-source`는 변경 없는 16 MiB 형제 원본을 둔 1만 요청, `--smoke`는 합성 100요청 한 쌍이다. 이전 SQL 기준은 기본 갱신이 바뀌기 전 별도 빌드를 사용한다.

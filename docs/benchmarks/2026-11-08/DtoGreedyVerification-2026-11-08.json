@@ -1,0 +1,155 @@
+{
+  "dateSeoul": "2026-11-08",
+  "benchmarkSha256": "213d09ad2d09968f77568bdcf83930cff92d5ff13ef893f6cdc002faa1620d79",
+  "profileRunnerSha256": "a9b08fdcca8b13dc9d6a345702b7cdada842dde93f35f22a9b841f1f258d9da4",
+  "helperHashes": {
+    "incremental-refresh.cjs": "f8ce9a3c894716263cd32bb5ecbcbf15399f5d40038f23fa55f9b094a26e1085",
+    "temp-batch-ab.cjs": "6b88334ee83847f9c49b9ea6ac8c1d0bda099a059c7a8fe7e38f91f0ef97a020",
+    "dto-greedy-candidate.cjs": "33ffbe91789d63f411881b1feef8a58a724574cdb149a04a1a0c532c4efeb727",
+    "dto-greedy-ab.test.cjs": "8f72994df74744de83222945ad69bf8fe755c5a63e89fae0744015f2f86388ce"
+  },
+  "profiles": [
+    {
+      "name": "current",
+      "operations": {
+        "A": {
+          "lookups": 22751,
+          "objects": 22751,
+          "replacements": 170
+        },
+        "B": {
+          "comparisons": 254953724,
+          "objects": 22581,
+          "replacements": 170
+        }
+      },
+      "winnerGroups": 22581,
+      "sourceUsageDtos": 25369,
+      "compactedUsageDtos": 22581,
+      "distribution": {
+        "loadedFiles": 599,
+        "sessions": 464,
+        "projects": 30,
+        "providerRequests": {
+          "claude": 19,
+          "codex": 1495
+        },
+        "firstRequestAtMs": 1780415265000,
+        "lastRequestAtMs": 1794117370000
+      },
+      "compactedCacheDifference": {
+        "addedRequests": 50,
+        "addedZeroUsageRequests": 50,
+        "removedRequests": 0,
+        "changedRequests": 0,
+        "changedFields": {}
+      }
+    },
+    {
+      "name": "synthetic-10000",
+      "operations": {
+        "A": {
+          "lookups": 10000,
+          "objects": 10000,
+          "replacements": 0
+        },
+        "B": {
+          "comparisons": 49995000,
+          "objects": 10000,
+          "replacements": 0
+        }
+      },
+      "winnerGroups": 10000,
+      "sourceUsageDtos": 10000,
+      "compactedUsageDtos": 10000,
+      "distribution": {
+        "loadedFiles": 100,
+        "sessions": 100,
+        "projects": 10,
+        "providerRequests": {
+          "claude": 5000,
+          "codex": 5000
+        },
+        "firstRequestAtMs": 1782864000000,
+        "lastRequestAtMs": 1783987497000
+      },
+      "compactedCacheDifference": {
+        "addedRequests": 0,
+        "addedZeroUsageRequests": 0,
+        "removedRequests": 0,
+        "changedRequests": 0,
+        "changedFields": {}
+      }
+    },
+    {
+      "name": "synthetic-100",
+      "operations": {
+        "A": {
+          "lookups": 100,
+          "objects": 100,
+          "replacements": 0
+        },
+        "B": {
+          "comparisons": 4950,
+          "objects": 100,
+          "replacements": 0
+        }
+      },
+      "winnerGroups": 100,
+      "sourceUsageDtos": 100,
+      "compactedUsageDtos": 100,
+      "distribution": {
+        "loadedFiles": 10,
+        "sessions": 10,
+        "projects": 10,
+        "providerRequests": {
+          "claude": 50,
+          "codex": 50
+        },
+        "firstRequestAtMs": 1782864000000,
+        "lastRequestAtMs": 1783641627000
+      },
+      "compactedCacheDifference": {
+        "addedRequests": 0,
+        "addedZeroUsageRequests": 0,
+        "removedRequests": 0,
+        "changedRequests": 0,
+        "changedFields": {}
+      }
+    }
+  ],
+  "validation": {
+    "commands": [
+      {
+        "command": "npm run check",
+        "tests": 430,
+        "log": "tests/results/dto-greedy-check.log",
+        "exitCode": 0,
+        "logSha256": "ba37d70c5c127d67d009d6a7dd3a51c0952872e90f7ca5bef9832ccb45f2dd4b"
+      },
+      {
+        "command": "node --test tests/benchmarks/dto-greedy-ab.test.cjs",
+        "tests": 10,
+        "generatedDatasets": 500,
+        "log": "tests/results/dto-greedy-unit.log",
+        "exitCode": 0,
+        "logSha256": "ba8cbe5bc693f3ffd46f349f9298a474448324807898b74351d255990e316bc0"
+      },
+      {
+        "command": "node --no-warnings --require ./tests/benchmarks/dto-greedy-preload.cjs --test dist/tests/node/memory-aggregate.test.js dist/tests/node/memory-incremental.test.js dist/tests/node/summary.integration.test.js",
+        "tests": 61,
+        "log": "tests/results/dto-greedy-candidate-regression.log",
+        "exitCode": 0,
+        "logSha256": "3142cf63c12399f065599d6cac4a358b42dfe721c3d8bd91fbe1146a73f69d22"
+      }
+    ],
+    "additionalLint": {
+      "command": "npm run lint",
+      "exitCode": 0
+    },
+    "sourceBuildHashesMatch": true,
+    "localLinksChecked": 85,
+    "baselineProductUnchanged": true,
+    "preloadSha256": "9a718b1c505c613692087a92452a801d00fde98a117563302d1007aea6f14b61"
+  }
+}

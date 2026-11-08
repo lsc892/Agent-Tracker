@@ -1,0 +1,4742 @@
+{
+  "startedAtSeoul": "2026-11-08 15:02:57",
+  "sourceRevision": "3b99d1a9e15d7d7a26addf3052dafababb19f5ac",
+  "runnerSha256": "940fbf793e7a77228c51f5953f6275f591da0f6a5167c1c711ad6a7b0566affe",
+  "candidateSha256": "33ffbe91789d63f411881b1feef8a58a724574cdb149a04a1a0c532c4efeb727",
+  "sources": {
+    "src/summary/scanner/memoryScanner.ts": "3d46ab1170f951a9536fe4f7b6faa04dd0bf60a40c6dd702b4016dbfdc6d1743",
+    "src/summary/aggregation/memoryAggregate.ts": "8286f4fc30be20e269e979cbfe986e8c3c90f2f0132cdbf92134473912f7f333",
+    "dist/src/summary/scanner/memoryScanner.js": "bf4b8a0ca192f59d8a31b0b9643ac9d6f9298b573bbaa270ebe9db3baba4ad3f",
+    "dist/src/summary/aggregation/memoryAggregate.js": "69d6b9c2c54c0f47b79fed69ef844707cbee4ee954d33ca07357404bfcc1f2f9"
+  },
+  "environment": {
+    "node": "v24.14.1",
+    "cpu": "AMD Ryzen 5 7500F 6-Core Processor             ",
+    "platform": "win32",
+    "timezone": "Asia/Seoul"
+  },
+  "workspace": "tests/.cache/dto-greedy-ab-MUp5ok",
+  "warmupPairs": 3,
+  "measuredPairs": 10,
+  "scope": "A=current product; B=prepared validity and source cache preserved, no winner Map, linear array lookup and in-place slot metadata updates. Early discard and DTO overwrite are separate correctness-only failed candidates.",
+  "conditions": "Single process AB/BA, same frozen inputs, fixed full period and timezone, warm OS cache, no forced GC during timings. DB/source/cache restored before each append. Append includes refresh and COMMIT; file append itself and preparation excluded. Heap samples in isolated --expose-gc workers, not continuous peak or GC pause metrics.",
+  "datasets": [
+    {
+      "name": "current",
+      "inventory": [
+        {
+          "provider": "claude",
+          "rootOrdinal": 0,
+          "files": 16,
+          "bytes": 8110187,
+          "compressed": 0
+        },
+        {
+          "provider": "codex",
+          "rootOrdinal": 1,
+          "files": 582,
+          "bytes": 433567778,
+          "compressed": 462,
+          "metadata": {
+            "indexBytes": 44546,
+            "threads": 583
+          }
+        },
+        {
+          "provider": "codex",
+          "rootOrdinal": 2,
+          "files": 2,
+          "bytes": 3075020,
+          "compressed": 2,
+          "metadata": {
+            "indexBytes": 44546,
+            "threads": 583
+          }
+        }
+      ],
+      "inputSha256": "931d46dd67997f7b324754296ae593be8728277f35b139bcfbd197323a981aa2",
+      "hashes": {
+        "baseline": "69d6b9c2c54c0f47b79fed69ef844707cbee4ee954d33ca07357404bfcc1f2f9",
+        "arraySlots": "50f3368ff33e7ee270f84d2edaa5977cad6a14123833decdc7d71a5e3924b9d6",
+        "overwrite": "20e248b8752934492903b37de2037842efafa16d1883eefc8921f19ea167b49f"
+      },
+      "initial": {
+        "A": {
+          "ms": 8309.6288,
+          "requests": 1514,
+          "tokens": 2455634711,
+          "failed": 0,
+          "parsed": 600,
+          "bodyBytes": 444752985,
+          "checked": {
+            "factsSha256": "fbce9015986a2dd1f9d1fbc5e9b6cbafbb68ec1d02ce9e8681ebe07d90eb5c6d",
+            "aggregatesSha256": "0b1ccb371694e548f8c5c19b705bfed5fc4a889ee562eadbca619fc2d08607cc",
+            "rawChecks": 10,
+            "independent": {
+              "day": {
+                "groups": 90,
+                "requests": 1514,
+                "tokens": 2455634711,
+                "sha256": "38a42487b9b4ca718617f374b9d7e97654376a5510b6e471524f6c663d6858fc"
+              },
+              "month": {
+                "groups": 9,
+                "requests": 1514,
+                "tokens": 2455634711,
+                "sha256": "22f785761c03da28e05c22e3fbfe72bd587fa65983468afdfb0358033553542d"
+              },
+              "session": {
+                "groups": 448,
+                "requests": 1514,
+                "tokens": 2455634711,
+                "sha256": "01433a0c2949d94968fedf2760e3a20bc53942f601523e28cdbc0941b94bd74a"
+              },
+              "project": {
+                "groups": 33,
+                "requests": 1514,
+                "tokens": 2455634711,
+                "sha256": "1d25b4d74224221251fef02b7316a7988e7869d39b95188b64c670370f14db99"
+              }
+            }
+          }
+        },
+        "B": {
+          "ms": 9565.7266,
+          "requests": 1514,
+          "tokens": 2455634711,
+          "failed": 0,
+          "parsed": 600,
+          "bodyBytes": 444752985,
+          "checked": {
+            "factsSha256": "fbce9015986a2dd1f9d1fbc5e9b6cbafbb68ec1d02ce9e8681ebe07d90eb5c6d",
+            "aggregatesSha256": "0b1ccb371694e548f8c5c19b705bfed5fc4a889ee562eadbca619fc2d08607cc",
+            "rawChecks": 10,
+            "independent": {
+              "day": {
+                "groups": 90,
+                "requests": 1514,
+                "tokens": 2455634711,
+                "sha256": "38a42487b9b4ca718617f374b9d7e97654376a5510b6e471524f6c663d6858fc"
+              },
+              "month": {
+                "groups": 9,
+                "requests": 1514,
+                "tokens": 2455634711,
+                "sha256": "22f785761c03da28e05c22e3fbfe72bd587fa65983468afdfb0358033553542d"
+              },
+              "session": {
+                "groups": 448,
+                "requests": 1514,
+                "tokens": 2455634711,
+                "sha256": "01433a0c2949d94968fedf2760e3a20bc53942f601523e28cdbc0941b94bd74a"
+              },
+              "project": {
+                "groups": 33,
+                "requests": 1514,
+                "tokens": 2455634711,
+                "sha256": "1d25b4d74224221251fef02b7316a7988e7869d39b95188b64c670370f14db99"
+              }
+            }
+          }
+        }
+      },
+      "samples": [
+        {
+          "pair": 0,
+          "variant": "B",
+          "kernelMs": 1295.1402000000016,
+          "appendMs": 252.72430000000168,
+          "reads": {
+            "day": 18.635999999998603,
+            "month": 13.007000000005064,
+            "session": 8.908800000004703,
+            "project": 5.01759999999922
+          },
+          "requests": 1515,
+          "tokens": 2455634841,
+          "parsed": 1,
+          "bodyBytes": 18937886,
+          "factsSha256": "d2f142c77075ed93380b078ea2ffbd32dc915451fe945f08f51450bad05fdc61",
+          "aggregatesSha256": "30e19715aac23136701c2185e1c9b7ea99e1d2c62a9e9d905099c8a1ede12313",
+          "queryDigests": {
+            "day": {
+              "groups": 90,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "59efbdc2f2fe58e7938775b78b8fc11bffd4806deb74b62ff742a0ceb3f49357"
+            },
+            "month": {
+              "groups": 9,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "78a4121c24a22a806cb76e5e898fd8f845dcb2ce67eaa7ec125cbb6b0481936e"
+            },
+            "session": {
+              "groups": 448,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "ac4ed4e4a33534bb9b7b500f09235492d752c260e5985c27c80a40ddf18e7c4b"
+            },
+            "project": {
+              "groups": 33,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "3a6722404f572bc8a9bc18d641ae96d19f8783056848543d102b20fbfa4cb6ac"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 0,
+          "variant": "A",
+          "kernelMs": 103.05299999999988,
+          "appendMs": 267.6811000000016,
+          "reads": {
+            "day": 17.22690000000148,
+            "month": 17.00250000000233,
+            "session": 9.184699999997974,
+            "project": 5.257599999997183
+          },
+          "requests": 1515,
+          "tokens": 2455634841,
+          "parsed": 1,
+          "bodyBytes": 18937886,
+          "factsSha256": "d2f142c77075ed93380b078ea2ffbd32dc915451fe945f08f51450bad05fdc61",
+          "aggregatesSha256": "30e19715aac23136701c2185e1c9b7ea99e1d2c62a9e9d905099c8a1ede12313",
+          "queryDigests": {
+            "day": {
+              "groups": 90,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "59efbdc2f2fe58e7938775b78b8fc11bffd4806deb74b62ff742a0ceb3f49357"
+            },
+            "month": {
+              "groups": 9,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "78a4121c24a22a806cb76e5e898fd8f845dcb2ce67eaa7ec125cbb6b0481936e"
+            },
+            "session": {
+              "groups": 448,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "ac4ed4e4a33534bb9b7b500f09235492d752c260e5985c27c80a40ddf18e7c4b"
+            },
+            "project": {
+              "groups": 33,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "3a6722404f572bc8a9bc18d641ae96d19f8783056848543d102b20fbfa4cb6ac"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 1,
+          "variant": "A",
+          "kernelMs": 107.7705999999962,
+          "appendMs": 257.0320999999967,
+          "reads": {
+            "day": 13.077899999996589,
+            "month": 11.883900000000722,
+            "session": 10.804400000000896,
+            "project": 6.344600000003993
+          },
+          "requests": 1515,
+          "tokens": 2455634841,
+          "parsed": 1,
+          "bodyBytes": 18937886,
+          "factsSha256": "d2f142c77075ed93380b078ea2ffbd32dc915451fe945f08f51450bad05fdc61",
+          "aggregatesSha256": "30e19715aac23136701c2185e1c9b7ea99e1d2c62a9e9d905099c8a1ede12313",
+          "queryDigests": {
+            "day": {
+              "groups": 90,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "59efbdc2f2fe58e7938775b78b8fc11bffd4806deb74b62ff742a0ceb3f49357"
+            },
+            "month": {
+              "groups": 9,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "78a4121c24a22a806cb76e5e898fd8f845dcb2ce67eaa7ec125cbb6b0481936e"
+            },
+            "session": {
+              "groups": 448,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "ac4ed4e4a33534bb9b7b500f09235492d752c260e5985c27c80a40ddf18e7c4b"
+            },
+            "project": {
+              "groups": 33,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "3a6722404f572bc8a9bc18d641ae96d19f8783056848543d102b20fbfa4cb6ac"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 1,
+          "variant": "B",
+          "kernelMs": 1202.9352,
+          "appendMs": 264.9360000000015,
+          "reads": {
+            "day": 12.506200000003446,
+            "month": 11.824500000002445,
+            "session": 8.207500000004075,
+            "project": 4.947299999999814
+          },
+          "requests": 1515,
+          "tokens": 2455634841,
+          "parsed": 1,
+          "bodyBytes": 18937886,
+          "factsSha256": "d2f142c77075ed93380b078ea2ffbd32dc915451fe945f08f51450bad05fdc61",
+          "aggregatesSha256": "30e19715aac23136701c2185e1c9b7ea99e1d2c62a9e9d905099c8a1ede12313",
+          "queryDigests": {
+            "day": {
+              "groups": 90,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "59efbdc2f2fe58e7938775b78b8fc11bffd4806deb74b62ff742a0ceb3f49357"
+            },
+            "month": {
+              "groups": 9,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "78a4121c24a22a806cb76e5e898fd8f845dcb2ce67eaa7ec125cbb6b0481936e"
+            },
+            "session": {
+              "groups": 448,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "ac4ed4e4a33534bb9b7b500f09235492d752c260e5985c27c80a40ddf18e7c4b"
+            },
+            "project": {
+              "groups": 33,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "3a6722404f572bc8a9bc18d641ae96d19f8783056848543d102b20fbfa4cb6ac"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 2,
+          "variant": "B",
+          "kernelMs": 1232.787599999996,
+          "appendMs": 320.96140000000014,
+          "reads": {
+            "day": 13.691899999997986,
+            "month": 13.292900000000373,
+            "session": 11.690999999998894,
+            "project": 5.8752000000022235
+          },
+          "requests": 1515,
+          "tokens": 2455634841,
+          "parsed": 1,
+          "bodyBytes": 18937886,
+          "factsSha256": "d2f142c77075ed93380b078ea2ffbd32dc915451fe945f08f51450bad05fdc61",
+          "aggregatesSha256": "30e19715aac23136701c2185e1c9b7ea99e1d2c62a9e9d905099c8a1ede12313",
+          "queryDigests": {
+            "day": {
+              "groups": 90,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "59efbdc2f2fe58e7938775b78b8fc11bffd4806deb74b62ff742a0ceb3f49357"
+            },
+            "month": {
+              "groups": 9,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "78a4121c24a22a806cb76e5e898fd8f845dcb2ce67eaa7ec125cbb6b0481936e"
+            },
+            "session": {
+              "groups": 448,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "ac4ed4e4a33534bb9b7b500f09235492d752c260e5985c27c80a40ddf18e7c4b"
+            },
+            "project": {
+              "groups": 33,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "3a6722404f572bc8a9bc18d641ae96d19f8783056848543d102b20fbfa4cb6ac"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 2,
+          "variant": "A",
+          "kernelMs": 97.70279999999912,
+          "appendMs": 259.13060000000405,
+          "reads": {
+            "day": 12.63180000000284,
+            "month": 11.314899999997579,
+            "session": 9.370999999999185,
+            "project": 7.9575000000040745
+          },
+          "requests": 1515,
+          "tokens": 2455634841,
+          "parsed": 1,
+          "bodyBytes": 18937886,
+          "factsSha256": "d2f142c77075ed93380b078ea2ffbd32dc915451fe945f08f51450bad05fdc61",
+          "aggregatesSha256": "30e19715aac23136701c2185e1c9b7ea99e1d2c62a9e9d905099c8a1ede12313",
+          "queryDigests": {
+            "day": {
+              "groups": 90,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "59efbdc2f2fe58e7938775b78b8fc11bffd4806deb74b62ff742a0ceb3f49357"
+            },
+            "month": {
+              "groups": 9,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "78a4121c24a22a806cb76e5e898fd8f845dcb2ce67eaa7ec125cbb6b0481936e"
+            },
+            "session": {
+              "groups": 448,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "ac4ed4e4a33534bb9b7b500f09235492d752c260e5985c27c80a40ddf18e7c4b"
+            },
+            "project": {
+              "groups": 33,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "3a6722404f572bc8a9bc18d641ae96d19f8783056848543d102b20fbfa4cb6ac"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 3,
+          "variant": "A",
+          "kernelMs": 100.29789999999775,
+          "appendMs": 267.3355999999985,
+          "reads": {
+            "day": 16.397100000001956,
+            "month": 15.647899999996298,
+            "session": 13.856299999999464,
+            "project": 5.3259000000034575
+          },
+          "requests": 1515,
+          "tokens": 2455634841,
+          "parsed": 1,
+          "bodyBytes": 18937886,
+          "factsSha256": "d2f142c77075ed93380b078ea2ffbd32dc915451fe945f08f51450bad05fdc61",
+          "aggregatesSha256": "30e19715aac23136701c2185e1c9b7ea99e1d2c62a9e9d905099c8a1ede12313",
+          "queryDigests": {
+            "day": {
+              "groups": 90,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "59efbdc2f2fe58e7938775b78b8fc11bffd4806deb74b62ff742a0ceb3f49357"
+            },
+            "month": {
+              "groups": 9,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "78a4121c24a22a806cb76e5e898fd8f845dcb2ce67eaa7ec125cbb6b0481936e"
+            },
+            "session": {
+              "groups": 448,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "ac4ed4e4a33534bb9b7b500f09235492d752c260e5985c27c80a40ddf18e7c4b"
+            },
+            "project": {
+              "groups": 33,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "3a6722404f572bc8a9bc18d641ae96d19f8783056848543d102b20fbfa4cb6ac"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 3,
+          "variant": "B",
+          "kernelMs": 1412.0564999999988,
+          "appendMs": 297.23939999999857,
+          "reads": {
+            "day": 13.597399999998743,
+            "month": 14.930599999999686,
+            "session": 9.700700000001234,
+            "project": 5.140500000001339
+          },
+          "requests": 1515,
+          "tokens": 2455634841,
+          "parsed": 1,
+          "bodyBytes": 18937886,
+          "factsSha256": "d2f142c77075ed93380b078ea2ffbd32dc915451fe945f08f51450bad05fdc61",
+          "aggregatesSha256": "30e19715aac23136701c2185e1c9b7ea99e1d2c62a9e9d905099c8a1ede12313",
+          "queryDigests": {
+            "day": {
+              "groups": 90,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "59efbdc2f2fe58e7938775b78b8fc11bffd4806deb74b62ff742a0ceb3f49357"
+            },
+            "month": {
+              "groups": 9,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "78a4121c24a22a806cb76e5e898fd8f845dcb2ce67eaa7ec125cbb6b0481936e"
+            },
+            "session": {
+              "groups": 448,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "ac4ed4e4a33534bb9b7b500f09235492d752c260e5985c27c80a40ddf18e7c4b"
+            },
+            "project": {
+              "groups": 33,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "3a6722404f572bc8a9bc18d641ae96d19f8783056848543d102b20fbfa4cb6ac"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 4,
+          "variant": "B",
+          "kernelMs": 1178.9623999999967,
+          "appendMs": 265.95760000000155,
+          "reads": {
+            "day": 17.249299999995856,
+            "month": 11.572400000004563,
+            "session": 8.957299999994575,
+            "project": 5.1885999999940395
+          },
+          "requests": 1515,
+          "tokens": 2455634841,
+          "parsed": 1,
+          "bodyBytes": 18937886,
+          "factsSha256": "d2f142c77075ed93380b078ea2ffbd32dc915451fe945f08f51450bad05fdc61",
+          "aggregatesSha256": "30e19715aac23136701c2185e1c9b7ea99e1d2c62a9e9d905099c8a1ede12313",
+          "queryDigests": {
+            "day": {
+              "groups": 90,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "59efbdc2f2fe58e7938775b78b8fc11bffd4806deb74b62ff742a0ceb3f49357"
+            },
+            "month": {
+              "groups": 9,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "78a4121c24a22a806cb76e5e898fd8f845dcb2ce67eaa7ec125cbb6b0481936e"
+            },
+            "session": {
+              "groups": 448,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "ac4ed4e4a33534bb9b7b500f09235492d752c260e5985c27c80a40ddf18e7c4b"
+            },
+            "project": {
+              "groups": 33,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "3a6722404f572bc8a9bc18d641ae96d19f8783056848543d102b20fbfa4cb6ac"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 4,
+          "variant": "A",
+          "kernelMs": 100.05139999999665,
+          "appendMs": 254.46949999999924,
+          "reads": {
+            "day": 12.24840000000404,
+            "month": 12.59719999999652,
+            "session": 10.304300000003423,
+            "project": 6.6679000000003725
+          },
+          "requests": 1515,
+          "tokens": 2455634841,
+          "parsed": 1,
+          "bodyBytes": 18937886,
+          "factsSha256": "d2f142c77075ed93380b078ea2ffbd32dc915451fe945f08f51450bad05fdc61",
+          "aggregatesSha256": "30e19715aac23136701c2185e1c9b7ea99e1d2c62a9e9d905099c8a1ede12313",
+          "queryDigests": {
+            "day": {
+              "groups": 90,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "59efbdc2f2fe58e7938775b78b8fc11bffd4806deb74b62ff742a0ceb3f49357"
+            },
+            "month": {
+              "groups": 9,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "78a4121c24a22a806cb76e5e898fd8f845dcb2ce67eaa7ec125cbb6b0481936e"
+            },
+            "session": {
+              "groups": 448,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "ac4ed4e4a33534bb9b7b500f09235492d752c260e5985c27c80a40ddf18e7c4b"
+            },
+            "project": {
+              "groups": 33,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "3a6722404f572bc8a9bc18d641ae96d19f8783056848543d102b20fbfa4cb6ac"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 5,
+          "variant": "A",
+          "kernelMs": 90.14259999999922,
+          "appendMs": 254.48809999999503,
+          "reads": {
+            "day": 16.264400000000023,
+            "month": 11.652699999998731,
+            "session": 8.300699999999779,
+            "project": 5.023800000002666
+          },
+          "requests": 1515,
+          "tokens": 2455634841,
+          "parsed": 1,
+          "bodyBytes": 18937886,
+          "factsSha256": "d2f142c77075ed93380b078ea2ffbd32dc915451fe945f08f51450bad05fdc61",
+          "aggregatesSha256": "30e19715aac23136701c2185e1c9b7ea99e1d2c62a9e9d905099c8a1ede12313",
+          "queryDigests": {
+            "day": {
+              "groups": 90,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "59efbdc2f2fe58e7938775b78b8fc11bffd4806deb74b62ff742a0ceb3f49357"
+            },
+            "month": {
+              "groups": 9,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "78a4121c24a22a806cb76e5e898fd8f845dcb2ce67eaa7ec125cbb6b0481936e"
+            },
+            "session": {
+              "groups": 448,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "ac4ed4e4a33534bb9b7b500f09235492d752c260e5985c27c80a40ddf18e7c4b"
+            },
+            "project": {
+              "groups": 33,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "3a6722404f572bc8a9bc18d641ae96d19f8783056848543d102b20fbfa4cb6ac"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 5,
+          "variant": "B",
+          "kernelMs": 1175.5204999999987,
+          "appendMs": 273.11039999999775,
+          "reads": {
+            "day": 14.677100000000792,
+            "month": 14.71639999999752,
+            "session": 9.116399999998976,
+            "project": 5.131000000001222
+          },
+          "requests": 1515,
+          "tokens": 2455634841,
+          "parsed": 1,
+          "bodyBytes": 18937886,
+          "factsSha256": "d2f142c77075ed93380b078ea2ffbd32dc915451fe945f08f51450bad05fdc61",
+          "aggregatesSha256": "30e19715aac23136701c2185e1c9b7ea99e1d2c62a9e9d905099c8a1ede12313",
+          "queryDigests": {
+            "day": {
+              "groups": 90,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "59efbdc2f2fe58e7938775b78b8fc11bffd4806deb74b62ff742a0ceb3f49357"
+            },
+            "month": {
+              "groups": 9,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "78a4121c24a22a806cb76e5e898fd8f845dcb2ce67eaa7ec125cbb6b0481936e"
+            },
+            "session": {
+              "groups": 448,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "ac4ed4e4a33534bb9b7b500f09235492d752c260e5985c27c80a40ddf18e7c4b"
+            },
+            "project": {
+              "groups": 33,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "3a6722404f572bc8a9bc18d641ae96d19f8783056848543d102b20fbfa4cb6ac"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 6,
+          "variant": "B",
+          "kernelMs": 1193.5674,
+          "appendMs": 260.91279999999824,
+          "reads": {
+            "day": 12.737799999995332,
+            "month": 11.326200000003155,
+            "session": 8.352500000000873,
+            "project": 5.568500000001222
+          },
+          "requests": 1515,
+          "tokens": 2455634841,
+          "parsed": 1,
+          "bodyBytes": 18937886,
+          "factsSha256": "d2f142c77075ed93380b078ea2ffbd32dc915451fe945f08f51450bad05fdc61",
+          "aggregatesSha256": "30e19715aac23136701c2185e1c9b7ea99e1d2c62a9e9d905099c8a1ede12313",
+          "queryDigests": {
+            "day": {
+              "groups": 90,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "59efbdc2f2fe58e7938775b78b8fc11bffd4806deb74b62ff742a0ceb3f49357"
+            },
+            "month": {
+              "groups": 9,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "78a4121c24a22a806cb76e5e898fd8f845dcb2ce67eaa7ec125cbb6b0481936e"
+            },
+            "session": {
+              "groups": 448,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "ac4ed4e4a33534bb9b7b500f09235492d752c260e5985c27c80a40ddf18e7c4b"
+            },
+            "project": {
+              "groups": 33,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "3a6722404f572bc8a9bc18d641ae96d19f8783056848543d102b20fbfa4cb6ac"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 6,
+          "variant": "A",
+          "kernelMs": 100.71330000000307,
+          "appendMs": 281.71459999999934,
+          "reads": {
+            "day": 12.738199999999779,
+            "month": 11.31749999999738,
+            "session": 9.008499999996275,
+            "project": 5.8343000000022585
+          },
+          "requests": 1515,
+          "tokens": 2455634841,
+          "parsed": 1,
+          "bodyBytes": 18937886,
+          "factsSha256": "d2f142c77075ed93380b078ea2ffbd32dc915451fe945f08f51450bad05fdc61",
+          "aggregatesSha256": "30e19715aac23136701c2185e1c9b7ea99e1d2c62a9e9d905099c8a1ede12313",
+          "queryDigests": {
+            "day": {
+              "groups": 90,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "59efbdc2f2fe58e7938775b78b8fc11bffd4806deb74b62ff742a0ceb3f49357"
+            },
+            "month": {
+              "groups": 9,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "78a4121c24a22a806cb76e5e898fd8f845dcb2ce67eaa7ec125cbb6b0481936e"
+            },
+            "session": {
+              "groups": 448,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "ac4ed4e4a33534bb9b7b500f09235492d752c260e5985c27c80a40ddf18e7c4b"
+            },
+            "project": {
+              "groups": 33,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "3a6722404f572bc8a9bc18d641ae96d19f8783056848543d102b20fbfa4cb6ac"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 7,
+          "variant": "A",
+          "kernelMs": 91.71110000000044,
+          "appendMs": 261.2384999999995,
+          "reads": {
+            "day": 19.84769999999844,
+            "month": 15.447999999996682,
+            "session": 10.683299999996962,
+            "project": 5.3125
+          },
+          "requests": 1515,
+          "tokens": 2455634841,
+          "parsed": 1,
+          "bodyBytes": 18937886,
+          "factsSha256": "d2f142c77075ed93380b078ea2ffbd32dc915451fe945f08f51450bad05fdc61",
+          "aggregatesSha256": "30e19715aac23136701c2185e1c9b7ea99e1d2c62a9e9d905099c8a1ede12313",
+          "queryDigests": {
+            "day": {
+              "groups": 90,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "59efbdc2f2fe58e7938775b78b8fc11bffd4806deb74b62ff742a0ceb3f49357"
+            },
+            "month": {
+              "groups": 9,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "78a4121c24a22a806cb76e5e898fd8f845dcb2ce67eaa7ec125cbb6b0481936e"
+            },
+            "session": {
+              "groups": 448,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "ac4ed4e4a33534bb9b7b500f09235492d752c260e5985c27c80a40ddf18e7c4b"
+            },
+            "project": {
+              "groups": 33,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "3a6722404f572bc8a9bc18d641ae96d19f8783056848543d102b20fbfa4cb6ac"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 7,
+          "variant": "B",
+          "kernelMs": 1405.4973000000027,
+          "appendMs": 271.7914000000019,
+          "reads": {
+            "day": 16.37819999999192,
+            "month": 11.614600000000792,
+            "session": 8.885399999999208,
+            "project": 5.988400000002002
+          },
+          "requests": 1515,
+          "tokens": 2455634841,
+          "parsed": 1,
+          "bodyBytes": 18937886,
+          "factsSha256": "d2f142c77075ed93380b078ea2ffbd32dc915451fe945f08f51450bad05fdc61",
+          "aggregatesSha256": "30e19715aac23136701c2185e1c9b7ea99e1d2c62a9e9d905099c8a1ede12313",
+          "queryDigests": {
+            "day": {
+              "groups": 90,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "59efbdc2f2fe58e7938775b78b8fc11bffd4806deb74b62ff742a0ceb3f49357"
+            },
+            "month": {
+              "groups": 9,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "78a4121c24a22a806cb76e5e898fd8f845dcb2ce67eaa7ec125cbb6b0481936e"
+            },
+            "session": {
+              "groups": 448,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "ac4ed4e4a33534bb9b7b500f09235492d752c260e5985c27c80a40ddf18e7c4b"
+            },
+            "project": {
+              "groups": 33,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "3a6722404f572bc8a9bc18d641ae96d19f8783056848543d102b20fbfa4cb6ac"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 8,
+          "variant": "B",
+          "kernelMs": 1184.3061000000016,
+          "appendMs": 281.23949999999604,
+          "reads": {
+            "day": 16.94640000000072,
+            "month": 16.31590000000142,
+            "session": 12.272799999991548,
+            "project": 5.529600000008941
+          },
+          "requests": 1515,
+          "tokens": 2455634841,
+          "parsed": 1,
+          "bodyBytes": 18937886,
+          "factsSha256": "d2f142c77075ed93380b078ea2ffbd32dc915451fe945f08f51450bad05fdc61",
+          "aggregatesSha256": "30e19715aac23136701c2185e1c9b7ea99e1d2c62a9e9d905099c8a1ede12313",
+          "queryDigests": {
+            "day": {
+              "groups": 90,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "59efbdc2f2fe58e7938775b78b8fc11bffd4806deb74b62ff742a0ceb3f49357"
+            },
+            "month": {
+              "groups": 9,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "78a4121c24a22a806cb76e5e898fd8f845dcb2ce67eaa7ec125cbb6b0481936e"
+            },
+            "session": {
+              "groups": 448,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "ac4ed4e4a33534bb9b7b500f09235492d752c260e5985c27c80a40ddf18e7c4b"
+            },
+            "project": {
+              "groups": 33,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "3a6722404f572bc8a9bc18d641ae96d19f8783056848543d102b20fbfa4cb6ac"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 8,
+          "variant": "A",
+          "kernelMs": 97.95299999999406,
+          "appendMs": 261.04359999998996,
+          "reads": {
+            "day": 13.774799999999232,
+            "month": 12.4375,
+            "session": 8.946500000005472,
+            "project": 5.286099999997532
+          },
+          "requests": 1515,
+          "tokens": 2455634841,
+          "parsed": 1,
+          "bodyBytes": 18937886,
+          "factsSha256": "d2f142c77075ed93380b078ea2ffbd32dc915451fe945f08f51450bad05fdc61",
+          "aggregatesSha256": "30e19715aac23136701c2185e1c9b7ea99e1d2c62a9e9d905099c8a1ede12313",
+          "queryDigests": {
+            "day": {
+              "groups": 90,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "59efbdc2f2fe58e7938775b78b8fc11bffd4806deb74b62ff742a0ceb3f49357"
+            },
+            "month": {
+              "groups": 9,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "78a4121c24a22a806cb76e5e898fd8f845dcb2ce67eaa7ec125cbb6b0481936e"
+            },
+            "session": {
+              "groups": 448,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "ac4ed4e4a33534bb9b7b500f09235492d752c260e5985c27c80a40ddf18e7c4b"
+            },
+            "project": {
+              "groups": 33,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "3a6722404f572bc8a9bc18d641ae96d19f8783056848543d102b20fbfa4cb6ac"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 9,
+          "variant": "A",
+          "kernelMs": 98.98059999999532,
+          "appendMs": 248.72970000001078,
+          "reads": {
+            "day": 13.282999999995809,
+            "month": 11.47269999999844,
+            "session": 9.592900000003283,
+            "project": 5.571899999995367
+          },
+          "requests": 1515,
+          "tokens": 2455634841,
+          "parsed": 1,
+          "bodyBytes": 18937886,
+          "factsSha256": "d2f142c77075ed93380b078ea2ffbd32dc915451fe945f08f51450bad05fdc61",
+          "aggregatesSha256": "30e19715aac23136701c2185e1c9b7ea99e1d2c62a9e9d905099c8a1ede12313",
+          "queryDigests": {
+            "day": {
+              "groups": 90,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "59efbdc2f2fe58e7938775b78b8fc11bffd4806deb74b62ff742a0ceb3f49357"
+            },
+            "month": {
+              "groups": 9,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "78a4121c24a22a806cb76e5e898fd8f845dcb2ce67eaa7ec125cbb6b0481936e"
+            },
+            "session": {
+              "groups": 448,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "ac4ed4e4a33534bb9b7b500f09235492d752c260e5985c27c80a40ddf18e7c4b"
+            },
+            "project": {
+              "groups": 33,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "3a6722404f572bc8a9bc18d641ae96d19f8783056848543d102b20fbfa4cb6ac"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 9,
+          "variant": "B",
+          "kernelMs": 1201.6864999999962,
+          "appendMs": 266.1883999999991,
+          "reads": {
+            "day": 17.232199999998556,
+            "month": 12.756099999998696,
+            "session": 10.231599999999162,
+            "project": 7.240400000009686
+          },
+          "requests": 1515,
+          "tokens": 2455634841,
+          "parsed": 1,
+          "bodyBytes": 18937886,
+          "factsSha256": "d2f142c77075ed93380b078ea2ffbd32dc915451fe945f08f51450bad05fdc61",
+          "aggregatesSha256": "30e19715aac23136701c2185e1c9b7ea99e1d2c62a9e9d905099c8a1ede12313",
+          "queryDigests": {
+            "day": {
+              "groups": 90,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "59efbdc2f2fe58e7938775b78b8fc11bffd4806deb74b62ff742a0ceb3f49357"
+            },
+            "month": {
+              "groups": 9,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "78a4121c24a22a806cb76e5e898fd8f845dcb2ce67eaa7ec125cbb6b0481936e"
+            },
+            "session": {
+              "groups": 448,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "ac4ed4e4a33534bb9b7b500f09235492d752c260e5985c27c80a40ddf18e7c4b"
+            },
+            "project": {
+              "groups": 33,
+              "requests": 1515,
+              "tokens": 2455634841,
+              "sha256": "3a6722404f572bc8a9bc18d641ae96d19f8783056848543d102b20fbfa4cb6ac"
+            }
+          },
+          "rawChecks": 10
+        }
+      ],
+      "heap": {
+        "A": {
+          "variant": "A",
+          "samples": [
+            {
+              "before": 29801784,
+              "atSelection": 53449920,
+              "after": 75619744,
+              "sampledExtraHeapBytes": 45817960,
+              "retainedResultBytes": 823888,
+              "winnerCount": 22581,
+              "totals": {
+                "requests": 1514,
+                "input": 2443010767,
+                "output": 12623944,
+                "tokens": 2455634711
+              }
+            },
+            {
+              "before": 29760624,
+              "atSelection": 56319064,
+              "after": 76968296,
+              "sampledExtraHeapBytes": 47207672,
+              "retainedResultBytes": 901896,
+              "winnerCount": 22581,
+              "totals": {
+                "requests": 1514,
+                "input": 2443010767,
+                "output": 12623944,
+                "tokens": 2455634711
+              }
+            },
+            {
+              "before": 29760512,
+              "atSelection": 67692032,
+              "after": 89809360,
+              "sampledExtraHeapBytes": 60048848,
+              "retainedResultBytes": 873688,
+              "winnerCount": 22581,
+              "totals": {
+                "requests": 1514,
+                "input": 2443010767,
+                "output": 12623944,
+                "tokens": 2455634711
+              }
+            },
+            {
+              "before": 29729320,
+              "atSelection": 67693552,
+              "after": 89846120,
+              "sampledExtraHeapBytes": 60116800,
+              "retainedResultBytes": 942000,
+              "winnerCount": 22581,
+              "totals": {
+                "requests": 1514,
+                "input": 2443010767,
+                "output": 12623944,
+                "tokens": 2455634711
+              }
+            },
+            {
+              "before": 29769104,
+              "atSelection": 67801128,
+              "after": 89917816,
+              "sampledExtraHeapBytes": 60148712,
+              "retainedResultBytes": 870152,
+              "winnerCount": 22581,
+              "totals": {
+                "requests": 1514,
+                "input": 2443010767,
+                "output": 12623944,
+                "tokens": 2455634711
+              }
+            },
+            {
+              "before": 29783896,
+              "atSelection": 67751128,
+              "after": 88429456,
+              "sampledExtraHeapBytes": 58645560,
+              "retainedResultBytes": 946120,
+              "winnerCount": 22581,
+              "totals": {
+                "requests": 1514,
+                "input": 2443010767,
+                "output": 12623944,
+                "tokens": 2455634711
+              }
+            },
+            {
+              "before": 29830016,
+              "atSelection": 67726680,
+              "after": 89708368,
+              "sampledExtraHeapBytes": 59878352,
+              "retainedResultBytes": 900768,
+              "winnerCount": 22581,
+              "totals": {
+                "requests": 1514,
+                "input": 2443010767,
+                "output": 12623944,
+                "tokens": 2455634711
+              }
+            },
+            {
+              "before": 29828776,
+              "atSelection": 67713096,
+              "after": 89712712,
+              "sampledExtraHeapBytes": 59883936,
+              "retainedResultBytes": 902592,
+              "winnerCount": 22581,
+              "totals": {
+                "requests": 1514,
+                "input": 2443010767,
+                "output": 12623944,
+                "tokens": 2455634711
+              }
+            },
+            {
+              "before": 29751000,
+              "atSelection": 67741344,
+              "after": 89937568,
+              "sampledExtraHeapBytes": 60186568,
+              "retainedResultBytes": 905736,
+              "winnerCount": 22581,
+              "totals": {
+                "requests": 1514,
+                "input": 2443010767,
+                "output": 12623944,
+                "tokens": 2455634711
+              }
+            },
+            {
+              "before": 29791000,
+              "atSelection": 67853208,
+              "after": 88502952,
+              "sampledExtraHeapBytes": 58711952,
+              "retainedResultBytes": 940800,
+              "winnerCount": 22581,
+              "totals": {
+                "requests": 1514,
+                "input": 2443010767,
+                "output": 12623944,
+                "tokens": 2455634711
+              }
+            }
+          ],
+          "note": "Separate process; inputs loaded before GC; sample at end of selection and return, not continuous peak or GC pause measurement."
+        },
+        "B": {
+          "variant": "B",
+          "samples": [
+            {
+              "before": 29721048,
+              "atSelection": 54111216,
+              "after": 76261824,
+              "sampledExtraHeapBytes": 46540776,
+              "retainedResultBytes": 907608,
+              "winnerCount": 22581,
+              "totals": {
+                "requests": 1514,
+                "input": 2443010767,
+                "output": 12623944,
+                "tokens": 2455634711
+              }
+            },
+            {
+              "before": 29763608,
+              "atSelection": 57667136,
+              "after": 78316480,
+              "sampledExtraHeapBytes": 48552872,
+              "retainedResultBytes": 902368,
+              "winnerCount": 22581,
+              "totals": {
+                "requests": 1514,
+                "input": 2443010767,
+                "output": 12623944,
+                "tokens": 2455634711
+              }
+            },
+            {
+              "before": 29763968,
+              "atSelection": 68628472,
+              "after": 90753232,
+              "sampledExtraHeapBytes": 60989264,
+              "retainedResultBytes": 875088,
+              "winnerCount": 22581,
+              "totals": {
+                "requests": 1514,
+                "input": 2443010767,
+                "output": 12623944,
+                "tokens": 2455634711
+              }
+            },
+            {
+              "before": 29773080,
+              "atSelection": 68665880,
+              "after": 89317360,
+              "sampledExtraHeapBytes": 59544280,
+              "retainedResultBytes": 905416,
+              "winnerCount": 22581,
+              "totals": {
+                "requests": 1514,
+                "input": 2443010767,
+                "output": 12623944,
+                "tokens": 2455634711
+              }
+            },
+            {
+              "before": 29776488,
+              "atSelection": 68640864,
+              "after": 90679256,
+              "sampledExtraHeapBytes": 60902768,
+              "retainedResultBytes": 941184,
+              "winnerCount": 22581,
+              "totals": {
+                "requests": 1514,
+                "input": 2443010767,
+                "output": 12623944,
+                "tokens": 2455634711
+              }
+            },
+            {
+              "before": 29746720,
+              "atSelection": 68569168,
+              "after": 90809848,
+              "sampledExtraHeapBytes": 61063128,
+              "retainedResultBytes": 909896,
+              "winnerCount": 22581,
+              "totals": {
+                "requests": 1514,
+                "input": 2443010767,
+                "output": 12623944,
+                "tokens": 2455634711
+              }
+            },
+            {
+              "before": 29754136,
+              "atSelection": 68648384,
+              "after": 90769920,
+              "sampledExtraHeapBytes": 61015784,
+              "retainedResultBytes": 977768,
+              "winnerCount": 22581,
+              "totals": {
+                "requests": 1514,
+                "input": 2443010767,
+                "output": 12623944,
+                "tokens": 2455634711
+              }
+            },
+            {
+              "before": 29829608,
+              "atSelection": 68646232,
+              "after": 90797880,
+              "sampledExtraHeapBytes": 60968272,
+              "retainedResultBytes": 827608,
+              "winnerCount": 22581,
+              "totals": {
+                "requests": 1514,
+                "input": 2443010767,
+                "output": 12623944,
+                "tokens": 2455634711
+              }
+            },
+            {
+              "before": 29791456,
+              "atSelection": 68691248,
+              "after": 89341608,
+              "sampledExtraHeapBytes": 59550152,
+              "retainedResultBytes": 941504,
+              "winnerCount": 22581,
+              "totals": {
+                "requests": 1514,
+                "input": 2443010767,
+                "output": 12623944,
+                "tokens": 2455634711
+              }
+            },
+            {
+              "before": 29830952,
+              "atSelection": 68653176,
+              "after": 90683600,
+              "sampledExtraHeapBytes": 60852648,
+              "retainedResultBytes": 902576,
+              "winnerCount": 22581,
+              "totals": {
+                "requests": 1514,
+                "input": 2443010767,
+                "output": 12623944,
+                "tokens": 2455634711
+              }
+            }
+          ],
+          "note": "Separate process; inputs loaded before GC; sample at end of selection and return, not continuous peak or GC pause measurement."
+        }
+      },
+      "requests": 1514,
+      "tokens": 2455634711,
+      "dtoCount": 45990,
+      "usageCount": 25369,
+      "correctness": {
+        "fullPreparedArray": true,
+        "sourceUnchanged": true,
+        "baseline": {
+          "requests": 1514,
+          "input": 2443010767,
+          "output": 12623944,
+          "tokens": 2455634711,
+          "digest": "922d1c2d4c5290b2ba24b60ca7aebf53906d6567e3e8cc7f395af89ff6c07571"
+        },
+        "earlyDiscard": {
+          "requests": 1514,
+          "input": 2443010767,
+          "output": 12623944,
+          "tokens": 2455634711,
+          "digest": "922d1c2d4c5290b2ba24b60ca7aebf53906d6567e3e8cc7f395af89ff6c07571",
+          "equal": true
+        },
+        "winnerOnlyCacheUnchangedRefresh": {
+          "requests": 1564,
+          "input": 2443010767,
+          "output": 12623944,
+          "tokens": 2455634711,
+          "digest": "912bfd94303f5d69a9011ed3ea05a3392fd434ec8e3f6c989b36e1022ace8228",
+          "equal": false
+        }
+      },
+      "inputRestored": true,
+      "metrics": {
+        "appendMs": {
+          "A": {
+            "medianMs": 260.087099999997,
+            "minMs": 248.72970000001078,
+            "maxMs": 281.71459999999934,
+            "samplesMs": [
+              267.6811000000016,
+              257.0320999999967,
+              259.13060000000405,
+              267.3355999999985,
+              254.46949999999924,
+              254.48809999999503,
+              281.71459999999934,
+              261.2384999999995,
+              261.04359999998996,
+              248.72970000001078
+            ]
+          },
+          "B": {
+            "medianMs": 268.9899000000005,
+            "minMs": 252.72430000000168,
+            "maxMs": 320.96140000000014,
+            "samplesMs": [
+              252.72430000000168,
+              264.9360000000015,
+              320.96140000000014,
+              297.23939999999857,
+              265.95760000000155,
+              273.11039999999775,
+              260.91279999999824,
+              271.7914000000019,
+              281.23949999999604,
+              266.1883999999991
+            ]
+          }
+        },
+        "kernelMs": {
+          "A": {
+            "medianMs": 99.51599999999598,
+            "minMs": 90.14259999999922,
+            "maxMs": 107.7705999999962,
+            "samplesMs": [
+              103.05299999999988,
+              107.7705999999962,
+              97.70279999999912,
+              100.29789999999775,
+              100.05139999999665,
+              90.14259999999922,
+              100.71330000000307,
+              91.71110000000044,
+              97.95299999999406,
+              98.98059999999532
+            ]
+          },
+          "B": {
+            "medianMs": 1202.310849999998,
+            "minMs": 1175.5204999999987,
+            "maxMs": 1412.0564999999988,
+            "samplesMs": [
+              1295.1402000000016,
+              1202.9352,
+              1232.787599999996,
+              1412.0564999999988,
+              1178.9623999999967,
+              1175.5204999999987,
+              1193.5674,
+              1405.4973000000027,
+              1184.3061000000016,
+              1201.6864999999962
+            ]
+          }
+        },
+        "day": {
+          "A": {
+            "medianMs": 13.52889999999752,
+            "minMs": 12.24840000000404,
+            "maxMs": 19.84769999999844,
+            "samplesMs": [
+              17.22690000000148,
+              13.077899999996589,
+              12.63180000000284,
+              16.397100000001956,
+              12.24840000000404,
+              16.264400000000023,
+              12.738199999999779,
+              19.84769999999844,
+              13.774799999999232,
+              13.282999999995809
+            ]
+          },
+          "B": {
+            "medianMs": 15.527649999996356,
+            "minMs": 12.506200000003446,
+            "maxMs": 18.635999999998603,
+            "samplesMs": [
+              18.635999999998603,
+              12.506200000003446,
+              13.691899999997986,
+              13.597399999998743,
+              17.249299999995856,
+              14.677100000000792,
+              12.737799999995332,
+              16.37819999999192,
+              16.94640000000072,
+              17.232199999998556
+            ]
+          }
+        },
+        "month": {
+          "A": {
+            "medianMs": 12.16070000000036,
+            "minMs": 11.314899999997579,
+            "maxMs": 17.00250000000233,
+            "samplesMs": [
+              17.00250000000233,
+              11.883900000000722,
+              11.314899999997579,
+              15.647899999996298,
+              12.59719999999652,
+              11.652699999998731,
+              11.31749999999738,
+              15.447999999996682,
+              12.4375,
+              11.47269999999844
+            ]
+          },
+          "B": {
+            "medianMs": 12.88155000000188,
+            "minMs": 11.326200000003155,
+            "maxMs": 16.31590000000142,
+            "samplesMs": [
+              13.007000000005064,
+              11.824500000002445,
+              13.292900000000373,
+              14.930599999999686,
+              11.572400000004563,
+              14.71639999999752,
+              11.326200000003155,
+              11.614600000000792,
+              16.31590000000142,
+              12.756099999998696
+            ]
+          }
+        },
+        "session": {
+          "A": {
+            "medianMs": 9.481950000001234,
+            "minMs": 8.300699999999779,
+            "maxMs": 13.856299999999464,
+            "samplesMs": [
+              9.184699999997974,
+              10.804400000000896,
+              9.370999999999185,
+              13.856299999999464,
+              10.304300000003423,
+              8.300699999999779,
+              9.008499999996275,
+              10.683299999996962,
+              8.946500000005472,
+              9.592900000003283
+            ]
+          },
+          "B": {
+            "medianMs": 9.036849999996775,
+            "minMs": 8.207500000004075,
+            "maxMs": 12.272799999991548,
+            "samplesMs": [
+              8.908800000004703,
+              8.207500000004075,
+              11.690999999998894,
+              9.700700000001234,
+              8.957299999994575,
+              9.116399999998976,
+              8.352500000000873,
+              8.885399999999208,
+              12.272799999991548,
+              10.231599999999162
+            ]
+          }
+        },
+        "project": {
+          "A": {
+            "medianMs": 5.448899999999412,
+            "minMs": 5.023800000002666,
+            "maxMs": 7.9575000000040745,
+            "samplesMs": [
+              5.257599999997183,
+              6.344600000003993,
+              7.9575000000040745,
+              5.3259000000034575,
+              6.6679000000003725,
+              5.023800000002666,
+              5.8343000000022585,
+              5.3125,
+              5.286099999997532,
+              5.571899999995367
+            ]
+          },
+          "B": {
+            "medianMs": 5.35910000000149,
+            "minMs": 4.947299999999814,
+            "maxMs": 7.240400000009686,
+            "samplesMs": [
+              5.01759999999922,
+              4.947299999999814,
+              5.8752000000022235,
+              5.140500000001339,
+              5.1885999999940395,
+              5.131000000001222,
+              5.568500000001222,
+              5.988400000002002,
+              5.529600000008941,
+              7.240400000009686
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "synthetic-10000",
+      "inventory": [
+        {
+          "provider": "claude",
+          "rootOrdinal": 0,
+          "files": 50,
+          "bytes": 2327560,
+          "compressed": 0
+        },
+        {
+          "provider": "codex",
+          "rootOrdinal": 1,
+          "files": 50,
+          "bytes": 3309650,
+          "compressed": 0,
+          "metadata": {
+            "indexBytes": 0,
+            "threads": 0
+          }
+        }
+      ],
+      "inputSha256": "0b2ecd37faa5c29385cd3def00cad4bdf5adddc581e4a5d4cc4c02b9cdceea0f",
+      "expected": {
+        "requests": 10000,
+        "tokens": 6340000,
+        "sessions": 100,
+        "turnsPerSession": 100
+      },
+      "hashes": {
+        "baseline": "69d6b9c2c54c0f47b79fed69ef844707cbee4ee954d33ca07357404bfcc1f2f9",
+        "arraySlots": "50f3368ff33e7ee270f84d2edaa5977cad6a14123833decdc7d71a5e3924b9d6",
+        "overwrite": "20e248b8752934492903b37de2037842efafa16d1883eefc8921f19ea167b49f"
+      },
+      "initial": {
+        "A": {
+          "ms": 1722.3295999999973,
+          "requests": 10000,
+          "tokens": 6340000,
+          "failed": 0,
+          "parsed": 100,
+          "bodyBytes": 5637210,
+          "checked": {
+            "factsSha256": "73ce0ab16c041841951e100141ccac31bb9ab6cb3b4dd7c6e8e15b401f13201d",
+            "aggregatesSha256": "b5a523957412b258705762e4bfe08f27f596663092795eeb734d578740bbb2cf",
+            "rawChecks": 10,
+            "independent": {
+              "day": {
+                "groups": 14,
+                "requests": 10000,
+                "tokens": 6340000,
+                "sha256": "680544496467112fe42948798e6df80d38d2692aefd0b08442eb4118b466ef08"
+              },
+              "month": {
+                "groups": 2,
+                "requests": 10000,
+                "tokens": 6340000,
+                "sha256": "d38604e9a59e274552c423bdbdc7501cb77a0cc9f8ed993caadcb83d823b0513"
+              },
+              "session": {
+                "groups": 100,
+                "requests": 10000,
+                "tokens": 6340000,
+                "sha256": "8855dd61c99e2c0a963745bd612e5bbda7bf162d4e749bcd6147d436bcad1747"
+              },
+              "project": {
+                "groups": 10,
+                "requests": 10000,
+                "tokens": 6340000,
+                "sha256": "d90d88a00b72f04276d7cee9438bf0345a1c4ff7951b20cd5e0981c487867c4c"
+              }
+            }
+          }
+        },
+        "B": {
+          "ms": 2002.2407999999996,
+          "requests": 10000,
+          "tokens": 6340000,
+          "failed": 0,
+          "parsed": 100,
+          "bodyBytes": 5637210,
+          "checked": {
+            "factsSha256": "73ce0ab16c041841951e100141ccac31bb9ab6cb3b4dd7c6e8e15b401f13201d",
+            "aggregatesSha256": "b5a523957412b258705762e4bfe08f27f596663092795eeb734d578740bbb2cf",
+            "rawChecks": 10,
+            "independent": {
+              "day": {
+                "groups": 14,
+                "requests": 10000,
+                "tokens": 6340000,
+                "sha256": "680544496467112fe42948798e6df80d38d2692aefd0b08442eb4118b466ef08"
+              },
+              "month": {
+                "groups": 2,
+                "requests": 10000,
+                "tokens": 6340000,
+                "sha256": "d38604e9a59e274552c423bdbdc7501cb77a0cc9f8ed993caadcb83d823b0513"
+              },
+              "session": {
+                "groups": 100,
+                "requests": 10000,
+                "tokens": 6340000,
+                "sha256": "8855dd61c99e2c0a963745bd612e5bbda7bf162d4e749bcd6147d436bcad1747"
+              },
+              "project": {
+                "groups": 10,
+                "requests": 10000,
+                "tokens": 6340000,
+                "sha256": "d90d88a00b72f04276d7cee9438bf0345a1c4ff7951b20cd5e0981c487867c4c"
+              }
+            }
+          }
+        }
+      },
+      "samples": [
+        {
+          "pair": 0,
+          "variant": "B",
+          "kernelMs": 330.4401000000071,
+          "appendMs": 24.650399999998626,
+          "reads": {
+            "day": 84.26699999999255,
+            "month": 86.24709999999322,
+            "session": 49.15219999999681,
+            "project": 39.46180000000459
+          },
+          "requests": 10001,
+          "tokens": 6340130,
+          "parsed": 1,
+          "bodyBytes": 66180,
+          "factsSha256": "47c02c2045f58afdc14ff278e8efef1a2e172cf74d91a9ce0574063e4158399c",
+          "aggregatesSha256": "405f92ace713e82126f7d623fcc9873b73c7490704b07bc4889413add315ed1d",
+          "queryDigests": {
+            "day": {
+              "groups": 15,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "13eae4da121211c46c727f87354ab67a9c0ac7f2c27aabfc7b4bba438fc973f8"
+            },
+            "month": {
+              "groups": 3,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "a28879c010214d92a5b8efea16c19dbfaf1ebdfe893f173048ec599888f74765"
+            },
+            "session": {
+              "groups": 100,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "525734bf18fbdc185dcfb45a8519e37595f57c76c5fe0078b31b31936a25a752"
+            },
+            "project": {
+              "groups": 10,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "48295aedf46e667ec7cd10b3617fd67082b802a622be18fda03d03f8433ea5ed"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 0,
+          "variant": "A",
+          "kernelMs": 83.01329999999143,
+          "appendMs": 25.399400000009337,
+          "reads": {
+            "day": 78.44390000001295,
+            "month": 75.96630000000005,
+            "session": 42.62200000000303,
+            "project": 42.129000000000815
+          },
+          "requests": 10001,
+          "tokens": 6340130,
+          "parsed": 1,
+          "bodyBytes": 66180,
+          "factsSha256": "47c02c2045f58afdc14ff278e8efef1a2e172cf74d91a9ce0574063e4158399c",
+          "aggregatesSha256": "405f92ace713e82126f7d623fcc9873b73c7490704b07bc4889413add315ed1d",
+          "queryDigests": {
+            "day": {
+              "groups": 15,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "13eae4da121211c46c727f87354ab67a9c0ac7f2c27aabfc7b4bba438fc973f8"
+            },
+            "month": {
+              "groups": 3,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "a28879c010214d92a5b8efea16c19dbfaf1ebdfe893f173048ec599888f74765"
+            },
+            "session": {
+              "groups": 100,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "525734bf18fbdc185dcfb45a8519e37595f57c76c5fe0078b31b31936a25a752"
+            },
+            "project": {
+              "groups": 10,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "48295aedf46e667ec7cd10b3617fd67082b802a622be18fda03d03f8433ea5ed"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 1,
+          "variant": "A",
+          "kernelMs": 61.20639999999548,
+          "appendMs": 31.69340000000375,
+          "reads": {
+            "day": 76.92530000000261,
+            "month": 75.98689999998896,
+            "session": 39.36129999998957,
+            "project": 34.117599999997765
+          },
+          "requests": 10001,
+          "tokens": 6340130,
+          "parsed": 1,
+          "bodyBytes": 66180,
+          "factsSha256": "47c02c2045f58afdc14ff278e8efef1a2e172cf74d91a9ce0574063e4158399c",
+          "aggregatesSha256": "405f92ace713e82126f7d623fcc9873b73c7490704b07bc4889413add315ed1d",
+          "queryDigests": {
+            "day": {
+              "groups": 15,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "13eae4da121211c46c727f87354ab67a9c0ac7f2c27aabfc7b4bba438fc973f8"
+            },
+            "month": {
+              "groups": 3,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "a28879c010214d92a5b8efea16c19dbfaf1ebdfe893f173048ec599888f74765"
+            },
+            "session": {
+              "groups": 100,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "525734bf18fbdc185dcfb45a8519e37595f57c76c5fe0078b31b31936a25a752"
+            },
+            "project": {
+              "groups": 10,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "48295aedf46e667ec7cd10b3617fd67082b802a622be18fda03d03f8433ea5ed"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 1,
+          "variant": "B",
+          "kernelMs": 341.42010000001756,
+          "appendMs": 27.03630000000703,
+          "reads": {
+            "day": 78.63779999999679,
+            "month": 79.49139999999898,
+            "session": 39.03139999997802,
+            "project": 35.617599999997765
+          },
+          "requests": 10001,
+          "tokens": 6340130,
+          "parsed": 1,
+          "bodyBytes": 66180,
+          "factsSha256": "47c02c2045f58afdc14ff278e8efef1a2e172cf74d91a9ce0574063e4158399c",
+          "aggregatesSha256": "405f92ace713e82126f7d623fcc9873b73c7490704b07bc4889413add315ed1d",
+          "queryDigests": {
+            "day": {
+              "groups": 15,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "13eae4da121211c46c727f87354ab67a9c0ac7f2c27aabfc7b4bba438fc973f8"
+            },
+            "month": {
+              "groups": 3,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "a28879c010214d92a5b8efea16c19dbfaf1ebdfe893f173048ec599888f74765"
+            },
+            "session": {
+              "groups": 100,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "525734bf18fbdc185dcfb45a8519e37595f57c76c5fe0078b31b31936a25a752"
+            },
+            "project": {
+              "groups": 10,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "48295aedf46e667ec7cd10b3617fd67082b802a622be18fda03d03f8433ea5ed"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 2,
+          "variant": "B",
+          "kernelMs": 472.70549999998184,
+          "appendMs": 24.721000000019558,
+          "reads": {
+            "day": 78.56789999999455,
+            "month": 99.32629999998608,
+            "session": 51.32280000002356,
+            "project": 34.59399999998277
+          },
+          "requests": 10001,
+          "tokens": 6340130,
+          "parsed": 1,
+          "bodyBytes": 66180,
+          "factsSha256": "47c02c2045f58afdc14ff278e8efef1a2e172cf74d91a9ce0574063e4158399c",
+          "aggregatesSha256": "405f92ace713e82126f7d623fcc9873b73c7490704b07bc4889413add315ed1d",
+          "queryDigests": {
+            "day": {
+              "groups": 15,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "13eae4da121211c46c727f87354ab67a9c0ac7f2c27aabfc7b4bba438fc973f8"
+            },
+            "month": {
+              "groups": 3,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "a28879c010214d92a5b8efea16c19dbfaf1ebdfe893f173048ec599888f74765"
+            },
+            "session": {
+              "groups": 100,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "525734bf18fbdc185dcfb45a8519e37595f57c76c5fe0078b31b31936a25a752"
+            },
+            "project": {
+              "groups": 10,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "48295aedf46e667ec7cd10b3617fd67082b802a622be18fda03d03f8433ea5ed"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 2,
+          "variant": "A",
+          "kernelMs": 69.9435999999987,
+          "appendMs": 24.894300000014482,
+          "reads": {
+            "day": 76.00920000000042,
+            "month": 76.15469999998459,
+            "session": 38.818800000008196,
+            "project": 42.15979999999399
+          },
+          "requests": 10001,
+          "tokens": 6340130,
+          "parsed": 1,
+          "bodyBytes": 66180,
+          "factsSha256": "47c02c2045f58afdc14ff278e8efef1a2e172cf74d91a9ce0574063e4158399c",
+          "aggregatesSha256": "405f92ace713e82126f7d623fcc9873b73c7490704b07bc4889413add315ed1d",
+          "queryDigests": {
+            "day": {
+              "groups": 15,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "13eae4da121211c46c727f87354ab67a9c0ac7f2c27aabfc7b4bba438fc973f8"
+            },
+            "month": {
+              "groups": 3,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "a28879c010214d92a5b8efea16c19dbfaf1ebdfe893f173048ec599888f74765"
+            },
+            "session": {
+              "groups": 100,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "525734bf18fbdc185dcfb45a8519e37595f57c76c5fe0078b31b31936a25a752"
+            },
+            "project": {
+              "groups": 10,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "48295aedf46e667ec7cd10b3617fd67082b802a622be18fda03d03f8433ea5ed"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 3,
+          "variant": "A",
+          "kernelMs": 71.38879999998608,
+          "appendMs": 32.790500000002794,
+          "reads": {
+            "day": 89.84109999999055,
+            "month": 77.44269999998505,
+            "session": 39.01339999999618,
+            "project": 35.146300000022165
+          },
+          "requests": 10001,
+          "tokens": 6340130,
+          "parsed": 1,
+          "bodyBytes": 66180,
+          "factsSha256": "47c02c2045f58afdc14ff278e8efef1a2e172cf74d91a9ce0574063e4158399c",
+          "aggregatesSha256": "405f92ace713e82126f7d623fcc9873b73c7490704b07bc4889413add315ed1d",
+          "queryDigests": {
+            "day": {
+              "groups": 15,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "13eae4da121211c46c727f87354ab67a9c0ac7f2c27aabfc7b4bba438fc973f8"
+            },
+            "month": {
+              "groups": 3,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "a28879c010214d92a5b8efea16c19dbfaf1ebdfe893f173048ec599888f74765"
+            },
+            "session": {
+              "groups": 100,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "525734bf18fbdc185dcfb45a8519e37595f57c76c5fe0078b31b31936a25a752"
+            },
+            "project": {
+              "groups": 10,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "48295aedf46e667ec7cd10b3617fd67082b802a622be18fda03d03f8433ea5ed"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 3,
+          "variant": "B",
+          "kernelMs": 398.13469999999506,
+          "appendMs": 25.037300000025425,
+          "reads": {
+            "day": 77.19219999999041,
+            "month": 76.21369999999297,
+            "session": 47.54230000000098,
+            "project": 42.82170000000042
+          },
+          "requests": 10001,
+          "tokens": 6340130,
+          "parsed": 1,
+          "bodyBytes": 66180,
+          "factsSha256": "47c02c2045f58afdc14ff278e8efef1a2e172cf74d91a9ce0574063e4158399c",
+          "aggregatesSha256": "405f92ace713e82126f7d623fcc9873b73c7490704b07bc4889413add315ed1d",
+          "queryDigests": {
+            "day": {
+              "groups": 15,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "13eae4da121211c46c727f87354ab67a9c0ac7f2c27aabfc7b4bba438fc973f8"
+            },
+            "month": {
+              "groups": 3,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "a28879c010214d92a5b8efea16c19dbfaf1ebdfe893f173048ec599888f74765"
+            },
+            "session": {
+              "groups": 100,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "525734bf18fbdc185dcfb45a8519e37595f57c76c5fe0078b31b31936a25a752"
+            },
+            "project": {
+              "groups": 10,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "48295aedf46e667ec7cd10b3617fd67082b802a622be18fda03d03f8433ea5ed"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 4,
+          "variant": "B",
+          "kernelMs": 404.5609000000113,
+          "appendMs": 25.770799999998417,
+          "reads": {
+            "day": 75.59659999998985,
+            "month": 95.988800000021,
+            "session": 50.32600000000093,
+            "project": 33.796799999981886
+          },
+          "requests": 10001,
+          "tokens": 6340130,
+          "parsed": 1,
+          "bodyBytes": 66180,
+          "factsSha256": "47c02c2045f58afdc14ff278e8efef1a2e172cf74d91a9ce0574063e4158399c",
+          "aggregatesSha256": "405f92ace713e82126f7d623fcc9873b73c7490704b07bc4889413add315ed1d",
+          "queryDigests": {
+            "day": {
+              "groups": 15,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "13eae4da121211c46c727f87354ab67a9c0ac7f2c27aabfc7b4bba438fc973f8"
+            },
+            "month": {
+              "groups": 3,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "a28879c010214d92a5b8efea16c19dbfaf1ebdfe893f173048ec599888f74765"
+            },
+            "session": {
+              "groups": 100,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "525734bf18fbdc185dcfb45a8519e37595f57c76c5fe0078b31b31936a25a752"
+            },
+            "project": {
+              "groups": 10,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "48295aedf46e667ec7cd10b3617fd67082b802a622be18fda03d03f8433ea5ed"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 4,
+          "variant": "A",
+          "kernelMs": 72.89200000002165,
+          "appendMs": 25.891199999983655,
+          "reads": {
+            "day": 79.86189999998896,
+            "month": 78.34510000000591,
+            "session": 39.89439999999013,
+            "project": 34.67960000000312
+          },
+          "requests": 10001,
+          "tokens": 6340130,
+          "parsed": 1,
+          "bodyBytes": 66180,
+          "factsSha256": "47c02c2045f58afdc14ff278e8efef1a2e172cf74d91a9ce0574063e4158399c",
+          "aggregatesSha256": "405f92ace713e82126f7d623fcc9873b73c7490704b07bc4889413add315ed1d",
+          "queryDigests": {
+            "day": {
+              "groups": 15,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "13eae4da121211c46c727f87354ab67a9c0ac7f2c27aabfc7b4bba438fc973f8"
+            },
+            "month": {
+              "groups": 3,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "a28879c010214d92a5b8efea16c19dbfaf1ebdfe893f173048ec599888f74765"
+            },
+            "session": {
+              "groups": 100,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "525734bf18fbdc185dcfb45a8519e37595f57c76c5fe0078b31b31936a25a752"
+            },
+            "project": {
+              "groups": 10,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "48295aedf46e667ec7cd10b3617fd67082b802a622be18fda03d03f8433ea5ed"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 5,
+          "variant": "A",
+          "kernelMs": 80.56659999999101,
+          "appendMs": 25.29989999998361,
+          "reads": {
+            "day": 77.91740000000573,
+            "month": 79.52569999999832,
+            "session": 39.845899999985704,
+            "project": 35.311900000000605
+          },
+          "requests": 10001,
+          "tokens": 6340130,
+          "parsed": 1,
+          "bodyBytes": 66180,
+          "factsSha256": "47c02c2045f58afdc14ff278e8efef1a2e172cf74d91a9ce0574063e4158399c",
+          "aggregatesSha256": "405f92ace713e82126f7d623fcc9873b73c7490704b07bc4889413add315ed1d",
+          "queryDigests": {
+            "day": {
+              "groups": 15,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "13eae4da121211c46c727f87354ab67a9c0ac7f2c27aabfc7b4bba438fc973f8"
+            },
+            "month": {
+              "groups": 3,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "a28879c010214d92a5b8efea16c19dbfaf1ebdfe893f173048ec599888f74765"
+            },
+            "session": {
+              "groups": 100,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "525734bf18fbdc185dcfb45a8519e37595f57c76c5fe0078b31b31936a25a752"
+            },
+            "project": {
+              "groups": 10,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "48295aedf46e667ec7cd10b3617fd67082b802a622be18fda03d03f8433ea5ed"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 5,
+          "variant": "B",
+          "kernelMs": 405.95729999998,
+          "appendMs": 24.71950000000652,
+          "reads": {
+            "day": 76.84560000000056,
+            "month": 77.00740000000224,
+            "session": 58.388999999995576,
+            "project": 42.34350000001723
+          },
+          "requests": 10001,
+          "tokens": 6340130,
+          "parsed": 1,
+          "bodyBytes": 66180,
+          "factsSha256": "47c02c2045f58afdc14ff278e8efef1a2e172cf74d91a9ce0574063e4158399c",
+          "aggregatesSha256": "405f92ace713e82126f7d623fcc9873b73c7490704b07bc4889413add315ed1d",
+          "queryDigests": {
+            "day": {
+              "groups": 15,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "13eae4da121211c46c727f87354ab67a9c0ac7f2c27aabfc7b4bba438fc973f8"
+            },
+            "month": {
+              "groups": 3,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "a28879c010214d92a5b8efea16c19dbfaf1ebdfe893f173048ec599888f74765"
+            },
+            "session": {
+              "groups": 100,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "525734bf18fbdc185dcfb45a8519e37595f57c76c5fe0078b31b31936a25a752"
+            },
+            "project": {
+              "groups": 10,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "48295aedf46e667ec7cd10b3617fd67082b802a622be18fda03d03f8433ea5ed"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 6,
+          "variant": "B",
+          "kernelMs": 433.8718999999983,
+          "appendMs": 25.151800000021467,
+          "reads": {
+            "day": 83.3530000000028,
+            "month": 99.05270000000019,
+            "session": 38.266299999988405,
+            "project": 36.78570000000764
+          },
+          "requests": 10001,
+          "tokens": 6340130,
+          "parsed": 1,
+          "bodyBytes": 66180,
+          "factsSha256": "47c02c2045f58afdc14ff278e8efef1a2e172cf74d91a9ce0574063e4158399c",
+          "aggregatesSha256": "405f92ace713e82126f7d623fcc9873b73c7490704b07bc4889413add315ed1d",
+          "queryDigests": {
+            "day": {
+              "groups": 15,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "13eae4da121211c46c727f87354ab67a9c0ac7f2c27aabfc7b4bba438fc973f8"
+            },
+            "month": {
+              "groups": 3,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "a28879c010214d92a5b8efea16c19dbfaf1ebdfe893f173048ec599888f74765"
+            },
+            "session": {
+              "groups": 100,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "525734bf18fbdc185dcfb45a8519e37595f57c76c5fe0078b31b31936a25a752"
+            },
+            "project": {
+              "groups": 10,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "48295aedf46e667ec7cd10b3617fd67082b802a622be18fda03d03f8433ea5ed"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 6,
+          "variant": "A",
+          "kernelMs": 76.53210000001127,
+          "appendMs": 25.94310000000405,
+          "reads": {
+            "day": 98.61629999999423,
+            "month": 78.10209999998915,
+            "session": 44.970000000001164,
+            "project": 37.1135999999824
+          },
+          "requests": 10001,
+          "tokens": 6340130,
+          "parsed": 1,
+          "bodyBytes": 66180,
+          "factsSha256": "47c02c2045f58afdc14ff278e8efef1a2e172cf74d91a9ce0574063e4158399c",
+          "aggregatesSha256": "405f92ace713e82126f7d623fcc9873b73c7490704b07bc4889413add315ed1d",
+          "queryDigests": {
+            "day": {
+              "groups": 15,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "13eae4da121211c46c727f87354ab67a9c0ac7f2c27aabfc7b4bba438fc973f8"
+            },
+            "month": {
+              "groups": 3,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "a28879c010214d92a5b8efea16c19dbfaf1ebdfe893f173048ec599888f74765"
+            },
+            "session": {
+              "groups": 100,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "525734bf18fbdc185dcfb45a8519e37595f57c76c5fe0078b31b31936a25a752"
+            },
+            "project": {
+              "groups": 10,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "48295aedf46e667ec7cd10b3617fd67082b802a622be18fda03d03f8433ea5ed"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 7,
+          "variant": "A",
+          "kernelMs": 73.23519999999553,
+          "appendMs": 25.762099999992643,
+          "reads": {
+            "day": 75.35920000000624,
+            "month": 78.37470000001485,
+            "session": 37.85510000001523,
+            "project": 34.63420000000042
+          },
+          "requests": 10001,
+          "tokens": 6340130,
+          "parsed": 1,
+          "bodyBytes": 66180,
+          "factsSha256": "47c02c2045f58afdc14ff278e8efef1a2e172cf74d91a9ce0574063e4158399c",
+          "aggregatesSha256": "405f92ace713e82126f7d623fcc9873b73c7490704b07bc4889413add315ed1d",
+          "queryDigests": {
+            "day": {
+              "groups": 15,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "13eae4da121211c46c727f87354ab67a9c0ac7f2c27aabfc7b4bba438fc973f8"
+            },
+            "month": {
+              "groups": 3,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "a28879c010214d92a5b8efea16c19dbfaf1ebdfe893f173048ec599888f74765"
+            },
+            "session": {
+              "groups": 100,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "525734bf18fbdc185dcfb45a8519e37595f57c76c5fe0078b31b31936a25a752"
+            },
+            "project": {
+              "groups": 10,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "48295aedf46e667ec7cd10b3617fd67082b802a622be18fda03d03f8433ea5ed"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 7,
+          "variant": "B",
+          "kernelMs": 391.52349999998114,
+          "appendMs": 27.385500000003958,
+          "reads": {
+            "day": 76.03010000000359,
+            "month": 75.79629999998724,
+            "session": 39.08070000002044,
+            "project": 34.748999999981606
+          },
+          "requests": 10001,
+          "tokens": 6340130,
+          "parsed": 1,
+          "bodyBytes": 66180,
+          "factsSha256": "47c02c2045f58afdc14ff278e8efef1a2e172cf74d91a9ce0574063e4158399c",
+          "aggregatesSha256": "405f92ace713e82126f7d623fcc9873b73c7490704b07bc4889413add315ed1d",
+          "queryDigests": {
+            "day": {
+              "groups": 15,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "13eae4da121211c46c727f87354ab67a9c0ac7f2c27aabfc7b4bba438fc973f8"
+            },
+            "month": {
+              "groups": 3,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "a28879c010214d92a5b8efea16c19dbfaf1ebdfe893f173048ec599888f74765"
+            },
+            "session": {
+              "groups": 100,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "525734bf18fbdc185dcfb45a8519e37595f57c76c5fe0078b31b31936a25a752"
+            },
+            "project": {
+              "groups": 10,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "48295aedf46e667ec7cd10b3617fd67082b802a622be18fda03d03f8433ea5ed"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 8,
+          "variant": "B",
+          "kernelMs": 389.23120000000927,
+          "appendMs": 32.62249999999767,
+          "reads": {
+            "day": 86.96760000000359,
+            "month": 80.46059999999125,
+            "session": 41.50689999997849,
+            "project": 35.53770000001532
+          },
+          "requests": 10001,
+          "tokens": 6340130,
+          "parsed": 1,
+          "bodyBytes": 66180,
+          "factsSha256": "47c02c2045f58afdc14ff278e8efef1a2e172cf74d91a9ce0574063e4158399c",
+          "aggregatesSha256": "405f92ace713e82126f7d623fcc9873b73c7490704b07bc4889413add315ed1d",
+          "queryDigests": {
+            "day": {
+              "groups": 15,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "13eae4da121211c46c727f87354ab67a9c0ac7f2c27aabfc7b4bba438fc973f8"
+            },
+            "month": {
+              "groups": 3,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "a28879c010214d92a5b8efea16c19dbfaf1ebdfe893f173048ec599888f74765"
+            },
+            "session": {
+              "groups": 100,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "525734bf18fbdc185dcfb45a8519e37595f57c76c5fe0078b31b31936a25a752"
+            },
+            "project": {
+              "groups": 10,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "48295aedf46e667ec7cd10b3617fd67082b802a622be18fda03d03f8433ea5ed"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 8,
+          "variant": "A",
+          "kernelMs": 68.76439999998547,
+          "appendMs": 29.261599999997998,
+          "reads": {
+            "day": 100.26620000001276,
+            "month": 84.01339999999618,
+            "session": 39.76819999999134,
+            "project": 36.330199999996694
+          },
+          "requests": 10001,
+          "tokens": 6340130,
+          "parsed": 1,
+          "bodyBytes": 66180,
+          "factsSha256": "47c02c2045f58afdc14ff278e8efef1a2e172cf74d91a9ce0574063e4158399c",
+          "aggregatesSha256": "405f92ace713e82126f7d623fcc9873b73c7490704b07bc4889413add315ed1d",
+          "queryDigests": {
+            "day": {
+              "groups": 15,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "13eae4da121211c46c727f87354ab67a9c0ac7f2c27aabfc7b4bba438fc973f8"
+            },
+            "month": {
+              "groups": 3,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "a28879c010214d92a5b8efea16c19dbfaf1ebdfe893f173048ec599888f74765"
+            },
+            "session": {
+              "groups": 100,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "525734bf18fbdc185dcfb45a8519e37595f57c76c5fe0078b31b31936a25a752"
+            },
+            "project": {
+              "groups": 10,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "48295aedf46e667ec7cd10b3617fd67082b802a622be18fda03d03f8433ea5ed"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 9,
+          "variant": "A",
+          "kernelMs": 78.63689999998314,
+          "appendMs": 24.59419999999227,
+          "reads": {
+            "day": 75.77150000000256,
+            "month": 83.06609999999637,
+            "session": 37.591800000023795,
+            "project": 34.203699999983655
+          },
+          "requests": 10001,
+          "tokens": 6340130,
+          "parsed": 1,
+          "bodyBytes": 66180,
+          "factsSha256": "47c02c2045f58afdc14ff278e8efef1a2e172cf74d91a9ce0574063e4158399c",
+          "aggregatesSha256": "405f92ace713e82126f7d623fcc9873b73c7490704b07bc4889413add315ed1d",
+          "queryDigests": {
+            "day": {
+              "groups": 15,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "13eae4da121211c46c727f87354ab67a9c0ac7f2c27aabfc7b4bba438fc973f8"
+            },
+            "month": {
+              "groups": 3,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "a28879c010214d92a5b8efea16c19dbfaf1ebdfe893f173048ec599888f74765"
+            },
+            "session": {
+              "groups": 100,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "525734bf18fbdc185dcfb45a8519e37595f57c76c5fe0078b31b31936a25a752"
+            },
+            "project": {
+              "groups": 10,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "48295aedf46e667ec7cd10b3617fd67082b802a622be18fda03d03f8433ea5ed"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 9,
+          "variant": "B",
+          "kernelMs": 391.9745999999868,
+          "appendMs": 25.54529999999795,
+          "reads": {
+            "day": 77.86429999998654,
+            "month": 84.88800000000629,
+            "session": 36.351399999985006,
+            "project": 36.478999999992084
+          },
+          "requests": 10001,
+          "tokens": 6340130,
+          "parsed": 1,
+          "bodyBytes": 66180,
+          "factsSha256": "47c02c2045f58afdc14ff278e8efef1a2e172cf74d91a9ce0574063e4158399c",
+          "aggregatesSha256": "405f92ace713e82126f7d623fcc9873b73c7490704b07bc4889413add315ed1d",
+          "queryDigests": {
+            "day": {
+              "groups": 15,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "13eae4da121211c46c727f87354ab67a9c0ac7f2c27aabfc7b4bba438fc973f8"
+            },
+            "month": {
+              "groups": 3,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "a28879c010214d92a5b8efea16c19dbfaf1ebdfe893f173048ec599888f74765"
+            },
+            "session": {
+              "groups": 100,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "525734bf18fbdc185dcfb45a8519e37595f57c76c5fe0078b31b31936a25a752"
+            },
+            "project": {
+              "groups": 10,
+              "requests": 10001,
+              "tokens": 6340130,
+              "sha256": "48295aedf46e667ec7cd10b3617fd67082b802a622be18fda03d03f8433ea5ed"
+            }
+          },
+          "rawChecks": 10
+        }
+      ],
+      "heap": {
+        "A": {
+          "variant": "A",
+          "samples": [
+            {
+              "before": 14688288,
+              "atSelection": 70842680,
+              "after": 50085960,
+              "sampledExtraHeapBytes": 56154392,
+              "retainedResultBytes": 6217024,
+              "winnerCount": 10000,
+              "totals": {
+                "requests": 10000,
+                "input": 5995000,
+                "output": 345000,
+                "tokens": 6340000
+              }
+            },
+            {
+              "before": 14659880,
+              "atSelection": 70858264,
+              "after": 53634920,
+              "sampledExtraHeapBytes": 56198384,
+              "retainedResultBytes": 6276808,
+              "winnerCount": 10000,
+              "totals": {
+                "requests": 10000,
+                "input": 5995000,
+                "output": 345000,
+                "tokens": 6340000
+              }
+            },
+            {
+              "before": 14696432,
+              "atSelection": 70863912,
+              "after": 50100104,
+              "sampledExtraHeapBytes": 56167480,
+              "retainedResultBytes": 6222128,
+              "winnerCount": 10000,
+              "totals": {
+                "requests": 10000,
+                "input": 5995000,
+                "output": 345000,
+                "tokens": 6340000
+              }
+            },
+            {
+              "before": 14672136,
+              "atSelection": 70860440,
+              "after": 53953768,
+              "sampledExtraHeapBytes": 56188304,
+              "retainedResultBytes": 6273128,
+              "winnerCount": 10000,
+              "totals": {
+                "requests": 10000,
+                "input": 5995000,
+                "output": 345000,
+                "tokens": 6340000
+              }
+            },
+            {
+              "before": 14705008,
+              "atSelection": 70849304,
+              "after": 50050064,
+              "sampledExtraHeapBytes": 56144296,
+              "retainedResultBytes": 6214920,
+              "winnerCount": 10000,
+              "totals": {
+                "requests": 10000,
+                "input": 5995000,
+                "output": 345000,
+                "tokens": 6340000
+              }
+            },
+            {
+              "before": 14683336,
+              "atSelection": 70843368,
+              "after": 53813968,
+              "sampledExtraHeapBytes": 56160032,
+              "retainedResultBytes": 6276768,
+              "winnerCount": 10000,
+              "totals": {
+                "requests": 10000,
+                "input": 5995000,
+                "output": 345000,
+                "tokens": 6340000
+              }
+            },
+            {
+              "before": 14719824,
+              "atSelection": 70876688,
+              "after": 50120528,
+              "sampledExtraHeapBytes": 56156864,
+              "retainedResultBytes": 6211040,
+              "winnerCount": 10000,
+              "totals": {
+                "requests": 10000,
+                "input": 5995000,
+                "output": 345000,
+                "tokens": 6340000
+              }
+            },
+            {
+              "before": 14690648,
+              "atSelection": 70884808,
+              "after": 53860808,
+              "sampledExtraHeapBytes": 56194160,
+              "retainedResultBytes": 6270344,
+              "winnerCount": 10000,
+              "totals": {
+                "requests": 10000,
+                "input": 5995000,
+                "output": 345000,
+                "tokens": 6340000
+              }
+            },
+            {
+              "before": 14720736,
+              "atSelection": 70876616,
+              "after": 50115952,
+              "sampledExtraHeapBytes": 56155880,
+              "retainedResultBytes": 6210784,
+              "winnerCount": 10000,
+              "totals": {
+                "requests": 10000,
+                "input": 5995000,
+                "output": 345000,
+                "tokens": 6340000
+              }
+            },
+            {
+              "before": 14685216,
+              "atSelection": 70891056,
+              "after": 53962752,
+              "sampledExtraHeapBytes": 56205840,
+              "retainedResultBytes": 6272480,
+              "winnerCount": 10000,
+              "totals": {
+                "requests": 10000,
+                "input": 5995000,
+                "output": 345000,
+                "tokens": 6340000
+              }
+            }
+          ],
+          "note": "Separate process; inputs loaded before GC; sample at end of selection and return, not continuous peak or GC pause measurement."
+        },
+        "B": {
+          "variant": "B",
+          "samples": [
+            {
+              "before": 14700624,
+              "atSelection": 70262896,
+              "after": 49011360,
+              "sampledExtraHeapBytes": 55562272,
+              "retainedResultBytes": 6216368,
+              "winnerCount": 10000,
+              "totals": {
+                "requests": 10000,
+                "input": 5995000,
+                "output": 345000,
+                "tokens": 6340000
+              }
+            },
+            {
+              "before": 14673160,
+              "atSelection": 70169872,
+              "after": 53033912,
+              "sampledExtraHeapBytes": 55496712,
+              "retainedResultBytes": 6271656,
+              "winnerCount": 10000,
+              "totals": {
+                "requests": 10000,
+                "input": 5995000,
+                "output": 345000,
+                "tokens": 6340000
+              }
+            },
+            {
+              "before": 14704560,
+              "atSelection": 70277336,
+              "after": 49075984,
+              "sampledExtraHeapBytes": 55572776,
+              "retainedResultBytes": 6225248,
+              "winnerCount": 10000,
+              "totals": {
+                "requests": 10000,
+                "input": 5995000,
+                "output": 345000,
+                "tokens": 6340000
+              }
+            },
+            {
+              "before": 14683704,
+              "atSelection": 70269584,
+              "after": 53048120,
+              "sampledExtraHeapBytes": 55585880,
+              "retainedResultBytes": 6276624,
+              "winnerCount": 10000,
+              "totals": {
+                "requests": 10000,
+                "input": 5995000,
+                "output": 345000,
+                "tokens": 6340000
+              }
+            },
+            {
+              "before": 14720072,
+              "atSelection": 70278760,
+              "after": 49032728,
+              "sampledExtraHeapBytes": 55558688,
+              "retainedResultBytes": 6213024,
+              "winnerCount": 10000,
+              "totals": {
+                "requests": 10000,
+                "input": 5995000,
+                "output": 345000,
+                "tokens": 6340000
+              }
+            },
+            {
+              "before": 15167928,
+              "atSelection": 70287344,
+              "after": 52796968,
+              "sampledExtraHeapBytes": 55119416,
+              "retainedResultBytes": 5804320,
+              "winnerCount": 10000,
+              "totals": {
+                "requests": 10000,
+                "input": 5995000,
+                "output": 345000,
+                "tokens": 6340000
+              }
+            },
+            {
+              "before": 14732024,
+              "atSelection": 70298904,
+              "after": 49013880,
+              "sampledExtraHeapBytes": 55566880,
+              "retainedResultBytes": 6211040,
+              "winnerCount": 10000,
+              "totals": {
+                "requests": 10000,
+                "input": 5995000,
+                "output": 345000,
+                "tokens": 6340000
+              }
+            },
+            {
+              "before": 14696848,
+              "atSelection": 70290840,
+              "after": 53130872,
+              "sampledExtraHeapBytes": 55593992,
+              "retainedResultBytes": 6272544,
+              "winnerCount": 10000,
+              "totals": {
+                "requests": 10000,
+                "input": 5995000,
+                "output": 345000,
+                "tokens": 6340000
+              }
+            },
+            {
+              "before": 14729136,
+              "atSelection": 70300880,
+              "after": 49119288,
+              "sampledExtraHeapBytes": 55571744,
+              "retainedResultBytes": 6214352,
+              "winnerCount": 10000,
+              "totals": {
+                "requests": 10000,
+                "input": 5995000,
+                "output": 345000,
+                "tokens": 6340000
+              }
+            },
+            {
+              "before": 14697384,
+              "atSelection": 70284288,
+              "after": 53062160,
+              "sampledExtraHeapBytes": 55586904,
+              "retainedResultBytes": 6478400,
+              "winnerCount": 10000,
+              "totals": {
+                "requests": 10000,
+                "input": 5995000,
+                "output": 345000,
+                "tokens": 6340000
+              }
+            }
+          ],
+          "note": "Separate process; inputs loaded before GC; sample at end of selection and return, not continuous peak or GC pause measurement."
+        }
+      },
+      "requests": 10000,
+      "tokens": 6340000,
+      "dtoCount": 30000,
+      "usageCount": 10000,
+      "correctness": {
+        "fullPreparedArray": true,
+        "sourceUnchanged": true,
+        "baseline": {
+          "requests": 10000,
+          "input": 5995000,
+          "output": 345000,
+          "tokens": 6340000,
+          "digest": "76919d5ce5c084c841b54444122a6b60b99a4bf38e830245ae4747352df13db9"
+        },
+        "earlyDiscard": {
+          "requests": 10000,
+          "input": 5995000,
+          "output": 345000,
+          "tokens": 6340000,
+          "digest": "76919d5ce5c084c841b54444122a6b60b99a4bf38e830245ae4747352df13db9",
+          "equal": true
+        },
+        "winnerOnlyCacheUnchangedRefresh": {
+          "requests": 10000,
+          "input": 5995000,
+          "output": 345000,
+          "tokens": 6340000,
+          "digest": "76919d5ce5c084c841b54444122a6b60b99a4bf38e830245ae4747352df13db9",
+          "equal": true
+        }
+      },
+      "inputRestored": true,
+      "metrics": {
+        "appendMs": {
+          "A": {
+            "medianMs": 25.82664999998815,
+            "minMs": 24.59419999999227,
+            "maxMs": 32.790500000002794,
+            "samplesMs": [
+              25.399400000009337,
+              31.69340000000375,
+              24.894300000014482,
+              32.790500000002794,
+              25.891199999983655,
+              25.29989999998361,
+              25.94310000000405,
+              25.762099999992643,
+              29.261599999997998,
+              24.59419999999227
+            ]
+          },
+          "B": {
+            "medianMs": 25.34855000000971,
+            "minMs": 24.650399999998626,
+            "maxMs": 32.62249999999767,
+            "samplesMs": [
+              24.650399999998626,
+              27.03630000000703,
+              24.721000000019558,
+              25.037300000025425,
+              25.770799999998417,
+              24.71950000000652,
+              25.151800000021467,
+              27.385500000003958,
+              32.62249999999767,
+              25.54529999999795
+            ]
+          }
+        },
+        "kernelMs": {
+          "A": {
+            "medianMs": 73.06360000000859,
+            "minMs": 61.20639999999548,
+            "maxMs": 83.01329999999143,
+            "samplesMs": [
+              83.01329999999143,
+              61.20639999999548,
+              69.9435999999987,
+              71.38879999998608,
+              72.89200000002165,
+              80.56659999999101,
+              76.53210000001127,
+              73.23519999999553,
+              68.76439999998547,
+              78.63689999998314
+            ]
+          },
+          "B": {
+            "medianMs": 395.05464999999094,
+            "minMs": 330.4401000000071,
+            "maxMs": 472.70549999998184,
+            "samplesMs": [
+              330.4401000000071,
+              341.42010000001756,
+              472.70549999998184,
+              398.13469999999506,
+              404.5609000000113,
+              405.95729999998,
+              433.8718999999983,
+              391.52349999998114,
+              389.23120000000927,
+              391.9745999999868
+            ]
+          }
+        },
+        "day": {
+          "A": {
+            "medianMs": 78.18065000000934,
+            "minMs": 75.35920000000624,
+            "maxMs": 100.26620000001276,
+            "samplesMs": [
+              78.44390000001295,
+              76.92530000000261,
+              76.00920000000042,
+              89.84109999999055,
+              79.86189999998896,
+              77.91740000000573,
+              98.61629999999423,
+              75.35920000000624,
+              100.26620000001276,
+              75.77150000000256
+            ]
+          },
+          "B": {
+            "medianMs": 78.21609999999055,
+            "minMs": 75.59659999998985,
+            "maxMs": 86.96760000000359,
+            "samplesMs": [
+              84.26699999999255,
+              78.63779999999679,
+              78.56789999999455,
+              77.19219999999041,
+              75.59659999998985,
+              76.84560000000056,
+              83.3530000000028,
+              76.03010000000359,
+              86.96760000000359,
+              77.86429999998654
+            ]
+          }
+        },
+        "month": {
+          "A": {
+            "medianMs": 78.22359999999753,
+            "minMs": 75.96630000000005,
+            "maxMs": 84.01339999999618,
+            "samplesMs": [
+              75.96630000000005,
+              75.98689999998896,
+              76.15469999998459,
+              77.44269999998505,
+              78.34510000000591,
+              79.52569999999832,
+              78.10209999998915,
+              78.37470000001485,
+              84.01339999999618,
+              83.06609999999637
+            ]
+          },
+          "B": {
+            "medianMs": 82.67429999999877,
+            "minMs": 75.79629999998724,
+            "maxMs": 99.32629999998608,
+            "samplesMs": [
+              86.24709999999322,
+              79.49139999999898,
+              99.32629999998608,
+              76.21369999999297,
+              95.988800000021,
+              77.00740000000224,
+              99.05270000000019,
+              75.79629999998724,
+              80.46059999999125,
+              84.88800000000629
+            ]
+          }
+        },
+        "session": {
+          "A": {
+            "medianMs": 39.564749999990454,
+            "minMs": 37.591800000023795,
+            "maxMs": 44.970000000001164,
+            "samplesMs": [
+              42.62200000000303,
+              39.36129999998957,
+              38.818800000008196,
+              39.01339999999618,
+              39.89439999999013,
+              39.845899999985704,
+              44.970000000001164,
+              37.85510000001523,
+              39.76819999999134,
+              37.591800000023795
+            ]
+          },
+          "B": {
+            "medianMs": 44.52459999998973,
+            "minMs": 36.351399999985006,
+            "maxMs": 58.388999999995576,
+            "samplesMs": [
+              49.15219999999681,
+              39.03139999997802,
+              51.32280000002356,
+              47.54230000000098,
+              50.32600000000093,
+              58.388999999995576,
+              38.266299999988405,
+              39.08070000002044,
+              41.50689999997849,
+              36.351399999985006
+            ]
+          }
+        },
+        "project": {
+          "A": {
+            "medianMs": 35.229100000011385,
+            "minMs": 34.117599999997765,
+            "maxMs": 42.15979999999399,
+            "samplesMs": [
+              42.129000000000815,
+              34.117599999997765,
+              42.15979999999399,
+              35.146300000022165,
+              34.67960000000312,
+              35.311900000000605,
+              37.1135999999824,
+              34.63420000000042,
+              36.330199999996694,
+              34.203699999983655
+            ]
+          },
+          "B": {
+            "medianMs": 36.048299999994924,
+            "minMs": 33.796799999981886,
+            "maxMs": 42.82170000000042,
+            "samplesMs": [
+              39.46180000000459,
+              35.617599999997765,
+              34.59399999998277,
+              42.82170000000042,
+              33.796799999981886,
+              42.34350000001723,
+              36.78570000000764,
+              34.748999999981606,
+              35.53770000001532,
+              36.478999999992084
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "synthetic-100",
+      "inventory": [
+        {
+          "provider": "claude",
+          "rootOrdinal": 0,
+          "files": 5,
+          "bytes": 22860,
+          "compressed": 0
+        },
+        {
+          "provider": "codex",
+          "rootOrdinal": 1,
+          "files": 5,
+          "bytes": 32840,
+          "compressed": 0,
+          "metadata": {
+            "indexBytes": 0,
+            "threads": 0
+          }
+        }
+      ],
+      "inputSha256": "0b5b30314e8445f83eaedcd291b3a065707c646fba18b093b4883ea90faa6291",
+      "expected": {
+        "requests": 100,
+        "tokens": 18400,
+        "sessions": 10,
+        "turnsPerSession": 10
+      },
+      "hashes": {
+        "baseline": "69d6b9c2c54c0f47b79fed69ef844707cbee4ee954d33ca07357404bfcc1f2f9",
+        "arraySlots": "50f3368ff33e7ee270f84d2edaa5977cad6a14123833decdc7d71a5e3924b9d6",
+        "overwrite": "20e248b8752934492903b37de2037842efafa16d1883eefc8921f19ea167b49f"
+      },
+      "initial": {
+        "A": {
+          "ms": 34.34299999999348,
+          "requests": 100,
+          "tokens": 18400,
+          "failed": 0,
+          "parsed": 10,
+          "bodyBytes": 55700,
+          "checked": {
+            "factsSha256": "28558a7a96cf39696d17bc80abc13f6ab9d16677af392e9d30bafbb29cd2ce3a",
+            "aggregatesSha256": "48a295a0ee8e5ae2a2d3b102afaaa810bb5ab64a5d25f7dabedf5ada09848a85",
+            "rawChecks": 10,
+            "independent": {
+              "day": {
+                "groups": 10,
+                "requests": 100,
+                "tokens": 18400,
+                "sha256": "f2f140b9f746a1eb9a94d95af39cb06552c9324c211184f41a2ee653a0c6dfd0"
+              },
+              "month": {
+                "groups": 2,
+                "requests": 100,
+                "tokens": 18400,
+                "sha256": "4e818ce2fc2d701769e879bb52a4e87121e2670e548dac35d8057c640138bb14"
+              },
+              "session": {
+                "groups": 10,
+                "requests": 100,
+                "tokens": 18400,
+                "sha256": "e63fabb3cb696fa51502fc5c3f488f92e1f41bd9a068dccba8c52121bd0fbf7f"
+              },
+              "project": {
+                "groups": 10,
+                "requests": 100,
+                "tokens": 18400,
+                "sha256": "7b5a8ecf6f77db0ca75936806a7d526c2acb5345199eeb9639de58f53fa69840"
+              }
+            }
+          }
+        },
+        "B": {
+          "ms": 27.443800000008196,
+          "requests": 100,
+          "tokens": 18400,
+          "failed": 0,
+          "parsed": 10,
+          "bodyBytes": 55700,
+          "checked": {
+            "factsSha256": "28558a7a96cf39696d17bc80abc13f6ab9d16677af392e9d30bafbb29cd2ce3a",
+            "aggregatesSha256": "48a295a0ee8e5ae2a2d3b102afaaa810bb5ab64a5d25f7dabedf5ada09848a85",
+            "rawChecks": 10,
+            "independent": {
+              "day": {
+                "groups": 10,
+                "requests": 100,
+                "tokens": 18400,
+                "sha256": "f2f140b9f746a1eb9a94d95af39cb06552c9324c211184f41a2ee653a0c6dfd0"
+              },
+              "month": {
+                "groups": 2,
+                "requests": 100,
+                "tokens": 18400,
+                "sha256": "4e818ce2fc2d701769e879bb52a4e87121e2670e548dac35d8057c640138bb14"
+              },
+              "session": {
+                "groups": 10,
+                "requests": 100,
+                "tokens": 18400,
+                "sha256": "e63fabb3cb696fa51502fc5c3f488f92e1f41bd9a068dccba8c52121bd0fbf7f"
+              },
+              "project": {
+                "groups": 10,
+                "requests": 100,
+                "tokens": 18400,
+                "sha256": "7b5a8ecf6f77db0ca75936806a7d526c2acb5345199eeb9639de58f53fa69840"
+              }
+            }
+          }
+        }
+      },
+      "samples": [
+        {
+          "pair": 0,
+          "variant": "B",
+          "kernelMs": 0.6074000000080559,
+          "appendMs": 6.363700000016252,
+          "reads": {
+            "day": 1.317799999989802,
+            "month": 1.1114999999990687,
+            "session": 0.7266999999992549,
+            "project": 0.6379999999771826
+          },
+          "requests": 101,
+          "tokens": 18530,
+          "parsed": 1,
+          "bodyBytes": 7205,
+          "factsSha256": "386c09ef5db7585acc0f1f87f615f6404f8886102c6392743ba53f82aad5dd8a",
+          "aggregatesSha256": "47233ba14d2a823eea6ea22706a1b33817dcbb8d9d2b50dd1e043603d0b9ce83",
+          "queryDigests": {
+            "day": {
+              "groups": 11,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "24629c231ebf2c8e1855d531bcf227969e1f3c58a11c04eb176abafe2528741d"
+            },
+            "month": {
+              "groups": 3,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "c5b999636156d48eef5102530e0df673d7743bd10c7de7188e6b63c58c4102b5"
+            },
+            "session": {
+              "groups": 10,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "4768cbc38ba463e5fba9c1adb97016ac041964005a73839d715e008b48b6c878"
+            },
+            "project": {
+              "groups": 10,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "91417a4da71085701ff0f56c25654289b456a6a18099c96d01e3d15ba66d097b"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 0,
+          "variant": "A",
+          "kernelMs": 0.6913000000058673,
+          "appendMs": 7.4416999999957625,
+          "reads": {
+            "day": 1.256599999993341,
+            "month": 1.0781000000133645,
+            "session": 0.7115000000048894,
+            "project": 0.639999999984866
+          },
+          "requests": 101,
+          "tokens": 18530,
+          "parsed": 1,
+          "bodyBytes": 7205,
+          "factsSha256": "386c09ef5db7585acc0f1f87f615f6404f8886102c6392743ba53f82aad5dd8a",
+          "aggregatesSha256": "47233ba14d2a823eea6ea22706a1b33817dcbb8d9d2b50dd1e043603d0b9ce83",
+          "queryDigests": {
+            "day": {
+              "groups": 11,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "24629c231ebf2c8e1855d531bcf227969e1f3c58a11c04eb176abafe2528741d"
+            },
+            "month": {
+              "groups": 3,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "c5b999636156d48eef5102530e0df673d7743bd10c7de7188e6b63c58c4102b5"
+            },
+            "session": {
+              "groups": 10,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "4768cbc38ba463e5fba9c1adb97016ac041964005a73839d715e008b48b6c878"
+            },
+            "project": {
+              "groups": 10,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "91417a4da71085701ff0f56c25654289b456a6a18099c96d01e3d15ba66d097b"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 1,
+          "variant": "A",
+          "kernelMs": 0.5476000000198837,
+          "appendMs": 6.424799999978859,
+          "reads": {
+            "day": 1.3255000000062864,
+            "month": 1.076600000000326,
+            "session": 0.7044999999925494,
+            "project": 0.638699999981327
+          },
+          "requests": 101,
+          "tokens": 18530,
+          "parsed": 1,
+          "bodyBytes": 7205,
+          "factsSha256": "386c09ef5db7585acc0f1f87f615f6404f8886102c6392743ba53f82aad5dd8a",
+          "aggregatesSha256": "47233ba14d2a823eea6ea22706a1b33817dcbb8d9d2b50dd1e043603d0b9ce83",
+          "queryDigests": {
+            "day": {
+              "groups": 11,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "24629c231ebf2c8e1855d531bcf227969e1f3c58a11c04eb176abafe2528741d"
+            },
+            "month": {
+              "groups": 3,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "c5b999636156d48eef5102530e0df673d7743bd10c7de7188e6b63c58c4102b5"
+            },
+            "session": {
+              "groups": 10,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "4768cbc38ba463e5fba9c1adb97016ac041964005a73839d715e008b48b6c878"
+            },
+            "project": {
+              "groups": 10,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "91417a4da71085701ff0f56c25654289b456a6a18099c96d01e3d15ba66d097b"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 1,
+          "variant": "B",
+          "kernelMs": 0.815600000001723,
+          "appendMs": 7.214200000016717,
+          "reads": {
+            "day": 1.259200000000419,
+            "month": 1.0809000000008382,
+            "session": 0.7792000000190455,
+            "project": 0.6738999999943189
+          },
+          "requests": 101,
+          "tokens": 18530,
+          "parsed": 1,
+          "bodyBytes": 7205,
+          "factsSha256": "386c09ef5db7585acc0f1f87f615f6404f8886102c6392743ba53f82aad5dd8a",
+          "aggregatesSha256": "47233ba14d2a823eea6ea22706a1b33817dcbb8d9d2b50dd1e043603d0b9ce83",
+          "queryDigests": {
+            "day": {
+              "groups": 11,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "24629c231ebf2c8e1855d531bcf227969e1f3c58a11c04eb176abafe2528741d"
+            },
+            "month": {
+              "groups": 3,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "c5b999636156d48eef5102530e0df673d7743bd10c7de7188e6b63c58c4102b5"
+            },
+            "session": {
+              "groups": 10,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "4768cbc38ba463e5fba9c1adb97016ac041964005a73839d715e008b48b6c878"
+            },
+            "project": {
+              "groups": 10,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "91417a4da71085701ff0f56c25654289b456a6a18099c96d01e3d15ba66d097b"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 2,
+          "variant": "B",
+          "kernelMs": 0.5164999999979045,
+          "appendMs": 6.818900000012945,
+          "reads": {
+            "day": 1.2637999999860767,
+            "month": 1.0997999999963213,
+            "session": 0.71919999999227,
+            "project": 0.8083000000042375
+          },
+          "requests": 101,
+          "tokens": 18530,
+          "parsed": 1,
+          "bodyBytes": 7205,
+          "factsSha256": "386c09ef5db7585acc0f1f87f615f6404f8886102c6392743ba53f82aad5dd8a",
+          "aggregatesSha256": "47233ba14d2a823eea6ea22706a1b33817dcbb8d9d2b50dd1e043603d0b9ce83",
+          "queryDigests": {
+            "day": {
+              "groups": 11,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "24629c231ebf2c8e1855d531bcf227969e1f3c58a11c04eb176abafe2528741d"
+            },
+            "month": {
+              "groups": 3,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "c5b999636156d48eef5102530e0df673d7743bd10c7de7188e6b63c58c4102b5"
+            },
+            "session": {
+              "groups": 10,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "4768cbc38ba463e5fba9c1adb97016ac041964005a73839d715e008b48b6c878"
+            },
+            "project": {
+              "groups": 10,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "91417a4da71085701ff0f56c25654289b456a6a18099c96d01e3d15ba66d097b"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 2,
+          "variant": "A",
+          "kernelMs": 0.6022999999986496,
+          "appendMs": 7.025699999998324,
+          "reads": {
+            "day": 1.2629000000015367,
+            "month": 1.1228999999875668,
+            "session": 0.7564000000129454,
+            "project": 0.6542999999946915
+          },
+          "requests": 101,
+          "tokens": 18530,
+          "parsed": 1,
+          "bodyBytes": 7205,
+          "factsSha256": "386c09ef5db7585acc0f1f87f615f6404f8886102c6392743ba53f82aad5dd8a",
+          "aggregatesSha256": "47233ba14d2a823eea6ea22706a1b33817dcbb8d9d2b50dd1e043603d0b9ce83",
+          "queryDigests": {
+            "day": {
+              "groups": 11,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "24629c231ebf2c8e1855d531bcf227969e1f3c58a11c04eb176abafe2528741d"
+            },
+            "month": {
+              "groups": 3,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "c5b999636156d48eef5102530e0df673d7743bd10c7de7188e6b63c58c4102b5"
+            },
+            "session": {
+              "groups": 10,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "4768cbc38ba463e5fba9c1adb97016ac041964005a73839d715e008b48b6c878"
+            },
+            "project": {
+              "groups": 10,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "91417a4da71085701ff0f56c25654289b456a6a18099c96d01e3d15ba66d097b"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 3,
+          "variant": "A",
+          "kernelMs": 0.49299999998766,
+          "appendMs": 6.5125000000116415,
+          "reads": {
+            "day": 1.2136000000173226,
+            "month": 1.1031999999831896,
+            "session": 0.747300000017276,
+            "project": 0.6535000000149012
+          },
+          "requests": 101,
+          "tokens": 18530,
+          "parsed": 1,
+          "bodyBytes": 7205,
+          "factsSha256": "386c09ef5db7585acc0f1f87f615f6404f8886102c6392743ba53f82aad5dd8a",
+          "aggregatesSha256": "47233ba14d2a823eea6ea22706a1b33817dcbb8d9d2b50dd1e043603d0b9ce83",
+          "queryDigests": {
+            "day": {
+              "groups": 11,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "24629c231ebf2c8e1855d531bcf227969e1f3c58a11c04eb176abafe2528741d"
+            },
+            "month": {
+              "groups": 3,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "c5b999636156d48eef5102530e0df673d7743bd10c7de7188e6b63c58c4102b5"
+            },
+            "session": {
+              "groups": 10,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "4768cbc38ba463e5fba9c1adb97016ac041964005a73839d715e008b48b6c878"
+            },
+            "project": {
+              "groups": 10,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "91417a4da71085701ff0f56c25654289b456a6a18099c96d01e3d15ba66d097b"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 3,
+          "variant": "B",
+          "kernelMs": 0.5081000000063796,
+          "appendMs": 6.03979999999865,
+          "reads": {
+            "day": 1.2807000000029802,
+            "month": 1.106099999975413,
+            "session": 0.7096000000019558,
+            "project": 0.7587999999814201
+          },
+          "requests": 101,
+          "tokens": 18530,
+          "parsed": 1,
+          "bodyBytes": 7205,
+          "factsSha256": "386c09ef5db7585acc0f1f87f615f6404f8886102c6392743ba53f82aad5dd8a",
+          "aggregatesSha256": "47233ba14d2a823eea6ea22706a1b33817dcbb8d9d2b50dd1e043603d0b9ce83",
+          "queryDigests": {
+            "day": {
+              "groups": 11,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "24629c231ebf2c8e1855d531bcf227969e1f3c58a11c04eb176abafe2528741d"
+            },
+            "month": {
+              "groups": 3,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "c5b999636156d48eef5102530e0df673d7743bd10c7de7188e6b63c58c4102b5"
+            },
+            "session": {
+              "groups": 10,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "4768cbc38ba463e5fba9c1adb97016ac041964005a73839d715e008b48b6c878"
+            },
+            "project": {
+              "groups": 10,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "91417a4da71085701ff0f56c25654289b456a6a18099c96d01e3d15ba66d097b"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 4,
+          "variant": "B",
+          "kernelMs": 0.631599999993341,
+          "appendMs": 6.50690000000759,
+          "reads": {
+            "day": 1.4974999999976717,
+            "month": 1.1692000000039116,
+            "session": 0.8134000000136439,
+            "project": 0.6878999999898952
+          },
+          "requests": 101,
+          "tokens": 18530,
+          "parsed": 1,
+          "bodyBytes": 7205,
+          "factsSha256": "386c09ef5db7585acc0f1f87f615f6404f8886102c6392743ba53f82aad5dd8a",
+          "aggregatesSha256": "47233ba14d2a823eea6ea22706a1b33817dcbb8d9d2b50dd1e043603d0b9ce83",
+          "queryDigests": {
+            "day": {
+              "groups": 11,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "24629c231ebf2c8e1855d531bcf227969e1f3c58a11c04eb176abafe2528741d"
+            },
+            "month": {
+              "groups": 3,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "c5b999636156d48eef5102530e0df673d7743bd10c7de7188e6b63c58c4102b5"
+            },
+            "session": {
+              "groups": 10,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "4768cbc38ba463e5fba9c1adb97016ac041964005a73839d715e008b48b6c878"
+            },
+            "project": {
+              "groups": 10,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "91417a4da71085701ff0f56c25654289b456a6a18099c96d01e3d15ba66d097b"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 4,
+          "variant": "A",
+          "kernelMs": 0.5168000000121538,
+          "appendMs": 6.925199999997858,
+          "reads": {
+            "day": 1.298399999999674,
+            "month": 1.2012000000104308,
+            "session": 0.8090000000083819,
+            "project": 0.643099999986589
+          },
+          "requests": 101,
+          "tokens": 18530,
+          "parsed": 1,
+          "bodyBytes": 7205,
+          "factsSha256": "386c09ef5db7585acc0f1f87f615f6404f8886102c6392743ba53f82aad5dd8a",
+          "aggregatesSha256": "47233ba14d2a823eea6ea22706a1b33817dcbb8d9d2b50dd1e043603d0b9ce83",
+          "queryDigests": {
+            "day": {
+              "groups": 11,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "24629c231ebf2c8e1855d531bcf227969e1f3c58a11c04eb176abafe2528741d"
+            },
+            "month": {
+              "groups": 3,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "c5b999636156d48eef5102530e0df673d7743bd10c7de7188e6b63c58c4102b5"
+            },
+            "session": {
+              "groups": 10,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "4768cbc38ba463e5fba9c1adb97016ac041964005a73839d715e008b48b6c878"
+            },
+            "project": {
+              "groups": 10,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "91417a4da71085701ff0f56c25654289b456a6a18099c96d01e3d15ba66d097b"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 5,
+          "variant": "A",
+          "kernelMs": 0.5204999999841675,
+          "appendMs": 6.369000000006054,
+          "reads": {
+            "day": 1.2454999999899883,
+            "month": 1.0957000000053085,
+            "session": 0.7102000000013504,
+            "project": 0.6394999999902211
+          },
+          "requests": 101,
+          "tokens": 18530,
+          "parsed": 1,
+          "bodyBytes": 7205,
+          "factsSha256": "386c09ef5db7585acc0f1f87f615f6404f8886102c6392743ba53f82aad5dd8a",
+          "aggregatesSha256": "47233ba14d2a823eea6ea22706a1b33817dcbb8d9d2b50dd1e043603d0b9ce83",
+          "queryDigests": {
+            "day": {
+              "groups": 11,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "24629c231ebf2c8e1855d531bcf227969e1f3c58a11c04eb176abafe2528741d"
+            },
+            "month": {
+              "groups": 3,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "c5b999636156d48eef5102530e0df673d7743bd10c7de7188e6b63c58c4102b5"
+            },
+            "session": {
+              "groups": 10,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "4768cbc38ba463e5fba9c1adb97016ac041964005a73839d715e008b48b6c878"
+            },
+            "project": {
+              "groups": 10,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "91417a4da71085701ff0f56c25654289b456a6a18099c96d01e3d15ba66d097b"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 5,
+          "variant": "B",
+          "kernelMs": 0.5332000000053085,
+          "appendMs": 6.814299999998184,
+          "reads": {
+            "day": 1.2324999999837019,
+            "month": 1.1148000000102911,
+            "session": 0.7186999999976251,
+            "project": 0.6450999999942724
+          },
+          "requests": 101,
+          "tokens": 18530,
+          "parsed": 1,
+          "bodyBytes": 7205,
+          "factsSha256": "386c09ef5db7585acc0f1f87f615f6404f8886102c6392743ba53f82aad5dd8a",
+          "aggregatesSha256": "47233ba14d2a823eea6ea22706a1b33817dcbb8d9d2b50dd1e043603d0b9ce83",
+          "queryDigests": {
+            "day": {
+              "groups": 11,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "24629c231ebf2c8e1855d531bcf227969e1f3c58a11c04eb176abafe2528741d"
+            },
+            "month": {
+              "groups": 3,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "c5b999636156d48eef5102530e0df673d7743bd10c7de7188e6b63c58c4102b5"
+            },
+            "session": {
+              "groups": 10,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "4768cbc38ba463e5fba9c1adb97016ac041964005a73839d715e008b48b6c878"
+            },
+            "project": {
+              "groups": 10,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "91417a4da71085701ff0f56c25654289b456a6a18099c96d01e3d15ba66d097b"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 6,
+          "variant": "B",
+          "kernelMs": 0.8140999999886844,
+          "appendMs": 6.58729999998468,
+          "reads": {
+            "day": 1.2605000000039581,
+            "month": 1.2383000000263564,
+            "session": 0.7529999999969732,
+            "project": 0.6820000000006985
+          },
+          "requests": 101,
+          "tokens": 18530,
+          "parsed": 1,
+          "bodyBytes": 7205,
+          "factsSha256": "386c09ef5db7585acc0f1f87f615f6404f8886102c6392743ba53f82aad5dd8a",
+          "aggregatesSha256": "47233ba14d2a823eea6ea22706a1b33817dcbb8d9d2b50dd1e043603d0b9ce83",
+          "queryDigests": {
+            "day": {
+              "groups": 11,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "24629c231ebf2c8e1855d531bcf227969e1f3c58a11c04eb176abafe2528741d"
+            },
+            "month": {
+              "groups": 3,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "c5b999636156d48eef5102530e0df673d7743bd10c7de7188e6b63c58c4102b5"
+            },
+            "session": {
+              "groups": 10,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "4768cbc38ba463e5fba9c1adb97016ac041964005a73839d715e008b48b6c878"
+            },
+            "project": {
+              "groups": 10,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "91417a4da71085701ff0f56c25654289b456a6a18099c96d01e3d15ba66d097b"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 6,
+          "variant": "A",
+          "kernelMs": 0.7343999999866355,
+          "appendMs": 8.2896999999939,
+          "reads": {
+            "day": 1.5119999999878928,
+            "month": 1.5328000000154134,
+            "session": 0.7454999999899883,
+            "project": 0.6766000000061467
+          },
+          "requests": 101,
+          "tokens": 18530,
+          "parsed": 1,
+          "bodyBytes": 7205,
+          "factsSha256": "386c09ef5db7585acc0f1f87f615f6404f8886102c6392743ba53f82aad5dd8a",
+          "aggregatesSha256": "47233ba14d2a823eea6ea22706a1b33817dcbb8d9d2b50dd1e043603d0b9ce83",
+          "queryDigests": {
+            "day": {
+              "groups": 11,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "24629c231ebf2c8e1855d531bcf227969e1f3c58a11c04eb176abafe2528741d"
+            },
+            "month": {
+              "groups": 3,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "c5b999636156d48eef5102530e0df673d7743bd10c7de7188e6b63c58c4102b5"
+            },
+            "session": {
+              "groups": 10,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "4768cbc38ba463e5fba9c1adb97016ac041964005a73839d715e008b48b6c878"
+            },
+            "project": {
+              "groups": 10,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "91417a4da71085701ff0f56c25654289b456a6a18099c96d01e3d15ba66d097b"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 7,
+          "variant": "A",
+          "kernelMs": 0.510999999998603,
+          "appendMs": 12.126599999988684,
+          "reads": {
+            "day": 2.8215000000200234,
+            "month": 1.72620000000461,
+            "session": 1.1661000000021886,
+            "project": 0.9951000000000931
+          },
+          "requests": 101,
+          "tokens": 18530,
+          "parsed": 1,
+          "bodyBytes": 7205,
+          "factsSha256": "386c09ef5db7585acc0f1f87f615f6404f8886102c6392743ba53f82aad5dd8a",
+          "aggregatesSha256": "47233ba14d2a823eea6ea22706a1b33817dcbb8d9d2b50dd1e043603d0b9ce83",
+          "queryDigests": {
+            "day": {
+              "groups": 11,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "24629c231ebf2c8e1855d531bcf227969e1f3c58a11c04eb176abafe2528741d"
+            },
+            "month": {
+              "groups": 3,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "c5b999636156d48eef5102530e0df673d7743bd10c7de7188e6b63c58c4102b5"
+            },
+            "session": {
+              "groups": 10,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "4768cbc38ba463e5fba9c1adb97016ac041964005a73839d715e008b48b6c878"
+            },
+            "project": {
+              "groups": 10,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "91417a4da71085701ff0f56c25654289b456a6a18099c96d01e3d15ba66d097b"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 7,
+          "variant": "B",
+          "kernelMs": 0.5265999999828637,
+          "appendMs": 6.181899999995949,
+          "reads": {
+            "day": 1.2466999999887776,
+            "month": 1.1094000000157394,
+            "session": 0.6928999999945518,
+            "project": 0.6485999999858905
+          },
+          "requests": 101,
+          "tokens": 18530,
+          "parsed": 1,
+          "bodyBytes": 7205,
+          "factsSha256": "386c09ef5db7585acc0f1f87f615f6404f8886102c6392743ba53f82aad5dd8a",
+          "aggregatesSha256": "47233ba14d2a823eea6ea22706a1b33817dcbb8d9d2b50dd1e043603d0b9ce83",
+          "queryDigests": {
+            "day": {
+              "groups": 11,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "24629c231ebf2c8e1855d531bcf227969e1f3c58a11c04eb176abafe2528741d"
+            },
+            "month": {
+              "groups": 3,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "c5b999636156d48eef5102530e0df673d7743bd10c7de7188e6b63c58c4102b5"
+            },
+            "session": {
+              "groups": 10,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "4768cbc38ba463e5fba9c1adb97016ac041964005a73839d715e008b48b6c878"
+            },
+            "project": {
+              "groups": 10,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "91417a4da71085701ff0f56c25654289b456a6a18099c96d01e3d15ba66d097b"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 8,
+          "variant": "B",
+          "kernelMs": 0.6150999999954365,
+          "appendMs": 6.188699999998789,
+          "reads": {
+            "day": 1.2239000000117812,
+            "month": 1.1022999999986496,
+            "session": 0.7007999999914318,
+            "project": 0.7259000000194646
+          },
+          "requests": 101,
+          "tokens": 18530,
+          "parsed": 1,
+          "bodyBytes": 7205,
+          "factsSha256": "386c09ef5db7585acc0f1f87f615f6404f8886102c6392743ba53f82aad5dd8a",
+          "aggregatesSha256": "47233ba14d2a823eea6ea22706a1b33817dcbb8d9d2b50dd1e043603d0b9ce83",
+          "queryDigests": {
+            "day": {
+              "groups": 11,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "24629c231ebf2c8e1855d531bcf227969e1f3c58a11c04eb176abafe2528741d"
+            },
+            "month": {
+              "groups": 3,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "c5b999636156d48eef5102530e0df673d7743bd10c7de7188e6b63c58c4102b5"
+            },
+            "session": {
+              "groups": 10,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "4768cbc38ba463e5fba9c1adb97016ac041964005a73839d715e008b48b6c878"
+            },
+            "project": {
+              "groups": 10,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "91417a4da71085701ff0f56c25654289b456a6a18099c96d01e3d15ba66d097b"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 8,
+          "variant": "A",
+          "kernelMs": 0.5706000000063796,
+          "appendMs": 6.249700000014855,
+          "reads": {
+            "day": 1.1869000000006054,
+            "month": 1.1010999999998603,
+            "session": 0.8546999999962281,
+            "project": 0.6720000000204891
+          },
+          "requests": 101,
+          "tokens": 18530,
+          "parsed": 1,
+          "bodyBytes": 7205,
+          "factsSha256": "386c09ef5db7585acc0f1f87f615f6404f8886102c6392743ba53f82aad5dd8a",
+          "aggregatesSha256": "47233ba14d2a823eea6ea22706a1b33817dcbb8d9d2b50dd1e043603d0b9ce83",
+          "queryDigests": {
+            "day": {
+              "groups": 11,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "24629c231ebf2c8e1855d531bcf227969e1f3c58a11c04eb176abafe2528741d"
+            },
+            "month": {
+              "groups": 3,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "c5b999636156d48eef5102530e0df673d7743bd10c7de7188e6b63c58c4102b5"
+            },
+            "session": {
+              "groups": 10,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "4768cbc38ba463e5fba9c1adb97016ac041964005a73839d715e008b48b6c878"
+            },
+            "project": {
+              "groups": 10,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "91417a4da71085701ff0f56c25654289b456a6a18099c96d01e3d15ba66d097b"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 9,
+          "variant": "A",
+          "kernelMs": 0.6518999999971129,
+          "appendMs": 11.259900000004563,
+          "reads": {
+            "day": 1.8831000000063796,
+            "month": 1.1689000000187661,
+            "session": 0.7667999999830499,
+            "project": 0.6946999999927357
+          },
+          "requests": 101,
+          "tokens": 18530,
+          "parsed": 1,
+          "bodyBytes": 7205,
+          "factsSha256": "386c09ef5db7585acc0f1f87f615f6404f8886102c6392743ba53f82aad5dd8a",
+          "aggregatesSha256": "47233ba14d2a823eea6ea22706a1b33817dcbb8d9d2b50dd1e043603d0b9ce83",
+          "queryDigests": {
+            "day": {
+              "groups": 11,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "24629c231ebf2c8e1855d531bcf227969e1f3c58a11c04eb176abafe2528741d"
+            },
+            "month": {
+              "groups": 3,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "c5b999636156d48eef5102530e0df673d7743bd10c7de7188e6b63c58c4102b5"
+            },
+            "session": {
+              "groups": 10,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "4768cbc38ba463e5fba9c1adb97016ac041964005a73839d715e008b48b6c878"
+            },
+            "project": {
+              "groups": 10,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "91417a4da71085701ff0f56c25654289b456a6a18099c96d01e3d15ba66d097b"
+            }
+          },
+          "rawChecks": 10
+        },
+        {
+          "pair": 9,
+          "variant": "B",
+          "kernelMs": 0.8074000000196975,
+          "appendMs": 6.613000000012107,
+          "reads": {
+            "day": 1.677399999985937,
+            "month": 1.1312999999790918,
+            "session": 1.0353999999933876,
+            "project": 0.7091000000073109
+          },
+          "requests": 101,
+          "tokens": 18530,
+          "parsed": 1,
+          "bodyBytes": 7205,
+          "factsSha256": "386c09ef5db7585acc0f1f87f615f6404f8886102c6392743ba53f82aad5dd8a",
+          "aggregatesSha256": "47233ba14d2a823eea6ea22706a1b33817dcbb8d9d2b50dd1e043603d0b9ce83",
+          "queryDigests": {
+            "day": {
+              "groups": 11,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "24629c231ebf2c8e1855d531bcf227969e1f3c58a11c04eb176abafe2528741d"
+            },
+            "month": {
+              "groups": 3,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "c5b999636156d48eef5102530e0df673d7743bd10c7de7188e6b63c58c4102b5"
+            },
+            "session": {
+              "groups": 10,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "4768cbc38ba463e5fba9c1adb97016ac041964005a73839d715e008b48b6c878"
+            },
+            "project": {
+              "groups": 10,
+              "requests": 101,
+              "tokens": 18530,
+              "sha256": "91417a4da71085701ff0f56c25654289b456a6a18099c96d01e3d15ba66d097b"
+            }
+          },
+          "rawChecks": 10
+        }
+      ],
+      "heap": {
+        "A": {
+          "variant": "A",
+          "samples": [
+            {
+              "before": 5757400,
+              "atSelection": 6866800,
+              "after": 7222152,
+              "sampledExtraHeapBytes": 1464752,
+              "retainedResultBytes": 62976,
+              "winnerCount": 100,
+              "totals": {
+                "requests": 100,
+                "input": 14950,
+                "output": 3450,
+                "tokens": 18400
+              }
+            },
+            {
+              "before": 5758472,
+              "atSelection": 6866544,
+              "after": 7221664,
+              "sampledExtraHeapBytes": 1463192,
+              "retainedResultBytes": 63048,
+              "winnerCount": 100,
+              "totals": {
+                "requests": 100,
+                "input": 14950,
+                "output": 3450,
+                "tokens": 18400
+              }
+            },
+            {
+              "before": 5758688,
+              "atSelection": 6868680,
+              "after": 7226808,
+              "sampledExtraHeapBytes": 1468120,
+              "retainedResultBytes": 74952,
+              "winnerCount": 100,
+              "totals": {
+                "requests": 100,
+                "input": 14950,
+                "output": 3450,
+                "tokens": 18400
+              }
+            },
+            {
+              "before": 5772800,
+              "atSelection": 6884368,
+              "after": 7239992,
+              "sampledExtraHeapBytes": 1467192,
+              "retainedResultBytes": 62344,
+              "winnerCount": 100,
+              "totals": {
+                "requests": 100,
+                "input": 14950,
+                "output": 3450,
+                "tokens": 18400
+              }
+            },
+            {
+              "before": 5772312,
+              "atSelection": 6880384,
+              "after": 7235584,
+              "sampledExtraHeapBytes": 1463272,
+              "retainedResultBytes": 65072,
+              "winnerCount": 100,
+              "totals": {
+                "requests": 100,
+                "input": 14950,
+                "output": 3450,
+                "tokens": 18400
+              }
+            },
+            {
+              "before": 6017536,
+              "atSelection": 6894248,
+              "after": 7249512,
+              "sampledExtraHeapBytes": 1231976,
+              "retainedResultBytes": -167712,
+              "winnerCount": 100,
+              "totals": {
+                "requests": 100,
+                "input": 14950,
+                "output": 3450,
+                "tokens": 18400
+              }
+            },
+            {
+              "before": 5792112,
+              "atSelection": 6392096,
+              "after": 6747600,
+              "sampledExtraHeapBytes": 955488,
+              "retainedResultBytes": 48776,
+              "winnerCount": 100,
+              "totals": {
+                "requests": 100,
+                "input": 14950,
+                "output": 3450,
+                "tokens": 18400
+              }
+            },
+            {
+              "before": 5778024,
+              "atSelection": 6378216,
+              "after": 6748920,
+              "sampledExtraHeapBytes": 970896,
+              "retainedResultBytes": 78864,
+              "winnerCount": 100,
+              "totals": {
+                "requests": 100,
+                "input": 14950,
+                "output": 3450,
+                "tokens": 18400
+              }
+            },
+            {
+              "before": 5793816,
+              "atSelection": 6394008,
+              "after": 6750168,
+              "sampledExtraHeapBytes": 956352,
+              "retainedResultBytes": 63232,
+              "winnerCount": 100,
+              "totals": {
+                "requests": 100,
+                "input": 14950,
+                "output": 3450,
+                "tokens": 18400
+              }
+            },
+            {
+              "before": 5793976,
+              "atSelection": 6394168,
+              "after": 6749400,
+              "sampledExtraHeapBytes": 955424,
+              "retainedResultBytes": 63288,
+              "winnerCount": 100,
+              "totals": {
+                "requests": 100,
+                "input": 14950,
+                "output": 3450,
+                "tokens": 18400
+              }
+            }
+          ],
+          "note": "Separate process; inputs loaded before GC; sample at end of selection and return, not continuous peak or GC pause measurement."
+        },
+        "B": {
+          "variant": "B",
+          "samples": [
+            {
+              "before": 5916328,
+              "atSelection": 7050512,
+              "after": 7405144,
+              "sampledExtraHeapBytes": 1488816,
+              "retainedResultBytes": -93936,
+              "winnerCount": 100,
+              "totals": {
+                "requests": 100,
+                "input": 14950,
+                "output": 3450,
+                "tokens": 18400
+              }
+            },
+            {
+              "before": 5760368,
+              "atSelection": 6875000,
+              "after": 7230088,
+              "sampledExtraHeapBytes": 1469720,
+              "retainedResultBytes": 63048,
+              "winnerCount": 100,
+              "totals": {
+                "requests": 100,
+                "input": 14950,
+                "output": 3450,
+                "tokens": 18400
+              }
+            },
+            {
+              "before": 5760584,
+              "atSelection": 6876008,
+              "after": 7234096,
+              "sampledExtraHeapBytes": 1473512,
+              "retainedResultBytes": 75184,
+              "winnerCount": 100,
+              "totals": {
+                "requests": 100,
+                "input": 14950,
+                "output": 3450,
+                "tokens": 18400
+              }
+            },
+            {
+              "before": 5774688,
+              "atSelection": 6891736,
+              "after": 7248480,
+              "sampledExtraHeapBytes": 1473792,
+              "retainedResultBytes": 62336,
+              "winnerCount": 100,
+              "totals": {
+                "requests": 100,
+                "input": 14950,
+                "output": 3450,
+                "tokens": 18400
+              }
+            },
+            {
+              "before": 5774192,
+              "atSelection": 6887696,
+              "after": 7242864,
+              "sampledExtraHeapBytes": 1468672,
+              "retainedResultBytes": 65072,
+              "winnerCount": 100,
+              "totals": {
+                "requests": 100,
+                "input": 14950,
+                "output": 3450,
+                "tokens": 18400
+              }
+            },
+            {
+              "before": 6054872,
+              "atSelection": 6901560,
+              "after": 7256792,
+              "sampledExtraHeapBytes": 1201920,
+              "retainedResultBytes": -203408,
+              "winnerCount": 100,
+              "totals": {
+                "requests": 100,
+                "input": 14950,
+                "output": 3450,
+                "tokens": 18400
+              }
+            },
+            {
+              "before": 5793992,
+              "atSelection": 6400416,
+              "after": 6755776,
+              "sampledExtraHeapBytes": 961784,
+              "retainedResultBytes": 48776,
+              "winnerCount": 100,
+              "totals": {
+                "requests": 100,
+                "input": 14950,
+                "output": 3450,
+                "tokens": 18400
+              }
+            },
+            {
+              "before": 5779904,
+              "atSelection": 6385408,
+              "after": 6756000,
+              "sampledExtraHeapBytes": 976096,
+              "retainedResultBytes": 78624,
+              "winnerCount": 100,
+              "totals": {
+                "requests": 100,
+                "input": 14950,
+                "output": 3450,
+                "tokens": 18400
+              }
+            },
+            {
+              "before": 5795696,
+              "atSelection": 6402328,
+              "after": 6758344,
+              "sampledExtraHeapBytes": 962648,
+              "retainedResultBytes": 63232,
+              "winnerCount": 100,
+              "totals": {
+                "requests": 100,
+                "input": 14950,
+                "output": 3450,
+                "tokens": 18400
+              }
+            },
+            {
+              "before": 5795856,
+              "atSelection": 6401360,
+              "after": 6756448,
+              "sampledExtraHeapBytes": 960592,
+              "retainedResultBytes": 63048,
+              "winnerCount": 100,
+              "totals": {
+                "requests": 100,
+                "input": 14950,
+                "output": 3450,
+                "tokens": 18400
+              }
+            }
+          ],
+          "note": "Separate process; inputs loaded before GC; sample at end of selection and return, not continuous peak or GC pause measurement."
+        }
+      },
+      "requests": 100,
+      "tokens": 18400,
+      "dtoCount": 300,
+      "usageCount": 100,
+      "correctness": {
+        "fullPreparedArray": true,
+        "sourceUnchanged": true,
+        "baseline": {
+          "requests": 100,
+          "input": 14950,
+          "output": 3450,
+          "tokens": 18400,
+          "digest": "98d141a0a162643a0491ba06d84e89ec9f9ed39d028526b26a88198a067f60ea"
+        },
+        "earlyDiscard": {
+          "requests": 100,
+          "input": 14950,
+          "output": 3450,
+          "tokens": 18400,
+          "digest": "98d141a0a162643a0491ba06d84e89ec9f9ed39d028526b26a88198a067f60ea",
+          "equal": true
+        },
+        "winnerOnlyCacheUnchangedRefresh": {
+          "requests": 100,
+          "input": 14950,
+          "output": 3450,
+          "tokens": 18400,
+          "digest": "98d141a0a162643a0491ba06d84e89ec9f9ed39d028526b26a88198a067f60ea",
+          "equal": true
+        }
+      },
+      "inputRestored": true,
+      "metrics": {
+        "appendMs": {
+          "A": {
+            "medianMs": 6.975449999998091,
+            "minMs": 6.249700000014855,
+            "maxMs": 12.126599999988684,
+            "samplesMs": [
+              7.4416999999957625,
+              6.424799999978859,
+              7.025699999998324,
+              6.5125000000116415,
+              6.925199999997858,
+              6.369000000006054,
+              8.2896999999939,
+              12.126599999988684,
+              6.249700000014855,
+              11.259900000004563
+            ]
+          },
+          "B": {
+            "medianMs": 6.547099999996135,
+            "minMs": 6.03979999999865,
+            "maxMs": 7.214200000016717,
+            "samplesMs": [
+              6.363700000016252,
+              7.214200000016717,
+              6.818900000012945,
+              6.03979999999865,
+              6.50690000000759,
+              6.814299999998184,
+              6.58729999998468,
+              6.181899999995949,
+              6.188699999998789,
+              6.613000000012107
+            ]
+          }
+        },
+        "kernelMs": {
+          "A": {
+            "medianMs": 0.5591000000131316,
+            "minMs": 0.49299999998766,
+            "maxMs": 0.7343999999866355,
+            "samplesMs": [
+              0.6913000000058673,
+              0.5476000000198837,
+              0.6022999999986496,
+              0.49299999998766,
+              0.5168000000121538,
+              0.5204999999841675,
+              0.7343999999866355,
+              0.510999999998603,
+              0.5706000000063796,
+              0.6518999999971129
+            ]
+          },
+          "B": {
+            "medianMs": 0.6112500000017462,
+            "minMs": 0.5081000000063796,
+            "maxMs": 0.815600000001723,
+            "samplesMs": [
+              0.6074000000080559,
+              0.815600000001723,
+              0.5164999999979045,
+              0.5081000000063796,
+              0.631599999993341,
+              0.5332000000053085,
+              0.8140999999886844,
+              0.5265999999828637,
+              0.6150999999954365,
+              0.8074000000196975
+            ]
+          }
+        },
+        "day": {
+          "A": {
+            "medianMs": 1.2806500000006054,
+            "minMs": 1.1869000000006054,
+            "maxMs": 2.8215000000200234,
+            "samplesMs": [
+              1.256599999993341,
+              1.3255000000062864,
+              1.2629000000015367,
+              1.2136000000173226,
+              1.298399999999674,
+              1.2454999999899883,
+              1.5119999999878928,
+              2.8215000000200234,
+              1.1869000000006054,
+              1.8831000000063796
+            ]
+          },
+          "B": {
+            "medianMs": 1.2621499999950174,
+            "minMs": 1.2239000000117812,
+            "maxMs": 1.677399999985937,
+            "samplesMs": [
+              1.317799999989802,
+              1.259200000000419,
+              1.2637999999860767,
+              1.2807000000029802,
+              1.4974999999976717,
+              1.2324999999837019,
+              1.2605000000039581,
+              1.2466999999887776,
+              1.2239000000117812,
+              1.677399999985937
+            ]
+          }
+        },
+        "month": {
+          "A": {
+            "medianMs": 1.1130499999853782,
+            "minMs": 1.076600000000326,
+            "maxMs": 1.72620000000461,
+            "samplesMs": [
+              1.0781000000133645,
+              1.076600000000326,
+              1.1228999999875668,
+              1.1031999999831896,
+              1.2012000000104308,
+              1.0957000000053085,
+              1.5328000000154134,
+              1.72620000000461,
+              1.1010999999998603,
+              1.1689000000187661
+            ]
+          },
+          "B": {
+            "medianMs": 1.110450000007404,
+            "minMs": 1.0809000000008382,
+            "maxMs": 1.2383000000263564,
+            "samplesMs": [
+              1.1114999999990687,
+              1.0809000000008382,
+              1.0997999999963213,
+              1.106099999975413,
+              1.1692000000039116,
+              1.1148000000102911,
+              1.2383000000263564,
+              1.1094000000157394,
+              1.1022999999986496,
+              1.1312999999790918
+            ]
+          }
+        },
+        "session": {
+          "A": {
+            "medianMs": 0.7518500000151107,
+            "minMs": 0.7044999999925494,
+            "maxMs": 1.1661000000021886,
+            "samplesMs": [
+              0.7115000000048894,
+              0.7044999999925494,
+              0.7564000000129454,
+              0.747300000017276,
+              0.8090000000083819,
+              0.7102000000013504,
+              0.7454999999899883,
+              1.1661000000021886,
+              0.8546999999962281,
+              0.7667999999830499
+            ]
+          },
+          "B": {
+            "medianMs": 0.7229499999957625,
+            "minMs": 0.6928999999945518,
+            "maxMs": 1.0353999999933876,
+            "samplesMs": [
+              0.7266999999992549,
+              0.7792000000190455,
+              0.71919999999227,
+              0.7096000000019558,
+              0.8134000000136439,
+              0.7186999999976251,
+              0.7529999999969732,
+              0.6928999999945518,
+              0.7007999999914318,
+              1.0353999999933876
+            ]
+          }
+        },
+        "project": {
+          "A": {
+            "medianMs": 0.6539000000047963,
+            "minMs": 0.638699999981327,
+            "maxMs": 0.9951000000000931,
+            "samplesMs": [
+              0.639999999984866,
+              0.638699999981327,
+              0.6542999999946915,
+              0.6535000000149012,
+              0.643099999986589,
+              0.6394999999902211,
+              0.6766000000061467,
+              0.9951000000000931,
+              0.6720000000204891,
+              0.6946999999927357
+            ]
+          },
+          "B": {
+            "medianMs": 0.6849499999952968,
+            "minMs": 0.6379999999771826,
+            "maxMs": 0.8083000000042375,
+            "samplesMs": [
+              0.6379999999771826,
+              0.6738999999943189,
+              0.8083000000042375,
+              0.7587999999814201,
+              0.6878999999898952,
+              0.6450999999942724,
+              0.6820000000006985,
+              0.6485999999858905,
+              0.7259000000194646,
+              0.7091000000073109
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "completedAtSeoul": "2026-11-08 15:06:09",
+  "counterexamples": [
+    {
+      "case": "prefix: copied 102 hides later valid 12, parent 102 remains",
+      "A": 114,
+      "earlyDiscard": 102
+    },
+    {
+      "case": "later current 12 invalidates same-key legacy 102",
+      "A": 12,
+      "earlyDiscard": 102
+    },
+    {
+      "case": "discard explicit request one then introduce request two",
+      "A": 206,
+      "winnerOnlyCache": 102
+    },
+    {
+      "case": "delete winning source 102, defeated source 12 unchanged",
+      "A": 12,
+      "winnerOnlyCache": 0,
+      "overwrite": 102
+    },
+    {
+      "case": "winning source moves session, defeated source remains",
+      "A": 114,
+      "winnerOnlyCache": 102
+    }
+  ]
+}
