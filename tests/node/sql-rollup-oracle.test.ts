@@ -40,7 +40,7 @@ function fixture(t: TestContext, rows: TurnSummaryInput[]): SummaryDatabase {
   const db = new SummaryDatabase(':memory:');
   t.after(() => db.close());
   const sessions = new Map(rows.map(row => [`${row.provider}:${row.session_id}`, { provider: row.provider, session_id: row.session_id }]));
-  db.replaceSessions({ sessions: sessions.values(), files: [], summaries: rows });
+  db.replaceMemory({scanId: 'test', sessions: sessions.values(), files: [], summaries: rows });
   prototype.install(db);
   db.transaction(() => prototype.refresh(db));
   return db;

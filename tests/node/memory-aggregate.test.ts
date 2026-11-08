@@ -2,7 +2,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
-import { aggregateMemory, type MemoryAggregateFile, type MaterializedTurnSummary } from '../../src/summary/aggregation/memoryAggregate';
+import { aggregateMemory, type MemoryAggregateFile } from '../fixtures/streaming-aggregate';
+import type { MaterializedTurnSummary } from '../../src/summary/aggregation/memoryAggregate';
 import type { ParseEvent, UsageEvent } from '../../src/summary/types';
 
 const source = (id: number, provider: MemoryAggregateFile['provider'] = 'codex', events: ParseEvent[] = []): MemoryAggregateFile => ({
@@ -186,7 +187,7 @@ test('canonical requests retain ambiguity, literal no-req collisions, ties and c
   assert.deepEqual(comparable(aggregateMemory([file]).summaries),comparable(sqlOracle([file])));
 });
 
-test('legacy copied winner exclusion keeps a lower valid candidate and original warning without source rereads',()=>{
+test('legacy copied duplicate selection discards its losing model while preserving the original warning',()=>{
   const parent=source(1,'codex',[
     {kind:'turn',rootId:'root',isMain:true,startedAt:0,offset:0},usage(100,{schema:'legacy',threadId:'parent',model:'parent-model'}),
   ]);
@@ -200,7 +201,7 @@ test('legacy copied winner exclusion keeps a lower valid candidate and original 
   const result=aggregateMemory([parent,child]);assert.equal(result.summaries.length,1);
   const row=result.summaries[0];assert.equal(row.total_tokens,102);
   assert.deepEqual([...row.model_usage].map(x=>[x.model,x.input_tokens,x.output_tokens]).sort(),
-    [['parent-model',100,2],['surviving-model',0,0]]);
+    [['parent-model',100,2]]);
   assert.match(row.quality_flags ?? '',/counter-regression/);assert.deepEqual(result.orphans,[]);
 });
 

@@ -110,13 +110,13 @@ test('names are stored once, filters escape wildcard characters, and failed repl
   const row: TurnSummaryInput = {provider:'claude',project_key:'/project',project_name:'100%_project',
     session_id:'one',session_name:'100%_session',root_turn_id:'first',
     duration_quality:'missing',input_tokens:10,output_tokens:2,total_tokens:12,status:'in_progress'};
-  const replace = (summaries: TurnSummaryInput[]): void => db.replaceSessions({sessions:[{provider:'claude',session_id:'one'}],files:[],summaries});
+  const replace = (summaries: TurnSummaryInput[]): void => db.replaceMemory({scanId: 'test',sessions:[{provider:'claude',session_id:'one'}],files:[],summaries});
   replace([row,{...row,root_turn_id:'second'}]);
   assert.equal(db.connection.prepare('SELECT count(*) n FROM projects').get()?.n,1);
   assert.equal(db.connection.prepare('SELECT count(*) n FROM sessions').get()?.n,1);
   assert.equal(db.queryTurnsCount({projectName:'%_',sessionName:'%_'}),2);
   assert.equal(db.queryUsageCount({sessionName:'missing%'}),0);
-  assert.throws(()=>replace([{...row,session_name:'broken',project_name:'broken',total_tokens:999}]),/CHECK constraint/);
+  assert.throws(()=>replace([{...row,session_name:'broken',project_name:'broken',total_tokens:999}]),/Invalid total tokens/);
   assert.ok(db.queryTurns().every(turn=>turn.project_name==='100%_project' && turn.session_name==='100%_session'));
   replace([{...row,session_name:'renamed'}]);
   assert.equal(db.queryTurns()[0].session_name,'renamed');
@@ -134,7 +134,7 @@ test('name choices page through every stored identity with stable ordering and p
     started_at_ms:index,duration_quality:'missing',input_tokens:10,output_tokens:2,total_tokens:12,status:'in_progress',
   }));
   summaries.push({...summaries[0],provider:'claude'});
-  db.replaceSessions({sessions:summaries.map(row=>({provider:row.provider,session_id:row.session_id})),files:[],summaries});
+  db.replaceMemory({scanId: 'test',sessions:summaries.map(row=>({provider:row.provider,session_id:row.session_id})),files:[],summaries});
   const projects = db.queryNames({kind:'project'});
   assert.equal(projects.total,125);assert.equal(projects.rows.length,100);
   const projectTail = db.queryNames({kind:'project',offset:100});

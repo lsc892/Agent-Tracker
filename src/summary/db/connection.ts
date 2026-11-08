@@ -95,7 +95,7 @@ export class SqliteSession {
 
   private optimizeConnection(onOpen = false): boolean {
     try {
-      // Limit maintenance to persistent tables, even when scan staging exists.
+      // Limit maintenance to persistent tables.
       this.connection.exec(onOpen ? 'PRAGMA main.optimize=0x10002;' : 'PRAGMA main.optimize;');
       return true;
     } catch {

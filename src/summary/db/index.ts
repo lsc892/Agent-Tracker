@@ -3,12 +3,11 @@ import type { DatabaseSync } from 'node:sqlite';
 import type { NameQuery, NameResult } from '../types';
 import type {
   BillingMode, CapabilityCategory, CapabilityPage, ChartMetric, DiagnosticsPage, FileMetadata,
-  KeysetPage, ManifestRow, OffsetPage, ProcessingStatus, Provider, SessionReplacement, SummaryFilter,
+  KeysetPage, ManifestRow, OffsetPage, ProcessingStatus, Provider, SummaryFilter,
   TurnSummaryRow, UsagePage, UsageGrouping, UsageRow, UsageSort,
 } from './types';
 import { SqliteSession, type SqliteSessionOptions } from './connection';
 import { ManifestStore } from './manifest';
-import { SessionStore } from './sessions';
 import { SessionBillingStore } from './billing';
 import { SummaryReader } from './reader';
 import { MemoryStore, type MemoryReplacement } from './memoryStore';
@@ -22,7 +21,6 @@ export class SummaryDatabase {
   readonly connection: DatabaseSync;
   private readonly sqlite: SqliteSession;
   private readonly manifest: ManifestStore;
-  private readonly sessions: SessionStore;
   private readonly billing: SessionBillingStore;
   private readonly reader: SummaryReader;
 
@@ -31,7 +29,6 @@ export class SummaryDatabase {
     this.connection = this.sqlite.connection;
     this.manifest = new ManifestStore(this.sqlite);
     this.billing = new SessionBillingStore(this.sqlite);
-    this.sessions = new SessionStore(this.sqlite, this.billing);
     this.reader = new SummaryReader(this.sqlite);
   }
 
@@ -48,7 +45,10 @@ export class SummaryDatabase {
   }
 
   clearData(): void {
-    return this.sessions.clearData();
+    this.sqlite.transaction(() => {
+      this.sqlite.rollups.clear();
+      this.connection.exec('DELETE FROM turn_summary; DELETE FROM manifest; DELETE FROM sessions; DELETE FROM projects;');
+    });
   }
 
   findManifest(provider: Provider, path: string): ManifestRow | undefined {
@@ -77,10 +77,6 @@ export class SummaryDatabase {
 
   unseenFiles(provider: Provider, sourceRoot: string, scanId: string, limit = 100): IterableIterator<ManifestRow> {
     return this.manifest.unseenFiles(provider, sourceRoot, scanId, limit);
-  }
-
-  replaceSessions(replacement: SessionReplacement): void {
-    return this.sessions.replaceSessions(replacement);
   }
 
   replaceMemory(replacement: MemoryReplacement): void {

@@ -39,14 +39,14 @@ async function fixture(run: (value: Fixture) => Promise<void>): Promise<void> {
 }
 
 const metadata = (db: SummaryDatabase) => db.connection.prepare(
-  'SELECT * FROM turn_metadata ORDER BY provider,session_id,root_id').all();
+  'SELECT id,source_identity,content_hash FROM manifest ORDER BY id').all();
 
 test('a full reread with unchanged statistics preserves request identities across database reopen',async () => fixture(async value => {
   const {root,options} = value,path = join(root,'session.jsonl');
   const source = jsonl([user(),response(),user('two'),response(40,'two','response-two','request-two')]);
   await writeFile(path,source);assert.equal((await refreshSummary(value.db,options)).failed,0);
   const before = value.db.queryTurns(),beforeMetadata = metadata(value.db);
-  assert.equal(beforeMetadata.length,2);
+  assert.equal(beforeMetadata.length,1);
   value.db.connection.exec(`CREATE TABLE request_writes(operation TEXT);
     CREATE TRIGGER request_insert AFTER INSERT ON turn_summary BEGIN INSERT INTO request_writes VALUES('insert'); END;
     CREATE TRIGGER request_update AFTER UPDATE ON turn_summary BEGIN INSERT INTO request_writes VALUES('update'); END;
@@ -58,10 +58,9 @@ test('a full reread with unchanged statistics preserves request identities acros
   assert.ok(result.bodyBytes >= Buffer.byteLength(source+extra),'changed sources are still read from the beginning');
   assert.deepEqual(value.db.queryTurns(),before);
   const afterMetadata=metadata(value.db);
-  assert.deepEqual(afterMetadata.map(({signature,...row})=>row),beforeMetadata.map(({signature,...row})=>row),
-    'final prepared snapshots stay unchanged when appended source bytes contain no statistical events');
-  assert.ok(afterMetadata.every((row,index)=>row.signature!==beforeMetadata[index].signature),
-    'the file-state signature records the newly accepted raw file snapshot');
+  assert.deepEqual(afterMetadata.map(({content_hash,...row})=>row),beforeMetadata.map(({content_hash,...row})=>row));
+  assert.ok(afterMetadata.every((row,index)=>row.content_hash!==beforeMetadata[index].content_hash),
+    'the accepted source hash changes even when appended records contain no statistical events');
   assert.equal(value.db.connection.prepare('SELECT count(*) AS n FROM request_writes').get()?.n,0,
     'unchanged normalized facts do not rewrite the request table');
 }));
@@ -139,11 +138,10 @@ test('equal-score shared responses follow the current cross-root source parse or
   assert.equal(db.queryTurns({}, {},'model').find(row=>row.root_turn_id===other.root)?.model,other.model);
 }));
 
-test('a missing metadata cache still removes facts whose entire root disappeared from the source',async () => fixture(async ({db,root,options}) => {
+test('rewriting a source removes facts whose entire root disappeared',async () => fixture(async ({db,root,options}) => {
   const path = join(root,'session.jsonl');
   await writeFile(path,jsonl([user(),response(),user('two'),response(40,'two','response-two','request-two')]));
   assert.equal((await refreshSummary(db,options)).failed,0);assert.equal(db.queryTurnsCount(),2);
-  db.connection.exec('DELETE FROM turn_metadata');
   await writeFile(path,jsonl([user(),response()]));
   assert.equal((await refreshSummary(db,options)).failed,0);
   assert.equal(db.queryTurnsCount(),1);assert.equal(db.queryTurns()[0].root_turn_id,'one');
@@ -194,13 +192,13 @@ test('a malformed rewrite does not publish candidates and recovery survives reop
   assert.equal(value.db.queryTurns()[0].last_error,null);
 }));
 
-test('metadata write failure rolls back request changes and a retry publishes both',async () => fixture(async ({db,root,options}) => {
+test('model write failure rolls back source hashes and request changes and a retry publishes both',async () => fixture(async ({db,root,options}) => {
   const path = join(root,'session.jsonl');
   await writeFile(path,jsonl([user(),response()]));await refreshSummary(db,options);
   const before = db.queryTurns()[0],beforeMetadata = metadata(db);
-  db.connection.exec(`CREATE TRIGGER reject_metadata_insert BEFORE INSERT ON turn_metadata
+  db.connection.exec(`CREATE TRIGGER reject_metadata_insert BEFORE INSERT ON turn_model_usage
       BEGIN SELECT RAISE(ABORT,'fixture metadata rejection'); END;
-    CREATE TRIGGER reject_metadata_update BEFORE UPDATE ON turn_metadata
+    CREATE TRIGGER reject_metadata_update BEFORE UPDATE ON turn_model_usage
       BEGIN SELECT RAISE(ABORT,'fixture metadata rejection'); END;`);
   await writeFile(path,jsonl([user(),response(110)]));
   assert.equal((await refreshSummary(db,options)).failed,1);
@@ -213,11 +211,11 @@ test('metadata write failure rolls back request changes and a retry publishes bo
   assert.notDeepEqual(metadata(db),beforeMetadata);
 }));
 
-test('clearing statistics removes the persistent turn metadata and its children',async () => fixture(async ({db,root,options}) => {
+test('clearing statistics removes source state and all derived facts',async () => fixture(async ({db,root,options}) => {
   await writeFile(join(root,'session.jsonl'),jsonl([user(),response()]));
   assert.equal((await refreshSummary(db,options)).failed,0);assert.equal(metadata(db).length,1);
   db.clearData();assert.equal(db.queryTurnsCount(),0);
-  for (const table of ['turn_metadata','turn_metadata_models','turn_metadata_capabilities','turn_metadata_dependencies']) {
+  for (const table of ['manifest','turn_summary','turn_model_usage','turn_capability_usage','turn_costs','sessions','projects']) {
     assert.equal(db.connection.prepare(`SELECT count(*) AS n FROM ${table}`).get()?.n,0);
   }
   assert.deepEqual(db.connection.prepare('PRAGMA foreign_key_check').all(),[]);
@@ -233,7 +231,7 @@ test('an aborted-only Codex source does not require an otherwise absent session 
     {type:'event_msg',timestamp:'2026-10-01T00:00:02Z',payload:{type:'turn_aborted',turn_id:'turn',root_turn_id:'turn'}},
   ]));
   assert.equal((await refreshSummary(db,codexOptions)).failed,0);
-  assert.equal(db.queryTurnsCount(),0);assert.equal(metadata(db).length,0);
+  assert.equal(db.queryTurnsCount(),0);assert.equal(metadata(db).length,1);
   await appendFile(path,jsonl([{type:'ignored'}]));
   assert.equal((await refreshSummary(db,codexOptions)).failed,0);
   assert.equal(db.queryTurnsCount(),0);

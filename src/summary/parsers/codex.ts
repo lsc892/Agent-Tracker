@@ -115,7 +115,7 @@ export class CodexCurrentParserAdapter {
   private currentUsage(record: CodexRecordContext): void {
     const { payload, offset, identity, suppliedRoot, suppliedTurn } = record;
     this.sawCurrent = true;
-    // Mixed generations can coexist. Disk staging discards legacy usage if any current usage exists in this file.
+    // Mixed generations can coexist. Source evidence excludes legacy usage when this file contains current usage.
     const rootId = suppliedRoot ?? (!identity.isMain && !this.hasExplicitRoot
       ? suppliedTurn ?? this.turn ?? this.root : this.root ?? suppliedTurn);
     const turnId = suppliedTurn ?? this.turn;
@@ -248,6 +248,3 @@ export class CodexCurrentParserAdapter {
       forkedFromId: identity.forkedFromId ?? identity.parentThreadId, standaloneSubagent: true };
   }
 }
-
-/** 공통 Codex 파서를 이전 로그 형식용 클래스 이름으로 제공한다. */
-export class CodexLegacyParserAdapter extends CodexCurrentParserAdapter {}

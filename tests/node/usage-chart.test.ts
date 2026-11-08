@@ -29,7 +29,7 @@ function database(t: TestContext, rows: TurnSummaryInput[], path = ':memory:'): 
 }
 function seed(db: SummaryDatabase, rows: TurnSummaryInput[]): void {
   const sessions = new Map(rows.map(row => [`${row.provider}/${row.session_id}`, { provider: row.provider, session_id: row.session_id }]));
-  db.replaceSessions({ sessions: sessions.values(), files: [], summaries: rows });
+  db.replaceMemory({scanId: 'test', sessions: sessions.values(), files: [], summaries: rows });
 }
 
 test('table sorting orders the full result before paging and raw/rollup queries agree for every column', t => {

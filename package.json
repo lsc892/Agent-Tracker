@@ -42,8 +42,6 @@
     "package:npm": "node tools/npm/package.cjs",
     "benchmark": "npm run build && node tests/benchmarks/summary.cjs",
     "benchmark:quota": "npm run build && node tests/benchmarks/quota/benchmark.cjs",
-    "benchmark:titles": "npm run build && node tests/benchmarks/request-titles.cjs",
-    "benchmark:transactions": "npm run build && node tests/benchmarks/summary-transactions.cjs",
     "benchmark:sql": "npm run build && node tests/benchmarks/sql-explain.cjs",
     "benchmark:sql:writes": "npm run build && node tests/benchmarks/sql-writes.cjs",
     "benchmark:storage": "npm run build && node tests/benchmarks/storage-ab.cjs",

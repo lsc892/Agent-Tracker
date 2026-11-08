@@ -146,13 +146,13 @@ test('capability ratios combine enabled providers within each category and recom
   const db=new SummaryDatabase(':memory:');
   try {
     const codex=summary('shared','/project',2);
-    db.replaceSessions({sessions:[{provider:'codex',session_id:'s'},{provider:'claude',session_id:'s'}],files:[],
+    db.replaceMemory({scanId: 'test',sessions:[{provider:'codex',session_id:'s'},{provider:'claude',session_id:'s'}],files:[],
       summaries:[codex,{...summary('shared'),provider:'claude'}]});
     const page=db.queryCapabilities({},'skill');assert.equal(page.totalUses,3);
     assert.ok(Math.abs(page.rows[0].percentage-200/3)<1e-10);
     assert.equal(db.queryCapabilities({providers:['claude']},'skill').rows[0].percentage,100);
     assert.equal(db.queryCapabilities({providers:[]},'skill').totalUses,0);
-    db.replaceSessions({sessions:[{provider:'codex',session_id:'s'}],files:[],summaries:[]});
+    db.replaceMemory({scanId: 'test',sessions:[{provider:'codex',session_id:'s'}],files:[],summaries:[]});
     assert.equal(db.queryCapabilities({},'skill').totalUses,1,'session deletion cascades usage counts');
   } finally {db.close();}
 });
@@ -161,7 +161,7 @@ test('capability pagination uses the full denominator, date filters exclude unkn
   const directory=await mkdtemp(join(tmpdir(),'tracker-capabilities-migration-'));
   const file=join(directory,'db.sqlite');let db=new SummaryDatabase(file);
   t.after(async()=>{db.close();await rm(directory,{recursive:true,force:true});});
-  db.replaceSessions({sessions:[{provider:'codex',session_id:'s'}],files:[],summaries:Array.from({length:105},(_,i)=>summary(`skill-${i}`))});
+  db.replaceMemory({scanId: 'test',sessions:[{provider:'codex',session_id:'s'}],files:[],summaries:Array.from({length:105},(_,i)=>summary(`skill-${i}`))});
   const first=db.queryCapabilities({},'skill'),second=db.queryCapabilities({},'skill',100);
   assert.equal(first.totalUses,105);assert.equal(second.totalUses,105);assert.equal(first.rows.length,100);assert.equal(second.rows.length,5);
   assert.equal(first.maxUses,1);assert.equal(second.maxUses,1);
@@ -176,7 +176,7 @@ test('capability pagination uses the full denominator, date filters exclude unkn
   assert.equal(db.queryCapabilities({fromMs:0},'skill').totalUses,0);
   assert.deepEqual(db.queryCapabilities({fromMs:0},'skill').rows,[]);
   const before=db.queryTurns();
-  assert.throws(()=>db.replaceSessions({sessions:[{provider:'codex',session_id:'s'}],files:[],summaries:[summary('bad','/other',0)]}));
+  assert.throws(()=>db.replaceMemory({scanId: 'test',sessions:[{provider:'codex',session_id:'s'}],files:[],summaries:[summary('bad','/other',0)]}));
   assert.equal(db.queryCapabilities({},'skill').totalUses,105);
   db.connection.exec('DROP TABLE turn_capability_usage; PRAGMA user_version=5;');
   db.close();db=new SummaryDatabase(file);
@@ -189,7 +189,7 @@ test('worker applies independent Skill page sizes and preserves totals across cu
   const dbPath=join(directory,'db.sqlite');
   const db=new SummaryDatabase(dbPath);
   try {
-    db.replaceSessions({sessions:[{provider:'codex',session_id:'s'}],files:[],summaries:Array.from({length:105},(_,i)=>({
+    db.replaceMemory({scanId: 'test',sessions:[{provider:'codex',session_id:'s'}],files:[],summaries:Array.from({length:105},(_,i)=>({
       ...summary(`entry-${i}`),capability_usage:(['skill','subagent','plugin'] as const).map(category=>({category,name:`entry-${i}`,usage_count:1})),
     }))});
   } finally {db.close();}
@@ -210,7 +210,7 @@ test('capability pages retain filtered maxima and the denominator of omitted ent
   const db=new SummaryDatabase(':memory:');
   try {
     const startedAt=Date.parse('2026-10-07T00:00:00Z');
-    db.replaceSessions({sessions:[{provider:'codex',session_id:'s'},{provider:'claude',session_id:'other'}],files:[],summaries:[
+    db.replaceMemory({scanId: 'test',sessions:[{provider:'codex',session_id:'s'},{provider:'claude',session_id:'other'}],files:[],summaries:[
       ...Array.from({length:25},(_,i)=>({...summary(`rank-${i}`,'/project',25-i),started_at_ms:startedAt})),
       {...summary('outside','/other',1000),provider:'claude',session_id:'other',started_at_ms:startedAt-86_400_000},
     ]});

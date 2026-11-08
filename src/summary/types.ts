@@ -8,8 +8,6 @@ export interface SummaryOptions {
   roots: SourceRoot[];
   timezone?: string;
   workerPath?: string;
-  batchSize?: number;
-  metadataBytes?: number;
   maxLineBytes?: number;
   cancellation?: SharedArrayBuffer;
 }
@@ -118,7 +116,7 @@ export interface TurnEvent {
   duration?: number | null;
   durationQuality?: 'exact' | 'derived' | 'approximate' | 'missing';
   completed?: boolean;
-  /** Aborted outcomes exist only in staging and never become persisted request summaries. */
+  /** Aborted outcomes remain transient and never become persisted request summaries. */
   status?: 'completed' | 'in_progress' | 'failed' | 'aborted';
   statusAt?: number | null;
   flags?: string[];
