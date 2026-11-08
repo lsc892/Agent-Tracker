@@ -1,0 +1,30 @@
+{
+  "node": "v24.14.1",
+  "platform": "win32",
+  "runnerSha256": "52bfc72cd30a1c0c3dcbec969ab6cdd178ca8d283aae7c474f0d8f6b14985fd4",
+  "readerBuilds": {
+    "A": "0d3aa19442dab4f124f6cc8a5f2464355a32b0a34aa6ab3aa22ace69e3677285",
+    "R2": "b4d878817d76931adaa7c2807357ac21b778129bfc721049a78d1e1b5e9221fc"
+  },
+  "input": {
+    "generator": "fixed UTF-8/CRLF/image/boundary cases, no RNG",
+    "sourceBytes": 196698,
+    "sourceSha256": "9da62dedb386a238fd393367945afec18d9f0d9aeb2cb67be523a95963336b8e"
+  },
+  "normalDifferentialCases": 42,
+  "normalCases": "passed",
+  "compared": "rows, original offsets, complete row counts, partial lines, errors/offsets, successful full-read raw hashes",
+  "excluded": "read callback timing, raw bytes/batch counts on early-stop or error; R2 intentionally reads ahead",
+  "independent": "ordinary/Zstd rows and offsets; cancellation before a row",
+  "correctness": "rejected: truncated source prefix delivery differs",
+  "rejectedContractCase": {
+    "name": "source shorter than observed size",
+    "error": {
+      "code": "file-truncated-during-read",
+      "offset": 15
+    },
+    "emittedRowsA": 1,
+    "emittedRowsR2": 0,
+    "consequence": "parser identity/metadata from the valid prefix can differ on a failed file"
+  }
+}
