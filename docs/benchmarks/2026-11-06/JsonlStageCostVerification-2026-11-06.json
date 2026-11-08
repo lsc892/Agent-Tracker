@@ -1,0 +1,45 @@
+{
+  "date": "2026-11-07",
+  "experimentDate": "2026-11-06",
+  "timezone": "Asia/Seoul",
+  "states": 396,
+  "cold": 66,
+  "sourcesMatchPriorFrozenSqlAndCache": true,
+  "exclusiveClocksVerified": true,
+  "correctnessFields": [
+    "requests",
+    "tokens",
+    "failed",
+    "factsSha256",
+    "aggregatesSha256",
+    "metadataSha256",
+    "dependencySha256",
+    "independent"
+  ],
+  "npmCheck": {
+    "tests": 426,
+    "pass": 426,
+    "fail": 0,
+    "logSha256": "561fe8b08a6bfb7c18218615be5fcef7ef02a5d995940579d3d71d7af48e638c"
+  },
+  "nameBatchDiagnostic": {
+    "variants": 3,
+    "measuredStates": 30,
+    "warmupsPerVariant": 3,
+    "titlesAndPrioritiesMatch": true,
+    "persistedRequestAndTokenTotalsMatch": true,
+    "actualTransactionStateVerified": true,
+    "onlyNamesBatchRestoredAtRuntime": true,
+    "productSourceUnchanged": true,
+    "runnerSha256": "3049591ce342df012bb1540a2090667c7b88555fa2468f561b5f7f9f2434f803"
+  },
+  "artifacts": {
+    "JsonlStageCostAB-2026-11-06.json": "234d463fec5407e65410c6f8e70e1de9f4850a197b5038cf2a2d71891f654903",
+    "JsonlNameBatchDiagnostic-2026-11-06.json": "793858b47725d52cd4f09600f6a01552f7c45183d95cd53737c6ce043f7d0dd8",
+    "JsonlNameBatchMemoryControl-2026-11-06.json": "9f3c5e47bf7f4e2b95c1d22304be73c99502f151ffc34529bceeb0f82a6efc96",
+    "JsonlNameBatchEmptyScanControl-2026-11-06.json": "d74ee3b7d07ec8f81f5fea368df29aa2c8b12d7d3ec89419883dbe5967a49a5d",
+    "JsonlNameBatchPopulatedScanControl-2026-11-06.json": "ecc40075d6c5fcbfbae1591a0bcaacd55223ed49e78718b5e313400f21440302"
+  },
+  "instrumentationSha256": "d823af1ede65be57ba2dd1e113457f2065afc33d8a7e9b9bc6fc93f198461215",
+  "runnerSha256": "ac3402a0247269e1c56dbac54b3bc6b3e4b5da1236e13e2092badf49640ba56d"
+}

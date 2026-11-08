@@ -1,0 +1,120 @@
+{
+  "dateSeoul": "2026-11-07",
+  "branch": "experiment/jsonl-greedy-minimal-2026-11-07",
+  "baseCommit": "80fc586d4c0cee0da4e925db395cbebb47d2aa0d",
+  "check": {
+    "command": "npm run check",
+    "exitCode": 0,
+    "typecheck": "pass",
+    "lint": "pass",
+    "tests": 416,
+    "passed": 416,
+    "failed": 0,
+    "skipped": 0,
+    "logSha256": "36a3796363a2c14d61d7e47b21aa6654965a8392c6edacd455633a0513e762de",
+    "testSourceSha256": {
+      "tests/node/memory-events.test.ts": "d2ba2c8aab0f3d16e66c815aa171ca65a3265fa18c5c4e664edfada476b4e027",
+      "tests/node/memory-winner-oracle.test.ts": "d4ee4c6280f9fb3681ebc3d8d78375350c84345023003978922f6e8a835cde1c",
+      "tests/node/greedy-streaming-metadata.test.ts": "2922ce992c7e1c3173e8229834ff0f13821ee69dfee895c91a04e19e09fc0f39",
+      "tests/node/summary-staging.test.ts": "5e23887c4601f84d438e5af859e5b9d0ab8d2dfb5ee2d4910fb05d39eb77cb04"
+    }
+  },
+  "benchmark": {
+    "raw": "JsonlGreedyMinimalAB-2026-11-07.json",
+    "rawSha256": "0537341f85f32a1d08e221a73a5615f29944567459c0bc29bae5fa484307660b",
+    "runnerSha256": "993a63e0560c92170417218eeb3d5cc7c8be0a3b19fc6287e59b2b9839fddce7",
+    "helperSha256": {
+      "incremental-refresh.cjs": "f5cb7a68c4d8b0d745dd85b4b3c69811e1009cd3cb7701ce80d90d2f23a5f601",
+      "temp-batch-ab.cjs": "9567311fbf7746c537fcdc7eaa05bf35e92e7dc04931075c03d8ba6bb03b10b0"
+    },
+    "fullLogSha256": "e19345081eb4f977f3d3a20266d5da24776e4632f02d747f6c590247ecb8300c",
+    "warmupPairsPerDataset": 3,
+    "measuredPairsPerDataset": 10,
+    "scenariosPerTrial": 6,
+    "measuredStates": 360,
+    "diagnosticStates": 36,
+    "sqlMigrationStates": 18,
+    "datasets": [
+      {
+        "name": "current",
+        "requests": 1473,
+        "tokens": 2169957606,
+        "inputSha256": "59e806089e09799c20b65234976c93068d2fd4c5685a3101ecf0a512699c0010",
+        "correctness": "A/B/migration requests,tokens,failures,normalized facts,diagnostics,dependency SHA,independent group averages,raw/rollup pages,FK/integrity and restored snapshot hashes passed; parser read work recorded separately"
+      },
+      {
+        "name": "synthetic-10000",
+        "requests": 10000,
+        "tokens": 6340000,
+        "inputSha256": "0b2ecd37faa5c29385cd3def00cad4bdf5adddc581e4a5d4cc4c02b9cdceea0f",
+        "correctness": "A/B/migration requests,tokens,failures,normalized facts,diagnostics,dependency SHA,independent group averages,raw/rollup pages,FK/integrity and restored snapshot hashes passed; parser read work recorded separately"
+      },
+      {
+        "name": "synthetic-100",
+        "requests": 100,
+        "tokens": 18400,
+        "inputSha256": "0b5b30314e8445f83eaedcd291b3a065707c646fba18b093b4883ea90faa6291",
+        "correctness": "A/B/migration requests,tokens,failures,normalized facts,diagnostics,dependency SHA,independent group averages,raw/rollup pages,FK/integrity and restored snapshot hashes passed; parser read work recorded separately"
+      }
+    ],
+    "smokes": [
+      {
+        "name": "100",
+        "sha256": "470b1be51c0b8426cbd2d002e3c8031c9bca6efd87ec5a96883901782d6e3c5b",
+        "states": 18
+      },
+      {
+        "name": "current",
+        "sha256": "c2f30fd7e8558a26de9b30a235cf464090f0bd45e5b5556692891527d8f16b53",
+        "states": 18
+      }
+    ]
+  },
+  "identity": {
+    "liveCandidateMatchesMeasuredSource": true,
+    "liveCandidateMatchesMeasuredBuild": true,
+    "originalDevSourceMatchesFrozenSqlBaseline": true,
+    "sourceAndBuildStableThroughoutMeasurement": true,
+    "sourceFingerprintA": "61def5f4568c8c0df7662b940fb76d07e9c73edd2e8b7b7751d479abbda475bc",
+    "sourceFingerprintB": "3254fb1d163375319d9be6d24e9c88e3f0d646ad1a244b76563e1e28687f86a5",
+    "buildFingerprintA": "506192e38d41cea45c0a268d8974f4d09072c8ce7d35f7eaaff27298560e7dcc",
+    "buildFingerprintB": "48bbbaeb7b9a612571b9df2b097b571fdd8b0c94f6d1cf01b0041542e1cf451a",
+    "originalDevSourceHead": "80fc586d4c0cee0da4e925db395cbebb47d2aa0d",
+    "changedSourceFiles": [
+      "src/summary/eventValues.ts",
+      "src/summary/memoryEvents.ts",
+      "src/summary/metadata.ts",
+      "src/summary/scanner.ts",
+      "src/summary/staging.ts"
+    ],
+    "readerParsersPermanentDatabaseAndQueriesUnchanged": true
+  },
+  "semanticScope": {
+    "strict": [
+      "requests",
+      "tokens",
+      "normalized facts including models and quality diagnostics",
+      "raw and rollup group results and independent averages",
+      "dependency SHA",
+      "FK and integrity",
+      "restored source content hashes"
+    ],
+    "differentByDesign": "Versioned streaming metadata signature replaces literal SQL raw-event SHA; original SQL seed migration was checked separately.",
+    "limits": [
+      "Timing compares the entire DTO/signature/staging path, not max-greedy alone.",
+      "Memory high-water includes process state; batch samples can miss transient peaks.",
+      "Source scan and affected-session whole-file reparse remain; no offset cache."
+    ]
+  },
+  "originalWorktree": "Source unchanged; existing research documentation changes preserved.",
+  "installed": false,
+  "committed": false,
+  "documentation": {
+    "reportSha256": "b5f2318b91622a387459b2805ad49b6a1bef716df1fc59ca3efc278c858fe061",
+    "markdownFilesChecked": 4,
+    "relativeLinksChecked": 82,
+    "utf8AndWhitespace": "pass",
+    "gitDiffCheck": "pass",
+    "benchmarkRunnerSyntax": "pass"
+  }
+}

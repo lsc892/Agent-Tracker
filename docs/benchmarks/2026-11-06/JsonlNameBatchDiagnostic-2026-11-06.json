@@ -1,0 +1,681 @@
+{
+  "date": "2026-11-07",
+  "timezone": "Asia/Seoul",
+  "node": "v24.14.1",
+  "warmups": 3,
+  "pairs": 10,
+  "runnerSha256": "3049591ce342df012bb1540a2090667c7b88555fa2468f561b5f7f9f2434f803",
+  "inputSha256": "e56d9e80f71856d0bed95cdaf097823d92ede97175ad1bae5f8f76fa0423dc99",
+  "sourceHashes": {
+    "SQL": {
+      "src/summary/names.ts": "10ccce9b7173bfb0ffbf1d3018b6d2cbf8222631a88109fa12c7b4674b11a4bd",
+      "dist/src/summary/names.js": "7cad1a32e5b4a0d098a4700b58b36e5325b4b212f69d3077ee757e8cdefd322b",
+      "src/summary/staging.ts": "bd6c65aa96322aff6bb12d6905f32169f0e13932a97f723a384557ca9ecfa14e",
+      "dist/src/summary/staging.js": "25289bc30df6e1f453c801126f4dbaf667dcbb37b670a11ed0c9c4b64195ff59"
+    },
+    "Map": {
+      "src/summary/names.ts": "10ccce9b7173bfb0ffbf1d3018b6d2cbf8222631a88109fa12c7b4674b11a4bd",
+      "dist/src/summary/names.js": "7cad1a32e5b4a0d098a4700b58b36e5325b4b212f69d3077ee757e8cdefd322b",
+      "src/summary/staging.ts": "43bdc8f850dac043b3656b21a8ad33393cf83324bbfdc47efb8a0d2e29b1c2d4",
+      "dist/src/summary/staging.js": "9ca01441213c552d005c9bed75d832d78b344489eeab21e8f1ee86a5a64da7ba"
+    }
+  },
+  "method": "Unchanged full refresh from independent frozen seed database file copies. Preserve file discovery, title collection, lineage, cleanup and normal connection context. Three warmups then ten samples per variant in alternating order, no forced GC. No conversation body reads. Title hash query after collector is included in total but excluded from namesMs.",
+  "causalVariant": "MapBatchedNames adds BEGIN/COMMIT only around title batch callbacks at runtime; no product source/build change. Names hashes, transaction state and persisted request/token totals must match.",
+  "limitation": "Supplemental unchanged-flow ablation; do not subtract times from separate append trials or claim a fixed append improvement. Implicit TEMP transactions do not imply a physical fsync per row.",
+  "trials": [
+    {
+      "variant": "SQL",
+      "pair": 0,
+      "restoreNamesBatch": false,
+      "inNames": false,
+      "batches": 7,
+      "callbacksInTransaction": 7,
+      "titleInserts": 756,
+      "insertsInTransaction": 756,
+      "namesMs": 8.578800000000001,
+      "rows": 454,
+      "resultSha256": "4566747a50d1fb37bfdca0c154a81bb606973d70b0745625491c076b817ea9ba",
+      "refreshMs": 134.1368,
+      "totals": {
+        "requests": 1419,
+        "tokens": 1952612300
+      }
+    },
+    {
+      "variant": "Map",
+      "pair": 0,
+      "restoreNamesBatch": false,
+      "inNames": false,
+      "batches": 7,
+      "callbacksInTransaction": 0,
+      "titleInserts": 756,
+      "insertsInTransaction": 0,
+      "namesMs": 59.80379999999991,
+      "rows": 454,
+      "resultSha256": "4566747a50d1fb37bfdca0c154a81bb606973d70b0745625491c076b817ea9ba",
+      "refreshMs": 187.6826000000001,
+      "totals": {
+        "requests": 1419,
+        "tokens": 1952612300
+      }
+    },
+    {
+      "variant": "MapBatchedNames",
+      "pair": 0,
+      "restoreNamesBatch": true,
+      "inNames": false,
+      "batches": 7,
+      "callbacksInTransaction": 7,
+      "titleInserts": 756,
+      "insertsInTransaction": 756,
+      "namesMs": 8.005200000000059,
+      "rows": 454,
+      "resultSha256": "4566747a50d1fb37bfdca0c154a81bb606973d70b0745625491c076b817ea9ba",
+      "refreshMs": 137.83669999999984,
+      "totals": {
+        "requests": 1419,
+        "tokens": 1952612300
+      }
+    },
+    {
+      "variant": "MapBatchedNames",
+      "pair": 1,
+      "restoreNamesBatch": true,
+      "inNames": false,
+      "batches": 7,
+      "callbacksInTransaction": 7,
+      "titleInserts": 756,
+      "insertsInTransaction": 756,
+      "namesMs": 9.216500000000451,
+      "rows": 454,
+      "resultSha256": "4566747a50d1fb37bfdca0c154a81bb606973d70b0745625491c076b817ea9ba",
+      "refreshMs": 137.62310000000002,
+      "totals": {
+        "requests": 1419,
+        "tokens": 1952612300
+      }
+    },
+    {
+      "variant": "Map",
+      "pair": 1,
+      "restoreNamesBatch": false,
+      "inNames": false,
+      "batches": 7,
+      "callbacksInTransaction": 0,
+      "titleInserts": 756,
+      "insertsInTransaction": 0,
+      "namesMs": 60.16330000000016,
+      "rows": 454,
+      "resultSha256": "4566747a50d1fb37bfdca0c154a81bb606973d70b0745625491c076b817ea9ba",
+      "refreshMs": 186.6244999999999,
+      "totals": {
+        "requests": 1419,
+        "tokens": 1952612300
+      }
+    },
+    {
+      "variant": "SQL",
+      "pair": 1,
+      "restoreNamesBatch": false,
+      "inNames": false,
+      "batches": 7,
+      "callbacksInTransaction": 7,
+      "titleInserts": 756,
+      "insertsInTransaction": 756,
+      "namesMs": 7.476900000000114,
+      "rows": 454,
+      "resultSha256": "4566747a50d1fb37bfdca0c154a81bb606973d70b0745625491c076b817ea9ba",
+      "refreshMs": 140.52039999999988,
+      "totals": {
+        "requests": 1419,
+        "tokens": 1952612300
+      }
+    },
+    {
+      "variant": "SQL",
+      "pair": 2,
+      "restoreNamesBatch": false,
+      "inNames": false,
+      "batches": 7,
+      "callbacksInTransaction": 7,
+      "titleInserts": 756,
+      "insertsInTransaction": 756,
+      "namesMs": 7.322000000000116,
+      "rows": 454,
+      "resultSha256": "4566747a50d1fb37bfdca0c154a81bb606973d70b0745625491c076b817ea9ba",
+      "refreshMs": 136.08690000000024,
+      "totals": {
+        "requests": 1419,
+        "tokens": 1952612300
+      }
+    },
+    {
+      "variant": "Map",
+      "pair": 2,
+      "restoreNamesBatch": false,
+      "inNames": false,
+      "batches": 7,
+      "callbacksInTransaction": 0,
+      "titleInserts": 756,
+      "insertsInTransaction": 0,
+      "namesMs": 62.24200000000019,
+      "rows": 454,
+      "resultSha256": "4566747a50d1fb37bfdca0c154a81bb606973d70b0745625491c076b817ea9ba",
+      "refreshMs": 190.81029999999964,
+      "totals": {
+        "requests": 1419,
+        "tokens": 1952612300
+      }
+    },
+    {
+      "variant": "MapBatchedNames",
+      "pair": 2,
+      "restoreNamesBatch": true,
+      "inNames": false,
+      "batches": 7,
+      "callbacksInTransaction": 7,
+      "titleInserts": 756,
+      "insertsInTransaction": 756,
+      "namesMs": 7.436200000000099,
+      "rows": 454,
+      "resultSha256": "4566747a50d1fb37bfdca0c154a81bb606973d70b0745625491c076b817ea9ba",
+      "refreshMs": 134.3195999999998,
+      "totals": {
+        "requests": 1419,
+        "tokens": 1952612300
+      }
+    },
+    {
+      "variant": "MapBatchedNames",
+      "pair": 3,
+      "restoreNamesBatch": true,
+      "inNames": false,
+      "batches": 7,
+      "callbacksInTransaction": 7,
+      "titleInserts": 756,
+      "insertsInTransaction": 756,
+      "namesMs": 7.540899999999965,
+      "rows": 454,
+      "resultSha256": "4566747a50d1fb37bfdca0c154a81bb606973d70b0745625491c076b817ea9ba",
+      "refreshMs": 133.95229999999992,
+      "totals": {
+        "requests": 1419,
+        "tokens": 1952612300
+      }
+    },
+    {
+      "variant": "Map",
+      "pair": 3,
+      "restoreNamesBatch": false,
+      "inNames": false,
+      "batches": 7,
+      "callbacksInTransaction": 0,
+      "titleInserts": 756,
+      "insertsInTransaction": 0,
+      "namesMs": 61.076500000000124,
+      "rows": 454,
+      "resultSha256": "4566747a50d1fb37bfdca0c154a81bb606973d70b0745625491c076b817ea9ba",
+      "refreshMs": 193.1617000000001,
+      "totals": {
+        "requests": 1419,
+        "tokens": 1952612300
+      }
+    },
+    {
+      "variant": "SQL",
+      "pair": 3,
+      "restoreNamesBatch": false,
+      "inNames": false,
+      "batches": 7,
+      "callbacksInTransaction": 7,
+      "titleInserts": 756,
+      "insertsInTransaction": 756,
+      "namesMs": 7.643099999999777,
+      "rows": 454,
+      "resultSha256": "4566747a50d1fb37bfdca0c154a81bb606973d70b0745625491c076b817ea9ba",
+      "refreshMs": 143.69939999999997,
+      "totals": {
+        "requests": 1419,
+        "tokens": 1952612300
+      }
+    },
+    {
+      "variant": "SQL",
+      "pair": 4,
+      "restoreNamesBatch": false,
+      "inNames": false,
+      "batches": 7,
+      "callbacksInTransaction": 7,
+      "titleInserts": 756,
+      "insertsInTransaction": 756,
+      "namesMs": 8.853100000000268,
+      "rows": 454,
+      "resultSha256": "4566747a50d1fb37bfdca0c154a81bb606973d70b0745625491c076b817ea9ba",
+      "refreshMs": 142.70240000000013,
+      "totals": {
+        "requests": 1419,
+        "tokens": 1952612300
+      }
+    },
+    {
+      "variant": "Map",
+      "pair": 4,
+      "restoreNamesBatch": false,
+      "inNames": false,
+      "batches": 7,
+      "callbacksInTransaction": 0,
+      "titleInserts": 756,
+      "insertsInTransaction": 0,
+      "namesMs": 64.26180000000022,
+      "rows": 454,
+      "resultSha256": "4566747a50d1fb37bfdca0c154a81bb606973d70b0745625491c076b817ea9ba",
+      "refreshMs": 200.26139999999987,
+      "totals": {
+        "requests": 1419,
+        "tokens": 1952612300
+      }
+    },
+    {
+      "variant": "MapBatchedNames",
+      "pair": 4,
+      "restoreNamesBatch": true,
+      "inNames": false,
+      "batches": 7,
+      "callbacksInTransaction": 7,
+      "titleInserts": 756,
+      "insertsInTransaction": 756,
+      "namesMs": 11.76319999999987,
+      "rows": 454,
+      "resultSha256": "4566747a50d1fb37bfdca0c154a81bb606973d70b0745625491c076b817ea9ba",
+      "refreshMs": 144.19979999999987,
+      "totals": {
+        "requests": 1419,
+        "tokens": 1952612300
+      }
+    },
+    {
+      "variant": "MapBatchedNames",
+      "pair": 5,
+      "restoreNamesBatch": true,
+      "inNames": false,
+      "batches": 7,
+      "callbacksInTransaction": 7,
+      "titleInserts": 756,
+      "insertsInTransaction": 756,
+      "namesMs": 7.953199999999924,
+      "rows": 454,
+      "resultSha256": "4566747a50d1fb37bfdca0c154a81bb606973d70b0745625491c076b817ea9ba",
+      "refreshMs": 136.0682999999999,
+      "totals": {
+        "requests": 1419,
+        "tokens": 1952612300
+      }
+    },
+    {
+      "variant": "Map",
+      "pair": 5,
+      "restoreNamesBatch": false,
+      "inNames": false,
+      "batches": 7,
+      "callbacksInTransaction": 0,
+      "titleInserts": 756,
+      "insertsInTransaction": 0,
+      "namesMs": 78.90990000000056,
+      "rows": 454,
+      "resultSha256": "4566747a50d1fb37bfdca0c154a81bb606973d70b0745625491c076b817ea9ba",
+      "refreshMs": 217.3077000000003,
+      "totals": {
+        "requests": 1419,
+        "tokens": 1952612300
+      }
+    },
+    {
+      "variant": "SQL",
+      "pair": 5,
+      "restoreNamesBatch": false,
+      "inNames": false,
+      "batches": 7,
+      "callbacksInTransaction": 7,
+      "titleInserts": 756,
+      "insertsInTransaction": 756,
+      "namesMs": 7.08429999999953,
+      "rows": 454,
+      "resultSha256": "4566747a50d1fb37bfdca0c154a81bb606973d70b0745625491c076b817ea9ba",
+      "refreshMs": 139.17540000000008,
+      "totals": {
+        "requests": 1419,
+        "tokens": 1952612300
+      }
+    },
+    {
+      "variant": "SQL",
+      "pair": 6,
+      "restoreNamesBatch": false,
+      "inNames": false,
+      "batches": 7,
+      "callbacksInTransaction": 7,
+      "titleInserts": 756,
+      "insertsInTransaction": 756,
+      "namesMs": 9.219100000000253,
+      "rows": 454,
+      "resultSha256": "4566747a50d1fb37bfdca0c154a81bb606973d70b0745625491c076b817ea9ba",
+      "refreshMs": 144.3692000000001,
+      "totals": {
+        "requests": 1419,
+        "tokens": 1952612300
+      }
+    },
+    {
+      "variant": "Map",
+      "pair": 6,
+      "restoreNamesBatch": false,
+      "inNames": false,
+      "batches": 7,
+      "callbacksInTransaction": 0,
+      "titleInserts": 756,
+      "insertsInTransaction": 0,
+      "namesMs": 60.89520000000084,
+      "rows": 454,
+      "resultSha256": "4566747a50d1fb37bfdca0c154a81bb606973d70b0745625491c076b817ea9ba",
+      "refreshMs": 197.71649999999954,
+      "totals": {
+        "requests": 1419,
+        "tokens": 1952612300
+      }
+    },
+    {
+      "variant": "MapBatchedNames",
+      "pair": 6,
+      "restoreNamesBatch": true,
+      "inNames": false,
+      "batches": 7,
+      "callbacksInTransaction": 7,
+      "titleInserts": 756,
+      "insertsInTransaction": 756,
+      "namesMs": 8.186799999999494,
+      "rows": 454,
+      "resultSha256": "4566747a50d1fb37bfdca0c154a81bb606973d70b0745625491c076b817ea9ba",
+      "refreshMs": 143.9252000000006,
+      "totals": {
+        "requests": 1419,
+        "tokens": 1952612300
+      }
+    },
+    {
+      "variant": "MapBatchedNames",
+      "pair": 7,
+      "restoreNamesBatch": true,
+      "inNames": false,
+      "batches": 7,
+      "callbacksInTransaction": 7,
+      "titleInserts": 756,
+      "insertsInTransaction": 756,
+      "namesMs": 8.681800000000294,
+      "rows": 454,
+      "resultSha256": "4566747a50d1fb37bfdca0c154a81bb606973d70b0745625491c076b817ea9ba",
+      "refreshMs": 150.4913000000006,
+      "totals": {
+        "requests": 1419,
+        "tokens": 1952612300
+      }
+    },
+    {
+      "variant": "Map",
+      "pair": 7,
+      "restoreNamesBatch": false,
+      "inNames": false,
+      "batches": 7,
+      "callbacksInTransaction": 0,
+      "titleInserts": 756,
+      "insertsInTransaction": 0,
+      "namesMs": 59.85889999999927,
+      "rows": 454,
+      "resultSha256": "4566747a50d1fb37bfdca0c154a81bb606973d70b0745625491c076b817ea9ba",
+      "refreshMs": 195.91960000000017,
+      "totals": {
+        "requests": 1419,
+        "tokens": 1952612300
+      }
+    },
+    {
+      "variant": "SQL",
+      "pair": 7,
+      "restoreNamesBatch": false,
+      "inNames": false,
+      "batches": 7,
+      "callbacksInTransaction": 7,
+      "titleInserts": 756,
+      "insertsInTransaction": 756,
+      "namesMs": 7.561200000000099,
+      "rows": 454,
+      "resultSha256": "4566747a50d1fb37bfdca0c154a81bb606973d70b0745625491c076b817ea9ba",
+      "refreshMs": 148.61169999999947,
+      "totals": {
+        "requests": 1419,
+        "tokens": 1952612300
+      }
+    },
+    {
+      "variant": "SQL",
+      "pair": 8,
+      "restoreNamesBatch": false,
+      "inNames": false,
+      "batches": 7,
+      "callbacksInTransaction": 7,
+      "titleInserts": 756,
+      "insertsInTransaction": 756,
+      "namesMs": 7.285399999999754,
+      "rows": 454,
+      "resultSha256": "4566747a50d1fb37bfdca0c154a81bb606973d70b0745625491c076b817ea9ba",
+      "refreshMs": 148.1896000000006,
+      "totals": {
+        "requests": 1419,
+        "tokens": 1952612300
+      }
+    },
+    {
+      "variant": "Map",
+      "pair": 8,
+      "restoreNamesBatch": false,
+      "inNames": false,
+      "batches": 7,
+      "callbacksInTransaction": 0,
+      "titleInserts": 756,
+      "insertsInTransaction": 0,
+      "namesMs": 61.58599999999933,
+      "rows": 454,
+      "resultSha256": "4566747a50d1fb37bfdca0c154a81bb606973d70b0745625491c076b817ea9ba",
+      "refreshMs": 192.29370000000017,
+      "totals": {
+        "requests": 1419,
+        "tokens": 1952612300
+      }
+    },
+    {
+      "variant": "MapBatchedNames",
+      "pair": 8,
+      "restoreNamesBatch": true,
+      "inNames": false,
+      "batches": 7,
+      "callbacksInTransaction": 7,
+      "titleInserts": 756,
+      "insertsInTransaction": 756,
+      "namesMs": 7.32510000000002,
+      "rows": 454,
+      "resultSha256": "4566747a50d1fb37bfdca0c154a81bb606973d70b0745625491c076b817ea9ba",
+      "refreshMs": 141.16689999999926,
+      "totals": {
+        "requests": 1419,
+        "tokens": 1952612300
+      }
+    },
+    {
+      "variant": "MapBatchedNames",
+      "pair": 9,
+      "restoreNamesBatch": true,
+      "inNames": false,
+      "batches": 7,
+      "callbacksInTransaction": 7,
+      "titleInserts": 756,
+      "insertsInTransaction": 756,
+      "namesMs": 7.47190000000046,
+      "rows": 454,
+      "resultSha256": "4566747a50d1fb37bfdca0c154a81bb606973d70b0745625491c076b817ea9ba",
+      "refreshMs": 136.60609999999997,
+      "totals": {
+        "requests": 1419,
+        "tokens": 1952612300
+      }
+    },
+    {
+      "variant": "Map",
+      "pair": 9,
+      "restoreNamesBatch": false,
+      "inNames": false,
+      "batches": 7,
+      "callbacksInTransaction": 0,
+      "titleInserts": 756,
+      "insertsInTransaction": 0,
+      "namesMs": 59.2524999999996,
+      "rows": 454,
+      "resultSha256": "4566747a50d1fb37bfdca0c154a81bb606973d70b0745625491c076b817ea9ba",
+      "refreshMs": 192.39229999999952,
+      "totals": {
+        "requests": 1419,
+        "tokens": 1952612300
+      }
+    },
+    {
+      "variant": "SQL",
+      "pair": 9,
+      "restoreNamesBatch": false,
+      "inNames": false,
+      "batches": 7,
+      "callbacksInTransaction": 7,
+      "titleInserts": 756,
+      "insertsInTransaction": 756,
+      "namesMs": 7.106700000000274,
+      "rows": 454,
+      "resultSha256": "4566747a50d1fb37bfdca0c154a81bb606973d70b0745625491c076b817ea9ba",
+      "refreshMs": 141.07510000000002,
+      "totals": {
+        "requests": 1419,
+        "tokens": 1952612300
+      }
+    }
+  ],
+  "summary": {
+    "SQL": {
+      "medianMs": 7.519050000000107,
+      "meanMs": 7.813060000000019,
+      "minMs": 7.08429999999953,
+      "maxMs": 9.219100000000253,
+      "samplesMs": [
+        8.578800000000001,
+        7.476900000000114,
+        7.322000000000116,
+        7.643099999999777,
+        8.853100000000268,
+        7.08429999999953,
+        9.219100000000253,
+        7.561200000000099,
+        7.285399999999754,
+        7.106700000000274
+      ]
+    },
+    "Map": {
+      "medianMs": 60.98585000000048,
+      "meanMs": 62.80499000000002,
+      "minMs": 59.2524999999996,
+      "maxMs": 78.90990000000056,
+      "samplesMs": [
+        59.80379999999991,
+        60.16330000000016,
+        62.24200000000019,
+        61.076500000000124,
+        64.26180000000022,
+        78.90990000000056,
+        60.89520000000084,
+        59.85889999999927,
+        61.58599999999933,
+        59.2524999999996
+      ]
+    },
+    "MapBatchedNames": {
+      "medianMs": 7.979199999999992,
+      "meanMs": 8.358080000000063,
+      "minMs": 7.32510000000002,
+      "maxMs": 11.76319999999987,
+      "samplesMs": [
+        8.005200000000059,
+        9.216500000000451,
+        7.436200000000099,
+        7.540899999999965,
+        11.76319999999987,
+        7.953199999999924,
+        8.186799999999494,
+        8.681800000000294,
+        7.32510000000002,
+        7.47190000000046
+      ]
+    }
+  },
+  "refreshSummary": {
+    "SQL": {
+      "medianMs": 141.88875000000007,
+      "meanMs": 141.85669000000004,
+      "minMs": 134.1368,
+      "maxMs": 148.61169999999947,
+      "samplesMs": [
+        134.1368,
+        140.52039999999988,
+        136.08690000000024,
+        143.69939999999997,
+        142.70240000000013,
+        139.17540000000008,
+        144.3692000000001,
+        148.61169999999947,
+        148.1896000000006,
+        141.07510000000002
+      ]
+    },
+    "Map": {
+      "medianMs": 192.77699999999982,
+      "meanMs": 195.41702999999993,
+      "minMs": 186.6244999999999,
+      "maxMs": 217.3077000000003,
+      "samplesMs": [
+        187.6826000000001,
+        186.6244999999999,
+        190.81029999999964,
+        193.1617000000001,
+        200.26139999999987,
+        217.3077000000003,
+        197.71649999999954,
+        195.91960000000017,
+        192.29370000000017,
+        192.39229999999952
+      ]
+    },
+    "MapBatchedNames": {
+      "medianMs": 137.72989999999993,
+      "meanMs": 139.61892999999998,
+      "minMs": 133.95229999999992,
+      "maxMs": 150.4913000000006,
+      "samplesMs": [
+        137.83669999999984,
+        137.62310000000002,
+        134.3195999999998,
+        133.95229999999992,
+        144.19979999999987,
+        136.0682999999999,
+        143.9252000000006,
+        150.4913000000006,
+        141.16689999999926,
+        136.60609999999997
+      ]
+    }
+  },
+  "correctness": "All title/priority hashes and persisted totals equal; isTransaction verifies SQL/batched Map writes have explicit transactions and ordinary Map writes do not"
+}
