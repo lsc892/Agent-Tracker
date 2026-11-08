@@ -17,19 +17,23 @@ test('transaction benchmark measures the actual refresh and verifies before/afte
       .map(line => JSON.parse(line));
     assert.equal(lines[0].input, 'fixture');
     assert.equal(lines[0].inventory[0].files, 1);
+    assert.equal(lines[0].pipeline,'memory');
     const prepares = lines.filter(row => row.kind === 'prepare');
-    assert.equal(prepares.length, 4);
-    for (const row of prepares) {
+    assert.equal(prepares.length, 0,'the active refresh no longer prepares SQL event tables');
+    const aggregates = lines.filter(row=>row.kind==='memory-aggregate');
+    assert.equal(aggregates.length,4);
+    for (const row of aggregates) {
       assert.equal(row.insideExplicitTransaction, false);
       assert.equal(row.requests, 30);
       assert.equal(row.titleCandidates, 30);
       assert.ok(row.elapsedMs > 0);
-      assert.equal(row.usesTitleIndex, row.variant === 'partial-index');
-      assert.equal(row.indexBytes > 0, row.variant === 'partial-index');
+      assert.equal(row.usesTitleIndex,false);
+      assert.equal(row.indexBytes,0);
     }
     const transactions = lines.filter(row => row.kind === 'transaction');
-    assert.ok(transactions.some(row => row.mode === 'BEGIN DEFERRED' && row.purpose === 'temp-parse-batch'));
-    assert.ok(transactions.some(row => row.mode === 'BEGIN IMMEDIATE' && row.purpose === 'replace-sessions'));
+    assert.ok(!transactions.some(row => row.purpose === 'temp-map-load'));
+    assert.ok(!transactions.some(row => row.purpose === 'temp-parse-batch'));
+    assert.ok(transactions.some(row => row.mode === 'BEGIN IMMEDIATE' && row.purpose === 'replace-memory'));
     for (const row of transactions) {
       assert.equal(row.outcome, 'COMMIT');
       assert.ok(row.elapsedMs >= 0 && row.before.rssBytes > 0 && row.after.main.allocatedBytes > 0);

@@ -1,4 +1,5 @@
 // 전수 파싱을 유지하는 영속 metadata 후보를 고정 워크트리·원본 사본으로 비교한다.
+const { summaryPath } = require('./summary-paths.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { mkdir, mkdtemp, cp, copyFile, readFile, writeFile, truncate, utimes, rm } = require('node:fs/promises');
@@ -78,7 +79,7 @@ async function worker(configPath, variant, pairText, work) {
   const { SummaryStaging } = require(join(product, 'dist/src/summary/staging'));
   const { refreshSummary } = require(join(product, 'dist/src/summary/scanner'));
   const { buildUsageQuery } = require(join(product, 'dist/src/summary/db/queries'));
-  const Metadata = fs.existsSync(join(product, 'dist/src/summary/metadata.js')) ? require(join(product, 'dist/src/summary/metadata')).SummaryMetadata : undefined;
+  const Metadata = fs.existsSync(summaryPath(product, "dist/src/summary/metadata/index.js")) ? require(join(product, 'dist/src/summary/metadata')).SummaryMetadata : undefined;
   await mkdir(work, { recursive: true });
   const samples = []; let reads;
   for (const scenario of scenarios) {

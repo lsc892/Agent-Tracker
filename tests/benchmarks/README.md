@@ -2,6 +2,10 @@
 
 요약·JSONL·SQL·quota 처리의 정확성과 성능을 비교하는 도구를 모은다.
 
+- [summary-paths.cjs](summary-paths.cjs) — 책임별 폴더로 이동한 현재 summary 파일과 과거 고정 제품의 파일 경로를 함께 해석한다. 이전 측정 입력·원시 결과는 바꾸지 않는다.
+
+- [jsonl-memory-ab.cjs](jsonl-memory-ab.cjs) — `--before=<고정 SQL> --after=<고정 메모리 집계> --current-snapshot=<고정 snapshot.json> --output=<새 JSON>`으로 파일 DTO 재사용·메모리 최종 집계·직접 영속 저장을 비교한다. 실제·1만·100요청에서 준비 3쌍·AB/BA 10쌍과 DB 재개방·SQL seed 전환·정합성·TEMP 생성 0회를 검사한다. `--multi-source`는 변경 없는 16 MiB 형제 원본을 둔 1만 요청, `--smoke`는 합성 100요청 한 쌍이다. 이전 SQL 기준은 기본 갱신이 바뀌기 전 별도 빌드를 사용한다.
+
 - [metadata-ab.cjs](metadata-ab.cjs) — `--before=<기준 빌드> --after=<후보 빌드> --output=<새 JSON>`에서 파일 전수 파싱을 유지하는 영속 metadata를 현재·1만·100요청으로 비교한다. variant별 warm DB, 동일 내용 재파싱·한 건 추가·일/월/세션/프로젝트 조회의 준비 3쌍·AB/BA 10쌍, dirty·winner 처리량·공간·정확성과 Markdown을 기록한다. `--baseline-only`는 고정 사본과 A 사전 측정을 보존하며 `--workspace=<기존 캐시>`로 같은 입력을 재사용한다.
 
 - [temp-batch-ab.cjs](temp-batch-ab.cjs) — `--before=<빌드된 이전 소스> --after=<빌드된 이후 소스>`의 고정 사본에서 현재 로그 전체·1만·100요청의 TEMP 집계를 비교한다. 준비 3회 뒤 AB/BA 10쌍의 전체 재파싱·요청 한 건 추가·조회와 독립 JS 평균 검증을 기록한다. `--synthetic-only`는 합성 두 규모, `--smoke`는 100건 한 쌍만 실행한다.

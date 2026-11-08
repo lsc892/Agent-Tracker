@@ -1,4 +1,5 @@
 // 메모리에 고정한 JSONL 입력으로 파싱 분기 변경 전후의 속도와 메모리를 비교한다.
+const { summaryPath } = require('./summary-paths.cjs');
 const assert = require('node:assert/strict');
 const { fork, execFileSync } = require('node:child_process');
 const { createHash } = require('node:crypto');
@@ -34,19 +35,19 @@ async function prepare() {
   const branches = {};
   for (const [variant, suffix] of [['before', 'before'], ['after', 'after']]) {
     const directory = resolve(root, `../Agent-Tracker-bench-jsonl-${suffix}-20261009`);
-    const source = await fs.readFile(join(directory, 'src/summary/jsonl.ts'));
-    const modulePath = join(directory, 'dist/src/summary/jsonl.js');
+    const source = await fs.readFile(summaryPath(directory, "src/summary/jsonl/index.ts"));
+    const modulePath = summaryPath(directory, "dist/src/summary/jsonl/index.js");
     await fs.writeFile(join(cache, `${variant}.ts`), source, { flag: 'wx' });
     branches[variant] = { directory, branch: git(directory, ['branch', '--show-current']), commit: git(directory, ['rev-parse', 'HEAD']),
       sourceSha256: sha(source), canonicalSourceSha256: canonicalSha(source), modulePath,
       moduleSha256: sha(await fs.readFile(modulePath)), status: git(directory, ['status', '--short']),
-      readerStatus: git(directory, ['status', '--short', '--', 'src/summary/jsonl.ts']) };
+      readerStatus: git(directory, ['status', '--short', '--', 'src/summary/jsonl/index.ts']) };
   }
   assert.equal(branches.before.commit, manifest.baselineCommit);
   assert.equal(branches.before.readerStatus, '');
   assert.equal(branches.before.canonicalSourceSha256, canonicalSha(await fs.readFile(join(root, 'tests/.cache/jsonl-reader/baseline.ts'))));
-  assert.equal(branches.after.canonicalSourceSha256, canonicalSha(await fs.readFile(join(root, 'src/summary/jsonl.ts'))));
-  await fs.writeFile(join(cache, 'after-reader.patch'), git(branches.after.directory, ['diff', '--no-ext-diff', '--', 'src/summary/jsonl.ts']) + '\n', { flag: 'wx' });
+  assert.equal(branches.after.canonicalSourceSha256, canonicalSha(await fs.readFile(summaryPath(root, "src/summary/jsonl/index.ts"))));
+  await fs.writeFile(join(cache, 'after-reader.patch'), git(branches.after.directory, ['diff', '--no-ext-diff', '--', 'src/summary/jsonl/index.ts']) + '\n', { flag: 'wx' });
   const setup = { preparedAtSeoul: seoulTime(), originalBranch: git(root, ['branch', '--show-current']),
     legacyReportSha256: sha(legacy), inputManifestSha256: sha(manifestBytes), branches };
   await fs.writeFile(setupPath, JSON.stringify(setup, null, 2), { flag: 'wx' });
@@ -78,7 +79,7 @@ async function worker(request) {
   const branch = setup.branches[request.variant];
   const entry = manifest.cases.find(value => value.name === request.name);
   assert.equal(sha(await fs.readFile(branch.modulePath)), branch.moduleSha256, 'Compiled branch changed');
-  assert.equal(sha(await fs.readFile(join(branch.directory, 'src/summary/jsonl.ts'))), branch.sourceSha256, 'Branch source changed');
+  assert.equal(sha(await fs.readFile(summaryPath(branch.directory, "src/summary/jsonl/index.ts"))), branch.sourceSha256, 'Branch source changed');
   const inputs = new Map();
   for (const file of entry.files) {
     const buffer = await fs.readFile(file.path);
@@ -213,7 +214,7 @@ async function compare() {
   assert.equal(sha(await fs.readFile(legacyPath)), setup.legacyReportSha256);
   assert.equal(git(root, ['branch', '--show-current']), setup.originalBranch);
   for (const branch of Object.values(setup.branches)) {
-    assert.equal(sha(await fs.readFile(join(branch.directory, 'src/summary/jsonl.ts'))), branch.sourceSha256);
+    assert.equal(sha(await fs.readFile(summaryPath(branch.directory, "src/summary/jsonl/index.ts"))), branch.sourceSha256);
   }
   const output = resolve(root, option('--output', 'docs/benchmarks/2026-10-09/JsonlParsingBranches-2026-10-09.json'));
   const report = { recordedAtSeoul: seoulTime(), node: process.version, platform: process.platform, arch: process.arch, pairs,

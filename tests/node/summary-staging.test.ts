@@ -86,13 +86,14 @@ test('lineage excludes failed, removed and unparsed parents and retains known se
   assert.equal(database.connection.prepare("SELECT 1 FROM flags WHERE file_id=7 AND flag='missing-parent-agent'").get(),undefined);
 }));
 
-test('bounded TEMP event batches leave the persistent database available to another writer',async () => {
+test('memory event batches avoid SQL writes, roll back failed chunks and leave another writer available',async () => {
   const directory = await mkdtemp(join(tmpdir(),'agent-tracker-staging-'));
   const path = join(directory,'summary.sqlite');
   const database = new SummaryDatabase(path);
   const writer = new SummaryDatabase(path);
   const staging = new SummaryStaging(database.connection);
   try {
+    codexFile(staging,1,'memory-session');
     // A busy timeout of zero makes an accidental main-database writer lock fail immediately.
     writer.connection.exec('PRAGMA busy_timeout=0');
     staging.batchEvents(() => {
@@ -101,17 +102,36 @@ test('bounded TEMP event batches leave the persistent database available to anot
         size_bytes:0,mtime_ms:0,dev:null,inode:null,parser_version:1},'synthetic-scan');
     });
     assert.equal(writer.diagnostics().counts.files,1);
-    assert.equal((database.connection.prepare('SELECT count(*) count FROM events').get() as {count:number}).count,1);
+    assert.equal(database.connection.prepare('SELECT count(*) count FROM events').get()?.count,0);
     assert.throws(() => staging.batchEvents(() => {
       staging.event(1,{kind:'turn',rootId:'request-two',isMain:true,offset:1});
       throw new Error('synthetic parse failure');
     }),/synthetic parse failure/);
-    assert.equal((database.connection.prepare('SELECT count(*) count FROM events').get() as {count:number}).count,1);
-    // A failed chunk leaves no transaction open, and the next chunk can be staged normally.
+    assert.equal(database.connection.prepare('SELECT count(*) count FROM events').get()?.count,0);
+    // Only memory DTOs exist until preparation; the failed chunk must never be loaded.
     staging.batchEvents(() => staging.event(1,{kind:'turn',rootId:'request-three',isMain:true,offset:2}));
-    assert.equal((database.connection.prepare('SELECT count(*) count FROM events').get() as {count:number}).count,2);
+    assert.equal(database.connection.prepare('SELECT count(*) count FROM events').get()?.count,0);
+    staging.nextComponent();staging.prepareSummaries();
+    assert.deepEqual(database.connection.prepare('SELECT root_id FROM events ORDER BY id').all().map(row=>row.root_id),
+      ['request-one','request-three']);
   } finally { staging.close();writer.close();database.close();await rm(directory,{recursive:true,force:true}); }
 });
+
+test('shared parse batches keep name metadata inside one SQL transaction and roll it back on failure',()=>withStaging((staging,database)=>{
+  const insert=database.connection.prepare("INSERT INTO session_names VALUES('codex',?,?,1)");
+  assert.equal(database.connection.isTransaction,false);
+  staging.batchEvents(()=>{
+    assert.equal(database.connection.isTransaction,true);
+    insert.run('first','First title');insert.run('second','Second title');
+  });
+  assert.equal(database.connection.isTransaction,false);
+  assert.throws(()=>staging.batchEvents(()=>{
+    insert.run('failed','Uncommitted title');throw new Error('name batch failure');
+  }),/name batch failure/);
+  assert.equal(database.connection.isTransaction,false);
+  assert.deepEqual(database.connection.prepare('SELECT session_id FROM session_names ORDER BY session_id').all()
+    .map(row=>row.session_id),['first','second']);
+}));
 
 test('consecutive component aggregates keep shared request ids, empty usage, titles and capabilities isolated',() => withStaging((staging,database) => {
   for (const [id,session] of [[1,'a'],[2,'b'],[3,'c']] as const) {

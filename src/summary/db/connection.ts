@@ -5,7 +5,7 @@ import { DatabaseSync, type StatementSync } from 'node:sqlite';
 import { migrateSchema } from './migrations';
 import { calendarPeriod } from './timezone';
 import { UsageRollupStore } from './rollups';
-import { modelOrderKey, modelRelease } from '../modelOrder';
+import { modelOrderKey, modelRelease } from '../models/modelOrder';
 
 export type SqliteSessionOptions = string | { databasePath: string; cacheKiB?: number };
 

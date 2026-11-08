@@ -1,10 +1,10 @@
 // 통계 Worker에서 호스트 명령을 받아 DB 조회·갱신·설정·삭제를 실행한다.
 import { parentPort, workerData } from 'node:worker_threads';
-import { SummaryDatabase, usageChartFromPage } from './db';
-import { refreshSummary } from './scanner';
-import { acquireRefreshLock } from './lock';
-import type { SummaryOptions, UsageQuery, SourceRoot, RefreshResult, NameQuery } from './types';
-import type { BillingMode, Provider } from './db/types';
+import { SummaryDatabase, usageChartFromPage } from '../db';
+import { refreshSummary } from '../scanner';
+import { acquireRefreshLock } from '../scanner/lock';
+import type { SummaryOptions, UsageQuery, SourceRoot, RefreshResult, NameQuery } from '../types';
+import type { BillingMode, Provider } from '../db/types';
 
 if (!parentPort) throw new Error('Summary worker requires a parent');
 const port = parentPort;

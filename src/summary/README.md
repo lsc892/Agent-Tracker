@@ -1,21 +1,16 @@
 # summary
 
-Claude·Codex 대화 로그를 수집·집계하고 Worker를 통해 통계 API를 제공한다.
+Claude·Codex 대화 로그의 수집·집계·저장·Worker API를 책임별 폴더로 나눈다. 기본 갱신은 파일 DTO를 재사용하는 메모리 집계이며 SQL staging·metadata API는 호환성과 별도 검증을 위해 유지한다.
 
-- [client.ts](client.ts) — `SummaryClient`: 통계 조회·갱신·설정 API와 작업 순서를 조율한다.
-- [db](db/README.md) — 통계의 SQLite 저장·조회·마이그레이션·사전 집계를 담당한다.
-- [jsonl.ts](jsonl.ts) — JSONL을 읽으며 `SummaryError`는 오류 코드·위치를, `JsonlLine`은 크기 제한·이미지 제거를 담당한다.
-- [lock.ts](lock.ts) — 여러 VS Code 창의 통계 쓰기를 SQLite 잠금으로 직렬화한다.
-- [metadata.ts](metadata.ts) — `SummaryMetadata`: 전수 파싱한 요청의 fingerprint·의존 키를 비교하고 확정 집계를 재사용한다.
-- [modelOrder.ts](modelOrder.ts) — 모델 출시일과 숫자 버전으로 정렬 기준을 만든다.
-- [names.ts](names.ts) — Codex의 별도 제목 메타데이터를 저장된 세션 이름에 반영한다.
-- [parsers](parsers/README.md) — 제공자별 로그를 공통 식별 정보와 파싱 이벤트로 변환한다.
-- [pricing.ts](pricing.ts) — 모델별 표준 단가로 API 추정 비용을 계산한다.
-- [refresh.ts](refresh.ts) — `RefreshController`: 갱신·취소·삭제 요청의 중복과 실행 순서를 관리한다.
-- [scanner.ts](scanner.ts) — 변경된 로그와 연결 세션을 다시 파싱해 통계를 교체한다.
-- [sourceFingerprint.ts](sourceFingerprint.ts) — 원본 식별자·내용 해시로 이동한 로그의 이전 snapshot 포함 여부를 검증한다.
-- [staging.ts](staging.ts) — `SummaryStaging`: 세션 계보를 해소하고 변경 요청만 중복 제거·집계해 성분별 결과를 제공한다.
-- [transport.ts](transport.ts) — `WorkerTransport`: Worker 수명과 요청·응답·진행 알림을 관리한다.
-- [types.ts](types.ts) — 통계 API와 제공자 공통 파싱 이벤트 타입을 정의한다.
-- [worker.ts](worker.ts) — 호스트 명령에 따라 DB 조회·갱신·설정·삭제를 실행한다.
-- [zstd.ts](zstd.ts) — Zstd를 스트리밍 해제하며 `ZstdError`는 오류를, `ZstdFrames`는 프레임 경계 검증을 담당한다.
+- [client/](client/README.md): 통계 클라이언트, Worker 통신·명령 실행, 갱신·취소·삭제 직렬화.
+- [scanner/](scanner/README.md): 기본 갱신 진입점, manifest·파일 DTO 재사용, 잠금과 원본 이동 검증.
+- [jsonl/](jsonl/README.md): JSONL 스트림·줄/이미지 처리와 Zstd frame 검증·해제.
+- [aggregation/](aggregation/README.md): 파일 DTO의 계보·복사·응답 중복을 처리해 최종 요청·모델·도구 집계 생성.
+- [staging/](staging/README.md): 호환 SQL 경로의 원본·이벤트·계보·연결 성분·집계 준비와 제공자 제목 수집.
+- [metadata/](metadata/README.md): 호환 SQL 경로의 요청 의미 서명·dirty 의존성·확정 snapshot.
+- [models/](models/README.md): 모델별 API 단가와 출시일·이름 정렬 정책.
+- [db/](db/README.md): SQLite 저장·조회·마이그레이션·사전 집계.
+- [parsers/](parsers/README.md): Claude·Codex 원본을 공통 식별 정보와 파싱 이벤트로 정규화.
+- [types.ts](types.ts): 통계 API와 제공자 공통 파싱 이벤트 타입.
+
+기존 summary/client·scanner·jsonl·staging·metadata import는 각 폴더의 index.ts에서 같은 공개 API를 제공한다. Worker 실행 파일은 [client/worker.ts](client/worker.ts)에 있으며 클라이언트의 기본 경로도 같은 폴더를 사용한다.

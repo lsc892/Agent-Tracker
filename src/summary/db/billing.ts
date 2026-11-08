@@ -2,7 +2,7 @@
 import type { SQLInputValue } from 'node:sqlite';
 import type { SqliteSession } from './connection';
 import type { BillingMode, Provider } from './types';
-import { PRICING_VERSION } from '../pricing';
+import { PRICING_VERSION } from '../models/pricing';
 
 /** 세션의 결제 분류를 관리하고 모델별 추정 비용을 요청 비용으로 저장한다. */
 export class SessionBillingStore {

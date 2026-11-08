@@ -12,7 +12,7 @@ const { SummaryDatabase } = require('../../dist/src/summary/db');
 const { buildRollupUsageQueries } = require('../../dist/src/summary/db/rollup-queries');
 const { buildUsageQuery, buildQueryFilter } = require('../../dist/src/summary/db/queries');
 const { periodBounds } = require('../../dist/src/summary/db/timezone');
-const { PRICING_VERSION } = require('../../dist/src/summary/pricing');
+const { PRICING_VERSION } = require('../../dist/src/summary/models/pricing');
 const { seed, compareResults } = require('./sql-rollup.cjs');
 const { describe, stats } = require('./sql-explain.cjs');
 

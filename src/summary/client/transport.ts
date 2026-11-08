@@ -1,8 +1,8 @@
 // 확장 호스트와 통계 Worker 사이의 요청·응답 및 진행 알림을 전달한다.
 import { Worker } from 'node:worker_threads';
 import { join } from 'node:path';
-import { t, type TranslationKey } from '../localization';
-import type { SummaryOptions, SummaryProgress } from './types';
+import { t, type TranslationKey } from '../../localization';
+import type { SummaryOptions, SummaryProgress } from '../types';
 
 interface PendingRequest {
   resolve(value: unknown): void;

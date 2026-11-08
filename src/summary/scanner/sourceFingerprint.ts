@@ -1,9 +1,9 @@
 // 파싱된 원본 식별자와 내용 해시로 이동한 로그의 기존 snapshot 포함 여부를 검증한다.
 import { createHash } from 'node:crypto';
 import { lstat, open } from 'node:fs/promises';
-import type { FileMetadata } from './db/types';
-import type { ParsedIdentity } from './types';
-import { SummaryError } from './jsonl';
+import type { FileMetadata } from '../db/types';
+import type { ParsedIdentity } from '../types';
+import { SummaryError } from '../jsonl';
 
 export function sourceIdentity(identity: ParsedIdentity): string {
   return JSON.stringify([identity.threadId, identity.isMain]);

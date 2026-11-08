@@ -12,7 +12,7 @@ import {
 } from '../../src/summary/db';
 import { buildUsageCountQuery, buildUsageQuery, type UsageBasis } from '../../src/summary/db/queries';
 import { SCHEMA_VERSION } from '../../src/summary/db/schema';
-import { applySessionNames } from '../../src/summary/names';
+import { applySessionNames } from '../../src/summary/staging/names';
 import type { SqliteSession } from '../../src/summary/db/connection';
 import { SummaryReader } from '../../src/summary/db/reader';
 import { UsageRollupStore } from '../../src/summary/db/rollups';

@@ -57,7 +57,11 @@ test('a full reread with unchanged statistics preserves request identities acros
   assert.equal(result.failed,0);assert.equal(result.parsed,1);
   assert.ok(result.bodyBytes >= Buffer.byteLength(source+extra),'changed sources are still read from the beginning');
   assert.deepEqual(value.db.queryTurns(),before);
-  assert.deepEqual(metadata(value.db),beforeMetadata);
+  const afterMetadata=metadata(value.db);
+  assert.deepEqual(afterMetadata.map(({signature,...row})=>row),beforeMetadata.map(({signature,...row})=>row),
+    'final prepared snapshots stay unchanged when appended source bytes contain no statistical events');
+  assert.ok(afterMetadata.every((row,index)=>row.signature!==beforeMetadata[index].signature),
+    'the file-state signature records the newly accepted raw file snapshot');
   assert.equal(value.db.connection.prepare('SELECT count(*) AS n FROM request_writes').get()?.n,0,
     'unchanged normalized facts do not rewrite the request table');
 }));

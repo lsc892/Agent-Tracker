@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { SummaryDatabase, type TurnSummaryInput } from '../../src/summary/db';
 import { SummaryClient } from '../../src/summary/client';
 import { refreshSummary } from '../../src/summary/scanner';
-import { estimateCost, PRICING_VERSION } from '../../src/summary/pricing';
+import { estimateCost, PRICING_VERSION } from '../../src/summary/models/pricing';
 import { parseDashboardMessage } from '../../src/ui/presentation';
 
 const text = (rows: unknown[]): string => rows.map(row=>JSON.stringify(row)).join('\n')+'\n';

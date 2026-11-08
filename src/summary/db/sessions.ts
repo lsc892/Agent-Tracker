@@ -4,7 +4,7 @@ import type { SessionBillingStore } from './billing';
 import type { SqliteSession } from './connection';
 import type { BillingMode, SessionReplacement, TurnSummaryInput } from './types';
 import { nonnegative } from './validation';
-import { estimateCost, PRICING_VERSION } from '../pricing';
+import { estimateCost, PRICING_VERSION } from '../models/pricing';
 import { SessionChanges, TURN_COLUMNS } from './sessionChanges';
 
 const TURN_INSERT = `INSERT INTO turn_summary (${TURN_COLUMNS}) VALUES (${TURN_COLUMNS.map(() => '?')})`;

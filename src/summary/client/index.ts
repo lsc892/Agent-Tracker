@@ -1,9 +1,9 @@
 // 확장 호스트에서 통계 Worker를 사용하는 공개 API를 제공한다.
 import { WorkerTransport } from './transport';
 import { RefreshController, type RefreshOptions } from './refresh';
-import type { SummaryOptions, SummaryProgress, RefreshResult, UsageQuery, UsageResult, DiagnosticsResult, SourceRoot, NameQuery, NameResult } from './types';
-import type { BillingMode, Provider } from './db/types';
-export * from './types';
+import type { SummaryOptions, SummaryProgress, RefreshResult, UsageQuery, UsageResult, DiagnosticsResult, SourceRoot, NameQuery, NameResult } from '../types';
+import type { BillingMode, Provider } from '../db/types';
+export * from '../types';
 
 /** 통계 조회·갱신·설정 API를 제공하고 작업 순서를 조율한다. */
 export class SummaryClient {

@@ -1,4 +1,5 @@
 // 고정 JSONL의 줄 경계·이미지·UTF-8 결과와 청크 리더의 시간·프로세스 메모리를 비교한다.
+const { summaryPath } = require('./summary-paths.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { mkdtemp, mkdir, open, writeFile, readFile, rm } = require('node:fs/promises');
@@ -103,8 +104,8 @@ async function main() {
         distribution: 'ordinal-v1, one normalized request-shaped row per record, CRLF, UTF-8 suffix, tokens=100+index%1000; reader-only, no sessions/projects or DB' },
       runnerSha256: sha(fs.readFileSync(__filename)), sources: {}, cases: [] };
     for (const variant of ['A', 'B']) report.sources[variant] = {
-      sourceSha256: sha(fs.readFileSync(join(config[variant], 'src/summary/jsonl.ts'))),
-      buildSha256: sha(fs.readFileSync(join(config[variant], 'dist/src/summary/jsonl.js'))),
+      sourceSha256: sha(fs.readFileSync(summaryPath(config[variant], "src/summary/jsonl/index.ts"))),
+      buildSha256: sha(fs.readFileSync(summaryPath(config[variant], "dist/src/summary/jsonl/index.js"))),
     };
     for (const [index, spec] of cases.entries()) {
       const trials = { A: [], B: [] };
