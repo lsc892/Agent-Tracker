@@ -12,7 +12,6 @@ import {
 } from '../../src/summary/db';
 import { buildUsageCountQuery, buildUsageQuery, type UsageBasis } from '../../src/summary/db/queries';
 import { SCHEMA_VERSION } from '../../src/summary/db/schema';
-import { applySessionNames } from '../../src/summary/staging/names';
 import type { SqliteSession } from '../../src/summary/db/connection';
 import { SummaryReader } from '../../src/summary/db/reader';
 import { UsageRollupStore } from '../../src/summary/db/rollups';
@@ -42,7 +41,7 @@ function model(name: string, tokens: number): ModelUsageInput {
 
 function replace(db: SummaryDatabase, rows: TurnSummaryInput[], sessions = [...new Map(rows.map(row =>
   [`${row.provider}:${row.session_id}`, { provider: row.provider, session_id: row.session_id }])).values()]): void {
-  db.replaceSessions({ sessions, files: [], summaries: rows });
+  db.replaceMemory({scanId: 'test', sessions, files: [], summaries: rows });
 }
 
 function fixture(t: TestContext, rows: TurnSummaryInput[] = []): SummaryDatabase {
@@ -343,7 +342,7 @@ test('manifest diagnostic updates refresh stale counts and successful replacemen
   const manifest = db.observeFile(file, 'first');
   const rows = [turn('one', '2026-10-01T12:00:00', 100, { model_usage: [model('A', 100)] }),
     turn('two', '2026-10-02T12:00:00', 200, { model_usage: [model('B', 200)] })];
-  const install = (): void => db.replaceSessions({ sessions: [{ provider: 'claude', session_id: 'session-a' }],
+  const install = (): void => db.replaceMemory({scanId: 'test', sessions: [{ provider: 'claude', session_id: 'session-a' }],
     files: [{ ...file, id: manifest.id }], summaries: rows });
   install();
   expect(oracle(db)[0], { stale_turns: 0, total_tokens: 300 });
@@ -366,7 +365,7 @@ test('v10 upgrade preserves existing IDs, diagnostic/model/cost rows and lazily 
   const previous = files.open();
   const file = metadata();
   const manifest = previous.observeFile(file, 'old');
-  previous.replaceSessions({ sessions: [{ provider: 'claude', session_id: 'session-a' }], files: [{ ...file, id: manifest.id }],
+  previous.replaceMemory({scanId: 'test', sessions: [{ provider: 'claude', session_id: 'session-a' }], files: [{ ...file, id: manifest.id }],
     summaries: [turn('preserved', '2026-10-01T12:00:00', 100, {
       diagnostic_file_id: manifest.id, diagnostic_offset: 42, last_error: 'stored-error', billing: 'api',
       model_usage: [model('claude-sonnet-4-6', 100)], capability_usage: [{ category: 'skill', name: 'fixture', usage_count: 2 }],
@@ -400,7 +399,7 @@ test('v10 upgrade preserves existing IDs, diagnostic/model/cost rows and lazily 
 for (const version of [14, 15]) test(`v${version} month layout returns to session clustering without rewriting facts`, t => {
   const files = disk(t), previous = files.open();
   const file = metadata(), manifest = previous.observeFile(file, 'v13');
-  previous.replaceSessions({ sessions: [{ provider: 'claude', session_id: 'session-a' }], files: [{ ...file, id: manifest.id }], summaries: [
+  previous.replaceMemory({scanId: 'test', sessions: [{ provider: 'claude', session_id: 'session-a' }], files: [{ ...file, id: manifest.id }], summaries: [
     turn('before-month', '2026-09-30T23:59:00', 100, { diagnostic_file_id: manifest.id, model_usage: [model('A', 100)],
       capability_usage: [{ category: 'skill', name: 'preserved', usage_count: 2 }], billing: 'api' }),
     turn('after-month', '2026-10-01T00:01:00', 200, { model_usage: [model('A', 200)] }),
@@ -456,7 +455,7 @@ test('a failure after request rollup refresh rolls back facts, model rollup, dia
   const db = fixture(t);
   const file = metadata();
   const manifest = db.observeFile(file, 'first');
-  const install = (tokens: number, name: string): void => db.replaceSessions({
+  const install = (tokens: number, name: string): void => db.replaceMemory({scanId: 'test',
     sessions: [{ provider: 'claude', session_id: 'session-a' }],
     files: [{ ...file, size_bytes: tokens, id: manifest.id }],
     summaries: [turn('same', '2026-10-01T12:00:00', tokens, {
@@ -518,9 +517,8 @@ test('metadata-only session renames immediately affect rollup dimensions and nam
   const db = fixture(t, [turn('same', '2026-10-01T12:00:00', 100)]);
   oracle(db, {}, 'session');
   const before = snapshot(db, rollupTables);
-  db.connection.exec(`CREATE TEMP TABLE session_names(provider TEXT,session_id TEXT,session_name TEXT);
-    INSERT INTO session_names VALUES ('claude','session-a','Metadata-only rename');`);
-  db.transaction(() => applySessionNames(db.connection));
+  db.replaceMemory({scanId:'rename',sessions:[{provider:'claude',session_id:'session-a'}],files:[],
+    summaries:[{...turn('same', '2026-10-01T12:00:00', 100),session_name:'Metadata-only rename'}]});
   expect(oracle(db, { sessionName: 'Metadata-only' }, 'session')[0], { session_name: 'Metadata-only rename', total_tokens: 100 });
   assert.deepEqual(oracle(db, { sessionName: 'Session%_' }, 'session'), []);
   assert.deepEqual(snapshot(db, rollupTables), before, 'Names remain normalized instead of duplicating them in rollups');

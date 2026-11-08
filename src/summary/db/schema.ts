@@ -2,37 +2,7 @@
 import { SCHEMA_ROLLUP_SQL } from './rollup-state';
 
 export { SCHEMA_ROLLUP_SQL } from './rollup-state';
-export const SCHEMA_VERSION = 17;
-
-// Accepted turn calculations are reusable only after the complete source snapshot commits.
-export const SCHEMA_METADATA_SQL = `
-CREATE TABLE IF NOT EXISTS turn_metadata (
-  provider TEXT NOT NULL, session_id TEXT NOT NULL, root_id TEXT NOT NULL,
-  signature TEXT NOT NULL, prepared_json TEXT,
-  PRIMARY KEY(provider,session_id,root_id),
-  FOREIGN KEY(provider,session_id) REFERENCES sessions(provider,session_id) ON DELETE CASCADE
-) WITHOUT ROWID;
-CREATE TABLE IF NOT EXISTS turn_metadata_models (
-  provider TEXT NOT NULL, session_id TEXT NOT NULL, root_id TEXT NOT NULL, model TEXT NOT NULL,
-  input_tokens INTEGER NOT NULL, output_tokens INTEGER NOT NULL,
-  cache_read_input_tokens INTEGER, cache_write_input_tokens INTEGER,
-  PRIMARY KEY(provider,session_id,root_id,model),
-  FOREIGN KEY(provider,session_id,root_id) REFERENCES turn_metadata(provider,session_id,root_id) ON DELETE CASCADE
-) WITHOUT ROWID;
-CREATE TABLE IF NOT EXISTS turn_metadata_capabilities (
-  provider TEXT NOT NULL, session_id TEXT NOT NULL, root_id TEXT NOT NULL,
-  category TEXT NOT NULL, name TEXT NOT NULL, usage_count INTEGER NOT NULL,
-  PRIMARY KEY(provider,session_id,root_id,category,name),
-  FOREIGN KEY(provider,session_id,root_id) REFERENCES turn_metadata(provider,session_id,root_id) ON DELETE CASCADE
-) WITHOUT ROWID;
-CREATE TABLE IF NOT EXISTS turn_metadata_dependencies (
-  provider TEXT NOT NULL, session_id TEXT NOT NULL, root_id TEXT NOT NULL, dependency TEXT NOT NULL,
-  PRIMARY KEY(provider,session_id,root_id,dependency),
-  FOREIGN KEY(provider,session_id,root_id) REFERENCES turn_metadata(provider,session_id,root_id) ON DELETE CASCADE
-) WITHOUT ROWID;
-CREATE INDEX IF NOT EXISTS idx_turn_metadata_dependency
-  ON turn_metadata_dependencies(provider,session_id,dependency,root_id);
-`;
+export const SCHEMA_VERSION = 18;
 
 /**
  * 책임: 파일 이동 판정에 필요한 플랫폼별 identity 인덱스를 구성한다.
@@ -161,7 +131,6 @@ ${TURN_SUMMARY_INDEX_SQL}
 ${SCHEMA_MODEL_SQL}
 ${SCHEMA_CAPABILITY_SQL}
 ${SCHEMA_ROLLUP_SQL}
-${SCHEMA_METADATA_SQL}
 `;
 
 /** Both v1 and v2 stored project names on every turn. Preserve ids, statistics and diagnostics. */

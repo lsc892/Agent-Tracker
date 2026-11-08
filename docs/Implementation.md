@@ -23,11 +23,11 @@
 | [quota/codex/](../src/quota/codex/) | RPC/process 수명·quota 응답 해석·실행 파일 탐색·공유 오류 |
 | [quota/claude/](../src/quota/claude/) | 제한된 HTTP 본문 읽기·reader 해제와 quota 응답 해석 |
 | [quota/service.ts](../src/quota/service.ts), [providerState.ts](../src/quota/providerState.ts) | 조회·timer·구독 실행 제어와 provider별 snapshot·오류·재시도·만료 상태의 분리 |
-| `src/summary/client.ts`, `transport.ts`, `refresh.ts`, `worker.ts` | 공개 API, Worker 통신·종료, 중복 갱신·취소·삭제 직렬화, DB 실행 |
-| `src/summary/scanner.ts`, `jsonl.ts`, `lock.ts` | bounded 순회·스트리밍·파일 잠금 |
+| `src/summary/client/` | 공개 API, Worker 통신·종료, 갱신·취소·삭제 직렬화 |
+| `src/summary/scanner/`, `jsonl/` | 탐색·근거 수집·고정 byte 검증·winner 스트림·잠금 |
 | `src/summary/parsers/` | Claude·Codex current/legacy 정규화 |
-| `src/summary/staging.ts` | 디스크 임시 테이블, 중복 제거·lineage·root 요청 합산 |
-| `src/summary/db/` | 영속 통계·turn metadata, transaction, 페이지·시간대 집계 |
+| `src/summary/aggregation/` | 유효성 근거·단일 winner DTO 갱신·최종 요청/모델/도구 집계 |
+| `src/summary/db/` | 최종 facts 직접 저장·transaction·페이지·일별 집계·스키마 18 전환 |
 | `src/ui/`, `media/` | Quota Markdown 툴팁, Usage·Diagnostics Webview |
 | `tools/vscode/statusbar-toggle.cjs` | 로컬 VS Code 내장 클릭 토글 연결, 백업·무결성 검사·복원 |
 | `tests/vscode/statusbar-toggle.cjs` | 격리된 실제 VS Code의 클릭·닫기·재열기 검증 |
@@ -35,21 +35,21 @@
 ## 구현 결정
 
 - 별도 native npm binding 대신 worker 안에서 Node 내장 `node:sqlite`를 사용합니다. 동기 SQL은 Extension Host에서 실행하지 않습니다. 로컬 설치된 VS Code의 Electron Node 24.21.0에서 `DatabaseSync` 로딩을 확인했습니다. 최소 지원 런타임은 Node 22.15로 잡았습니다.
-- SQLite WAL, 메인·임시 cache 각각 4 MiB, `temp_store=FILE`, `mmap_size=0`을 설정합니다. 전체 이벤트 수와 무관하게 JS에서는 metadata와 조회 page만 보유합니다.
+- SQLite WAL과 제한된 SQLite cache를 사용합니다. Worker는 원본을 한 번 읽으며 그룹별 winner DTO를 갱신하고 패자를 버립니다. 남은 원본별 winner만 최종 세션·요청 그룹으로 병합합니다. 진단·귀속 근거와 비사용량 이벤트는 같은 읽기에서 수집하며, 패자 모델을 별도 행으로 복원하지 않습니다. 원본 이벤트 DTO 캐시와 SQL TEMP 집계 경로는 제거했습니다.
 - 새 CLI credential을 직접 발급하거나 인증 내용을 쓰지 않습니다. Codex는 account 조회만 수행하고 thread/turn이나 모델 호출을 만들지 않습니다.
 - Webview 동적 문자열은 `textContent`로 렌더링하고 nonce CSP와 message allowlist를 사용합니다. 프로젝트·세션 filter나 기간 변경은 JSONL 재집계를 일으키지 않습니다.
 - 사용자가 제외한 루트는 삭제 판정에서 제외합니다. 같은 논리 세션의 일부가 그 루트에 남아 있으면 재집계에 필요한 원본을 함께 읽으며, 읽을 수 없으면 세션의 이전 수치를 보존합니다.
 - 원본 삭제 후 사용량 보존은 기본 ON이며 데이터 설정에서 바꿉니다. 모델별 양수 사용량과 유효 세션·요청 ID가 있는 저장 요청은 경고·실패·재파싱 오류와 관계없이 모델·비용·Skill 행까지 유지합니다. schema v12의 manifest.source_missing으로 삭제를 기록하고, 일부 원본이 없으면 기존 요청 snapshot을 고정해 누락·중복 합산을 피하며 새 요청은 계속 수집합니다. 누락 원본이 모두 복원되면 교체하고, OFF의 다음 갱신 또는 명시적 데이터 삭제는 보존 이력도 제거합니다.
-- 이벤트 삽입은 JSONL 64 KiB chunk마다 동기 TEMP transaction으로 묶고 고정 SQL의 prepared statement를 재사용합니다. 파일 읽기는 transaction 밖에서 수행하며, TEMP 처리 중 다른 연결의 영속 DB 쓰기를 막지 않는지 검증했습니다. 세션 교체 시 삭제는 요청 UNIQUE 인덱스 `(provider, session_id, root_turn_id)`의 앞 두 키를 사용합니다. schema v10은 별도 세션 인덱스와 Windows에서 미사용인 identity 인덱스를 제거하고 날짜·프로젝트 및 manifest 루트·세션 인덱스를 유지합니다.
+- JSONL 이벤트는 유효성 확인 후 단일 winner 선택기에 직접 전달합니다. 최종 요청·모델·도구만 기존 facts와 비교해 바뀐 행을 저장하며 파일 읽기는 저장 transaction 밖에서 수행합니다. 요청 UNIQUE 인덱스의 제공자·세션 앞 두 키와 기존 조회 인덱스를 유지합니다.
 - schema v16은 갱신 지연을 우선해 일별 집계를 세션 PK `(provider,session_id,project_key,local_day[,model_key])`와 형식 v1로 복원합니다. 월 컬럼·세션/월 목록·월 prefix 추적을 제거하고 대상 세션 범위만 삭제·재집계합니다. v13 캐시는 재사용하며 실험 버전 v14·v15는 facts·ID·비용·Skill을 보존하고 파생 캐시만 재구축합니다.
-- schema v17은 요청별 fingerprint·확정 집계와 응답·누계 의존 키를 `turn_metadata`와 자식 테이블에 저장합니다. 변경·연결 파일은 기존처럼 처음부터 전수 파싱하고, 입력이 달라진 요청과 같은 응답·누계 그룹의 요청만 기존 winner SQL로 재계산합니다. 정상 캐시 경로는 그 요청·모델·Skill만 비교해 달라진 facts·비용을 반영하며 변경 없는 ID·updated_at을 유지합니다. 최초 저장·원본 삭제·Skill 보존은 기존 세션 snapshot 경로를 사용합니다. metadata·manifest·통계는 함께 commit/rollback하며 실제 facts 변경 시 대상 세션의 일별 상태를 정확히 재집계합니다. 기존 DB는 통계를 보존한 채 다음 실제 재파싱에서 metadata를 채웁니다.
+- schema v18은 v17의 turn metadata·모델·도구·의존 키 캐시를 삭제하고 기존 요청·이름·모델·비용·Skill·manifest·일별 집계를 보존합니다. MemoryStore 직접 저장만 사용하며 SessionStore·SessionChanges와 SQL staging·metadata 구현은 제거했습니다.
 - 조회 계획용 통계는 DB 열기, 첫 스캔 완료, 이후 24시간 이상 지난 스캔 완료, 연결 종료에서 `PRAGMA main.optimize`로 수집하며 열기에는 `0x10002`를 지정합니다. TEMP 파싱 테이블을 분석하지 않으며 유지보수 실패는 스캔·종료에 영향을 주지 않습니다.
 - 갱신 직렬화에는 `${dbPath}.refresh-lock.sqlite`의 `BEGIN EXCLUSIVE`를 사용합니다. 이 파일에는 테이블·데이터가 없고 실제 통계 DB의 쓰기 transaction과 분리됩니다. `busy_timeout=0`과 취소 가능한 비동기 대기를 사용하며 연결 종료·worker 종료·process 종료 시 해제됩니다. 기존 JSON owner 파일 방식의 빈 파일 잔류와 stale lock 삭제 경쟁을 없앴고, 이전 `.lock` 파일은 읽거나 삭제하지 않습니다. 새 잠금 파일은 재사용을 위해 남깁니다.
 
 ## 오류 처리 보완
 
 - Claude HTTP 오류 응답 정리에 실패해도 401 credential 재확인과 429 Retry-After 분류를 유지합니다. Codex는 응답 뒤 process 정리 도중 발생한 취소·timeout도 실패로 반환합니다.
-- 파싱에 실패한 파일에서 이미 확인한 session/parent identity는 임시 staging에 남겨 관련 세션 전체의 이전 통계를 보존합니다. 세션 귀속이 바뀌다 실패하면 이전·새 세션을 함께 보존합니다.
+- 파싱에 실패한 파일의 식별 근거로 관련 세션을 연결해 이전 정상 통계를 보존합니다. 한 번의 읽기에는 고정 byte 경계와 파일 정체성·축소·동일 크기 재작성 검사를 적용하고 내용 SHA-256을 저장합니다. 읽기 완료 뒤 append·재작성은 다음 갱신에서 수집하며, 본문을 다시 읽어 두 hash를 비교하는 단계는 없습니다.
 - 일부 세션 저장 후 취소하면 저장된 세션은 정상 상태로 두고, 아직 끝내지 못한 세션의 변경·재사용 원본에 중단 상태를 남깁니다.
 - 일·월 조회의 날짜 필터가 시각 미상 그룹을 숨기지 않으며 결과 page 수에도 포함합니다. 잘못된 시간대는 시스템 시간대와 설정 오류 안내를 사용합니다.
 - Quota 카운트다운은 숫자·문구만 갱신해 카드·버튼 focus를 보존합니다. Diagnostics에 재진입하면 첫 페이지와 버튼 상태를 함께 초기화하며 늦게 도착한 이전 조회는 폐기합니다.

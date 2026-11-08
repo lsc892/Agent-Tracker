@@ -7,19 +7,13 @@ import { nonnegative } from './validation';
 import { estimateCost, PRICING_VERSION } from '../models/pricing';
 
 export interface MemoryReplacement {
-  sessions: readonly SessionRef[];
-  summaries: readonly TurnSummaryInput[];
+  sessions: Iterable<SessionRef>;
+  summaries: Iterable<TurnSummaryInput>;
   files: readonly (FileMetadata & { id: number })[];
-  removedFileIds?: readonly number[];
+  removedFileIds?: Iterable<number>;
   reconnectedFiles?: readonly { old_id: number; new_id: number }[];
   preserveCapabilities?: boolean;
   retainDeletedSourceUsage?: boolean;
-  metadata?: readonly {
-    provider: SessionRef['provider'];
-    session_id: string;
-    root_id: string;
-    signature: string;
-  }[];
   scanId: string;
 }
 
@@ -28,7 +22,6 @@ type SourceSession = { provider: string; session_id: string | null };
 type RemovedSources = Map<number, SourceSession>;
 type StoredRow = Record<string, SQLOutputValue>;
 type MemoryFile = MemoryReplacement['files'][number];
-type MemoryMetadata = NonNullable<MemoryReplacement['metadata']>[number];
 
 interface RetainedUsage {
   turnIds: Set<number>;
@@ -102,10 +95,10 @@ export class MemoryStore {
     this.database.transaction(() => this.apply(replacement));
   }
 
-  /** 보존 대상 준비부터 원본·요청·metadata 반영과 파생 데이터 정리까지 순서대로 조율한다. */
+  /** 보존 대상 준비부터 원본·요청 반영과 파생 데이터 정리까지 순서대로 조율한다. */
   private apply(replacement: MemoryReplacement): void {
     const now = new Date().toISOString();
-    const sessions = new Map(replacement.sessions.map(session => [sessionKey(session.provider, session.session_id), session]));
+    const sessions = new Map(Array.from(replacement.sessions, session => [sessionKey(session.provider, session.session_id), session]));
     const changedSessions = new Set<string>();
     const affectedProjects = new Set<string>();
     const removed = this.collectRemovedSources(replacement.removedFileIds ?? [], sessions);
@@ -118,8 +111,7 @@ export class MemoryStore {
     this.saveSummaries(next, retained.roots, replacement.preserveCapabilities, now, changedSessions, affectedProjects);
     this.reconnectDiagnostics(reconnected);
     this.removeSources(removed, reconnected, retained.sessions, now);
-    const metadataKeys = this.saveMetadata(replacement.metadata ?? [], sessions, next, retained.roots);
-    this.finishSessions(sessions, metadataKeys, retained.roots, changedSessions);
+    this.finishSessions(sessions, changedSessions);
     this.pruneNames(sessions, affectedProjects);
   }
 
@@ -131,7 +123,7 @@ export class MemoryStore {
   }
 
   /** 삭제 ID의 manifest를 순서대로 읽고 교체 범위를 검증해 삭제 후보 Map을 만든다. */
-  private collectRemovedSources(ids: readonly number[], sessions: ReplacementSessions): RemovedSources {
+  private collectRemovedSources(ids: Iterable<number>, sessions: ReplacementSessions): RemovedSources {
     const removed: RemovedSources = new Map();
     for (const id of ids) {
       const file = this.database.statement('SELECT provider,session_id FROM manifest WHERE id=?')
@@ -217,7 +209,7 @@ export class MemoryStore {
   }
 
   /** 요청을 입력 순서대로 검증하고 제공자·세션·root 키의 중복 없는 Map을 만든다. */
-  private indexSummaries(summaries: readonly TurnSummaryInput[], sessions: ReplacementSessions): Map<string, TurnSummaryInput> {
+  private indexSummaries(summaries: Iterable<TurnSummaryInput>, sessions: ReplacementSessions): Map<string, TurnSummaryInput> {
     const next = new Map<string, TurnSummaryInput>();
     for (const summary of summaries) {
       this.requireSession(summary.provider, summary.session_id, sessions);
@@ -397,74 +389,10 @@ export class MemoryStore {
     this.database.statement('DELETE FROM manifest WHERE id=?').run(id);
   }
 
-  /** metadata 입력의 범위를 검증하고 최신 키를 기록한 뒤 각 확정 snapshot을 반영한다. */
-  private saveMetadata(
-    metadata: readonly MemoryMetadata[], sessions: ReplacementSessions, next: Map<string, TurnSummaryInput>, retainedRoots: Set<string>,
-  ): Set<string> {
-    const keys = new Set<string>();
-    for (const row of metadata) {
-      this.requireSession(row.provider, row.session_id, sessions);
-      const key = JSON.stringify([row.provider, row.session_id, row.root_id]);
-      keys.add(key);
-      this.saveRequestMetadata(row, key, next, retainedRoots);
-    }
-    return keys;
-  }
-
-  /** 보존·미존재 세션·동일 snapshot을 건너뛰고 바뀐 요청 metadata와 자식 행을 교체한다. */
-  private saveRequestMetadata(
-    metadata: MemoryMetadata, key: string, next: Map<string, TurnSummaryInput>, retainedRoots: Set<string>,
-  ): void {
-    if (retainedRoots.has(rootKey(metadata.provider, metadata.root_id))) return;
-    if (!this.database.statement('SELECT 1 FROM sessions WHERE provider=? AND session_id=?').get(metadata.provider, metadata.session_id)) return;
-    const summary = next.get(key);
-    const prepared = summary ? JSON.stringify(summary) : null;
-    const previous = this.database.statement('SELECT signature,prepared_json FROM turn_metadata WHERE provider=? AND session_id=? AND root_id=?')
-      .get(metadata.provider, metadata.session_id, metadata.root_id);
-    if (previous?.signature === metadata.signature && previous.prepared_json === prepared) return;
-    this.database.statement(`INSERT INTO turn_metadata(provider,session_id,root_id,signature,prepared_json) VALUES(?,?,?,?,?)
-      ON CONFLICT(provider,session_id,root_id) DO UPDATE SET signature=excluded.signature,prepared_json=excluded.prepared_json
-      WHERE signature IS NOT excluded.signature OR prepared_json IS NOT excluded.prepared_json`)
-      .run(metadata.provider, metadata.session_id, metadata.root_id, metadata.signature, prepared);
-    this.replaceMetadataChildren(metadata);
-  }
-
-  /** 기존 metadata 자식 행을 지우고 확정 요청의 모델·Skill 행을 metadata snapshot으로 복사한다. */
-  private replaceMetadataChildren(metadata: MemoryMetadata): void {
-    for (const table of ['turn_metadata_models', 'turn_metadata_capabilities', 'turn_metadata_dependencies']) {
-      this.database.statement(`DELETE FROM ${table} WHERE provider=? AND session_id=? AND root_id=?`)
-        .run(metadata.provider, metadata.session_id, metadata.root_id);
-    }
-    const turn = this.database.statement('SELECT id FROM turn_summary WHERE provider=? AND session_id=? AND root_turn_id=?')
-      .get(metadata.provider, metadata.session_id, metadata.root_id);
-    if (!turn) return;
-    this.database.statement(`INSERT INTO turn_metadata_models SELECT ?,?,?,model,input_tokens,output_tokens,cache_read_input_tokens,
-      cache_write_input_tokens FROM turn_model_usage WHERE turn_id=?`)
-      .run(metadata.provider, metadata.session_id, metadata.root_id, turn.id);
-    this.database.statement(`INSERT INTO turn_metadata_capabilities SELECT ?,?,?,category,name,usage_count FROM turn_capability_usage WHERE turn_id=?`)
-      .run(metadata.provider, metadata.session_id, metadata.root_id, turn.id);
-  }
-
-  /** 세션마다 사라진 metadata를 정리한 뒤 실제 요청이 바뀐 세션의 rollup만 재구축한다. */
-  private finishSessions(
-    sessions: ReplacementSessions, metadataKeys: Set<string>, retainedRoots: Set<string>, changedSessions: Set<string>,
-  ): void {
+  /** Rebuild derived rollups only for sessions whose accepted facts changed. */
+  private finishSessions(sessions: ReplacementSessions, changedSessions: Set<string>): void {
     for (const [key, session] of sessions) {
-      this.deleteMissingMetadata(session, metadataKeys, retainedRoots);
-      if (!changedSessions.has(key)) continue;
-      this.database.rollups.refreshSession(session.provider, session.session_id);
-    }
-  }
-
-  /** 현재 입력에도 삭제 보존 root에도 없는 요청 metadata를 해당 세션에서 제거한다. */
-  private deleteMissingMetadata(session: SessionRef, metadataKeys: Set<string>, retainedRoots: Set<string>): void {
-    const previous = this.database.statement('SELECT root_id FROM turn_metadata WHERE provider=? AND session_id=?')
-      .all(session.provider, session.session_id);
-    for (const row of previous) {
-      const key = JSON.stringify([session.provider, session.session_id, row.root_id]);
-      if (metadataKeys.has(key) || retainedRoots.has(rootKey(session.provider, row.root_id))) continue;
-      this.database.statement('DELETE FROM turn_metadata WHERE provider=? AND session_id=? AND root_id=?')
-        .run(session.provider, session.session_id, row.root_id);
+      if (changedSessions.has(key)) this.database.rollups.refreshSession(session.provider, session.session_id);
     }
   }
 

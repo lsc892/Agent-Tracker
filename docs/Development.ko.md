@@ -139,7 +139,7 @@ Codex 하위 에이전트 파일 전체에 `root_turn_id`가 없는 구형 로�
 
 여러 창의 동시 갱신은 데이터·테이블이 없는 별도 `agent-tracker.sqlite.refresh-lock.sqlite` 파일의 SQLite 잠금으로 조정합니다. 프로세스가 비정상 종료되어도 잠금은 해제되며, 이 파일은 재사용하므로 실행 중 삭제하지 않습니다.
 
-파일 목록과 응답 후보는 worker의 디스크 임시 테이블에서 처리합니다. 파일 metadata 묶음은 최대 256개, 통계 조회 페이지는 기본 100개(직접 지정 시 1~1,000개), JSONL 한 줄은 기본 4 MiB로 제한합니다. 한도를 넘거나 형식을 해석할 수 없으면 진단을 남기고 기존 정상 통계를 유지합니다. 프롬프트·응답·tool 본문과 OAuth token은 DB에 저장하지 않습니다.
+파일 목록과 유효성 근거·winner DTO는 갱신 중 Worker 메모리에서 처리합니다. 패자와 전체 이벤트 배열을 캐시하지 않습니다. 조회 페이지는 기본 100개(1~1,000개), JSONL 보관 줄은 기본 4 MiB로 제한합니다. 형식·예산·내용 검증 실패는 진단을 남기고 기존 통계를 유지합니다. 프롬프트·응답·tool 본문과 OAuth token은 DB에 저장하지 않습니다.
 
 통계 화면 맨 아래에는 **데이터 확인** 링크만 표시합니다. 클릭하면 별도의 ‘Agent Tracker 데이터 확인’ Webview에 파일 처리 상태와 확인이 필요한 요청을 보여 줍니다. 이미 데이터 확인 창이 열려 있으면 해당 창을 표시하고 첫 페이지를 다시 조회합니다. 데이터 확인 창 열기와 **다시 조회**는 DB에 저장된 상태만 읽으며 원본 재검증·재집계는 하지 않습니다. 통계 갱신이 끝나면 열려 있는 데이터 확인 창도 갱신합니다. **확인이 필요한 요청**은 DB에 저장된 요청 중 품질 경고나 갱신 실패가 있는 목록으로, 경고만으로 통계에서 제외하지 않습니다. 갱신 실패 시 이전 정상 수치를 유지하며, 소요 시간이 없는 요청은 시간 평균의 표본에서 제외합니다. 새 파일을 처음부터 해석하지 못했다면 파일 오류만 기록되고 요청 통계는 만들 수 없습니다.
 
@@ -175,15 +175,11 @@ npm run test:toggle # 패치된 로컬 VS Code에서 실제 클릭·유지·닫�
 npm run test:quota:live # 실제 로그인 계정의 Codex·Claude quota와 표시 로직 대조
 npm run benchmark   # 합성 파일 301개 + 큰 세션 2,000개 요청
 npm run benchmark:quota # 합성 App Server 성공/오류/timeout/취소의 시간·메모리·종료 검증
-npm run benchmark:titles # 요청 제목 TEMP 인덱스 / 기존 집계 통합 A/B 비교
-npm run benchmark:transactions # 합성 JSONL의 실제 집계·DB 교체 transaction 측정
 ```
 
 대량 benchmark는 `BENCHMARK_FILES`, `BENCHMARK_TURNS` 환경 변수로 조절합니다. 결과는 `tests/results/benchmarks/summary.json`에 남으며 실제 개인 대화 기록은 사용하지 않습니다. quota 자원 측정 옵션과 한계는 [측정 안내](QuotaBenchmark.md)를 참고하세요.
 
-제목 A/B는 같은 2,000개 요청을 긴 세션과 여러 제공자·세션에 배치하고, 워밍업 후 순서를 교차해 20쌍을 비교합니다. 정확성은 `node:test`에서 현재 제품 SQL과 두 후보의 전체 집계 결과를 대조하며, 성능 실행은 시간·TEMP 할당·process RSS를 별도 보고서로 남깁니다. `--cases`, `--pairs`, `--warmups`로 규모를 조절하고 `--report docs/benchmarks/2026-10-08/RequestTitleAB.md`로 Markdown과 원시 JSON을 보관할 수 있습니다. 조건과 측정 결과는 [제목 A/B 보고서](benchmarks/2026-10-08/RequestTitleAB.md)를 참고하세요.
-
-제품은 A(TEMP partial index)를 사용합니다. `npm run benchmark:transactions -- --real --pairs 3 --report docs/benchmarks/2026-10-08/RequestTitleTransactions.md`는 실제 로컬 대화내역을 고정 사본으로 읽고, 무인덱스 대조군과 A의 최초·전체 재집계·변경 없는 갱신을 비교합니다. 전체 시간과 실제 transaction 시간, TEMP 페이지·RSS·결과 동등성을 Markdown·JSON·JSONL로 남깁니다. 원본과 설치된 확장 DB는 수정하지 않으며 사본·실험 DB는 종료 후 삭제합니다. `--real`을 생략하면 개인 파일을 읽지 않는 합성 검증입니다. 선택 근거와 복잡도·측정 한계는 [실제 transaction 보고서](benchmarks/2026-10-08/RequestTitleTransactions.md)를 참고하세요.
+현재 수집은 원본을 한 번 읽으며 그룹 winner 비교 → DTO 갱신 → 패자 폐기를 수행하고, 남은 winner를 최종 세션·요청 그룹으로 병합합니다. 패자 모델을 별도 행으로 복원하지 않습니다. 이전 TEMP 제목 인덱스와 SQL transaction 측정 실행기는 제거했으며 [제목 A/B](benchmarks/2026-10-08/RequestTitleAB.md)·[transaction 결과](benchmarks/2026-10-08/RequestTitleTransactions.md)는 과거 설계 기록으로 보존합니다. 구현·정합성과 성능은 [단일 읽기 A/B 기록](benchmarks/2026-11-08/SinglePassWinnerAB-2026-11-08.md)을 참고하세요.
 
 `$quota-qa` 또는 [quota-qa 스킬](../.agents/skills/quota-qa/SKILL.md)로 실제 계정 검증을 실행합니다. `test:quota:live`는 Claude의 OAuth usage 응답과 Codex의 실제 App Server 응답을 동일 응답 기준으로 제품 provider와 대조하고 사용/남음 표시 반올림·잔량 막대·Codex 프로세스 종료도 검사합니다. 결과는 `tests/results/quota-live.json`에 남으며 토큰·계정 식별자는 저장하지 않습니다. 두 제공자 중 하나라도 인증 오류·429·timeout·불일치이면 종료 코드 1입니다. 429는 자동 재시도하지 않습니다. 일반 `check`와 CI는 합성 입력으로 QA 도구를 검사하며 실제 계정을 호출하지 않습니다. 설치된 VS Code나 제공자 웹 화면의 대조는 별도 검증입니다.
 

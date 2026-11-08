@@ -1,4 +1,4 @@
-// DTO 재사용·메모리 집계·최종 영속 저장 경계의 증분 동작과 원자성을 검증한다.
+// 스트리밍 winner 집계·관련 원본 재읽기·최종 저장의 원자성을 검증한다.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { appendFile, mkdir, mkdtemp, rm, stat, unlink, writeFile } from 'node:fs/promises';
@@ -53,7 +53,7 @@ test('final memory replacement creates no TEMP tables, keeps identical facts unt
   }finally{db.close();}
 });
 
-test('refresh performs memory aggregation without TEMP staging and reuses unchanged sibling DTOs',async()=>fixture(async(db,options,root)=>{
+test('refresh streams winners without TEMP staging and rereads related sources after a change',async()=>fixture(async(db,options,root)=>{
   const main=join(root,'main.jsonl'),sibling=join(root,'copy.jsonl');
   await writeFile(main,jsonl([user(),response()]));await writeFile(sibling,jsonl([user(),response(50)]));
   const initial=await refreshSummary(db,options);assert.equal(initial.failed,0);assert.equal(initial.parsed,2);
@@ -62,8 +62,9 @@ test('refresh performs memory aggregation without TEMP staging and reuses unchan
   const unchanged=await refreshSummary(db,options);assert.equal(unchanged.failed,0);assert.equal(unchanged.parsed,0);assert.equal(unchanged.bodyBytes,0);
   await appendFile(main,jsonl([user('extra'),response(20,'extra','extra-response')]));
   const changed=await refreshSummary(db,options);assert.equal(changed.failed,0);
-  assert.equal(changed.parsed,1,'only the changed source is parsed; related sibling DTOs are reused');
-  assert.equal(changed.bodyBytes,(await stat(main)).size,'changed file is read from its start and sibling body is not reread');
+  assert.equal(changed.parsed,2,'the changed source and its sibling are read again without a retained DTO cache');
+  assert.equal(changed.bodyBytes,(await stat(main)).size+(await stat(sibling)).size,
+    'every related source is read only once while its winner DTOs are selected');
   assert.equal(db.queryTurns().reduce((sum,row)=>sum+row.total_tokens,0),124);
   assert.deepEqual(db.connection.prepare("SELECT name FROM sqlite_temp_master WHERE type='table'").all(),[]);
 }));
@@ -79,7 +80,7 @@ test('replacing and deleting source snapshots removes their old contribution and
   assert.deepEqual(db.connection.prepare('PRAGMA foreign_key_check').all(),[]);
 }));
 
-test('a failed final transaction does not publish candidate DTO state and retry commits the same source snapshot',async()=>fixture(async(db,options,root)=>{
+test('a failed final transaction preserves facts and retry rereads the same source snapshot',async()=>fixture(async(db,options,root)=>{
   const path=join(root,'session.jsonl');await writeFile(path,jsonl([user(),response()]));
   assert.equal((await refreshSummary(db,options)).failed,0);const original=db.queryTurns()[0];
   await appendFile(path,jsonl([user('new'),response(20,'new','new-response')]));

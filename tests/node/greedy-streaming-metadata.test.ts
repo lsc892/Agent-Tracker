@@ -45,11 +45,11 @@ test('a discarded current usage DTO still contributes token quality flags and th
   assert.deepEqual(db.connection.prepare('PRAGMA foreign_key_check').all(),[]);
 }));
 
-test('discarded source usage is absorbed into the stream signature without rewriting unchanged facts',async()=>fixture(async(db,options,path)=>{
+test('discarded source usage is absorbed into the source hash without rewriting unchanged facts',async()=>fixture(async(db,options,path)=>{
   await writeFile(path,source(response(100)));
   assert.equal((await refreshSummary(db,options)).failed,0);
   const before=db.queryTurns()[0];
-  const signature=()=>db.connection.prepare("SELECT signature FROM turn_metadata WHERE root_id='root'").get()?.signature;
+  const signature=()=>db.findManifest('codex',path)?.content_hash;
   const originalSignature=signature();assert.equal(typeof originalSignature,'string');
   db.connection.exec(`CREATE TABLE greedy_fact_writes(operation TEXT);
     CREATE TRIGGER greedy_fact_insert AFTER INSERT ON turn_summary BEGIN INSERT INTO greedy_fact_writes VALUES('insert'); END;
@@ -57,13 +57,13 @@ test('discarded source usage is absorbed into the stream signature without rewri
     CREATE TRIGGER greedy_fact_delete AFTER DELETE ON turn_summary BEGIN INSERT INTO greedy_fact_writes VALUES('delete'); END;`);
   await writeFile(path,source(response(90,0,'gpt-6-sol')));
   assert.equal((await refreshSummary(db,options)).failed,0);
-  assert.notEqual(signature(),originalSignature,'the raw stream signature must reflect even a discarded DTO');
+  assert.notEqual(signature(),originalSignature,'the raw source hash must reflect even a discarded DTO');
   assert.deepEqual(db.queryTurns()[0],before,'the selected normalized facts are unchanged');
   assert.equal(db.connection.prepare('SELECT count(*) n FROM greedy_fact_writes').get()?.n,0);
   assert.deepEqual(db.connection.prepare('PRAGMA foreign_key_check').all(),[]);
 }));
 
-test('a real legacy fork keeps a surviving zero-token DTO from its cached source after the copied winner is excluded',async()=>fixture(async(db,options,path)=>{
+test('a real legacy fork discards the losing zero-token model together with its duplicate usage DTO',async()=>fixture(async(db,options,path)=>{
   const parent=join(options.roots[0].path,'parent.jsonl');
   const metadata=(id:string,forkedFromId?:string)=>({type:'session_meta',payload:{
     id,session_id:'session',cwd:'/synthetic/project',...(forkedFromId?{forked_from_id:forkedFromId}:{}),
@@ -80,13 +80,13 @@ test('a real legacy fork keeps a surviving zero-token DTO from its cached source
     context('gpt-6-sol'),cumulative(100),end]));
   const result=await refreshSummary(db,options);
   assert.equal(result.failed,0);
-  assert.equal(result.parsed,2,'each source is parsed once and its DTOs provide prefix fallback');
+  assert.equal(result.parsed,2,'each source is read once while its winner DTOs are selected');
   assert.equal(result.bodyBytes,(await stat(parent)).size+(await stat(path)).size);
   const turn=db.queryTurns()[0];assert.equal(turn.total_tokens,100);
   assert.match(turn.quality_flags??'',/counter-regression/);
   const models=db.connection.prepare('SELECT model,input_tokens,output_tokens FROM turn_model_usage ORDER BY model').all();
   assert.deepEqual(models.map(row=>[row.model,row.input_tokens,row.output_tokens]),[
-    ['gpt-5.6-sol',100,0],['gpt-6-sol',0,0],
-  ],'the post-prefix lower DTO contributes its own model even though its usage is zero');
+    ['gpt-5.6-sol',100,0],
+  ],'only the final winner model is displayed; a discarded duplicate contributes no separate model row');
   assert.deepEqual(db.connection.prepare('PRAGMA foreign_key_check').all(),[]);
 }));

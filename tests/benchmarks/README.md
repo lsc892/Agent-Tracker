@@ -2,7 +2,13 @@
 
 요약·JSONL·SQL·quota 처리의 정확성과 성능을 비교하는 도구를 모은다.
 
-- [dto-greedy-ab.cjs](dto-greedy-ab.cjs) — 전체 DTO 캐시 API가 있던 `3b99d1a` 시점의 체크아웃에서 빌드한 뒤 `node --no-warnings tests/benchmarks/dto-greedy-ab.cjs --output=<새 JSON>`으로 실제 사본·1만·100요청의 원본 보존/Map 없는 배열 대조군을 준비 3쌍·AB/BA 10쌍 비교한다. 실제 갱신·COMMIT, 전체 DTO 집계, 일/월/세션/프로젝트 조회와 독립 평균 검증, 별도 프로세스 heap 표본을 기록한다. `--smoke`는 100요청만 실행한다. [후보](dto-greedy-candidate.cjs)와 [정합성 테스트](dto-greedy-ab.test.cjs)는 패자 영구 폐기·DTO 직접 덮어쓰기의 반례도 검사한다. 정합성 테스트도 같은 이전 체크아웃에서 `node --test tests/benchmarks/dto-greedy-ab.test.cjs`로 실행한다. 제품 소스는 변경하지 않는다.
+이전 SQL staging·turn metadata·원본 DTO 캐시를 전제로 한 실행기는 해당 시점의 고정 빌드에서 재현하는 과거 실험 도구다. 현재 스트리밍 제품에서는 제거한 API를 제공하지 않는다. 제목 SQL A/B·transaction 실행기는 삭제하고 기존 보고서·원시 결과는 보존한다.
+
+- [dto-greedy-ab.cjs](dto-greedy-ab.cjs) — 전체 DTO 캐시 API가 있던 `3b99d1a` 시점의 체크아웃에서 빌드한 뒤 `node --no-warnings tests/benchmarks/dto-greedy-ab.cjs --output=<새 JSON>`으로 실제 사본·1만·100요청의 원본 보존/Map 없는 배열 대조군을 준비 3쌍·AB/BA 10쌍 비교한다. 현재 단일 읽기 제품에는 이 실행기가 요구하는 `aggregateMemory()` API가 없다. 실제 갱신·COMMIT, 전체 DTO 집계, 일/월/세션/프로젝트 조회와 독립 평균 검증, 별도 프로세스 heap 표본을 기록한다. `--smoke`는 100요청만 실행한다. [후보](dto-greedy-candidate.cjs)와 [정합성 테스트](dto-greedy-ab.test.cjs)는 패자 영구 폐기·DTO 직접 덮어쓰기의 반례도 검사한다. 정합성 테스트도 같은 이전 체크아웃에서 `node --test tests/benchmarks/dto-greedy-ab.test.cjs`로 실행한다. 제품 소스는 변경하지 않는다.
+
+- [streaming-winner-ab.cjs](streaming-winner-ab.cjs) — 교체 직전 전체 DTO 캐시 빌드와 현재의 근거 수집·두 번째 읽기·winner DTO 갱신 구현을 별도 프로세스에서 비교한다. `--before=<보존 dist 폴더> --current-snapshot=<고정 snapshot.json> --oracle=<사전 합계 JSON> --output=<새 JSON>`으로 현재 사본·1만·100요청의 초회 수집, 한 건 추가·COMMIT, 변경 없는 갱신, 네 평균 조회를 준비 3쌍·AB/BA 10쌍 측정한다. `--smoke`는 합성 100요청 한 쌍이다. 원본 사본 복원·facts 대조·독립 JS 평균·retained heap 표본을 포함하며 제품 소스는 바꾸지 않는다. [측정 보고서](../../docs/benchmarks/2026-11-08/StreamingWinnerAB-2026-11-08.md).
+- [streaming-winner-profile.cjs](streaming-winner-profile.cjs) — 위 실험의 `config.json A또는B <새 JSON>`을 받아 단일 초기·추가 갱신의 읽기/파싱·최종 집계·저장 시간과 metadata 행 수를 진단한다. `node --expose-gc --no-warnings`로 실행하며 본 A/B 시간 표본에 섞지 않는다.
+- [single-pass-winner-ab.cjs](single-pass-winner-ab.cjs) — 같은 교대 측정 실행기를 재사용해 직전 두 번 읽기 빌드와 단일 읽기 winner 구현을 비교한다. 같은 `--before=<보존 dist> --current-snapshot=<snapshot.json> --oracle=<합계 JSON> --output=<새 JSON>` 인자를 받으며 `--smoke`는 합성 100요청 한 쌍이다. [단일 읽기 보고서](../../docs/benchmarks/2026-11-08/SinglePassWinnerAB-2026-11-08.md).
 
 - [summary-paths.cjs](summary-paths.cjs) — 책임별 폴더로 이동한 현재 summary 파일과 과거 고정 제품의 파일 경로를 함께 해석한다. 이전 측정 입력·원시 결과는 바꾸지 않는다.
 
@@ -30,7 +36,6 @@
 - [query-source-files.cjs](query-source-files.cjs) — 벤치마크 fingerprint에 기록할 공개 쿼리 진입점·분리된 구현·선택적 컴파일 파일 경로를 수집한다.
 - [query-profile.cjs](query-profile.cjs) — 설치 DB 사본과 합성 1만·10만 요청에서 현재 조회 SQL의 실행 시간·계획과 가장 느린 공개 API를 측정한다.
 - [write-profile.cjs](write-profile.cjs) — 고정 로그 사본으로 통계 진입의 스캔·파싱·세션 저장·첫 집계와 INSERT/UPDATE·COMMIT 비용을 구간/SQL 상세 계측으로 나눠 측정한다.
-- [request-titles.cjs](request-titles.cjs) — 요청 제목 집계 SQL 대안의 정확성·시간·저장 공간을 비교한다.
 - [sql-explain.cjs](sql-explain.cjs) — 사용량 쿼리의 실행 계획과 인덱스 대안별 조회 성능·공간을 비교한다.
 - [sql-writes.cjs](sql-writes.cjs) — 고정 DB와 별도 프로세스로 요청 증분 저장·일/월 기본키 배치·세션 인덱스의 비용을 비교한다.
 - [storage-ab.cjs](storage-ab.cjs) — 날짜·월 PK의 맞춤 SQL, TEMP/JOIN 묶음 비교, 파싱 상태 재사용과 세션 크기별 저장 경로를 통제 비교한다.
@@ -49,5 +54,4 @@
 - [sql-rollup.cjs](sql-rollup.cjs) — 원본 집계와 세션·일별 롤업 시제품의 정확성·읽기·쓰기·공간을 비교한다.
 - [incremental-refresh.cjs](incremental-refresh.cjs) — 빌드된 전후 워크트리에서 실제 로그 사본 또는 요청 수·세션 밀도를 지정한 합성 입력의 증분 저장·전체 갱신 시간과 결과를 비교한다.
 - [refresh-rollback.cjs](refresh-rollback.cjs) — 현재 소스의 증분 저장 롤백을 전후 워크트리에서 비교하고 파일 확인·파싱·집계 준비·DB 저장과 주요 기간·세션·평균 조회를 측정한다.
-- [summary-transactions.cjs](summary-transactions.cjs) — 동일 로그 스냅샷으로 제목 인덱스 전후의 전체 요약 갱신 비용을 비교한다.
 - [summary.cjs](summary.cjs) — 합성 대화 로그로 최초·재사용·추가 갱신의 요약 처리 성능을 측정한다.

@@ -31,7 +31,7 @@ test('v7 summaries migrate without losing tokens or session metadata', async t =
   t.after(() => rm(directory, { recursive: true, force: true }));
   const path = join(directory, 'db.sqlite');
   const previous = new SummaryDatabase(path);
-  previous.replaceSessions({ files: [], sessions: [{ provider: 'claude', session_id: 's' }], summaries: [{
+  previous.replaceMemory({scanId: 'test', files: [], sessions: [{ provider: 'claude', session_id: 's' }], summaries: [{
     provider: 'claude', project_key: '/project', project_name: 'Project', session_id: 's', session_name: 'Session',
     root_turn_id: 'r', duration_quality: 'missing', input_tokens: 10, output_tokens: 5,
     total_tokens: 15, status: 'completed',

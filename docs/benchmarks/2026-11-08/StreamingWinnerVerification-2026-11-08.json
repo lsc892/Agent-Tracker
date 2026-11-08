@@ -1,0 +1,210 @@
+{
+  "date": "2026-11-08",
+  "timezone": "Asia/Seoul",
+  "rawResultSha256": "5d8583da186ebd3e3148e1f50fbf1dd2718fbe0113ea3bb8092f4128d342cf30",
+  "runnerSha256": "e469bacffafd97f4a42683c21fad91b5f9019bd392b26f9494ee0835a4f23102",
+  "diagnosticRunnerSha256": "afbac11723375b79b86aaacfb0bc47f97d9152013698b1b31eb1c64d57e71e2f",
+  "commands": {
+    "benchmark": "node --no-warnings tests/benchmarks/streaming-winner-ab.cjs --before=tests/.cache/streaming-winner-oracle-20261108/baseline-dist --current-snapshot=tests/.cache/jsonl-winner-once-CdxSNE/snapshot.json --oracle=tests/.cache/streaming-winner-oracle-20261108/baseline-summary.json --output=docs/benchmarks/2026-11-08/StreamingWinnerAB-2026-11-08.json",
+    "smoke": "node --no-warnings tests/benchmarks/streaming-winner-ab.cjs --before=tests/.cache/streaming-winner-oracle-20261108/baseline-dist --smoke --output=tests/results/benchmarks/StreamingWinnerAB-smoke-2026-11-08.json",
+    "profiles": [
+      "node --expose-gc --no-warnings tests/benchmarks/streaming-winner-profile.cjs tests/.cache/streaming-winner-ab-9tWua1/current/config.json A tests/results/benchmarks/streaming-winner-profile-current-A.json",
+      "node --expose-gc --no-warnings tests/benchmarks/streaming-winner-profile.cjs tests/.cache/streaming-winner-ab-9tWua1/current/config.json B tests/results/benchmarks/streaming-winner-profile-current-B.json",
+      "node --expose-gc --no-warnings tests/benchmarks/streaming-winner-profile.cjs tests/.cache/streaming-winner-ab-9tWua1/synthetic-10000/config.json A tests/results/benchmarks/streaming-winner-profile-synthetic-10000-A.json",
+      "node --expose-gc --no-warnings tests/benchmarks/streaming-winner-profile.cjs tests/.cache/streaming-winner-ab-9tWua1/synthetic-10000/config.json B tests/results/benchmarks/streaming-winner-profile-synthetic-10000-B.json"
+    ],
+    "check": "npm.cmd run check",
+    "diff": "git diff --check",
+    "rerunNote": "Use a new output filename. Archived pre-replacement dist and private frozen snapshot are required; they are not committed."
+  },
+  "checks": {
+    "typecheck": "passed",
+    "lint": "passed",
+    "nodeTests": {
+      "passed": 413,
+      "failed": 0
+    },
+    "smoke": "passed",
+    "diffWhitespace": "passed",
+    "fullAb": {
+      "datasets": 3,
+      "measuredPairsPerDataset": 10,
+      "warmupPairsPerDataset": 3,
+      "requestTokenFactsAndAverages": "passed"
+    },
+    "frozenOriginalFilesAfter": 601,
+    "frozenCopiedFilesAfterProfiles": 601,
+    "sourceAndBuildBStillMatch": true,
+    "queryFilesIdentical": 12
+  },
+  "diagnosticScope": "One instrumented initial and append per dataset/variant; excluded from A/B medians. Read includes parser callbacks and streaming add; finalize columns have different scopes. Diagnostic append identifiers are shorter than benchmark append identifiers.",
+  "profiles": {
+    "current": {
+      "A": {
+        "variant": "A",
+        "samples": {
+          "initial": {
+            "ms": 7641.9896,
+            "readCalls": 602,
+            "readMs": 6621.341599999993,
+            "storeCalls": 466,
+            "storeMs": 459.3358999999991,
+            "aggregateCalls": 1,
+            "aggregateFinishMs": 109.66799999999967,
+            "parsed": 601,
+            "bodyBytes": 446954509,
+            "requests": 1518,
+            "tokens": 2459825397,
+            "metadataRows": {
+              "turn_metadata": 1518,
+              "turn_metadata_capabilities": 1826,
+              "turn_metadata_dependencies": 0,
+              "turn_metadata_models": 1333
+            }
+          },
+          "append": {
+            "ms": 243.61589999999978,
+            "readCalls": 2,
+            "readMs": 126.35930000000008,
+            "storeCalls": 2,
+            "storeMs": 7.018399999999929,
+            "aggregateCalls": 1,
+            "aggregateFinishMs": 7.18539999999939,
+            "parsed": 1,
+            "bodyBytes": 18937893,
+            "requests": 1519,
+            "tokens": 2459825527,
+            "metadataRows": {
+              "turn_metadata": 1519,
+              "turn_metadata_capabilities": 1827,
+              "turn_metadata_dependencies": 0,
+              "turn_metadata_models": 1334
+            }
+          }
+        },
+        "note": "One diagnostic run only, excluded from A/B medians. Read timing includes parse callbacks and streaming winner.add; A aggregate timing covers all selection, B finish timing only finalization, so those columns are not equivalent isolated kernels. Store timing includes final transactions and metadata persistence where present."
+      },
+      "B": {
+        "variant": "B",
+        "samples": {
+          "initial": {
+            "ms": 13950.916500000001,
+            "readCalls": 1202,
+            "readMs": 13046.63550000001,
+            "storeCalls": 466,
+            "storeMs": 322.5233999999746,
+            "aggregateCalls": 1,
+            "aggregateFinishMs": 28.402500000000146,
+            "parsed": 601,
+            "bodyBytes": 893909018,
+            "requests": 1518,
+            "tokens": 2459825397,
+            "metadataRows": {}
+          },
+          "append": {
+            "ms": 1013.5425999999989,
+            "readCalls": 55,
+            "readMs": 882.1613999999881,
+            "storeCalls": 2,
+            "storeMs": 2.8804000000000087,
+            "aggregateCalls": 1,
+            "aggregateFinishMs": 2.211300000000847,
+            "parsed": 27,
+            "bodyBytes": 133031298,
+            "requests": 1519,
+            "tokens": 2459825527,
+            "metadataRows": {}
+          }
+        },
+        "note": "One diagnostic run only, excluded from A/B medians. Read timing includes parse callbacks and streaming winner.add; A aggregate timing covers all selection, B finish timing only finalization, so those columns are not equivalent isolated kernels. Store timing includes final transactions and metadata persistence where present."
+      }
+    },
+    "synthetic-10000": {
+      "A": {
+        "variant": "A",
+        "samples": {
+          "initial": {
+            "ms": 1233.616,
+            "readCalls": 100,
+            "readMs": 113.49310000000004,
+            "storeCalls": 100,
+            "storeMs": 842.6199999999997,
+            "aggregateCalls": 1,
+            "aggregateFinishMs": 87.52799999999999,
+            "parsed": 100,
+            "bodyBytes": 5637210,
+            "requests": 10000,
+            "tokens": 6340000,
+            "metadataRows": {
+              "turn_metadata": 10000,
+              "turn_metadata_capabilities": 10000,
+              "turn_metadata_dependencies": 0,
+              "turn_metadata_models": 10000
+            }
+          },
+          "append": {
+            "ms": 23.379599999999982,
+            "readCalls": 1,
+            "readMs": 1.4168999999999414,
+            "storeCalls": 1,
+            "storeMs": 6.9746000000000095,
+            "aggregateCalls": 1,
+            "aggregateFinishMs": 0.8837000000000899,
+            "parsed": 1,
+            "bodyBytes": 66187,
+            "requests": 10001,
+            "tokens": 6340130,
+            "metadataRows": {
+              "turn_metadata": 10001,
+              "turn_metadata_capabilities": 10001,
+              "turn_metadata_dependencies": 0,
+              "turn_metadata_models": 10001
+            }
+          }
+        },
+        "note": "One diagnostic run only, excluded from A/B medians. Read timing includes parse callbacks and streaming winner.add; A aggregate timing covers all selection, B finish timing only finalization, so those columns are not equivalent isolated kernels. Store timing includes final transactions and metadata persistence where present."
+      },
+      "B": {
+        "variant": "B",
+        "samples": {
+          "initial": {
+            "ms": 852.523,
+            "readCalls": 200,
+            "readMs": 282.0908999999999,
+            "storeCalls": 100,
+            "storeMs": 336.0755999999998,
+            "aggregateCalls": 1,
+            "aggregateFinishMs": 39.5745,
+            "parsed": 100,
+            "bodyBytes": 11274420,
+            "requests": 10000,
+            "tokens": 6340000,
+            "metadataRows": {}
+          },
+          "append": {
+            "ms": 20.393599999999992,
+            "readCalls": 2,
+            "readMs": 3.396400000000085,
+            "storeCalls": 1,
+            "storeMs": 2.6107000000000653,
+            "aggregateCalls": 1,
+            "aggregateFinishMs": 0.29759999999998854,
+            "parsed": 1,
+            "bodyBytes": 132374,
+            "requests": 10001,
+            "tokens": 6340130,
+            "metadataRows": {}
+          }
+        },
+        "note": "One diagnostic run only, excluded from A/B medians. Read timing includes parse callbacks and streaming winner.add; A aggregate timing covers all selection, B finish timing only finalization, so those columns are not equivalent isolated kernels. Store timing includes final transactions and metadata persistence where present."
+      }
+    }
+  },
+  "unmeasured": [
+    "GC pause durations",
+    "continuous peak JS heap",
+    "cold OS file cache",
+    "schema migration time",
+    "other append target distributions"
+  ]
+}

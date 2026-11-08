@@ -134,12 +134,12 @@ test('aggregate cache counts stay unknown when any included turn has not been re
   database.connection.exec('UPDATE turn_summary SET cache_write_input_tokens=NULL,cache_read_input_tokens=NULL');
   const old = database.queryTurns()[0];
   const next: TurnSummaryInput = { ...old, root_turn_id: 'next', cache_write_input_tokens: 30, cache_read_input_tokens: 60 };
-  database.replaceSessions({ sessions: [{ provider: 'claude', session_id: 'session' }], files: [], summaries: [old, next] });
+  database.replaceMemory({scanId: 'test', sessions: [{ provider: 'claude', session_id: 'session' }], files: [], summaries: [old, next] });
   const usage = database.queryUsage()[0];
   assert.equal(usage.total_tokens, 400);
   assert.equal(usage.cache_write_input_tokens, null);
   assert.equal(usage.cache_read_input_tokens, null);
-  assert.throws(() => database.replaceSessions({ sessions: [{ provider: 'claude', session_id: 'session' }], files: [],
+  assert.throws(() => database.replaceMemory({scanId: 'test', sessions: [{ provider: 'claude', session_id: 'session' }], files: [],
     summaries: [{ ...next, cache_read_input_tokens: 200 }] }), /Cache components cannot exceed input tokens/);
   assert.equal(database.queryUsage()[0].total_tokens, 400, 'invalid components roll back replacement');
 });

@@ -2,6 +2,11 @@
 
 UI·다국어·JSONL 파싱·저장소 갱신과 조회의 조사 결과와 구현 선택 근거를 둔다.
 
+- [StreamingWinnerScanner-2026-11-08.md](StreamingWinnerScanner-2026-11-08.md): 승인된 파일 읽기·winner DTO 갱신·패자 폐기 구조와 읽기 비용을 정리한다.
+- [StreamingWinnerSelection-2026-11-08.md](StreamingWinnerSelection-2026-11-08.md): 토큰 없는 근거와 단일 winner 선택·최종 요청 생성의 경계를 설명한다.
+- [StreamingWinnerCleanup-2026-11-08.md](StreamingWinnerCleanup-2026-11-08.md): SQL staging·metadata·호환 저장 경로 제거와 스키마 18 전환을 기록한다.
+- [StreamingWinnerVerification-2026-11-08.md](StreamingWinnerVerification-2026-11-08.md): 실제 고정 JSONL의 요청·모델·도구·조회 값과 기존 DB 전환을 대조한다.
+
 - [SummaryOrganization-2026-11-08.md](SummaryOrganization-2026-11-08.md): summary 책임별 폴더 배치와 staging·metadata 분리, 호출부·Worker 경로·동작 보존 검증을 정리한다.
 - [MemoryStoreReadability-2026-11-08.md](MemoryStoreReadability-2026-11-08.md): 메모리 집계 저장의 단계별 메소드·중첩 분기·책임 주석 정리와 동작 보존 검증을 기록한다.
 - [JsonlParsingOptimizationPrompt-2026-11-06.md](JsonlParsingOptimizationPrompt-2026-11-06.md): 현재 구현과 중복되는 부분을 재사용하며 memchr·SIMD 바이트 위치 검색, 줄 구간 참조·선별·파일별 병렬 처리·Map 병합·SQL 배치 저장·DTO 캐시를 비교하는 테스트 프롬프트다.

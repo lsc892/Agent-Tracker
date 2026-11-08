@@ -18,7 +18,7 @@ const response = (tokens = 100, root = 'prompt-one', id = 'response-one', reques
 async function fixture(run: (database: SummaryDatabase, options: SummaryOptions, root: string, base: string) => Promise<void>): Promise<void> {
   const base = await mkdtemp(join(tmpdir(),'agent-tracker-summary-'));
   const root = join(base,'projects');await mkdir(root);
-  const options: SummaryOptions = {dbPath:join(base,'summary.sqlite'),roots:[{provider:'claude',path:root}],batchSize:2};
+  const options: SummaryOptions = {dbPath:join(base,'summary.sqlite'),roots:[{provider:'claude',path:root}]};
   const database = new SummaryDatabase(options.dbPath);
   try { await run(database,options,root,base); }
   finally { database.close();await rm(base,{recursive:true,force:true}); }
