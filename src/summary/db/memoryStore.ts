@@ -5,6 +5,8 @@ import type { SessionBillingStore } from './billing';
 import type { BillingMode, FileMetadata, ModelUsageInput, SessionRef, TurnSummaryInput } from './types';
 import { nonnegative } from './validation';
 import { estimateCost, PRICING_VERSION } from '../models/pricing';
+import { performance } from 'node:perf_hooks';
+import { StageProfiler, type StorageStage } from '../profiling';
 
 export interface MemoryReplacement {
   sessions: Iterable<SessionRef>;
@@ -88,15 +90,19 @@ function summaryValues(row: TurnSummaryInput, now: string): SQLInputValue[] {
 
 /** DTO를 SQL 임시 표에 재적재하지 않고 최종 facts·모델·도구·원본 상태를 저장한다. */
 export class MemoryStore {
-  constructor(private readonly database: SqliteSession, private readonly billing: SessionBillingStore) {}
+  constructor(
+    private readonly database: SqliteSession, private readonly billing: SessionBillingStore,
+    private readonly profile = new StageProfiler<StorageStage>(),
+  ) {}
 
   /** 최종 snapshot의 모든 변경을 하나의 트랜잭션으로 묶어 실패 시 함께 되돌린다. */
   replace(replacement: MemoryReplacement): void {
-    this.database.transaction(() => this.apply(replacement));
+    this.profile.measure('replace', () => this.database.transaction(() => this.apply(replacement), this.profile));
   }
 
   /** 보존 대상 준비부터 원본·요청 반영과 파생 데이터 정리까지 순서대로 조율한다. */
   private apply(replacement: MemoryReplacement): void {
+    const prepareStarted = performance.now();
     const now = new Date().toISOString();
     const sessions = new Map(Array.from(replacement.sessions, session => [sessionKey(session.provider, session.session_id), session]));
     const changedSessions = new Set<string>();
@@ -104,15 +110,16 @@ export class MemoryStore {
     const removed = this.collectRemovedSources(replacement.removedFileIds ?? [], sessions);
     const reconnected = this.collectReconnectedSources(replacement, removed, sessions);
     const retained = this.collectRetainedUsage(replacement.retainDeletedSourceUsage, removed, reconnected);
+    this.profile.record('prepare', prepareStarted);
 
-    this.saveFiles(replacement, sessions, now);
-    const next = this.indexSummaries(replacement.summaries, sessions);
-    this.deleteMissingSummaries(sessions, next, retained.turnIds, changedSessions, affectedProjects);
-    this.saveSummaries(next, retained.roots, replacement.preserveCapabilities, now, changedSessions, affectedProjects);
-    this.reconnectDiagnostics(reconnected);
-    this.removeSources(removed, reconnected, retained.sessions, now);
-    this.finishSessions(sessions, changedSessions);
-    this.pruneNames(sessions, affectedProjects);
+    this.profile.measure('manifest', () => this.saveFiles(replacement, sessions, now));
+    const next = this.profile.measure('indexSummaries', () => this.indexSummaries(replacement.summaries, sessions));
+    this.profile.measure('deleteMissing', () => this.deleteMissingSummaries(sessions, next, retained.turnIds, changedSessions, affectedProjects));
+    this.profile.measure('summaries', () => this.saveSummaries(next, retained.roots, replacement.preserveCapabilities, now, changedSessions, affectedProjects));
+    this.profile.measure('reconnectDiagnostics', () => this.reconnectDiagnostics(reconnected));
+    this.profile.measure('removeSources', () => this.removeSources(removed, reconnected, retained.sessions, now));
+    this.profile.measure('rollups', () => this.finishSessions(sessions, changedSessions));
+    this.profile.measure('pruneNames', () => this.pruneNames(sessions, affectedProjects));
   }
 
   /** 원본의 세션이 교체 범위에 포함되는지 검사하되 미귀속 원본은 허용한다. */
@@ -262,6 +269,7 @@ export class MemoryStore {
     summary: TurnSummaryInput, preserveCapabilities: boolean | undefined, now: string,
     changedSessions: Set<string>, affectedProjects: Set<string>,
   ): void {
+    const compareStarted = performance.now();
     const key = sessionKey(summary.provider, summary.session_id);
     const previous = this.database.statement('SELECT * FROM turn_summary WHERE provider=? AND session_id=? AND root_turn_id=?')
       .get(summary.provider, summary.session_id, summary.root_turn_id);
@@ -278,15 +286,20 @@ export class MemoryStore {
     const mode = this.billingMode(summary);
     const costChanged = this.hasCostChanged(previous, mode);
     const factsChanged = this.hasFactsChanged(previous, incoming, summary);
+    this.profile.record('summaryCompare', compareStarted);
     if (!factsChanged && !modelsChanged && !capabilitiesChanged && !costChanged) return;
 
-    const id = this.saveFacts(previous, incoming);
-    if (!previous || modelsChanged) this.replaceModels(id, models);
-    if (!previous || capabilitiesChanged) {
-      this.replaceCapabilities(id, preserveCapabilities && previous ? previousCapabilities : capabilities ?? []);
+    const writeStarted = performance.now();
+    try {
+      const id = this.profile.measure('facts', () => this.saveFacts(previous, incoming));
+      if (!previous || modelsChanged) this.profile.measure('models', () => this.replaceModels(id, models));
+      if (!previous || capabilitiesChanged) {
+        this.profile.measure('capabilities', () => this.replaceCapabilities(id, preserveCapabilities && previous ? previousCapabilities : capabilities ?? []));
+      }
+      this.profile.measure('costs', () => this.billing.saveTurnCost(id, mode));
+      changedSessions.add(key);
     }
-    this.billing.saveTurnCost(id, mode);
-    changedSessions.add(key);
+    finally { this.profile.record('summaryWrites', writeStarted); }
   }
 
   /** 프로젝트 이름을 갱신하고 비어 있지 않은 세션 이름만 기존 값에 덮어쓴다. */
@@ -392,7 +405,7 @@ export class MemoryStore {
   /** Rebuild derived rollups only for sessions whose accepted facts changed. */
   private finishSessions(sessions: ReplacementSessions, changedSessions: Set<string>): void {
     for (const [key, session] of sessions) {
-      if (changedSessions.has(key)) this.database.rollups.refreshSession(session.provider, session.session_id);
+      if (changedSessions.has(key)) this.database.rollups.refreshSession(session.provider, session.session_id, this.profile);
     }
   }
 

@@ -10,5 +10,6 @@ Claude·Codex 로그를 읽으면서 그룹별 winner DTO를 갱신하고 패자
 - [db/](db/README.md): SQLite 저장·조회·마이그레이션·사전 집계.
 - [parsers/](parsers/README.md): Claude·Codex 원본을 공통 식별 정보와 파싱 이벤트로 정규화.
 - [types.ts](types.ts): 통계 API와 제공자 공통 파싱 이벤트 타입.
+- [profiling.ts](profiling.ts): 갱신·SQL 저장 단계별 누적 시간과 호출 횟수.
 
 Worker 실행 파일은 [client/worker.ts](client/worker.ts)에 있다. 수집은 [scanner/index.ts](scanner/index.ts), 최종 저장은 [db/memoryStore.ts](db/memoryStore.ts)의 한 경로만 사용한다.

@@ -3,6 +3,7 @@ import { opendir, lstat } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { setImmediate as yieldToWorker } from 'node:timers/promises';
+import { performance } from 'node:perf_hooks';
 import { SummaryDatabase } from '../db';
 import type { FileMetadata, ManifestRow, Provider } from '../db/types';
 import { SummaryError } from '../jsonl';
@@ -13,6 +14,7 @@ import { acquireRefreshLock } from './lock';
 import { includesSourceSnapshot } from './sourceFingerprint';
 import { readSource, sqlText } from './sourceReader';
 import { readNames } from './names';
+import { StageProfiler, type ScanStage, type StorageStage } from '../profiling';
 import type { ParsedIdentity, SummaryOptions, SummaryProgress, RefreshResult } from '../types';
 
 export const PARSER_VERSION = 17;
@@ -68,8 +70,10 @@ export async function refreshSummary(
   database: SummaryDatabase, options: SummaryOptions, signal?: AbortSignal,
   progress?: (value: SummaryProgress) => void,
 ): Promise<RefreshResult> {
+  const started = performance.now();
+  const scan = new StageProfiler<ScanStage>(), storage = new StageProfiler<StorageStage>();
   const result: RefreshResult = { scanId: randomUUID(), discovered: 0, parsed: 0, reused: 0, failed: 0,
-    bodyBytes: 0, interrupted: false, completedAt: '' };
+    bodyBytes: 0, interrupted: false, completedAt: '', timings: { totalMs: 0, scan: scan.timings, storage: storage.timings } };
   const cancellation = options.cancellation ? new Int32Array(options.cancellation) : undefined;
   const cancelled = (): boolean => Boolean(signal?.aborted || cancellation && Atomics.load(cancellation, 0));
   const check = (): void => {
@@ -115,27 +119,29 @@ export async function refreshSummary(
   };
   try {
     check();
-    release = await acquireRefreshLock(options.dbPath, signal, cancelled);
+    release = await scan.measureAsync('lock', () => acquireRefreshLock(options.dbPath, signal, cancelled));
     report(true);
-    await discoverSources();
+    await scan.measureAsync('discover', discoverSources);
     check();
-    const names = await readNames(roots, cancelled);
+    const names = await scan.measureAsync('names', () => readNames(roots, cancelled));
     phase = 'parsing';
     report(true);
-    for (const file of [...files.values()].sort((a, b) => a.id - b.id))
-      if (file.changed && !file.removed)
-        await inspectSource(file);
-    await expandRelatedSources();
-    resolveParentRequests();
-    await reconnectSources();
+    await scan.measureAsync('parseChanged', async () => {
+      for (const file of [...files.values()].sort((a, b) => a.id - b.id))
+        if (file.changed && !file.removed)
+          await inspectSource(file);
+    });
+    await scan.measureAsync('expandRelated', expandRelatedSources);
+    scan.measure('resolveParents', resolveParentRequests);
+    await scan.measureAsync('reconnect', reconnectSources);
     check();
-    const aggregated = await collectWinners(names);
+    const aggregated = await scan.measureAsync('aggregate', () => collectWinners(names));
     phase = 'committing';
     report(true);
     check();
-    await commitComponents(aggregated);
-    finishScan(names);
-    database.optimize();
+    await scan.measureAsync('commitComponents', () => commitComponents(aggregated));
+    scan.measure('finishScan', () => finishScan(names));
+    scan.measure('optimize', () => database.optimize());
   }
   catch (error) {
     result.interrupted = true;
@@ -153,6 +159,7 @@ export async function refreshSummary(
     result.completedAt = new Date().toISOString();
     phase = 'complete';
     report(true);
+    result.timings!.totalMs = performance.now() - started;
   }
   return result;
 
@@ -269,7 +276,7 @@ export async function refreshSummary(
       database.replaceMemory({ sessions, summaries, files: members.filter(file => !file.removed).map(finalFile),
         removedFileIds: members.filter(file => file.removed).map(file => file.id),
         reconnectedFiles: reconnections.filter(link => members.some(file => file.id === link.old_id)),
-        preserveCapabilities: !collect, retainDeletedSourceUsage: retain, scanId: result.scanId });
+        preserveCapabilities: !collect, retainDeletedSourceUsage: retain, scanId: result.scanId }, storage);
       for (const file of members)
         file.settled = true;
     }
@@ -293,13 +300,14 @@ export async function refreshSummary(
   }
 
   function finishScan(names: Map<string, string>): void {
-    const unsettled = [...files.values()].filter(file => file.selected && !file.settled && !file.error && !file.removed && file.session === null);
+    const unsettled = [...files.values()].filter(file => file.selected && file.attempted
+      && !file.settled && !file.error && !file.removed && file.session === null);
     if (unsettled.length)
-      database.replaceMemory({ sessions: [], summaries: [], files: unsettled.map(finalFile), scanId: result.scanId });
+      database.replaceMemory({ sessions: [], summaries: [], files: unsettled.map(finalFile), scanId: result.scanId }, storage);
     const removedEmpty = [...files.values()].filter(file => file.removed && file.previous?.session_id === null);
     if (removedEmpty.length)
       database.replaceMemory({ sessions: [], summaries: [], files: [], removedFileIds: removedEmpty.map(file => file.id),
-        retainDeletedSourceUsage: retain, scanId: result.scanId });
+        retainDeletedSourceUsage: retain, scanId: result.scanId }, storage);
     database.transaction(() => {
       const update = database.connection.prepare('UPDATE sessions SET session_name=? WHERE provider=? AND session_id=? AND session_name IS NOT ?');
       for (const [value, name] of names) {
@@ -316,7 +324,9 @@ export async function refreshSummary(
         recordFailure(file);
   }
   function finalFile(file: FileState): FileMetadata & { id: number } {
-    return { ...file, session_id: file.session,
+    return { id: file.id, provider: file.provider, source_root: file.source_root, path: file.path,
+      session_id: file.session, size_bytes: file.size_bytes, mtime_ms: file.mtime_ms, dev: file.dev, inode: file.inode,
+      parser_version: file.parser_version, capabilities_collected: file.capabilities_collected,
       source_identity: file.prepared?.sourceIdentity ?? file.source_identity, content_hash: file.prepared?.contentHash ?? file.content_hash };
   }
   function sourceFlags(file: FileState): { rootId: string; flag: string }[] {
@@ -350,9 +360,9 @@ export async function refreshSummary(
     const winners = new SourceWinners(file.provider), evidence = winners.evidence;
     const onIdentity = (identity: ParsedIdentity): void => { file.session = identity.sessionId; connect(file.provider, file.previous?.session_id, file.session); };
     try {
-      const read = await readSource(file, (event, index) => winners.add(event, index), { signal, cancelled,
+      const read = await scan.measureAsync('readSources', () => readSource(file, (event, index) => winners.add(event, index), { signal, cancelled,
         maxLineBytes: options.maxLineBytes, collectCapabilities: collect, onBytes: bytes => { result.bodyBytes += bytes; report(); }, onIdentity,
-        onChild: (reference, rootId) => evidence.child(reference, rootId) });
+        onChild: (reference, rootId) => evidence.child(reference, rootId) }));
       result.parsed++;
       if (!read.rows) {
         if (read.partialLine && file.previous?.session_id) {
@@ -534,6 +544,6 @@ export async function refreshSummary(
     const removed = members.filter(file => file.removed);
     if (removed.length && retain)
       database.replaceMemory({ sessions: removed.filter(file => file.session).map(file => ({ provider: file.provider, session_id: file.session! })),
-        summaries: [], files: [], removedFileIds: removed.map(file => file.id), retainDeletedSourceUsage: true, scanId: result.scanId });
+        summaries: [], files: [], removedFileIds: removed.map(file => file.id), retainDeletedSourceUsage: true, scanId: result.scanId }, storage);
   }
 }

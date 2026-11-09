@@ -3,6 +3,8 @@ import type { SqliteSession } from './connection';
 import type { Provider } from './types';
 import { aggregateUsageSource } from './rollup-queries';
 import { ROLLUP_FORMAT_VERSION, ROLLUP_TABLES } from './rollup-state';
+import { performance } from 'node:perf_hooks';
+import type { StageProfiler, StorageStage } from '../profiling';
 
 interface RollupMetadata { timezone: string; format_version: number }
 // Keep local days in the four-digit AD range, with room for timezone offsets.
@@ -81,22 +83,28 @@ export class UsageRollupStore {
     this.refresh('(provider, session_id) IN (SELECT provider, session_id FROM db_replacement_sessions)', []);
   }
 
-  refreshSession(provider: Provider, sessionId: string): void {
-    this.refresh('provider = ? AND session_id = ?', [provider, sessionId]);
+  refreshSession(provider: Provider, sessionId: string, profile?: StageProfiler<StorageStage>): void {
+    this.refresh('provider = ? AND session_id = ?', [provider, sessionId], profile);
   }
 
   /**
    * 책임: 변경된 세션의 이전 날짜·프로젝트 기여분까지 교체한다.
    * 알고리즘: 활성 시간대·형식을 검증한 뒤 대상 세션의 provider·model 일별 행을 지우고 현재 facts로 다시 집계한다.
    */
-  private refresh(where: string, values: string[]): void {
+  private refresh(where: string, values: string[], profile?: StageProfiler<StorageStage>): void {
     const metadata = this.metadata();
     if (!metadata || metadata.format_version !== ROLLUP_FORMAT_VERSION) return;
     if (!this.calendarSupported()) { this.clear(); return; }
     for (const by of ['provider', 'model'] as const) {
-      this.database.statement(`DELETE FROM ${ROLLUP_TABLES[by]} WHERE ${where}`).run(...values);
-      this.database.statement(`INSERT INTO ${ROLLUP_TABLES[by]} ${aggregateUsageSource(by, where)}`)
-        .run(metadata.timezone, ...values);
+      const deleteStarted = performance.now();
+      try { this.database.statement(`DELETE FROM ${ROLLUP_TABLES[by]} WHERE ${where}`).run(...values); }
+      finally { profile?.record(by === 'provider' ? 'rollupRequestDelete' : 'rollupModelDelete', deleteStarted); }
+      const insertStarted = performance.now();
+      try {
+        this.database.statement(`INSERT INTO ${ROLLUP_TABLES[by]} ${aggregateUsageSource(by, where)}`)
+          .run(metadata.timezone, ...values);
+      }
+      finally { profile?.record(by === 'provider' ? 'rollupRequestInsert' : 'rollupModelInsert', insertStarted); }
     }
   }
 

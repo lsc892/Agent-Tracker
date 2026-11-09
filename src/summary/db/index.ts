@@ -11,6 +11,7 @@ import { ManifestStore } from './manifest';
 import { SessionBillingStore } from './billing';
 import { SummaryReader } from './reader';
 import { MemoryStore, type MemoryReplacement } from './memoryStore';
+import type { StageProfiler, StorageStage } from '../profiling';
 
 export * from './types';
 export { usageChartFromPage } from './chart';
@@ -79,8 +80,8 @@ export class SummaryDatabase {
     return this.manifest.unseenFiles(provider, sourceRoot, scanId, limit);
   }
 
-  replaceMemory(replacement: MemoryReplacement): void {
-    return new MemoryStore(this.sqlite,this.billing).replace(replacement);
+  replaceMemory(replacement: MemoryReplacement, profile?: StageProfiler<StorageStage>): void {
+    return new MemoryStore(this.sqlite, this.billing, profile).replace(replacement);
   }
 
   queryNames(query: NameQuery): NameResult {
