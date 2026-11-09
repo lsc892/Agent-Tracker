@@ -2,6 +2,7 @@
 
 UI·다국어·JSONL 파싱·저장소 갱신과 조회의 조사 결과와 구현 선택 근거를 둔다.
 
+- [ParentDtoRefactor-2026-11-08.md](ParentDtoRefactor-2026-11-08.md): 부모 DTO 합산 규칙을 보존하며 중복 색인·순회·모델 Map·진단 전체 정렬을 줄인 내부 리팩터링을 정리한다.
 - [StreamingWinnerScanner-2026-11-08.md](StreamingWinnerScanner-2026-11-08.md): 승인된 파일 읽기·winner DTO 갱신·패자 폐기 구조와 읽기 비용을 정리한다.
 - [StreamingWinnerSelection-2026-11-08.md](StreamingWinnerSelection-2026-11-08.md): 토큰 없는 근거와 단일 winner 선택·최종 요청 생성의 경계를 설명한다.
 - [StreamingWinnerCleanup-2026-11-08.md](StreamingWinnerCleanup-2026-11-08.md): SQL staging·metadata·호환 저장 경로 제거와 스키마 18 전환을 기록한다.
