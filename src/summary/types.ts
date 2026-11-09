@@ -61,6 +61,7 @@ export interface RefreshResult {
   interrupted: boolean;
   completedAt: string;
   error?: string;
+  timings?: import('./profiling').RefreshTimings;
 }
 export interface SummaryProgress {
   phase: 'scanning' | 'parsing' | 'committing' | 'complete';
