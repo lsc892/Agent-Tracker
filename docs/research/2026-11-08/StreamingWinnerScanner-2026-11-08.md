@@ -4,8 +4,8 @@
 
 ## 적용 범위
 
-- [수집 진입점](../../src/summary/scanner/index.ts)은 파일 탐색, 관련 원본 준비, 스트리밍 집계, 연결 성분별 저장을 조율한다.
-- 파일 읽기는 [sourceReader.ts](../../src/summary/scanner/sourceReader.ts), 제공자 제목 조회는 [names.ts](../../src/summary/scanner/names.ts)로 분리했다. 기존 `memoryScanner.ts`와 전체 이벤트 DTO 캐시는 제거했다.
+- [수집 진입점](../../../src/summary/scanner/index.ts)은 파일 탐색, 관련 원본 준비, 스트리밍 집계, 연결 성분별 저장을 조율한다.
+- 파일 읽기는 [sourceReader.ts](../../../src/summary/scanner/sourceReader.ts), 제공자 제목 조회는 [names.ts](../../../src/summary/scanner/names.ts)로 분리했다. 기존 `memoryScanner.ts`와 전체 이벤트 DTO 캐시는 제거했다.
 - 먼저 숫자 벡터를 보관하지 않는 원본 근거를 읽어 최종 세션·current 전환·복사 접두사·Claude request ID를 확정한다. 다음 읽기에서 유효한 이벤트를 하나의 winner 선택기에 바로 전달한다.
 - 변경 없는 스캔은 본문을 읽지 않는다. 변경된 세션의 관련 원본은 다시 읽는다. 삭제·이동·동점 순서·실패 보존·취소·Skill 수집 전환은 유지한다.
 - [선택기 담당 기록](StreamingWinnerSelection-2026-11-08.md), [이전 저장 경로 제거](StreamingWinnerCleanup-2026-11-08.md), [실제 입력 대조](StreamingWinnerVerification-2026-11-08.md)와 함께 적용한다.
@@ -18,6 +18,6 @@
 
 ## 검증
 
-`npm run check`의 타입·린트·413개 테스트가 통과했다. [새 읽기 경계 검사](../../tests/node/streaming-scanner.test.ts)는 두 읽기 사이 append의 고정 byte 경계, rewrite 후 growth의 SHA 불일치·기존 값 보존, 근거 수집 뒤 취소를 확인했다. 독립 SQL oracle와 winner 검사는 동점·큰 정수·패자 root/진단·복사 접두사·request 보정을 확인한다.
+`npm run check`의 타입·린트·413개 테스트가 통과했다. [새 읽기 경계 검사](../../../tests/node/streaming-scanner.test.ts)는 두 읽기 사이 append의 고정 byte 경계, rewrite 후 growth의 SHA 불일치·기존 값 보존, 근거 수집 뒤 취소를 확인했다. 독립 SQL oracle와 winner 검사는 동점·큰 정수·패자 root/진단·복사 접두사·request 보정을 확인한다.
 
 고정 로컬 JSONL 601파일에서 기존과 같은 1,518요청·2,459,825,397토큰, 요청·모델·도구·비용·이름·진단과 조회 10차원을 확인했다. v17 DB 사본의 v18 전환도 값·참조를 보존하고 파생 metadata를 제거했다. 변경 없는 두 번째 스캔의 본문 읽기는 0byte다. 초회 읽기는 두 순회로 기존 446,954,509byte에서 893,909,018byte가 됐으며 시간·메모리 성능 향상은 검증하지 않았다. 원본 로그·설치 DB·설치 확장은 변경하지 않았다.

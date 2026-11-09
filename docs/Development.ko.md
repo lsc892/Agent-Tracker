@@ -76,7 +76,7 @@ npm run restore:vscode         # 원본 복원
 
 개발 시 설정은 [공통 설정 정의](../src/configuration/schema.ts)의 해당 영역에 추가합니다. 키·기본값·선택지·설명·category를 선언하면 읽기와 타입에 자동 반영되며 `npm run localization:sync`로 VS Code 설정 등록을 생성합니다. 생성된 `package.json`의 `contributes.configuration`을 직접 수정하지 않습니다. 경로·시간대 등 파생 처리는 [설정 변환](../src/configuration.ts)에 구현하고 기능 사용처를 연결한 뒤 `npm run check`로 확인합니다.
 
-확장 설정의 **언어 → Language**에서 표시 언어를 지정합니다. 기본은 VS Code 표시 언어를 따르고, 한국어·영어·중국어 간체·일본어·스페인어·프랑스어를 지원합니다. 열린 화면과 상태 표시줄은 변경에 즉시 반영되며 지원하지 않는 언어와 누락된 번역은 한국어를 사용합니다. 명령 팔레트와 VS Code 설정 설명은 VS Code 표시 언어를 따릅니다. 구조·추가 방법은 [로컬라이징 문서](research/Localization.md)에 있습니다.
+확장 설정의 **언어 → Language**에서 표시 언어를 지정합니다. 기본은 VS Code 표시 언어를 따르고, 한국어·영어·중국어 간체·일본어·스페인어·프랑스어를 지원합니다. 열린 화면과 상태 표시줄은 변경에 즉시 반영되며 지원하지 않는 언어와 누락된 번역은 한국어를 사용합니다. 명령 팔레트와 VS Code 설정 설명은 VS Code 표시 언어를 따릅니다. 구조·추가 방법은 [로컬라이징 문서](research/2026-10-09/Localization.md)에 있습니다.
 
 ## 로그인과 경로
 
@@ -193,7 +193,7 @@ PR CI는 Windows·Linux·macOS, Node 22·24의 단위·통합 테스트와 Linux
 
 ## 현재 제약
 
-- 사용량 카드는 `StatusBarItem.tooltip`과 `MarkdownString`을 사용합니다. 클릭 토글에는 로컬 VS Code 패치가 필요하며 드래그 이동은 제공하지 않습니다. 카드의 위치·크기·테마는 VS Code가 결정합니다. 상태줄은 SVG 원본에서 만든 폰트 아이콘을 쓰며 기본 자동 색상은 VS Code 상태 표시줄 색상을 상속합니다. 흰색·검은색·사용자 지정은 사용량 항목 전체와 새로고침 버튼에 함께 적용합니다. 막대는 남은 잔량을 표시하며, 숫자는 `display.percentage` 설정을 따릅니다. API 조사와 구현 지점은 [상태표시줄 팝업 문서](research/StatusBarPopup.md)를 참고하세요.
+- 사용량 카드는 `StatusBarItem.tooltip`과 `MarkdownString`을 사용합니다. 클릭 토글에는 로컬 VS Code 패치가 필요하며 드래그 이동은 제공하지 않습니다. 카드의 위치·크기·테마는 VS Code가 결정합니다. 상태줄은 SVG 원본에서 만든 폰트 아이콘을 쓰며 기본 자동 색상은 VS Code 상태 표시줄 색상을 상속합니다. 흰색·검은색·사용자 지정은 사용량 항목 전체와 새로고침 버튼에 함께 적용합니다. 막대는 남은 잔량을 표시하며, 숫자는 `display.percentage` 설정을 따릅니다. API 조사와 구현 지점은 [상태표시줄 팝업 문서](research/2026-10-05/StatusBarPopup.md)를 참고하세요.
 - Claude OAuth usage는 비공개 endpoint입니다. 401이면 CLI가 보관한 credential을 한 번 다시 읽고, 계속 실패하면 CLI 재로그인을 안내합니다. refresh token을 직접 교체하지 않습니다.
 - 로컬 JSONL은 제공자의 안정된 API 계약이 아닙니다. 확인할 수 없는 부모 관계나 요청은 임의로 합산하지 않고 별도 데이터 확인 Webview에 표시합니다. fork 이력은 부모와 일치하는 순차 legacy prefix만 제외합니다.
 - 2026-10-08 실제 계정 QA에서 Claude·Codex의 서버 quota와 제품 provider 값·상태 표시줄 formatter가 일치하고 Codex 조회 프로세스가 종료되는 것을 확인했습니다. `$quota-qa`로 다시 검증할 수 있습니다. 이 QA는 설치된 VS Code 창이나 제공자 웹 화면을 관찰하지 않습니다. 실제 VS Code light/dark 테마의 필터·도표·데이터 확인 표시 동작은 별도 자동 검증하며, 화면 가독성과 원격 환경은 수동 검증 대상입니다. 일반 자동 테스트는 합성 fixture와 대체 App Server 프로세스를 사용합니다.

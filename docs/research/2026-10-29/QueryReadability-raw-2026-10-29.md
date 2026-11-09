@@ -2,18 +2,18 @@
 
 ## 검토 범위와 계약
 
-- [queries.ts](../../src/summary/db/queries.ts): 기존 호출 경로를 보존하는 공개 진입점.
-- [reader.ts](../../src/summary/db/reader.ts): 생성된 SQL의 필터 바인딩 뒤에 페이지 바인딩을 연결하는 호출부.
-- [summary-rollup.test.ts](../../tests/node/summary-rollup.test.ts), [usage-chart.test.ts](../../tests/node/usage-chart.test.ts): 원본과 롤업 결과·정렬·페이지 동등성 검증.
+- [queries.ts](../../../src/summary/db/queries.ts): 기존 호출 경로를 보존하는 공개 진입점.
+- [reader.ts](../../../src/summary/db/reader.ts): 생성된 SQL의 필터 바인딩 뒤에 페이지 바인딩을 연결하는 호출부.
+- [summary-rollup.test.ts](../../../tests/node/summary-rollup.test.ts), [usage-chart.test.ts](../../../tests/node/usage-chart.test.ts): 원본과 롤업 결과·정렬·페이지 동등성 검증.
 - 공개 export, 출력 열 순서, SQL의 의미, 바인딩 순서, 입력 검증과 예외 순서를 보존한다.
 
 ## 문제와 적용 범위
 
 `queries.ts`에 서로 다른 조회 역할이 모여 필요한 SQL의 책임을 파일 이름으로 찾기 어려웠다. 사용자의 명시적 요청인 “스크립트를 책임별로 쪼개고 폴더별로 분간이 쉽게”를 승인 범위로 삼아, 공통 계약·필터·정렬과 원본 조회 SQL을 폴더·스크립트로 분리했다. 각 SQL의 절·CASE·서브쿼리를 펼치고 조건부 조각은 지역 이름으로 설명한다.
 
-- 승인·적용 범위: 원본 SQL을 [common](../../src/summary/db/queries/common/README.md), [raw](../../src/summary/db/queries/raw/README.md)로 분리하고 루트 정렬 구현도 공통 폴더로 옮겼다. 공개 export·SQL 의미·바인딩·집계 알고리즘은 유지했다.
-- 루트 [queries.ts](../../src/summary/db/queries.ts)는 9줄의 공개 API re-export만 남겼다. 내부 모듈은 필요한 하위 모듈을 직접 참조해 순환 의존을 만들지 않는다.
-- 원래 `src/summary/db/sorting.ts`의 구현은 [common/sorting.ts](../../src/summary/db/queries/common/sorting.ts)로 옮겼다. 롤업 호출부도 이 공통 모듈을 직접 참조한다.
+- 승인·적용 범위: 원본 SQL을 [common](../../../src/summary/db/queries/common/README.md), [raw](../../../src/summary/db/queries/raw/README.md)로 분리하고 루트 정렬 구현도 공통 폴더로 옮겼다. 공개 export·SQL 의미·바인딩·집계 알고리즘은 유지했다.
+- 루트 [queries.ts](../../../src/summary/db/queries.ts)는 9줄의 공개 API re-export만 남겼다. 내부 모듈은 필요한 하위 모듈을 직접 참조해 순환 의존을 만들지 않는다.
+- 원래 `src/summary/db/sorting.ts`의 구현은 [common/sorting.ts](../../../src/summary/db/queries/common/sorting.ts)로 옮겼다. 롤업 호출부도 이 공통 모듈을 직접 참조한다.
 - 승인 대기 큰 변경: 없음.
 
 변경 전에는 `queries.ts`가 모든 원본 SQL을, 루트 `sorting.ts`가 표 정렬을 맡았다. 적용한 구조와 책임은 다음과 같다.
@@ -34,9 +34,9 @@ queries/
     diagnostics.ts            파일·요청 진단
 ```
 
-공통 구현: [types.ts](../../src/summary/db/queries/common/types.ts), [filters.ts](../../src/summary/db/queries/common/filters.ts), [sorting.ts](../../src/summary/db/queries/common/sorting.ts).
+공통 구현: [types.ts](../../../src/summary/db/queries/common/types.ts), [filters.ts](../../../src/summary/db/queries/common/filters.ts), [sorting.ts](../../../src/summary/db/queries/common/sorting.ts).
 
-원본 구현: [source.ts](../../src/summary/db/queries/raw/source.ts), [usage.ts](../../src/summary/db/queries/raw/usage.ts), [turns.ts](../../src/summary/db/queries/raw/turns.ts), [names.ts](../../src/summary/db/queries/raw/names.ts), [capabilities.ts](../../src/summary/db/queries/raw/capabilities.ts), [diagnostics.ts](../../src/summary/db/queries/raw/diagnostics.ts).
+원본 구현: [source.ts](../../../src/summary/db/queries/raw/source.ts), [usage.ts](../../../src/summary/db/queries/raw/usage.ts), [turns.ts](../../../src/summary/db/queries/raw/turns.ts), [names.ts](../../../src/summary/db/queries/raw/names.ts), [capabilities.ts](../../../src/summary/db/queries/raw/capabilities.ts), [diagnostics.ts](../../../src/summary/db/queries/raw/diagnostics.ts).
 
 ## 검증 계획과 결과
 

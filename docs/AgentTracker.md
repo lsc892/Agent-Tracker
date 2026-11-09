@@ -198,7 +198,7 @@ manual refresh
 
 클릭 명령은 `agentTracker.toggleQuotaTooltip`이다. `tools/vscode/statusbar-toggle.cjs`가 Agent Tracker의 이 명령만 내부 `ToggleTooltipCommand` 객체로 변환한다. 공개 API의 기능은 아니므로 확장 설치·활성화와 패치 적용을 구분한다. 원본 백업과 복원 명령을 제공하며 VS Code 업데이트 뒤 재적용한다. 패치가 없는 설치에서는 기본 호버와 클릭 열기 경로를 사용한다.
 
-`src/ui/quotaTooltip.ts`가 현재 snapshot으로 카드 내용을 만든다. 외부 label과 오류 메시지는 `appendText`로 이스케이프하고, 명령 링크는 필요한 명령만 `isTrusted.enabledCommands`에 허용한다. 위치와 스타일은 VS Code 기본 툴팁을 따른다. API 근거와 구현 상세는 [StatusBarPopup.md](research/StatusBarPopup.md)에 정리한다.
+`src/ui/quotaTooltip.ts`가 현재 snapshot으로 카드 내용을 만든다. 외부 label과 오류 메시지는 `appendText`로 이스케이프하고, 명령 링크는 필요한 명령만 `isTrusted.enabledCommands`에 허용한다. 위치와 스타일은 VS Code 기본 툴팁을 따른다. API 근거와 구현 상세는 [StatusBarPopup.md](research/2026-10-05/StatusBarPopup.md)에 정리한다.
 
 ### 3.5 카드 내용과 설정
 
@@ -254,7 +254,7 @@ Agent Tracker의 VS Code 설정은 다음 순서의 소제목과 목차 하위 �
 
 `agentTracker.language`는 기본 `auto`로 VS Code 표시 언어를 따르며 여섯 언어를 명시적으로 지정할 수 있다. 확장의 실행 중 문구는 명시적 언어를 우선하고 `auto`일 때 VS Code 표시 언어를 사용하며, 지원하지 않는 언어는 영어로 fallback한다. 지역 태그는 지원하는 기본 언어로 묶는다. 누락된 번역 키는 한국어로 fallback하며 한국어 JSON을 원문과 번역 키의 기준으로 둔다. 상태 표시줄·카드·안내와 열린 통계·데이터 확인·색상 화면을 현재 언어로 다시 표시한다. 숫자·날짜도 언어를 따르며 집계 시간대·원본 이름·진단 코드는 보존한다. 언어 전환은 서버 조회나 원본 재집계를 유발하지 않는다.
 
-기능별 키를 가진 언어별 JSON과 공통 i18next 계층을 사용한다. 언어 목록·번역 원본·`package.nls` 생성물은 루트의 `localization/`에 모으고 `localization/languages.json`에서 설정 선택지·manifest 번역·패키지 리소스를 생성한다. 실행용 JSON은 `dist/localization/`에서 읽는다. VS Code가 요구하는 루트의 `package.nls*.json`은 패키징·VS Code 테스트·F5 디버깅 동안만 복사하고 작업 뒤 원래 상태로 복원한다. 번역 키·변수·누락과 화면 코드의 한국어 문자열을 검사한다. 명령 팔레트·VS Code Settings의 카테고리·설명·선택지는 VS Code 표시 언어를 따르며 확장 Language 설정과 독립적이다. 기본 `package.nls.json`은 영어로 생성하고 한국어는 `package.nls.ko.json`으로 제공한다. 지원하지 않는 VS Code 언어의 정적 manifest 문구는 영어로 fallback한다. 추가 절차와 구현 근거는 [로컬라이징 문서](./research/Localization.md)에 기록한다.
+기능별 키를 가진 언어별 JSON과 공통 i18next 계층을 사용한다. 언어 목록·번역 원본·`package.nls` 생성물은 루트의 `localization/`에 모으고 `localization/languages.json`에서 설정 선택지·manifest 번역·패키지 리소스를 생성한다. 실행용 JSON은 `dist/localization/`에서 읽는다. VS Code가 요구하는 루트의 `package.nls*.json`은 패키징·VS Code 테스트·F5 디버깅 동안만 복사하고 작업 뒤 원래 상태로 복원한다. 번역 키·변수·누락과 화면 코드의 한국어 문자열을 검사한다. 명령 팔레트·VS Code Settings의 카테고리·설명·선택지는 VS Code 표시 언어를 따르며 확장 Language 설정과 독립적이다. 기본 `package.nls.json`은 영어로 생성하고 한국어는 `package.nls.ko.json`으로 제공한다. 지원하지 않는 VS Code 언어의 정적 manifest 문구는 영어로 fallback한다. 추가 절차와 구현 근거는 [로컬라이징 문서](research/2026-10-09/Localization.md)에 기록한다.
 
 ## 4. 기능 2: 일·월·프로젝트·세션 총량과 turn 평균
 
@@ -960,7 +960,7 @@ SQLite query는 기간과 project/session filter를 먼저 적용하고 turn_sum
 
 파일 읽기 → 그룹 winner 비교 → 기존 DTO 갱신 → 패자 폐기를 같은 읽기에서 수행한다. 원본별 그룹 winner Map과 최종 귀속 병합 Map을 사용하며 패자의 숫자 벡터를 남기지 않는다. 나중의 복사 제외·귀속 보정 때문에 폐기한 패자 DTO나 모델을 되살리지 않는다. 삭제·재귀속 뒤에는 다음 갱신에서 필요한 원본을 다시 읽어 winner를 구성한다. 파일 탐색·계보·근거 수집·정렬·최종 저장 비용이 별도로 있으므로 전체 갱신을 추가 요청 수에만 비례한다고 해석하지 않는다.
 
-연결 성분은 최종 저장·취소·실패 보존의 경계다. 고아 요청과 삭제 보존은 해당 성분에서 판정하고 모델·Skill도 제공자·세션·요청으로 구분한다. schema v18은 manifest·facts·모델·비용·Skill·이름·rollup을 함께 확정한다. 단일 읽기의 실패는 관련 성분의 기존 값을 보존하고 취소는 저장 전에 확인한다. 저장 단계의 성분별 실패도 기존 정상 통계를 보존한다. SQL staging·dirty 의존성·turn metadata와 승인 DTO 캐시는 제거했다. 이전 두 번 읽기 구현과 DB 전환의 동등성은 [당시 검증 기록](research/StreamingWinnerVerification-2026-11-08.md)에, 현재 단일 읽기는 [새 보고서](benchmarks/2026-11-08/SinglePassWinnerAB-2026-11-08.md)에 둔다.
+연결 성분은 최종 저장·취소·실패 보존의 경계다. 고아 요청과 삭제 보존은 해당 성분에서 판정하고 모델·Skill도 제공자·세션·요청으로 구분한다. schema v18은 manifest·facts·모델·비용·Skill·이름·rollup을 함께 확정한다. 단일 읽기의 실패는 관련 성분의 기존 값을 보존하고 취소는 저장 전에 확인한다. 저장 단계의 성분별 실패도 기존 정상 통계를 보존한다. SQL staging·dirty 의존성·turn metadata와 승인 DTO 캐시는 제거했다. 이전 두 번 읽기 구현과 DB 전환의 동등성은 [당시 검증 기록](research/2026-11-08/StreamingWinnerVerification-2026-11-08.md)에, 현재 단일 읽기는 [새 보고서](benchmarks/2026-11-08/SinglePassWinnerAB-2026-11-08.md)에 둔다.
 
 SQLite 자체보다 주의할 부분은 VS Code extension 배포 방식이다.
 

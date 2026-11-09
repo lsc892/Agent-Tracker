@@ -24,7 +24,7 @@
 
 ## 결과
 
-100,000 raw 요청의 중앙값(ms). 원본 9개 표본·P10/P90·SQL·bindings·계획은 [측정 JSON](../benchmarks/DateStorageQuery-2026-10-25.json)에 있다.
+100,000 raw 요청의 중앙값(ms). 원본 9개 표본·P10/P90·SQL·bindings·계획은 [측정 JSON](../../benchmarks/2026-10-25/DateStorageQuery-2026-10-25.json)에 있다.
 
 | 조회 | A 현행 | B UNION | C 특수화 | 해석 |
 |---|---:|---:|---:|---|

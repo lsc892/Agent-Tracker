@@ -2,7 +2,7 @@
 
 JSONL 파싱·DTO 적재·파일 캐시·구간별 비용을 비교한 실험 기록이다. 같은 실험의 2026-11-07 후속 분석도 함께 보관한다. 아래 수치는 당시 구현의 결과이며 현재 `dev`의 동작은 [메모리 최종 집계 A/B](../2026-11-07/JsonlMemoryIncrementalAB-2026-11-07.md)를 따른다.
 
-실험 워크트리는 2026-11-08에 정리했다. 보고서·원시 JSON·검증 기록을 보존하며 과거 실행 명령과 소스·빌드 해시는 측정 당시 식별자다. 채택하지 않은 실험 구현·실행기·로컬 캐시와 입력 사본은 보관하지 않는다. [보관 파일과 해시](../WorktreeArchive-2026-11-08.json)에서 원본과 보관본을 대조할 수 있다.
+실험 워크트리는 2026-11-08에 정리했다. 보고서·원시 JSON·검증 기록을 보존하며 과거 실행 명령과 소스·빌드 해시는 측정 당시 식별자다. 채택하지 않은 실험 구현·실행기·로컬 캐시와 입력 사본은 보관하지 않는다. [보관 파일과 해시](../2026-11-08/WorktreeArchive-2026-11-08.json)에서 원본과 보관본을 대조할 수 있다.
 
 - [JSONL 파싱·중복 제거 A/B](JsonlParsingOptimizationAB-2026-11-06.md): 청크 줄 구간 참조, 전체 Buffer와 Map 승자 선택의 시간·메모리·오류 계약 및 채택 판단.
 - [실제 갱신 원시 결과](JsonlParsingRefreshAB-2026-11-06.json), [R1 읽기](JsonlParsingReaderR1AB-2026-11-06.json), [R2 읽기](JsonlParsingReaderR2AB-2026-11-06.json), [R1→R2 비교](JsonlParsingReaderR1R2AB-2026-11-06.json), [Map 중복 제거](JsonlParsingDedupAB-2026-11-06.json), [R2 오류 계약](JsonlParsingReaderR2Validation-2026-11-06.json), [검증 기록](JsonlParsingVerification-2026-11-06.json).

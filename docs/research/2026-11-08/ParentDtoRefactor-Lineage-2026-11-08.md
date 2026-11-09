@@ -4,8 +4,8 @@
 
 ## 검토 범위와 유지할 계약
 
-- [scanner/index.ts](../../src/summary/scanner/index.ts#L423)의 `resolveLineage`, [resolveParentRequests](../../src/summary/scanner/index.ts#L448), [expandRelatedSources](../../src/summary/scanner/index.ts#L482)를 검토한다. 원본 검사·귀속 변경 연결·실패 보존·취소와 파일 처리 순서는 유지한다.
-- [parentGroups.ts](../../src/summary/aggregation/parentGroups.ts)는 직접 부모 그룹과 다단계 Union-Find·Small-to-Large를 유지한다. 부모 누락·충돌·순환의 해소 불가 판정과 중복 thread 원본도 유지한다.
+- [scanner/index.ts](../../../src/summary/scanner/index.ts#L423)의 `resolveLineage`, [resolveParentRequests](../../../src/summary/scanner/index.ts#L448), [expandRelatedSources](../../../src/summary/scanner/index.ts#L482)를 검토한다. 원본 검사·귀속 변경 연결·실패 보존·취소와 파일 처리 순서는 유지한다.
+- [parentGroups.ts](../../../src/summary/aggregation/parentGroups.ts)는 직접 부모 그룹과 다단계 Union-Find·Small-to-Large를 유지한다. 부모 누락·충돌·순환의 해소 불가 판정과 중복 thread 원본도 유지한다.
 - 미커밋 상태인 앞선 부모 DTO 기능 변경 위에서 작업하며 테스트·벤치마크와 다른 담당자의 파일은 수정하지 않는다.
 
 ## 적용할 내부 정리

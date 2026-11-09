@@ -4,9 +4,9 @@
 
 ## 검토 범위와 현재 흐름
 
-- [StreamingAggregation](../../src/summary/aggregation/memoryAggregate.ts)은 준비된 원본을 세션으로 묶고, 원래 root에서 유효성을 확인한 뒤 부모 root에 winner·요청 상태를 반영한다.
-- [Winners](../../src/summary/aggregation/winners.ts)는 input+output 최대값·동점의 늦은 순번을 선택하며 같은 DTO를 갱신하고 교체 전 차감·교체 후 가산을 알린다.
-- [기존 호출 계약](../../tests/node/streaming-winner.test.ts)과 [집계 fixture](../../tests/node/memory-aggregate.test.ts)는 읽기만 했다. 테스트 코드는 수정하거나 실행하지 않는다.
+- [StreamingAggregation](../../../src/summary/aggregation/memoryAggregate.ts)은 준비된 원본을 세션으로 묶고, 원래 root에서 유효성을 확인한 뒤 부모 root에 winner·요청 상태를 반영한다.
+- [Winners](../../../src/summary/aggregation/winners.ts)는 input+output 최대값·동점의 늦은 순번을 선택하며 같은 DTO를 갱신하고 교체 전 차감·교체 후 가산을 알린다.
+- [기존 호출 계약](../../../tests/node/streaming-winner.test.ts)과 [집계 fixture](../../../tests/node/memory-aggregate.test.ts)는 읽기만 했다. 테스트 코드는 수정하거나 실행하지 않는다.
 
 ## 적용한 내부 정리
 

@@ -4,11 +4,11 @@
 
 ## 현재 구현에서 출발할 지점
 
-- [scanner.ts](../../src/summary/scanner/index.ts)는 디렉터리를 `opendir({bufferSize:32})`로 열거하고, 파일별 `lstat`를 직렬로 기다린다. 파싱도 `await parseSource(file)`로 파일 하나씩 진행한다.
-- [jsonl.ts](../../src/summary/jsonl/index.ts)는 `open('r')` → 최대 64 KiB씩 `FileHandle.read()` → 파싱 → close 순서다. 읽기 buffer 크기는 `min(64 KiB, 파일 크기)`이며, 한 파일 안에서 재사용한다.
+- [scanner.ts](../../../src/summary/scanner/index.ts)는 디렉터리를 `opendir({bufferSize:32})`로 열거하고, 파일별 `lstat`를 직렬로 기다린다. 파싱도 `await parseSource(file)`로 파일 하나씩 진행한다.
+- [jsonl.ts](../../../src/summary/jsonl/index.ts)는 `open('r')` → 최대 64 KiB씩 `FileHandle.read()` → 파싱 → close 순서다. 읽기 buffer 크기는 `min(64 KiB, 파일 크기)`이며, 한 파일 안에서 재사용한다.
 - 따라서 **64 KiB 이하 일반 파일은 보통 본문 read 한 번으로 끝난다.** 짧은 read가 반환되면 추가 호출은 필요하다. 작은 파일 때문에 느린 상황을 64→256 KiB 버퍼 변경만으로 해결하기는 어렵다.
 - 읽기 전후 path의 metadata를 확인해 교체·잘림을 검증한다. 이 검사는 단순한 중복 호출로 보고 삭제할 수 없다.
-- 통계는 이미 [별도 Worker](../../src/summary/client/worker.ts)에서 실행된다. Worker를 새로 둔다는 사실만으로 I/O가 빨라지는 구조는 아니다.
+- 통계는 이미 [별도 Worker](../../../src/summary/client/worker.ts)에서 실행된다. Worker를 새로 둔다는 사실만으로 I/O가 빨라지는 구조는 아니다.
 
 작은 파일을 직렬로 읽으면 파일마다 경로·metadata 조회, open/read/close, 비동기 작업 전달·완료 처리의 고정 비용이 반복된다. 많은 바이트를 한 파일에서 읽는 문제와 구분해야 한다. 아래에서 공개 문서의 사실과 이 코드에 대한 적용 가설을 구분한다.
 
