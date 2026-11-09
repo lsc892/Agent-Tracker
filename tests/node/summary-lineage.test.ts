@@ -65,7 +65,8 @@ test('duplicate parent identities must agree on their resolved session before a 
   assert.equal((await refreshSummary(db,options)).failed,0);
   assert.equal(db.findManifest('codex',child)?.session_id,'child-session');
   assert.equal(db.queryTurns().find(row=>row.session_id==='child-session')?.total_tokens,2);
-  await writeFile(join(root,'b-parent.jsonl'),source('duplicate',null,'session-a'));
+  // 같은 시각 단위 안의 재작성도 크기 변경으로 확실하게 발견한다.
+  await writeFile(join(root,'b-parent.jsonl'),source('duplicate',null,'session-a')+'\n');
   await writeFile(child,source('child','duplicate','child-session')+'\n');
   assert.equal((await refreshSummary(db,options)).failed,0);
   assert.equal(db.findManifest('codex',child)?.session_id,'session-a');
