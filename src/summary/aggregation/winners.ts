@@ -17,16 +17,22 @@ const score = (event: UsageEvent): number | bigint => Number.isSafeInteger(event
 export class Winners {
   private readonly groups = new Map<string, Winner>();
 
+  constructor(private readonly apply?: (winner: Winner, direction: 1 | -1) => void) {}
+
   add(id: string, source: SourcePlan, event: UsageEvent, ordinal: number, request: string | null): void {
-    const value = score(event), previous = this.groups.get(id);
-    if (!previous) {
-      this.groups.set(id, { source, event: { ...event }, ordinal, request, score: value });
-      return;
+    const value = score(event);
+    let winner = this.groups.get(id);
+    if (winner) {
+      if (value < winner.score || value === winner.score && ordinal <= winner.ordinal) return;
+      this.apply?.(winner, -1);
+      for (const name of Object.keys(winner.event)) if (!Object.hasOwn(event, name)) Reflect.deleteProperty(winner.event, name);
+      Object.assign(winner.event, event);
+      winner.source = source; winner.ordinal = ordinal; winner.request = request; winner.score = value;
+    } else {
+      winner = { source, event: { ...event }, ordinal, request, score: value };
+      this.groups.set(id, winner);
     }
-    if (value < previous.score || value === previous.score && ordinal <= previous.ordinal) return;
-    for (const name of Object.keys(previous.event)) if (!Object.hasOwn(event, name)) Reflect.deleteProperty(previous.event, name);
-    Object.assign(previous.event, event);
-    previous.source = source; previous.ordinal = ordinal; previous.request = request; previous.score = value;
+    this.apply?.(winner, 1);
   }
 
   values(): IterableIterator<Winner> { return this.groups.values(); }

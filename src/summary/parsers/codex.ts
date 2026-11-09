@@ -27,7 +27,6 @@ export class CodexCurrentParserAdapter {
   private root: string | undefined;
   private turn: string | undefined;
   private sawCurrent = false;
-  private sawLegacy = false;
   private legacySignature: string | undefined;
   private highWater: TokenVector = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0 };
   private currentClosed = false;
@@ -36,6 +35,7 @@ export class CodexCurrentParserAdapter {
   private hasExplicitRoot = false;
   private model: string | undefined;
   private billing: import('../db/types').BillingMode = 'unknown';
+  private readonly spawnRequests = new Map<string, string>();
 
   constructor(private readonly context: FileContext, private readonly sink: ParseSink) {}
 
@@ -60,7 +60,7 @@ export class CodexCurrentParserAdapter {
     switch (row.type) {
       case 'turn_context': this.turnContext(record); break;
       case 'token_usage_record': this.currentUsage(record); break;
-      case 'response_item': this.responseCapabilities(record); break;
+      case 'response_item': this.responseItem(record); break;
       case 'event_msg': this.eventLifecycle(record); break;
     }
   }
@@ -82,6 +82,7 @@ export class CodexCurrentParserAdapter {
     this.identityValue = { sessionId: string(payload.session_id) ?? string(payload.sessionId) ?? this.identityValue?.sessionId ?? parent ?? id,
       threadId: id, parentThreadId: parent, isMain: parent === null,
       forkedFromId: string(payload.forked_from_id) ?? this.identityValue?.forkedFromId ?? null,
+      agentPath: string(payload.agent_path) ?? string(spawned.agent_path) ?? this.identityValue?.agentPath,
       sessionName: displayName(payload.thread_name) ?? displayName(payload.name) ?? displayName(payload.title) ?? this.identityValue?.sessionName,
       ...this.projectMetadata(cwd),
     };
@@ -99,7 +100,7 @@ export class CodexCurrentParserAdapter {
 
   private turnContext(record: CodexRecordContext): void {
     const { payload, identity, suppliedRoot, suppliedTurn } = record;
-    // Rootless subagents use their own turn ids; finish() gives the thread a separate session.
+    // Rootless subagents retain their own turn ids until the spawn binding identifies the parent request.
     const ownTurns = identity.isMain || !this.hasExplicitRoot;
     this.model = displayName(payload.model);
     if (payload.billing_mode !== undefined || payload.auth_mode !== undefined) this.billing = billingMode(payload.billing_mode ?? payload.auth_mode);
@@ -134,8 +135,9 @@ export class CodexCurrentParserAdapter {
       turnId, tokens: codexTokens(object(payload.turn_token_usage)), offset });
   }
 
-  private responseCapabilities(record: CodexRecordContext): void {
+  private responseItem(record: CodexRecordContext): void {
     const { payload, offset, identity } = record;
+    this.recordChildBinding(payload);
     if (this.context.collectCapabilities === false || !this.root) return;
     if (!['function_call', 'custom_tool_call'].includes(String(payload.type))) return;
     const name = string(payload.name);
@@ -145,6 +147,27 @@ export class CodexCurrentParserAdapter {
       this.sink.event({ kind: 'capability', rootId: this.root, threadId: identity.threadId,
         eventId: `${eventId}:${use.index}`, category: use.category, name: use.name, offset });
     }
+  }
+
+  /** 생성 호출 시점의 요청을 기억하고 반환된 자식 식별자를 부모 요청에 연결한다. */
+  private recordChildBinding(payload: Record<string, unknown>): void {
+    const callId = string(payload.call_id) ?? string(payload.id);
+    if (!callId) return;
+    const name = string(payload.name);
+    if (payload.type === 'function_call' && (name === 'spawn_agent' || name?.endsWith('.spawn_agent'))) {
+      if (this.root) this.spawnRequests.set(callId, this.root);
+      return;
+    }
+    if (payload.type !== 'function_call_output') return;
+    const root = this.spawnRequests.get(callId);
+    if (!root) return;
+    this.spawnRequests.delete(callId);
+    let output: Record<string, unknown>;
+    try { output = object(typeof payload.output === 'string' ? JSON.parse(payload.output) : payload.output); }
+    catch { return; }
+    const agent = string(output.agent_id), task = string(output.task_name);
+    if (agent) this.sink.child?.(agent, root);
+    if (task && task !== agent) this.sink.child?.(task, root);
   }
 
   /**
@@ -211,7 +234,6 @@ export class CodexCurrentParserAdapter {
       this.root = this.turn = this.turn ?? `legacy-${this.identityValue.threadId}`;
     }
     if (!this.root || !this.turn || !this.identityValue) throw new SummaryError('missing-root-turn', offset);
-    this.sawLegacy = true;
     const total = info.total_token_usage ? codexTokens(object(info.total_token_usage)) : {...this.highWater};
     const last = info.last_token_usage ? codexTokens(object(info.last_token_usage)) : null;
     const signature = JSON.stringify([total, last]);
@@ -238,13 +260,12 @@ export class CodexCurrentParserAdapter {
   }
 
   /**
-   * 책임: 부모 root가 없는 subagent의 사용량을 독립 세션으로 보존한다.
-   * 알고리즘: 명시 root가 없는 자식 thread만 자신의 세션·주 요청으로 승격하고 기존 부모 정보는 fork 참조로 남긴다.
+   * 책임: 부모 요청을 뒤에서 연결할 수 있도록 root 없는 subagent의 원래 계보를 보존한다.
+   * 알고리즘: 명시 root가 없는 자식은 독립 메인으로 승격하지 않고 rootless 표시만 추가한다.
    */
   getIdentity(): ParsedIdentity | undefined {
     const identity = this.identityValue;
     if (!identity || identity.isMain || this.hasExplicitRoot) return identity;
-    return { ...identity, sessionId: identity.threadId, parentThreadId: null, isMain: true,
-      forkedFromId: identity.forkedFromId ?? identity.parentThreadId, standaloneSubagent: true };
+    return { ...identity, rootlessSubagent: true };
   }
 }

@@ -371,7 +371,7 @@ response별 증분 상태를 영속화하지 않으므로 append도 tail만 더�
 
 1. 디렉터리를 iterator로 순회하고 metadata 발견·manifest 조회·방문 기록은 최대 n개씩 처리한다. 초기 n은 256이며 byte 예산에 먼저 도달하면 더 작은 묶음으로 처리한다.
 2. 관련 원본을 고정 byte 경계까지 한 번 읽는다. JSONL은 64 KiB 청크의 native LF 탐색·줄 예산·이미지 본문 생략·escape 검증을 적용하고 newline 없는 마지막 줄은 보류한다. 파싱 callback은 원본별 winner DTO를 갱신하고 패자 숫자 벡터를 버린다. 같은 읽기에서 파일 정체성·축소·동일 크기 재작성을 검사하고 내용 SHA-256을 계산한다. 읽기가 완료된 뒤 변경된 원본은 다음 갱신에서 수집한다.
-3. 세션·current 전환·복사 접두사·request 보정을 확정한 뒤 유효한 이벤트를 즉시 winner DTO에 비교한다. 더 큰 input+output과 동점의 늦은 순번을 선택하고 패자는 보관하지 않는다.
+3. 세션·current 전환·복사 접두사·request 보정을 확정한 뒤 파일별 남은 winner를 부모 요청의 최종 winner Map에 비교한다. 더 큰 input+output과 동점의 늦은 순번을 선택한다. 교체 전 winner의 기여를 빼고 새 winner를 같은 부모 요청 DTO에 더해 토큰·캐시·모델·도구·결제 빈도를 유지한다. 종료 시 최종 winner 전체를 다시 합산하지 않는다.
 4. 다음 묶음은 현재 묶음의 처리가 진행된 만큼만 받아 대기열이 무제한으로 늘어나지 않도록 한다.
 5. 파일 읽기·파싱·집계가 끝난 뒤 결과 반영에만 write transaction을 사용한다. 한 session의 결과를 여러 묶음으로 읽어 쓰더라도 COMMIT은 그 반영 단위가 완성됐을 때 수행한다.
 
@@ -544,9 +544,9 @@ agent_role = parent_thread_id가 없으면 main, 있으면 subagent
 
 파일의 첫 `session_meta`가 소유 thread를 정한다. fork 로그 안에 복제된 다른 thread의 부모 `session_meta`는 소유 식별자·프로젝트·lineage를 덮어쓰지 않는다. 같은 thread의 반복 metadata는 기존 부모·fork·프로젝트 정보를 유지하면서 제공된 제목 등을 갱신한다.
 
-부모 세션 연결은 관련 파일의 식별 정보와 메모리 방문 상태·스택을 사용하는 그래프 순회로 계산한다. 부모를 먼저 해소하고 같은 thread의 정상 소스가 같은 최종 세션을 가리킬 때만 자식을 재배정한다. 조상 누락·모호한 부모는 현재 세션 정보를 유지하고, 순환과 그 의존 경로는 missing-parent-agent를 남긴다. parser version 15는 관련 원본을 근거 수집과 winner 선택에 각각 읽으며 이전 전체 DTO 캐시는 사용하지 않는다.
+부모 세션 연결은 원본의 parent_thread_id로 계산한다. 직접 자식만 있는 계보는 부모 그룹에 바로 모으고, 다단계 계보는 경로 압축 Union-Find와 Small-to-Large로 작은 소스 membership Map을 큰 Map에 합친다. Union-Find의 물리적 대표와 최상위 부모 ID는 구분한다. forked_from_id는 복사 이력 검증에만 사용한다. 부모 누락·충돌·순환과 그 의존 경로는 missing-parent-agent를 남긴다. parser v17은 관련 원본을 한 번 읽으며 원본 전체 DTO 캐시는 사용하지 않는다.
 
-예외로, 파일 전체에 `root_turn_id`가 없는 구형 subagent는 `thread_id`를 독립 `session_id`로 사용하고 자체 `turn_id`로 요청을 구분한다. 요청 식별자가 없는 usage-only 기록은 thread에 하나의 안정적인 요청 id를 부여한다. 해당 thread의 token·시간을 자체 대화에 집계하고 `standalone-subagent` 품질 flag를 남긴다. 원래 부모·fork 정보는 복제 이력의 중복 검증에 사용하며, 명시적인 `root_turn_id`가 있는 subagent는 부모 요청 합산을 유지한다.
+파일 전체에 `root_turn_id`가 없는 구형 subagent도 독립 세션·요청으로 승격하지 않는다. 부모 로그의 spawn_agent call_id와 호출 당시 요청 ID를 기억하고 반환된 agent_id 또는 task_name을 자식 thread_id 또는 agent_path와 연결한다. root 없는 부모를 가진 손자는 그 부모가 귀속된 최상위 요청으로 합산한다. 복사 이력 제외는 원래 root·index로 먼저 판정한 뒤 부모 root로 변환하며 response/thread/turn 식별자는 유지한다. 자식의 시간·상태 이벤트는 부모 수명주기를 바꾸지 않는다. 실제 이벤트가 없는 원본은 manifest만 유지하고, 비어 있지 않지만 귀속을 확정하지 못한 자식은 관련 성분의 저장을 보류해 이전 정상 통계를 보존한다. 원본 진단·도구 사용 횟수는 유지하지만 자식별 사용량·요청 행은 저장하지 않는다.
 
 forked child가 부모의 token prefix를 복제한 구형 로그는 verified lineage prefix만 제외한다. 부모를 찾을 수 없으면 임의로 차감하지 않고 `missing-parent`를 표시한다.
 
@@ -942,7 +942,7 @@ Extension Host 메모리에 유지하는 값:
 - 사용량·데이터 확인 Webview마다 현재 보이는 제한된 한 page의 row
 - worker가 보내는 작은 진행 상태와 현재 조회 page·제한된 제공자별·모델별 도표 결과
 
-누계 Worker는 갱신 동안 manifest·현재 파일 식별 정보·귀속 근거·원본별/최종 그룹 winner DTO·비사용량 이벤트·최종 요청 상태를 보유한다. 원본을 한 번 읽으며 같은 그룹의 더 좋은 후보로 기존 DTO를 갱신하고 패자 숫자 벡터를 버린다. current 전환·legacy 복사 접두사의 해시·요청 ID·품질 flag와 root 최소 위치는 같은 읽기에서 수집한다. 원본별 그룹은 response·raw request 또는 thread/turn·포맷으로 구분하며, 읽기 뒤 확정된 세션·request로 남은 winner만 병합한다. 사용량 패자 모델을 별도 행으로 복원하지 않는다. 원본 전체 이벤트 DTO와 패자를 다음 갱신까지 캐시하지 않는다.
+누계 Worker는 갱신 동안 manifest·현재 파일 식별 정보·귀속 근거·원본별/최종 그룹 winner DTO·비사용량 이벤트·최종 요청 상태를 보유한다. 원본을 한 번 읽으며 같은 그룹의 더 좋은 후보로 기존 DTO를 갱신하고 패자 숫자 벡터를 버린다. current 전환·legacy 복사 접두사의 해시·요청 ID·품질 flag·root 최소 위치와 생성 호출의 자식 연결은 같은 읽기에서 수집한다. 원본별 그룹은 response·raw request 또는 thread/turn·포맷으로 구분하며, 읽기 뒤 확정된 부모 세션·request로 남은 winner를 전달한다. 최종 winner 교체는 부모 요청 DTO에 차감·가산을 즉시 반영하므로 종료 시 winner 재합산 순회는 없다. 계보 확정과 원본별 winner 전달·최종 요청 생성 순회는 유지한다. 사용량 패자 모델을 별도 행으로 복원하지 않으며 원본 전체 이벤트 DTO와 패자를 다음 갱신까지 캐시하지 않는다.
 
 메모리에 유지하지 않는 값:
 

@@ -51,6 +51,14 @@ export class SourceEvidence {
   readonly capabilities = new Map<string, number>();
   readonly requests = new Map<string, string | null>();
   readonly legacyRequests = new Map<string, string | null>();
+  readonly childRequests = new Map<string, string | null>();
+
+  /** 생성 결과의 thread ID·agent path를 호출 당시 부모 요청에 연결한다. */
+  child(reference: string, rootId: string): void {
+    reference = text(reference); rootId = text(rootId);
+    if (!this.childRequests.has(reference)) this.childRequests.set(reference, rootId);
+    else if (this.childRequests.get(reference) !== rootId) this.childRequests.set(reference, null);
+  }
 
   add(raw: ParseEvent, index: number): void {
     const event = normalizedEvent(raw);
@@ -90,8 +98,11 @@ export function prepareSources(files: readonly StreamingAggregateFile[]): {
     const identity = { ...raw.identity };
     for (const [name, value] of Object.entries(identity)) if (typeof value === 'string') Reflect.set(identity, name, text(value));
     const file = { ...raw, session_id: text(raw.session_id), identity };
-    const flags = new Map([...file.evidence.flags].map(([rootId, values]) => [rootId, new Set(values)]));
-    for (const flag of file.flags ?? []) addFlag(flags, text(flag.rootId), text(flag.flag));
+    const flags = new Map<string, Set<string>>();
+    const targetRoot = (rootId: string): string => file.identity.parentRootId ?? rootId;
+    for (const [rootId, values] of file.evidence.flags)
+      for (const flag of values) addFlag(flags, targetRoot(rootId), flag);
+    for (const flag of file.flags ?? []) addFlag(flags, targetRoot(text(flag.rootId)), text(flag.flag));
     if (identity.standaloneSubagent) addFlag(flags, '*', 'standalone-subagent');
     const source: SourcePlan = { file, base: ordinal, flags, inheritedRoots: new Set(), copiedCapabilities: new Set(), legacyCutoff: -1 };
     ordinal += file.evidence.eventCount;

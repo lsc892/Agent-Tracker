@@ -103,6 +103,9 @@ export interface ParsedIdentity {
   sessionName?: string;
   isMain: boolean;
   forkedFromId?: string | null;
+  agentPath?: string;
+  rootlessSubagent?: boolean;
+  parentRootId?: string;
   standaloneSubagent?: boolean;
 }
 export interface TurnEvent {
@@ -149,4 +152,5 @@ export type ParseEvent = TurnEvent | UsageEvent | CheckEvent | CapabilityEvent;
 export interface ParseSink {
   identity(identity: ParsedIdentity): void;
   event(event: ParseEvent): void;
+  child?(reference: string, rootId: string): void;
 }
