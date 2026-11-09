@@ -48,6 +48,22 @@ export class SourceQueue<T extends { id: number }> {
     }
     return first;
   }
+
+  /** 큐를 변경하지 않고 ID가 작은 준비 후보만 제한된 선행 읽기에 제공한다. */
+  preview(limit: number, accept: (value: T) => boolean): T[] {
+    const result: T[] = [], frontier = new SourceQueue<{ id: number; heapIndex: number }>();
+    if (this.heap.length) frontier.add({ id: this.heap[0].id, heapIndex: 0 });
+    while (result.length < limit) {
+      const next = frontier.take();
+      if (!next) break;
+      const value = this.heap[next.heapIndex];
+      if (accept(value)) result.push(value);
+      const childEnd = Math.min(next.heapIndex * 2 + 3, this.heap.length);
+      for (let heapIndex = next.heapIndex * 2 + 1; heapIndex < childEnd; heapIndex++)
+        frontier.add({ id: this.heap[heapIndex].id, heapIndex });
+    }
+    return result;
+  }
 }
 
 /** 여러 그룹의 멤버를 원래 입력 순서대로 합쳐 전체 배열의 반복 filter를 대신한다. */

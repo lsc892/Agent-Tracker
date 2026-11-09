@@ -12,7 +12,8 @@ import { SourceWinners } from '../aggregation/sourceWinners';
 import { groupParents } from '../aggregation/parentGroups';
 import { acquireRefreshLock } from './lock';
 import { includesSourceSnapshot } from './sourceFingerprint';
-import { readSource, sqlText } from './sourceReader';
+import { sqlText } from './sourceReader';
+import { SourceReaderPool } from './sourcePool';
 import { readNames } from './names';
 import { addMember, removeMember, OrderedGroups, SourceQueue } from './worklist';
 import { StageProfiler, type ScanStage, type StorageStage } from '../profiling';
@@ -81,6 +82,9 @@ export async function refreshSummary(
     if (cancelled())
       throw new SummaryError('interrupted');
   };
+  const sourcePool = new SourceReaderPool({ workers: options.sourceWorkers, collectCapabilities: options.collectCapabilities !== false,
+    maxLineBytes: options.maxLineBytes, signal, cancelled, externalCancellation: options.cancellation,
+    onBytes: bytes => { result.bodyBytes += bytes; report(); } });
   let phase: SummaryProgress['phase'] = 'scanning', lastProgress = 0, release: (() => void) | undefined;
   const report = (force = false): void => {
     if (force || Date.now() - lastProgress > 100) {
@@ -139,9 +143,8 @@ export async function refreshSummary(
     phase = 'parsing';
     report(true);
     await scan.measureAsync('parseChanged', async () => {
-      for (const file of [...files.values()].sort((a, b) => a.id - b.id))
-        if (file.changed && !file.removed)
-          await inspectSource(file);
+      const changed = [...files.values()].filter(file => file.changed && !file.removed).sort((a, b) => a.id - b.id);
+      await inspectBatch(changed);
     });
     await scan.measureAsync('expandRelated', expandRelatedSources);
     scan.measure('resolveParents', resolveParentRequests);
@@ -167,6 +170,7 @@ export async function refreshSummary(
       }
   }
   finally {
+    await scan.measureAsync('sourcePoolClose', () => sourcePool.dispose());
     release?.();
     result.completedAt = new Date().toISOString();
     phase = 'complete';
@@ -443,12 +447,18 @@ export async function refreshSummary(
       result.reused = Math.max(0, result.reused - 1);
     if (!file.selected && !await refreshOutsideSource(file))
       return;
-    const winners = new SourceWinners(file.provider), evidence = winners.evidence;
-    const onIdentity = (identity: ParsedIdentity): void => { setSession(file, identity.sessionId); connect(file.provider, file.previous?.session_id, file.session); };
     try {
-      const read = await scan.measureAsync('readSources', () => readSource(file, (event, index) => winners.add(event, index), { signal, cancelled,
-        maxLineBytes: options.maxLineBytes, collectCapabilities: collect, onBytes: bytes => { result.bodyBytes += bytes; report(); }, onIdentity,
-        onChild: (reference, rootId) => evidence.child(reference, rootId) }));
+      const preparation = await scan.measureAsync('readSources', () => sourcePool.read(file));
+      report();
+      if (!preparation.ok) {
+        if (preparation.identity) {
+          setSession(file, preparation.identity.sessionId);
+          connect(file.provider, file.previous?.session_id, file.session);
+        }
+        throw new SummaryError(preparation.error.code, preparation.error.offset);
+      }
+      check();
+      const read = preparation.read, winners = new SourceWinners(file.provider, preparation.winners), evidence = winners.evidence;
       result.parsed++;
       if (!read.rows) {
         if (read.partialLine && file.previous?.session_id) {
@@ -472,6 +482,14 @@ export async function refreshSummary(
       fail(file, error);
       if (cancelled())
         throw error;
+    }
+  }
+
+  async function inspectBatch(batch: readonly FileState[]): Promise<void> {
+    for (let index = 0; index < batch.length; index++) {
+      const candidates = batch.slice(index, index + sourcePool.lookahead).filter(file => file.selected && ready(file));
+      sourcePool.prefetch(candidates);
+      await inspectSource(batch[index]);
     }
   }
 
@@ -581,6 +599,7 @@ export async function refreshSummary(
     }
   }
   async function expandRelatedSources(): Promise<void> {
+    const isAffectedSource = (file: FileState): boolean => ready(file) && affected.has(key(file.provider, file.session ?? ''));
     while (true) {
       resolveLineage();
       enqueueParents();
@@ -594,13 +613,14 @@ export async function refreshSummary(
       }
       if (parents.length) {
         // 새 참조가 생겨도 이번 반복 시작에 확정한 부모 batch의 id 순서를 먼저 보존한다.
-        for (const file of parents)
-          await inspectSource(file);
+        await inspectBatch(parents);
         continue;
       }
+      const candidates = relatedQueue.preview(sourcePool.lookahead, file => file.selected && isAffectedSource(file));
+      sourcePool.prefetch(candidates);
       let next: FileState | undefined;
       while ((candidate = relatedQueue.take()))
-        if (ready(candidate) && affected.has(key(candidate.provider, candidate.session ?? ''))) {
+        if (isAffectedSource(candidate)) {
           next = candidate;
           break;
         }

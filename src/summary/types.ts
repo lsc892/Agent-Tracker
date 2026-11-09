@@ -9,6 +9,8 @@ export interface SummaryOptions {
   timezone?: string;
   workerPath?: string;
   maxLineBytes?: number;
+  /** 파일 준비 Worker 수. 1은 순차 처리이며 기본은 사용 가능한 CPU에 맞춰 최대 4개다. */
+  sourceWorkers?: number;
   cancellation?: SharedArrayBuffer;
 }
 export interface UsageQuery {
