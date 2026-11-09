@@ -2,7 +2,7 @@
 
 조사 기준: **2026-11-05, Asia/Seoul**. Agent Tracker의 현재 코드와 공식 문서·원 논문·개발자 공개 소스를 대조했다. 설명 아래의 데이터는 이해를 위한 합성 예시다.
 
-아래의 현재 구현 비교는 영속 turn metadata 도입 전 기준이다. 이후 전수 파싱을 유지하면서 변경 요청만 재집계하는 구조와 검증 결과는 [metadata A/B 보고서](../benchmarks/2026-11-05/MetadataKeyedAB-2026-11-05.md)에 기록한다.
+아래의 현재 구현 비교는 영속 turn metadata 도입 전 기준이다. 이후 전수 파싱을 유지하면서 변경 요청만 재집계하는 구조와 검증 결과는 [metadata A/B 보고서](../../benchmarks/2026-11-05/MetadataKeyedAB-2026-11-05.md)에 기록한다.
 
 핵심은 **읽고 만드는 양을 줄이고, 같은 작업을 묶고, 이미 계산한 결과를 다시 사용하는 것**이다.
 
@@ -26,7 +26,7 @@
 
 현재의 증분 처리는 **변경 없는 세션을 건너뛰는 것**이 중심이다. ‘추가된 바이트만 읽기’나 ‘변경 행의 증감분만 집계에 반영하기’까지 구현한 것은 아니다. 아래에서는 **현재 대응**과 **추가 후보**를 구분한다.
 
-현재 구조의 근거: [JSONL reader](../../src/summary/jsonl/index.ts), [scanner](../../src/summary/scanner/index.ts), [staging](../../src/summary/staging/index.ts), [세션 저장](../../src/summary/db/sessions.ts), [부분 저장 판정](../../src/summary/db/sessionChanges.ts), [rollup 갱신](../../src/summary/db/rollups.ts), [집계 조회 선택](../../src/summary/db/reader.ts).
+현재 구조의 근거: [JSONL reader](../../../src/summary/jsonl/index.ts), [scanner](../../../src/summary/scanner/index.ts), [staging](../../../src/summary/staging/index.ts), [세션 저장](../../../src/summary/db/sessions.ts), [부분 저장 판정](../../../src/summary/db/sessionChanges.ts), [rollup 갱신](../../../src/summary/db/rollups.ts), [집계 조회 선택](../../../src/summary/db/reader.ts).
 
 ## 1. Claude·Codex JSONL 파싱에 직접 대응하는 레퍼런스
 
@@ -47,7 +47,7 @@
 3. 완성된 두 번째 행을 처리하고 문자열을 버린다.
 ```
 
-**현재 코드 연결:** [readJsonl](../../src/summary/jsonl/index.ts)은 최대 64 KiB 청크를 읽고, 일반적인 짧은 행은 곧바로 `JSON.parse()`에 전달한다. 여러 청크에 걸친 행과 이미지 포함 행에만 별도 구성기를 사용한다. 기본 보관 줄 예산은 4 MiB다.
+**현재 코드 연결:** [readJsonl](../../../src/summary/jsonl/index.ts)은 최대 64 KiB 청크를 읽고, 일반적인 짧은 행은 곧바로 `JSON.parse()`에 전달한다. 여러 청크에 걸친 행과 이미지 포함 행에만 별도 구성기를 사용한다. 기본 보관 줄 예산은 4 MiB다.
 
 **이점·제약:** 순차 바이트 스캔은 여전히 O(N)이지만 파일 전체를 보관할 필요가 없다. 보조 공간은 청크와 보관 중인 최대 줄 크기에 좌우된다. 반환 JSON 객체·adapter·SQLite의 메모리까지 이 상한에 포함되는 것은 아니다.
 
@@ -64,7 +64,7 @@ token_usage_record(usage=120)   → A/T/M에 토큰 120을 귀속
 session_meta(thread=부모)       → 복제된 부모 metadata로 A를 덮어쓰지 않음
 ```
 
-**현재 코드 연결:** [CodexCurrentParserAdapter](../../src/summary/parsers/codex.ts)와 [ClaudeParserAdapter](../../src/summary/parsers/claude.ts)가 같은 종류의 순차 상태 처리를 한다. Claude는 `promptId`·`uuid`와 tool result 여부를, Codex는 session·root turn·response ID를 해석한다. 이는 공식 구현을 복사했다는 뜻이 아니라, 코드에서 확인한 개념적 대응이다.
+**현재 코드 연결:** [CodexCurrentParserAdapter](../../../src/summary/parsers/codex.ts)와 [ClaudeParserAdapter](../../../src/summary/parsers/claude.ts)가 같은 종류의 순차 상태 처리를 한다. Claude는 `promptId`·`uuid`와 tool result 여부를, Codex는 session·root turn·response ID를 해석한다. 이는 공식 구현을 복사했다는 뜻이 아니라, 코드에서 확인한 개념적 대응이다.
 
 **이점·제약:** 각 행을 한 번 순서대로 처리하는 것이 기본이다. 다만 파일 중간부터 재개하려면 마지막 offset만으로 부족하고, 이 상태도 함께 복원해야 한다. 공식 recorder는 파싱한 이벤트를 최종 `Vec`에 모으므로 reader 전체가 상수 메모리인 예시는 아니다.
 
@@ -196,9 +196,9 @@ On-Demand: 구조 탐색 → 해당 경로 접근 → input 숫자를 변환
 이미지 data URI 포함 줄  → 문자열 문법을 추적하며 Base64 본문 제거 → JSON.parse
 ```
 
-현재 구현은 `JSON.parse()`를 바꾸기보다 그 앞의 줄 구성·복사·버리는 값의 보관 비용을 줄였다. 따옴표/역슬래시 탐색 위치를 재사용해 같은 남은 구간을 반복 검색하지 않는 것도 포함된다. [현재 reader](../../src/summary/jsonl/index.ts)
+현재 구현은 `JSON.parse()`를 바꾸기보다 그 앞의 줄 구성·복사·버리는 값의 보관 비용을 줄였다. 따옴표/역슬래시 탐색 위치를 재사용해 같은 남은 구간을 반복 검색하지 않는 것도 포함된다. [현재 reader](../../../src/summary/jsonl/index.ts)
 
-기존 저장소의 2026-10-09 보고서는 고정된 실제 입력 53,271행의 **파싱 구간만** 4,941.028→1,718.516 ms(중앙값)로 줄었다고 기록한다. 당시 adapter·파일 I/O·SQLite는 제외했다. 이번 조사에서 새로 실행한 측정이나 전체 갱신 속도가 아니다. [기존 JSONL 파싱 비교](../benchmarks/2026-10-09/JsonlParsingBranches-2026-10-09.md)
+기존 저장소의 2026-10-09 보고서는 고정된 실제 입력 53,271행의 **파싱 구간만** 4,941.028→1,718.516 ms(중앙값)로 줄었다고 기록한다. 당시 adapter·파일 I/O·SQLite는 제외했다. 이번 조사에서 새로 실행한 측정이나 전체 갱신 속도가 아니다. [기존 JSONL 파싱 비교](../../benchmarks/2026-10-09/JsonlParsingBranches-2026-10-09.md)
 
 후보 비교 시에는 메타데이터·사용량·도구·대형 이미지·대형 중첩 본문을 섞고, UTF-8 청크 경계·escape·미완성 행·오류 offset·중복 집계가 현재 결과와 같은지 함께 확인해야 한다. 읽어야 하는 원본 바이트가 그대로라면 I/O의 O(N) 자체는 사라지지 않는다.
 
@@ -217,7 +217,7 @@ Dirty flag는 **어디가 달라졌는지 표시하는 방법**이다. 표시된
 
 현재 방식은 **영향 세션만 다시 계산하는 증분 처리**다. `SUM += delta`를 사용하는 행 단위 IVM과 구분해야 한다. `processing_position='committed'`는 진단 상태이며 append byte cursor가 아니다.
 
-현재 코드: [scanner.ts](../../src/summary/scanner/index.ts), [staging.ts](../../src/summary/staging/index.ts), [sessions.ts](../../src/summary/db/sessions.ts), [sessionChanges.ts](../../src/summary/db/sessionChanges.ts), [rollups.ts](../../src/summary/db/rollups.ts).
+현재 코드: [scanner.ts](../../../src/summary/scanner/index.ts), [staging.ts](../../../src/summary/staging/index.ts), [sessions.ts](../../../src/summary/db/sessions.ts), [sessionChanges.ts](../../../src/summary/db/sessionChanges.ts), [rollups.ts](../../../src/summary/db/rollups.ts).
 
 ### 3.1 Dirty Flag + 변경 키 집합: 같은 대상을 여러 번 계산하지 않기
 
@@ -336,7 +336,7 @@ COMMIT;
 
 **현재 대응.** `SessionStore.replaceSessions()`가 manifest, facts, 자식·비용, rollup과 이름 정리를 한 transaction으로 묶는다. 논리 요청의 `UNIQUE(provider, session_id, root_turn_id)`와 snapshot 교체가 재시도 시 통계의 중복 누적을 막는다. 단, metadata 방문·TEMP 비교·작은 세션의 재쓰기까지 사라지는 보장은 아니다. 현재에는 영속 dirty 큐나 byte checkpoint를 추가하지 않았다.
 
-**검증 범위.** 이번 작업은 코드와 공개 레퍼런스 조사다. 후보 알고리즘을 구현하거나 신규 성능 실측을 수행하지 않았다. 기존 [IncrementalRefresh 결과](../benchmarks/2026-10-29/IncrementalRefresh-2026-10-29.md)도 증분 저장의 전체 시간 개선이 일관되지 않았다고 기록한다. 비교 비용·재파싱·쓰기량을 함께 측정해야 실제 이득을 판단할 수 있다.
+**검증 범위.** 이번 작업은 코드와 공개 레퍼런스 조사다. 후보 알고리즘을 구현하거나 신규 성능 실측을 수행하지 않았다. 기존 [IncrementalRefresh 결과](../../benchmarks/2026-10-29/IncrementalRefresh-2026-10-29.md)도 증분 저장의 전체 시간 개선이 일관되지 않았다고 기록한다. 비교 비용·재파싱·쓰기량을 함께 측정해야 실제 이득을 판단할 수 있다.
 
 ## 4. 월·일·프로젝트·세션·평균 조회: 작은 집계를 다시 합친다
 
@@ -430,7 +430,7 @@ GROUP BY provider,project,session;
 
 **기대 결과:** 11월 1일은 `300 tokens / 3요청`, 11월 2일은 전체 상태 합계 `1050 tokens / 3요청`, 미상 날짜는 `25 tokens / 1요청`이다. 월별 알려진 11월 합계는 1350 tokens, 완료 표본 평균은 `1300/5=260`이다. 프로젝트 A 합계는 1350, 프로젝트 B는 25다. 진행 중인 50 tokens는 합계에 포함되지만 완료 요청 평균에서는 제외된다.
 
-**현재 코드 연결:** [rollup-state.ts](../../src/summary/db/rollup-state.ts), [rollup/usage.ts](../../src/summary/db/queries/rollup/usage.ts), [rollup/source.ts](../../src/summary/db/queries/rollup/source.ts). 제품은 제공자 기준·모델 기준 일별 테이블을 별도로 유지한다. 모든 차원의 조합을 미리 만드는 완전한 데이터 큐브를 구현한 것은 아니다. 비용을 포함하는 조회는 현재 원본 경로를 쓴다.
+**현재 코드 연결:** [rollup-state.ts](../../../src/summary/db/rollup-state.ts), [rollup/usage.ts](../../../src/summary/db/queries/rollup/usage.ts), [rollup/source.ts](../../../src/summary/db/queries/rollup/source.ts). 제품은 제공자 기준·모델 기준 일별 테이블을 별도로 유지한다. 모든 차원의 조합을 미리 만드는 완전한 데이터 큐브를 구현한 것은 아니다. 비용을 포함하는 조회는 현재 원본 경로를 쓴다.
 
 **장점과 제약:** 기간 안의 요청이 N개, 일별 집계 행이 D개라면 읽어 합칠 입력을 N에서 D로 줄일 수 있다. D가 N에 가까운 짧은 세션이 많으면 이점이 작다. `GROUP BY`·집계 결과 정렬 비용은 남는다. 저장 공간과 갱신 비용도 추가된다. 이 복잡도 비교는 해당 구조에 대한 적용 분석이며, 새 성능 측정 결과는 아니다.
 
@@ -454,7 +454,7 @@ WHERE local_day<>'';
 
 `COUNT(*)`는 모든 행, `COUNT(duration)`은 시간이 알려진 행만 센다. 분모가 0이면 `NULLIF(...,0)`로 미상 평균을 반환한다. `1.0*`는 정수 나눗셈을 피한다. SQLite의 `AVG`도 NULL을 제외한 표본의 평균을 구한다. [SQLite AVG·COUNT](https://www.sqlite.org/lang_aggfunc.html).
 
-**현재 코드 연결:** [raw/usage.ts](../../src/summary/db/queries/raw/usage.ts)는 완료 요청을 평균 표본으로 삼는다. `excludeEmptyUsage`가 켜지면 완료 요청 중 `total_tokens>0 OR has_model=1`인 표본만 사용한다. 예시의 `recorded`는 이 실제 판정을 단순화한 값이다. [rollup/metrics.ts](../../src/summary/db/queries/rollup/metrics.ts)는 해당 표본별 합계와 분모를 병합한다. 시간 평균의 분모는 알려진 소요 시간 수다. 캐시 합계는 전체 요청에 미상이 하나라도 있으면 NULL을, 캐시 평균은 선택된 완료 표본에 미상이 하나라도 있으면 NULL을 보존한다.
+**현재 코드 연결:** [raw/usage.ts](../../../src/summary/db/queries/raw/usage.ts)는 완료 요청을 평균 표본으로 삼는다. `excludeEmptyUsage`가 켜지면 완료 요청 중 `total_tokens>0 OR has_model=1`인 표본만 사용한다. 예시의 `recorded`는 이 실제 판정을 단순화한 값이다. [rollup/metrics.ts](../../../src/summary/db/queries/rollup/metrics.ts)는 해당 표본별 합계와 분모를 병합한다. 시간 평균의 분모는 알려진 소요 시간 수다. 캐시 합계는 전체 요청에 미상이 하나라도 있으면 NULL을, 캐시 평균은 선택된 완료 표본에 미상이 하나라도 있으면 NULL을 보존한다.
 
 **주의:** ‘요청당 평균’과 ‘하루당 평균’은 다른 지표다. 최근 30일의 일 평균을 원한다면 활동한 날짜 수인지, 활동이 없는 날을 포함한 달력 30일인지 먼저 정해야 한다. 현재 공개 평균 지표를 임의로 일 평균으로 바꾸지 않는다.
 
@@ -473,9 +473,9 @@ WHERE started_ms >= unixepoch('2026-10-31 15:00:00')*1000
 -- 기대: 1350. NULL 시각 행은 이 범위 결과에서 제외된다.
 ```
 
-**현재 코드 연결:** [common/filters.ts](../../src/summary/db/queries/common/filters.ts)는 epoch 밀리초에 `>=`, `<`를 사용한다. [timezone.ts](../../src/summary/db/timezone.ts)는 `Intl.DateTimeFormat`으로 현지 날짜를 얻고 시작·다음 경계를 각각 이진 탐색하므로 DST가 있는 날을 단순한 `24시간`으로 취급하지 않는다. 제품의 일·월 조회는 기본적으로 미상 시각을 별도 그룹에 유지한다. 위 단순 SQL처럼 NULL을 제외하는 예시와 이 정책을 구분한다.
+**현재 코드 연결:** [common/filters.ts](../../../src/summary/db/queries/common/filters.ts)는 epoch 밀리초에 `>=`, `<`를 사용한다. [timezone.ts](../../../src/summary/db/timezone.ts)는 `Intl.DateTimeFormat`으로 현지 날짜를 얻고 시작·다음 경계를 각각 이진 탐색하므로 DST가 있는 날을 단순한 `24시간`으로 취급하지 않는다. 제품의 일·월 조회는 기본적으로 미상 시각을 별도 그룹에 유지한다. 위 단순 SQL처럼 NULL을 제외하는 예시와 이 정책을 구분한다.
 
-기간이 `11월 1일 12:00~11월 3일 06:00`처럼 날짜 중간에서 시작·끝나면, 현재 [rollup/source.ts](../../src/summary/db/queries/rollup/source.ts)는 완전한 11월 2일만 일별 집계에서 읽고 양끝 부분을 원본에서 읽어 `UNION ALL`한다. 두 영역이 겹치지 않게 나눠 중복 계산을 피한다. 이는 이번 저장소 코드에서 확인한 혼합 전략이며, 위 SQLite 문서가 이 제품 전략 자체를 제안한 것은 아니다.
+기간이 `11월 1일 12:00~11월 3일 06:00`처럼 날짜 중간에서 시작·끝나면, 현재 [rollup/source.ts](../../../src/summary/db/queries/rollup/source.ts)는 완전한 11월 2일만 일별 집계에서 읽고 양끝 부분을 원본에서 읽어 `UNION ALL`한다. 두 영역이 겹치지 않게 나눠 중복 계산을 피한다. 이는 이번 저장소 코드에서 확인한 혼합 전략이며, 위 SQLite 문서가 이 제품 전략 자체를 제안한 것은 아니다.
 
 ## 5. 위 조회에 맞춘 인덱싱 레퍼런스
 
@@ -495,7 +495,7 @@ WHERE provider='codex' AND project='A'
   AND started_ms< unixepoch('2026-11-30 15:00:00')*1000;
 ```
 
-**현재 존재하는 접근 경로:** [schema.ts](../../src/summary/db/schema.ts), [rollup-state.ts](../../src/summary/db/rollup-state.ts).
+**현재 존재하는 접근 경로:** [schema.ts](../../../src/summary/db/schema.ts), [rollup-state.ts](../../../src/summary/db/rollup-state.ts).
 
 | 조회/작업 | 실제 키/인덱스 | 쓰임과 한계 |
 | --- | --- | --- |
@@ -567,9 +567,9 @@ WHERE local_day<>'' AND substr(local_day,1,7)='2026-11';
 
 **쉽게 설명하면:** 인덱스를 만들었다는 사실보다 ‘실제로 어느 구간을 읽었는지’를 본다. `EXPLAIN QUERY PLAN`의 `SEARCH`, `COVERING INDEX`, `USE TEMP B-TREE`를 확인하고 같은 입력의 읽기·쓰기·공간을 비교한다. 출력 문자열은 SQLite 버전에 따라 바뀔 수 있다. [SQLite EXPLAIN QUERY PLAN](https://www.sqlite.org/eqp.html).
 
-기존 [11월 3일 세션 시간 인덱스 A/B](../benchmarks/2026-11-03/SessionTimeIndexAB-2026-11-03.md)는 `(provider,session_id,started_at_ms)` 하나를 **실험 후보**로 추가했다. 합성 1만 요청 DB의 기존 데이터에 처음 생성한 공간은 +424KiB였고, 1,000요청/세션 입력의 요청 추가 갱신은 +3.735~5.933ms였다. 이는 당시 장비·입력의 기존 실측이며 새 측정이 아니다. 현재 schema v16에는 그 인덱스가 없다. 읽기 후보 평가와 갱신 비용을 함께 봐야 한다.
+기존 [11월 3일 세션 시간 인덱스 A/B](../../benchmarks/2026-11-03/SessionTimeIndexAB-2026-11-03.md)는 `(provider,session_id,started_at_ms)` 하나를 **실험 후보**로 추가했다. 합성 1만 요청 DB의 기존 데이터에 처음 생성한 공간은 +424KiB였고, 1,000요청/세션 입력의 요청 추가 갱신은 +3.735~5.933ms였다. 이는 당시 장비·입력의 기존 실측이며 새 측정이 아니다. 현재 schema v16에는 그 인덱스가 없다. 읽기 후보 평가와 갱신 비용을 함께 봐야 한다.
 
-현재 [connection.ts](../../src/summary/db/connection.ts)는 열 때 `PRAGMA main.optimize=0x10002`, 이후 하루 간격·닫을 때 `PRAGMA main.optimize`를 이미 실행한다. 이는 장기간 연결의 통계를 유지하는 SQLite 권장 패턴과 대응한다. 새 기능으로 중복 도입할 필요는 없다. [SQLite ANALYZE §2.1](https://www.sqlite.org/lang_analyze.html#periodically_run_pragma_optimize).
+현재 [connection.ts](../../../src/summary/db/connection.ts)는 열 때 `PRAGMA main.optimize=0x10002`, 이후 하루 간격·닫을 때 `PRAGMA main.optimize`를 이미 실행한다. 이는 장기간 연결의 통계를 유지하는 SQLite 권장 패턴과 대응한다. 새 기능으로 중복 도입할 필요는 없다. [SQLite ANALYZE §2.1](https://www.sqlite.org/lang_analyze.html#periodically_run_pragma_optimize).
 
 ### 5.5. Keyset pagination: 상세 행을 끝까지 넘길 때 앞부분을 반복해서 버리지 않는다
 
@@ -584,7 +584,7 @@ ORDER BY id
 LIMIT 100;
 ```
 
-현재 제품의 상세 요청·진단 API와 비용 재계산 ID 순회에는 keyset 경로가 있다. 반면 집계표는 합계·평균 등의 정렬과 전체 개수에 `LIMIT/OFFSET`을 사용한다. 원본 상세 행용 keyset을 집계표에 그대로 적용하면 전체 범위의 집계 비용이 자동으로 사라지지 않는다. 특정 세션 조건까지 붙인 비용 재계산은 기존 세션 UNIQUE 키와 rowid 정렬의 조합을 실제 계획으로 확인해야 하며, 시간 인덱스가 그 ID 커서까지 항상 해결한다고 가정하지 않는다. [reader.ts](../../src/summary/db/reader.ts), [billing.ts](../../src/summary/db/billing.ts).
+현재 제품의 상세 요청·진단 API와 비용 재계산 ID 순회에는 keyset 경로가 있다. 반면 집계표는 합계·평균 등의 정렬과 전체 개수에 `LIMIT/OFFSET`을 사용한다. 원본 상세 행용 keyset을 집계표에 그대로 적용하면 전체 범위의 집계 비용이 자동으로 사라지지 않는다. 특정 세션 조건까지 붙인 비용 재계산은 기존 세션 UNIQUE 키와 rowid 정렬의 조합을 실제 계획으로 확인해야 하며, 시간 인덱스가 그 ID 커서까지 항상 해결한다고 가정하지 않는다. [reader.ts](../../../src/summary/db/reader.ts), [billing.ts](../../../src/summary/db/billing.ts).
 
 ## 이 저장소에서 레퍼런스를 활용할 때의 판단 순서
 
@@ -598,7 +598,7 @@ LIMIT 100;
 
 위 표는 병목에 따른 **조사·비교 순서**이며 새 기능의 채택 결정이나 성능 보장이 아니다. JSON 구조 인덱스(Mison)는 문자 위치를 찾는 자료구조이고, SQLite B-tree 인덱스는 DB 행을 찾는 자료구조다. 둘은 이름이 같아도 대상으로 하는 비용이 다르다.
 
-기존 [JSONL 파싱 비교](../benchmarks/2026-10-09/JsonlParsingBranches-2026-10-09.md), [증분 갱신 비교](../benchmarks/2026-10-29/IncrementalRefresh-2026-10-29.md), [단순 인덱스 비교](../benchmarks/2026-11-03/SimpleIndexAB-2026-11-03.md), [TEMP 묶음 제품 확인](../benchmarks/2026-11-04/TempBatchProduct-2026-11-04.md)는 각 시점·입력의 결과다. 논문의 속도 배수나 과거 실험 수치를 현재 제품 전체의 개선율로 옮기지 않는다.
+기존 [JSONL 파싱 비교](../../benchmarks/2026-10-09/JsonlParsingBranches-2026-10-09.md), [증분 갱신 비교](../../benchmarks/2026-10-29/IncrementalRefresh-2026-10-29.md), [단순 인덱스 비교](../../benchmarks/2026-11-03/SimpleIndexAB-2026-11-03.md), [TEMP 묶음 제품 확인](../../benchmarks/2026-11-04/TempBatchProduct-2026-11-04.md)는 각 시점·입력의 결과다. 논문의 속도 배수나 과거 실험 수치를 현재 제품 전체의 개선율로 옮기지 않는다.
 
 검증: 4·5절의 SQL **9개 블록**을 Node v24.19.0 / SQLite 3.53.3 메모리 DB에서 실행했다. 일·월·프로젝트·세션 합계, 완료 평균 260, 기록된 완료 평균 325, 알려진 완료 소요 시간 평균 2333.333…ms를 기대값과 대조하고 원본·일별 집계 결과의 일치를 확인했다. 복합 인덱스 `SEARCH`와 `COVERING INDEX` 실행 계획도 확인했다.
 

@@ -2,7 +2,7 @@
 
 ## 범위와 보존 기준
 
-[turns.ts](../../src/summary/aggregation/turns.ts)의 차분 기여와 최종 요청 생성, [Codex parser](../../src/summary/parsers/codex.ts)의 생성 결과 연결을 검토한다. 사용자 요청의 상태·순회 최소화 범위에서 같은 모델 키의 수치와 응답 개수를 한곳에 관리하고 불필요한 임시 컬렉션을 줄인다. winner 비교·부모 귀속·중단 제외 알고리즘과 공개 결과 형식은 유지한다.
+[turns.ts](../../../src/summary/aggregation/turns.ts)의 차분 기여와 최종 요청 생성, [Codex parser](../../../src/summary/parsers/codex.ts)의 생성 결과 연결을 검토한다. 사용자 요청의 상태·순회 최소화 범위에서 같은 모델 키의 수치와 응답 개수를 한곳에 관리하고 불필요한 임시 컬렉션을 줄인다. winner 비교·부모 귀속·중단 제외 알고리즘과 공개 결과 형식은 유지한다.
 
 ## 적용한 내부 정리
 
@@ -13,7 +13,7 @@
 
 ## 검증과 남은 범위
 
-`Root.models`는 [turns.ts](../../src/summary/aggregation/turns.ts) 안에서만 접근함을 참조 검색으로 확인했다. 모델 수치 객체는 wrapper의 `usage`로 그대로 유지·반환하므로 공개 결과에 count가 추가되지 않는다. 마지막 모델 응답 차감 시에만 키를 제거하며 cache clamp·모델 사용 횟수·결제 빈도 갱신은 그대로 유지했다.
+`Root.models`는 [turns.ts](../../../src/summary/aggregation/turns.ts) 안에서만 접근함을 참조 검색으로 확인했다. 모델 수치 객체는 wrapper의 `usage`로 그대로 유지·반환하므로 공개 결과에 count가 추가되지 않는다. 마지막 모델 응답 차감 시에만 키를 제거하며 cache clamp·모델 사용 횟수·결제 빈도 갱신은 그대로 유지했다.
 
 진단은 wildcard와 현재 root가 같은 경우 한 번만 조회하고, 다른 경우 기존 byte 정렬 순서로 최대 두 키만 조회한다. main 선택은 첫 메인 파일, 이름 선택은 마지막 non-null 메인 이름을 유지한다. 생성 결과 콜백은 agent_id 다음 task_name 순서로 호출하고 같은 문자열이면 한 번만 호출한다. Codex의 `sawLegacy`는 참조가 없는 선언·대입뿐임을 확인해 제거했다.
 

@@ -14,7 +14,7 @@
 
 ## 설치 DB의 현재 규모
 
-[읽기 전용 프로필](benchmarks/DateStorageProfile-2026-10-25.json)은 하나의 읽기 트랜잭션으로 수집했다. 설치 DB는 schema 12이고 실험은 현재 소스의 schema 13이다. 설치 DB의 migration·쓰기·원본 로그 읽기는 수행하지 않았다.
+[읽기 전용 프로필](benchmarks/2026-10-25/DateStorageProfile-2026-10-25.json)은 하나의 읽기 트랜잭션으로 수집했다. 설치 DB는 schema 12이고 실험은 현재 소스의 schema 13이다. 설치 DB의 migration·쓰기·원본 로그 읽기는 수행하지 않았다.
 
 | 항목 | 관측값 |
 |---|---:|
@@ -38,7 +38,7 @@
 
 ## 요청 facts의 저장·인덱스 비교
 
-[원시 측정](benchmarks/DateStorageRaw-2026-10-25.json), [재현 코드](../tests/benchmarks/date-storage-raw.cjs). 정상 일별 rollup을 사용하는 경로와 분리해 최신 요청 및 비용 포함 raw fallback을 측정했다.
+[원시 측정](benchmarks/2026-10-25/DateStorageRaw-2026-10-25.json), [재현 코드](../tests/benchmarks/date-storage-raw.cjs). 정상 일별 rollup을 사용하는 경로와 분리해 최신 요청 및 비용 포함 raw fallback을 측정했다.
 
 10만 요청, 중앙값:
 
@@ -57,7 +57,7 @@ D는 날짜 인덱스 자체를 2,334,720 → 1,626,112 B로 줄였다. 대신 �
 
 ## 일별 집계의 기본 키 비교
 
-[원시 측정](benchmarks/DateStorageRollup-2026-10-25.json), [재현 코드](../tests/benchmarks/date-storage-rollup.cjs). 날짜를 맨 앞에 둔 PK는 아래 정확성 문제로 제외했다. 성능 비교는 통과한 `(provider, local_day, session_id, project_key[, model_key])`를 대상으로 한다. B는 기존 day 인덱스를 제거하고 project-day 인덱스를 유지하며, C는 여기에 `(provider, session_id)` 인덱스를 추가한다.
+[원시 측정](benchmarks/2026-10-25/DateStorageRollup-2026-10-25.json), [재현 코드](../tests/benchmarks/date-storage-rollup.cjs). 날짜를 맨 앞에 둔 PK는 아래 정확성 문제로 제외했다. 성능 비교는 통과한 `(provider, local_day, session_id, project_key[, model_key])`를 대상으로 한다. B는 기존 day 인덱스를 제거하고 project-day 인덱스를 유지하며, C는 여기에 `(provider, session_id)` 인덱스를 추가한다.
 
 10만 요청·세션당 10요청:
 
@@ -77,7 +77,7 @@ D는 날짜 인덱스 자체를 2,334,720 → 1,626,112 B로 줄였다. 대신 �
 
 ## SQL 날짜 조건 비교
 
-[원시 측정](benchmarks/DateStorageQuery-2026-10-25.json), [상세 분석](research/DateStorageQueryNotes.md), [재현 코드](../tests/benchmarks/date-storage-query.cjs).
+[원시 측정](benchmarks/2026-10-25/DateStorageQuery-2026-10-25.json), [상세 분석](research/2026-10-25/DateStorageQueryNotes.md), [재현 코드](../tests/benchmarks/date-storage-query.cjs).
 
 A는 현행 `(날짜 범위 OR local_day='')`, B는 서로소 `UNION ALL`, C는 무기간·시각미상만 조건을 특수화하고 나머지는 UNION으로 분리한다.
 
@@ -95,7 +95,7 @@ A는 현행 `(날짜 범위 OR local_day='')`, B는 서로소 `UNION ALL`, C는 
 
 ## 실제 최신 요청 정렬 비교
 
-[원시 측정](benchmarks/DateStorageOrder-2026-10-25.json), [재현 코드](../tests/benchmarks/date-storage-order.cjs). 기존 인덱스를 유지하고 현재 UI의 provider별 최신 요청 ORDER BY와 맞는 표현식 인덱스를 하나 추가했다.
+[원시 측정](benchmarks/2026-10-25/DateStorageOrder-2026-10-25.json), [재현 코드](../tests/benchmarks/date-storage-order.cjs). 기존 인덱스를 유지하고 현재 UI의 provider별 최신 요청 ORDER BY와 맞는 표현식 인덱스를 하나 추가했다.
 
 ```sql
 CREATE INDEX bench_summary_ui_date_order ON turn_summary(
@@ -120,7 +120,7 @@ live 공간은 30,924,800 → 33,255,424 B, **+2,330,624 B·7.54%**다. 100요�
 
 ## 날짜 선두 PK에서 발견한 정확성 문제
 
-[최소 재현](../tests/benchmarks/date-storage-sqlite-repro.cjs), [Node 관측 결과](benchmarks/DateStorageSqliteRepro-2026-10-25.json), [설치 VS Code 런타임 관측 결과](benchmarks/DateStorageSqliteReproVSCode-2026-10-25.json).
+[최소 재현](../tests/benchmarks/date-storage-sqlite-repro.cjs), [Node 관측 결과](benchmarks/2026-10-25/DateStorageSqliteRepro-2026-10-25.json), [설치 VS Code 런타임 관측 결과](benchmarks/2026-10-25/DateStorageSqliteReproVSCode-2026-10-25.json).
 
 SQLite 3.51.2에서 날짜 선두 `WITHOUT ROWID` PK, `provider IN (...)`, `(날짜 범위 OR local_day='')`의 조합이 PK의 `MULTI-INDEX OR` 계획을 택하면 시각 미상 행이 누락됐다. 제품 코드 없이 5컬럼 메모리 DB와 독립 JS raw oracle로 재현했으며 `integrity_check`는 정상이다. secondary index 강제 또는 서로소 UNION은 oracle와 일치했다. 해당 후보는 성능 개선율과 무관하게 제외했다.
 

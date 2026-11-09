@@ -6,17 +6,17 @@
 
 ## 구조
 
-기존에는 DB·parser를 제외한 클라이언트, Worker, JSONL reader, 스캐너, 모델 정책과 SQL staging 코드가 `summary/`에 함께 있었다. [summary 안내](../../src/summary/README.md)의 역할별 폴더로 정리했다.
+기존에는 DB·parser를 제외한 클라이언트, Worker, JSONL reader, 스캐너, 모델 정책과 SQL staging 코드가 `summary/`에 함께 있었다. [summary 안내](../../../src/summary/README.md)의 역할별 폴더로 정리했다.
 
 | 폴더 | 책임 |
 | --- | --- |
-| [client/](../../src/summary/client/README.md) | SummaryClient·Worker 통신·갱신 직렬화·Worker 명령 실행 |
-| [scanner/](../../src/summary/scanner/README.md) | 기본 갱신 진입점·파일 DTO 재사용 스캔·갱신 잠금·원본 이동 검증 |
-| [jsonl/](../../src/summary/jsonl/README.md) | JSONL 스트리밍·줄/이미지 처리·Zstd 해제 |
-| [aggregation/](../../src/summary/aggregation/README.md) | 메모리에서 요청·모델·도구의 최종 집계 |
-| [staging/](../../src/summary/staging/README.md) | 호환 SQL 경로의 파일·이벤트·계보·연결 성분·집계 준비 |
-| [metadata/](../../src/summary/metadata/README.md) | 호환 SQL 경로의 요청 의미 서명·변경 의존성·확정 snapshot |
-| [models/](../../src/summary/models/README.md) | 모델 단가·출시일·모델 정렬 정책 |
+| [client/](../../../src/summary/client/README.md) | SummaryClient·Worker 통신·갱신 직렬화·Worker 명령 실행 |
+| [scanner/](../../../src/summary/scanner/README.md) | 기본 갱신 진입점·파일 DTO 재사용 스캔·갱신 잠금·원본 이동 검증 |
+| [jsonl/](../../../src/summary/jsonl/README.md) | JSONL 스트리밍·줄/이미지 처리·Zstd 해제 |
+| [aggregation/](../../../src/summary/aggregation/README.md) | 메모리에서 요청·모델·도구의 최종 집계 |
+| [staging/](../../../src/summary/staging/README.md) | 호환 SQL 경로의 파일·이벤트·계보·연결 성분·집계 준비 |
+| [metadata/](../../../src/summary/metadata/README.md) | 호환 SQL 경로의 요청 의미 서명·변경 의존성·확정 snapshot |
+| [models/](../../../src/summary/models/README.md) | 모델 단가·출시일·모델 정렬 정책 |
 | `db/`, `parsers/` | 기존 영속 DB와 제공자 parser 경계를 유지 |
 
 `summary/client`, `summary/scanner`, `summary/jsonl`, `summary/staging`, `summary/metadata`의 extensionless import는 각 폴더 `index.ts`로 연결한다. 이동한 내부 모듈과 Worker 실행 경로는 호출부·테스트·측정 도구에서 실제 경로로 갱신한다. 과거 벤치마크의 원시 JSON과 측정값은 수정하지 않는다.
