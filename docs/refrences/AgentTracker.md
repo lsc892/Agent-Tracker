@@ -288,6 +288,10 @@ Claude credential·로그 보존 설정은 `<dataHome>/.claude`, Codex App Serve
 
 갱신 시 manifest 전체와 현재 파일 metadata를 비교한다. 변경된 세션의 관련 원본을 한 번 읽으며 그룹 winner DTO를 갱신하고 패자 숫자 벡터를 버린다. 남은 원본별 winner는 최종 세션·request 그룹으로 병합한다. 다음 갱신까지 원본 이벤트 DTO·패자를 보관하지 않는다. 진단 정보는 상태·처리 위치·기록 시각·오류 네 column으로 제한한다.
 
+관련 원본은 갱신 동안 유지하는 `현재 세션 → 파일 집합`, `제공자·source identity → 파일 집합` 역인덱스로 찾고 파일 ID 우선 최소 힙 작업 큐로 중복 준비를 막는다. 변경 원본 전체를 ID순으로 읽은 뒤 미해결 부모·fork의 경로 후보를 해당 반복의 ID순 배치로 먼저 읽고, 영향 세션의 최소 ID 파일을 하나씩 준비하며 새 관계를 반영한다. 부모·fork의 읽기 의존성과 이전·현재 세션의 저장 연결은 구분한다. manifest에는 부모 thread가 없으므로 새 미해결 참조마다 기존 `path.includes(reference)` 후보를 한 번 검색하는 fallback을 유지한다. 새 Codex 원본이 준비되었을 때만 계보를 다시 계산하며 계보 검증 자체의 비용은 남는다.
+
+저장 전에는 이전·현재 세션별 파일과 최종 summary·orphan을 색인하고 연결 성분의 멤버만 원래 순서대로 모은다. 파일 ID·읽기 sequence·동점 winner·오류 성분의 이전 정상값 보존과 트랜잭션 경계를 유지한다. 비Windows dev/inode 이동 후보도 metadata 색인으로 조회한다. 이 색인과 큐는 갱신 종료 시 폐기하며 영속 원본별 상태나 append checkpoint를 추가하지 않는다. watcher와 metadata 동시성은 보류하고 전체 디렉터리 탐색·stat·manifest 비교는 유지한다.
+
 ```text
 id                  // 내부 파일 식별자; dev/inode 이동 최적화는 유지하고 내용 검증 연결은 새 위치의 id 사용
 provider            // 로그 제공자: claude 또는 codex

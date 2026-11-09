@@ -14,6 +14,7 @@ import { acquireRefreshLock } from './lock';
 import { includesSourceSnapshot } from './sourceFingerprint';
 import { readSource, sqlText } from './sourceReader';
 import { readNames } from './names';
+import { addMember, removeMember, OrderedGroups, SourceQueue } from './worklist';
 import { StageProfiler, type ScanStage, type StorageStage } from '../profiling';
 import type { ParsedIdentity, SummaryOptions, SummaryProgress, RefreshResult } from '../types';
 
@@ -88,14 +89,25 @@ export async function refreshSummary(
     }
   };
   const files = new Map<number, FileState>(), affected = new Set<string>(), links = new Map<string, Set<string>>();
+  const sessionFiles = new Map<string, Set<FileState>>(), identityFiles = new Map<string, Set<FileState>>();
+  const codexFiles = new Set<FileState>(), preparedCodex = new Set<FileState>();
+  const fileOrder = new Map<FileState, number>();
+  const knownThreads = new Set<string>(), missingReferences = new Set<string>();
+  const unsearchedReferences = new Set<string>();
+  const parentReasons = new Map<FileState, Set<string>>();
+  const relatedQueue = new SourceQueue<FileState>(), parentQueue = new SourceQueue<FileState>();
+  let lineageDirty = false;
   let sequence = 0;
   const missingParents = new Set<number>();
   const reconnections: { old_id: number; new_id: number }[] = [];
   const collect = options.collectCapabilities !== false, retain = options.retainDeletedSourceUsage !== false;
   const roots = options.roots.map(root => ({ ...root, path: resolve(root.path) }));
   const affect = (provider: Provider, session: string | null | undefined): void => {
-    if (session)
-      affected.add(key(provider, session));
+    if (!session) return;
+    const value = key(provider, session);
+    if (affected.has(value)) return;
+    affected.add(value);
+    for (const file of sessionFiles.get(value) ?? []) enqueueRelated(file);
   };
   const connect = (provider: Provider, a: string | null | undefined, b: string | null | undefined): void => {
     if (!a || !b || a === b)
@@ -107,8 +119,8 @@ export async function refreshSummary(
         links.set(from, set = new Set());
       set.add(to);
     }
-    affected.add(left);
-    affected.add(right);
+    affect(provider, a);
+    affect(provider, b);
   };
   const fail = (file: FileState, error: unknown): void => {
     if (!file.error)
@@ -163,9 +175,78 @@ export async function refreshSummary(
   }
   return result;
 
+  function ready(file: FileState): boolean {
+    return files.get(file.id) === file && !file.attempted && !file.prepared && !file.error && !file.removed;
+  }
+  function enqueueRelated(file: FileState): void {
+    if (ready(file)) relatedQueue.add(file);
+  }
+  function trackFile(file: FileState): void {
+    const previous = files.get(file.id);
+    const order = previous ? fileOrder.get(previous)! : fileOrder.size;
+    if (previous) {
+      removeMember(sessionFiles, key(previous.provider, previous.session ?? ''), previous);
+      if (previous.source_identity)
+        removeMember(identityFiles, JSON.stringify([previous.provider, previous.source_identity]), previous);
+      codexFiles.delete(previous);
+      fileOrder.delete(previous);
+    }
+    files.set(file.id, file);
+    fileOrder.set(file, order);
+    addMember(sessionFiles, key(file.provider, file.session ?? ''), file);
+    if (file.source_identity)
+      addMember(identityFiles, JSON.stringify([file.provider, file.source_identity]), file);
+    if (file.provider === 'codex') codexFiles.add(file);
+    if (affected.has(key(file.provider, file.session ?? ''))) enqueueRelated(file);
+  }
+  function setSession(file: FileState, session: string | null): void {
+    if (file.session === session) return;
+    removeMember(sessionFiles, key(file.provider, file.session ?? ''), file);
+    file.session = session;
+    addMember(sessionFiles, key(file.provider, session ?? ''), file);
+    if (affected.has(key(file.provider, session ?? ''))) enqueueRelated(file);
+  }
+  function setSourceIdentity(file: FileState, identity: string | null | undefined): void {
+    if (file.source_identity === identity) return;
+    if (file.source_identity)
+      removeMember(identityFiles, JSON.stringify([file.provider, file.source_identity]), file);
+    file.source_identity = identity;
+    if (identity) addMember(identityFiles, JSON.stringify([file.provider, identity]), file);
+  }
+  function registerPrepared(file: FileState): void {
+    const identity = file.prepared!.identity;
+    knownThreads.add(identity.threadId);
+    missingReferences.delete(identity.threadId);
+    if (file.provider !== 'codex') return;
+    preparedCodex.add(file);
+    lineageDirty = true;
+    for (const reference of [identity.parentThreadId, identity.forkedFromId]) {
+      if (!reference || knownThreads.has(reference) || missingReferences.has(reference)) continue;
+      missingReferences.add(reference);
+      unsearchedReferences.add(reference);
+    }
+  }
+  function enqueueParents(): void {
+    for (const reference of unsearchedReferences) {
+      if (!missingReferences.has(reference)) continue;
+      // manifest에 thread가 없으므로 새 미해결 참조마다 기존 substring 후보를 한 번 찾는다.
+      for (const candidate of codexFiles) {
+        if (!ready(candidate) || !candidate.path.includes(reference)) continue;
+        let reasons = parentReasons.get(candidate);
+        if (!reasons) parentReasons.set(candidate, reasons = new Set());
+        reasons.add(reference);
+        parentQueue.add(candidate);
+      }
+    }
+    unsearchedReferences.clear();
+  }
+
   async function discoverSources(): Promise<void> {
     const manifest = database.connection.prepare('SELECT * FROM manifest ORDER BY id').all() as unknown as ManifestRow[];
     const paths = new Map(manifest.map(file => [key(file.provider, file.path), file]));
+    const inodes = new Map<string, Set<ManifestRow>>();
+    if (process.platform !== 'win32')
+      for (const file of manifest) addMember(inodes, JSON.stringify([file.provider, file.dev, file.inode]), file);
     let nextId = manifest.reduce((max, file) => Math.max(max, file.id), 0) + 1;
     const observed = new Set<number>();
     for (const root of roots) {
@@ -176,8 +257,8 @@ export async function refreshSummary(
             continue;
           let previous = paths.get(key(root.provider, resolve(path)));
           if (!previous && process.platform !== 'win32') {
-            const candidates = manifest.filter(file => file.provider === root.provider && file.dev === String(stat.dev)
-              && file.inode === String(stat.ino) && !observed.has(file.id));
+            const candidates = [...inodes.get(JSON.stringify([root.provider, String(stat.dev), String(stat.ino)])) ?? []]
+              .filter(file => !observed.has(file.id));
             if (candidates.length === 1) {
               try {
                 await lstat(candidates[0].path);
@@ -195,7 +276,7 @@ export async function refreshSummary(
             || fingerprint(previous) !== fingerprint(metadata) || collect && previous.capabilities_collected !== 1
             || previous.session_id !== null && previous.size_bytes > 0 && (!previous.source_identity || !previous.content_hash);
           const file: FileState = { ...metadata, id: previous?.id ?? nextId++, previous, changed, removed: false, selected: true, session: metadata.session_id };
-          files.set(file.id, file);
+          trackFile(file);
           observed.add(file.id);
           result.discovered++;
           if (changed)
@@ -216,12 +297,17 @@ export async function refreshSummary(
         const selected = roots.some(root => root.provider === previous.provider && root.path === previous.source_root);
         const file: FileState = { ...previous, id: previous.id, previous, changed: selected && (!previous.source_missing || !retain),
           removed: selected, selected, session: previous.session_id };
-        files.set(file.id, file);
+        trackFile(file);
         if (file.changed)
           affect(file.provider, file.session);
       }
   }
   async function commitComponents(aggregated: MemoryAggregateResult): Promise<void> {
+    if (!affected.size) return;
+    const memberGroups = new OrderedGroups(files.values(), file => [key(file.provider, file.session ?? ''),
+      key(file.provider, file.previous?.session_id ?? '')]);
+    const summaryGroups = new OrderedGroups(aggregated.summaries, row => [key(row.provider, row.session_id)]);
+    const orphanGroups = new OrderedGroups(aggregated.orphans, row => [key(row.provider, row.session_id)]);
     for (const seed of [...affected].sort()) {
       if (!affected.has(seed))
         continue;
@@ -232,11 +318,10 @@ export async function refreshSummary(
             component.add(linked);
             pending.push(linked);
           }
-      const members = [...files.values()].filter(file => component.has(key(file.provider, file.session ?? ''))
-        || component.has(key(file.provider, file.previous?.session_id ?? '')));
+      const members = memberGroups.members(component);
       await yieldToWorker();
       check();
-      commitComponent(component, members, aggregated);
+      commitComponent(component, members, { summaries: summaryGroups.members(component), orphans: orphanGroups.members(component) });
       for (const value of component)
         affected.delete(value);
       report();
@@ -257,7 +342,7 @@ export async function refreshSummary(
       return;
     }
     const missing = members.some(file => file.removed);
-    const orphan = aggregated.orphans.find(row => component.has(key(row.provider, row.session_id)) && (!retain || !missing));
+    const orphan = !retain || !missing ? aggregated.orphans[0] : undefined;
     if (orphan) {
       const file = files.get(orphan.fileId)!;
       fail(file, new SummaryError('missing-root-turn', orphan.offset));
@@ -268,14 +353,15 @@ export async function refreshSummary(
       return;
     }
     try {
-      const summaries = aggregated.summaries.filter(row => component.has(key(row.provider, row.session_id)) && (!retain || !missing || row.hasMain));
+      const summaries = aggregated.summaries.filter(row => !retain || !missing || row.hasMain);
+      const memberIds = new Set(members.map(file => file.id));
       const sessions = [...component].map(value => {
         const [provider, session_id] = JSON.parse(value) as [Provider, string];
         return { provider, session_id };
       });
       database.replaceMemory({ sessions, summaries, files: members.filter(file => !file.removed).map(finalFile),
         removedFileIds: members.filter(file => file.removed).map(file => file.id),
-        reconnectedFiles: reconnections.filter(link => members.some(file => file.id === link.old_id)),
+        reconnectedFiles: reconnections.filter(link => memberIds.has(link.old_id)),
         preserveCapabilities: !collect, retainDeletedSourceUsage: retain, scanId: result.scanId }, storage);
       for (const file of members)
         file.settled = true;
@@ -358,7 +444,7 @@ export async function refreshSummary(
     if (!file.selected && !await refreshOutsideSource(file))
       return;
     const winners = new SourceWinners(file.provider), evidence = winners.evidence;
-    const onIdentity = (identity: ParsedIdentity): void => { file.session = identity.sessionId; connect(file.provider, file.previous?.session_id, file.session); };
+    const onIdentity = (identity: ParsedIdentity): void => { setSession(file, identity.sessionId); connect(file.provider, file.previous?.session_id, file.session); };
     try {
       const read = await scan.measureAsync('readSources', () => readSource(file, (event, index) => winners.add(event, index), { signal, cancelled,
         maxLineBytes: options.maxLineBytes, collectCapabilities: collect, onBytes: bytes => { result.bodyBytes += bytes; report(); }, onIdentity,
@@ -370,14 +456,15 @@ export async function refreshSummary(
           return;
         }
         file.content_hash = null;
-        file.source_identity = null;
-        file.session = file.previous?.session_id ?? null;
+        setSourceIdentity(file, null);
+        setSession(file, file.previous?.session_id ?? null);
         return;
       }
-      file.session = read.identity!.sessionId;
+      setSession(file, read.identity!.sessionId);
       file.prepared = { identity: read.identity!, evidence, winners, partialLine: read.partialLine, sourceIdentity: read.sourceIdentity!, contentHash: read.contentHash };
-      file.source_identity = read.sourceIdentity;
+      setSourceIdentity(file, read.sourceIdentity);
       file.content_hash = read.contentHash;
+      registerPrepared(file);
       affect(file.provider, file.session);
       connect(file.provider, file.previous?.session_id, file.session);
     }
@@ -398,8 +485,8 @@ export async function refreshSummary(
       return true;
     }
     catch (error) {
-      const replacement = [...files.values()].some(candidate => candidate.prepared && !candidate.error && !candidate.removed
-        && candidate.provider === file.provider && candidate.source_identity === file.source_identity);
+      const replacement = [...identityFiles.get(JSON.stringify([file.provider, file.source_identity])) ?? []]
+        .some(candidate => candidate.prepared && !candidate.error && !candidate.removed);
       if ((error as NodeJS.ErrnoException).code === 'ENOENT' && (replacement || retain && file.previous?.source_missing)) {
         file.removed = true;
         file.changed = true;
@@ -431,8 +518,11 @@ export async function refreshSummary(
     return aggregation.finish();
   }
   function resolveLineage(): void {
+    if (!lineageDirty) return;
+    lineageDirty = false;
     missingParents.clear();
-    const candidates = [...files.values()].filter(file => !file.removed && !file.error && file.prepared && file.provider === 'codex');
+    const candidates = [...preparedCodex].filter(file => !file.removed && !file.error)
+      .sort((a, b) => fileOrder.get(a)! - fileOrder.get(b)!);
     const { groups, unresolved } = groupParents(candidates.map(file => ({ id: file.prepared!.identity.threadId,
       parentId: file.prepared!.identity.parentThreadId, value: file })));
     const sessions = new Map<string, string | null>();
@@ -449,14 +539,15 @@ export async function refreshSummary(
       const session = resolved ? target : identity.sessionId;
       if (file.session !== session) {
         connect(file.provider, file.session, session);
-        file.session = session;
+        setSession(file, session);
       }
     }
   }
 
   /** 자식 자체 요청 행 대신 검증된 생성 호출의 부모 요청에 사용량을 붙인다. */
   function resolveParentRequests(): void {
-    const sources = [...files.values()].filter(file => file.provider === 'codex' && file.prepared && !file.error && !file.removed);
+    const sources = [...preparedCodex].filter(file => !file.error && !file.removed)
+      .sort((a, b) => fileOrder.get(a)! - fileOrder.get(b)!);
     const threads = new Map<string, FileState[]>();
     for (const file of sources) {
       const id = file.prepared!.identity.threadId, previous = threads.get(id);
@@ -492,28 +583,27 @@ export async function refreshSummary(
   async function expandRelatedSources(): Promise<void> {
     while (true) {
       resolveLineage();
-      const references = new Set<string>(), known = new Set<string>(), pending: FileState[] = [];
-      for (const file of files.values()) {
-        if (file.removed || file.error) continue;
-        if (!file.prepared) {
-          if (!file.attempted) pending.push(file);
-          continue;
-        }
-        const identity = file.prepared.identity;
-        known.add(identity.threadId);
-        if (file.provider !== 'codex') continue;
-        if (identity.parentThreadId) references.add(identity.parentThreadId);
-        if (identity.forkedFromId) references.add(identity.forkedFromId);
+      enqueueParents();
+      const parents: FileState[] = [];
+      let candidate: FileState | undefined;
+      while ((candidate = parentQueue.take())) {
+        const reasons = parentReasons.get(candidate);
+        parentReasons.delete(candidate);
+        if (ready(candidate) && reasons && [...reasons].some(reference => missingReferences.has(reference)))
+          parents.push(candidate);
       }
-      pending.sort((a, b) => a.id - b.id);
-      const missing = [...references].filter(id => !known.has(id));
-      const parents = pending.filter(file => file.provider === 'codex' && missing.some(id => file.path.includes(id)));
       if (parents.length) {
+        // 새 참조가 생겨도 이번 반복 시작에 확정한 부모 batch의 id 순서를 먼저 보존한다.
         for (const file of parents)
           await inspectSource(file);
         continue;
       }
-      const next = pending.find(file => affected.has(key(file.provider, file.session ?? '')));
+      let next: FileState | undefined;
+      while ((candidate = relatedQueue.take()))
+        if (ready(candidate) && affected.has(key(candidate.provider, candidate.session ?? ''))) {
+          next = candidate;
+          break;
+        }
       if (!next) break;
       await inspectSource(next);
     }
@@ -521,12 +611,13 @@ export async function refreshSummary(
   async function reconnectSources(): Promise<void> {
     for (const file of files.values())
       if (file.prepared && !file.error && !file.removed) {
-        const active = [...files.values()].filter(item => !item.removed && !item.error && item.provider === file.provider && item.source_identity === file.source_identity);
+        const matching = [...identityFiles.get(JSON.stringify([file.provider, file.source_identity])) ?? []]
+          .sort((a, b) => fileOrder.get(a)! - fileOrder.get(b)!);
+        const active = matching.filter(item => !item.removed && !item.error);
         if (active.length !== 1)
           continue;
-        for (const old of files.values())
-          if (old.removed && old.provider === file.provider && old.source_identity === file.source_identity
-            && old.session === file.session && old.content_hash && old.size_bytes > 0) {
+        for (const old of matching)
+          if (old.removed && old.session === file.session && old.content_hash && old.size_bytes > 0) {
             try {
               if (await includesSourceSnapshot(file, old, { check, onBytes: bytes => { result.bodyBytes += bytes; report(); } }))
                 reconnections.push({ old_id: old.id, new_id: file.id });

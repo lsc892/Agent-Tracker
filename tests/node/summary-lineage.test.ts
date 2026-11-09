@@ -9,11 +9,11 @@ import { refreshSummary } from '../../src/summary/scanner';
 import type { SummaryOptions } from '../../src/summary/types';
 
 const jsonl=(rows:unknown[])=>rows.map(row=>JSON.stringify(row)).join('\n')+'\n';
-const source=(thread:string,parent:string|null=null,session=parent??thread)=>jsonl([
+const source=(thread:string,parent:string|null=null,session=parent??thread,input=1,model='gpt-5.6-sol')=>jsonl([
   {type:'session_meta',payload:{id:thread,parent_thread_id:parent,session_id:session,cwd:'/synthetic/project'}},
   {type:'event_msg',timestamp:'2026-11-01T00:00:00Z',payload:{type:'task_started',root_turn_id:'root',turn_id:'root'}},
-  {type:'token_usage_record',payload:{root_turn_id:'root',turn_id:'root',response_id:'response',model:'gpt-5.6-sol',
-    usage:{input_tokens:1,output_tokens:0}}},
+  {type:'token_usage_record',payload:{root_turn_id:'root',turn_id:'root',response_id:'response',model,
+    usage:{input_tokens:input,output_tokens:0}}},
 ]);
 
 async function fixture(run:(db:SummaryDatabase,options:SummaryOptions,root:string)=>Promise<void>):Promise<void>{
@@ -74,4 +74,91 @@ test('duplicate parent identities must agree on their resolved session before a 
     'the two identical parent records are deduplicated before adding the child');
   assert.equal(db.queryTurns().find(row=>row.session_id==='child-session')?.total_tokens,1);
   assert.deepEqual(db.connection.prepare('PRAGMA foreign_key_check').all(),[]);
+}));
+
+test('changed sources expand their stored session when filenames contain no thread identities',async()=>fixture(async(db,options,root)=>{
+  const main=join(root,'00.jsonl'),child=join(root,'01.jsonl'),other=join(root,'02.jsonl');
+  await writeFile(main,source('hidden-main-thread',null,'shared-session'));
+  await writeFile(child,source('hidden-child-thread','hidden-main-thread','shared-session'));
+  await writeFile(other,source('independent-thread'));
+  assert.equal((await refreshSummary(db,options)).failed,0);
+  const independent=db.queryTurns().find(row=>row.session_id==='independent-thread')!;
+
+  await writeFile(child,source('hidden-child-thread','hidden-main-thread','shared-session',17));
+  const updated=await refreshSummary(db,options);
+  assert.equal(updated.failed,0);assert.equal(updated.parsed,2);assert.equal(updated.reused,1);
+  assert.equal(db.queryTurns().find(row=>row.session_id==='shared-session')?.total_tokens,18);
+  assert.deepEqual(db.queryTurns().find(row=>row.session_id==='independent-thread'),independent);
+  assert.doesNotMatch(db.queryTurns().find(row=>row.session_id==='shared-session')?.quality_flags??'',/missing-parent/);
+
+  const unchanged=await refreshSummary(db,options);
+  assert.equal(unchanged.parsed,0);assert.equal(unchanged.bodyBytes,0);assert.equal(unchanged.reused,3);
+}));
+
+test('moving a parent between sessions updates unchanged descendants and both previous and next totals',async()=>fixture(async(db,options,root)=>{
+  const mainA=join(root,'thread-main-a.jsonl'),mainB=join(root,'thread-main-b.jsonl');
+  const child=join(root,'thread-child.jsonl'),grandchild=join(root,'opaque-descendant.jsonl');
+  await writeFile(mainA,source('thread-main-a'));
+  await writeFile(mainB,source('thread-main-b'));
+  await writeFile(child,source('thread-child','thread-main-a','thread-main-a'));
+  await writeFile(grandchild,source('thread-grandchild','thread-child','thread-main-a'));
+  assert.equal((await refreshSummary(db,options)).failed,0);
+  assert.equal(db.queryTurns().find(row=>row.session_id==='thread-main-a')?.total_tokens,3);
+
+  await writeFile(child,source('thread-child','thread-main-b','thread-main-b',11));
+  const updated=await refreshSummary(db,options);
+  assert.equal(updated.failed,0);assert.equal(updated.parsed,4);
+  assert.equal(db.findManifest('codex',child)?.session_id,'thread-main-b');
+  assert.equal(db.findManifest('codex',grandchild)?.session_id,'thread-main-b');
+  const rows=db.queryTurns();assert.equal(rows.length,2);
+  assert.equal(rows.find(row=>row.session_id==='thread-main-a')?.total_tokens,1);
+  assert.equal(rows.find(row=>row.session_id==='thread-main-b')?.total_tokens,13);
+  assert.deepEqual(db.connection.prepare('PRAGMA foreign_key_check').all(),[]);
+
+  const unchanged=await refreshSummary(db,options);
+  assert.equal(unchanged.parsed,0);assert.equal(unchanged.bodyBytes,0);
+  assert.deepEqual(db.queryTurns(),rows);
+}));
+
+test('new descendants preserve the later-id winner among multiple unchanged parent filename candidates',async()=>fixture(async(db,options,root)=>{
+  const main=join(root,'thread-main.jsonl');
+  const first=join(root,'first-thread-parent.jsonl'),second=join(root,'second-thread-parent.jsonl');
+  await writeFile(main,source('thread-main',null,'session-main',1,'main-model'));
+  await writeFile(first,source('thread-parent','thread-main','session-main',10,'parent-a'));
+  await writeFile(second,source('thread-parent','thread-main','session-main',10,'parent-b'));
+  assert.equal((await refreshSummary(db,options)).failed,0);
+  const winner=db.findManifest('codex',first)!.id>db.findManifest('codex',second)!.id?'parent-a':'parent-b';
+  const models=()=>db.connection.prepare('SELECT model,input_tokens FROM turn_model_usage ORDER BY model').all();
+  assert.deepEqual(models().map(row=>({...row})),[{model:'main-model',input_tokens:1},{model:winner,input_tokens:10}]);
+
+  await writeFile(join(root,'new-grandchild.jsonl'),source('new-grandchild','thread-parent','session-main',3,'grandchild-model'));
+  const updated=await refreshSummary(db,options);
+  assert.equal(updated.failed,0);assert.equal(updated.parsed,4);
+  const rows=db.queryTurns();assert.equal(rows.length,1);assert.equal(rows[0].total_tokens,14);
+  assert.equal(rows[0].session_id,'session-main');
+  assert.deepEqual(models().map(row=>({...row})),[
+    {model:'grandchild-model',input_tokens:3},{model:'main-model',input_tokens:1},{model:winner,input_tokens:10},
+  ]);
+  assert.doesNotMatch(rows[0].quality_flags??'',/missing-parent/);
+}));
+
+test('overlapping scan roots prepare each manifest file once after discovery replaces its queued state',async()=>fixture(async(db,options,root)=>{
+  const nested=join(root,'nested');await mkdir(nested);
+  const main=join(root,'00.jsonl'),child=join(nested,'01.jsonl');
+  const mainSource=source('opaque-main-thread',null,'shared-session');
+  await writeFile(main,mainSource);
+  await writeFile(child,source('opaque-child-thread','opaque-main-thread','shared-session'));
+  assert.equal((await refreshSummary(db,options)).failed,0);
+  const previousId=db.findManifest('codex',child)!.id;
+
+  const changedSource=source('opaque-child-thread','opaque-main-thread','shared-session',17);
+  await writeFile(child,changedSource);
+  const overlapping:SummaryOptions={...options,roots:[...options.roots,{provider:'codex',path:nested}]};
+  const updated=await refreshSummary(db,overlapping);
+  assert.equal(updated.failed,0);assert.equal(updated.discovered,3);assert.equal(updated.parsed,2);
+  assert.equal(updated.bodyBytes,Buffer.byteLength(mainSource)+Buffer.byteLength(changedSource));
+  assert.equal(db.connection.prepare('SELECT count(*) AS n FROM manifest').get()?.n,2);
+  assert.equal(db.findManifest('codex',child)?.id,previousId);
+  assert.equal(db.findManifest('codex',child)?.source_root,nested);
+  const rows=db.queryTurns();assert.equal(rows.length,1);assert.equal(rows[0].total_tokens,18);
 }));

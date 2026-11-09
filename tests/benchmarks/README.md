@@ -4,7 +4,9 @@
 
 이전 SQL staging·turn metadata·원본 DTO 캐시를 전제로 한 실행기는 해당 시점의 고정 빌드에서 재현하는 과거 실험 도구다. 현재 스트리밍 제품에서는 제거한 API를 제공하지 않는다. 제목 SQL A/B·transaction 실행기는 삭제하고 기존 보고서·원시 결과는 보존한다.
 
-- [scan-stages.cjs](scan-stages.cjs) — 고정된 현재 구현과 실데이터 사본·합성 10,000요청에서 최초 수집·Codex 요청 1건 추가·무변경 갱신을 각각 1회 계측하고 읽기·검색·정렬·SQL 구간을 기록한다. [보고서](../../docs/benchmarks/2026-11-09/ScanStages-2026-11-09.md).
+- [scan-stages.cjs](scan-stages.cjs) — 역인덱스·큐 적용 전 기준 구현의 고정 빌드·실데이터 사본과 합성 10,000요청에서 최초 수집·Codex 요청 1건 추가·무변경 갱신을 준비 실행 없이 각각 1회 측정한 실행기다. 기존 반복 검색·pending 정렬 코드를 모듈 로딩 때 계측하므로 해당 이전 빌드에서 사용한다. 새 스캐너는 아래 scan-queue-ab.cjs를 사용한다. [보고서](../../docs/benchmarks/2026-11-09/ScanStages-2026-11-09.md).
+
+- [scan-queue-ab.cjs](scan-queue-ab.cjs) — `--workspace=<고정 입력 사본 폴더> --before=<A 소스·dist 루트> --after=<B 소스·dist 루트> --output=<새 JSON>`으로 현재 전체·합성 10,000요청의 최초·1건 추가·무변경 갱신과 네 평균 조회를 준비3쌍·AB/BA10쌍 비교한다. 구간별 StageProfiler와 원본 읽기 순서·DB 의미·독립 JS 평균 검증을 기록한다. `--structure --pairs=1 --warmups=0`은 별도 관계 검색/큐 구조 진단이며 본 시간 표본에 섞지 않는다. [보고서](../../docs/benchmarks/2026-11-09/ScanQueueAB-2026-11-09.md).
 
 - [parent-dto-delta-ab.cjs](parent-dto-delta-ab.cjs) — 현재 실제 JSONL 고정 사본만 사용해 변경 전·후 초회 수집·재파싱·변경 없는 갱신과 네 평균 조회를 준비 1쌍·AB/BA 3쌍 비교한다. `--workspace=<A 빌드와 current/snapshot.json을 보존한 비공개 폴더> --after=<B 빌드 루트> --output=<새 JSON>`으로 실행하며, `--upgrade-only`는 A DB 사본을 B로 갱신해 fresh B와 비교한다. [parent-dto-delta-oracle.cjs](parent-dto-delta-oracle.cjs)는 같은 workspace와 원본 계보 매핑에서 변경 전 선택기의 child 기여를 부모별 기대값으로 대조한다. [보고서](../../docs/benchmarks/2026-11-08/ParentDtoDeltaAB-2026-11-08.md).
 
