@@ -12,4 +12,4 @@ Claude·Codex 로그를 읽으면서 그룹별 winner DTO를 갱신하고 패자
 - [types.ts](types.ts): 통계 API와 제공자 공통 파싱 이벤트 타입.
 - [profiling.ts](profiling.ts): 갱신·SQL 저장 단계별 누적 시간과 호출 횟수.
 
-Worker 실행 파일은 [client/worker.ts](client/worker.ts)에 있다. 수집은 [scanner/index.ts](scanner/index.ts), 최종 저장은 [db/memoryStore.ts](db/memoryStore.ts)의 한 경로만 사용한다.
+Worker 실행 파일은 [client/worker.ts](client/worker.ts)에 있다. 수집의 공개 API는 [scanner/index.ts](scanner/index.ts), 실행 조율과 책임별 단계는 [scanner/refresh/](scanner/refresh/README.md), 최종 저장은 [db/memoryStore.ts](db/memoryStore.ts)의 한 경로를 사용한다.

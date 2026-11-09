@@ -1,5 +1,7 @@
 # 파일 준비 Worker 풀 가독성 정리
 
+> 후속: [갱신 책임별 폴더 분리](ScannerResponsibilities-2026-11-09.md)를 적용했다. 이 기록의 index 내부 함수 위치는 당시 코드 기준이며 현재 단계는 scanner/refresh/에서 확인한다.
+
 2026-11-09, Asia/Seoul. 사용자는 현재 Worker 풀 구현을 유지하면서 알고리즘을 간결하게 정리하고 서브에이전트가 리팩토링한 결과를 커밋하도록 요청했다. 실행 기준은 [가독성 스킬](../../../.agents/skills/refactor-readability/SKILL.md)과 [보존 지침](../../../.agents/skills/refactor-readability/GUIDELINES.md)이다.
 
 ## 범위와 담당
