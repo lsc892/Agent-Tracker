@@ -1,0 +1,272 @@
+{
+  "date": "2026-11-09",
+  "timezone": "Asia/Seoul",
+  "node": "v24.14.1",
+  "sqlite": "3.51.2",
+  "mode": "single live-data operational profile; no tests or A/B",
+  "capabilities": true,
+  "retention": true,
+  "input": "local Claude projects + Codex sessions; read only",
+  "runs": [
+    {
+      "name": "initial-active-rollup",
+      "discovered": 629,
+      "parsed": 629,
+      "reused": 0,
+      "failed": 0,
+      "bodyBytes": 485397497,
+      "interrupted": false,
+      "completedAt": "2026-11-09T04:00:19.149Z",
+      "timings": {
+        "totalMs": 8018.440100000001,
+        "scan": {
+          "lock": {
+            "calls": 1,
+            "totalMs": 2.0733000000000033
+          },
+          "discover": {
+            "calls": 1,
+            "totalMs": 115.1077
+          },
+          "names": {
+            "calls": 1,
+            "totalMs": 8.403199999999998
+          },
+          "readSources": {
+            "calls": 629,
+            "totalMs": 7200.881800000006
+          },
+          "parseChanged": {
+            "calls": 1,
+            "totalMs": 7206.046
+          },
+          "expandRelated": {
+            "calls": 1,
+            "totalMs": 2.220800000000054
+          },
+          "resolveParents": {
+            "calls": 1,
+            "totalMs": 0.4963999999999942
+          },
+          "reconnect": {
+            "calls": 1,
+            "totalMs": 9.512499999999818
+          },
+          "aggregate": {
+            "calls": 1,
+            "totalMs": 129.61099999999988
+          },
+          "commitComponents": {
+            "calls": 1,
+            "totalMs": 540.7115000000003
+          },
+          "finishScan": {
+            "calls": 1,
+            "totalMs": 2.1895999999997002
+          },
+          "optimize": {
+            "calls": 1,
+            "totalMs": 1.2615000000005239
+          }
+        },
+        "storage": {
+          "begin": {
+            "calls": 372,
+            "totalMs": 3.6073000000005777
+          },
+          "prepare": {
+            "calls": 372,
+            "totalMs": 3.209300000006806
+          },
+          "manifest": {
+            "calls": 372,
+            "totalMs": 10.323599999995167
+          },
+          "indexSummaries": {
+            "calls": 372,
+            "totalMs": 1.2134000000041851
+          },
+          "deleteMissing": {
+            "calls": 372,
+            "totalMs": 1.0740999999998166
+          },
+          "summaryCompare": {
+            "calls": 1268,
+            "totalMs": 12.928999999997359
+          },
+          "facts": {
+            "calls": 1268,
+            "totalMs": 15.38280000000941
+          },
+          "models": {
+            "calls": 1268,
+            "totalMs": 5.348000000015418
+          },
+          "capabilities": {
+            "calls": 1268,
+            "totalMs": 8.27440000000297
+          },
+          "costs": {
+            "calls": 1268,
+            "totalMs": 6.94360000000961
+          },
+          "summaryWrites": {
+            "calls": 1268,
+            "totalMs": 36.914200000001074
+          },
+          "summaries": {
+            "calls": 372,
+            "totalMs": 51.11320000000978
+          },
+          "reconnectDiagnostics": {
+            "calls": 372,
+            "totalMs": 0.19089999999869178
+          },
+          "removeSources": {
+            "calls": 372,
+            "totalMs": 0.16109999998388957
+          },
+          "rollupRequestDelete": {
+            "calls": 357,
+            "totalMs": 0.9349999999922147
+          },
+          "rollupRequestInsert": {
+            "calls": 357,
+            "totalMs": 36.79010000000562
+          },
+          "rollupModelDelete": {
+            "calls": 357,
+            "totalMs": 0.9109000000071319
+          },
+          "rollupModelInsert": {
+            "calls": 357,
+            "totalMs": 32.78709999999228
+          },
+          "rollups": {
+            "calls": 372,
+            "totalMs": 75.10729999999785
+          },
+          "pruneNames": {
+            "calls": 372,
+            "totalMs": 2.4413000000076863
+          },
+          "commit": {
+            "calls": 372,
+            "totalMs": 230.96870000000945
+          },
+          "replace": {
+            "calls": 372,
+            "totalMs": 380.6871000000101
+          }
+        }
+      }
+    },
+    {
+      "name": "repeat-live-scan",
+      "discovered": 629,
+      "parsed": 0,
+      "reused": 629,
+      "failed": 0,
+      "bodyBytes": 0,
+      "interrupted": false,
+      "completedAt": "2026-11-09T04:00:19.275Z",
+      "timings": {
+        "totalMs": 124.52389999999923,
+        "scan": {
+          "lock": {
+            "calls": 1,
+            "totalMs": 1.190099999999802
+          },
+          "discover": {
+            "calls": 1,
+            "totalMs": 112.17720000000008
+          },
+          "names": {
+            "calls": 1,
+            "totalMs": 6.774400000000242
+          },
+          "parseChanged": {
+            "calls": 1,
+            "totalMs": 0.0922999999984313
+          },
+          "expandRelated": {
+            "calls": 1,
+            "totalMs": 0.457300000000032
+          },
+          "resolveParents": {
+            "calls": 1,
+            "totalMs": 0.030899999999746797
+          },
+          "reconnect": {
+            "calls": 1,
+            "totalMs": 0.04340000000047439
+          },
+          "aggregate": {
+            "calls": 1,
+            "totalMs": 0.09240000000136206
+          },
+          "commitComponents": {
+            "calls": 1,
+            "totalMs": 0.002899999999499414
+          },
+          "finishScan": {
+            "calls": 1,
+            "totalMs": 3.21349999999984
+          },
+          "optimize": {
+            "calls": 1,
+            "totalMs": 0.0059000000001105946
+          }
+        },
+        "storage": {}
+      }
+    }
+  ],
+  "queries": [
+    {
+      "group": "day",
+      "totalMs": 2.373700000000099,
+      "returnedRows": 88,
+      "totalGroups": 88
+    },
+    {
+      "group": "month",
+      "totalMs": 0.9603000000006432,
+      "returnedRows": 8,
+      "totalGroups": 8
+    },
+    {
+      "group": "session",
+      "totalMs": 2.0216999999993277,
+      "returnedRows": 100,
+      "totalGroups": 357
+    },
+    {
+      "group": "project",
+      "totalMs": 0.8917999999994208,
+      "returnedRows": 33,
+      "totalGroups": 33
+    }
+  ],
+  "rollupActiveBeforeScan": true,
+  "accepted": {
+    "requests": 1268,
+    "tokens": 2545276593
+  },
+  "manifest": [
+    {
+      "provider": "claude",
+      "files": 21,
+      "pending": 0
+    },
+    {
+      "provider": "codex",
+      "files": 608,
+      "pending": 0
+    }
+  ],
+  "rollupRows": {
+    "request": 386,
+    "model": 409
+  }
+}
