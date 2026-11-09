@@ -4,7 +4,7 @@ import { addFlag, eligible, key, normalizedEvent, prepareSources,
   type SourcePlan, type StreamingAggregateFile } from './sourceEvidence';
 import { addCapability, addTurn, addWinner, createRoot, materialize, max,
   type MemoryAggregateResult, type Outcome, type Root } from './turns';
-import { Winners } from './winners';
+import { Winners, type Winner } from './winners';
 import type { ObservedRoot } from './sourceWinners';
 
 export { SourceEvidence } from './sourceEvidence';
@@ -13,20 +13,22 @@ export type { MaterializedTurnSummary, MemoryAggregateResult } from './turns';
 
 /** 같은 읽기에서 모은 귀속 근거와 원본별 winner를 최종 세션·요청 그룹으로 병합한다. */
 export class StreamingAggregation {
-  private readonly sources: Map<number, SourcePlan>;
+  private readonly sources = new Map<number, SourcePlan>();
   private readonly requests: Map<string, string | null>;
   private readonly sessions = new Map<string, SourcePlan[]>();
   private readonly roots = new Map<string, Root>();
-  private readonly winners = new Winners();
+  private readonly winners = new Winners((winner, direction) => this.applyWinner(winner, direction));
+  private readonly totals = new Map<string, { input: number; output: number }>();
+  private readonly missingRequests = new Map<string, { source: SourcePlan; rootId: string; count: number }>();
   private readonly checks = new Map<string, { source: SourcePlan; event: Extract<ParseEvent, { kind: 'check' }>; ordinal: number }>();
   private readonly sourceOutcomes = new Map<string, { root: Root; outcome: Outcome }>();
   private readonly capabilities = new Set<string>();
 
   constructor(files: readonly StreamingAggregateFile[], private readonly collectCapabilities = true) {
     const prepared = prepareSources(files);
-    this.sources = new Map(prepared.sources.map(source => [source.file.id, source]));
     this.requests = prepared.requests;
     for (const source of prepared.sources) {
+      this.sources.set(source.file.id, source);
       const id = key(source.file.provider, source.file.session_id);
       let files = this.sessions.get(id);
       if (!files) this.sessions.set(id, files = []);
@@ -38,13 +40,12 @@ export class StreamingAggregation {
   add(fileId: number, raw: ParseEvent, index: number): void {
     const source = this.sources.get(fileId);
     if (!source) throw new Error('Unknown streaming source');
-    const event = normalizedEvent(raw);
+    let event = normalizedEvent(raw);
     if (!eligible(source, event, index)) return;
-    const file = source.file, ordinal = source.base + index, rootKey = key(file.provider, file.session_id, event.rootId);
-    let root = this.roots.get(rootKey);
-    if (!root) this.roots.set(rootKey, root = createRoot(file, event.rootId, event.offset));
-    if (file.id < root.firstFile.id) root.firstFile = file;
-    root.offset = Math.min(root.offset, event.offset); root.hasMain ||= file.identity.isMain;
+    if (event.kind === 'turn' && !source.file.identity.isMain && !source.file.identity.standaloneSubagent) return;
+    if (source.file.identity.parentRootId) event = { ...event, rootId: source.file.identity.parentRootId };
+    const file = source.file, ordinal = source.base + index;
+    const root = this.observeRequest(file, event.rootId, event.offset);
     switch (event.kind) {
       case 'turn': {
         if (!event.isMain && !file.identity.standaloneSubagent) return;
@@ -81,11 +82,17 @@ export class StreamingAggregation {
     if (!source) throw new Error('Unknown streaming source');
     const event = { kind: 'usage', rootId: observed.rootId, schema: observed.schema } as ParseEvent;
     if (!eligible(source, event, observed.index)) return;
-    const file = source.file, id = key(file.provider, file.session_id, observed.rootId);
+    const file = source.file, rootId = file.identity.parentRootId ?? observed.rootId;
+    this.observeRequest(file, rootId, observed.offset);
+  }
+
+  private observeRequest(file: StreamingAggregateFile, rootId: string, offset: number): Root {
+    const id = key(file.provider, file.session_id, rootId);
     let root = this.roots.get(id);
-    if (!root) this.roots.set(id, root = createRoot(file, observed.rootId, observed.offset));
+    if (!root) this.roots.set(id, root = createRoot(file, rootId, offset));
     if (file.id < root.firstFile.id) root.firstFile = file;
-    root.offset = Math.min(root.offset, observed.offset); root.hasMain ||= file.identity.isMain;
+    root.offset = Math.min(root.offset, offset); root.hasMain ||= file.identity.isMain;
+    return root;
   }
 
   finish(): MemoryAggregateResult {
@@ -94,19 +101,27 @@ export class StreamingAggregation {
       if (!before || outcome.orderingAt !== null && (before.orderingAt === null || outcome.orderingAt > before.orderingAt)
         || outcome.orderingAt === before.orderingAt && outcome.ordinal > before.ordinal) root.outcome = outcome;
     }
-    const totals = new Map<string, { input: number; output: number }>();
-    for (const winner of this.winners.values()) {
-      const { source, event, request } = winner, file = source.file;
-      addWinner(this.roots.get(key(file.provider, file.session_id, event.rootId))!, winner, this.collectCapabilities);
-      if (file.provider === 'claude' && request === null) addFlag(source.flags, event.rootId, 'missing-request-id');
-      const id = key(file.provider, file.session_id, event.threadId, event.turnId), sum = totals.get(id);
-      if (sum) { sum.input += event.tokens.input; sum.output += event.tokens.output; }
-      else totals.set(id, { input: event.tokens.input, output: event.tokens.output });
-    }
+    for (const { source, rootId, count } of this.missingRequests.values())
+      if (count > 0) addFlag(source.flags, rootId, 'missing-request-id');
     for (const [id, { source, event }] of this.checks) {
-      const sum = totals.get(id);
+      const sum = this.totals.get(id);
       if (event.tokens.input !== (sum?.input ?? 0) || event.tokens.output !== (sum?.output ?? 0)) addFlag(source.flags, event.rootId, 'token-total-mismatch');
     }
     return materialize(this.roots.values(), this.sessions, this.collectCapabilities);
+  }
+
+  private applyWinner(winner: Winner, direction: 1 | -1): void {
+    const { source, event, request } = winner, file = source.file;
+    addWinner(this.roots.get(key(file.provider, file.session_id, event.rootId))!, winner, this.collectCapabilities, direction);
+    const id = key(file.provider, file.session_id, event.threadId, event.turnId);
+    let sum = this.totals.get(id);
+    if (!sum) this.totals.set(id, sum = { input: 0, output: 0 });
+    sum.input += direction * event.tokens.input; sum.output += direction * event.tokens.output;
+    if (file.provider === 'claude' && request === null) {
+      const id = key(file.id, event.rootId);
+      let missing = this.missingRequests.get(id);
+      if (!missing) this.missingRequests.set(id, missing = { source, rootId: event.rootId, count: 0 });
+      missing.count += direction;
+    }
   }
 }

@@ -20,8 +20,8 @@ export interface Root {
   provider: StreamingAggregateFile['provider']; session: string; rootId: string; firstFile: StreamingAggregateFile;
   offset: number; hasMain: boolean; started: number | null; completedAt: number | null; lastAssistant: number | null;
   completed: boolean; explicitDuration: number | null; lifecycle: boolean; title: string | null; outcome?: Outcome;
-  input: number; output: number; cacheRead: number; cacheWrite: number; billing: Set<BillingMode>;
-  models: Map<string, ModelUsageInput>; capabilities: Map<string, CapabilityUsageInput>;
+  input: number; output: number; cacheRead: number; cacheWrite: number; billing: Map<BillingMode, number>;
+  models: Map<string, { usage: ModelUsageInput; count: number }>; capabilities: Map<string, CapabilityUsageInput>;
 }
 
 export const compareText = (a: string, b: string): number => Buffer.compare(Buffer.from(a), Buffer.from(b));
@@ -31,7 +31,7 @@ export const max = (a: number | null, b: number | null | undefined): number | nu
 export function createRoot(file: StreamingAggregateFile, rootId: string, offset: number): Root {
   return { provider: file.provider, session: file.session_id, rootId, firstFile: file, offset, hasMain: false,
     started: null, completedAt: null, lastAssistant: null, completed: false, explicitDuration: null, lifecycle: false,
-    title: null, input: 0, output: 0, cacheRead: 0, cacheWrite: 0, billing: new Set(), models: new Map(), capabilities: new Map() };
+    title: null, input: 0, output: 0, cacheRead: 0, cacheWrite: 0, billing: new Map(), models: new Map(), capabilities: new Map() };
 }
 
 export function addTurn(root: Root, event: TurnEvent): void {
@@ -43,24 +43,33 @@ export function addTurn(root: Root, event: TurnEvent): void {
   if (root.title === null && event.title !== undefined) root.title = event.title;
 }
 
-export function addCapability(root: Root, category: CapabilityUsageInput['category'], name: string): void {
+export function addCapability(root: Root, category: CapabilityUsageInput['category'], name: string, direction: 1 | -1 = 1): void {
   const id = key(category, name), previous = root.capabilities.get(id);
-  if (previous) previous.usage_count++;
-  else root.capabilities.set(id, { category, name, usage_count: 1 });
+  const count = (previous?.usage_count ?? 0) + direction;
+  if (count === 0) root.capabilities.delete(id);
+  else if (previous) previous.usage_count = count;
+  else root.capabilities.set(id, { category, name, usage_count: count });
 }
 
-export function addWinner(root: Root, winner: Winner, collectCapabilities: boolean): void {
+/** 교체 전 기여를 빼고 새 기여를 더해 winner 전체를 다시 합산하지 않는다. */
+export function addWinner(root: Root, winner: Winner, collectCapabilities: boolean, direction: 1 | -1 = 1): void {
   const event = winner.event, tokens = event.tokens;
-  root.input += tokens.input; root.output += tokens.output;
+  root.input += direction * tokens.input; root.output += direction * tokens.output;
   const cacheRead = Math.min(tokens.input, tokens.cacheRead), cacheWrite = Math.min(Math.max(0, tokens.input - tokens.cacheRead), tokens.cacheWrite);
-  root.cacheRead += cacheRead; root.cacheWrite += cacheWrite; root.billing.add(event.billingMode ?? 'unknown');
+  root.cacheRead += direction * cacheRead; root.cacheWrite += direction * cacheWrite;
+  const billing = event.billingMode ?? 'unknown', billingCount = (root.billing.get(billing) ?? 0) + direction;
+  if (billingCount === 0) root.billing.delete(billing); else root.billing.set(billing, billingCount);
   const model = event.model ?? '', previous = root.models.get(model);
-  if (previous) {
-    previous.input_tokens += tokens.input; previous.output_tokens += tokens.output;
-    previous.cache_read_input_tokens! += cacheRead; previous.cache_write_input_tokens! += cacheWrite;
-  } else root.models.set(model, { model, input_tokens: tokens.input, output_tokens: tokens.output,
-    cache_read_input_tokens: cacheRead, cache_write_input_tokens: cacheWrite });
-  if (collectCapabilities && (model !== '' || tokens.input + tokens.output > 0)) addCapability(root, 'model', model);
+  const count = (previous?.count ?? 0) + direction;
+  if (count === 0) root.models.delete(model);
+  else if (previous) {
+    previous.count = count;
+    const usage = previous.usage;
+    usage.input_tokens += direction * tokens.input; usage.output_tokens += direction * tokens.output;
+    usage.cache_read_input_tokens! += direction * cacheRead; usage.cache_write_input_tokens! += direction * cacheWrite;
+  } else root.models.set(model, { count, usage: { model, input_tokens: tokens.input, output_tokens: tokens.output,
+    cache_read_input_tokens: cacheRead, cache_write_input_tokens: cacheWrite } });
+  if (collectCapabilities && (model !== '' || tokens.input + tokens.output > 0)) addCapability(root, 'model', model, direction);
 }
 
 function timing(root: Root): { status: TurnSummaryInput['status']; completedAt: number | null;
@@ -85,15 +94,24 @@ export function materialize(roots: Iterable<Root>, sessions: Map<string, SourceP
   for (const root of roots) {
     if (root.outcome?.event.status === 'aborted') continue;
     const sessionFiles = sessions.get(key(root.provider, root.session))!;
-    const main = sessionFiles.find(source => source.file.identity.isMain)?.file ?? root.firstFile;
-    const name = sessionFiles.filter(source => source.file.identity.isMain && source.file.identity.sessionName != null).at(-1)?.file.identity.sessionName ?? null;
+    let main: StreamingAggregateFile | undefined, name: string | null = null;
     const flags = new Set<string>();
+    const flagRoots = root.rootId === '*' ? ['*'] : ['*', root.rootId].sort(compareText);
     for (const source of sessionFiles) {
-      for (const [rootId, sourceFlags] of [...source.flags].sort(([a], [b]) => compareText(a, b))) {
-        if (rootId !== '*' && rootId !== root.rootId) continue;
+      if (source.file.identity.isMain) {
+        main ??= source.file;
+        name = source.file.identity.sessionName ?? name;
+      }
+      for (const rootId of flagRoots) {
+        const sourceFlags = source.flags.get(rootId);
+        if (!sourceFlags) continue;
         for (const flag of [...sourceFlags].sort(compareText)) flags.add(flag);
       }
     }
+    main ??= root.firstFile;
+    const modelUsage: ModelUsageInput[] = [];
+    for (const { usage } of root.models.values())
+      if (usage.model !== '' || usage.input_tokens + usage.output_tokens > 0) modelUsage.push(usage);
     const { status, completedAt, duration, quality } = timing(root);
     if (quality === 'missing') flags.add('duration-missing');
     if (quality === 'approximate') flags.add('duration-approximate');
@@ -107,10 +125,9 @@ export function materialize(roots: Iterable<Root>, sessions: Map<string, SourceP
       input_tokens: root.input, output_tokens: root.output, cache_read_input_tokens: root.cacheRead, cache_write_input_tokens: root.cacheWrite,
       total_tokens: root.input + root.output, status, quality_flags: [...flags].join(',') || null,
       diagnostic_file_id: flags.size ? root.firstFile.id : null, diagnostic_offset: flags.size ? root.offset : null,
-      model_usage: [...root.models.values()].filter(model => model.model !== '' || model.input_tokens + model.output_tokens > 0)
-        .sort((a, b) => compareText(a.model, b.model)),
+      model_usage: modelUsage.sort((a, b) => compareText(a.model, b.model)),
       capability_usage: collectCapabilities ? [...root.capabilities.values()].sort((a, b) => compareText(a.category, b.category) || compareText(a.name, b.name)) : undefined,
-      billing: root.billing.size === 1 ? root.billing.values().next().value! : 'unknown', hasMain: root.hasMain });
+      billing: root.billing.size === 1 ? root.billing.keys().next().value! : 'unknown', hasMain: root.hasMain });
   }
   result.summaries.sort((a, b) => compareText(a.provider, b.provider) || compareText(a.session_id, b.session_id) || compareText(a.root_turn_id, b.root_turn_id));
   return result;

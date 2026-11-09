@@ -8,13 +8,14 @@ import type { FileMetadata, ManifestRow, Provider } from '../db/types';
 import { SummaryError } from '../jsonl';
 import { SourceEvidence, StreamingAggregation, type StreamingAggregateFile, type MemoryAggregateResult } from '../aggregation/memoryAggregate';
 import { SourceWinners } from '../aggregation/sourceWinners';
+import { groupParents } from '../aggregation/parentGroups';
 import { acquireRefreshLock } from './lock';
 import { includesSourceSnapshot } from './sourceFingerprint';
 import { readSource, sqlText } from './sourceReader';
 import { readNames } from './names';
 import type { ParsedIdentity, SummaryOptions, SummaryProgress, RefreshResult } from '../types';
 
-export const PARSER_VERSION = 16;
+export const PARSER_VERSION = 17;
 
 interface PreparedSource {
   identity: ParsedIdentity;
@@ -125,6 +126,7 @@ export async function refreshSummary(
       if (file.changed && !file.removed)
         await inspectSource(file);
     await expandRelatedSources();
+    resolveParentRequests();
     await reconnectSources();
     check();
     const aggregated = await collectWinners(names);
@@ -349,7 +351,8 @@ export async function refreshSummary(
     const onIdentity = (identity: ParsedIdentity): void => { file.session = identity.sessionId; connect(file.provider, file.previous?.session_id, file.session); };
     try {
       const read = await readSource(file, (event, index) => winners.add(event, index), { signal, cancelled,
-        maxLineBytes: options.maxLineBytes, collectCapabilities: collect, onBytes: bytes => { result.bodyBytes += bytes; report(); }, onIdentity });
+        maxLineBytes: options.maxLineBytes, collectCapabilities: collect, onBytes: bytes => { result.bodyBytes += bytes; report(); }, onIdentity,
+        onChild: (reference, rootId) => evidence.child(reference, rootId) });
       result.parsed++;
       if (!read.rows) {
         if (read.partialLine && file.previous?.session_id) {
@@ -420,72 +423,90 @@ export async function refreshSummary(
   function resolveLineage(): void {
     missingParents.clear();
     const candidates = [...files.values()].filter(file => !file.removed && !file.error && file.prepared && file.provider === 'codex');
-    const byThread = new Map<string, FileState[]>();
+    const { groups, unresolved } = groupParents(candidates.map(file => ({ id: file.prepared!.identity.threadId,
+      parentId: file.prepared!.identity.parentThreadId, value: file })));
+    const sessions = new Map<string, string | null>();
     for (const file of candidates) {
-      const thread = file.prepared!.identity.threadId;
-      let group = byThread.get(thread);
-      if (!group)
-        byThread.set(thread, group = []);
-      group.push(file);
-    }
-    const memo = new Map<number, string | null>(), visiting = new Set<number>();
-    const visit = (file: FileState): string | null => {
-      if (memo.has(file.id))
-        return memo.get(file.id)!;
-      if (visiting.has(file.id))
-        return null;
-      visiting.add(file.id);
-      const identity = file.prepared!.identity, parent = identity.parentThreadId;
-      let target: string | null = identity.sessionId;
-      if (parent) {
-        const parents = byThread.get(parent) ?? [];
-        if (!parents.length)
-          missingParents.add(file.id);
-        else {
-          const targets = parents.map(visit);
-          target = targets.includes(null) ? null : new Set(targets).size === 1 ? targets[0] : identity.sessionId;
-        }
+      const identity = file.prepared!.identity, group = groups.get(identity.threadId)!;
+      if (!sessions.has(group.rootId)) {
+        const targets = new Set(group.members.get(group.rootId)!.map(parent => parent.prepared!.identity.sessionId));
+        sessions.set(group.rootId, targets.size === 1 ? targets.values().next().value! : null);
       }
-      visiting.delete(file.id);
-      memo.set(file.id, target);
-      return target;
-    };
-    for (const file of candidates) {
-      const target = visit(file);
-      if (target === null)
+      const target = sessions.get(group.rootId)!;
+      const resolved = !unresolved.has(identity.threadId) && target !== null;
+      if (!resolved)
         missingParents.add(file.id);
-      const session = target ?? file.prepared!.identity.sessionId;
+      const session = resolved ? target : identity.sessionId;
       if (file.session !== session) {
         connect(file.provider, file.session, session);
         file.session = session;
       }
     }
   }
+
+  /** 자식 자체 요청 행 대신 검증된 생성 호출의 부모 요청에 사용량을 붙인다. */
+  function resolveParentRequests(): void {
+    const sources = [...files.values()].filter(file => file.provider === 'codex' && file.prepared && !file.error && !file.removed);
+    const threads = new Map<string, FileState[]>();
+    for (const file of sources) {
+      const id = file.prepared!.identity.threadId, previous = threads.get(id);
+      if (previous) previous.push(file); else threads.set(id, [file]);
+    }
+    const memo = new Map<number, string | null>(), visiting = new Set<number>();
+    const resolve = (file: FileState): string | null => {
+      if (memo.has(file.id)) return memo.get(file.id)!;
+      if (visiting.has(file.id)) return null;
+      visiting.add(file.id);
+      const identity = file.prepared!.identity;
+      const parents = threads.get(identity.parentThreadId ?? '') ?? [];
+      const references = identity.agentPath ? [identity.threadId, identity.agentPath] : [identity.threadId];
+      const roots = new Set<string | null>();
+      for (const parent of parents) {
+        const prepared = parent.prepared!;
+        if (prepared.identity.rootlessSubagent) { roots.add(resolve(parent)); continue; }
+        for (const reference of references)
+          if (reference && prepared.evidence.childRequests.has(reference)) roots.add(prepared.evidence.childRequests.get(reference)!);
+      }
+      const target = roots.size === 1 ? roots.values().next().value! : null;
+      visiting.delete(file.id); memo.set(file.id, target);
+      return target;
+    };
+    for (const file of sources) {
+      if (!file.prepared!.identity.rootlessSubagent) continue;
+      if (file.prepared!.evidence.eventCount === 0) continue;
+      const root = resolve(file);
+      if (root === null || missingParents.has(file.id)) fail(file, new SummaryError('missing-root-turn'));
+      else file.prepared!.identity.parentRootId = root;
+    }
+  }
   async function expandRelatedSources(): Promise<void> {
     while (true) {
       resolveLineage();
-      let expanded = false;
-      const references = new Set([...files.values()].filter(file => file.provider === 'codex' && file.prepared && !file.error && !file.removed)
-        .flatMap(file => [file.prepared!.identity.parentThreadId, file.prepared!.identity.forkedFromId].filter((id): id is string => Boolean(id))));
-      const known = new Set([...files.values()].filter(file => file.prepared && !file.error && !file.removed).map(file => file.prepared!.identity.threadId));
-      const pending = [...files.values()].sort((a, b) => a.id - b.id).filter(file => !file.removed && !file.error && !file.prepared && !file.attempted);
-      const parents = pending.filter(file => file.provider === 'codex' && [...references].some(id => !known.has(id) && file.path.includes(id)));
+      const references = new Set<string>(), known = new Set<string>(), pending: FileState[] = [];
+      for (const file of files.values()) {
+        if (file.removed || file.error) continue;
+        if (!file.prepared) {
+          if (!file.attempted) pending.push(file);
+          continue;
+        }
+        const identity = file.prepared.identity;
+        known.add(identity.threadId);
+        if (file.provider !== 'codex') continue;
+        if (identity.parentThreadId) references.add(identity.parentThreadId);
+        if (identity.forkedFromId) references.add(identity.forkedFromId);
+      }
+      pending.sort((a, b) => a.id - b.id);
+      const missing = [...references].filter(id => !known.has(id));
+      const parents = pending.filter(file => file.provider === 'codex' && missing.some(id => file.path.includes(id)));
       if (parents.length) {
         for (const file of parents)
           await inspectSource(file);
-        expanded = true;
+        continue;
       }
-      else {
-        const next = pending.find(file => affected.has(key(file.provider, file.session ?? '')));
-        if (next) {
-          await inspectSource(next);
-          expanded = true;
-        }
-      }
-      if (!expanded)
-        break;
+      const next = pending.find(file => affected.has(key(file.provider, file.session ?? '')));
+      if (!next) break;
+      await inspectSource(next);
     }
-    resolveLineage();
   }
   async function reconnectSources(): Promise<void> {
     for (const file of files.values())

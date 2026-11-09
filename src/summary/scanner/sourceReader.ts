@@ -30,6 +30,7 @@ interface ReadOptions {
   collectCapabilities: boolean;
   onBytes: (bytes: number) => void;
   onIdentity?: (identity: ParsedIdentity) => void;
+  onChild?: (reference: string, rootId: string) => void;
 }
 
 /** 고정 byte 경계의 단일 읽기로 winner 선택과 귀속·진단 근거 수집을 함께 수행한다. */
@@ -41,7 +42,8 @@ export async function readSource(
   const context = { provider: file.provider, path: file.path, sourceRoot: file.source_root,
     fileId: file.id, collectCapabilities: options.collectCapabilities };
   let index = 0;
-  const sink = { identity() {}, event: (value: ParseEvent) => event(value, index++) };
+  const sink = { identity() {}, event: (value: ParseEvent) => event(value, index++),
+    child: (reference: string, rootId: string) => options.onChild?.(sqlText(reference), sqlText(rootId)) };
   const parser = file.provider === 'claude' ? new ClaudeParserAdapter(context, sink) : new CodexCurrentParserAdapter(context, sink);
   try {
     const before = await lstat(file.path);
