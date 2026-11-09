@@ -20,6 +20,8 @@ VS Code 확장으로 다음 두 기능을 제공한다.
 
 ## 2. 전체 구조
 
+스캔 갱신의 공개 API는 `scanner/index.ts`에서 유지하고, 실제 실행은 [scanner/refresh/index.ts](../../src/summary/scanner/refresh/index.ts)가 조율한다. 같은 `refresh/` 폴더의 state·context가 한 갱신의 공유 상태와 참조 계약을 제공하고 discovery·preparation·relations·aggregation·persistence가 책임별 단계를 수행한다. context와 상태 소유자는 갱신당 한 번 만들며 기존 Map·Set·DTO를 단계마다 복제하지 않는다. 관계 확장 중 준비 함수를 호출하는 순서, 오류·삭제 보존·취소·트랜잭션과 finally의 Worker 종료는 유지한다. 구조와 검증 범위는 [책임 분리 기록](../research/2026-11-09/ScannerResponsibilities-2026-11-09.md)에 둔다.
+
 ```text
                     실시간 quota 경로
 

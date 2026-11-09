@@ -1,5 +1,6 @@
 # 2026-11-09 조사 자료
 
+- [ScannerResponsibilities-2026-11-09.md](ScannerResponsibilities-2026-11-09.md): 긴 scanner 진입점의 상태·탐색·준비·관계·집계·저장 책임을 refresh 하위 폴더로 분리하고 처리 순서와 참조 공유를 보존한 기록이다.
 - [SourcePoolReadability-2026-11-09.md](SourcePoolReadability-2026-11-09.md): 두 서브에이전트가 Worker 배정·완료·실패와 스캐너의 논리 결과 반영을 기존 파일 안에서 정리한 통합 기록이다.
 - [SourcePoolOrderAudit-2026-11-09.md](SourcePoolOrderAudit-2026-11-09.md): Worker 완료 순서와 논리 반영·저장 순서를 추적하고 기존 A/B 20쌍의 원시 결과·보존 DB를 읽기 전용으로 대조한다. 순서 오류의 근거와 조기 종료 후보의 분석 한계를 구분한다. [분석 JSON](SourcePoolOrderAudit-2026-11-09.json).
 - [DtoLifetimePlan-2026-11-09.md](DtoLifetimePlan-2026-11-09.md): 읽지 않은 파일의 상태 재저장을 줄이고 DTO 수명·반복 검색 비용을 줄이는 알고리즘을 제안한다.
