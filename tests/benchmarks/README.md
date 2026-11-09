@@ -4,6 +4,8 @@
 
 이전 SQL staging·turn metadata·원본 DTO 캐시를 전제로 한 실행기는 해당 시점의 고정 빌드에서 재현하는 과거 실험 도구다. 현재 스트리밍 제품에서는 제거한 API를 제공하지 않는다. 제목 SQL A/B·transaction 실행기는 삭제하고 기존 보고서·원시 결과는 보존한다.
 
+- [scan-stages.cjs](scan-stages.cjs) — 고정된 현재 구현과 실데이터 사본·합성 10,000요청에서 최초 수집·Codex 요청 1건 추가·무변경 갱신을 각각 1회 계측하고 읽기·검색·정렬·SQL 구간을 기록한다. [보고서](../../docs/benchmarks/2026-11-09/ScanStages-2026-11-09.md).
+
 - [parent-dto-delta-ab.cjs](parent-dto-delta-ab.cjs) — 현재 실제 JSONL 고정 사본만 사용해 변경 전·후 초회 수집·재파싱·변경 없는 갱신과 네 평균 조회를 준비 1쌍·AB/BA 3쌍 비교한다. `--workspace=<A 빌드와 current/snapshot.json을 보존한 비공개 폴더> --after=<B 빌드 루트> --output=<새 JSON>`으로 실행하며, `--upgrade-only`는 A DB 사본을 B로 갱신해 fresh B와 비교한다. [parent-dto-delta-oracle.cjs](parent-dto-delta-oracle.cjs)는 같은 workspace와 원본 계보 매핑에서 변경 전 선택기의 child 기여를 부모별 기대값으로 대조한다. [보고서](../../docs/benchmarks/2026-11-08/ParentDtoDeltaAB-2026-11-08.md).
 
 - [dto-greedy-ab.cjs](dto-greedy-ab.cjs) — 전체 DTO 캐시 API가 있던 `3b99d1a` 시점의 체크아웃에서 빌드한 뒤 `node --no-warnings tests/benchmarks/dto-greedy-ab.cjs --output=<새 JSON>`으로 실제 사본·1만·100요청의 원본 보존/Map 없는 배열 대조군을 준비 3쌍·AB/BA 10쌍 비교한다. 현재 단일 읽기 제품에는 이 실행기가 요구하는 `aggregateMemory()` API가 없다. 실제 갱신·COMMIT, 전체 DTO 집계, 일/월/세션/프로젝트 조회와 독립 평균 검증, 별도 프로세스 heap 표본을 기록한다. `--smoke`는 100요청만 실행한다. [후보](dto-greedy-candidate.cjs)와 [정합성 테스트](dto-greedy-ab.test.cjs)는 패자 영구 폐기·DTO 직접 덮어쓰기의 반례도 검사한다. 정합성 테스트도 같은 이전 체크아웃에서 `node --test tests/benchmarks/dto-greedy-ab.test.cjs`로 실행한다. 제품 소스는 변경하지 않는다.
