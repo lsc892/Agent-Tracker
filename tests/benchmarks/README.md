@@ -2,6 +2,8 @@
 
 요약·JSONL·SQL·quota 처리의 정확성과 성능을 비교하는 도구를 모은다.
 
+- [scan-source-pool-ab.cjs](scan-source-pool-ab.cjs) — `--workspace=<고정 입력 폴더> --before=<A 소스·dist 루트> --after=<B 소스·dist 루트> --output=<새 JSON>`으로 현재 전체·합성 10,000요청의 순차·Worker 풀 파일 준비를 준비3쌍·교대10쌍 비교한다. 최초·1건 추가·무변경의 구간과 저장 내부·평균 조회, DB 의미·논리 읽기 순서·미소비 선행 작업 여부를 검사한다. `--prepare-only`로 고정 입력만 준비할 수 있다. [보고서](../../docs/benchmarks/2026-11-09/SourcePoolAB-2026-11-09.md).
+
 이전 SQL staging·turn metadata·원본 DTO 캐시를 전제로 한 실행기는 해당 시점의 고정 빌드에서 재현하는 과거 실험 도구다. 현재 스트리밍 제품에서는 제거한 API를 제공하지 않는다. 제목 SQL A/B·transaction 실행기는 삭제하고 기존 보고서·원시 결과는 보존한다.
 
 - [scan-stages.cjs](scan-stages.cjs) — 역인덱스·큐 적용 전 기준 구현의 고정 빌드·실데이터 사본과 합성 10,000요청에서 최초 수집·Codex 요청 1건 추가·무변경 갱신을 준비 실행 없이 각각 1회 측정한 실행기다. 기존 반복 검색·pending 정렬 코드를 모듈 로딩 때 계측하므로 해당 이전 빌드에서 사용한다. 새 스캐너는 아래 scan-queue-ab.cjs를 사용한다. [보고서](../../docs/benchmarks/2026-11-09/ScanStages-2026-11-09.md).

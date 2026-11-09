@@ -4,15 +4,31 @@ import { key, normalizedEvent, SourceEvidence } from './sourceEvidence';
 
 interface Candidate { event: UsageEvent; index: number; score: number | bigint }
 export interface ObservedRoot { rootId: string; offset: number; index: number; schema?: UsageEvent['schema'] }
+export interface SourceWinnersSnapshot {
+  evidence: Omit<SourceEvidence, 'add' | 'child'>;
+  roots: ObservedRoot[];
+  winners: Map<string, Candidate>;
+  metadata: { event: Exclude<ParseEvent, UsageEvent>; index: number }[];
+}
 
 /** 파일의 최종 귀속이 정해지기 전에도 원본별 그룹의 패자 DTO를 보관하지 않는다. */
 export class SourceWinners {
-  readonly evidence = new SourceEvidence();
-  readonly roots: ObservedRoot[] = [];
-  private readonly winners = new Map<string, Candidate>();
-  private readonly metadata: { event: Exclude<ParseEvent, UsageEvent>; index: number }[] = [];
+  readonly evidence: SourceEvidence;
+  readonly roots: ObservedRoot[];
+  private readonly winners: Map<string, Candidate>;
+  private readonly metadata: { event: Exclude<ParseEvent, UsageEvent>; index: number }[];
 
-  constructor(private readonly provider: Provider) {}
+  constructor(private readonly provider: Provider, snapshot?: SourceWinnersSnapshot) {
+    this.evidence = snapshot ? Object.assign(new SourceEvidence(), snapshot.evidence) : new SourceEvidence();
+    this.roots = snapshot?.roots ?? [];
+    this.winners = snapshot?.winners ?? new Map();
+    this.metadata = snapshot?.metadata ?? [];
+  }
+
+  /** 원문·패자 DTO 없이 파일별 준비 결과만 Worker 메시지로 전달한다. */
+  snapshot(): SourceWinnersSnapshot {
+    return { evidence: this.evidence, roots: this.roots, winners: this.winners, metadata: this.metadata };
+  }
 
   add(raw: ParseEvent, index: number): void {
     const event = normalizedEvent(raw);

@@ -284,6 +284,10 @@ Claude credential·로그 보존 설정은 `<dataHome>/.claude`, Codex App Serve
 
 ### 4.3 manifest
 
+파일 준비는 기존 역인덱스·ID 우선 작업 큐 위의 제한된 Worker 풀에서 실행한다. 파일 하나의 고정 범위 읽기·JSONL/Zstd 파싱·SHA-256·원본별 winner 선택을 같은 Worker가 끝내고 원문·패자 DTO 없이 winner·관계 근거·root 위치만 반환한다. 기본 Worker 수는 `max(1,min(4,availableParallelism()-1))`이고 내부 `sourceWorkers=1`은 순차 처리다. 선행 후보가 하나뿐이거나 후보 원본 크기 합계가 1 MiB 미만이면 풀을 시작하지 않는다. 한 갱신 안에서 Worker를 재사용하고 갱신 종료 시 모두 종료하며, 단일 파일·작은 입력의 시작 비용을 피한다.
+
+선행 작업·미소비 결과는 최대 Worker 수의 두 배(기본 8파일)다. 논리상 먼저 필요한 새 부모가 선행 창 밖에 있으면 우선 작업 하나를 추가할 수 있다. 물리 읽기 완료 순서와 기존 파일 sequence·파일 내 index를 분리하고 식별·세션·오류·계보·winner 반영은 기존 순서대로 수행한다. 미해결 부모와 관계 확장이 끝난 뒤 최종 집계하고 연결 묶음별 DB transaction을 유지한다. 파일 완료만으로 최종 사용량을 INSERT하지 않는다. Worker 오류는 해당 파일 준비 실패로 전달하고, 공유 취소 flag·AbortSignal을 확인하며, 큰 원본의 진행 바이트는 약 100ms 간격으로 전달한다. 오류·취소·파일 교체의 전용 실행 검증은 아직 수행하지 않았다. 실제 범위와 구간별 비교는 [Worker 풀 A/B](../benchmarks/2026-11-09/SourcePoolAB-2026-11-09.md)에 기록한다.
+
 영속 SQLite table은 manifest·projects·sessions·turn_summary·turn_model_usage·turn_costs·session_billing·turn_capability_usage와 일별 집계다. 파일당 manifest 한 행, 외부 사용자 요청당 summary 한 행을 두며 이름은 프로젝트·세션당 한 번 저장한다. agent 실행 row·response candidate·turn metadata 캐시는 저장하지 않는다.
 
 갱신 시 manifest 전체와 현재 파일 metadata를 비교한다. 변경된 세션의 관련 원본을 한 번 읽으며 그룹 winner DTO를 갱신하고 패자 숫자 벡터를 버린다. 남은 원본별 winner는 최종 세션·request 그룹으로 병합한다. 다음 갱신까지 원본 이벤트 DTO·패자를 보관하지 않는다. 진단 정보는 상태·처리 위치·기록 시각·오류 네 column으로 제한한다.
@@ -951,6 +955,8 @@ Extension Host 메모리에 유지하는 값:
 - worker가 보내는 작은 진행 상태와 현재 조회 page·제한된 제공자별·모델별 도표 결과
 
 누계 Worker는 갱신 동안 manifest·현재 파일 식별 정보·귀속 근거·원본별/최종 그룹 winner DTO·비사용량 이벤트·최종 요청 상태를 보유한다. 원본을 한 번 읽으며 같은 그룹의 더 좋은 후보로 기존 DTO를 갱신하고 패자 숫자 벡터를 버린다. current 전환·legacy 복사 접두사의 해시·요청 ID·품질 flag·root 최소 위치와 생성 호출의 자식 연결은 같은 읽기에서 수집한다. 원본별 그룹은 response·raw request 또는 thread/turn·포맷으로 구분하며, 읽기 뒤 확정된 부모 세션·request로 남은 winner를 전달한다. 최종 winner 교체는 부모 요청 DTO에 차감·가산을 즉시 반영하므로 종료 시 winner 재합산 순회는 없다. 계보 확정과 원본별 winner 전달·최종 요청 생성 순회는 유지한다. 사용량 패자 모델을 별도 행으로 복원하지 않으며 원본 전체 이벤트 DTO와 패자를 다음 갱신까지 캐시하지 않는다.
+
+파일 준비 풀의 선행 개수 제한은 전체 집계 메모리의 고정 상한을 뜻하지 않는다. 준비가 끝나 반영된 winner·관계 근거는 기존 최종 집계까지 남고, Worker별 JSONL/Zstd 버퍼·전송 중 복사·미소비 결과도 추가된다. Worker 수·파일 수 제한과 별개로 피크 메모리는 미측정이다.
 
 메모리에 유지하지 않는 값:
 
