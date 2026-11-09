@@ -681,7 +681,8 @@ test('cancelling an affected session also marks its reread unchanged source inte
   await writeFile(main,jsonl([user(),response()]));
   await writeFile(child,jsonl([response(30,'prompt-one','child','child-request')]));
   await refreshSummary(database,options);
-  await writeFile(child,jsonl([response(60,'prompt-one','child','child-request')]));
+  // 30→60의 같은 길이 재작성도 변경 감지가 확실하도록 크기를 바꾼다.
+  await writeFile(child,jsonl([response(60,'prompt-one','child','child-request')])+'\n');
   const controller=new AbortController();
   const result=await refreshSummary(database,options,controller.signal,progress=>{if(progress.phase==='committing')controller.abort();});
   assert.equal(result.interrupted,true);
@@ -696,8 +697,9 @@ test('cancellation after one session commits does not mark that successful sessi
     await writeFile(path,jsonl([user(prompt,session),response(100,prompt)]));
   }
   await refreshSummary(database,options);
+  // 100→200은 같은 길이이므로 빈 줄로 크기도 바꿔 mtime 정밀도에 의존하지 않는다.
   for(const [path,session,prompt] of [[a,'session-a','prompt-a'],[b,'session-b','prompt-b']]) {
-    await writeFile(path,jsonl([user(prompt,session),response(200,prompt)]));
+    await writeFile(path,jsonl([user(prompt,session),response(200,prompt)])+'\n');
   }
   const controller=new AbortController();const original=database.replaceMemory.bind(database);
   database.replaceMemory=replacement=>{original(replacement);controller.abort();};
@@ -728,7 +730,8 @@ test('a middle batch commit failure preserves its old snapshot and still commits
   const sources=['a','b','c'].map(name=>({name,path:join(root,`${name}.jsonl`),session:`session-${name}`}));
   for (const source of sources) await writeFile(source.path,jsonl([user('same-request',source.session),response(100,'same-request')]));
   await refreshSummary(database,options);database.queryUsage();
-  for (const source of sources) await writeFile(source.path,jsonl([user('same-request',source.session),response(200,'same-request')]));
+  // 같은 길이의 토큰 값 교체가 stat 비교에서 빠지지 않도록 빈 줄을 더한다.
+  for (const source of sources) await writeFile(source.path,jsonl([user('same-request',source.session),response(200,'same-request')])+'\n');
   database.connection.exec(`CREATE TEMP TRIGGER reject_middle BEFORE INSERT ON main.turn_summary
     WHEN NEW.session_id='session-b' BEGIN SELECT RAISE(ABORT,'reject middle'); END;
     CREATE TEMP TRIGGER reject_middle_update BEFORE UPDATE ON main.turn_summary

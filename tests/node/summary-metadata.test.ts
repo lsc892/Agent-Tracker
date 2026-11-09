@@ -200,7 +200,8 @@ test('model write failure rolls back source hashes and request changes and a ret
       BEGIN SELECT RAISE(ABORT,'fixture metadata rejection'); END;
     CREATE TRIGGER reject_metadata_update BEFORE UPDATE ON turn_model_usage
       BEGIN SELECT RAISE(ABORT,'fixture metadata rejection'); END;`);
-  await writeFile(path,jsonl([user(),response(110)]));
+  // 100→110은 같은 길이이므로 빈 줄로 변경 감지를 보장한 뒤 rollback을 검증한다.
+  await writeFile(path,jsonl([user(),response(110)])+'\n');
   assert.equal((await refreshSummary(db,options)).failed,1);
   assert.equal(db.queryTurns()[0].total_tokens,before.total_tokens);
   assert.equal(db.queryTurns()[0].updated_at,before.updated_at);
