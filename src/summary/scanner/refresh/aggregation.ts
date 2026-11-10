@@ -13,13 +13,7 @@ export async function collectWinners(context: RefreshContext, names: Map<string,
   const aggregation = new StreamingAggregation(inputs, collect);
   for (const file of sources) {
     check();
-    for (const root of file.prepared!.winners.roots)
-      aggregation.observeRoot(file.id, root);
-    for (const { event, index } of file.prepared!.winners.events()) {
-      if (file.prepared!.identity.standaloneSubagent && event.kind === 'turn')
-        event.isMain = true;
-      aggregation.add(file.id, event, index);
-    }
+    aggregation.addSource(file.id, file.prepared!.winners);
   }
   return aggregation.finish();
 }

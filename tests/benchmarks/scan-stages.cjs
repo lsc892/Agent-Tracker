@@ -63,7 +63,8 @@ function installCounters(product, state) {
   const { SourceWinners } = require(join(product, 'dist/src/summary/aggregation/sourceWinners'));
   const asyncMeasure = StageProfiler.prototype.measureAsync, lstat = fsp.lstat;
   const read = reader.readSource, verify = source.includesSourceSnapshot;
-  const Aggregate = aggregation.StreamingAggregation, events = SourceWinners.prototype.events;
+  const Aggregate = aggregation.StreamingAggregation;
+  const enumerate = SourceWinners.prototype.events ? 'events' : 'values', originalEnumeration = SourceWinners.prototype[enumerate];
   StageProfiler.prototype.measureAsync = async function(stage, action) {
     const previous = state.stage;
     if (stage !== 'readSources') state.stage = stage;
@@ -96,14 +97,14 @@ function installCounters(product, state) {
       return result;
     }
   };
-  SourceWinners.prototype.events = function() {
+  SourceWinners.prototype[enumerate] = function() {
     state.counters.sourceWinnerGroups += this.winners.size;
-    return events.call(this);
+    return originalEnumeration.call(this);
   };
   return () => {
     StageProfiler.prototype.measureAsync = asyncMeasure; fsp.lstat = lstat;
     reader.readSource = read; source.includesSourceSnapshot = verify;
-    aggregation.StreamingAggregation = Aggregate; SourceWinners.prototype.events = events;
+    aggregation.StreamingAggregation = Aggregate; SourceWinners.prototype[enumerate] = originalEnumeration;
   };
 }
 

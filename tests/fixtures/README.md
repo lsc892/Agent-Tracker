@@ -10,4 +10,5 @@
 - [storage-ab](storage-ab/README.md) — 날짜·월 배치와 SQL 묶음 비교에 사용할 롤백 전 증분 저장·집계 클래스를 보존한다.
 - [summary-lock.cjs](summary-lock.cjs) — 스레드·자식 프로세스에서 요약 갱신 잠금의 획득과 해제를 제어한다.
 - [streaming-aggregate.ts](streaming-aggregate.ts) — 독립 SQL oracle 입력을 제품과 같은 단일 읽기·원본별 winner 선택·최종 그룹 병합 순서로 전달한다.
+- [event-order-aggregate.ts](event-order-aggregate.ts) — 통합 전 이벤트 재생 순서를 회귀 기준으로 보존해 접은 요청 상태의 결과와 대조한다.
 - [usage-chart.ts](usage-chart.ts) — 공개 사용량 표 페이지를 차트로 변환하는 공통 테스트 도우미를 제공한다.

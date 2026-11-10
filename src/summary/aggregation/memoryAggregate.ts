@@ -1,13 +1,12 @@
 // 단일 읽기에서 남은 원본별 winner를 최종 그룹·요청·모델·진단 값으로 병합한다.
 import type { ParseEvent } from '../types';
-import { addFlag, eligible, key, normalizedEvent, prepareSources,
+import { addFlag, eligible, key, prepareSources,
   type SourcePlan, type StreamingAggregateFile } from './sourceEvidence';
-import { addCapability, addTurn, addWinner, createRoot, materialize, max,
+import { addCapability, addWinner, createRoot, materialize, max, mergeTurn,
   type MemoryAggregateResult, type Outcome, type Root } from './turns';
 import { Winners, type Winner } from './winners';
-import type { ObservedRoot } from './sourceWinners';
+import type { SourceWinners } from './sourceWinners';
 
-export { SourceEvidence } from './sourceEvidence';
 export type { StreamingAggregateFile } from './sourceEvidence';
 export type { MaterializedTurnSummary, MemoryAggregateResult } from './turns';
 
@@ -21,7 +20,6 @@ export class StreamingAggregation {
   private readonly totals = new Map<string, { input: number; output: number }>();
   private readonly missingRequests = new Map<string, { source: SourcePlan; rootId: string; count: number }>();
   private readonly checks = new Map<string, { source: SourcePlan; event: Extract<ParseEvent, { kind: 'check' }>; ordinal: number }>();
-  private readonly sourceOutcomes = new Map<string, { root: Root; outcome: Outcome }>();
   private readonly capabilities = new Set<string>();
 
   constructor(files: readonly StreamingAggregateFile[], private readonly collectCapabilities = true) {
@@ -37,30 +35,54 @@ export class StreamingAggregation {
     for (const files of this.sessions.values()) files.sort((a, b) => a.file.id - b.file.id);
   }
 
-  add(fileId: number, raw: ParseEvent, index: number): void {
-    const source = this.sources.get(fileId);
-    if (!source) throw new Error('Unknown streaming source');
-    let event = normalizedEvent(raw);
+  /** 읽는 동안 접은 요청 상태를 한 번 병합하고 남은 winner만 바로 합계에 반영한다. */
+  addSource(fileId: number, prepared: SourceWinners): void {
+    const source = this.sources.get(fileId)!, file = source.file;
+    const outcomes = new Map<string, Outcome>();
+    for (const state of prepared.roots.values()) {
+      const inherited = source.inheritedRoots.has(state.rootId);
+      const rootId = file.identity.parentRootId ?? state.rootId;
+      const observe = (offset: number): Root => this.observeRequest(file, rootId, offset);
+      if (!inherited) {
+        if (state.usageOffset !== null) observe(state.usageOffset);
+        if (!file.evidence.current) for (const observed of state.legacy)
+          if (observed.index > source.legacyCutoff) observe(observed.offset);
+        if (state.checkOffset !== null) observe(state.checkOffset);
+        for (const [isMain, turn] of state.turns) {
+          if (!file.identity.isMain && !file.identity.standaloneSubagent) continue;
+          const target = observe(turn.offset);
+          if (!isMain && !file.identity.standaloneSubagent) continue;
+          mergeTurn(target, turn, source.base);
+          if (turn.outcome) this.recordOutcome(outcomes, target, turn.outcome.event,
+            source.base + turn.outcome.ordinal, turn.outcome.orderingAt);
+        }
+        for (const { event, index } of state.checks.values()) this.addNormalized(source, event, index);
+      }
+      for (const { event, positions } of state.capabilities.values()) {
+        for (const position of positions) {
+          if (!eligible(source, event, position.index)) continue;
+          observe(position.offset);
+          this.addNormalized(source, { ...event, offset: position.offset }, position.index);
+          break;
+        }
+      }
+    }
+    for (const { event, index, score } of prepared.values()) this.addNormalized(source, event, index, score);
+  }
+
+  private addNormalized(source: SourcePlan, raw: Exclude<ParseEvent, { kind: 'turn' }>, index: number, score?: number | bigint): void {
+    let event = raw;
     if (!eligible(source, event, index)) return;
-    if (event.kind === 'turn' && !source.file.identity.isMain && !source.file.identity.standaloneSubagent) return;
     if (source.file.identity.parentRootId) event = { ...event, rootId: source.file.identity.parentRootId };
     const file = source.file, ordinal = source.base + index;
     const root = this.observeRequest(file, event.rootId, event.offset);
     switch (event.kind) {
-      case 'turn': {
-        if (!event.isMain && !file.identity.standaloneSubagent) return;
-        addTurn(root, event);
-        if (event.status === undefined) return;
-        const id = key(file.id, event.rootId), before = this.sourceOutcomes.get(id)?.outcome;
-        this.sourceOutcomes.set(id, { root, outcome: { event, ordinal, orderingAt: max(before?.orderingAt ?? null, event.statusAt) } });
-        return;
-      }
       case 'usage': {
         const request = file.provider === 'claude' && event.requestId === null
           ? this.requests.get(key(file.session_id, event.responseId)) ?? null : event.requestId;
         const id = key(file.provider, file.session_id, event.responseId,
           file.provider === 'claude' ? request ?? 'no-req' : event.threadId, file.provider === 'claude' ? '' : event.turnId);
-        this.winners.add(id, source, event, ordinal, request);
+        this.winners.add(id, source, event, ordinal, request, score);
         return;
       }
       case 'check': {
@@ -76,14 +98,19 @@ export class StreamingAggregation {
     }
   }
 
-  /** 패자의 숫자 DTO 없이도 기존 root·최소 진단 위치를 보존한다. */
-  observeRoot(fileId: number, observed: ObservedRoot): void {
-    const source = this.sources.get(fileId);
-    if (!source) throw new Error('Unknown streaming source');
-    const event = { kind: 'usage', rootId: observed.rootId, schema: observed.schema } as ParseEvent;
-    if (!eligible(source, event, observed.index)) return;
-    const file = source.file, rootId = file.identity.parentRootId ?? observed.rootId;
-    this.observeRequest(file, rootId, observed.offset);
+  private recordOutcome(outcomes: Map<string, Outcome>, root: Root, event: Extract<ParseEvent, { kind: 'turn' }>,
+    ordinal: number, orderingAt: number | null): void {
+    let outcome = outcomes.get(root.rootId);
+    if (!outcome) {
+      outcome = { event, ordinal, orderingAt };
+      outcomes.set(root.rootId, outcome);
+    } else {
+      outcome.orderingAt = max(outcome.orderingAt, orderingAt);
+      if (ordinal > outcome.ordinal) { outcome.event = event; outcome.ordinal = ordinal; }
+    }
+    const before = root.outcome;
+    if (!before || outcome.orderingAt !== null && (before.orderingAt === null || outcome.orderingAt > before.orderingAt)
+      || outcome.orderingAt === before.orderingAt && outcome.ordinal > before.ordinal) root.outcome = outcome;
   }
 
   private observeRequest(file: StreamingAggregateFile, rootId: string, offset: number): Root {
@@ -96,11 +123,6 @@ export class StreamingAggregation {
   }
 
   finish(): MemoryAggregateResult {
-    for (const { root, outcome } of this.sourceOutcomes.values()) {
-      const before = root.outcome;
-      if (!before || outcome.orderingAt !== null && (before.orderingAt === null || outcome.orderingAt > before.orderingAt)
-        || outcome.orderingAt === before.orderingAt && outcome.ordinal > before.ordinal) root.outcome = outcome;
-    }
     for (const { source, rootId, count } of this.missingRequests.values())
       if (count > 0) addFlag(source.flags, rootId, 'missing-request-id');
     for (const [id, { source, event }] of this.checks) {
