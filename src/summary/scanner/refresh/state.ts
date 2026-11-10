@@ -52,6 +52,7 @@ export class ScanState {
   readonly parentQueue = new SourceQueue<FileState>();
   readonly missingParents = new Set<number>();
   readonly reconnections: { old_id: number; new_id: number }[] = [];
+  readonly savedSessionNames = new Map<string, string>();
   lineageDirty = false;
   sequence = 0;
 

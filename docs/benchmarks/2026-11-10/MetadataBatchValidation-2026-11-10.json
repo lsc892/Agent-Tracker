@@ -1,0 +1,84 @@
+{
+  "dateSeoul": "2026-11-10",
+  "revision": "49564236362a12bd8318e5be85908dca4a894040",
+  "totalMemoryGiB": 7.913616180419922,
+  "checks": {
+    "typecheck": "passed",
+    "lint": "passed",
+    "diffCheck": "passed",
+    "suite": {
+      "total": 427,
+      "passed": 421,
+      "failed": 6,
+      "failedTests": [
+        "cancellation after one session commits does not mark that successful session stale",
+        "copied parent metadata preserves child lineage and only the verified inherited usage is removed",
+        "rootless Codex subagents retain their local turns and become independent sessions",
+        "rootless legacy subagents become separate sessions without counting verified inherited usage twice",
+        "rootless usage-only subagents work without the parent source and keep sibling sessions distinct",
+        "subagent fallback reassigns an accepted parent session without leaving old totals behind"
+      ],
+      "allFailuresReproducedBefore": true
+    },
+    "baseline": {
+      "total": 59,
+      "passed": 53,
+      "failed": 6
+    },
+    "newMetadataTests": [
+      "normal batches collect final names once per key and keep request-specific billing fallback",
+      "billing override is read once per session and empty names preserve accepted metadata",
+      "failed metadata batches roll back names and retry with a fresh transaction plan",
+      "repeated-session snapshots retain deletion billing cascades and do not report pruned names",
+      "retained requests do not contribute replacement names or billing metadata",
+      "scanner skips committed names but still applies metadata-only title changes",
+      "scanner fallback records only committed names and finishes metadata for the failed session"
+    ],
+    "transactionValidation": "MetadataBatchTransactionValidation-2026-11-10.json",
+    "ab": [
+      {
+        "dataset": "current",
+        "requests": 805,
+        "checks": {
+          "allAbPairs": true,
+          "sameSourceReadSetAndOrder": true,
+          "semanticFactsAndManifest": true,
+          "rawSqlRollup10Dimensions": true,
+          "independentJsProviderAndModelAverages": true,
+          "exactAppendDelta": true,
+          "unchangedSkippedBodyAndReplaceMemory": true,
+          "frozenSourcesRestored": true,
+          "foreignKeysAndIntegrity": true,
+          "independentRealDataParserOracle": "not performed; synthetic totals checked against generator"
+        }
+      },
+      {
+        "dataset": "synthetic-10000",
+        "requests": 10000,
+        "checks": {
+          "allAbPairs": true,
+          "sameSourceReadSetAndOrder": true,
+          "semanticFactsAndManifest": true,
+          "rawSqlRollup10Dimensions": true,
+          "independentJsProviderAndModelAverages": true,
+          "exactAppendDelta": true,
+          "unchangedSkippedBodyAndReplaceMemory": true,
+          "frozenSourcesRestored": true,
+          "foreignKeysAndIntegrity": true,
+          "independentRealDataParserOracle": "not performed; synthetic totals checked against generator"
+        }
+      }
+    ]
+  },
+  "scope": {
+    "pairs": 1,
+    "warmups": 0,
+    "order": "AB for each dataset",
+    "normalMetadataUnit": "one name upsert per key and billing override SELECT per provider/session within a transaction batch; repeated-session/removal/reconnection direct API falls back to one plan per snapshot"
+  },
+  "optionalHistoricalHarness": {
+    "script": "tests/benchmarks/rollup-batch-validation.cjs",
+    "result": "not applicable to this baseline",
+    "reason": "Historical assertion requires A to execute three rollup statements for repeated snapshots, but current A already batches this to one. It stopped at that count assertion; no passing result claimed."
+  }
+}

@@ -10,7 +10,7 @@ import { SqliteSession, type SqliteSessionOptions } from './connection';
 import { ManifestStore } from './manifest';
 import { SessionBillingStore } from './billing';
 import { SummaryReader } from './reader';
-import { MemoryStore, type MemoryReplacement } from './memoryStore';
+import { MemoryStore, type MemoryReplacement, type SavedSessionNames } from './memoryStore';
 import type { StageProfiler, StorageStage } from '../profiling';
 
 export * from './types';
@@ -80,11 +80,11 @@ export class SummaryDatabase {
     return this.manifest.unseenFiles(provider, sourceRoot, scanId, limit);
   }
 
-  replaceMemory(replacement: MemoryReplacement, profile?: StageProfiler<StorageStage>): void {
+  replaceMemory(replacement: MemoryReplacement, profile?: StageProfiler<StorageStage>): SavedSessionNames {
     return new MemoryStore(this.sqlite, this.billing, profile).replace(replacement);
   }
 
-  replaceMemoryBatch(replacements: readonly MemoryReplacement[], profile?: StageProfiler<StorageStage>): void {
+  replaceMemoryBatch(replacements: readonly MemoryReplacement[], profile?: StageProfiler<StorageStage>): SavedSessionNames {
     return new MemoryStore(this.sqlite, this.billing, profile).replaceBatch(replacements);
   }
 

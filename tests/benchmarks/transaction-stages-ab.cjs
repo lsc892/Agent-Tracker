@@ -12,7 +12,7 @@ const { independentCheck, stats } = require('./temp-batch-ab.cjs');
 
 const root = resolve(__dirname, '../..'), timezone = 'Asia/Seoul';
 const groups = ['day', 'month', 'session', 'project'], scenarios = ['initial', 'append-one', 'unchanged'];
-const peerStages = ['begin', 'prepare', 'manifest', 'indexSummaries', 'deleteMissing', 'summaries',
+const peerStages = ['begin', 'prepare', 'manifest', 'indexSummaries', 'metadata', 'deleteMissing', 'summaries',
   'reconnectDiagnostics', 'removeSources', 'rollups', 'pruneNames', 'commit'];
 const sha = value => createHash('sha256').update(value).digest('hex');
 const clock = () => new Intl.DateTimeFormat('sv-SE', { timeZone: timezone, dateStyle: 'short', timeStyle: 'medium' }).format(new Date());
@@ -30,6 +30,17 @@ function retainedUsage(row) {
 
 function normalizedUsage(row) {
   return helpers.normalized(retainedUsage(row));
+}
+
+function metadataSqlKind(sql) {
+  const text = sql.replace(/\s+/g, ' ').trim().toLowerCase();
+  if (/^insert (?:or \w+ )?into projects\b/.test(text)) return 'projectUpserts';
+  if (/^insert (?:or \w+ )?into sessions\b/.test(text)) return 'sessionUpserts';
+  if (/^update sessions set session_name\b/.test(text)) return 'sessionNameUpdates';
+  if (/^select\b/.test(text) && /\bfrom session_billing\b/.test(text)) return 'billingReads';
+  if (/^delete from projects\b/.test(text)) return 'projectPrunes';
+  if (/^delete from sessions\b/.test(text)) return 'sessionPrunes';
+  return undefined;
 }
 
 function allUsageBy(db, group, usageFilter, by = 'provider') {
@@ -231,6 +242,20 @@ async function worker(configPath, variant, pairText, work) {
   const dbPath = join(work, 'summary.sqlite'), openStarted = performance.now();
   const db = new SummaryDatabase(dbPath), databaseOpenMs = performance.now() - openStarted, samples = [];
   const originalExec = db.connection.exec;
+  const originalPrepare = db.connection.prepare;
+  let metadataCounts;
+  if (config.metadataCounters) db.connection.prepare = function(sql, ...args) {
+    const statement = Reflect.apply(originalPrepare, this, [sql, ...args]), kind = metadataSqlKind(sql);
+    if (!kind) return statement;
+    for (const method of ['run', 'get', 'all', 'iterate']) {
+      const execute = statement[method];
+      statement[method] = function(...values) {
+        if (metadataCounts) metadataCounts[kind]++;
+        return Reflect.apply(execute, this, values);
+      };
+    }
+    return statement;
+  };
   let transactions, transactionStarted, beginReturned;
   db.connection.exec = function(sql) {
     const begin = /^\s*BEGIN IMMEDIATE\s*;?\s*$/i.test(sql), commit = /^\s*COMMIT\s*;?\s*$/i.test(sql);
@@ -266,8 +291,11 @@ async function worker(configPath, variant, pairText, work) {
         queueAddAttempts: 0, queueEnqueued: 0, queueDequeued: 0, groupLookups: 0, groupMembersReturned: 0 };
       Object.assign(state.counters, { workerSubmitted: 0, workerConsumed: 0, workerMaxPending: 0, workerMaxThreads: 0 });
       transactions = [];
+      if (config.metadataCounters) metadataCounts = { projectUpserts: 0, sessionUpserts: 0,
+        sessionNameUpdates: 0, billingReads: 0, projectPrunes: 0, sessionPrunes: 0 };
       const refreshed = await refreshSummary(db, { dbPath, roots: config.snapshot.roots, timezone,
         collectCapabilities: true, retainDeletedSourceUsage: true });
+      const metadataSql = metadataCounts; metadataCounts = undefined;
       const transactionSamples = transactions; transactions = undefined;
       assert.equal(refreshed.failed, 0); assert.equal(refreshed.interrupted, false); assert.equal(refreshed.error, undefined);
       const counters = state.counters; state.counters = undefined;
@@ -289,6 +317,7 @@ async function worker(configPath, variant, pairText, work) {
       }
       const { scanId: _scanId, completedAt: _completedAt, ...refresh } = refreshed;
       const sample = { scenario, refresh, counters, totals: totals(db), queries, rollupBeforeRefresh, rollupAfterRefresh,
+        ...(metadataSql ? { metadataSql } : {}),
         transactions: { calls: transactionSamples.length,
           totalMs: transactionSamples.reduce((sum, value) => sum + value.elapsedMs, 0),
           beginMs: transactionSamples.reduce((sum, value) => sum + value.beginMs, 0),
@@ -339,7 +368,8 @@ async function worker(configPath, variant, pairText, work) {
   } finally {
     state.counters = undefined;
     if (target) { await fsp.truncate(target.path, target.originalBytes); await fsp.utimes(target.path, target.originalAtime, target.originalMtime); }
-    transactions = undefined; db.connection.exec = originalExec; db.close(); restore(); delete globalThis[profileKey];
+    transactions = undefined; metadataCounts = undefined;
+    db.connection.exec = originalExec; db.connection.prepare = originalPrepare; db.close(); restore(); delete globalThis[profileKey];
   }
 }
 
@@ -436,6 +466,7 @@ async function main(args = process.argv.slice(2), experiment = {}) {
   const rawRange = args.includes('--raw-range');
   if (rawRange) filter = { fromMs: -8640000000000000, toMs: 8640000000000000, ...filter };
   const structure = args.includes('--structure');
+  const metadataCounters = Boolean(experiment.metadataCounters);
   const omittedUsageFields = args.includes('--omit-obsolete-rollup-fields')
     ? ['unknown_time_turns', 'stale_turns', 'last_successful_update'] : [];
   const trialDirectory = await fsp.mkdtemp(join(options.workspace, structure ? 'diagnostic-' : 'trials-'));
@@ -450,7 +481,7 @@ async function main(args = process.argv.slice(2), experiment = {}) {
     runnerSha256: sha(fs.readFileSync(__filename)), helperSha256: Object.fromEntries(['incremental-refresh.cjs', 'temp-batch-ab.cjs']
       .map(name => [name, sha(fs.readFileSync(join(__dirname, name)))])),
     workspace: relative(root, options.workspace).split(sep).join('/'),
-    trialWorkspace: relative(root, trialDirectory).split(sep).join('/'), structure, rawRange, filter, omittedUsageFields,
+    trialWorkspace: relative(root, trialDirectory).split(sep).join('/'), structure, rawRange, filter, omittedUsageFields, metadataCounters,
     conditions: { cache: 'OS cache uncontrolled; no forced cache flush or GC; input freezing and product builds precede measurement; each variant uses a new process and new DB',
       trials: `${options.warmups} warmup pairs excluded, then ${options.pairs} AB/BA pairs per dataset; with zero warmups the first order is AB. Each initial build supplies the identical pre-append state for that trial`,
       timing: 'Product StageProfiler refresh through COMMIT/optimize; queries outside refresh; copy, process startup, DB open/migration, empty rollup activation, append, checks and source restoration excluded. Explicit BEGIN IMMEDIATE entry through COMMIT return is additionally measured by a lightweight exec wrapper; BEGIN elapsed includes uncontended lock acquisition and is reported separately. Storage peer stages are ranked without nested summaries/rollups child timers.',
@@ -458,12 +489,13 @@ async function main(args = process.argv.slice(2), experiment = {}) {
       instrumentation: structure ? 'Optional structural-diagnostic label; the same StageProfiler, source read and transaction exec wrappers are installed for both variants'
         : 'Existing StageProfiler, logical source read wrappers and lightweight explicit BEGIN/COMMIT exec timestamps are identical in A and B; both variants use the same Worker pool and report its submission counts. Worker file stats are not intercepted; wrapper overhead is not separately calibrated',
       residual: 'Stage minus nested logical preparation wait; both A and B use the same Worker pool executing ahead in parallel, so this residual is coordinator overhead rather than Worker CPU time',
+      metadataSqlCounters: metadataCounters ? 'Counts name INSERT/UPDATE, session billing SELECT and name pruning statement executions during refresh only; same prepare/run/get/all/iterate wrappers in both variants, overhead not calibrated' : 'disabled',
       exclusions: 'UI, extension-host IPC, quota, heap/GC peak, adversarial error/cancellation/rewrite scenarios and independent real-log parser oracle not measured; source-worker IPC is included' }, datasets: [] };
   for (const { name, directory, snapshot, ...spec } of snapshots) {
     for (const file of snapshot.files) assert.equal(sha(fs.readFileSync(file.path)), file.sha256, 'Frozen input must match original before trials');
     const work = join(trialDirectory, name); await fsp.mkdir(work, { recursive: true });
     const config = join(work, 'queue-config.json');
-    await fsp.writeFile(config, JSON.stringify({ products, directory, snapshot, structure, filter, rawRange, omittedUsageFields }));
+    await fsp.writeFile(config, JSON.stringify({ products, directory, snapshot, structure, filter, rawRange, omittedUsageFields, metadataCounters }));
     const entry = { name, inputSha256: snapshot.sha256, inventory: snapshot.inventory, expected: snapshot.expected ?? null,
       syntheticGeneration: spec.requests ? { seed: 'deterministic ordinal; no random generator', turnsPerSession: spec['turns-per-session'],
         providers: 'alternating sessions; equal requests', projects: 10, timestampRule: '2026-07-01 + sessionIndex % 14 days + turnIndex * 3 seconds' } : null,

@@ -1,6 +1,6 @@
 # 성능 개선 인수인계
 
-2026-11-10, Asia/Seoul. 대화 기록 없이 다음 작업을 시작하기 위한 진입점이다. 아래 개선 후보는 아직 구현하거나 A/B로 효과를 검증하지 않았다. 구현 기준은 `96b894e`이며 실제 작업 전 현재 브랜치·status·후속 커밋을 확인한다.
+2026-11-10, Asia/Seoul. 대화 기록 없이 다음 작업을 시작하기 위한 진입점이다. 아래 원래 계측의 기준은 `96b894e`이며 실제 작업 전 현재 브랜치·status·후속 커밋을 확인한다. 이후 `4956423`에서 미사용 rollup 상태를 제거했고, 후속 작업으로 최종 이름·결제 설정의 중복 제거가 작업 트리에 적용됐다. 최신 [이름·설정 1회 A/B](MetadataBatchAB-2026-11-10.md)와 [미사용 상태 제거 1회 A/B](RollupTrimAB-2026-11-10.md)를 먼저 읽고 아래 당시 수치를 최신 구현 성능으로 재사용하지 않는다.
 
 ## 1. 완료된 변경과 근거
 
@@ -31,16 +31,16 @@
 
 ## 3. 다음 후보와 먼저 볼 코드
 
-1. **요청 비교·저장의 중복 SQL**: [memoryStore.ts](../../../src/summary/db/memoryStore.ts)의 `saveSummary`, `saveNames`, `readModels`, `readCapabilities`, `billingMode`, `hasCostChanged`를 본다. 같은 세션 결제 설정과 이름 UPSERT의 반복 제거, 기존 행의 묶음 조회를 각각 작은 후보로 분리한다. 최초 구축에는 실제 쓰기 비용도 크므로 비교 시간만 줄여 전체 저장이 같은 비율로 감소한다고 가정하지 않는다. 최종 B의 10,000요청에서 `summaryCompare=45.305`, `summaryWrites=192.772`, facts 쓰기 `82.040ms`이며 이 값들은 서로 중첩된다.
+1. **요청 비교·저장의 중복 SQL**: 같은 세션 결제 설정과 이름 UPSERT의 요청별 반복은 후속 [metadata 묶음 변경](MetadataBatchAB-2026-11-10.md)으로 제거했다. 현재 [memoryStore.ts](../../../src/summary/db/memoryStore.ts)의 `collectMetadata`·`saveNames`는 정상 묶음의 고유 키를 처리하고, `saveSummary`·`readModels`·`readCapabilities`·`hasCostChanged`의 요청별 기존 값 조회는 남는다. 다음 후보는 기존 행의 묶음 조회이며 아직 효과를 확인하지 않았다. 최초 구축의 실제 쓰기 비용과 메모리·재시도 계약을 함께 비교한다.
 2. **변경 날짜·프로젝트 버킷만 rollup**: [rollups.ts](../../../src/summary/db/rollups.ts)의 `refreshSessions`는 대상 세션 전체의 최종 facts를 합산한다. 다음 후보는 변경 전·후 `(provider, session_id, project_key, local_day[, model_key])`를 모아 해당 범위만 다시 계산하는 것이다. 날짜·프로젝트·모델 이동과 삭제의 이전 버킷, NULL 시각, MIN/MAX·최종 갱신 시각과 시간대 재구축을 보존해야 한다. 아직 구현하지 않았다.
-3. **이름 정리의 중복 확인**: `MemoryStore.pruneNames`는 각 성분에서 세션·프로젝트의 NOT EXISTS를 확인한다. 영향 키를 모아 transaction 마지막에 한 번 정리하는 후보를 검토하되, 뒤 성분이 다시 참조하는 이름과 오류 재시도의 결과를 보존해야 한다.
+3. **이름 정리의 중복 확인**: 정상 묶음의 영향 키는 후속 metadata 변경에서 모아 transaction 끝에 한 번 prune하도록 반영했다. 반복 세션 snapshot·삭제·재연결의 직접 batch 입력은 중간 삭제·결제 cascade 의미를 보존하는 snapshot별 호환 경로를 유지한다.
 4. **원본 준비·탐색**: 실데이터 체감 목표라면 [scanner/refresh/preparation.ts](../../../src/summary/scanner/refresh/preparation.ts), [sourceReader.ts](../../../src/summary/scanner/sourceReader.ts), [sourcePool.ts](../../../src/summary/scanner/sourcePool.ts), [discovery.ts](../../../src/summary/scanner/refresh/discovery.ts)를 본다. 현재도 Worker 풀과 변경 없는 원본 재사용은 적용돼 있다. 변경된 세션의 전체 원본 재처리·관련 원본 확장·전수 stat에서 무엇이 큰지 먼저 분리한다. 과거 [Worker 풀 A/B](../2026-11-09/SourcePoolAB-2026-11-09.md)와 이번 입력·성능을 동일한 것으로 취급하지 않는다.
 
-DB 목적의 다음 작업은 1번부터 시작하는 것이 현재 제안이다. 전체 갱신 체감 목적이면 4번의 분리 계측을 우선할 수 있다. 어느 후보도 효과를 확인한 채택안은 아니다.
+DB 목적의 다음 작업은 1번의 남은 요청별 조회부터 시작할 수 있다. 전체 갱신 체감 목적이면 4번의 분리 계측을 우선할 수 있다. 이미 적용한 이름·설정·prune을 제외한 후보는 효과를 확인한 채택안이 아니다.
 
 ## 4. 다음 A/B를 시작하는 방법
 
-- 저장소 `AGENTS.md`와 [ab-test 스킬](../../../.agents/skills/ab-test/SKILL.md)을 읽는다. 현재 사용자 지침은 명시하지 않은 테스트 코드·자동 테스트·임시 재현 스크립트 실행을 금지한다. 후속 A/B 요청에 필요한 검증과 일반 테스트 suite를 구분한다. 이번까지 일반 suite는 실행하지 않았고 컴파일·타입 검사·린트와 명시 요청한 A/B·직접 정확성 검증을 수행했다.
+- 저장소 `AGENTS.md`와 [ab-test 스킬](../../../.agents/skills/ab-test/SKILL.md), 현재 사용자의 실행 범위를 읽는다. 현행 저장소 지침은 코드 변경 시 `npm run check`를 요구한다. metadata 후속 변경은 427개 중 421개 테스트가 통과했고 실패 6개는 정리 전 A에서도 재현했다. 기존 테스트 실패와 새 변경 실패를 구분하고, 1회 A/B 요청에서는 반복 통계로 개선을 확정하지 않는다.
 - **다음 A는 현재 제품 코드**다. 이전 `rollup-batch-ab-20261110/A`는 `8f74434`이고 다음 baseline으로 사용하면 완료한 rollup 변경까지 섞인다. 현재 소스와 컴파일 산출물을 새 workspace의 A에 고정하고 hash를 기록한 뒤 후보 하나만 B에 적용한다.
 - [rollup-batch-ab.cjs](../../../tests/benchmarks/rollup-batch-ab.cjs)는 [transaction-stages-ab.cjs](../../../tests/benchmarks/transaction-stages-ab.cjs)의 공용 main을 재사용한다. 현재 전체·10,000요청, 최초·실제 1건 추가·무변경, 제공자/모델의 일·월·세션·프로젝트 평균을 준비 3쌍·교대 10쌍 비교하고 시간·호출 수·독립 JS facts 대조를 기록한다. 현재 공용 실행기의 기준일과 조회 기간은 2026-11-10 및 2026년으로 고정돼 있으므로 새 작업일·입력 기간에 맞는지 확인하고 원시 결과에 조건을 명시한다.
 - [transaction-batch-validation.cjs](../../../tests/benchmarks/transaction-batch-validation.cjs)와 [rollup-batch-validation.cjs](../../../tests/benchmarks/rollup-batch-validation.cjs)는 평균·캐시 NULL·원자성·실패 격리·취소·삭제 보존·이동 등의 직접 검증 출발점이다. 후보의 반례에 필요한 범위만 보완한다. 실데이터의 독립 JS reducer는 정규화 facts를 기대값으로 사용하며 JSONL 파서 전체의 독립 oracle은 아니다.
