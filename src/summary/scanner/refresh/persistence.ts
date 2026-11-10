@@ -47,8 +47,9 @@ export async function commitComponents(context: RefreshContext, aggregated: Memo
       return;
     }
     try {
-      context.database.replaceMemoryBatch(pendingBatch.map(entry =>
+      const names = context.database.replaceMemoryBatch(pendingBatch.map(entry =>
         componentReplacement(context, entry.component, entry.members, entry.aggregated)), context.storage);
+      for (const [key, name] of names) state.savedSessionNames.set(key, name);
     } catch {
       // Scanner summaries contain arrays, so rollback can safely retry each original component.
       for (const entry of pendingBatch) {
@@ -122,7 +123,8 @@ function commitComponent(context: RefreshContext, component: Set<string>, member
     return;
   }
   try {
-    database.replaceMemory(componentReplacement(context, component, members, aggregated), storage);
+    const names = database.replaceMemory(componentReplacement(context, component, members, aggregated), storage);
+    for (const [key, name] of names) state.savedSessionNames.set(key, name);
     for (const file of members)
       file.settled = true;
   }
@@ -178,6 +180,7 @@ export function finishScan(context: RefreshContext, names: Map<string, string>):
   database.transaction(() => {
     const update = database.connection.prepare('UPDATE sessions SET session_name=? WHERE provider=? AND session_id=? AND session_name IS NOT ?');
     for (const [value, name] of names) {
+      if (context.state.savedSessionNames.get(value) === name) continue;
       const [provider, session] = JSON.parse(value) as [Provider, string];
       update.run(name, provider, session, name);
     }

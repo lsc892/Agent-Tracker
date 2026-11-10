@@ -342,8 +342,8 @@ test('manifest diagnostic updates refresh stale counts and successful replacemen
   const manifest = db.observeFile(file, 'first');
   const rows = [turn('one', '2026-10-01T12:00:00', 100, { model_usage: [model('A', 100)] }),
     turn('two', '2026-10-02T12:00:00', 200, { model_usage: [model('B', 200)] })];
-  const install = (): void => db.replaceMemory({scanId: 'test', sessions: [{ provider: 'claude', session_id: 'session-a' }],
-    files: [{ ...file, id: manifest.id }], summaries: rows });
+  const install = (): void => { db.replaceMemory({scanId: 'test', sessions: [{ provider: 'claude', session_id: 'session-a' }],
+    files: [{ ...file, id: manifest.id }], summaries: rows }); };
   install();
   expect(oracle(db)[0], { total_tokens: 300 });
   assert.equal(db.diagnostics().counts.stale_summaries, 0);
@@ -520,14 +520,14 @@ test('a failure after request rollup refresh rolls back facts, model rollup, dia
   const db = fixture(t);
   const file = metadata();
   const manifest = db.observeFile(file, 'first');
-  const install = (tokens: number, name: string): void => db.replaceMemory({scanId: 'test',
+  const install = (tokens: number, name: string): void => { db.replaceMemory({scanId: 'test',
     sessions: [{ provider: 'claude', session_id: 'session-a' }],
     files: [{ ...file, size_bytes: tokens, id: manifest.id }],
     summaries: [turn('same', '2026-10-01T12:00:00', tokens, {
       project_name: name, session_name: name, model_usage: [model('A', tokens)], billing: 'api',
       capability_usage: [{ category: 'skill', name, usage_count: 1 }],
     })],
-  });
+  }); };
   install(100, 'Before');
   oracle(db);
   oracle(db, {}, 'total', 'Asia/Seoul', 'model');

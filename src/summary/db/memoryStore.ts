@@ -31,6 +31,26 @@ interface RetainedUsage {
   sessions: Set<string>;
 }
 
+interface PreparedReplacement {
+  replacement: MemoryReplacement;
+  sessions: ReplacementSessions;
+  next: Map<string, TurnSummaryInput>;
+  removed: RemovedSources;
+  reconnected: Map<number, number>;
+  retained: RetainedUsage;
+  now: string;
+}
+
+interface SessionMetadata extends SessionRef { name: string | null }
+interface ReplacementMetadata {
+  projects: Map<string, string>;
+  sessions: Map<string, SessionMetadata>;
+  billing: Map<string, BillingMode | undefined>;
+}
+
+/** COMMIT한 이름만 스캔 마무리의 중복 이름 갱신 생략에 사용한다. */
+export type SavedSessionNames = ReadonlyMap<string, string>;
+
 const SUMMARY_COLUMNS = [
   'provider', 'project_key', 'session_id', 'root_turn_id', 'request_title', 'started_at_ms', 'completed_at_ms',
   'duration_ms', 'duration_quality', 'input_tokens', 'output_tokens', 'cache_write_input_tokens', 'cache_read_input_tokens',
@@ -96,48 +116,83 @@ export class MemoryStore {
   ) {}
 
   /** 최종 snapshot의 모든 변경을 하나의 트랜잭션으로 묶어 실패 시 함께 되돌린다. */
-  replace(replacement: MemoryReplacement): void {
-    this.profile.measure('replace', () => this.database.transaction(() => this.apply(replacement), this.profile));
+  replace(replacement: MemoryReplacement): SavedSessionNames {
+    return this.replaceBatch([replacement]);
   }
 
   /** 독립 snapshot을 적용한 뒤 변경 세션의 rollup을 한 번 갱신하고 함께 확정한다. */
-  replaceBatch(replacements: readonly MemoryReplacement[]): void {
-    if (!replacements.length) return;
-    if (replacements.length === 1) { this.replace(replacements[0]); return; }
+  replaceBatch(replacements: readonly MemoryReplacement[]): SavedSessionNames {
+    const savedNames = new Map<string, string>();
+    if (!replacements.length) return savedNames;
     this.profile.measure('replace', () => this.database.transaction(() => {
+      const inputs = replacements.map(replacement => ({ ...replacement, sessions: [...replacement.sessions],
+        removedFileIds: [...replacement.removedFileIds ?? []] }));
       const changedSessions: ReplacementSessions = new Map();
-      for (const replacement of replacements) this.apply(replacement, changedSessions);
+      if (this.canShareMetadata(inputs)) {
+        this.applyPrepared(inputs.map(replacement => this.prepare(replacement)), changedSessions, savedNames);
+      } else {
+        // Repeated sessions and source removal retain their original intermediate prune/cascade semantics.
+        for (const replacement of inputs) this.applyPrepared([this.prepare(replacement)], changedSessions, savedNames);
+      }
       if (changedSessions.size) {
-        this.profile.measure('rollups', () => this.database.rollups.refreshSessions([...changedSessions.values()], this.profile));
+        this.profile.measure('rollups', () => {
+          if (replacements.length === 1) {
+            for (const session of changedSessions.values()) this.database.rollups.refreshSession(session.provider, session.session_id, this.profile);
+          } else this.database.rollups.refreshSessions([...changedSessions.values()], this.profile);
+        });
       }
     }, this.profile));
+    return savedNames;
   }
 
-  /** 보존 대상 준비부터 원본·요청 반영과 파생 데이터 정리까지 순서대로 조율한다. */
-  private apply(replacement: MemoryReplacement, batchSessions?: ReplacementSessions): void {
+  /** 서로 독립적인 정상 snapshot만 이름·설정 계획과 마지막 이름 정리를 공유한다. */
+  private canShareMetadata(replacements: readonly MemoryReplacement[]): boolean {
+    const seen = new Set<string>();
+    for (const replacement of replacements) {
+      if ([...replacement.removedFileIds ?? []].length || replacement.reconnectedFiles?.length) return false;
+      for (const session of replacement.sessions) {
+        const key = sessionKey(session.provider, session.session_id);
+        if (seen.has(key)) return false;
+        seen.add(key);
+      }
+    }
+    return true;
+  }
+
+  /** 입력 iterable을 한 번 색인하고 실제 저장에서 제외할 보존 root를 확정한다. */
+  private prepare(replacement: MemoryReplacement): PreparedReplacement {
     const prepareStarted = performance.now();
     const now = new Date().toISOString();
     const sessions = new Map(Array.from(replacement.sessions, session => [sessionKey(session.provider, session.session_id), session]));
-    const changedSessions = new Set<string>();
-    const affectedProjects = new Set<string>();
     const removed = this.collectRemovedSources(replacement.removedFileIds ?? [], sessions);
     const reconnected = this.collectReconnectedSources(replacement, removed, sessions);
     const retained = this.collectRetainedUsage(replacement.retainDeletedSourceUsage, removed, reconnected);
     this.profile.record('prepare', prepareStarted);
-
-    this.profile.measure('manifest', () => this.saveFiles(replacement, sessions, now));
     const next = this.profile.measure('indexSummaries', () => this.indexSummaries(replacement.summaries, sessions));
-    this.profile.measure('deleteMissing', () => this.deleteMissingSummaries(sessions, next, retained.turnIds, changedSessions, affectedProjects));
-    this.profile.measure('summaries', () => this.saveSummaries(next, retained.roots, replacement.preserveCapabilities, now, changedSessions, affectedProjects));
-    this.profile.measure('reconnectDiagnostics', () => this.reconnectDiagnostics(reconnected));
-    this.profile.measure('removeSources', () => this.removeSources(removed, reconnected, retained.sessions, now));
-    if (batchSessions) {
+    return { replacement, sessions, next, removed, reconnected, retained, now };
+  }
+
+  /** 최종 이름·설정을 먼저 저장한 뒤 facts를 순차 반영하고 사용하지 않는 이름을 한 번 정리한다. */
+  private applyPrepared(plans: readonly PreparedReplacement[], batchSessions: ReplacementSessions, savedNames: Map<string, string>): void {
+    const metadata = this.profile.measure('metadata', () => {
+      const metadata = this.collectMetadata(plans);
+      this.saveNames(metadata, savedNames);
+      return metadata;
+    });
+    const affectedSessions: ReplacementSessions = new Map(), affectedProjects = new Set<string>();
+    for (const { replacement, sessions, next, removed, reconnected, retained, now } of plans) {
+      const changedSessions = new Set<string>();
+      this.profile.measure('manifest', () => this.saveFiles(replacement, sessions, now));
+      this.profile.measure('deleteMissing', () => this.deleteMissingSummaries(sessions, next, retained.turnIds, changedSessions, affectedProjects));
+      this.profile.measure('summaries', () => this.saveSummaries(next, retained.roots, replacement.preserveCapabilities,
+        now, changedSessions, affectedProjects, metadata.billing));
+      this.profile.measure('reconnectDiagnostics', () => this.reconnectDiagnostics(reconnected));
+      this.profile.measure('removeSources', () => this.removeSources(removed, reconnected, retained.sessions, now));
       for (const [key, session] of sessions)
         if (changedSessions.has(key)) batchSessions.set(key, session);
-    } else {
-      this.profile.measure('rollups', () => this.finishSessions(sessions, changedSessions));
+      for (const [key, session] of sessions) affectedSessions.set(key, session);
     }
-    this.profile.measure('pruneNames', () => this.pruneNames(sessions, affectedProjects));
+    this.profile.measure('pruneNames', () => this.pruneNames(affectedSessions, affectedProjects, savedNames));
   }
 
   /** 원본의 세션이 교체 범위에 포함되는지 검사하되 미귀속 원본은 허용한다. */
@@ -274,18 +329,18 @@ export class MemoryStore {
   /** 삭제 보존 root는 건너뛰고 최종 요청을 입력 순서대로 비교·반영한다. */
   private saveSummaries(
     next: Map<string, TurnSummaryInput>, retainedRoots: Set<string>, preserveCapabilities: boolean | undefined,
-    now: string, changedSessions: Set<string>, affectedProjects: Set<string>,
+    now: string, changedSessions: Set<string>, affectedProjects: Set<string>, billing: Map<string, BillingMode | undefined>,
   ): void {
     for (const summary of next.values()) {
       if (retainedRoots.has(rootKey(summary.provider, summary.root_turn_id))) continue;
-      this.saveSummary(summary, preserveCapabilities, now, changedSessions, affectedProjects);
+      this.saveSummary(summary, preserveCapabilities, now, changedSessions, affectedProjects, billing);
     }
   }
 
   /** 요청·모델·Skill·비용을 비교해 같으면 쓰기를 생략하고 달라진 자식 행만 교체한다. */
   private saveSummary(
     summary: TurnSummaryInput, preserveCapabilities: boolean | undefined, now: string,
-    changedSessions: Set<string>, affectedProjects: Set<string>,
+    changedSessions: Set<string>, affectedProjects: Set<string>, billing: Map<string, BillingMode | undefined>,
   ): void {
     const compareStarted = performance.now();
     const key = sessionKey(summary.provider, summary.session_id);
@@ -294,14 +349,13 @@ export class MemoryStore {
     const incoming = summaryValues(summary, now);
     const models = this.modelValues(summary);
     const capabilities = this.capabilityValues(summary);
-    this.saveNames(summary);
     affectedProjects.add(summary.project_key);
 
     const previousModels = this.readModels(previous);
     const previousCapabilities = this.readCapabilities(previous);
     const modelsChanged = !equal(previousModels, models);
     const capabilitiesChanged = !preserveCapabilities && !equal(previousCapabilities, capabilities ?? []);
-    const mode = this.billingMode(summary);
+    const mode = billing.get(key) ?? summary.billing ?? 'unknown';
     const costChanged = this.hasCostChanged(previous, mode);
     const factsChanged = this.hasFactsChanged(previous, incoming, summary);
     this.profile.record('summaryCompare', compareStarted);
@@ -320,13 +374,31 @@ export class MemoryStore {
     finally { this.profile.record('summaryWrites', writeStarted); }
   }
 
-  /** 프로젝트 이름을 갱신하고 비어 있지 않은 세션 이름만 기존 값에 덮어쓴다. */
-  private saveNames(summary: TurnSummaryInput): void {
-    this.database.statement(`INSERT INTO projects VALUES(?,?) ON CONFLICT(project_key) DO UPDATE SET project_name=excluded.project_name
-      WHERE project_name<>excluded.project_name`).run(summary.project_key, summary.project_name);
-    this.database.statement(`INSERT INTO sessions VALUES(?,?,?) ON CONFLICT(provider,session_id) DO UPDATE SET session_name=excluded.session_name
-      WHERE excluded.session_name IS NOT NULL AND session_name IS NOT excluded.session_name`)
-      .run(summary.provider, summary.session_id, summary.session_name?.trim() || null);
+  /** 실제 반영할 요청에서 마지막 프로젝트 이름과 마지막 nonempty 세션 이름을 선택한다. */
+  private collectMetadata(plans: readonly PreparedReplacement[]): ReplacementMetadata {
+    const projects = new Map<string, string>(), sessions = new Map<string, SessionMetadata>();
+    for (const { next, retained } of plans) for (const summary of next.values()) {
+      if (retained.roots.has(rootKey(summary.provider, summary.root_turn_id))) continue;
+      projects.set(summary.project_key, summary.project_name);
+      const key = sessionKey(summary.provider, summary.session_id), name = summary.session_name?.trim() || null;
+      if (!sessions.has(key) || name !== null) sessions.set(key, { provider: summary.provider, session_id: summary.session_id, name });
+    }
+    return { projects, sessions, billing: new Map() };
+  }
+
+  /** 요청 FK의 부모 이름을 키별 한 번 UPSERT하고 세션별 사용자 결제 설정을 한 번 읽는다. */
+  private saveNames(metadata: ReplacementMetadata, savedNames: Map<string, string>): void {
+    const project = this.database.statement(`INSERT INTO projects VALUES(?,?) ON CONFLICT(project_key) DO UPDATE SET project_name=excluded.project_name
+      WHERE project_name<>excluded.project_name`);
+    for (const [key, name] of metadata.projects) project.run(key, name);
+    const session = this.database.statement(`INSERT INTO sessions VALUES(?,?,?) ON CONFLICT(provider,session_id) DO UPDATE SET session_name=excluded.session_name
+      WHERE excluded.session_name IS NOT NULL AND session_name IS NOT excluded.session_name`);
+    const billing = this.database.statement('SELECT billing_mode FROM session_billing WHERE provider=? AND session_id=?');
+    for (const [key, value] of metadata.sessions) {
+      session.run(value.provider, value.session_id, value.name);
+      metadata.billing.set(key, billing.get(value.provider, value.session_id)?.billing_mode as BillingMode | undefined);
+      if (value.name !== null) savedNames.set(key, value.name);
+    }
   }
 
   /** 기존 모델 행을 값 배열로 읽어 입력 모델 행과 동일한 문자열 순서로 정렬한다. */
@@ -344,13 +416,6 @@ export class MemoryStore {
     const capabilities = this.database.statement('SELECT category,name,usage_count FROM turn_capability_usage WHERE turn_id=? ORDER BY category,name')
       .all(previous.id).map(Object.values);
     return capabilities.sort(compareCapabilities);
-  }
-
-  /** 사용자 세션 결제 설정을 우선하고 없으면 요청의 방식과 unknown 순서로 선택한다. */
-  private billingMode(summary: TurnSummaryInput): BillingMode {
-    const chosen = this.database.statement('SELECT billing_mode FROM session_billing WHERE provider=? AND session_id=?')
-      .get(summary.provider, summary.session_id)?.billing_mode as BillingMode | undefined;
-    return chosen ?? summary.billing ?? 'unknown';
   }
 
   /** 기존 비용의 결제 방식·단가 버전을 비교해 비용 재계산 필요 여부를 판정한다. */
@@ -420,19 +485,13 @@ export class MemoryStore {
     this.database.statement('DELETE FROM manifest WHERE id=?').run(id);
   }
 
-  /** Rebuild derived rollups only for sessions whose accepted facts changed. */
-  private finishSessions(sessions: ReplacementSessions, changedSessions: Set<string>): void {
-    for (const [key, session] of sessions) {
-      if (changedSessions.has(key)) this.database.rollups.refreshSession(session.provider, session.session_id, this.profile);
-    }
-  }
-
   /** 요청이 더 이상 참조하지 않는 대상 세션 이름과 영향 프로젝트 이름만 삭제한다. */
-  private pruneNames(sessions: ReplacementSessions, affectedProjects: Set<string>): void {
-    for (const session of sessions.values()) {
-      this.database.statement(`DELETE FROM sessions WHERE provider=? AND session_id=? AND NOT EXISTS(
+  private pruneNames(sessions: ReplacementSessions, affectedProjects: Set<string>, savedNames: Map<string, string>): void {
+    for (const [key, session] of sessions) {
+      const deleted = this.database.statement(`DELETE FROM sessions WHERE provider=? AND session_id=? AND NOT EXISTS(
         SELECT 1 FROM turn_summary t WHERE t.provider=sessions.provider AND t.session_id=sessions.session_id)`)
         .run(session.provider, session.session_id);
+      if (deleted.changes) savedNames.delete(key);
     }
     for (const project of affectedProjects) {
       this.database.statement(`DELETE FROM projects WHERE project_key=?

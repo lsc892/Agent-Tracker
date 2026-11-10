@@ -1,5 +1,7 @@
 # 2026-11-10 벤치마크
 
+- [MetadataBatchAB-2026-11-10.md](MetadataBatchAB-2026-11-10.md): 현재 805요청·합성 10,000요청에서 최종 이름·세션 결제 설정 중복 제거를 각 1회 비교한다. 키별 UPSERT·설정 SELECT·후단 이름 UPDATE 횟수와 저장·조회·실패 경계를 기록한다. [A/B JSON](MetadataBatchAB-2026-11-10.json), [검증 요약](MetadataBatchValidation-2026-11-10.json), [transaction 검증](MetadataBatchTransactionValidation-2026-11-10.json).
+
 - [RollupTrimAB-2026-11-10.md](RollupTrimAB-2026-11-10.md): 이 노트북의 현재 798요청·합성 10,000요청으로 미사용 집계 지표 제거 전후를 각 1회 비교한다. 갱신·평균 조회·공간·기존 DB 전환 비용과 정리 전에도 재현되는 테스트 실패를 기록한다. [A/B JSON](RollupTrimAB-2026-11-10.json), [전환 측정](RollupTrimUpgrade-2026-11-10.json), [검증 요약](RollupTrimValidation-2026-11-10.json).
 
 - [PerformanceHandoff-2026-11-10.md](PerformanceHandoff-2026-11-10.md): 다른 세션의 시작점. 적용·커밋 상태, 최종 B의 남은 병목·미구현 후보·관련 코드, 다음 A/B의 기준 구현과 로컬 입력 사본의 전달 범위를 정리한다.

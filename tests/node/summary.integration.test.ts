@@ -702,7 +702,7 @@ test('cancellation after one session commits does not mark that successful sessi
     await writeFile(path,jsonl([user(prompt,session),response(200,prompt)])+'\n');
   }
   const controller=new AbortController();const original=database.replaceMemory.bind(database);
-  database.replaceMemory=replacement=>{original(replacement);controller.abort();};
+  database.replaceMemory=replacement=>{const names=original(replacement);controller.abort();return names;};
   const result=await refreshSummary(database,options,controller.signal);
   assert.equal(result.interrupted,true);
   assert.equal(database.findManifest('claude',a)!.processing_status,'done');
