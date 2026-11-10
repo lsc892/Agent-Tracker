@@ -2,6 +2,8 @@
 
 요약·JSONL·SQL·quota 처리의 정확성과 성능을 비교하는 도구를 모은다.
 
+- [unified-stream-stats-validation.cjs](unified-stream-stats-validation.cjs) — `--workspace --before --after --output`으로 원본 통계 누적 통합 전후의 고정 실로그·합성 10,000요청을 대조한다. 기본은 예열 없이 1쌍이며 최초·추가·무변경의 facts·평균·진단·사본 복원을 검증한다.
+
 - [metadata-batch-ab.cjs](metadata-batch-ab.cjs) — 최종 프로젝트·세션 이름과 세션 결제 설정 처리의 중복 제거를 실제 갱신·SQL 실행 횟수로 비교한다. `--workspace=... --before=... --after=... --output=<새 JSON> --pairs=1 --warmups=0`으로 현재·10,000요청을 각 1회 측정하고, 모든 잔존 조회 결과·독립 JS 집계·facts·manifest·FK/integrity를 대조한다.
 
 - [rollup-trim-ab.cjs](rollup-trim-ab.cjs) — 공용 transaction 실행기로 미사용 rollup 지표 제거 전후를 비교한다. `--workspace=... --before=... --after=... --output=<새 JSON> --pairs=1 --warmups=0`은 현재·10,000요청을 각 A/B 1회 측정한다. 의도적으로 삭제한 세 반환 필드만 비교에서 제외하며, 남은 지표·독립 JS 집계·원본 상태·raw/rollup을 대조하고 DB 페이지·집계 열 수를 함께 기록한다.

@@ -10,8 +10,10 @@ export interface Winner {
   score: number | bigint;
 }
 
-const score = (event: UsageEvent): number | bigint => Number.isSafeInteger(event.tokens.input + event.tokens.output)
-  ? event.tokens.input + event.tokens.output : BigInt(event.tokens.input) + BigInt(event.tokens.output);
+export function usageScore(event: UsageEvent): number | bigint {
+  const total = event.tokens.input + event.tokens.output;
+  return Number.isSafeInteger(total) ? total : BigInt(event.tokens.input) + BigInt(event.tokens.output);
+}
 
 /** 첫 winner만 생성하고 이후 교체에는 동일한 DTO를 재사용한다. */
 export class Winners {
@@ -19,8 +21,7 @@ export class Winners {
 
   constructor(private readonly apply?: (winner: Winner, direction: 1 | -1) => void) {}
 
-  add(id: string, source: SourcePlan, event: UsageEvent, ordinal: number, request: string | null): void {
-    const value = score(event);
+  add(id: string, source: SourcePlan, event: UsageEvent, ordinal: number, request: string | null, value = usageScore(event)): void {
     let winner = this.groups.get(id);
     if (winner) {
       if (value < winner.score || value === winner.score && ordinal <= winner.ordinal) return;

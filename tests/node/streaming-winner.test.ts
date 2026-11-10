@@ -1,8 +1,10 @@
 // 파싱 중 winner DTO 재사용과 첫 파싱 근거가 보존하는 실제 집계 계약을 검증한다.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SourceEvidence, StreamingAggregation, type StreamingAggregateFile } from '../../src/summary/aggregation/memoryAggregate';
-import type { MemoryAggregateFile } from '../fixtures/streaming-aggregate';
+import type { StreamingAggregateFile } from '../../src/summary/aggregation/memoryAggregate';
+import { EventOrderAggregation } from '../fixtures/event-order-aggregate';
+import { SourceWinners } from '../../src/summary/aggregation/sourceWinners';
+import { aggregateMemory, type MemoryAggregateFile } from '../fixtures/streaming-aggregate';
 import { prepareSources } from '../../src/summary/aggregation/sourceEvidence';
 import { Winners } from '../../src/summary/aggregation/winners';
 import type { ParseEvent, UsageEvent } from '../../src/summary/types';
@@ -17,15 +19,13 @@ const file = (id: number, events: ParseEvent[], provider: 'claude' | 'codex' = '
 });
 function prepare(files: readonly MemoryAggregateFile[]): StreamingAggregateFile[] {
   return files.map(({ events, ...source }) => {
-    const evidence = new SourceEvidence();
-    events.forEach((event, index) => evidence.add(event, index));
-    return { ...source, evidence };
+    const winners = new SourceWinners(source.provider);
+    events.forEach((event, index) => winners.add(event, index));
+    return { ...source, evidence: winners.evidence };
   });
 }
 function run(files: readonly MemoryAggregateFile[]) {
-  const aggregation = new StreamingAggregation(prepare(files));
-  for (const source of files) source.events.forEach((event, index) => aggregation.add(source.id, event, index));
-  return aggregation.finish();
+  return aggregateMemory(files);
 }
 
 test('a group keeps the same winner DTO through replacements and discards lower candidates', () => {
@@ -95,11 +95,12 @@ test('late current format and request identity resolve before any streaming usag
   const prepared = prepare([source]), evidence = prepared[0].evidence;
   assert.match(evidence.legacy[0].signature, /^[a-f0-9]{64}$/);
   assert.equal(Object.hasOwn(evidence.legacy[0], 'tokens'), false);
-  const aggregation = new StreamingAggregation(prepared);
+  const aggregation = new EventOrderAggregation(prepared);
   source.events.forEach((event, index) => aggregation.add(source.id, event, index));
   const result = aggregation.finish(), row = result.summaries[0];
   assert.equal(row.total_tokens, 102);
   assert.equal(row.model_usage[0].model, 'corrected');
   assert.doesNotMatch(row.quality_flags ?? '', /missing-request-id/);
   assert.match(row.quality_flags ?? '', /legacy-warning/);
+  assert.deepEqual(aggregateMemory([source]), result, 'compacted source state preserves the same late request correction');
 });

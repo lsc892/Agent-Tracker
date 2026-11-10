@@ -12,9 +12,6 @@ export function aggregateMemory(files: readonly MemoryAggregateFile[], collectCa
     return { ...file, evidence: winners.evidence, winners };
   });
   const aggregation = new StreamingAggregation(selected, collectCapabilities);
-  for (const file of selected) {
-    for (const root of file.winners.roots) aggregation.observeRoot(file.id, root);
-    for (const { event, index } of file.winners.events()) aggregation.add(file.id, event, index);
-  }
+  for (const file of selected) aggregation.addSource(file.id, file.winners);
   return aggregation.finish();
 }

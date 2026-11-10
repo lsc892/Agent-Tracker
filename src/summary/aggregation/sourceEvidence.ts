@@ -60,8 +60,8 @@ export class SourceEvidence {
     else if (this.childRequests.get(reference) !== rootId) this.childRequests.set(reference, null);
   }
 
-  add(raw: ParseEvent, index: number): void {
-    const event = normalizedEvent(raw);
+  /** 호출자가 원본 수집 경계에서 정규화한 이벤트를 같은 순회에서 관측한다. */
+  add(event: ParseEvent, index: number): void {
     this.eventCount = Math.max(this.eventCount, index + 1);
     if ('flags' in event) for (const flag of event.flags ?? []) addFlag(this.flags, event.rootId, flag);
     if (event.kind === 'capability') {

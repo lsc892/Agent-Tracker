@@ -16,10 +16,16 @@ export interface MemoryAggregateResult {
 }
 
 export interface Outcome { event: TurnEvent; ordinal: number; orderingAt: number | null }
+export interface TurnState {
+  started: number | null; completedAt: number | null; lastAssistant: number | null;
+  completed: boolean; explicitDuration: number | null; lifecycle: boolean; title: string | null;
+  titleOrdinal: number; outcome?: Outcome;
+  offset: number;
+}
 export interface Root {
   provider: StreamingAggregateFile['provider']; session: string; rootId: string; firstFile: StreamingAggregateFile;
   offset: number; hasMain: boolean; started: number | null; completedAt: number | null; lastAssistant: number | null;
-  completed: boolean; explicitDuration: number | null; lifecycle: boolean; title: string | null; outcome?: Outcome;
+  completed: boolean; explicitDuration: number | null; lifecycle: boolean; title: string | null; titleOrdinal: number; outcome?: Outcome;
   input: number; output: number; cacheRead: number; cacheWrite: number; billing: Map<BillingMode, number>;
   models: Map<string, { usage: ModelUsageInput; count: number }>; capabilities: Map<string, CapabilityUsageInput>;
 }
@@ -28,19 +34,35 @@ export const compareText = (a: string, b: string): number => Buffer.compare(Buff
 const min = (a: number | null, b: number | null | undefined): number | null => b == null ? a : a === null ? b : Math.min(a, b);
 export const max = (a: number | null, b: number | null | undefined): number | null => b == null ? a : a === null ? b : Math.max(a, b);
 
+export function createTurnState(): TurnState {
+  return { started: null, completedAt: null, lastAssistant: null, completed: false,
+    explicitDuration: null, lifecycle: false, title: null, titleOrdinal: Infinity, offset: Infinity };
+}
+
 export function createRoot(file: StreamingAggregateFile, rootId: string, offset: number): Root {
   return { provider: file.provider, session: file.session_id, rootId, firstFile: file, offset, hasMain: false,
     started: null, completedAt: null, lastAssistant: null, completed: false, explicitDuration: null, lifecycle: false,
-    title: null, input: 0, output: 0, cacheRead: 0, cacheWrite: 0, billing: new Map(), models: new Map(), capabilities: new Map() };
+    title: null, titleOrdinal: Infinity, input: 0, output: 0, cacheRead: 0, cacheWrite: 0, billing: new Map(), models: new Map(), capabilities: new Map() };
 }
 
-export function addTurn(root: Root, event: TurnEvent): void {
+export function addTurn(root: TurnState, event: TurnEvent, ordinal: number): void {
+  root.offset = Math.min(root.offset, event.offset);
   root.started = min(root.started, event.startedAt); root.lastAssistant = max(root.lastAssistant, event.lastAssistantAt);
   root.completed ||= Boolean(event.completed);
   if (event.completed) root.completedAt = max(root.completedAt, event.completedAt);
   if (event.durationQuality === 'exact') root.explicitDuration = max(root.explicitDuration, event.duration);
   if (event.completed && event.durationQuality === 'derived') root.lifecycle = true;
-  if (root.title === null && event.title !== undefined) root.title = event.title;
+  if (event.title !== undefined && ordinal < root.titleOrdinal) { root.title = event.title; root.titleOrdinal = ordinal; }
+}
+
+/** 원본 이벤트를 재생하지 않고 최소·최대·첫 제목 상태를 병합한다. */
+export function mergeTurn(root: TurnState, state: TurnState, base: number): void {
+  root.started = min(root.started, state.started); root.lastAssistant = max(root.lastAssistant, state.lastAssistant);
+  root.completed ||= state.completed; root.completedAt = max(root.completedAt, state.completedAt);
+  root.explicitDuration = max(root.explicitDuration, state.explicitDuration); root.lifecycle ||= state.lifecycle;
+  if (state.title !== null && base + state.titleOrdinal < root.titleOrdinal) {
+    root.title = state.title; root.titleOrdinal = base + state.titleOrdinal;
+  }
 }
 
 export function addCapability(root: Root, category: CapabilityUsageInput['category'], name: string, direction: 1 | -1 = 1): void {
@@ -91,24 +113,39 @@ function timing(root: Root): { status: TurnSummaryInput['status']; completedAt: 
 
 export function materialize(roots: Iterable<Root>, sessions: Map<string, SourcePlan[]>, collectCapabilities: boolean): MemoryAggregateResult {
   const result: MemoryAggregateResult = { summaries: [], orphans: [] };
-  for (const root of roots) {
-    if (root.outcome?.event.status === 'aborted') continue;
-    const sessionFiles = sessions.get(key(root.provider, root.session))!;
-    let main: StreamingAggregateFile | undefined, name: string | null = null;
-    const flags = new Set<string>();
-    const flagRoots = root.rootId === '*' ? ['*'] : ['*', root.rootId].sort(compareText);
-    for (const source of sessionFiles) {
+  // 세션의 main·이름·진단을 요청마다 모든 파일에서 다시 찾지 않는다.
+  const details = new Map<string, { main?: StreamingAggregateFile; name: string | null;
+    flags: Map<string, { fileId: number; rootId: string; values: string[] }[]> }>();
+  for (const [id, files] of sessions) {
+    const session: NonNullable<ReturnType<typeof details.get>> = { name: null, flags: new Map() };
+    for (const source of files) {
       if (source.file.identity.isMain) {
-        main ??= source.file;
-        name = source.file.identity.sessionName ?? name;
+        session.main ??= source.file;
+        session.name = source.file.identity.sessionName ?? session.name;
       }
-      for (const rootId of flagRoots) {
-        const sourceFlags = source.flags.get(rootId);
-        if (!sourceFlags) continue;
-        for (const flag of [...sourceFlags].sort(compareText)) flags.add(flag);
+      for (const [rootId, values] of source.flags) {
+        if (!values.size) continue;
+        let entries = session.flags.get(rootId);
+        if (!entries) session.flags.set(rootId, entries = []);
+        entries.push({ fileId: source.file.id, rootId, values: [...values].sort(compareText) });
       }
     }
-    main ??= root.firstFile;
+    details.set(id, session);
+  }
+  for (const root of roots) {
+    if (root.outcome?.event.status === 'aborted') continue;
+    const session = details.get(key(root.provider, root.session))!;
+    const main = session.main ?? root.firstFile;
+    const flags = new Set<string>();
+    const common = session.flags.get('*') ?? [], specific = root.rootId === '*' ? [] : session.flags.get(root.rootId) ?? [];
+    let commonIndex = 0, specificIndex = 0;
+    while (commonIndex < common.length || specificIndex < specific.length) {
+      const left = common[commonIndex], right = specific[specificIndex];
+      const takeCommon = !right || left && (left.fileId < right.fileId
+        || left.fileId === right.fileId && compareText(left.rootId, right.rootId) < 0);
+      const entry = takeCommon ? common[commonIndex++] : specific[specificIndex++];
+      for (const flag of entry.values) flags.add(flag);
+    }
     const modelUsage: ModelUsageInput[] = [];
     for (const { usage } of root.models.values())
       if (usage.model !== '' || usage.input_tokens + usage.output_tokens > 0) modelUsage.push(usage);
@@ -120,7 +157,7 @@ export function materialize(roots: Iterable<Root>, sessions: Map<string, SourceP
       result.orphans.push({ fileId: root.firstFile.id, offset: root.offset, provider: root.provider, session_id: root.session, rootId: root.rootId });
     }
     result.summaries.push({ provider: root.provider, project_key: main.identity.projectKey, project_name: main.identity.projectName,
-      session_id: root.session, session_name: name, root_turn_id: root.rootId, request_title: root.title,
+      session_id: root.session, session_name: session.name, root_turn_id: root.rootId, request_title: root.title,
       started_at_ms: root.started, completed_at_ms: completedAt, duration_ms: duration, duration_quality: quality,
       input_tokens: root.input, output_tokens: root.output, cache_read_input_tokens: root.cacheRead, cache_write_input_tokens: root.cacheWrite,
       total_tokens: root.input + root.output, status, quality_flags: [...flags].join(',') || null,
