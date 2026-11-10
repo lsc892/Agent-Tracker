@@ -1,11 +1,21 @@
 // 연결 묶음의 최종 변경분을 저장하고 소실 보존·관측·실패 진단을 마무리한다.
 import { setImmediate as yieldToWorker } from 'node:timers/promises';
 import type { MemoryAggregateResult } from '../../aggregation/memoryAggregate';
+import type { MemoryReplacement } from '../../db/memoryStore';
 import type { FileMetadata, Provider } from '../../db/types';
 import { SummaryError } from '../../jsonl';
 import { OrderedGroups } from '../worklist';
 import type { RefreshContext } from './context';
 import { sessionKey, type FileState } from './state';
+
+const MAX_COMMIT_BATCH_COMPONENTS = 16;
+const MAX_COMMIT_BATCH_SUMMARIES = 1000;
+
+interface ComponentCommit {
+  component: Set<string>;
+  members: FileState[];
+  aggregated: MemoryAggregateResult;
+}
 
 export async function commitComponents(context: RefreshContext, aggregated: MemoryAggregateResult): Promise<void> {
   const { state, check, report } = context;
@@ -15,8 +25,47 @@ export async function commitComponents(context: RefreshContext, aggregated: Memo
     sessionKey(file.provider, file.previous?.session_id ?? '')]);
   const summaryGroups = new OrderedGroups(aggregated.summaries, row => [sessionKey(row.provider, row.session_id)]);
   const orphanGroups = new OrderedGroups(aggregated.orphans, row => [sessionKey(row.provider, row.session_id)]);
+  const reconnectedIds = new Set(state.reconnections.flatMap(link => [link.old_id, link.new_id]));
+  const queued = new Set<string>();
+  let batch: ComponentCommit[] = [], batchSummaries = 0;
+  const finish = ({ component }: ComponentCommit): void => {
+    for (const value of component) affected.delete(value);
+    report();
+  };
+  const flush = async (): Promise<void> => {
+    if (!batch.length) return;
+    const pendingBatch = batch;
+    batch = [];
+    batchSummaries = 0;
+    queued.clear();
+    await yieldToWorker();
+    check();
+    if (pendingBatch.length === 1) {
+      const entry = pendingBatch[0];
+      commitComponent(context, entry.component, entry.members, entry.aggregated);
+      finish(entry);
+      return;
+    }
+    try {
+      context.database.replaceMemoryBatch(pendingBatch.map(entry =>
+        componentReplacement(context, entry.component, entry.members, entry.aggregated)), context.storage);
+    } catch {
+      // Scanner summaries contain arrays, so rollback can safely retry each original component.
+      for (const entry of pendingBatch) {
+        await yieldToWorker();
+        check();
+        commitComponent(context, entry.component, entry.members, entry.aggregated);
+        finish(entry);
+      }
+      return;
+    }
+    // A failed COMMIT must leave every member unsettled for the individual retry path.
+    for (const entry of pendingBatch)
+      for (const file of entry.members) file.settled = true;
+    for (const entry of pendingBatch) finish(entry);
+  };
   for (const seed of [...affected].sort()) {
-    if (!affected.has(seed))
+    if (!affected.has(seed) || queued.has(seed))
       continue;
     const component = new Set([seed]), pending = [seed];
     for (let index = 0; index < pending.length; index++)
@@ -26,13 +75,25 @@ export async function commitComponents(context: RefreshContext, aggregated: Memo
           pending.push(linked);
         }
     const members = memberGroups.members(component);
-    await yieldToWorker();
-    check();
-    commitComponent(context, component, members, { summaries: summaryGroups.members(component), orphans: orphanGroups.members(component) });
-    for (const value of component)
-      affected.delete(value);
-    report();
+    const grouped = { summaries: summaryGroups.members(component), orphans: orphanGroups.members(component) };
+    const entry = { component, members, aggregated: grouped };
+    const special = grouped.summaries.length > MAX_COMMIT_BATCH_SUMMARIES || grouped.orphans.length > 0
+      || members.some(file => file.deferred || file.error || file.removed || reconnectedIds.has(file.id));
+    if (special) {
+      await flush();
+      await yieldToWorker();
+      check();
+      commitComponent(context, component, members, grouped);
+      finish(entry);
+      continue;
+    }
+    if (batchSummaries + grouped.summaries.length > MAX_COMMIT_BATCH_SUMMARIES) await flush();
+    batch.push(entry);
+    batchSummaries += grouped.summaries.length;
+    for (const value of component) queued.add(value);
+    if (batch.length === MAX_COMMIT_BATCH_COMPONENTS || batchSummaries === MAX_COMMIT_BATCH_SUMMARIES) await flush();
   }
+  await flush();
 }
 
 function commitComponent(context: RefreshContext, component: Set<string>, members: FileState[], aggregated: MemoryAggregateResult): void {
@@ -61,16 +122,7 @@ function commitComponent(context: RefreshContext, component: Set<string>, member
     return;
   }
   try {
-    const summaries = aggregated.summaries.filter(row => !retain || !missing || row.hasMain);
-    const memberIds = new Set(members.map(file => file.id));
-    const sessions = [...component].map(value => {
-      const [provider, session_id] = JSON.parse(value) as [Provider, string];
-      return { provider, session_id };
-    });
-    database.replaceMemory({ sessions, summaries, files: members.filter(file => !file.removed).map(finalFile),
-      removedFileIds: members.filter(file => file.removed).map(file => file.id),
-      reconnectedFiles: state.reconnections.filter(link => memberIds.has(link.old_id)),
-      preserveCapabilities: !collect, retainDeletedSourceUsage: retain, scanId: result.scanId }, storage);
+    database.replaceMemory(componentReplacement(context, component, members, aggregated), storage);
     for (const file of members)
       file.settled = true;
   }
@@ -79,6 +131,24 @@ function commitComponent(context: RefreshContext, component: Set<string>, member
       state.fail(file, error instanceof SummaryError ? error : new SummaryError('session-commit-error'));
     preserveMissingSources(context, members);
   }
+}
+
+/** 성분별 보존·이동 범위를 합치지 않고 기존 snapshot 계약을 그대로 만든다. */
+function componentReplacement(
+  context: RefreshContext, component: Set<string>, members: FileState[], aggregated: MemoryAggregateResult,
+): MemoryReplacement {
+  const { state, result, collect, retain } = context;
+  const missing = members.some(file => file.removed);
+  const memberIds = new Set(members.map(file => file.id));
+  const sessions = [...component].map(value => {
+    const [provider, session_id] = JSON.parse(value) as [Provider, string];
+    return { provider, session_id };
+  });
+  return { sessions, summaries: aggregated.summaries.filter(row => !retain || !missing || row.hasMain),
+    files: members.filter(file => !file.removed).map(finalFile),
+    removedFileIds: members.filter(file => file.removed).map(file => file.id),
+    reconnectedFiles: state.reconnections.filter(link => memberIds.has(link.old_id)),
+    preserveCapabilities: !collect, retainDeletedSourceUsage: retain, scanId: result.scanId };
 }
 
 function settleDeferredComponent(context: RefreshContext, members: FileState[]): void {

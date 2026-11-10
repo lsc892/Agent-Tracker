@@ -84,6 +84,10 @@ export class SummaryDatabase {
     return new MemoryStore(this.sqlite, this.billing, profile).replace(replacement);
   }
 
+  replaceMemoryBatch(replacements: readonly MemoryReplacement[], profile?: StageProfiler<StorageStage>): void {
+    return new MemoryStore(this.sqlite, this.billing, profile).replaceBatch(replacements);
+  }
+
   queryNames(query: NameQuery): NameResult {
     return this.reader.queryNames(query);
   }
