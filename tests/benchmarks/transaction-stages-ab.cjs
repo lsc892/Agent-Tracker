@@ -20,6 +20,17 @@ const profileKey = Symbol.for('agent-tracker.source-pool-ab');
 let filter = { fromMs: Date.UTC(2025, 11, 31, 15), toMs: Date.UTC(2026, 11, 31, 15),
   unknownTime: 'include', excludeEmptyUsage: true };
 const elapsed = value => typeof value === 'number' ? value : value?.totalMs ?? 0;
+let omittedUsageFields = [];
+
+function retainedUsage(row) {
+  const result = { ...row };
+  for (const field of omittedUsageFields) delete result[field];
+  return result;
+}
+
+function normalizedUsage(row) {
+  return helpers.normalized(retainedUsage(row));
+}
 
 function allUsageBy(db, group, usageFilter, by = 'provider') {
   const rows = []; let total;
@@ -194,11 +205,11 @@ function distribution(db) {
 
 function verify(db, product) {
   const { buildUsageQuery } = require(join(product, 'dist/src/summary/db/queries'));
-  const checked = helpers.verify(db, buildUsageQuery), independent = {};
+  const checked = helpers.verify(db, buildUsageQuery, normalizedUsage), independent = {};
   for (const excludeEmptyUsage of [false, true]) for (const group of groups) {
     const usageFilter = { ...filter, excludeEmptyUsage };
-    independent[`${group}/provider/excludeEmpty=${excludeEmptyUsage}`] = independentCheck(db, usageFilter, group, allUsageBy(db, group, usageFilter));
-    independent[`${group}/model/excludeEmpty=${excludeEmptyUsage}`] = independentModelCheck(db, usageFilter, group, allUsageBy(db, group, usageFilter, 'model'));
+    independent[`${group}/provider/excludeEmpty=${excludeEmptyUsage}`] = independentCheck(db, usageFilter, group, allUsageBy(db, group, usageFilter).map(retainedUsage));
+    independent[`${group}/model/excludeEmpty=${excludeEmptyUsage}`] = independentModelCheck(db, usageFilter, group, allUsageBy(db, group, usageFilter, 'model').map(retainedUsage));
   }
   // 물리 ID와 갱신 시각만 제외하고 실제 DB 상태를 검증한다. 공개 결과에는 해시만 기록한다.
   const manifest = db.connection.prepare(`SELECT provider,path,source_root,session_id,size_bytes,mtime_ms,dev,inode,
@@ -210,13 +221,15 @@ function verify(db, product) {
 async function worker(configPath, variant, pairText, work) {
   const config = JSON.parse(fs.readFileSync(configPath, 'utf8')), product = config.products[variant];
   filter = config.filter;
+  omittedUsageFields = config.omittedUsageFields ?? [];
   const state = { stage: 'outside-refresh', counters: undefined };
   globalThis[profileKey] = state;
   const restore = installCounters(product, state, config.structure);
   const { refreshSummary, PARSER_VERSION } = loadScanner(product, variant, config.structure);
   const { SummaryDatabase } = require(join(product, 'dist/src/summary/db'));
   await fsp.mkdir(work, { recursive: true });
-  const dbPath = join(work, 'summary.sqlite'), db = new SummaryDatabase(dbPath), samples = [];
+  const dbPath = join(work, 'summary.sqlite'), openStarted = performance.now();
+  const db = new SummaryDatabase(dbPath), databaseOpenMs = performance.now() - openStarted, samples = [];
   const originalExec = db.connection.exec;
   let transactions, transactionStarted, beginReturned;
   db.connection.exec = function(sql) {
@@ -234,7 +247,9 @@ async function worker(configPath, variant, pairText, work) {
   };
   let target;
   try {
+    const activateStarted = performance.now();
     db.queryUsagePage(filter, 'day', timezone, { limit: 100 });
+    const emptyRollupActivationMs = performance.now() - activateStarted;
     const rollupState = () => ({
       metadataRows: db.connection.prepare('SELECT count(*) n FROM usage_rollup_meta').get().n,
       requestDailyRows: db.connection.prepare('SELECT count(*) n FROM usage_request_daily').get().n,
@@ -269,7 +284,7 @@ async function worker(configPath, variant, pairText, work) {
       for (const by of ['provider', 'model']) for (const group of groups) {
         const started = performance.now(), page = allUsageBy(db, group, filter, by);
         queries[`${group}/${by}`] = { elapsedMs: performance.now() - started, groups: page.length,
-          rowsSha256: sha(JSON.stringify(page.map(helpers.normalized))),
+          rowsSha256: sha(JSON.stringify(page.map(normalizedUsage))),
           queryMode: buildRollupUsageQueries(filter, group, timezone, by) && rollupState().metadataRows === 1 ? 'rollup-active' : 'raw-required' };
       }
       const { scanId: _scanId, completedAt: _completedAt, ...refresh } = refreshed;
@@ -283,6 +298,16 @@ async function worker(configPath, variant, pairText, work) {
         checked: verify(db, product) };
       sample.relatedControlMs = elapsed(refresh.timings.scan.expandRelated) - (counters.reads.expandRelated?.elapsedMs ?? 0);
       sample.changedControlMs = elapsed(refresh.timings.scan.parseChanged) - (counters.reads.parseChanged?.elapsedMs ?? 0);
+      if (config.omittedUsageFields?.length) {
+        const pragma = name => Object.values(db.connection.prepare(`PRAGMA ${name}`).get())[0];
+        sample.space = { pageSize: pragma('page_size'), pageCount: pragma('page_count'), freelistCount: pragma('freelist_count'),
+          requestColumns: db.connection.prepare('PRAGMA table_info(usage_request_daily)').all().length,
+          modelColumns: db.connection.prepare('PRAGMA table_info(usage_model_daily)').all().length };
+        try {
+          sample.space.dailyTables = db.connection.prepare(`SELECT name,count(*) pages,sum(pgsize) bytes,sum(payload) payloadBytes
+            FROM dbstat WHERE name IN ('usage_request_daily','usage_model_daily') GROUP BY name`).all().map(row => ({ ...row }));
+        } catch { sample.space.dailyTables = null; }
+      }
       samples.push(sample);
       process.send({ kind: 'sample', scenario, ms: refresh.timings.totalMs, parsed: refresh.parsed });
       return sample;
@@ -307,7 +332,7 @@ async function worker(configPath, variant, pairText, work) {
     assert.equal(unchanged.refresh.parsed, 0); assert.deepEqual(unchanged.refresh.timings.storage, {});
     assert.equal(unchanged.checked.factsSha256, appended.checked.factsSha256);
     assert.equal(unchanged.checked.aggregatesSha256, appended.checked.aggregatesSha256);
-    process.send({ kind: 'result', result: { variant, pair: Number(pairText), samples, initialDistribution, pragmas,
+    process.send({ kind: 'result', result: { variant, pair: Number(pairText), samples, initialDistribution, pragmas, databaseOpenMs, emptyRollupActivationMs,
       parserVersion: PARSER_VERSION, sqlite: db.connection.prepare('SELECT sqlite_version() version').get().version,
       appendTarget: { provider: 'codex', existingSessionRequests: target.requests, sessionSourceFiles: targetSessionFiles,
         sourceBytesBefore: target.originalBytes, inputTokens: 123, outputTokens: 7 } } });
@@ -384,7 +409,7 @@ function summarize(trials) {
 async function main(args = process.argv.slice(2), experiment = {}) {
   const options = { workspace: '', before: '', after: '', output: '', pairs: 10, warmups: 3 };
   for (const arg of args) {
-    if (arg === '--prepare-only' || arg === '--structure' || arg === '--raw-range') continue;
+    if (arg === '--prepare-only' || arg === '--structure' || arg === '--raw-range' || arg === '--omit-obsolete-rollup-fields') continue;
     const match = /^--([^=]+)=(.+)$/.exec(arg);
     assert.ok(match && Object.hasOwn(options, match[1]), 'Unknown or incomplete option');
     options[match[1]] = ['pairs', 'warmups'].includes(match[1]) ? Number(match[2]) : resolve(match[2]);
@@ -411,6 +436,8 @@ async function main(args = process.argv.slice(2), experiment = {}) {
   const rawRange = args.includes('--raw-range');
   if (rawRange) filter = { fromMs: -8640000000000000, toMs: 8640000000000000, ...filter };
   const structure = args.includes('--structure');
+  const omittedUsageFields = args.includes('--omit-obsolete-rollup-fields')
+    ? ['unknown_time_turns', 'stale_turns', 'last_successful_update'] : [];
   const trialDirectory = await fsp.mkdtemp(join(options.workspace, structure ? 'diagnostic-' : 'trials-'));
   const report = { dateSeoul: '2026-11-10', outputName: options.output.split(sep).pop(), startedAtSeoul: clock(), timezone, warmups: options.warmups, pairs: options.pairs,
     experiment: experiment.name ?? 'transaction-batch',
@@ -423,9 +450,9 @@ async function main(args = process.argv.slice(2), experiment = {}) {
     runnerSha256: sha(fs.readFileSync(__filename)), helperSha256: Object.fromEntries(['incremental-refresh.cjs', 'temp-batch-ab.cjs']
       .map(name => [name, sha(fs.readFileSync(join(__dirname, name)))])),
     workspace: relative(root, options.workspace).split(sep).join('/'),
-    trialWorkspace: relative(root, trialDirectory).split(sep).join('/'), structure, rawRange, filter,
-    conditions: { cache: 'OS cache uncontrolled, warmed by freezing and prior trials; no forced GC; each variant uses a new process and new DB',
-      trials: 'Three warmup pairs excluded, then ten alternating AB/BA pairs per dataset unless CLI overrides; each initial build supplies the identical pre-append state for that trial',
+    trialWorkspace: relative(root, trialDirectory).split(sep).join('/'), structure, rawRange, filter, omittedUsageFields,
+    conditions: { cache: 'OS cache uncontrolled; no forced cache flush or GC; input freezing and product builds precede measurement; each variant uses a new process and new DB',
+      trials: `${options.warmups} warmup pairs excluded, then ${options.pairs} AB/BA pairs per dataset; with zero warmups the first order is AB. Each initial build supplies the identical pre-append state for that trial`,
       timing: 'Product StageProfiler refresh through COMMIT/optimize; queries outside refresh; copy, process startup, DB open/migration, empty rollup activation, append, checks and source restoration excluded. Explicit BEGIN IMMEDIATE entry through COMMIT return is additionally measured by a lightweight exec wrapper; BEGIN elapsed includes uncontended lock acquisition and is reported separately. Storage peer stages are ranked without nested summaries/rollups child timers.',
       queries: 'All pages and total group counts for provider and model bases, fixed 2026-01-01 inclusive to 2027-01-01 exclusive Asia/Seoul calendar bounds, excludeEmptyUsage=true, unknownTime=include, costs excluded; first post-refresh query per grouping/basis. Independent JS facts reducers also validate excludeEmptyUsage=false outside query timers.',
       instrumentation: structure ? 'Optional structural-diagnostic label; the same StageProfiler, source read and transaction exec wrappers are installed for both variants'
@@ -436,7 +463,7 @@ async function main(args = process.argv.slice(2), experiment = {}) {
     for (const file of snapshot.files) assert.equal(sha(fs.readFileSync(file.path)), file.sha256, 'Frozen input must match original before trials');
     const work = join(trialDirectory, name); await fsp.mkdir(work, { recursive: true });
     const config = join(work, 'queue-config.json');
-    await fsp.writeFile(config, JSON.stringify({ products, directory, snapshot, structure, filter, rawRange }));
+    await fsp.writeFile(config, JSON.stringify({ products, directory, snapshot, structure, filter, rawRange, omittedUsageFields }));
     const entry = { name, inputSha256: snapshot.sha256, inventory: snapshot.inventory, expected: snapshot.expected ?? null,
       syntheticGeneration: spec.requests ? { seed: 'deterministic ordinal; no random generator', turnsPerSession: spec['turns-per-session'],
         providers: 'alternating sessions; equal requests', projects: 10, timestampRule: '2026-07-01 + sessionIndex % 14 days + turnIndex * 3 seconds' } : null,

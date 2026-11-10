@@ -232,7 +232,7 @@ function normalized(row) {
   return result;
 }
 
-function verify(db, buildUsageQuery) {
+function verify(db, buildUsageQuery, normalizeUsage = normalized) {
   const facts = createHash('sha256'), aggregates = createHash('sha256');
   const tables = [
     ['requests', 'SELECT * FROM turn_summary ORDER BY provider,session_id,root_turn_id'],
@@ -250,11 +250,11 @@ function verify(db, buildUsageQuery) {
   let rawChecks = 0;
   for (const by of ['provider', 'model']) for (const group of ['total', 'project', 'session', 'day', 'month']) {
     const query = buildUsageQuery({}, group, 'Asia/Seoul', by);
-    const expected = db.connection.prepare(query.sql).all(...query.values, 10000000, 0).map(normalized);
+    const expected = db.connection.prepare(query.sql).all(...query.values, 10000000, 0).map(normalizeUsage);
     const actual = [];
     for (let offset = 0; ; offset += 1000) {
       const page = db.queryUsagePage({}, group, 'Asia/Seoul', { offset, limit: 1000 }, by);
-      actual.push(...page.rows.map(normalized));
+      actual.push(...page.rows.map(normalizeUsage));
       assert.equal(page.total, expected.length);
       if (page.rows.length < 1000) break;
     }

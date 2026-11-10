@@ -4,7 +4,7 @@ import type { SummaryFilter, UsageGrouping } from '../../types';
 import { buildQueryFilter } from '../common/filters';
 import type { QuerySql, UsageBasis } from '../common/types';
 import { usageTurns } from '../raw/source';
-import { ROLLUP_STATES, ROLLUP_TABLES } from '../../rollup-state';
+import { rollupStates, ROLLUP_TABLES } from '../../rollup-state';
 import { calendarPeriod, periodBounds } from '../../timezone';
 
 interface FullDayBounds {
@@ -38,7 +38,7 @@ export function buildDailyUsageSource(
   const columns = [
     'provider', 'project_key', 'session_id', 'local_day',
     ...(by === 'model' ? ['model', 'model_key'] : []),
-    ...ROLLUP_STATES.map(state => state.name),
+    ...rollupStates(by).map(state => state.name),
   ];
   const unknownDay = unknownAllowed ? " OR local_day = ''" : '';
   const sql = `SELECT
@@ -141,7 +141,7 @@ export function aggregateUsageSource(by: UsageBasis, where = '1 = 1'): string {
       END AS model_key`);
     groups.push('model_key');
   }
-  columns.push(...ROLLUP_STATES.map(state => `${state.expression} AS ${state.name}`));
+  columns.push(...rollupStates(by).map(state => `${state.expression} AS ${state.name}`));
 
   return `SELECT
       ${columns.join(',\n      ')}

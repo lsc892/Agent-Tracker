@@ -1,0 +1,74 @@
+{
+  "dateSeoul": "2026-11-10",
+  "sourceRevision": "c9c7ecb3cbd7db389173b13ee85df59f6cc8615e",
+  "totalMemoryGiB": 7.913616180419922,
+  "checks": {
+    "typecheck": "passed",
+    "lint": "passed",
+    "diffCheck": "passed",
+    "suite": {
+      "total": 420,
+      "passed": 414,
+      "failed": 6,
+      "allFailuresReproducedBefore": true,
+      "failedTests": [
+        "cancellation after one session commits does not mark that successful session stale",
+        "copied parent metadata preserves child lineage and only the verified inherited usage is removed",
+        "rootless Codex subagents retain their local turns and become independent sessions",
+        "rootless legacy subagents become separate sessions without counting verified inherited usage twice",
+        "rootless usage-only subagents work without the parent source and keep sibling sessions distinct",
+        "subagent fallback reassigns an accepted parent session without leaving old totals behind"
+      ]
+    },
+    "baselineReproduction": {
+      "testFiles": [
+        "parsers.test.ts",
+        "summary.integration.test.ts"
+      ],
+      "total": 59,
+      "passed": 53,
+      "failed": 6
+    },
+    "ab": [
+      {
+        "dataset": "current",
+        "requests": 798,
+        "checks": {
+          "allAbPairs": true,
+          "sameSourceReadSetAndOrder": true,
+          "semanticFactsAndManifest": true,
+          "rawSqlRollup10Dimensions": true,
+          "independentJsProviderAndModelAverages": true,
+          "exactAppendDelta": true,
+          "unchangedSkippedBodyAndReplaceMemory": true,
+          "frozenSourcesRestored": true,
+          "foreignKeysAndIntegrity": true,
+          "independentRealDataParserOracle": "not performed; synthetic totals checked against generator"
+        }
+      },
+      {
+        "dataset": "synthetic-10000",
+        "requests": 10000,
+        "checks": {
+          "allAbPairs": true,
+          "sameSourceReadSetAndOrder": true,
+          "semanticFactsAndManifest": true,
+          "rawSqlRollup10Dimensions": true,
+          "independentJsProviderAndModelAverages": true,
+          "exactAppendDelta": true,
+          "unchangedSkippedBodyAndReplaceMemory": true,
+          "frozenSourcesRestored": true,
+          "foreignKeysAndIntegrity": true,
+          "independentRealDataParserOracle": "not performed; synthetic totals checked against generator"
+        }
+      }
+    ]
+  },
+  "measurement": {
+    "pairs": 1,
+    "warmups": 0,
+    "order": "A then B for each dataset",
+    "discardedAttempt": "Before the completed pair, the harness rounded floating-point values before independent assertions and failed on A. Corrected to compare original values and normalize only hashes; failed attempt excluded."
+  },
+  "buildPreparation": "Moved stale compiled files aside and rebuilt both variants from fixed sources. Baseline uses its unchanged localization runtime asset. No stale root scanner.js/client.js entrypoints in either measured build."
+}

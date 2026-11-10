@@ -149,9 +149,9 @@ test('partial-day boundaries are exclusive at the end and unknown time stays in 
   ]);
   const range = { fromMs: epoch('2026-10-01T12:00:00'), toMs: epoch('2026-10-03T12:00:00') };
   assert.equal(prototype.build(range, 'total', prototype.TIMEZONE, 'provider').mode, 'rollup-plus-raw-boundaries');
-  expect(read(db, range)[0], { total_tokens: 60, turn_count: 3, avg_tokens_per_turn: 20, unknown_time_turns: 0 });
-  expect(read(db, { ...range, unknownTime: 'include' })[0], { total_tokens: 100, turn_count: 4, unknown_time_turns: 1 });
-  expect(read(db, { ...range, unknownTime: 'only' })[0], { total_tokens: 40, turn_count: 1, unknown_time_turns: 1 });
+  expect(read(db, range)[0], { total_tokens: 60, turn_count: 3, avg_tokens_per_turn: 20 });
+  expect(read(db, { ...range, unknownTime: 'include' })[0], { total_tokens: 100, turn_count: 4 });
+  expect(read(db, { ...range, unknownTime: 'only' })[0], { total_tokens: 40, turn_count: 1 });
   const calendar = read(db, range, 'day');
   assert.deepEqual(calendar.map(row => [row.period, row.total_tokens]), [
     ['2026-10-01', 10], ['2026-10-02', 20], ['2026-10-03', 30], [null, 40],

@@ -297,7 +297,7 @@ test('calendar charts keep exact table periods and averages without combining da
   const filtered = queryChart(db, { fromMs: start, toMs: start + 86400000, providers: ['claude'] }, 'day', 'Asia/Seoul', 'requests');
   assert.equal(filtered.rows.length, 2, 'dated and undated rows both obey calendar table semantics');
   assert.equal((filtered.rows as UsageRow[]).find(row=>row.period!==null)!.turn_count, 3);
-  assert.equal((filtered.rows as UsageRow[]).find(row=>row.period===null)!.unknown_time_turns, 1);
+  assert.equal((filtered.rows as UsageRow[]).find(row=>row.period===null)!.turn_count, 1);
 });
 
 test('model tables retain each model, request averages, unknown totals, costs and filters in every grouping', t => {

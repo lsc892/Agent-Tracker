@@ -33,23 +33,19 @@ export function mergeRollupMetrics(excludeEmptyUsage = false): string {
       END AS avg_${field}`);
   // #endregion
 
-  // #region 알려진 소요 시간의 평균·품질과 진단 지표
+  // #region 알려진 소요 시간의 평균·품질
   const durationMetrics = [
     `${average(`${prefix}_duration_ms`, `${prefix}_duration_ms_known`)} AS avg_duration_ms`,
     `${sum(`${prefix}_duration_ms_known`)} AS turns_with_duration`,
     ...['exact', 'derived', 'approximate'].map(quality => `${sum(`${prefix}_${quality}`)} AS ${quality}_duration_turns`),
     `${sum(`${prefix}_duration_missing`)} AS missing_duration_turns`,
   ];
-  const diagnostics = [
-    ...['unknown_time_turns', 'stale_turns'].map(field => `${sum(field)} AS ${field}`),
-    'MAX(last_successful_update) AS last_successful_update',
-  ];
   // #endregion
 
   return [
     ...tokenTotals, ...cacheTotals, ...requestTotals,
     ...tokenAverages, ...cacheAverages,
-    ...durationMetrics, ...diagnostics,
+    ...durationMetrics,
   ].join(',\n      ');
 }
 

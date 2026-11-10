@@ -314,15 +314,20 @@ test('v17 upgrade drops obsolete calculation metadata and preserves every accept
       INSERT INTO ${name} VALUES ('claude','session-a','turn-a','old-derived-value');`);
   }
   previous.connection.exec('CREATE INDEX idx_turn_metadata_dependency ON turn_metadata_dependencies(provider,session_id,value,root_id); PRAGMA user_version=17;');
-  const snapshot=(db:SummaryDatabase)=>Object.fromEntries(summaryTables.map(name=>[name,db.connection.prepare(`SELECT * FROM ${name}`).all()]));
+  const factTables=summaryTables.filter(name=>!name.startsWith('usage_'));
+  const snapshot=(db:SummaryDatabase)=>Object.fromEntries(factTables.map(name=>[name,db.connection.prepare(`SELECT * FROM ${name}`).all()]));
   const before=snapshot(previous),turns=previous.queryTurns(),usage=previous.queryUsage({},'day','Asia/Seoul');
   previous.close();
   const current=new SummaryDatabase(dbPath);
   try {
     assert.equal(current.connection.prepare('PRAGMA user_version').get()?.user_version,SCHEMA_VERSION);
     assert.deepEqual(snapshot(current),before);
+    for (const name of ['usage_request_daily','usage_model_daily','usage_rollup_meta']) {
+      assert.equal(current.connection.prepare(`SELECT count(*) AS n FROM ${name}`).get()?.n,0,'Upgrade recreates an empty derived cache');
+    }
     assert.deepEqual(current.queryTurns(),turns);
     assert.deepEqual(current.queryUsage({},'day','Asia/Seoul'),usage);
+    assert.deepEqual(snapshot(current),before,'Lazy rollup rebuild preserves all accepted facts');
     assert.equal(current.findManifest('claude',metadata().path)?.id,fileId);
     assert.equal(current.queryTurns()[0].diagnostic_file_id,fileId);
     assert.equal(current.sessionBilling('claude','session-a'),'subscription');
@@ -481,7 +486,6 @@ test('discovery and failure preserve accepted metadata and previous successful v
   assert.equal(summary.diagnostic_offset, 128);
   assert.equal(summary.last_error, 'parse-error');
   assert.equal(db.diagnostics().counts.stale_summaries, 1);
-  assert.equal(db.queryUsage()[0].stale_turns, 1);
   seed(db);
   assert.equal(db.findManifest('claude', metadata().path)?.last_error, null);
   assert.equal(db.queryTurns()[0].last_error, null);
@@ -682,7 +686,7 @@ test('aggregates include in-progress tokens but average completed turns and know
   assert.equal(aggregate.avg_duration_ms, 2000);
   assert.equal(aggregate.turns_with_duration, 2);
   assert.equal(aggregate.missing_duration_turns, 1);
-  assert.equal(aggregate.unknown_time_turns, 1);
+  assert.equal(db.queryUsage({ unknownTime: 'only' })[0].turn_count, 1);
   const projects = db.queryUsage({}, 'project');
   assert.equal(projects.length, 2);
   assert.equal(projects[0].project_name, projects[1].project_name);
@@ -731,7 +735,7 @@ test('date-filtered calendar pages retain a separately counted unknown-time grou
     assert.equal(rows.length, 2);
     assert.notEqual(rows[0].period, null);
     assert.equal(rows[1].period, null);
-    assert.equal(rows[1].unknown_time_turns, 1);
+    assert.equal(rows[1].turn_count, 1);
     assert.equal(rows[1].total_tokens, 110);
     assert.equal(rows[0].turn_count, 1);
     assert.equal(db.queryUsageCount(filter, grouping, 'Asia/Seoul'), 2);

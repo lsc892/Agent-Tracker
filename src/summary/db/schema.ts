@@ -2,7 +2,7 @@
 import { SCHEMA_ROLLUP_SQL } from './rollup-state';
 
 export { SCHEMA_ROLLUP_SQL } from './rollup-state';
-export const SCHEMA_VERSION = 18;
+export const SCHEMA_VERSION = 19;
 
 /**
  * 책임: 파일 이동 판정에 필요한 플랫폼별 identity 인덱스를 구성한다.
