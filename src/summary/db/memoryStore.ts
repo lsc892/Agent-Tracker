@@ -100,16 +100,21 @@ export class MemoryStore {
     this.profile.measure('replace', () => this.database.transaction(() => this.apply(replacement), this.profile));
   }
 
-  /** 독립 snapshot을 입력 순서대로 적용하고 한 번의 COMMIT으로 함께 확정한다. */
+  /** 독립 snapshot을 적용한 뒤 변경 세션의 rollup을 한 번 갱신하고 함께 확정한다. */
   replaceBatch(replacements: readonly MemoryReplacement[]): void {
     if (!replacements.length) return;
+    if (replacements.length === 1) { this.replace(replacements[0]); return; }
     this.profile.measure('replace', () => this.database.transaction(() => {
-      for (const replacement of replacements) this.apply(replacement);
+      const changedSessions: ReplacementSessions = new Map();
+      for (const replacement of replacements) this.apply(replacement, changedSessions);
+      if (changedSessions.size) {
+        this.profile.measure('rollups', () => this.database.rollups.refreshSessions([...changedSessions.values()], this.profile));
+      }
     }, this.profile));
   }
 
   /** 보존 대상 준비부터 원본·요청 반영과 파생 데이터 정리까지 순서대로 조율한다. */
-  private apply(replacement: MemoryReplacement): void {
+  private apply(replacement: MemoryReplacement, batchSessions?: ReplacementSessions): void {
     const prepareStarted = performance.now();
     const now = new Date().toISOString();
     const sessions = new Map(Array.from(replacement.sessions, session => [sessionKey(session.provider, session.session_id), session]));
@@ -126,7 +131,12 @@ export class MemoryStore {
     this.profile.measure('summaries', () => this.saveSummaries(next, retained.roots, replacement.preserveCapabilities, now, changedSessions, affectedProjects));
     this.profile.measure('reconnectDiagnostics', () => this.reconnectDiagnostics(reconnected));
     this.profile.measure('removeSources', () => this.removeSources(removed, reconnected, retained.sessions, now));
-    this.profile.measure('rollups', () => this.finishSessions(sessions, changedSessions));
+    if (batchSessions) {
+      for (const [key, session] of sessions)
+        if (changedSessions.has(key)) batchSessions.set(key, session);
+    } else {
+      this.profile.measure('rollups', () => this.finishSessions(sessions, changedSessions));
+    }
     this.profile.measure('pruneNames', () => this.pruneNames(sessions, affectedProjects));
   }
 

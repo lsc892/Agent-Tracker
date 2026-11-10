@@ -369,6 +369,7 @@ function summarize(trials) {
     summary[scenario] = { total: metric(sample => sample.refresh.timings.totalMs),
       scan: Object.fromEntries(stageKeys.map(stage => [stage, metric(sample => elapsed(sample.refresh.timings.scan[stage]))])),
       storage: Object.fromEntries(storageKeys.map(stage => [stage, metric(sample => elapsed(sample.refresh.timings.storage[stage]))])),
+      storageCalls: Object.fromEntries(storageKeys.map(stage => [stage, metric(sample => sample.refresh.timings.storage[stage]?.calls ?? 0)])),
       transactions: Object.fromEntries(['calls', 'totalMs', 'beginMs', 'heldMs'].map(key => [key, metric(sample => sample.transactions[key])])),
       peerRankA: peerStages.filter(stage => entries.some(pair => elapsed(pair.A.refresh.timings.storage[stage]) > 0))
         .map(stage => ({ stage, ...stats(entries.map(pair => elapsed(pair.A.refresh.timings.storage[stage]))) }))
@@ -380,9 +381,9 @@ function summarize(trials) {
   return summary;
 }
 
-async function main() {
+async function main(args = process.argv.slice(2), experiment = {}) {
   const options = { workspace: '', before: '', after: '', output: '', pairs: 10, warmups: 3 };
-  for (const arg of process.argv.slice(2)) {
+  for (const arg of args) {
     if (arg === '--prepare-only' || arg === '--structure' || arg === '--raw-range') continue;
     const match = /^--([^=]+)=(.+)$/.exec(arg);
     assert.ok(match && Object.hasOwn(options, match[1]), 'Unknown or incomplete option');
@@ -402,16 +403,19 @@ async function main() {
     }
     snapshots.push({ ...spec, directory, snapshot: JSON.parse(fs.readFileSync(path, 'utf8')) });
   }
-  if (process.argv.includes('--prepare-only')) { console.log('Frozen inputs prepared'); return; }
+  if (args.includes('--prepare-only')) { console.log('Frozen inputs prepared'); return; }
   assert.ok(options.after && options.output, '--after and --output required for measurement');
   assert.ok(options.output.endsWith('.json'), '--output must end in .json');
   assert.equal(fs.existsSync(options.output), false, 'Never overwrite measurements');
   const products = { A: options.before, B: options.after };
-  const rawRange = process.argv.includes('--raw-range');
+  const rawRange = args.includes('--raw-range');
   if (rawRange) filter = { fromMs: -8640000000000000, toMs: 8640000000000000, ...filter };
-  const structure = process.argv.includes('--structure');
+  const structure = args.includes('--structure');
   const trialDirectory = await fsp.mkdtemp(join(options.workspace, structure ? 'diagnostic-' : 'trials-'));
   const report = { dateSeoul: '2026-11-10', outputName: options.output.split(sep).pop(), startedAtSeoul: clock(), timezone, warmups: options.warmups, pairs: options.pairs,
+    experiment: experiment.name ?? 'transaction-batch',
+    entrypoint: relative(root, experiment.entrypoint ?? __filename).split(sep).join('/'),
+    entrypointSha256: sha(fs.readFileSync(experiment.entrypoint ?? __filename)),
     environment: { node: process.version, platform: process.platform, release: release(), cpu: cpus()[0]?.model, logicalCpus: cpus().length },
     revision: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8', windowsHide: true }).trim(),
     products: Object.fromEntries(['A', 'B'].map(variant => [variant,
@@ -462,7 +466,9 @@ async function main() {
   console.log(`Saved ${relative(root, options.output)}`);
 }
 
-if (process.argv[2] === '--worker') worker(...process.argv.slice(3)).then(() => process.disconnect(), error => {
+module.exports = { main };
+
+if (require.main === module && process.argv[2] === '--worker') worker(...process.argv.slice(3)).then(() => process.disconnect(), error => {
   console.error(error); process.exitCode = 1; process.disconnect();
 });
-else main().catch(error => { console.error(error); process.exitCode = 1; });
+else if (require.main === module) main().catch(error => { console.error(error); process.exitCode = 1; });
