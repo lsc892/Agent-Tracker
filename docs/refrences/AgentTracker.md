@@ -288,7 +288,7 @@ Claude credential·로그 보존 설정은 `<dataHome>/.claude`, Codex App Serve
 
 파일 준비는 기존 역인덱스·ID 우선 작업 큐 위의 제한된 Worker 풀에서 실행한다. 파일 하나의 고정 범위 읽기·JSONL/Zstd 파싱·SHA-256·원본별 winner 선택을 같은 Worker가 끝내고 원문·패자 DTO 없이 winner·관계 근거·root 위치만 반환한다. 기본 Worker 수는 `max(1,min(4,availableParallelism()-1))`이고 내부 `sourceWorkers=1`은 순차 처리다. 선행 후보가 하나뿐이거나 후보 원본 크기 합계가 1 MiB 미만이면 풀을 시작하지 않는다. 한 갱신 안에서 Worker를 재사용하고 갱신 종료 시 모두 종료하며, 단일 파일·작은 입력의 시작 비용을 피한다.
 
-선행 작업·미소비 결과는 최대 Worker 수의 두 배(기본 8파일)다. 논리상 먼저 필요한 새 부모가 선행 창 밖에 있으면 우선 작업 하나를 추가할 수 있다. 물리 읽기 완료 순서와 기존 파일 sequence·파일 내 index를 분리하고 식별·세션·오류·계보·winner 반영은 기존 순서대로 수행한다. 미해결 부모와 관계 확장이 끝난 뒤 최종 집계하고 연결 묶음별 DB transaction을 유지한다. 파일 완료만으로 최종 사용량을 INSERT하지 않는다. Worker 오류는 해당 파일 준비 실패로 전달하고, 공유 취소 flag·AbortSignal을 확인하며, 큰 원본의 진행 바이트는 약 100ms 간격으로 전달한다. 오류·취소·파일 교체의 전용 실행 검증은 아직 수행하지 않았다. 실제 범위와 구간별 비교는 [Worker 풀 A/B](../benchmarks/2026-11-09/SourcePoolAB-2026-11-09.md)에 기록한다.
+선행 작업·미소비 결과는 최대 Worker 수의 두 배(기본 8파일)다. 논리상 먼저 필요한 새 부모가 선행 창 밖에 있으면 우선 작업 하나를 추가할 수 있다. 물리 읽기 완료 순서와 기존 파일 sequence·파일 내 index를 분리하고 식별·세션·오류·계보·winner 반영은 기존 순서대로 수행한다. 미해결 부모와 관계 확장이 끝난 뒤 최종 집계하고 연결 묶음별 원자성을 유지하며 저장 묶음은 4.4의 제한을 따른다. 파일 완료만으로 최종 사용량을 INSERT하지 않는다. Worker 오류는 해당 파일 준비 실패로 전달하고, 공유 취소 flag·AbortSignal을 확인하며, 큰 원본의 진행 바이트는 약 100ms 간격으로 전달한다. 오류·취소·파일 교체의 전용 실행 검증은 아직 수행하지 않았다. 실제 범위와 구간별 비교는 [Worker 풀 A/B](../benchmarks/2026-11-09/SourcePoolAB-2026-11-09.md)에 기록한다.
 
 영속 SQLite table은 manifest·projects·sessions·turn_summary·turn_model_usage·turn_costs·session_billing·turn_capability_usage와 일별 집계다. 파일당 manifest 한 행, 외부 사용자 요청당 summary 한 행을 두며 이름은 프로젝트·세션당 한 번 저장한다. agent 실행 row·response candidate·turn metadata 캐시는 저장하지 않는다.
 
@@ -296,7 +296,7 @@ Claude credential·로그 보존 설정은 `<dataHome>/.claude`, Codex App Serve
 
 관련 원본은 갱신 동안 유지하는 `현재 세션 → 파일 집합`, `제공자·source identity → 파일 집합` 역인덱스로 찾고 파일 ID 우선 최소 힙 작업 큐로 중복 준비를 막는다. 변경 원본 전체를 ID순으로 읽은 뒤 미해결 부모·fork의 경로 후보를 해당 반복의 ID순 배치로 먼저 읽고, 영향 세션의 최소 ID 파일을 하나씩 준비하며 새 관계를 반영한다. 부모·fork의 읽기 의존성과 이전·현재 세션의 저장 연결은 구분한다. manifest에는 부모 thread가 없으므로 새 미해결 참조마다 기존 `path.includes(reference)` 후보를 한 번 검색하는 fallback을 유지한다. 새 Codex 원본이 준비되었을 때만 계보를 다시 계산하며 계보 검증 자체의 비용은 남는다.
 
-저장 전에는 이전·현재 세션별 파일과 최종 summary·orphan을 색인하고 연결 성분의 멤버만 원래 순서대로 모은다. 파일 ID·읽기 sequence·동점 winner·오류 성분의 이전 정상값 보존과 트랜잭션 경계를 유지한다. 비Windows dev/inode 이동 후보도 metadata 색인으로 조회한다. 이 색인과 큐는 갱신 종료 시 폐기하며 영속 원본별 상태나 append checkpoint를 추가하지 않는다. watcher와 metadata 동시성은 보류하고 전체 디렉터리 탐색·stat·manifest 비교는 유지한다.
+저장 전에는 이전·현재 세션별 파일과 최종 summary·orphan을 색인하고 연결 성분의 멤버만 원래 순서대로 모은다. 파일 ID·읽기 sequence·동점 winner·오류 성분의 이전 정상값 보존과 성분별 원자성을 유지한다. 비Windows dev/inode 이동 후보도 metadata 색인으로 조회한다. 이 색인과 큐는 갱신 종료 시 폐기하며 영속 원본별 상태나 append checkpoint를 추가하지 않는다. watcher와 metadata 동시성은 보류하고 전체 디렉터리 탐색·stat·manifest 비교는 유지한다.
 
 ```text
 id                  // 내부 파일 식별자; dev/inode 이동 최적화는 유지하고 내용 검증 연결은 새 위치의 id 사용
@@ -367,11 +367,13 @@ response별 증분 상태를 영속화하지 않으므로 append도 tail만 더�
 
 ### 4.4 transaction과 오류 처리
 
-누계 갱신은 Usage 화면 진입 또는 사용자 새로 고침으로 시작한다. 파일 조사와 방문 기록은 최대 n개씩 수행하고, 통계의 확정 단위는 논리 session이다. 하나의 session에는 main과 여러 subagent 파일이 함께 속할 수 있다. 파일의 session 귀속이 바뀌면 이전·새 session을 같은 반영 단위로 묶는다.
+누계 갱신은 Usage 화면 진입 또는 사용자 새로 고침으로 시작한다. 파일 조사와 방문 기록은 최대 n개씩 수행하고, 논리 session과 연결 성분은 통계 snapshot·실패 격리의 단위이며, 정상 성분의 실제 COMMIT·취소 경계는 아래 제한된 저장 묶음이다. 하나의 session에는 main과 여러 subagent 파일이 함께 속할 수 있다. 파일의 session 귀속이 바뀌면 이전·새 session을 같은 반영 단위로 묶는다.
 
 `refreshSummary()`는 원본 발견·근거 수집·관련 세션 확대·winner 선택·성분별 저장을 구분한다. 저장 실패와 파싱 실패의 이전 값 보존을 각각 처리하고 잠금·취소·진행 상태를 공유한다. 전체 원본 이벤트 배열이나 SQL staging은 만들지 않는다.
 
-아래 절차는 각 문제의 처리 기준이다. scan ID·대상 루트·순회 완료 여부·검증 근거·winner는 이번 worker 호출에서만 유지한다. 최종 요청·모델·비용·도구·이름·manifest·삭제를 성분별 transaction에 함께 반영한다.
+아래 절차는 각 문제의 처리 기준이다. scan ID·대상 루트·순회 완료 여부·검증 근거·winner는 이번 worker 호출에서만 유지한다. 최종 요청·모델·비용·도구·이름·manifest·삭제를 성분별 snapshot으로 반영한다. 정상 독립 성분은 기존 순서를 유지하며 최대 16성분·합계 1,000요청까지 한 동기 transaction에서 확정한다. 1성분과 1,000요청 초과 성분은 기존 단일 저장 경로를 사용하고, deferred·원본 오류·orphan·삭제·재연결 성분 앞에서는 대기 묶음을 먼저 확정한 뒤 기존 경로로 처리한다.
+
+묶음의 COMMIT이 성공한 뒤에만 해당 원본을 settled로 표시하고 affected에서 제거한다. 묶음 실패 시 전체 rollback 후 materialize된 입력 배열을 기존 성분별 저장으로 재시도하여 실패 성분을 격리한다. Worker 양보와 취소 확인은 transaction 사이에서 수행한다. 취소 시 이미 확정된 묶음은 유지하고 대기 묶음은 반영하지 않는다. 강제 종료 시 진행 중인 정상 묶음 전체가 미확정 단위이며, WAL·synchronous 설정과 기존 성분 내부의 원자성은 유지한다. 측정 근거와 정확성 범위는 [트랜잭션 A/B](../benchmarks/2026-11-10/TransactionBatchAB-2026-11-10.md)에 둔다.
 
 #### 4.4.1 파일과 집계 결과가 커져 메모리·DB 잠금이 늘어나는 문제
 
@@ -385,7 +387,7 @@ response별 증분 상태를 영속화하지 않으므로 append도 tail만 더�
 4. 다음 묶음은 현재 묶음의 처리가 진행된 만큼만 받아 대기열이 무제한으로 늘어나지 않도록 한다.
 5. 파일 읽기·파싱·집계가 끝난 뒤 결과 반영에만 write transaction을 사용한다. 한 session의 결과를 여러 묶음으로 읽어 쓰더라도 COMMIT은 그 반영 단위가 완성됐을 때 수행한다.
 
-**처리 결과**: n개는 메모리와 조회 묶음의 경계이며, session은 통계 확정의 경계다. 큰 session도 전체 결과를 메모리에 올리지 않고 처리한다. 대신 임시 디스크 I/O와 변경 session 원본 전체를 다시 읽는 비용이 발생하며, transaction 중에는 해당 session 결과의 DB 반영 비용이 남는다.
+**처리 결과**: n개는 메모리와 조회 묶음의 경계이며, session과 연결 성분은 통계 snapshot·실패 격리의 단위다. 정상 성분의 COMMIT·취소 경계는 최대 16성분·1,000요청의 저장 묶음이다. 큰 session도 전체 결과를 메모리에 올리지 않고 처리한다. 대신 임시 디스크 I/O와 변경 session 원본 전체를 다시 읽는 비용이 발생하며, transaction 중에는 해당 session 결과의 DB 반영 비용이 남는다.
 
 #### 4.4.2 파일의 session 귀속 변경으로 중복·누락이 생기는 문제
 
@@ -411,7 +413,7 @@ response별 증분 상태를 영속화하지 않으므로 append도 tail만 더�
 3. lock은 파일 조사부터 삭제 판정·재집계·결과 반영·임시 작업 정리까지 갱신 전체에 적용한다. 각 session의 write transaction은 그 안에서 필요한 때만 연다.
 4. 작업 종료·오류·정상 취소 시 동기 `release()`로 잠금 전용 SQLite 트랜잭션을 종료하고 연결을 닫는다. 잠금 획득 대기는 취소 가능한 비동기로 유지한다.
 
-**처리 결과**: 한 DB의 조사·집계를 직렬 실행한다. 성분별 SQLite transaction이 최종 통계를 보호하고 process 간 lock이 transaction 밖의 탐색·단일 읽기까지 포함한 전체 갱신 순서를 보호한다.
+**처리 결과**: 한 DB의 조사·집계를 직렬 실행한다. 성분별 원자성과 제한된 저장 묶음이 최종 통계를 보호하고 process 간 lock이 transaction 밖의 탐색·단일 읽기까지 포함한 전체 갱신 순서를 보호한다.
 
 #### 4.4.4 중단과 부분 성공을 전체 완료로 오인하는 문제
 
@@ -770,7 +772,7 @@ DB당 시간대 하나의 집계만 유지하며 첫 집계·시간대 변경 �
 
 DB 모듈은 변경 이유별로 책임을 나눈다. `src/summary/db/index.ts`의 `SummaryDatabase`는 worker·scanner API를 연결하고 `connection.ts`는 연결·PRAGMA·statement cache·transaction·optimize·close를 소유한다. `migrations.ts`는 버전 전환, `manifest.ts`는 파일 관측·진단, `memoryStore.ts`는 최종 결과 저장, `billing.ts`는 비용 분류·재계산을 맡는다. 이전 SessionStore·SessionChanges와 SQL staging·metadata 구현은 제거했다.
 
-갱신 저장은 `SummaryDatabase.replaceMemory()`와 `memoryStore.ts`의 한 경로만 사용한다. 스트리밍 winner에서 완성한 요청·모델·도구 snapshot을 기존 facts와 비교해 달라진 행만 저장하며 manifest·삭제 보존·이름 정리·rollup을 같은 BEGIN IMMEDIATE/COMMIT으로 묶는다. 변경 없는 ID·updated_at과 Skill OFF의 기존 횟수를 유지한다. 실제 facts 변경 시 해당 세션의 일별 집계를 재구축하고 어느 단계가 실패해도 함께 rollback한다. 호환 replaceSessions API와 이벤트 TEMP 경로는 제공하지 않는다.
+갱신 저장은 `SummaryDatabase.replaceMemory()`와 정상 성분 묶음용 `replaceMemoryBatch()`를 통해 `memoryStore.ts`의 같은 apply 경로를 사용한다. 묶음 API는 각 snapshot의 보존·삭제·이름·rollup 처리를 입력 순서대로 실행하며 입력 Iterable을 자체 재시도하지 않는다. 스트리밍 winner에서 완성한 요청·모델·도구 snapshot을 기존 facts와 비교해 달라진 행만 저장하며 manifest·삭제 보존·이름 정리·rollup을 같은 BEGIN IMMEDIATE/COMMIT으로 묶는다. 변경 없는 ID·updated_at과 Skill OFF의 기존 횟수를 유지한다. 실제 facts 변경 시 해당 세션의 일별 집계를 재구축하고 어느 단계가 실패해도 해당 transaction 전체를 rollback한다. 호환 replaceSessions API와 이벤트 TEMP 경로는 제공하지 않는다.
 
 미귀속 원본(`session_id=null`)의 accepted metadata는 이번 갱신에서 실제 읽기를 시도했고 오류가 없는 파일만 최종 저장한다. 변경 없어 본문을 읽지 않은 빈 원본은 저장용 DTO 생성·manifest UPSERT를 생략한다. 기존 facts·manifest와 존재 관측 `last_seen_scan_id` 갱신은 유지한다. 저장 입력 파일 객체는 `FileMetadata`와 ID만 투영하며 `prepared` winner·`previous` manifest 참조를 포함하지 않는다.
 
@@ -976,7 +978,7 @@ SQLite query는 기간과 project/session filter를 먼저 적용하고 turn_sum
 
 파일 읽기 → 그룹 winner 비교 → 기존 DTO 갱신 → 패자 폐기를 같은 읽기에서 수행한다. 원본별 그룹 winner Map과 최종 귀속 병합 Map을 사용하며 패자의 숫자 벡터를 남기지 않는다. 나중의 복사 제외·귀속 보정 때문에 폐기한 패자 DTO나 모델을 되살리지 않는다. 삭제·재귀속 뒤에는 다음 갱신에서 필요한 원본을 다시 읽어 winner를 구성한다. 파일 탐색·계보·근거 수집·정렬·최종 저장 비용이 별도로 있으므로 전체 갱신을 추가 요청 수에만 비례한다고 해석하지 않는다.
 
-연결 성분은 최종 저장·취소·실패 보존의 경계다. 고아 요청과 삭제 보존은 해당 성분에서 판정하고 모델·Skill도 제공자·세션·요청으로 구분한다. schema v18은 manifest·facts·모델·비용·Skill·이름·rollup을 함께 확정한다. 단일 읽기의 실패는 관련 성분의 기존 값을 보존하고 취소는 저장 전에 확인한다. 저장 단계의 성분별 실패도 기존 정상 통계를 보존한다. SQL staging·dirty 의존성·turn metadata와 승인 DTO 캐시는 제거했다. 이전 두 번 읽기 구현과 DB 전환의 동등성은 [당시 검증 기록](research/2026-11-08/StreamingWinnerVerification-2026-11-08.md)에, 현재 단일 읽기는 [새 보고서](benchmarks/2026-11-08/SinglePassWinnerAB-2026-11-08.md)에 둔다.
+연결 성분은 최종 snapshot·실패 보존의 단위다. 정상 성분의 실제 COMMIT·취소 경계는 4.4의 제한된 저장 묶음이며 특수 성분은 기존 단일 경로를 따른다. 고아 요청과 삭제 보존은 해당 성분에서 판정하고 모델·Skill도 제공자·세션·요청으로 구분한다. schema v18은 manifest·facts·모델·비용·Skill·이름·rollup을 함께 확정한다. 단일 읽기의 실패는 관련 성분의 기존 값을 보존하고 취소는 저장 전에 확인한다. 저장 단계의 성분별 실패도 기존 정상 통계를 보존한다. SQL staging·dirty 의존성·turn metadata와 승인 DTO 캐시는 제거했다. 이전 두 번 읽기 구현과 DB 전환의 동등성은 [당시 검증 기록](research/2026-11-08/StreamingWinnerVerification-2026-11-08.md)에, 현재 단일 읽기는 [새 보고서](benchmarks/2026-11-08/SinglePassWinnerAB-2026-11-08.md)에 둔다.
 
 SQLite 자체보다 주의할 부분은 VS Code extension 배포 방식이다.
 

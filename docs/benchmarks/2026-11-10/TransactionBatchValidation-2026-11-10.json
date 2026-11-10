@@ -1,0 +1,239 @@
+{
+  "dateSeoul": "2026-11-10",
+  "runnerSha256": "d801c5a179967bdc24afa7e40183bd17e1b6cd7b85827b5744d6943272cf808e",
+  "products": {
+    "A": {
+      "src/summary/db/index.ts": "67564fe0e413ba2fd422c6dd2bec3181d75e1f59926ce46713a3945b09366b13",
+      "src/summary/db/memoryStore.ts": "43f9176713f21949793e53bcd8c76be745fe4b026e25369d7df7cd1da0e33ee8",
+      "src/summary/scanner/refresh/persistence.ts": "9928ba8324405dfb578212ec955f92c1bee850ae41e15b039ca6277664ed94f2",
+      "dist/src/summary/db/index.js": "a65f70bbcd647792d009f160149eb0d99dd3814f1070e92ce7ff2266b1d04ea7",
+      "dist/src/summary/db/memoryStore.js": "5760f111d5ba701c0d182a090f4126a9390ee83867fb4f95faf856c0f9e1b04c",
+      "dist/src/summary/scanner/refresh/persistence.js": "9bbe1252eaa93881affcdc5e6d1cb6c4b6ef74cce4797fa151ba1bdb64fe1450"
+    },
+    "B": {
+      "src/summary/db/index.ts": "cc77a923fc8f110c5ca64ed3b0da5c56f3b9f878cc88890a8919b96ebd527f8f",
+      "src/summary/db/memoryStore.ts": "fbf3895cf31f03e20b7bd51f2c30d94ff5fbf15ca83bb37c9f43eb2f44063065",
+      "src/summary/scanner/refresh/persistence.ts": "2172521972f6e4c9fa8c7b76f14c7f48d29a5646b10e42bc8984c65d7a7d1f51",
+      "dist/src/summary/db/index.js": "29385b04f4f345872d1a57e72f60430ca7709bc4630d628a0d981e6e9a144981",
+      "dist/src/summary/db/memoryStore.js": "9600b91a498aa79350f3dd540f826ac234868f9af2c95fca797af8b9fd759d4f",
+      "dist/src/summary/scanner/refresh/persistence.js": "ad7477117db52b00c4d7211631ab9b526302e48b4779832b17232bc0383f184f"
+    }
+  },
+  "scope": "Directly requested transaction A/B validation; no general automated suite. Synthetic DTOs and scanner persistence entry point.",
+  "limitations": [
+    "OS process kill and power-loss durability not exercised",
+    "No UI, live quota or independent real-log parser oracle"
+  ],
+  "apiSemantics": {
+    "rounds": 3,
+    "independentAggregateChecks": 160,
+    "reusableDtos": true,
+    "projectDateMoveAndDeletion": true,
+    "timezoneRebuild": true
+  },
+  "atomicVisibility": {
+    "separateReaderSeesOnlyCommittedBatch": true,
+    "rollbackRestoresAllPersistentTables": true,
+    "sameDtosRetryAfterRollback": true,
+    "emptyBatchNoTransaction": true,
+    "probeCalls": 5
+  },
+  "componentBoundaries": [
+    {
+      "label": "empty",
+      "calls": []
+    },
+    {
+      "label": "single-append",
+      "calls": [
+        {
+          "kind": "single",
+          "components": 1,
+          "requests": 1
+        }
+      ]
+    },
+    {
+      "label": "sixteen-limit",
+      "calls": [
+        {
+          "kind": "batch",
+          "components": 16,
+          "requests": 16
+        },
+        {
+          "kind": "single",
+          "components": 1,
+          "requests": 1
+        }
+      ]
+    },
+    {
+      "label": "thousand-limit",
+      "calls": [
+        {
+          "kind": "batch",
+          "components": 2,
+          "requests": 1000
+        },
+        {
+          "kind": "single",
+          "components": 1,
+          "requests": 1
+        }
+      ]
+    },
+    {
+      "label": "over-thousand-single",
+      "calls": [
+        {
+          "kind": "single",
+          "components": 1,
+          "requests": 1001
+        },
+        {
+          "kind": "batch",
+          "components": 2,
+          "requests": 2
+        }
+      ]
+    },
+    {
+      "label": "special-deferred",
+      "calls": [
+        {
+          "kind": "batch",
+          "components": 2,
+          "requests": 2
+        },
+        {
+          "kind": "batch",
+          "components": 2,
+          "requests": 2
+        }
+      ]
+    },
+    {
+      "label": "special-error",
+      "calls": [
+        {
+          "kind": "batch",
+          "components": 2,
+          "requests": 2
+        },
+        {
+          "kind": "batch",
+          "components": 2,
+          "requests": 2
+        }
+      ]
+    },
+    {
+      "label": "special-orphan",
+      "calls": [
+        {
+          "kind": "batch",
+          "components": 2,
+          "requests": 2
+        },
+        {
+          "kind": "batch",
+          "components": 2,
+          "requests": 2
+        }
+      ]
+    },
+    {
+      "label": "special-removed",
+      "calls": [
+        {
+          "kind": "batch",
+          "components": 2,
+          "requests": 2
+        },
+        {
+          "kind": "single",
+          "components": 1,
+          "requests": 0
+        },
+        {
+          "kind": "batch",
+          "components": 2,
+          "requests": 2
+        }
+      ]
+    }
+  ],
+  "fallback": {
+    "failedBatchRolledBackThenRetriedIndividually": true,
+    "isolatedFailures": 1,
+    "successfulComponents": 2,
+    "calls": [
+      {
+        "kind": "batch",
+        "components": 3,
+        "requests": 3
+      },
+      {
+        "kind": "single",
+        "components": 1,
+        "requests": 1
+      },
+      {
+        "kind": "single",
+        "components": 1,
+        "requests": 1
+      },
+      {
+        "kind": "single",
+        "components": 1,
+        "requests": 1
+      }
+    ]
+  },
+  "cancellation": {
+    "successfulBatchRemainsCommitted": true,
+    "pendingBatchUncommitted": true,
+    "committedComponents": 16,
+    "pendingComponents": 2
+  },
+  "sourceLifecycle": {
+    "retainedUsageAndCapabilitiesPreserved": true,
+    "explicitDeletion": true,
+    "movedSourceAndDiagnosticRelinked": true,
+    "sequentialAndBatchMatch": true
+  },
+  "fallbackCancellation": {
+    "successfulFallbackComponentCommitted": true,
+    "unattemptedComponentsRemainPending": true,
+    "committed": 1,
+    "pending": 2
+  },
+  "actualScannerFallback": {
+    "actualScannerRefresh": true,
+    "persistedFailureDiagnostic": true,
+    "healthyBeforeAndAfterFailureCommitted": true,
+    "calls": [
+      {
+        "kind": "batch",
+        "components": 3,
+        "requests": 3
+      },
+      {
+        "kind": "single",
+        "components": 1,
+        "requests": 1
+      },
+      {
+        "kind": "single",
+        "components": 1,
+        "requests": 1
+      },
+      {
+        "kind": "single",
+        "components": 1,
+        "requests": 1
+      }
+    ]
+  }
+}

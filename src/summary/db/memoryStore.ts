@@ -100,6 +100,14 @@ export class MemoryStore {
     this.profile.measure('replace', () => this.database.transaction(() => this.apply(replacement), this.profile));
   }
 
+  /** 독립 snapshot을 입력 순서대로 적용하고 한 번의 COMMIT으로 함께 확정한다. */
+  replaceBatch(replacements: readonly MemoryReplacement[]): void {
+    if (!replacements.length) return;
+    this.profile.measure('replace', () => this.database.transaction(() => {
+      for (const replacement of replacements) this.apply(replacement);
+    }, this.profile));
+  }
+
   /** 보존 대상 준비부터 원본·요청 반영과 파생 데이터 정리까지 순서대로 조율한다. */
   private apply(replacement: MemoryReplacement): void {
     const prepareStarted = performance.now();
