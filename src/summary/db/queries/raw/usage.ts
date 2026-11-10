@@ -92,10 +92,7 @@ function usageSums(excludeEmptyUsage = false): string {
     SUM(${completed} AND duration_quality = 'exact') AS exact_duration_turns,
     SUM(${completed} AND duration_quality = 'derived') AS derived_duration_turns,
     SUM(${completed} AND duration_quality = 'approximate') AS approximate_duration_turns,
-    SUM(${completed} AND duration_ms IS NULL) AS missing_duration_turns,
-    SUM(started_at_ms IS NULL) AS unknown_time_turns,
-    SUM(last_error IS NOT NULL) AS stale_turns,
-    MAX(updated_at) AS last_successful_update`;
+    SUM(${completed} AND duration_ms IS NULL) AS missing_duration_turns`;
 }
 
 /**

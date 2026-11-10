@@ -179,9 +179,9 @@ test('public daily range decomposition counts exact partial boundaries once and 
     turn('unknown', null, 40),
   ]);
   const range = { fromMs: epoch('2026-10-01T12:00:00'), toMs: epoch('2026-10-03T12:00:00') };
-  expect(oracle(db, range)[0], { total_tokens: 60, turn_count: 3, avg_tokens_per_turn: 20, unknown_time_turns: 0 });
-  expect(oracle(db, { ...range, unknownTime: 'include' })[0], { total_tokens: 100, turn_count: 4, unknown_time_turns: 1 });
-  expect(oracle(db, { ...range, unknownTime: 'only' })[0], { total_tokens: 40, turn_count: 1, unknown_time_turns: 1 });
+  expect(oracle(db, range)[0], { total_tokens: 60, turn_count: 3, avg_tokens_per_turn: 20 });
+  expect(oracle(db, { ...range, unknownTime: 'include' })[0], { total_tokens: 100, turn_count: 4 });
+  expect(oracle(db, { ...range, unknownTime: 'only' })[0], { total_tokens: 40, turn_count: 1 });
   assert.deepEqual(oracle(db, range, 'day').map(row => [row.period, row.total_tokens]), [
     ['2026-10-01', 10], ['2026-10-02', 20], ['2026-10-03', 30], [null, 40],
   ]);
@@ -345,13 +345,18 @@ test('manifest diagnostic updates refresh stale counts and successful replacemen
   const install = (): void => db.replaceMemory({scanId: 'test', sessions: [{ provider: 'claude', session_id: 'session-a' }],
     files: [{ ...file, id: manifest.id }], summaries: rows });
   install();
-  expect(oracle(db)[0], { stale_turns: 0, total_tokens: 300 });
+  expect(oracle(db)[0], { total_tokens: 300 });
+  assert.equal(db.diagnostics().counts.stale_summaries, 0);
   for (const status of ['error', 'interrupted'] as const) {
+    const beforeDiagnostic = snapshot(db, rollupTables);
     db.setManifestDiagnostic(manifest.id, status, 'failed-line', null, 17);
-    expect(oracle(db)[0], { stale_turns: 2, total_tokens: 300 });
+    assert.deepEqual(snapshot(db, rollupTables), beforeDiagnostic, 'Diagnostic-only updates do not rebuild usage aggregates');
+    expect(oracle(db)[0], { total_tokens: 300 });
+    assert.equal(db.diagnostics().counts.stale_summaries, 2);
     for (const by of ['provider', 'model'] as const) oracle(db, {}, 'day', 'Asia/Seoul', by);
     install();
-    expect(oracle(db)[0], { stale_turns: 0, total_tokens: 300 });
+    expect(oracle(db)[0], { total_tokens: 300 });
+    assert.equal(db.diagnostics().counts.stale_summaries, 0);
   }
   const before = snapshot(db, rollupTables);
   db.markSeen(manifest.id, 'later');
@@ -384,7 +389,7 @@ test('v10 upgrade preserves existing IDs, diagnostic/model/cost rows and lazily 
   assert.equal(migrated.connection.prepare('SELECT COUNT(*) count FROM usage_request_daily').get()?.count, 0);
   assert.equal(migrated.connection.prepare('SELECT COUNT(*) count FROM usage_model_daily').get()?.count, 0);
   for (const by of ['provider', 'model'] as const) {
-    expect(oracle(migrated, {}, 'total', 'Asia/Seoul', by)[0], { total_tokens: 100, stale_turns: 1 });
+    expect(oracle(migrated, {}, 'total', 'Asia/Seoul', by)[0], { total_tokens: 100 });
     oracle(migrated, { includeCosts: true }, 'total', 'Asia/Seoul', by);
   }
   assert.deepEqual(snapshot(migrated, factTables), facts, 'Backfill does not rewrite source/model pricing records');
@@ -443,12 +448,72 @@ for (const version of [14, 15]) test(`v${version} month layout returns to sessio
   assert.deepEqual(snapshot(migrated, factTables), facts);
 });
 
-test('v13 upgrade reuses the populated session-clustered cache without backfill', t => {
+test('v13 upgrade recreates only the derived cache and preserves source facts', t => {
   const files=disk(t),previous=files.open();
   replace(previous,[turn('preserved','2026-10-01T00:00:00',200),turn('unknown',null,10)]);
-  oracle(previous);const before=snapshot(previous);previous.connection.exec('PRAGMA user_version=13');previous.close();
-  const migrated=files.open();assert.deepEqual(snapshot(migrated),before);oracle(migrated);
-  assert.deepEqual(snapshot(migrated),before);
+  oracle(previous);const before=snapshot(previous,factTables);previous.connection.exec('PRAGMA user_version=13');previous.close();
+  const migrated=files.open();assert.deepEqual(snapshot(migrated,factTables),before);
+  assert.equal(migrated.connection.prepare('SELECT COUNT(*) count FROM usage_request_daily').get()?.count,0);
+  oracle(migrated);
+  assert.deepEqual(snapshot(migrated,factTables),before);
+});
+
+test('v18 upgrade removes unused daily columns and lazily rebuilds without changing facts or IDs', t => {
+  const files = disk(t), previous = files.open();
+  const file = metadata(), manifest = previous.observeFile(file, 'v18');
+  previous.replaceMemory({ scanId: 'v18', sessions: [{ provider: 'claude', session_id: 'session-a' }],
+    files: [{ ...file, id: manifest.id }], summaries: [
+      turn('first', '2026-09-30T23:59:00', 100, { diagnostic_file_id: manifest.id, diagnostic_offset: 42,
+        last_error: 'stored-error', billing: 'api', model_usage: [model('A', 100)],
+        capability_usage: [{ category: 'skill', name: 'preserved', usage_count: 2 }] }),
+      turn('second', '2026-10-01T00:01:00', 200, { model_usage: [model('B', 200)] }),
+      turn('unknown', null, 30),
+    ] });
+  const expectedStart = epoch('2026-09-30T23:59:00');
+  for (const by of ['provider', 'model'] as const) {
+    expect(oracle(previous, {}, 'session', 'Asia/Seoul', by)[0], { session_started_at_ms: expectedStart });
+  }
+  const facts = snapshot(previous, factTables), originalID = previous.queryTurns()[0].id;
+  const removed = ['unknown_time_turns', 'stale_turns', 'last_successful_update'];
+  // Recreate the old 41-state layout, including fields whose values are no longer consumed.
+  for (const table of ['usage_request_daily', 'usage_model_daily']) {
+    for (const column of removed) {
+      previous.connection.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${column === 'last_successful_update' ? 'TEXT' : 'INTEGER'}`);
+    }
+  }
+  previous.connection.exec(`ALTER TABLE usage_model_daily ADD COLUMN min_started_at_ms INTEGER;
+    UPDATE usage_rollup_meta SET format_version=1; PRAGMA user_version=18;`);
+  previous.close();
+
+  const migrated = files.open();
+  assert.equal(migrated.connection.prepare('PRAGMA user_version').get()?.user_version, SCHEMA_VERSION);
+  assert.deepEqual(snapshot(migrated, factTables), facts);
+  assert.equal(migrated.queryTurns()[0].id, originalID);
+  assert.equal(migrated.diagnostics().counts.stale_summaries, 1);
+  assert.equal(migrated.connection.prepare('SELECT COUNT(*) count FROM usage_rollup_meta').get()?.count, 0);
+  for (const table of ['usage_request_daily', 'usage_model_daily']) {
+    const columns = migrated.connection.prepare(`PRAGMA table_info(${table})`).all().map(column => column.name);
+    assert.ok(removed.every(column => !columns.includes(column)));
+    assert.equal(columns.includes('min_started_at_ms'), table === 'usage_request_daily');
+    assert.equal(migrated.connection.prepare(`SELECT COUNT(*) count FROM ${table}`).get()?.count, 0);
+  }
+  const range = { fromMs: epoch('2026-10-01T00:00:30'), toMs: epoch('2026-10-02T00:00:00') };
+  for (const by of ['provider', 'model'] as const) {
+    expect(oracle(migrated, {}, 'session', 'Asia/Seoul', by)[0], { session_started_at_ms: expectedStart });
+    for (const unknownTime of ['only', 'include', 'exclude'] as const) {
+      oracle(migrated, { ...range, unknownTime }, 'day', 'Asia/Seoul', by);
+    }
+    const row = oracle(migrated, {}, 'total', 'Asia/Seoul', by)[0];
+    assert.ok(removed.every(column => !Object.hasOwn(row, column)));
+  }
+  assert.deepEqual(snapshot(migrated, factTables), facts);
+  const rebuilt = snapshot(migrated, rollupTables);
+  migrated.close();
+  const reopened = files.open();
+  assert.deepEqual(snapshot(reopened, factTables), facts);
+  assert.deepEqual(snapshot(reopened, rollupTables), rebuilt);
+  oracle(reopened, {}, 'session', 'Asia/Seoul', 'model');
+  assert.deepEqual(snapshot(reopened, rollupTables), rebuilt, 'Reopen reuses the new materialization');
 });
 
 test('a failure after request rollup refresh rolls back facts, model rollup, diagnostics, names and costs', t => {

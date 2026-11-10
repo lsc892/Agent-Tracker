@@ -756,7 +756,7 @@ CREATE INDEX idx_summary_project_period
 
 조회 인덱스는 날짜 범위와 provider·프로젝트·날짜 범위를 유지한다. 세션 조회·교체는 `UNIQUE(provider, session_id, root_turn_id)`의 앞 두 키를 사용하고 별도 `idx_summary_session`은 두지 않는다. 세션으로 좁힌 요청의 `id`순 페이지 조회에는 임시 정렬이 추가될 수 있다. 비용 미포함 전체·프로젝트·세션·일·월 집계는 아래의 일별 rollup을 사용하고, 요청별 상세·비용 포함 조회는 기존 요청·모델 SQL을 사용한다. 결과 캐시는 추가하지 않는다. manifest의 루트·세션 인덱스는 증분 수집에 유지하고, 이동 탐지에 사용하는 identity 인덱스는 Windows에서 제거하며 Linux·macOS에서는 유지한다.
 
-schema v16은 일별 집계를 세션 선두 PK와 집계 형식 v1로 복원했다. v17에서 추가했던 turn_metadata·모델·도구·의존 키 캐시는 v18에서 제거한다. 요청·이름·모델·비용·Skill·manifest와 일별 집계는 보존한다. 조회는 기존 facts·모델·비용·이름 JOIN을 사용한다. 과거 월 PK 실험은 일별 집계에만 적용했던 변경이다.
+schema v16은 일별 집계를 세션 선두 PK와 집계 형식 v1로 복원했다. v17에서 추가했던 turn_metadata·모델·도구·의존 키 캐시는 v18에서 제거했다. v19·집계 형식 v2는 미사용 집계 열을 제거하기 위해 기존 일별 집계와 metadata만 폐기하고 첫 집계 조회에서 재구축한다. 요청·이름·모델·비용·Skill·manifest와 식별자는 보존하며 원본 로그를 다시 파싱하지 않는다. 조회는 기존 facts·모델·비용·이름 JOIN을 사용한다. 과거 월 PK 실험은 일별 집계에만 적용했던 변경이다.
 
 | 표 | 저장 단위와 내용 | 인덱스 |
 | --- | --- | --- |
@@ -764,7 +764,7 @@ schema v16은 일별 집계를 세션 선두 PK와 집계 형식 v1로 복원했
 | `usage_model_daily` | 같은 단위에 모델별 상태 추가. NULL 모델과 빈 모델명은 서로 다른 model_key로 저장 | 요청 표와 같은 PK에 model_key 추가, 같은 두 보조 인덱스 |
 | `usage_rollup_meta` | singleton=1, 현재 시간대, 집계 형식 버전 | singleton PK |
 
-합계·완료 표본·분모·품질·미상 시각·최종 갱신 시각을 보존한다. 평균은 같은 표본의 합계/건수로 병합한다. 다중 모델의 건수를 전체 요청 수로 합치지 않는다. 미상 시각은 빈 local_day로 저장하고 이름은 projects·sessions에서 읽는다. 월은 local_day의 앞 7자로 계산하며 별도 월 컬럼·세션/월 목록은 두지 않는다.
+합계·완료 표본·분모·시간 품질을 보존하며, 키를 제외한 집계 상태는 요청 표 38개·모델 표 37개다. 두 표의 `unknown_time_turns`·`stale_turns`·`last_successful_update`와 모델 표의 `min_started_at_ms`는 저장하지 않는다. 공통 세 진단 필드는 원본 집계의 반환값과 `UsageRow`에서도 제거했다. 세션 시작 시각은 요청 표에만 저장한 `min_started_at_ms`를 사용하며 모델별 조회도 같은 값을 읽는다. 오류·이전 값 안내는 기존 facts 기반 진단 조회를 유지한다. 평균은 같은 표본의 합계/건수로 병합한다. 다중 모델의 건수를 전체 요청 수로 합치지 않는다. 미상 시각은 빈 local_day로 저장하고 이름은 projects·sessions에서 읽는다. 월은 local_day의 앞 7자로 계산하며 별도 월 컬럼·세션/월 목록은 두지 않는다.
 
 DB당 시간대 하나의 집계만 유지하며 첫 집계·시간대 변경 때 두 표를 같은 transaction에서 구축한다. 완전한 현지 날짜는 rollup, 부분 경계는 원본 SQL로 중복 없이 병합한다. DST의 23·25시간 날짜도 현지 경계를 따른다. 범위 역전·지원 캘린더 밖의 시각·비용 포함·isTransaction이 없는 Node 22.15는 원본 SQL을 사용한다.
 
@@ -780,7 +780,7 @@ DB 모듈은 변경 이유별로 책임을 나눈다. `src/summary/db/index.ts`�
 
 갱신 결과는 `timings.totalMs`와 `timings.scan`·`timings.storage`의 고정 단계별 `{calls,totalMs}`를 반환하며 Worker 진단의 `lastRefresh.timings`로도 제공한다. 단조 시계로 잠금·탐색·원본 처리·관계 확장·최종 집계·성분별 저장과 SQL의 BEGIN·비교·facts/모델/Skill/비용·provider/model rollup DELETE/INSERT·COMMIT을 측정한다. 상위·하위 단계는 중첩되므로 합산하지 않는다. 파일별 상태·본문·경로는 계측에 포함하거나 영속화하지 않는다. 관측 기록 등 `replaceMemory` 밖 transaction은 바깥 단계에 포함되며 세부 측정 범위와 실패 시 해석은 [구간 계측 보고서](research/2026-11-09/ScanStorageProfile-2026-11-09.md)를 따른다.
 
-입력에 `updated_at`이 있으면 그 값을 사용하고 생략되면 실제 변경·일괄 재삽입 시각으로 기록한다. 부분 반영 경로의 변경 없는 요청은 이전 시각을 유지한다. 집계의 최종 갱신 시각은 마지막 정상 반영 시각이며 파일 재검사 시각은 manifest.recorded_at으로 확인한다. manifest로 변경 없는 세션을 재사용하고 변경 세션은 원본을 다시 읽는 정책을 유지한다. 월 PK 실험 이력은 [단계별 비교](benchmarks/2026-10-31/StorageProduct-2026-10-31.md)에 보존하고, 갱신 지연을 기준으로 세션 PK를 복원한 결과는 [쓰기 트랜잭션 비교](benchmarks/2026-10-31/StorageTransactions-2026-10-31.md)에 기록한다.
+입력에 `updated_at`이 있으면 그 값을 사용하고 생략되면 실제 변경·일괄 재삽입 시각으로 기록한다. 부분 반영 경로의 변경 없는 요청은 이전 시각을 유지한다. 요청별 갱신 시각은 facts의 `updated_at`, 파일 재검사 시각은 manifest.recorded_at으로 확인한다. 별도의 집계 최종 갱신 시각은 저장·반환하지 않는다. manifest로 변경 없는 세션을 재사용하고 변경 세션은 원본을 다시 읽는 정책을 유지한다. 월 PK 실험 이력은 [단계별 비교](benchmarks/2026-10-31/StorageProduct-2026-10-31.md)에 보존하고, 갱신 지연을 기준으로 세션 PK를 복원한 결과는 [쓰기 트랜잭션 비교](benchmarks/2026-10-31/StorageTransactions-2026-10-31.md)에 기록한다.
 
 `reader.ts`는 조회 실행·페이지·결과 변환과 rollup/raw 경로 선택, `validation.ts`는 공통 수치·페이지 검증을 맡는다. [queries/](../src/summary/db/queries/README.md)는 `common/`의 타입·필터·정렬, `raw/`의 원본·통계·요청·이름·도구·진단, `rollup/`의 최종 조회·일별 소스·병합 지표로 나눈다. 기존 `queries.ts`와 `rollup-queries.ts`는 공개 함수·타입만 재노출하며 내부 구현은 필요한 파일을 직접 참조한다. `rollup-state.ts`는 병합 가능한 상태와 schema, `rollups.ts`는 구축·세션별 갱신·조회 snapshot을 맡는다. SQL은 역할별 구역에서 절·목록·CASE·서브쿼리를 여러 줄로 표현한다. 실제 통계 worker는 `queryUsagePage()` 한 번으로 페이지 행과 전체 개수를 같은 snapshot에서 읽고, 반환된 행으로 도표를 만든다. 요청별·비용 포함·구버전 Node의 raw 조회도 같은 페이지 계약을 사용하며 별도의 도표 조회 메서드와 누계 요청·응답 계약은 두지 않는다. 목록과 개수는 같은 필터·그룹 정의를 사용하고 모델 해석은 공통 facts 표현식을 재사용한다. SQL 구조와 바인딩을 함께 반환하며 시간대·기간·ID는 SQL 문자열에 삽입하지 않는다. 집계 표본·NULL·미상 정렬과 기존 원본 인덱스를 보존한다.
 

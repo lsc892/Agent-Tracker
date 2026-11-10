@@ -174,9 +174,6 @@ export interface UsageRow extends CostFields {
   derived_duration_turns: number;
   approximate_duration_turns: number;
   missing_duration_turns: number;
-  unknown_time_turns: number;
-  stale_turns: number;
-  last_successful_update: string | null;
 }
 
 export interface DiagnosticsPage {
