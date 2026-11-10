@@ -768,11 +768,13 @@ schema v16은 일별 집계를 세션 선두 PK와 집계 형식 v1로 복원했
 
 DB당 시간대 하나의 집계만 유지하며 첫 집계·시간대 변경 때 두 표를 같은 transaction에서 구축한다. 완전한 현지 날짜는 rollup, 부분 경계는 원본 SQL로 중복 없이 병합한다. DST의 23·25시간 날짜도 현지 경계를 따른다. 범위 역전·지원 캘린더 밖의 시각·비용 포함·isTransaction이 없는 Node 22.15는 원본 SQL을 사용한다.
 
-실제 변경 시 대상 세션의 일별 행을 세션 PK 범위로 삭제하고 현재 facts에서 해당 세션 전체의 합계·분모·MIN/MAX를 다시 계산한다. 날짜·프로젝트·모델 이동의 이전 기여도 제거한다. 큰 세션의 동일 snapshot은 집계 쓰기도 생략한다. 진단 오류 갱신·초기화는 facts와 집계를 같은 transaction에서 반영한다. warm 조회는 deferred read transaction으로 준비 확인과 조회의 snapshot을 유지하고 재구축은 writer transaction에서 재확인한다.
+실제 변경 시 대상 세션의 일별 행을 세션 PK 범위로 삭제하고 최종 facts에서 해당 세션 전체의 합계·분모·MIN/MAX를 다시 계산한다. 정상 성분 묶음은 각 snapshot의 저장을 마친 뒤 실제 변경된 `(provider, session_id)`를 중복 제거하여 COMMIT 전에 한 번 집계한다. 각 daily 표에 DELETE·INSERT SELECT를 한 번씩 실행하며 전체 스캔 종료까지 갱신을 미루지 않는다. 변경 세션이 없으면 집계를 생략하고 하나면 기존 직접 세션 경로를 사용한다. 날짜·프로젝트·모델 이동의 이전 기여도 제거한다. 큰 세션의 동일 snapshot은 집계 쓰기도 생략한다. 진단 오류 갱신·초기화는 facts와 집계를 같은 transaction에서 반영한다. warm 조회는 deferred read transaction으로 준비 확인과 조회의 snapshot을 유지하고 재구축은 writer transaction에서 재확인한다.
+
+복수 변경 세션은 JSON tuple 목록 하나를 고정 SQL에 바인딩한다. daily 삭제는 `(provider, session_id)` PK를 사용하고, 재집계는 각 tuple의 기존 요청 UNIQUE 인덱스에서 요청 ID를 찾은 뒤 INTEGER PK로 최종 facts를 읽는다. 목록 길이별 SQL·TEMP 키 표·새 인덱스·스키마는 만들지 않는다. 집계 실패 시 해당 transaction의 facts·두 daily 표를 함께 rollback하며 기존 성분별 재시도를 유지한다. 시간대·형식·지원 시각은 최종 facts를 기준으로 확인한다. 묶음 중간에 미지원 시각이 생겼다가 최종 snapshot에서 제거되는 경우에는 중간 캐시를 폐기하는 대신 유효한 최종 캐시를 유지할 수 있고 공개 조회 결과는 같다. 근거는 [rollup 묶음 A/B](../benchmarks/2026-11-10/RollupBatchAB-2026-11-10.md)에 둔다.
 
 DB 모듈은 변경 이유별로 책임을 나눈다. `src/summary/db/index.ts`의 `SummaryDatabase`는 worker·scanner API를 연결하고 `connection.ts`는 연결·PRAGMA·statement cache·transaction·optimize·close를 소유한다. `migrations.ts`는 버전 전환, `manifest.ts`는 파일 관측·진단, `memoryStore.ts`는 최종 결과 저장, `billing.ts`는 비용 분류·재계산을 맡는다. 이전 SessionStore·SessionChanges와 SQL staging·metadata 구현은 제거했다.
 
-갱신 저장은 `SummaryDatabase.replaceMemory()`와 정상 성분 묶음용 `replaceMemoryBatch()`를 통해 `memoryStore.ts`의 같은 apply 경로를 사용한다. 묶음 API는 각 snapshot의 보존·삭제·이름·rollup 처리를 입력 순서대로 실행하며 입력 Iterable을 자체 재시도하지 않는다. 스트리밍 winner에서 완성한 요청·모델·도구 snapshot을 기존 facts와 비교해 달라진 행만 저장하며 manifest·삭제 보존·이름 정리·rollup을 같은 BEGIN IMMEDIATE/COMMIT으로 묶는다. 변경 없는 ID·updated_at과 Skill OFF의 기존 횟수를 유지한다. 실제 facts 변경 시 해당 세션의 일별 집계를 재구축하고 어느 단계가 실패해도 해당 transaction 전체를 rollback한다. 호환 replaceSessions API와 이벤트 TEMP 경로는 제공하지 않는다.
+갱신 저장은 `SummaryDatabase.replaceMemory()`와 정상 성분 묶음용 `replaceMemoryBatch()`를 통해 `memoryStore.ts`의 같은 apply 경로를 사용한다. 묶음 API는 각 snapshot의 보존·삭제·이름 처리를 입력 순서대로 실행하고 rollup은 변경 세션을 모아 마지막에 한 번 갱신하며 입력 Iterable을 자체 재시도하지 않는다. 스트리밍 winner에서 완성한 요청·모델·도구 snapshot을 기존 facts와 비교해 달라진 행만 저장하며 manifest·삭제 보존·이름 정리·rollup을 같은 BEGIN IMMEDIATE/COMMIT으로 묶는다. 변경 없는 ID·updated_at과 Skill OFF의 기존 횟수를 유지한다. 실제 facts 변경 시 해당 세션의 일별 집계를 재구축하고 어느 단계가 실패해도 해당 transaction 전체를 rollback한다. 호환 replaceSessions API와 이벤트 TEMP 경로는 제공하지 않는다.
 
 미귀속 원본(`session_id=null`)의 accepted metadata는 이번 갱신에서 실제 읽기를 시도했고 오류가 없는 파일만 최종 저장한다. 변경 없어 본문을 읽지 않은 빈 원본은 저장용 DTO 생성·manifest UPSERT를 생략한다. 기존 facts·manifest와 존재 관측 `last_seen_scan_id` 갱신은 유지한다. 저장 입력 파일 객체는 `FileMetadata`와 ID만 투영하며 `prepared` winner·`previous` manifest 참조를 포함하지 않는다.
 

@@ -2,6 +2,7 @@
 
 요약·JSONL·SQL·quota 처리의 정확성과 성능을 비교하는 도구를 모은다.
 
+- [rollup-batch-ab.cjs](rollup-batch-ab.cjs) — 공용 transaction 실행기를 재사용해 저장 묶음 마지막의 변경 세션 일괄 rollup을 `--workspace=<고정 입력 폴더> --before=<A 루트> --after=<B 루트> --output=<새 JSON>`으로 준비 3쌍·교대 10쌍 비교한다. 시간·실제 rollup SQL 호출 수·제공자/모델 평균을 기록한다. [rollup-batch-validation.cjs](rollup-batch-validation.cjs)는 `--before=... --after=... --output=<새 JSON>`으로 반복 세션·이동/삭제·보존·캐시·rollup 실패 원자성과 scanner fallback을 검증한다. [rollup-batch-plan.cjs](rollup-batch-plan.cjs)는 `--before=... --after=... --report=<완료 A/B JSON> --output=<새 JSON>`으로 타이밍 이후 DB 사본의 실제 SQL·계획을 기록한다. [보고서](../../docs/benchmarks/2026-11-10/RollupBatchAB-2026-11-10.md).
 - [transaction-stages-ab.cjs](transaction-stages-ab.cjs) — `--workspace=<고정 입력 폴더> --before=<A 소스·dist 루트> --after=<B 소스·dist 루트> --output=<새 JSON>`으로 현재 전체·합성 10,000요청의 정상 성분 묶음 저장을 준비 3쌍·교대 10쌍 비교한다. 동급 저장 구간 상위 두 개·명시적 거래·COMMIT 횟수·제공자/모델 평균과 JS facts oracle을 기록한다. [transaction-batch-validation.cjs](transaction-batch-validation.cjs)는 같은 A/B를 `--before=... --after=... --output=<새 JSON>`으로 받아 묶음 한계·전체 rollback·실패 격리·취소·삭제 보존·재연결을 별도 검증한다. [보고서](../../docs/benchmarks/2026-11-10/TransactionBatchAB-2026-11-10.md).
 
 - [scan-source-pool-ab.cjs](scan-source-pool-ab.cjs) — `--workspace=<고정 입력 폴더> --before=<A 소스·dist 루트> --after=<B 소스·dist 루트> --output=<새 JSON>`으로 현재 전체·합성 10,000요청의 순차·Worker 풀 파일 준비를 준비3쌍·교대10쌍 비교한다. 최초·1건 추가·무변경의 구간과 저장 내부·평균 조회, DB 의미·논리 읽기 순서·미소비 선행 작업 여부를 검사한다. `--prepare-only`로 고정 입력만 준비할 수 있다. [보고서](../../docs/benchmarks/2026-11-09/SourcePoolAB-2026-11-09.md).
