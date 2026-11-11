@@ -35,7 +35,7 @@ class JsonlLine {
     const search = chunk.subarray(0, end);
     const find = (byte: number, from: number): number => {
       const found = search.indexOf(byte, from);
-      return found < 0 || found > end ? end : found;
+      return found < 0 ? end : found;
     };
     let quote = find(34, start);
     let escape = find(92, start);
@@ -194,7 +194,7 @@ export async function readJsonl(
         let index = 0;
         while (index < bytesRead) {
           const newline = chunk.indexOf(10, index);
-          const end = newline < 0 || newline >= bytesRead ? bytesRead : newline;
+          const end = newline < 0 ? bytesRead : newline;
           let text: string | undefined;
           let sourceBytes = end - index;
           if (!line && end < bytesRead) {

@@ -50,9 +50,12 @@ function *nestedCalls(code: string): Generator<{name:string;args:Record<string,u
     const raw=code.slice(start,end-1);
     const args=argumentsObject(raw);
     // Object literals often have unquoted keys. Extract only supported scalar fields.
-    for (const key of ['cmd','command','file_path','path','skill','subagent_type','agent_type']) {
-      const field=new RegExp(`(?:^|[,{]\\s*)["']?${key}["']?\\s*:\\s*`).exec(raw);
-      if (!field) continue;
+    const fields=/(?:^|[,{]\s*)["']?(cmd|command|file_path|path|skill|subagent_type|agent_type)["']?\s*:\s*/g;
+    const seen=new Set<string>();
+    for (const field of raw.matchAll(fields)) {
+      const key=field[1];
+      if (seen.has(key)) continue;
+      seen.add(key);
       const position=field.index+field[0].length;
       if (!'\'"`'.includes(raw[position] ?? ' ')) continue;
       const end=stringEnd(raw,position);
@@ -72,8 +75,7 @@ function *nestedCalls(code: string): Generator<{name:string;args:Record<string,u
 function skillPaths(value: string): Use[] {
   const uses: Use[]=[];
   // Quoted paths may contain spaces; unquoted paths end at shell separators.
-  const paths=[...value.matchAll(/["']([^"'\r\n]*[\\/]SKILL\.md)["']|([^\s"'`;|]*[\\/]SKILL\.md)/gi)];
-  for (const match of paths) {
+  for (const match of value.matchAll(/["']([^"'\r\n]*[\\/]SKILL\.md)["']|([^\s"'`;|]*[\\/]SKILL\.md)/gi)) {
     const path=(match[1] ?? match[2]).replace(/\\/g,'/');
     const name=displayName(path.split('/').at(-2));
     if (!name) continue;
@@ -121,8 +123,17 @@ function directUses(name: string, args: Record<string,unknown>): Use[] {
   if (plugin) uses.push({category:'plugin',name:displayName(plugin)!});
   if (['read','read_file'].includes(lower)) uses.push(...skillPaths(string(args.file_path ?? args.path) ?? ''));
   if (['exec_command','bash','powershell','shell_command','shell'].includes(lower)) addShellSkillUses(args,uses);
-  return uses.flatMap(use=>{ const name=displayName(use.name);return name ? [{...use,name}] : []; })
-    .filter((use,index,all)=>all.findIndex(other=>other.category===use.category && other.name===use.name)===index);
+  const unique: Use[]=[];
+  const seen=new Set<string>();
+  for (const use of uses) {
+    const name=displayName(use.name);
+    if (!name) continue;
+    const key=`${use.category}:${name}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push({category:use.category,name});
+  }
+  return unique;
 }
 
 /**

@@ -124,14 +124,16 @@ export class CodexCurrentParserAdapter {
     if (!rootId || !turnId) throw new SummaryError('missing-root-turn', offset);
     if (!responseId) throw new SummaryError('missing-response-id', offset);
     this.root = rootId; this.turn = turnId;
-    if (string(payload.session_id)) identity.sessionId = String(payload.session_id);
+    const sessionId = string(payload.session_id);
+    if (sessionId) identity.sessionId = sessionId;
+    const threadId = string(payload.thread_id) ?? identity.threadId;
     const tokens = codexTokens(object(payload.usage));
     this.sink.event({ kind: 'usage', rootId, turnId, responseId, requestId: null,
-      threadId: string(payload.thread_id) ?? identity.threadId, tokens, schema: 'current',
+      threadId, tokens, schema: 'current',
       model: displayName(payload.model) ?? this.model,
       billingMode: billingMode(payload.billing_mode ?? payload.auth_mode ?? this.billing),
       flags: [...tokenFlags(tokens), ...(this.forkMissing ? ['missing-parent'] : [])], offset });
-    if (payload.turn_token_usage) this.sink.event({ kind: 'check', rootId, threadId: string(payload.thread_id) ?? identity.threadId,
+    if (payload.turn_token_usage) this.sink.event({ kind: 'check', rootId, threadId,
       turnId, tokens: codexTokens(object(payload.turn_token_usage)), offset });
   }
 
@@ -182,12 +184,13 @@ export class CodexCurrentParserAdapter {
     if (suppliedRoot) this.root = suppliedRoot;
     else if (ownTurns && suppliedTurn) this.root = suppliedTurn;
     switch (string(payload.type)) {
-      case 'task_started':
+      case 'task_started': {
         this.currentClosed = false; this.hasUserInTurn = false; this.pendingLifecycle = true;
+        const startedAt = lifecycleTimestamp(payload.started_at) ?? time;
         if (this.root) this.sink.event({ kind: 'turn', rootId: this.root, isMain: identity.isMain,
-          startedAt: lifecycleTimestamp(payload.started_at) ?? time, status: 'in_progress',
-          statusAt: lifecycleTimestamp(payload.started_at) ?? time, offset });
+          startedAt, status: 'in_progress', statusAt: startedAt, offset });
         break;
+      }
       case 'user_message':
         if (ownTurns && (!this.root || this.currentClosed || this.hasUserInTurn && !this.pendingLifecycle)) {
           this.root = string(payload.id) ?? (time === null ? undefined : `legacy-${time}`);
@@ -198,15 +201,17 @@ export class CodexCurrentParserAdapter {
           flags: this.root.startsWith('legacy-') ? ['missing-request-id'] : [], offset });
         break;
       case 'task_complete':
-      case 'task_completed':
+      case 'task_completed': {
         this.currentClosed = true;
         if (!this.root) return;
+        const completedAt = lifecycleTimestamp(payload.completed_at) ?? time;
         this.sink.event({ kind: 'turn', rootId: this.root, isMain: identity.isMain, completed: true,
-          completedAt: lifecycleTimestamp(payload.completed_at) ?? time,
+          completedAt,
           duration: typeof payload.duration_ms === 'number' ? number(payload.duration_ms) : null,
           durationQuality: typeof payload.duration_ms === 'number' ? 'exact' : 'derived',
-          status: 'completed', statusAt: lifecycleTimestamp(payload.completed_at) ?? time, offset });
+          status: 'completed', statusAt: completedAt, offset });
         break;
+      }
       case 'turn_aborted':
         this.currentClosed = true; this.pendingLifecycle = false;
         if (this.root) this.sink.event({ kind: 'turn', rootId: this.root, isMain: identity.isMain,
@@ -227,30 +232,33 @@ export class CodexCurrentParserAdapter {
    * 알고리즘: 동일한 total·last 조합은 건너뛰고 last가 없으면 high-water 차분을 사용하며, 누계 역행은 플래그로 남기고 기준값은 감소시키지 않는다.
    */
   private legacyTokens(record: CodexRecordContext): void {
-    const { payload, offset } = record;
+    const { payload, offset, identity } = record;
     const info = object(payload.info);
     if (!info.total_token_usage && !info.last_token_usage) return;
-    if (this.identityValue && !this.identityValue.isMain && !this.hasExplicitRoot && (!this.root || !this.turn)) {
-      this.root = this.turn = this.turn ?? `legacy-${this.identityValue.threadId}`;
+    if (!identity.isMain && !this.hasExplicitRoot && (!this.root || !this.turn)) {
+      this.root = this.turn = this.turn ?? `legacy-${identity.threadId}`;
     }
-    if (!this.root || !this.turn || !this.identityValue) throw new SummaryError('missing-root-turn', offset);
-    const total = info.total_token_usage ? codexTokens(object(info.total_token_usage)) : {...this.highWater};
+    if (!this.root || !this.turn) throw new SummaryError('missing-root-turn', offset);
+    const total = info.total_token_usage ? codexTokens(object(info.total_token_usage)) : this.highWater;
     const last = info.last_token_usage ? codexTokens(object(info.last_token_usage)) : null;
     const signature = JSON.stringify([total, last]);
     if (signature === this.legacySignature) return;
     this.legacySignature = signature;
     const tokens = { ...total };
     const flags: string[] = this.forkMissing ? ['missing-parent'] : [];
+    let regression = false;
     for (const key of Object.keys(total) as (keyof TokenVector)[]) {
-      if (total[key] < this.highWater[key]) flags.push('counter-regression');
+      if (total[key] < this.highWater[key]) regression = true;
       tokens[key] = last ? last[key] : Math.max(0, total[key] - this.highWater[key]);
       this.highWater[key] = Math.max(this.highWater[key], total[key]);
     }
+    if (regression) flags.push('counter-regression');
+    flags.push(...tokenFlags(tokens));
     this.sink.event({ kind: 'usage', rootId: this.root, turnId: this.turn,
       responseId: `legacy-${signature}`, requestId: null,
-      threadId: this.identityValue.threadId, tokens, model: displayName(payload.model) ?? this.model,
+      threadId: identity.threadId, tokens, model: displayName(payload.model) ?? this.model,
       billingMode: billingMode(payload.billing_mode ?? payload.auth_mode ?? this.billing),
-      schema: 'legacy', flags: [...new Set([...flags, ...tokenFlags(tokens)])], offset });
+      schema: 'legacy', flags, offset });
   }
 
   finish(): void {
