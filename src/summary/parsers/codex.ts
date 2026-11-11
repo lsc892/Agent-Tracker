@@ -33,6 +33,7 @@ export class CodexCurrentParserAdapter {
   private hasUserInTurn = false;
   private pendingLifecycle = false;
   private hasExplicitRoot = false;
+  private forkMissing = false;
   private model: string | undefined;
   private billing: import('../db/types').BillingMode = 'unknown';
   private readonly spawnRequests = new Map<string, string>();
@@ -114,11 +115,10 @@ export class CodexCurrentParserAdapter {
    * 알고리즘: root·turn·response ID를 검증해 usage를 내보내고 turn_token_usage는 check 이벤트로만 기록해 이중 합산을 막는다.
    */
   private currentUsage(record: CodexRecordContext): void {
-    const { payload, offset, identity, suppliedRoot, suppliedTurn } = record;
+    const { payload, offset, identity, suppliedTurn } = record;
     this.sawCurrent = true;
     // Mixed generations can coexist. Source evidence excludes legacy usage when this file contains current usage.
-    const rootId = suppliedRoot ?? (!identity.isMain && !this.hasExplicitRoot
-      ? suppliedTurn ?? this.turn ?? this.root : this.root ?? suppliedTurn);
+    const rootId = this.currentUsageRoot(record);
     const turnId = suppliedTurn ?? this.turn;
     const responseId = string(payload.response_id);
     if (!rootId || !turnId) throw new SummaryError('missing-root-turn', offset);
@@ -135,6 +135,15 @@ export class CodexCurrentParserAdapter {
       flags: [...tokenFlags(tokens), ...(this.forkMissing ? ['missing-parent'] : [])], offset });
     if (payload.turn_token_usage) this.sink.event({ kind: 'check', rootId, threadId,
       turnId, tokens: codexTokens(object(payload.turn_token_usage)), offset });
+  }
+
+  /** 명시 root를 우선하고 미연결 자식만 자신의 turn을 부모 후보보다 먼저 사용한다. */
+  private currentUsageRoot(record: CodexRecordContext): string | undefined {
+    if (record.suppliedRoot !== undefined) return record.suppliedRoot;
+    if (!record.identity.isMain && !this.hasExplicitRoot) {
+      return record.suppliedTurn ?? this.turn ?? this.root;
+    }
+    return this.root ?? record.suppliedTurn;
   }
 
   private responseItem(record: CodexRecordContext): void {
@@ -192,26 +201,12 @@ export class CodexCurrentParserAdapter {
         break;
       }
       case 'user_message':
-        if (ownTurns && (!this.root || this.currentClosed || this.hasUserInTurn && !this.pendingLifecycle)) {
-          this.root = string(payload.id) ?? (time === null ? undefined : `legacy-${time}`);
-          this.turn = this.root;
-        }
-        this.hasUserInTurn = true; this.currentClosed = false; this.pendingLifecycle = false;
-        if (this.root) this.sink.event({ kind: 'turn', rootId: this.root, isMain: identity.isMain, startedAt: time, title: requestTitle(payload.message),
-          flags: this.root.startsWith('legacy-') ? ['missing-request-id'] : [], offset });
+        this.recordUserMessage(record, time, ownTurns);
         break;
       case 'task_complete':
-      case 'task_completed': {
-        this.currentClosed = true;
-        if (!this.root) return;
-        const completedAt = lifecycleTimestamp(payload.completed_at) ?? time;
-        this.sink.event({ kind: 'turn', rootId: this.root, isMain: identity.isMain, completed: true,
-          completedAt,
-          duration: typeof payload.duration_ms === 'number' ? number(payload.duration_ms) : null,
-          durationQuality: typeof payload.duration_ms === 'number' ? 'exact' : 'derived',
-          status: 'completed', statusAt: completedAt, offset });
+      case 'task_completed':
+        this.recordCompletion(record, time);
         break;
-      }
       case 'turn_aborted':
         this.currentClosed = true; this.pendingLifecycle = false;
         if (this.root) this.sink.event({ kind: 'turn', rootId: this.root, isMain: identity.isMain,
@@ -226,7 +221,32 @@ export class CodexCurrentParserAdapter {
     }
   }
 
-  private forkMissing = false;
+  /** 명시 시작 이벤트가 없는 이전 형식에서도 다음 사용자 요청을 별도 root로 구분한다. */
+  private recordUserMessage(record: CodexRecordContext, time: number | null, ownTurns: boolean): void {
+    const { payload, identity, offset } = record;
+    if (ownTurns && (!this.root || this.currentClosed || this.hasUserInTurn && !this.pendingLifecycle)) {
+      this.root = string(payload.id) ?? (time === null ? undefined : `legacy-${time}`);
+      this.turn = this.root;
+    }
+    this.hasUserInTurn = true;
+    this.currentClosed = false;
+    this.pendingLifecycle = false;
+    if (this.root) this.sink.event({ kind: 'turn', rootId: this.root, isMain: identity.isMain, startedAt: time,
+      title: requestTitle(payload.message), flags: this.root.startsWith('legacy-') ? ['missing-request-id'] : [], offset });
+  }
+
+  /** 완료 시각과 duration의 출처를 보존하면서 요청을 종료 상태로 기록한다. */
+  private recordCompletion(record: CodexRecordContext, time: number | null): void {
+    const { payload, identity, offset } = record;
+    this.currentClosed = true;
+    if (!this.root) return;
+    const completedAt = lifecycleTimestamp(payload.completed_at) ?? time;
+    this.sink.event({ kind: 'turn', rootId: this.root, isMain: identity.isMain, completed: true, completedAt,
+      duration: typeof payload.duration_ms === 'number' ? number(payload.duration_ms) : null,
+      durationQuality: typeof payload.duration_ms === 'number' ? 'exact' : 'derived',
+      status: 'completed', statusAt: completedAt, offset });
+  }
+
   /**
    * 책임: 이전 형식의 누적 카운터에서 중복 없는 응답 사용량을 복원한다.
    * 알고리즘: 동일한 total·last 조합은 건너뛰고 last가 없으면 high-water 차분을 사용하며, 누계 역행은 플래그로 남기고 기준값은 감소시키지 않는다.
