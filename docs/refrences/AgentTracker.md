@@ -895,6 +895,8 @@ Codex `response_item`의 function/custom tool 호출과 `exec` 안의 정적인 
 
 수치는 제공자별에서는 `turn_summary`, 모델별에서는 `turn_model_usage`를 연결한 요청·모델 행에 filter와 `GROUP BY`를 적용해 조회하고 이름은 projects·sessions에서 연결한다. 이름 목록에서 선택한 project_key·session_id·provider로 조회하므로 중복 제목이 합쳐지지 않는다. 일·월은 configured timezone의 시작·끝 경계를 UTC millisecond로 변환한 뒤 `started_at_ms`에 적용한다. 한 요청의 token과 duration은 시작 시점의 일·월에 귀속하고 날짜 경계에서 나누지 않는다. timezone 변경은 조회 경계를 바꾸며 원본 재파싱은 요구하지 않는다.
 
+그룹 통계·이름 목록·도구 순위는 같은 GROUP BY 결과의 window 지표로 전체 개수와 도구 사용량의 전체 합계·최댓값을 함께 구한다. 첫 빈 페이지의 전체 개수는 0이며, 범위를 벗어난 후속 빈 페이지에만 별도 count SQL을 실행한다. 요청별 cursor 페이지는 cursor 이전까지 포함한 전체 개수가 필요하므로 기존 별도 count를 유지한다. 내부 window 필드는 반환 행에서 제거한다. 통계 화면의 coverage는 진단 counts만 읽고 진단 목록을 조회하지 않는다.
+
 이름 목록은 통계가 저장된 전체 프로젝트·세션을 대상으로 하고 날짜·표 페이지·선택된 세션 조건을 적용하지 않는다. 활성 제공자와 제공자 필터를 따르며 세션 목록에는 선택된 프로젝트 조건만 추가한다. 프로젝트는 project_key당 한 항목, 세션은 provider·project_key·session_id당 한 항목으로 이름순 정렬한다. 목록을 열 때 worker가 100개씩 조회하고 아래로 스크롤하면 다음 묶음을 표시한다. Extension Host는 한 묶음만 전달하고 Webview는 열린 목록의 이름 metadata만 누적하며 닫으면 해제한다. 선택은 표의 첫 페이지부터 적용하고 ‘전체 프로젝트’·‘전체 세션’으로 해제한다. 프로젝트를 바꾸면 기존 세션 선택을 해제하며 세션을 고르면 프로젝트·제공자도 맞춘다. 목록 조회와 선택은 원본 재스캔을 시작하지 않는다.
 
 ```sql

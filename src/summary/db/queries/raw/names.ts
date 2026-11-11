@@ -7,7 +7,7 @@ import type { QuerySql } from '../common/types';
  * 책임: 현재 표 페이지나 날짜와 독립적인 이름 선택 목록을 만든다.
  * 알고리즘: 제공자·프로젝트 범위의 저장 요청에서 ID로 그룹화하고 이름·고정 키로 정렬한 행과 전체 개수 SQL을 함께 생성한다.
  */
-export function buildNameQueries(query: NameQuery): { count: QuerySql; rows: QuerySql } {
+export function buildNameQueries(query: NameQuery, withTotal = false): { count: QuerySql; rows: QuerySql } {
   if (!['project', 'session'].includes(query.kind)) throw new RangeError('Unknown name kind');
   const session = query.kind === 'session';
   const where = buildQueryFilter({
@@ -48,7 +48,7 @@ export function buildNameQueries(query: NameQuery): { count: QuerySql; rows: Que
         ${provider} AS provider,
         ${sessionId} AS session_id,
         ${sessionName} AS session_name,
-        ${sessionStartedAt} AS session_started_at_ms
+        ${sessionStartedAt} AS session_started_at_ms${withTotal ? ', COUNT(*) OVER() AS _total' : ''}
       FROM turn_summary
       WHERE ${where.sql}
       GROUP BY ${groups}
