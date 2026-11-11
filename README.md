@@ -129,6 +129,8 @@ Use **Agent Tracker: Delete Statistics Data** to clear aggregated statistics. Or
 - **Unsupported language fallback** — Display English when the VS Code language is unsupported.
 - **Updated extension icon** — Replace the icon and reduce its image file size.
 
+[Algorithm changes, measured gains over v0.2.0, and limitations (Korean)](docs/Performance-v0.3.0.ko.md)
+
 </details>
 
 <details>

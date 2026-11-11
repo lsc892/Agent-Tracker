@@ -129,6 +129,8 @@ Utilisez **Agent Tracker : Supprimer les données statistiques** pour effacer le
 - **Langue par défaut pour les langues non prises en charge** — Affiche l'anglais lorsque la langue de VS Code n'est pas prise en charge.
 - **Nouvelle icône de l'extension** — Remplace l'icône et réduit la taille du fichier image.
 
+[Évolution des algorithmes, gains mesurés depuis v0.2.0 et limites (en coréen)](docs/Performance-v0.3.0.ko.md)
+
 </details>
 
 <details>
