@@ -33,7 +33,7 @@ export async function includesSourceSnapshot(
       if (position === previous.size_bytes && digest.copy().digest('hex') !== previous.content_hash) return false;
     }
     const after = await lstat(current.path);
-    if (!after.isFile() || after.isSymbolicLink() || String(after.dev) !== current.dev || String(after.ino) !== current.inode
+    if (!after.isFile() || String(after.dev) !== current.dev || String(after.ino) !== current.inode
         || after.size < current.size_bytes || after.size === current.size_bytes && after.mtimeMs !== current.mtime_ms
         || digest.digest('hex') !== current.content_hash) throw new SummaryError('file-rewritten-during-read');
     return true;

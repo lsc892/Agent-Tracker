@@ -47,7 +47,7 @@ export async function readSource(
   const parser = file.provider === 'claude' ? new ClaudeParserAdapter(context, sink) : new CodexCurrentParserAdapter(context, sink);
   try {
     const before = await lstat(file.path);
-    if (!before.isFile() || before.isSymbolicLink() || String(before.dev) !== file.dev
+    if (!before.isFile() || String(before.dev) !== file.dev
       || String(before.ino) !== file.inode || before.size < file.size_bytes) throw new SummaryError('file-replaced-during-read');
     const digest = createHash('sha256');
     const read = await readJsonl(file.path, file.size_bytes, (row, offset) => parser.row(row, offset), {

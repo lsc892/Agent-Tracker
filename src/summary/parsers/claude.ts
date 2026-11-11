@@ -74,7 +74,6 @@ export class ClaudeParserAdapter {
     const type = string(row.type);
     const message = object(row.message);
     const content = message.content;
-    const toolResult = Array.isArray(content) && content.some((item: unknown) => object(item).type === 'tool_result');
     return {
       type, offset, time: timestamp(row.timestamp),
       hasBillingMetadata: row.billing_mode !== undefined || row.auth_mode !== undefined,
@@ -83,7 +82,8 @@ export class ClaudeParserAdapter {
       sessionName: type === 'custom-title' ? displayName(row.customTitle)
         : type === 'ai-title' ? displayName(row.aiTitle) : undefined,
       promptId: string(row.promptId), uuid: string(row.uuid),
-      external: type === 'user' && row.isMeta !== true && !toolResult && row.isSidechain !== true,
+      external: type === 'user' && row.isMeta !== true && row.isSidechain !== true
+        && !(Array.isArray(content) && content.some((item: unknown) => object(item).type === 'tool_result')),
       content, usage: object(message.usage), responseId: string(message.id), requestId: string(row.requestId),
       model: displayName(message.model), usageBillingValue: message.billing_mode ?? row.billing_mode ?? row.auth_mode,
       apiError: row.isApiErrorMessage === true, stopReason: message.stop_reason, subtype: row.subtype,
@@ -124,8 +124,7 @@ export class ClaudeParserAdapter {
     const { promptId, uuid, external } = context;
     const previousRoot = this.currentRoot;
     if (promptId) this.currentRoot = promptId;
-    if (external && !this.currentRoot) this.currentRoot = uuid;
-    if (external && !promptId && uuid) this.currentRoot = uuid;
+    else if (external && uuid) this.currentRoot = uuid;
     context.rootId = this.currentRoot;
     if (external || context.rootId !== previousRoot) { this.apiFailed = false; this.stopBlocked = false; }
   }
