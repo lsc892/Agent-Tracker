@@ -72,7 +72,7 @@ DB 수치는 집계 본체와 보조 인덱스의 live 공간이다. WAL은 chec
 - 전체 결과·원본 SQL·해시·FK·integrity 대조를 통과했다. 저장 42개 시나리오, 파싱 22개 시나리오, 최종 PK 2개 데이터 조건 × 8개 후보를 검증했다. 당시 `npm run check`의 365개 테스트도 통과했다.
 - 실제 로그·OS cold I/O·미상 시각/부분 날짜 경계의 새 월 SQL·다른 시간대·장기 캐시 운용은 이번 비교에 포함하지 않았다. 제품 동작은 변경하지 않았다.
 
-[인덱스 순서 가이드](../../research/SQLiteIndexOrder-2026-10-29.md) · [재현 실행기](../../../tests/benchmarks/storage-ab.cjs) · [보존된 증분 구현](../../../tests/fixtures/storage-ab/README.md) · [이전 실험의 한계](../2026-10-26/SqlWrites-2026-10-26-Analysis.md).
+[인덱스 순서 가이드](../../research/2026-10-29/SQLiteIndexOrder-2026-10-29.md) · [재현 실행기](../../../tests/benchmarks/storage-ab.cjs) · [보존된 증분 구현](../../../tests/fixtures/storage-ab/README.md) · [이전 실험의 한계](../2026-10-26/SqlWrites-2026-10-26-Analysis.md).
 
 ```powershell
 npm.cmd run benchmark:storage -- --output=tests/results/benchmarks/storage-repeat.json

@@ -1,0 +1,319 @@
+{
+  "dateSeoul": "2026-11-08",
+  "inputSha256": "25f2b3bed7376f4ad34bcc920715be5092254b6ffb8c28d48a79ee75d7e174b6",
+  "measuredRunnerSha256": "ba674a498f76af25b86697870124a7f748d72e9fcdd5ec4beaf5912e59a69bc6",
+  "replayRunnerSha256": "a01f7fa1270310d121d34a5e1cb8cac30d05529ec0b9804f3246e5e29d54fb96",
+  "oracleRunnerSha256": "43e5ed52613b045957bb5d814032fa5e67f7f2f0017704983e1f121939f2a2ca",
+  "sourceMatchesMeasuredB": true,
+  "buildMatchesMeasuredB": true,
+  "oracle": {
+    "inputSha256": "25f2b3bed7376f4ad34bcc920715be5092254b6ffb8c28d48a79ee75d7e174b6",
+    "mappingSha256": "4cea927dc0ed4ed4dad62f53aebaf7694dc6412ecbf91fd2aa14e35ab4fedff9",
+    "method": "Unmodified A parser, source winner and eligibility. A materialize child-aborted exclusion is bypassed in memory only to expose usage. Independent raw spawn/agent_path mapping moves every child contribution to its parent; the parent aborted policy still applies.",
+    "baselineChildRequests": 295,
+    "baselineChildTokens": 269810300,
+    "rawChildRequests": 342,
+    "rawChildTokens": 291408837,
+    "exposedChildAbortedRoots": 47,
+    "childAbortedTokens": 21598537,
+    "childRowsMerged": 291,
+    "childRowsExcludedWithParent": 51,
+    "childTokensExcludedWithParent": 35767038,
+    "allExcludedParentsExplicitlyAborted": true,
+    "expectedRequests": 1271,
+    "actualRequests": 1271,
+    "expectedTokens": 2534264940,
+    "actualTokens": 2534264940,
+    "perParentTokenCacheVectorsMatch": true,
+    "perParentModelTokenCacheVectorsMatch": true,
+    "expectedModelRows": 1240,
+    "noChildStandaloneRows": true,
+    "excludedParentContributions": [
+      {
+        "keySha256": "58f962780de3919d173057466dfd8f89a14d6d0b087081cd14e3bd834dae8be6",
+        "tokens": 137514,
+        "parentAborted": true
+      },
+      {
+        "keySha256": "58f962780de3919d173057466dfd8f89a14d6d0b087081cd14e3bd834dae8be6",
+        "tokens": 1397644,
+        "parentAborted": true
+      },
+      {
+        "keySha256": "58f962780de3919d173057466dfd8f89a14d6d0b087081cd14e3bd834dae8be6",
+        "tokens": 170250,
+        "parentAborted": true
+      },
+      {
+        "keySha256": "58f962780de3919d173057466dfd8f89a14d6d0b087081cd14e3bd834dae8be6",
+        "tokens": 6609426,
+        "parentAborted": true
+      },
+      {
+        "keySha256": "58f962780de3919d173057466dfd8f89a14d6d0b087081cd14e3bd834dae8be6",
+        "tokens": 293671,
+        "parentAborted": true
+      },
+      {
+        "keySha256": "58f962780de3919d173057466dfd8f89a14d6d0b087081cd14e3bd834dae8be6",
+        "tokens": 2794637,
+        "parentAborted": true
+      },
+      {
+        "keySha256": "7c78aa8c6c9d53192c470c1a405e69b807e4b859ab0030c6c1fbcbd3e90cbbf0",
+        "tokens": 0,
+        "parentAborted": true
+      },
+      {
+        "keySha256": "7c78aa8c6c9d53192c470c1a405e69b807e4b859ab0030c6c1fbcbd3e90cbbf0",
+        "tokens": 1747331,
+        "parentAborted": true
+      },
+      {
+        "keySha256": "7c78aa8c6c9d53192c470c1a405e69b807e4b859ab0030c6c1fbcbd3e90cbbf0",
+        "tokens": 678813,
+        "parentAborted": true
+      },
+      {
+        "keySha256": "53da6f19a1075f18742565f22e3c2eb4ee75265a7a54c977358c2c2c82713c24",
+        "tokens": 0,
+        "parentAborted": true
+      },
+      {
+        "keySha256": "53da6f19a1075f18742565f22e3c2eb4ee75265a7a54c977358c2c2c82713c24",
+        "tokens": 2285486,
+        "parentAborted": true
+      },
+      {
+        "keySha256": "53da6f19a1075f18742565f22e3c2eb4ee75265a7a54c977358c2c2c82713c24",
+        "tokens": 320988,
+        "parentAborted": true
+      },
+      {
+        "keySha256": "53da6f19a1075f18742565f22e3c2eb4ee75265a7a54c977358c2c2c82713c24",
+        "tokens": 666874,
+        "parentAborted": true
+      },
+      {
+        "keySha256": "53da6f19a1075f18742565f22e3c2eb4ee75265a7a54c977358c2c2c82713c24",
+        "tokens": 0,
+        "parentAborted": true
+      },
+      {
+        "keySha256": "53da6f19a1075f18742565f22e3c2eb4ee75265a7a54c977358c2c2c82713c24",
+        "tokens": 3285865,
+        "parentAborted": true
+      },
+      {
+        "keySha256": "53da6f19a1075f18742565f22e3c2eb4ee75265a7a54c977358c2c2c82713c24",
+        "tokens": 532293,
+        "parentAborted": true
+      },
+      {
+        "keySha256": "53da6f19a1075f18742565f22e3c2eb4ee75265a7a54c977358c2c2c82713c24",
+        "tokens": 178782,
+        "parentAborted": true
+      },
+      {
+        "keySha256": "53da6f19a1075f18742565f22e3c2eb4ee75265a7a54c977358c2c2c82713c24",
+        "tokens": 0,
+        "parentAborted": true
+      },
+      {
+        "keySha256": "53da6f19a1075f18742565f22e3c2eb4ee75265a7a54c977358c2c2c82713c24",
+        "tokens": 2186747,
+        "parentAborted": true
+      },
+      {
+        "keySha256": "53da6f19a1075f18742565f22e3c2eb4ee75265a7a54c977358c2c2c82713c24",
+        "tokens": 3446545,
+        "parentAborted": true
+      },
+      {
+        "keySha256": "53da6f19a1075f18742565f22e3c2eb4ee75265a7a54c977358c2c2c82713c24",
+        "tokens": 361280,
+        "parentAborted": true
+      },
+      {
+        "keySha256": "d67c475f0ebe534a4e7f2f92f04f98242eadc6089652f9043f1f530b7e947b12",
+        "tokens": 0,
+        "parentAborted": true
+      },
+      {
+        "keySha256": "d67c475f0ebe534a4e7f2f92f04f98242eadc6089652f9043f1f530b7e947b12",
+        "tokens": 1895001,
+        "parentAborted": true
+      },
+      {
+        "keySha256": "d67c475f0ebe534a4e7f2f92f04f98242eadc6089652f9043f1f530b7e947b12",
+        "tokens": 565726,
+        "parentAborted": true
+      },
+      {
+        "keySha256": "d67c475f0ebe534a4e7f2f92f04f98242eadc6089652f9043f1f530b7e947b12",
+        "tokens": 0,
+        "parentAborted": true
+      },
+      {
+        "keySha256": "d67c475f0ebe534a4e7f2f92f04f98242eadc6089652f9043f1f530b7e947b12",
+        "tokens": 3003144,
+        "parentAborted": true
+      },
+      {
+        "keySha256": "735bebb8ef069dcc4513b2309e044e03a3124e636bb0bb3dc08a68e52729e862",
+        "tokens": 0,
+        "parentAborted": true
+      },
+      {
+        "keySha256": "735bebb8ef069dcc4513b2309e044e03a3124e636bb0bb3dc08a68e52729e862",
+        "tokens": 0,
+        "parentAborted": true
+      },
+      {
+        "keySha256": "735bebb8ef069dcc4513b2309e044e03a3124e636bb0bb3dc08a68e52729e862",
+        "tokens": 0,
+        "parentAborted": true
+      },
+      {
+        "keySha256": "735bebb8ef069dcc4513b2309e044e03a3124e636bb0bb3dc08a68e52729e862",
+        "tokens": 0,
+        "parentAborted": true
+      },
+      {
+        "keySha256": "735bebb8ef069dcc4513b2309e044e03a3124e636bb0bb3dc08a68e52729e862",
+        "tokens": 1235990,
+        "parentAborted": true
+      },
+      {
+        "keySha256": "260eabe2fb050237115ce50bb0503791723aab108db2b01d38d801a707620877",
+        "tokens": 0,
+        "parentAborted": true
+      },
+      {
+        "keySha256": "260eabe2fb050237115ce50bb0503791723aab108db2b01d38d801a707620877",
+        "tokens": 0,
+        "parentAborted": true
+      },
+      {
+        "keySha256": "260eabe2fb050237115ce50bb0503791723aab108db2b01d38d801a707620877",
+        "tokens": 0,
+        "parentAborted": true
+      },
+      {
+        "keySha256": "260eabe2fb050237115ce50bb0503791723aab108db2b01d38d801a707620877",
+        "tokens": 588769,
+        "parentAborted": true
+      },
+      {
+        "keySha256": "260eabe2fb050237115ce50bb0503791723aab108db2b01d38d801a707620877",
+        "tokens": 0,
+        "parentAborted": true
+      },
+      {
+        "keySha256": "260eabe2fb050237115ce50bb0503791723aab108db2b01d38d801a707620877",
+        "tokens": 0,
+        "parentAborted": true
+      },
+      {
+        "keySha256": "260eabe2fb050237115ce50bb0503791723aab108db2b01d38d801a707620877",
+        "tokens": 0,
+        "parentAborted": true
+      },
+      {
+        "keySha256": "260eabe2fb050237115ce50bb0503791723aab108db2b01d38d801a707620877",
+        "tokens": 443454,
+        "parentAborted": true
+      },
+      {
+        "keySha256": "d5f6442a1ff54a941e275a49bf37ca33566424378089a62bb629bf773f4e1538",
+        "tokens": 0,
+        "parentAborted": true
+      },
+      {
+        "keySha256": "d5f6442a1ff54a941e275a49bf37ca33566424378089a62bb629bf773f4e1538",
+        "tokens": 0,
+        "parentAborted": true
+      },
+      {
+        "keySha256": "d5f6442a1ff54a941e275a49bf37ca33566424378089a62bb629bf773f4e1538",
+        "tokens": 0,
+        "parentAborted": true
+      },
+      {
+        "keySha256": "d5f6442a1ff54a941e275a49bf37ca33566424378089a62bb629bf773f4e1538",
+        "tokens": 0,
+        "parentAborted": true
+      },
+      {
+        "keySha256": "d5f6442a1ff54a941e275a49bf37ca33566424378089a62bb629bf773f4e1538",
+        "tokens": 0,
+        "parentAborted": true
+      },
+      {
+        "keySha256": "d5f6442a1ff54a941e275a49bf37ca33566424378089a62bb629bf773f4e1538",
+        "tokens": 0,
+        "parentAborted": true
+      },
+      {
+        "keySha256": "dc6c975dddf2c31d980fa90cdf270358e08a7b06dda3d9660da9d63475685331",
+        "tokens": 0,
+        "parentAborted": true
+      },
+      {
+        "keySha256": "dc6c975dddf2c31d980fa90cdf270358e08a7b06dda3d9660da9d63475685331",
+        "tokens": 331450,
+        "parentAborted": true
+      },
+      {
+        "keySha256": "dc6c975dddf2c31d980fa90cdf270358e08a7b06dda3d9660da9d63475685331",
+        "tokens": 0,
+        "parentAborted": true
+      },
+      {
+        "keySha256": "dc6c975dddf2c31d980fa90cdf270358e08a7b06dda3d9660da9d63475685331",
+        "tokens": 308759,
+        "parentAborted": true
+      },
+      {
+        "keySha256": "dc6c975dddf2c31d980fa90cdf270358e08a7b06dda3d9660da9d63475685331",
+        "tokens": 0,
+        "parentAborted": true
+      },
+      {
+        "keySha256": "dc6c975dddf2c31d980fa90cdf270358e08a7b06dda3d9660da9d63475685331",
+        "tokens": 300599,
+        "parentAborted": true
+      }
+    ]
+  },
+  "upgrade": {
+    "before": {
+      "requests": 1566,
+      "tokens": 2548433441
+    },
+    "after": {
+      "requests": 1271,
+      "tokens": 2534264940
+    },
+    "failed": 0,
+    "parsed": 620,
+    "bodyBytes": 482670925,
+    "versions": [
+      {
+        "parser_version": 17,
+        "files": 620
+      }
+    ],
+    "allFactsModelsToolsCostsNamesManifestMatchFreshB": true,
+    "allTenAggregatesMatchFreshB": true,
+    "perRequestTokenCacheVectorsMatchFreshB": true,
+    "independentJsAverages": true,
+    "foreignKeysAndIntegrity": true
+  },
+  "verificationScope": "Only this frozen current real dataset; no synthetic data, request append, full automatic suite, live quota, UI or installation.",
+  "commands": [
+    "node --no-warnings tests/benchmarks/parent-dto-delta-ab.cjs --workspace=<private frozen workspace> --after=. --output=<new JSON>",
+    "node --no-warnings tests/benchmarks/parent-dto-delta-oracle.cjs <private frozen workspace>",
+    "node --no-warnings tests/benchmarks/parent-dto-delta-ab.cjs --workspace=<private frozen workspace> --upgrade-only"
+  ]
+}

@@ -1,0 +1,264 @@
+{
+  "dateSeoul": "2026-11-10",
+  "runnerSha256": "7748eea34262cbf39272956533ab40d697b6d9e61362f5978c221103453bbb92",
+  "helperSha256": "d801c5a179967bdc24afa7e40183bd17e1b6cd7b85827b5744d6943272cf808e",
+  "products": {
+    "A": {
+      "src/summary/db/memoryStore.ts": "fbf3895cf31f03e20b7bd51f2c30d94ff5fbf15ca83bb37c9f43eb2f44063065",
+      "src/summary/db/rollups.ts": "79fca405a3389f14cc2faf541e2ed1602ea382ed099757e74dc285d2c4663a72",
+      "dist/src/summary/db/memoryStore.js": "9600b91a498aa79350f3dd540f826ac234868f9af2c95fca797af8b9fd759d4f",
+      "dist/src/summary/db/rollups.js": "0be7d5055da984240a2d35182686d6d094c99a69a5580319127c70838a1adecd"
+    },
+    "B": {
+      "src/summary/db/memoryStore.ts": "f0b76f9a7c47802e076a3ae55278b1b0486458a8f41c4bf58bfc6736f0277721",
+      "src/summary/db/rollups.ts": "bbd176dec4c6ae4e11fd99826cec5d1fc6970f6e5770c079aa51e6c9aab04cc0",
+      "dist/src/summary/db/memoryStore.js": "c96e486a25fd79ef2902ab37e6b9b981237ca950942ae325132573efa35eca41",
+      "dist/src/summary/db/rollups.js": "8d95f985ca9da450ada515d3074be118e53d3b1ffc53218950ade7348ce78e51"
+    }
+  },
+  "scope": "Explicit rollup A/B correctness validation with synthetic DTOs and actual scanner; no general suite",
+  "repeatedSessions": {
+    "repeatedSessionChanges": 3,
+    "uniqueChangedSessions": 2,
+    "counts": {
+      "A": {
+        "DELETE usage_request_daily": 3,
+        "INSERT usage_request_daily": 3,
+        "DELETE usage_model_daily": 3,
+        "INSERT usage_model_daily": 3
+      },
+      "B": {
+        "DELETE usage_request_daily": 1,
+        "INSERT usage_request_daily": 1,
+        "DELETE usage_model_daily": 1,
+        "INSERT usage_model_daily": 1
+      }
+    },
+    "independentAggregateChecks": 40,
+    "separatorAndQuotedSessionIds": true,
+    "sameSessionIdOtherProviderPreserved": true,
+    "noChangeRollupStatements": 0,
+    "singleReplacementUnchanged": true,
+    "plans": [
+      {
+        "operation": "DELETE",
+        "table": "usage_request_daily",
+        "plan": [
+          "SEARCH usage_request_daily USING PRIMARY KEY (provider=? AND session_id=?)",
+          "LIST SUBQUERY 2",
+          "SCAN json_each VIRTUAL TABLE INDEX 1:",
+          "CREATE BLOOM FILTER"
+        ]
+      },
+      {
+        "operation": "INSERT",
+        "table": "usage_request_daily",
+        "plan": [
+          "SEARCH t USING INTEGER PRIMARY KEY (rowid=?)",
+          "LIST SUBQUERY 3",
+          "SCAN changed VIRTUAL TABLE INDEX 1:",
+          "SEARCH selected USING COVERING INDEX sqlite_autoindex_turn_summary_1 (provider=? AND session_id=?)",
+          "CREATE BLOOM FILTER",
+          "USE TEMP B-TREE FOR GROUP BY",
+          "CORRELATED SCALAR SUBQUERY 1",
+          "SEARCH m USING PRIMARY KEY (turn_id=?)",
+          "CORRELATED SCALAR SUBQUERY 1",
+          "SEARCH m USING PRIMARY KEY (turn_id=?)",
+          "CORRELATED SCALAR SUBQUERY 1",
+          "SEARCH m USING PRIMARY KEY (turn_id=?)",
+          "CORRELATED SCALAR SUBQUERY 1",
+          "SEARCH m USING PRIMARY KEY (turn_id=?)",
+          "CORRELATED SCALAR SUBQUERY 1",
+          "SEARCH m USING PRIMARY KEY (turn_id=?)",
+          "CORRELATED SCALAR SUBQUERY 1",
+          "SEARCH m USING PRIMARY KEY (turn_id=?)",
+          "CORRELATED SCALAR SUBQUERY 1",
+          "SEARCH m USING PRIMARY KEY (turn_id=?)",
+          "CORRELATED SCALAR SUBQUERY 1",
+          "SEARCH m USING PRIMARY KEY (turn_id=?)",
+          "CORRELATED SCALAR SUBQUERY 1",
+          "SEARCH m USING PRIMARY KEY (turn_id=?)",
+          "CORRELATED SCALAR SUBQUERY 1",
+          "SEARCH m USING PRIMARY KEY (turn_id=?)",
+          "CORRELATED SCALAR SUBQUERY 1",
+          "SEARCH m USING PRIMARY KEY (turn_id=?)",
+          "CORRELATED SCALAR SUBQUERY 1",
+          "SEARCH m USING PRIMARY KEY (turn_id=?)",
+          "CORRELATED SCALAR SUBQUERY 1",
+          "SEARCH m USING PRIMARY KEY (turn_id=?)",
+          "CORRELATED SCALAR SUBQUERY 1",
+          "SEARCH m USING PRIMARY KEY (turn_id=?)",
+          "CORRELATED SCALAR SUBQUERY 1",
+          "SEARCH m USING PRIMARY KEY (turn_id=?)"
+        ]
+      },
+      {
+        "operation": "DELETE",
+        "table": "usage_model_daily",
+        "plan": [
+          "SEARCH usage_model_daily USING PRIMARY KEY (provider=? AND session_id=?)",
+          "LIST SUBQUERY 2",
+          "SCAN json_each VIRTUAL TABLE INDEX 1:",
+          "CREATE BLOOM FILTER"
+        ]
+      },
+      {
+        "operation": "INSERT",
+        "table": "usage_model_daily",
+        "plan": [
+          "SEARCH t USING INTEGER PRIMARY KEY (rowid=?)",
+          "LIST SUBQUERY 2",
+          "SCAN changed VIRTUAL TABLE INDEX 1:",
+          "SEARCH selected USING COVERING INDEX sqlite_autoindex_turn_summary_1 (provider=? AND session_id=?)",
+          "CREATE BLOOM FILTER",
+          "SEARCH m USING PRIMARY KEY (turn_id=?) LEFT-JOIN",
+          "USE TEMP B-TREE FOR GROUP BY"
+        ]
+      }
+    ]
+  },
+  "metadataAndCalendar": [
+    {
+      "mode": "inactive",
+      "beforeRead": {
+        "A": {
+          "meta": [],
+          "daily": 0,
+          "rollupStatements": 0
+        },
+        "B": {
+          "meta": [],
+          "daily": 0,
+          "rollupStatements": 0
+        }
+      },
+      "afterPublicReadEquivalent": true,
+      "transientCacheDifference": null
+    },
+    {
+      "mode": "format-mismatch",
+      "beforeRead": {
+        "A": {
+          "meta": [
+            {
+              "singleton": 1,
+              "timezone": "Asia/Seoul",
+              "format_version": 999
+            }
+          ],
+          "daily": 1,
+          "rollupStatements": 0
+        },
+        "B": {
+          "meta": [
+            {
+              "singleton": 1,
+              "timezone": "Asia/Seoul",
+              "format_version": 999
+            }
+          ],
+          "daily": 1,
+          "rollupStatements": 0
+        }
+      },
+      "afterPublicReadEquivalent": true,
+      "transientCacheDifference": null
+    },
+    {
+      "mode": "different-timezone",
+      "beforeRead": {
+        "A": {
+          "meta": [
+            {
+              "singleton": 1,
+              "timezone": "America/New_York",
+              "format_version": 1
+            }
+          ],
+          "daily": 2,
+          "rollupStatements": 8
+        },
+        "B": {
+          "meta": [
+            {
+              "singleton": 1,
+              "timezone": "America/New_York",
+              "format_version": 1
+            }
+          ],
+          "daily": 2,
+          "rollupStatements": 4
+        }
+      },
+      "afterPublicReadEquivalent": true,
+      "transientCacheDifference": null
+    },
+    {
+      "mode": "final-unsupported",
+      "beforeRead": {
+        "A": {
+          "meta": [],
+          "daily": 0,
+          "rollupStatements": 0
+        },
+        "B": {
+          "meta": [],
+          "daily": 0,
+          "rollupStatements": 0
+        }
+      },
+      "afterPublicReadEquivalent": true,
+      "transientCacheDifference": null
+    },
+    {
+      "mode": "transient-unsupported",
+      "beforeRead": {
+        "A": {
+          "meta": [],
+          "daily": 0,
+          "rollupStatements": 0
+        },
+        "B": {
+          "meta": [
+            {
+              "singleton": 1,
+              "timezone": "Asia/Seoul",
+              "format_version": 1
+            }
+          ],
+          "daily": 1,
+          "rollupStatements": 4
+        }
+      },
+      "afterPublicReadEquivalent": true,
+      "transientCacheDifference": "A clears on intermediate unsupported facts; B materializes supported final facts. A lazy rebuild converges."
+    }
+  ],
+  "retainedAndRemoved": {
+    "intermediateProjectContributionRemoved": true,
+    "positiveKnownUsageRetained": true,
+    "finalDeletedSessionHasNoDailyRows": true
+  },
+  "atomicity": {
+    "failedModelInsertRollsBackFactsAndBothDailies": true,
+    "exactAllPersistentTableRollback": true,
+    "readerSeesOnlyPreviousCommitUntilBothDailiesComplete": true,
+    "retryWithoutLeakedDirtySessions": true,
+    "probeCalls": 4
+  },
+  "scannerFallback": {
+    "rollupFailureTriggersWholeBatchRollbackAndScannerIndividualFallback": true,
+    "failedComponents": 1,
+    "successfulComponents": 2,
+    "calls": [
+      "batch",
+      "single",
+      "single",
+      "single"
+    ]
+  },
+  "limitations": [
+    "No OS kill, power-loss durability, competing writer, UI or live quota checks",
+    "Intermediate unsupported calendar cache state can differ; final public reads and rebuilt daily states are compared"
+  ]
+}

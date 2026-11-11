@@ -1,13 +1,27 @@
 // 원본 요청과 일치하도록 활성 시간대의 일별 사전 집계를 구축·갱신한다.
 import type { SqliteSession } from './connection';
-import type { Provider } from './types';
+import type { Provider, SessionRef } from './types';
 import { aggregateUsageSource } from './rollup-queries';
 import { ROLLUP_FORMAT_VERSION, ROLLUP_TABLES } from './rollup-state';
+import { performance } from 'node:perf_hooks';
+import type { StageProfiler, StorageStage } from '../profiling';
 
 interface RollupMetadata { timezone: string; format_version: number }
 // Keep local days in the four-digit AD range, with room for timezone offsets.
 const MIN_CALENDAR_TIME = Date.parse('0002-01-03T00:00:00Z');
 const MAX_CALENDAR_TIME = Date.parse('9998-12-29T00:00:00Z');
+// Fixed SQL keeps the statement cache independent of the number of changed sessions.
+const SESSION_SET_FILTER = `(provider, session_id) IN (
+  SELECT json_extract(value, '$[0]'), json_extract(value, '$[1]') FROM json_each(?)
+)`;
+// Visit the existing session index for each tuple before fetching only its matching facts.
+const SESSION_FACTS_FILTER = `id IN (
+  SELECT selected.id
+  FROM json_each(?) AS changed
+  CROSS JOIN turn_summary AS selected
+  WHERE selected.provider = json_extract(changed.value, '$[0]')
+    AND selected.session_id = json_extract(changed.value, '$[1]')
+)`;
 
 /** DB에서 활성 시간대 하나의 일별 사전 집계를 구축하고 세션 변경을 반영한다. */
 export class UsageRollupStore {
@@ -81,22 +95,39 @@ export class UsageRollupStore {
     this.refresh('(provider, session_id) IN (SELECT provider, session_id FROM db_replacement_sessions)', []);
   }
 
-  refreshSession(provider: Provider, sessionId: string): void {
-    this.refresh('provider = ? AND session_id = ?', [provider, sessionId]);
+  refreshSession(provider: Provider, sessionId: string, profile?: StageProfiler<StorageStage>): void {
+    this.refresh('provider = ? AND session_id = ?', [provider, sessionId], profile);
+  }
+
+  /** 묶음 저장에서 모은 변경 세션을 최종 facts로 한 번에 재집계한다. */
+  refreshSessions(sessions: readonly SessionRef[], profile?: StageProfiler<StorageStage>): void {
+    if (!sessions.length) return;
+    if (sessions.length === 1) {
+      this.refreshSession(sessions[0].provider, sessions[0].session_id, profile);
+      return;
+    }
+    const tuples = JSON.stringify(sessions.map(session => [session.provider, session.session_id]));
+    this.refresh(SESSION_SET_FILTER, [tuples], profile, SESSION_FACTS_FILTER);
   }
 
   /**
    * 책임: 변경된 세션의 이전 날짜·프로젝트 기여분까지 교체한다.
    * 알고리즘: 활성 시간대·형식을 검증한 뒤 대상 세션의 provider·model 일별 행을 지우고 현재 facts로 다시 집계한다.
    */
-  private refresh(where: string, values: string[]): void {
+  private refresh(where: string, values: string[], profile?: StageProfiler<StorageStage>, sourceWhere = where): void {
     const metadata = this.metadata();
     if (!metadata || metadata.format_version !== ROLLUP_FORMAT_VERSION) return;
     if (!this.calendarSupported()) { this.clear(); return; }
     for (const by of ['provider', 'model'] as const) {
-      this.database.statement(`DELETE FROM ${ROLLUP_TABLES[by]} WHERE ${where}`).run(...values);
-      this.database.statement(`INSERT INTO ${ROLLUP_TABLES[by]} ${aggregateUsageSource(by, where)}`)
-        .run(metadata.timezone, ...values);
+      const deleteStarted = performance.now();
+      try { this.database.statement(`DELETE FROM ${ROLLUP_TABLES[by]} WHERE ${where}`).run(...values); }
+      finally { profile?.record(by === 'provider' ? 'rollupRequestDelete' : 'rollupModelDelete', deleteStarted); }
+      const insertStarted = performance.now();
+      try {
+        this.database.statement(`INSERT INTO ${ROLLUP_TABLES[by]} ${aggregateUsageSource(by, sourceWhere)}`)
+          .run(metadata.timezone, ...values);
+      }
+      finally { profile?.record(by === 'provider' ? 'rollupRequestInsert' : 'rollupModelInsert', insertStarted); }
     }
   }
 

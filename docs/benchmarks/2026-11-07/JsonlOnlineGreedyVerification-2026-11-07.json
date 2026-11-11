@@ -1,0 +1,44 @@
+{
+  "date": "2026-11-07",
+  "timezone": "Asia/Seoul",
+  "branch": "experiment/jsonl-online-greedy-check-2026-11-07",
+  "experiment": "Winner-only online usage selection with no retrospective regrouping or validity exclusions",
+  "baselineSourcesMatchFrozenSqlAndDto": true,
+  "snapshotFiles": 580,
+  "snapshotBytes": 392592768,
+  "inputSha256": "59e806089e09799c20b65234976c93068d2fd4c5685a3101ecf0a512699c0010",
+  "sourcesAndBuildsIdentified": true,
+  "snapshotBytesUnchanged": true,
+  "originalLogsNotModified": true,
+  "existingSqlAndDtoFactsMatch": true,
+  "independentSortedFinalWinnerControlMatches": true,
+  "referenceUsageProjectionMatchesSqlFacts": true,
+  "candidateWinnerOnlyMapsDoNotReadReferenceAuditRows": true,
+  "commonAbortedRootExclusion": "Applied only by comparison projection to both selections; lifecycle finalization itself is not under test",
+  "mainCandidateMatches": false,
+  "tokenDelta": 254651166,
+  "validityAndAttributionControlMatches": true,
+  "npmCheck": {
+    "tests": 398,
+    "pass": 398,
+    "fail": 0,
+    "logSha256": "d2385a93e3830679c59e29b96d713789becf3b0b7c21b98bab628ba9ce82e09c"
+  },
+  "experimentTests": {
+    "tests": 4,
+    "pass": 4,
+    "fail": 0,
+    "logSha256": "3934db5fa0d6fb0c03516dd046bd22af952bf482c31951c798a34da61b3de7fb"
+  },
+  "artifacts": {
+    "JsonlOnlineGreedyCorrectness-2026-11-07.json": "fb7c4ebb0aa730f43848fd3fcf4c51e3c815410b208a0d8727ef9412cc99c2d7"
+  },
+  "runners": {
+    "jsonl-online-greedy-check.cjs": "dc58031dedc9a8d455b44cbf7df88384c8a8844050e79664566ec1787c696120",
+    "incremental-refresh.cjs": "f5cb7a68c4d8b0d745dd85b4b3c69811e1009cd3cb7701ce80d90d2f23a5f601",
+    "temp-batch-ab.cjs": "9567311fbf7746c537fcdc7eaa05bf35e92e7dc04931075c03d8ba6bb03b10b0"
+  },
+  "testSha256": "9e4931b4bf0bdbc03b622af3a994681d9541c2aa470c965da8bb46caeb89f68d",
+  "productSourceChanges": false,
+  "performanceClaim": false
+}

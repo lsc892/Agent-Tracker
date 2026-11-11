@@ -1,4 +1,5 @@
 // 기준·후보 JSONL 리더의 결과 일치와 읽기·전체 갱신 성능을 비교한다.
+const { summaryPath } = require('./summary-paths.cjs');
 const assert = require('node:assert/strict');
 const { fork, execFileSync } = require('node:child_process');
 const { createHash } = require('node:crypto');
@@ -9,7 +10,7 @@ const { performance } = require('node:perf_hooks');
 const root = resolve(__dirname, '../..');
 const cache = join(root, 'tests/.cache/jsonl-reader');
 const manifestPath = join(cache, 'manifest.json');
-const currentModule = join(root, 'dist/src/summary/jsonl.js');
+const currentModule = summaryPath(root, "dist/src/summary/jsonl/index.js");
 const baselineModule = join(cache, 'baseline.cjs');
 const sha = data => createHash('sha256').update(data).digest('hex');
 const seoulTime = () => new Intl.DateTimeFormat('sv-SE', {
@@ -83,7 +84,7 @@ async function capture() {
   // Use a fresh directory; never overwrite a previous baseline or frozen input.
   await mkdir(dirname(cache), { recursive: true });
   await mkdir(cache, { recursive: false });
-  const source = await readFile(join(root, 'src/summary/jsonl.ts'), 'utf8');
+  const source = await readFile(summaryPath(root, "src/summary/jsonl/index.ts"), 'utf8');
   await writeFile(join(cache, 'baseline.ts'), source);
   await writeFile(baselineModule, ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText);
   const cases = [await synthetic('small', 2, 10, 256, 50), await synthetic('large', 200, 20, 4096)];
@@ -258,7 +259,7 @@ async function compare() {
   const ts = require('typescript');
   const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
   // Confirm the compiled candidate matches the source being reported.
-  const currentSource = await readFile(join(root, 'src/summary/jsonl.ts'), 'utf8');
+  const currentSource = await readFile(summaryPath(root, "src/summary/jsonl/index.ts"), 'utf8');
   assert.equal(await readFile(currentModule, 'utf8'), ts.transpileModule(currentSource, { compilerOptions: {
     target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, sourceMap: true,
   }, fileName: 'jsonl.ts' }).outputText);
@@ -314,7 +315,7 @@ async function compare() {
 async function confirmRefresh() {
   const destination = join(root, 'docs/benchmarks/2026-10-09/JsonlReaderTradeoff.json');
   const report = JSON.parse(await readFile(destination, 'utf8'));
-  assert.equal(report.candidateSourceSha256, sha(await readFile(join(root, 'src/summary/jsonl.ts'), 'utf8')));
+  assert.equal(report.candidateSourceSha256, sha(await readFile(summaryPath(root, "src/summary/jsonl/index.ts"), 'utf8')));
   const runs = [];
   for (let pair = 0; pair < 5; pair++) {
     for (const variant of pair % 2 ? ['candidate', 'baseline'] : ['baseline', 'candidate']) {

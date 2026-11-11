@@ -117,6 +117,22 @@ Usa **Agent Tracker: Eliminar datos estadísticos** para borrar los resultados a
 
 ## Notas de la versión
 
+<details open>
+<summary>v0.3.0</summary>
+
+- **Actualización de estadísticas más eficiente** — Lee y agrega los registros JSONL en una sola pasada y procesa varios archivos en paralelo cuando hay muchos datos. Para respuestas duplicadas, selecciona el registro preferido y ajusta los totales solo por la diferencia de sus contribuciones.
+- **Escrituras y consultas de base de datos** — Actualiza solo las solicitudes modificadas y agrupa las escrituras y agregaciones diarias de varias sesiones. Reduce las consultas duplicadas y comparte los mismos resultados entre tablas, gráficos y recuentos totales de filas.
+- **Uso de subagentes de Codex** — Suma el uso de los subagentes, incluidos los anidados, a la solicitud principal. Vincula los que no tienen identificador de solicitud mediante su historial de creación y mejora la gestión de cadenas largas, ciclos y agentes principales ausentes.
+- **Actualización de registros movidos** — Verifica la identidad y el contenido antes de vincular la nueva ruta y eliminar el registro de la anterior, de modo que el uso añadido después de mover un archivo siga actualizando las estadísticas.
+- **Tarjeta de uso y accesibilidad** — Restaura la tarjeta completa al pasar el cursor y, con el parche local de workbench, permite fijarla o cerrarla con un clic. Los resúmenes accesibles anuncian primero Codex, con el uso restante semanal y de 5 horas y los tiempos de reinicio, incluso en modo compacto.
+- **Compatibilidad de las consultas de uso** — Elimina el límite arbitrario de 100 ventanas de uso en las respuestas de Claude y Codex y utiliza la versión instalada de la extensión en los metadatos de comunicación.
+- **Idioma predeterminado para idiomas no compatibles** — Muestra inglés cuando el idioma de VS Code no es compatible.
+- **Nuevo icono de la extensión** — Sustituye el icono y reduce el tamaño del archivo de imagen.
+
+[Cambios de algoritmos, mejoras medidas frente a v0.2.0 y limitaciones (en coreano)](docs/Performance-v0.3.0.ko.md)
+
+</details>
+
 <details>
 <summary>v0.2.0</summary>
 

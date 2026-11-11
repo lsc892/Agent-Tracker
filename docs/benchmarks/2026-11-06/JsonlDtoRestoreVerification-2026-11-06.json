@@ -1,0 +1,72 @@
+{
+  "date": "2026-11-06",
+  "timezone": "Asia/Seoul",
+  "branch": "experiment/jsonl-map-ingestion-2026-11-06",
+  "status": "Restored the original full-DTO implementation; greedy candidate rejected and historical artifacts retained",
+  "originalSqlRevision": "80fc586d4c0cee0da4e925db395cbebb47d2aa0d",
+  "sourceAndBuildMatchOriginalDtoB": true,
+  "restoredFiles": [
+    "src/summary/memoryEvents.ts",
+    "src/summary/metadata.ts",
+    "src/summary/staging.ts"
+  ],
+  "originalDtoRawSha256": "8b6ba6fa80922ed7b2ef3b9274c26aecb8a089304d116a022fb59144427c8fe5",
+  "rejectedGreedyRawUnchanged": true,
+  "npmCheck": {
+    "exitCode": 0,
+    "tests": 406,
+    "pass": 406,
+    "fail": 0,
+    "logSha256": "65c72f8f2ad42bca68474ecea431217fa7c7d1ac3cc1ec1dd6c69bdaa14297f4"
+  },
+  "independentWinnerOracleTests": 4,
+  "removedGreedyOnlyTests": 6,
+  "postRestoreSqlChecks": [
+    {
+      "dataset": "synthetic-100",
+      "requests": 100,
+      "tokens": 18400,
+      "scenarios": [
+        "initial",
+        "unchanged",
+        "claude-1",
+        "codex-1",
+        "codex-100",
+        "codex-1000"
+      ],
+      "states": 12,
+      "outputsAndOriginalSignatures": "match",
+      "sourceSnapshot": "restored and verified by runner",
+      "localResultSha256": "d5d972487d829c08a756d2f5dc9e7a4fb0a7ffd49f1e2c1413e1d9c92747c1b4"
+    },
+    {
+      "dataset": "current",
+      "requests": 1419,
+      "tokens": 1952612300,
+      "scenarios": [
+        "initial",
+        "unchanged",
+        "claude-1",
+        "codex-1",
+        "codex-100",
+        "codex-1000"
+      ],
+      "states": 12,
+      "outputsAndOriginalSignatures": "match",
+      "sourceSnapshot": "restored and verified by runner",
+      "localResultSha256": "1ddb99be35c8951daf68cfbb7e5e5cf258110b8f6803eb1708ad4a73b568e91b"
+    }
+  ],
+  "performance": {
+    "newRepeatedABMeasurement": false,
+    "reference": "JsonlMapIngestionAB-2026-11-06.json",
+    "reason": "Restored sources and compiled product exactly match the original measured DTO candidate; single-pair reruns verify restoration only"
+  },
+  "originalDtoProductSourceFingerprintSha256": "e1d322ea7c2c71cddc243fc1879bd0d717892a86c8169608b50d452e5caef34d",
+  "originalDtoProductBuildFingerprintSha256": "234a528877009f8ca098c318dfebee7aad802c49742523c3d6de112d66c543b8",
+  "restoredSourceHashes": {
+    "src/summary/memoryEvents.ts": "215e6cfb9a25ce77858afcebab8e73b78647311bdd62beb181d277846cd48802",
+    "src/summary/metadata.ts": "0cb82143268ec0193f86d349b9576c1abff55fa58a1f3c3b729930f7dcd62915",
+    "src/summary/staging.ts": "34e4488dca504ce3fc0e886dcce5799a8cb44a5413039130e5c278f8e7dfaaf6"
+  }
+}

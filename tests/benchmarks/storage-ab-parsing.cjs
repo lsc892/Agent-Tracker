@@ -1,4 +1,5 @@
 // 파일 prefix를 검증하고 파서 상태·정규화 이벤트를 재사용하는 실험용 캐시를 전체 재파싱과 비교한다.
+const { summaryPath } = require('./summary-paths.cjs');
 const { readFile, writeFile } = require('node:fs/promises');
 const { statSync, readFileSync } = require('node:fs');
 const { join } = require('node:path');
@@ -10,7 +11,7 @@ const { readJsonl, SummaryError } = require(join(root, 'dist/src/summary/jsonl')
 const { CodexCurrentParserAdapter, ClaudeParserAdapter } = require(join(root, 'dist/src/summary/parsers'));
 const { SummaryDatabase } = require(join(root, 'dist/src/summary/db'));
 const { SummaryStaging } = require(join(root, 'dist/src/summary/staging'));
-const source = join(root, 'dist/src/summary/jsonl.js');
+const source = summaryPath(root, "dist/src/summary/jsonl/index.js");
 const helper = new Module(source, module); helper.filename = source; helper.paths = Module._nodeModulePaths(join(root, 'dist/src/summary'));
 helper._compile(readFileSync(source, 'utf8') + '\nexports.BenchmarkLine = JsonlLine;', source);
 const JsonlLine = helper.exports.BenchmarkLine;

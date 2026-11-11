@@ -222,7 +222,7 @@ async function main() {
           seed(db, data.size, data.turns);
           // Match the persisted product pricing format; avoid counting an artificial
           // fixture-version migration as an unchanged write benchmark.
-          const version = require('../../dist/src/summary/pricing').PRICING_VERSION;
+          const version = require('../../dist/src/summary/models/pricing').PRICING_VERSION;
           db.connection.prepare('UPDATE turn_model_usage SET pricing_version=?').run(version);
           db.connection.prepare(`INSERT INTO turn_costs SELECT t.id,'unknown',NULL,max(1,count(m.model)),?
             FROM turn_summary t LEFT JOIN turn_model_usage m ON m.turn_id=t.id GROUP BY t.id`).run(version);

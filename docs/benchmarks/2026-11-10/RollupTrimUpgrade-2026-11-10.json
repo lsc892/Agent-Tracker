@@ -1,0 +1,29 @@
+{
+  "dateSeoul": "2026-11-10",
+  "repetitions": 1,
+  "conditions": "Closed trial DB copies; open includes connection setup/migration/optimize. First day query includes both daily table rebuilds and result return. Copy, fact hashes, all other query comparisons and integrity checks excluded.",
+  "results": [
+    {
+      "dataset": "current",
+      "sourceRequests": 799,
+      "oldVersion": 18,
+      "newVersion": 19,
+      "openAndMigrationMs": 6.854900000000015,
+      "firstAggregateWithRebuildMs": 63.567499999999995,
+      "factsUnchanged": true,
+      "retainedQueriesEqual": true,
+      "integrity": true
+    },
+    {
+      "dataset": "synthetic-10000",
+      "sourceRequests": 10001,
+      "oldVersion": 18,
+      "newVersion": 19,
+      "openAndMigrationMs": 6.643900000000031,
+      "firstAggregateWithRebuildMs": 295.8456,
+      "factsUnchanged": true,
+      "retainedQueriesEqual": true,
+      "integrity": true
+    }
+  ]
+}

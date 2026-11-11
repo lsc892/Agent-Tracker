@@ -36,12 +36,14 @@ export function migrateSchema(connection: DatabaseSync, transaction: (action: ()
       connection.exec(initialMigrationSql(current.user_version));
       connection.exec(SCHEMA_MODEL_SQL);
       connection.exec(SCHEMA_CAPABILITY_SQL);
-      // Revert the experimental month layout; existing session-clustered v13 caches stay usable.
-      if (current.user_version === 14 || current.user_version === 15) {
+      // Removed aggregate columns change the derived layout; source facts and IDs stay intact.
+      if (current.user_version > 0) {
         connection.exec(`DROP TABLE IF EXISTS usage_request_daily; DROP TABLE IF EXISTS usage_model_daily;
           DROP TABLE IF EXISTS usage_rollup_meta; DROP TABLE IF EXISTS usage_session_months;`);
       }
       connection.exec(SCHEMA_ROLLUP_SQL);
+      connection.exec(`DROP TABLE IF EXISTS turn_metadata_dependencies; DROP TABLE IF EXISTS turn_metadata_capabilities;
+        DROP TABLE IF EXISTS turn_metadata_models; DROP TABLE IF EXISTS turn_metadata;`);
       if (!connection.prepare('PRAGMA table_info(manifest)').all().some(column => column.name === 'capabilities_collected')) {
         connection.exec('ALTER TABLE manifest ADD COLUMN capabilities_collected INTEGER NOT NULL DEFAULT 0 CHECK(capabilities_collected IN (0,1))');
       }

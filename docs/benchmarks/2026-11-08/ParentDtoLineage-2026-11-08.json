@@ -1,0 +1,188 @@
+{
+  "dateSeoul": "2026-11-08",
+  "scope": "Read-only audit of the same frozen current JSONL snapshot used by ParentDtoDelta A/B. Source paths, identifiers and message contents excluded.",
+  "inputSha256": "25f2b3bed7376f4ad34bcc920715be5092254b6ffb8c28d48a79ee75d7e174b6",
+  "codex": {
+    "files": 598,
+    "compressedFiles": 464,
+    "partialFiles": 0,
+    "readErrors": {},
+    "copiedForeignMetadataRows": 115,
+    "uniqueThreads": 597,
+    "parentEdges": 249,
+    "forkEdges": 237,
+    "depthDistribution": {
+      "0": 348,
+      "1": 244,
+      "2": 5
+    },
+    "maxDepthEdges": 2,
+    "maxChainNodes": 3,
+    "missingParentThreads": 0,
+    "cyclesDetected": 0,
+    "childrenWithoutExplicitRoot": 110,
+    "childrenCurrentlyPromotedStandalone": 110,
+    "multilevelChainExamples": [
+      {
+        "depth": 2,
+        "leafToRootHashes": [
+          "401bc2fbbba5607b",
+          "5293c6de60a86901",
+          "21d90daa9cb35f7b"
+        ],
+        "hasExplicitRoot": false,
+        "currentlyPromotedStandalone": true
+      },
+      {
+        "depth": 2,
+        "leafToRootHashes": [
+          "d9d6f97ae073324e",
+          "fea8179c3a1375cb",
+          "d3c491e90b78fae7"
+        ],
+        "hasExplicitRoot": false,
+        "currentlyPromotedStandalone": true
+      },
+      {
+        "depth": 2,
+        "leafToRootHashes": [
+          "0a543beef757de50",
+          "fea8179c3a1375cb",
+          "d3c491e90b78fae7"
+        ],
+        "hasExplicitRoot": false,
+        "currentlyPromotedStandalone": true
+      },
+      {
+        "depth": 2,
+        "leafToRootHashes": [
+          "d2202150d5f367a3",
+          "045e7e9f043511ad",
+          "0d47b0a44b54d8f1"
+        ],
+        "hasExplicitRoot": false,
+        "currentlyPromotedStandalone": true
+      },
+      {
+        "depth": 2,
+        "leafToRootHashes": [
+          "581484493d21355d",
+          "73374c78d777a3c7",
+          "52c34fa792109ee9"
+        ],
+        "hasExplicitRoot": true,
+        "currentlyPromotedStandalone": false
+      }
+    ],
+    "note": "Depth follows only subagent parent links; fork links are separate. Rootless children are currently promoted to standalone sessions by baseline parser."
+  },
+  "claude": {
+    "files": 22,
+    "subagentFiles": 1,
+    "maxSubagentPathDepth": 1,
+    "metadataFields": {
+      "sessionId": 3431,
+      "parentUuid": 2402,
+      "agentId": 20,
+      "attributionAgent": 2
+    },
+    "parentMetadataFields": {},
+    "readErrors": {}
+  },
+  "spawnAttribution": {
+    "rawCounts": {
+      "spawnCalls": 409,
+      "spawnOutputs": 357,
+      "spawnOutputTaskName": 348,
+      "spawnCallWithRoot": 409,
+      "parserErrors": 0
+    },
+    "spawnNames": {
+      "spawn_agent": 409
+    },
+    "outputShapes": {
+      "task_name": 348,
+      "string": 9
+    },
+    "children": 249,
+    "rootlessChildren": 110,
+    "childrenWithAgentPath": 248,
+    "exactAgentPathMatches": 248,
+    "tailAgentPathMatches": 0,
+    "mappedChildren": 248,
+    "mappedRootlessChildren": 109,
+    "unmappedRootlessChildren": 1,
+    "ambiguousChildRoots": 0,
+    "mappedExamples": [
+      {
+        "childHash": "f8b537d80ed38b82",
+        "parentHash": "d7e35a0b2ccd9027",
+        "roots": [
+          {
+            "parentHash": "d7e35a0b2ccd9027",
+            "rootHash": "ad94be5dde2da908",
+            "turnHash": "ad94be5dde2da908"
+          }
+        ]
+      },
+      {
+        "childHash": "8fba4e29f56b4af3",
+        "parentHash": "d7e35a0b2ccd9027",
+        "roots": [
+          {
+            "parentHash": "d7e35a0b2ccd9027",
+            "rootHash": "ad94be5dde2da908",
+            "turnHash": "ad94be5dde2da908"
+          }
+        ]
+      },
+      {
+        "childHash": "75f3b8d29c419748",
+        "parentHash": "d7e35a0b2ccd9027",
+        "roots": [
+          {
+            "parentHash": "d7e35a0b2ccd9027",
+            "rootHash": "ad94be5dde2da908",
+            "turnHash": "ad94be5dde2da908"
+          }
+        ]
+      },
+      {
+        "childHash": "89c857e3584deb87",
+        "parentHash": "d7e35a0b2ccd9027",
+        "roots": [
+          {
+            "parentHash": "d7e35a0b2ccd9027",
+            "rootHash": "ad94be5dde2da908",
+            "turnHash": "ad94be5dde2da908"
+          }
+        ]
+      },
+      {
+        "childHash": "cbbf911b824154b2",
+        "parentHash": "d7e35a0b2ccd9027",
+        "roots": [
+          {
+            "parentHash": "d7e35a0b2ccd9027",
+            "rootHash": "7c8363f602956e6b",
+            "turnHash": "7c8363f602956e6b"
+          }
+        ]
+      }
+    ],
+    "note": "Output.task_name matches child session_meta.agent_path or source.subagent.thread_spawn.agent_path under the same raw parentThreadId. Root is the existing parent parser context at spawn call. No message or tool argument text retained.",
+    "rootlessChildrenWithFinalBinding": 109,
+    "unmappedRootlessUsage": {
+      "children": 1,
+      "turnEvents": 0,
+      "usageEvents": 0,
+      "baselineRequests": 0,
+      "baselineTokens": 0,
+      "parentTurnRoots": 42,
+      "parentUsageRoots": 41,
+      "reason": "source.subagent.other has no agent_path, spawn output match, or parent request metadata. Parent has multiple requests; no guessed attribution is needed because this child has no usage."
+    },
+    "baselineRootlessRequests": 295,
+    "baselineRootlessTokens": 269810300
+  }
+}

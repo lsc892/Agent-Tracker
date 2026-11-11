@@ -141,8 +141,6 @@ function mergeMetrics(excludeEmptyUsage) {
     `${sum(`${prefix}_duration_ms_known`)} AS turns_with_duration`,
     ...['exact','derived','approximate'].map(quality => `${sum(`${prefix}_${quality}`)} AS ${quality}_duration_turns`),
     `${sum(`${prefix}_duration_missing`)} AS missing_duration_turns`,
-    ...['unknown_time_turns','stale_turns'].map(field => `${sum(field)} AS ${field}`),
-    'MAX(last_successful_update) AS last_successful_update',
   ].join(',\n');
 }
 

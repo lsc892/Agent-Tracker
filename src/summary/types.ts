@@ -8,9 +8,9 @@ export interface SummaryOptions {
   roots: SourceRoot[];
   timezone?: string;
   workerPath?: string;
-  batchSize?: number;
-  metadataBytes?: number;
   maxLineBytes?: number;
+  /** 파일 준비 Worker 수. 1은 순차 처리이며 기본은 사용 가능한 CPU에 맞춰 최대 4개다. */
+  sourceWorkers?: number;
   cancellation?: SharedArrayBuffer;
 }
 export interface UsageQuery {
@@ -63,6 +63,7 @@ export interface RefreshResult {
   interrupted: boolean;
   completedAt: string;
   error?: string;
+  timings?: import('./profiling').RefreshTimings;
 }
 export interface SummaryProgress {
   phase: 'scanning' | 'parsing' | 'committing' | 'complete';
@@ -105,6 +106,9 @@ export interface ParsedIdentity {
   sessionName?: string;
   isMain: boolean;
   forkedFromId?: string | null;
+  agentPath?: string;
+  rootlessSubagent?: boolean;
+  parentRootId?: string;
   standaloneSubagent?: boolean;
 }
 export interface TurnEvent {
@@ -118,7 +122,7 @@ export interface TurnEvent {
   duration?: number | null;
   durationQuality?: 'exact' | 'derived' | 'approximate' | 'missing';
   completed?: boolean;
-  /** Aborted outcomes exist only in staging and never become persisted request summaries. */
+  /** Aborted outcomes remain transient and never become persisted request summaries. */
   status?: 'completed' | 'in_progress' | 'failed' | 'aborted';
   statusAt?: number | null;
   flags?: string[];
@@ -151,4 +155,5 @@ export type ParseEvent = TurnEvent | UsageEvent | CheckEvent | CapabilityEvent;
 export interface ParseSink {
   identity(identity: ParsedIdentity): void;
   event(event: ParseEvent): void;
+  child?(reference: string, rootId: string): void;
 }

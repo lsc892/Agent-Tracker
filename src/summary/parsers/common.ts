@@ -40,16 +40,25 @@ export function project(path: string): { projectKey: string; projectName: string
  * 알고리즘: 텍스트 블록에서 명시 요청 구간을 우선해 첫 유효 줄을 고르고 제어 문자·공백을 정리한 뒤 최대 80자로 줄인다.
  */
 export function requestTitle(value: unknown): string | undefined {
-  const text = typeof value === 'string' ? value : Array.isArray(value)
-    ? value.filter(item => object(item).type === 'text' || object(item).type === 'input_text')
-      .map(item => string(object(item).text) ?? '').join('\n') : '';
+  let text = typeof value === 'string' ? value : '';
+  if (Array.isArray(value)) {
+    const blocks: string[] = [];
+    for (const item of value) {
+      const block = object(item);
+      if (block.type === 'text' || block.type === 'input_text') blocks.push(string(block.text) ?? '');
+    }
+    text = blocks.join('\n');
+  }
   // Codex prepends editor context; prefer the explicit request when available.
-  const request = text.split(/(?:^|\n)## My request:\s*/).at(-1) ?? text;
-  const first = request.split(/[\r\n]/).map(line => line.trim())
-    .find(line => line && !line.startsWith('<') && !/^#(?:\s|$)/.test(line));
-  if (!first) return undefined;
-  const cleaned = first.replace(/[\u0000-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim();
-  return cleaned.length > 80 ? `${cleaned.slice(0, 79)}…` : cleaned || undefined;
+  let start = 0;
+  for (const match of text.matchAll(/(?:^|\n)## My request:\s*/g)) start = match.index + match[0].length;
+  for (const match of text.slice(start).matchAll(/[^\r\n]+/g)) {
+    const first = match[0].trim();
+    if (!first || first.startsWith('<') || /^#(?:\s|$)/.test(first)) continue;
+    const cleaned = first.replace(/[\u0000-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim();
+    return cleaned.length > 80 ? `${cleaned.slice(0, 79)}…` : cleaned || undefined;
+  }
+  return undefined;
 }
 /**
  * 책임: Claude 토큰을 캐시 포함 입력이라는 공통 기준으로 맞춘다.
@@ -74,7 +83,6 @@ export function codexTokens(raw: Record<string, unknown>): TokenVector {
 }
 
 function validateTokens(raw: Record<string, unknown>): void {
-  if (Object.keys(raw).length === 0) throw new SummaryError('unsupported-token-schema');
   for (const key of ['input_tokens','output_tokens','cache_read_input_tokens','cache_creation_input_tokens','cached_input_tokens','cache_write_input_tokens','reasoning_output_tokens']) {
     if (raw[key] !== undefined && (typeof raw[key] !== 'number' || !Number.isSafeInteger(raw[key]) || Number(raw[key]) < 0)) throw new SummaryError('unsupported-token-schema');
   }

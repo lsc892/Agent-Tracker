@@ -17,7 +17,7 @@ function stagingPlan() {
     assert.ok(match, 'Current component cleanup SQL must be captured verbatim');
     return { note: 'Separate diagnostic on a fresh empty in-memory product TEMP schema; no time or loop/visit counters measured.',
       sqlite: db.connection.prepare('SELECT sqlite_version() v').get().v,
-      stagingSourceSha256: sha(fs.readFileSync(resolve(__dirname, '../../src/summary/staging.ts'))),
+      stagingSourceSha256: sha(fs.readFileSync(resolve(__dirname, '../../src/summary/staging/index.ts'))),
       queries: match[1].split(';').map(sql => sql.trim()).filter(Boolean).map(sql => ({ sql,
         plan: db.connection.prepare(`EXPLAIN QUERY PLAN ${sql}`).all() })) };
   } finally { staging.close(); db.close(); }

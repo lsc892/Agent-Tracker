@@ -8,7 +8,7 @@ import { SummaryDatabase } from '../../src/summary/db';
 import { PARSER_VERSION, refreshSummary } from '../../src/summary/scanner';
 import { SummaryClient } from '../../src/summary/client';
 import type { SummaryOptions } from '../../src/summary/types';
-import { acquireRefreshLock } from '../../src/summary/lock';
+import { acquireRefreshLock } from '../../src/summary/scanner/lock';
 import { constants, zstdCompressSync } from 'node:zlib';
 
 const jsonl = (rows: unknown[]): string => rows.map(row => JSON.stringify(row)).join('\n') + '\n';
@@ -18,7 +18,7 @@ const response = (tokens = 100, root = 'prompt-one', id = 'response-one', reques
 async function fixture(run: (database: SummaryDatabase, options: SummaryOptions, root: string, base: string) => Promise<void>): Promise<void> {
   const base = await mkdtemp(join(tmpdir(),'agent-tracker-summary-'));
   const root = join(base,'projects');await mkdir(root);
-  const options: SummaryOptions = {dbPath:join(base,'summary.sqlite'),roots:[{provider:'claude',path:root}],batchSize:2};
+  const options: SummaryOptions = {dbPath:join(base,'summary.sqlite'),roots:[{provider:'claude',path:root}]};
   const database = new SummaryDatabase(options.dbPath);
   try { await run(database,options,root,base); }
   finally { database.close();await rm(base,{recursive:true,force:true}); }
@@ -681,7 +681,8 @@ test('cancelling an affected session also marks its reread unchanged source inte
   await writeFile(main,jsonl([user(),response()]));
   await writeFile(child,jsonl([response(30,'prompt-one','child','child-request')]));
   await refreshSummary(database,options);
-  await writeFile(child,jsonl([response(60,'prompt-one','child','child-request')]));
+  // 30→60의 같은 길이 재작성도 변경 감지가 확실하도록 크기를 바꾼다.
+  await writeFile(child,jsonl([response(60,'prompt-one','child','child-request')])+'\n');
   const controller=new AbortController();
   const result=await refreshSummary(database,options,controller.signal,progress=>{if(progress.phase==='committing')controller.abort();});
   assert.equal(result.interrupted,true);
@@ -696,11 +697,12 @@ test('cancellation after one session commits does not mark that successful sessi
     await writeFile(path,jsonl([user(prompt,session),response(100,prompt)]));
   }
   await refreshSummary(database,options);
+  // 100→200은 같은 길이이므로 빈 줄로 크기도 바꿔 mtime 정밀도에 의존하지 않는다.
   for(const [path,session,prompt] of [[a,'session-a','prompt-a'],[b,'session-b','prompt-b']]) {
-    await writeFile(path,jsonl([user(prompt,session),response(200,prompt)]));
+    await writeFile(path,jsonl([user(prompt,session),response(200,prompt)])+'\n');
   }
-  const controller=new AbortController();const original=database.replaceSessions.bind(database);
-  database.replaceSessions=replacement=>{original(replacement);controller.abort();};
+  const controller=new AbortController();const original=database.replaceMemory.bind(database);
+  database.replaceMemory=replacement=>{const names=original(replacement);controller.abort();return names;};
   const result=await refreshSummary(database,options,controller.signal);
   assert.equal(result.interrupted,true);
   assert.equal(database.findManifest('claude',a)!.processing_status,'done');
@@ -709,4 +711,39 @@ test('cancellation after one session commits does not mark that successful sessi
   assert.equal(rows.find(row=>row.session_id==='session-a')!.last_error,null);
   assert.equal(rows.find(row=>row.session_id==='session-b')!.total_tokens,200);
   assert.equal(database.findManifest('claude',b)!.processing_status,'interrupted');
+}));
+
+test('a later batch orphan does not prevent an earlier healthy component from committing',async () => fixture(async(database,options,root)=>{
+  const codexOptions={...options,roots:[{provider:'codex' as const,path:root}]};
+  const valid=join(root,'a.jsonl'),orphan=join(root,'z.jsonl');
+  await writeFile(valid,jsonl([codexMeta('a'),codexStart('request'),currentUsage('a','request','request',100)]));
+  await writeFile(orphan,jsonl([codexMeta('z','missing'),codexStart('child','missing-request'),
+    currentUsage('z','child','missing-request',50)]));
+  const result=await refreshSummary(database,codexOptions);
+  assert.equal(result.failed,1);assert.equal(result.interrupted,false);
+  assert.equal(database.findManifest('codex',valid)!.processing_status,'done');
+  assert.equal(database.findManifest('codex',orphan)!.last_error,'missing-root-turn');
+  assert.equal(database.queryTurns().length,1);assert.equal(database.queryTurns()[0].total_tokens,100);
+}));
+
+test('a middle batch commit failure preserves its old snapshot and still commits the later component',async () => fixture(async(database,options,root)=>{
+  const sources=['a','b','c'].map(name=>({name,path:join(root,`${name}.jsonl`),session:`session-${name}`}));
+  for (const source of sources) await writeFile(source.path,jsonl([user('same-request',source.session),response(100,'same-request')]));
+  await refreshSummary(database,options);database.queryUsage();
+  // 같은 길이의 토큰 값 교체가 stat 비교에서 빠지지 않도록 빈 줄을 더한다.
+  for (const source of sources) await writeFile(source.path,jsonl([user('same-request',source.session),response(200,'same-request')])+'\n');
+  database.connection.exec(`CREATE TEMP TRIGGER reject_middle BEFORE INSERT ON main.turn_summary
+    WHEN NEW.session_id='session-b' BEGIN SELECT RAISE(ABORT,'reject middle'); END;
+    CREATE TEMP TRIGGER reject_middle_update BEFORE UPDATE ON main.turn_summary
+    WHEN NEW.session_id='session-b' AND NEW.input_tokens<>OLD.input_tokens BEGIN SELECT RAISE(ABORT,'reject middle'); END;`);
+  const result=await refreshSummary(database,options);
+  assert.equal(result.failed,1);assert.equal(result.interrupted,false);
+  const rows=database.queryTurns();
+  for (const source of sources) {
+    assert.equal(rows.find(row=>row.session_id===source.session)!.total_tokens,source.name==='b'?200:300);
+    assert.equal(database.findManifest('claude',source.path)!.processing_status,source.name==='b'?'error':'done');
+  }
+  assert.equal(database.queryUsage()[0].total_tokens,800);
+  assert.deepEqual(database.connection.prepare('PRAGMA foreign_key_check').all(),[]);
+  assert.equal(database.connection.prepare("SELECT count(*) n FROM sqlite_temp_master WHERE name='summary_batch'").get()?.n,0);
 }));

@@ -27,15 +27,16 @@ export class CodexCurrentParserAdapter {
   private root: string | undefined;
   private turn: string | undefined;
   private sawCurrent = false;
-  private sawLegacy = false;
   private legacySignature: string | undefined;
   private highWater: TokenVector = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0 };
   private currentClosed = false;
   private hasUserInTurn = false;
   private pendingLifecycle = false;
   private hasExplicitRoot = false;
+  private forkMissing = false;
   private model: string | undefined;
   private billing: import('../db/types').BillingMode = 'unknown';
+  private readonly spawnRequests = new Map<string, string>();
 
   constructor(private readonly context: FileContext, private readonly sink: ParseSink) {}
 
@@ -60,7 +61,7 @@ export class CodexCurrentParserAdapter {
     switch (row.type) {
       case 'turn_context': this.turnContext(record); break;
       case 'token_usage_record': this.currentUsage(record); break;
-      case 'response_item': this.responseCapabilities(record); break;
+      case 'response_item': this.responseItem(record); break;
       case 'event_msg': this.eventLifecycle(record); break;
     }
   }
@@ -82,6 +83,7 @@ export class CodexCurrentParserAdapter {
     this.identityValue = { sessionId: string(payload.session_id) ?? string(payload.sessionId) ?? this.identityValue?.sessionId ?? parent ?? id,
       threadId: id, parentThreadId: parent, isMain: parent === null,
       forkedFromId: string(payload.forked_from_id) ?? this.identityValue?.forkedFromId ?? null,
+      agentPath: string(payload.agent_path) ?? string(spawned.agent_path) ?? this.identityValue?.agentPath,
       sessionName: displayName(payload.thread_name) ?? displayName(payload.name) ?? displayName(payload.title) ?? this.identityValue?.sessionName,
       ...this.projectMetadata(cwd),
     };
@@ -99,7 +101,7 @@ export class CodexCurrentParserAdapter {
 
   private turnContext(record: CodexRecordContext): void {
     const { payload, identity, suppliedRoot, suppliedTurn } = record;
-    // Rootless subagents use their own turn ids; finish() gives the thread a separate session.
+    // Rootless subagents retain their own turn ids until the spawn binding identifies the parent request.
     const ownTurns = identity.isMain || !this.hasExplicitRoot;
     this.model = displayName(payload.model);
     if (payload.billing_mode !== undefined || payload.auth_mode !== undefined) this.billing = billingMode(payload.billing_mode ?? payload.auth_mode);
@@ -113,29 +115,40 @@ export class CodexCurrentParserAdapter {
    * 알고리즘: root·turn·response ID를 검증해 usage를 내보내고 turn_token_usage는 check 이벤트로만 기록해 이중 합산을 막는다.
    */
   private currentUsage(record: CodexRecordContext): void {
-    const { payload, offset, identity, suppliedRoot, suppliedTurn } = record;
+    const { payload, offset, identity, suppliedTurn } = record;
     this.sawCurrent = true;
-    // Mixed generations can coexist. Disk staging discards legacy usage if any current usage exists in this file.
-    const rootId = suppliedRoot ?? (!identity.isMain && !this.hasExplicitRoot
-      ? suppliedTurn ?? this.turn ?? this.root : this.root ?? suppliedTurn);
+    // Mixed generations can coexist. Source evidence excludes legacy usage when this file contains current usage.
+    const rootId = this.currentUsageRoot(record);
     const turnId = suppliedTurn ?? this.turn;
     const responseId = string(payload.response_id);
     if (!rootId || !turnId) throw new SummaryError('missing-root-turn', offset);
     if (!responseId) throw new SummaryError('missing-response-id', offset);
     this.root = rootId; this.turn = turnId;
-    if (string(payload.session_id)) identity.sessionId = String(payload.session_id);
+    const sessionId = string(payload.session_id);
+    if (sessionId) identity.sessionId = sessionId;
+    const threadId = string(payload.thread_id) ?? identity.threadId;
     const tokens = codexTokens(object(payload.usage));
     this.sink.event({ kind: 'usage', rootId, turnId, responseId, requestId: null,
-      threadId: string(payload.thread_id) ?? identity.threadId, tokens, schema: 'current',
+      threadId, tokens, schema: 'current',
       model: displayName(payload.model) ?? this.model,
       billingMode: billingMode(payload.billing_mode ?? payload.auth_mode ?? this.billing),
       flags: [...tokenFlags(tokens), ...(this.forkMissing ? ['missing-parent'] : [])], offset });
-    if (payload.turn_token_usage) this.sink.event({ kind: 'check', rootId, threadId: string(payload.thread_id) ?? identity.threadId,
+    if (payload.turn_token_usage) this.sink.event({ kind: 'check', rootId, threadId,
       turnId, tokens: codexTokens(object(payload.turn_token_usage)), offset });
   }
 
-  private responseCapabilities(record: CodexRecordContext): void {
+  /** 명시 root를 우선하고 미연결 자식만 자신의 turn을 부모 후보보다 먼저 사용한다. */
+  private currentUsageRoot(record: CodexRecordContext): string | undefined {
+    if (record.suppliedRoot !== undefined) return record.suppliedRoot;
+    if (!record.identity.isMain && !this.hasExplicitRoot) {
+      return record.suppliedTurn ?? this.turn ?? this.root;
+    }
+    return this.root ?? record.suppliedTurn;
+  }
+
+  private responseItem(record: CodexRecordContext): void {
     const { payload, offset, identity } = record;
+    this.recordChildBinding(payload);
     if (this.context.collectCapabilities === false || !this.root) return;
     if (!['function_call', 'custom_tool_call'].includes(String(payload.type))) return;
     const name = string(payload.name);
@@ -145,6 +158,27 @@ export class CodexCurrentParserAdapter {
       this.sink.event({ kind: 'capability', rootId: this.root, threadId: identity.threadId,
         eventId: `${eventId}:${use.index}`, category: use.category, name: use.name, offset });
     }
+  }
+
+  /** 생성 호출 시점의 요청을 기억하고 반환된 자식 식별자를 부모 요청에 연결한다. */
+  private recordChildBinding(payload: Record<string, unknown>): void {
+    const callId = string(payload.call_id) ?? string(payload.id);
+    if (!callId) return;
+    const name = string(payload.name);
+    if (payload.type === 'function_call' && (name === 'spawn_agent' || name?.endsWith('.spawn_agent'))) {
+      if (this.root) this.spawnRequests.set(callId, this.root);
+      return;
+    }
+    if (payload.type !== 'function_call_output') return;
+    const root = this.spawnRequests.get(callId);
+    if (!root) return;
+    this.spawnRequests.delete(callId);
+    let output: Record<string, unknown>;
+    try { output = object(typeof payload.output === 'string' ? JSON.parse(payload.output) : payload.output); }
+    catch { return; }
+    const agent = string(output.agent_id), task = string(output.task_name);
+    if (agent) this.sink.child?.(agent, root);
+    if (task && task !== agent) this.sink.child?.(task, root);
   }
 
   /**
@@ -159,30 +193,19 @@ export class CodexCurrentParserAdapter {
     if (suppliedRoot) this.root = suppliedRoot;
     else if (ownTurns && suppliedTurn) this.root = suppliedTurn;
     switch (string(payload.type)) {
-      case 'task_started':
+      case 'task_started': {
         this.currentClosed = false; this.hasUserInTurn = false; this.pendingLifecycle = true;
+        const startedAt = lifecycleTimestamp(payload.started_at) ?? time;
         if (this.root) this.sink.event({ kind: 'turn', rootId: this.root, isMain: identity.isMain,
-          startedAt: lifecycleTimestamp(payload.started_at) ?? time, status: 'in_progress',
-          statusAt: lifecycleTimestamp(payload.started_at) ?? time, offset });
+          startedAt, status: 'in_progress', statusAt: startedAt, offset });
         break;
+      }
       case 'user_message':
-        if (ownTurns && (!this.root || this.currentClosed || this.hasUserInTurn && !this.pendingLifecycle)) {
-          this.root = string(payload.id) ?? (time === null ? undefined : `legacy-${time}`);
-          this.turn = this.root;
-        }
-        this.hasUserInTurn = true; this.currentClosed = false; this.pendingLifecycle = false;
-        if (this.root) this.sink.event({ kind: 'turn', rootId: this.root, isMain: identity.isMain, startedAt: time, title: requestTitle(payload.message),
-          flags: this.root.startsWith('legacy-') ? ['missing-request-id'] : [], offset });
+        this.recordUserMessage(record, time, ownTurns);
         break;
       case 'task_complete':
       case 'task_completed':
-        this.currentClosed = true;
-        if (!this.root) return;
-        this.sink.event({ kind: 'turn', rootId: this.root, isMain: identity.isMain, completed: true,
-          completedAt: lifecycleTimestamp(payload.completed_at) ?? time,
-          duration: typeof payload.duration_ms === 'number' ? number(payload.duration_ms) : null,
-          durationQuality: typeof payload.duration_ms === 'number' ? 'exact' : 'derived',
-          status: 'completed', statusAt: lifecycleTimestamp(payload.completed_at) ?? time, offset });
+        this.recordCompletion(record, time);
         break;
       case 'turn_aborted':
         this.currentClosed = true; this.pendingLifecycle = false;
@@ -198,37 +221,64 @@ export class CodexCurrentParserAdapter {
     }
   }
 
-  private forkMissing = false;
+  /** 명시 시작 이벤트가 없는 이전 형식에서도 다음 사용자 요청을 별도 root로 구분한다. */
+  private recordUserMessage(record: CodexRecordContext, time: number | null, ownTurns: boolean): void {
+    const { payload, identity, offset } = record;
+    if (ownTurns && (!this.root || this.currentClosed || this.hasUserInTurn && !this.pendingLifecycle)) {
+      this.root = string(payload.id) ?? (time === null ? undefined : `legacy-${time}`);
+      this.turn = this.root;
+    }
+    this.hasUserInTurn = true;
+    this.currentClosed = false;
+    this.pendingLifecycle = false;
+    if (this.root) this.sink.event({ kind: 'turn', rootId: this.root, isMain: identity.isMain, startedAt: time,
+      title: requestTitle(payload.message), flags: this.root.startsWith('legacy-') ? ['missing-request-id'] : [], offset });
+  }
+
+  /** 완료 시각과 duration의 출처를 보존하면서 요청을 종료 상태로 기록한다. */
+  private recordCompletion(record: CodexRecordContext, time: number | null): void {
+    const { payload, identity, offset } = record;
+    this.currentClosed = true;
+    if (!this.root) return;
+    const completedAt = lifecycleTimestamp(payload.completed_at) ?? time;
+    this.sink.event({ kind: 'turn', rootId: this.root, isMain: identity.isMain, completed: true, completedAt,
+      duration: typeof payload.duration_ms === 'number' ? number(payload.duration_ms) : null,
+      durationQuality: typeof payload.duration_ms === 'number' ? 'exact' : 'derived',
+      status: 'completed', statusAt: completedAt, offset });
+  }
+
   /**
    * 책임: 이전 형식의 누적 카운터에서 중복 없는 응답 사용량을 복원한다.
    * 알고리즘: 동일한 total·last 조합은 건너뛰고 last가 없으면 high-water 차분을 사용하며, 누계 역행은 플래그로 남기고 기준값은 감소시키지 않는다.
    */
   private legacyTokens(record: CodexRecordContext): void {
-    const { payload, offset } = record;
+    const { payload, offset, identity } = record;
     const info = object(payload.info);
     if (!info.total_token_usage && !info.last_token_usage) return;
-    if (this.identityValue && !this.identityValue.isMain && !this.hasExplicitRoot && (!this.root || !this.turn)) {
-      this.root = this.turn = this.turn ?? `legacy-${this.identityValue.threadId}`;
+    if (!identity.isMain && !this.hasExplicitRoot && (!this.root || !this.turn)) {
+      this.root = this.turn = this.turn ?? `legacy-${identity.threadId}`;
     }
-    if (!this.root || !this.turn || !this.identityValue) throw new SummaryError('missing-root-turn', offset);
-    this.sawLegacy = true;
-    const total = info.total_token_usage ? codexTokens(object(info.total_token_usage)) : {...this.highWater};
+    if (!this.root || !this.turn) throw new SummaryError('missing-root-turn', offset);
+    const total = info.total_token_usage ? codexTokens(object(info.total_token_usage)) : this.highWater;
     const last = info.last_token_usage ? codexTokens(object(info.last_token_usage)) : null;
     const signature = JSON.stringify([total, last]);
     if (signature === this.legacySignature) return;
     this.legacySignature = signature;
     const tokens = { ...total };
     const flags: string[] = this.forkMissing ? ['missing-parent'] : [];
+    let regression = false;
     for (const key of Object.keys(total) as (keyof TokenVector)[]) {
-      if (total[key] < this.highWater[key]) flags.push('counter-regression');
+      if (total[key] < this.highWater[key]) regression = true;
       tokens[key] = last ? last[key] : Math.max(0, total[key] - this.highWater[key]);
       this.highWater[key] = Math.max(this.highWater[key], total[key]);
     }
+    if (regression) flags.push('counter-regression');
+    flags.push(...tokenFlags(tokens));
     this.sink.event({ kind: 'usage', rootId: this.root, turnId: this.turn,
       responseId: `legacy-${signature}`, requestId: null,
-      threadId: this.identityValue.threadId, tokens, model: displayName(payload.model) ?? this.model,
+      threadId: identity.threadId, tokens, model: displayName(payload.model) ?? this.model,
       billingMode: billingMode(payload.billing_mode ?? payload.auth_mode ?? this.billing),
-      schema: 'legacy', flags: [...new Set([...flags, ...tokenFlags(tokens)])], offset });
+      schema: 'legacy', flags, offset });
   }
 
   finish(): void {
@@ -238,16 +288,12 @@ export class CodexCurrentParserAdapter {
   }
 
   /**
-   * 책임: 부모 root가 없는 subagent의 사용량을 독립 세션으로 보존한다.
-   * 알고리즘: 명시 root가 없는 자식 thread만 자신의 세션·주 요청으로 승격하고 기존 부모 정보는 fork 참조로 남긴다.
+   * 책임: 부모 요청을 뒤에서 연결할 수 있도록 root 없는 subagent의 원래 계보를 보존한다.
+   * 알고리즘: 명시 root가 없는 자식은 독립 메인으로 승격하지 않고 rootless 표시만 추가한다.
    */
   getIdentity(): ParsedIdentity | undefined {
     const identity = this.identityValue;
     if (!identity || identity.isMain || this.hasExplicitRoot) return identity;
-    return { ...identity, sessionId: identity.threadId, parentThreadId: null, isMain: true,
-      forkedFromId: identity.forkedFromId ?? identity.parentThreadId, standaloneSubagent: true };
+    return { ...identity, rootlessSubagent: true };
   }
 }
-
-/** 공통 Codex 파서를 이전 로그 형식용 클래스 이름으로 제공한다. */
-export class CodexLegacyParserAdapter extends CodexCurrentParserAdapter {}

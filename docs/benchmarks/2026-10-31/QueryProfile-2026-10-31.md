@@ -18,7 +18,7 @@
 
 사실 테이블에는 날짜·프로젝트/날짜 인덱스가 있고, 일별 집계에는 `(provider, session_id, project_key, local_day[, model_key])` PK와 날짜·프로젝트/날짜 인덱스가 있다. `LIMIT 100`은 집계 후 반환 행을 제한하며, 합산할 입력을 100행으로 제한하지 않는다.
 
-관련 구현: [조회 선택](../../../src/summary/db/reader.ts), [일별 집계 조회](../../../src/summary/db/queries/rollup/usage.ts), [원본 집계](../../../src/summary/db/queries/raw/usage.ts), [Worker 응답](../../../src/summary/worker.ts).
+관련 구현: [조회 선택](../../../src/summary/db/reader.ts), [일별 집계 조회](../../../src/summary/db/queries/rollup/usage.ts), [원본 집계](../../../src/summary/db/queries/raw/usage.ts), [Worker 응답](../../../src/summary/client/worker.ts).
 
 ## 반복 조회 결과
 

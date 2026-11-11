@@ -11,7 +11,7 @@ import { SummaryDatabase, type TurnSummaryInput, type UsageRow, type TurnSummary
 import { SummaryClient } from '../../src/summary/client';
 import { parseDashboardMessage } from '../../src/ui/presentation';
 import { buildUsageQuery } from '../../src/summary/db/queries';
-import { modelRelease } from '../../src/summary/modelOrder';
+import { modelRelease } from '../../src/summary/models/modelOrder';
 import { USAGE_SORT_KEYS, type UsageSort } from '../../src/summary/db/types';
 
 const start = Date.parse('2026-01-01T00:00:00Z');
@@ -29,7 +29,7 @@ function database(t: TestContext, rows: TurnSummaryInput[], path = ':memory:'): 
 }
 function seed(db: SummaryDatabase, rows: TurnSummaryInput[]): void {
   const sessions = new Map(rows.map(row => [`${row.provider}/${row.session_id}`, { provider: row.provider, session_id: row.session_id }]));
-  db.replaceSessions({ sessions: sessions.values(), files: [], summaries: rows });
+  db.replaceMemory({scanId: 'test', sessions: sessions.values(), files: [], summaries: rows });
 }
 
 test('table sorting orders the full result before paging and raw/rollup queries agree for every column', t => {
@@ -297,7 +297,7 @@ test('calendar charts keep exact table periods and averages without combining da
   const filtered = queryChart(db, { fromMs: start, toMs: start + 86400000, providers: ['claude'] }, 'day', 'Asia/Seoul', 'requests');
   assert.equal(filtered.rows.length, 2, 'dated and undated rows both obey calendar table semantics');
   assert.equal((filtered.rows as UsageRow[]).find(row=>row.period!==null)!.turn_count, 3);
-  assert.equal((filtered.rows as UsageRow[]).find(row=>row.period===null)!.unknown_time_turns, 1);
+  assert.equal((filtered.rows as UsageRow[]).find(row=>row.period===null)!.turn_count, 1);
 });
 
 test('model tables retain each model, request averages, unknown totals, costs and filters in every grouping', t => {
