@@ -1,0 +1,597 @@
+{
+  "dateSeoul": "2026-11-11",
+  "scope": "Explicitly authorized synthetic A/B correctness validation; separate from performance timings",
+  "runnerSha256": "8b1018817805fc3297a8809787acb9af8c09dc3e563f01f7d75bf686cb173f6e",
+  "helperSha256": "924655bc5cf530620a1807c3100242805581040dc88720efd0a5b9768c79c1af",
+  "products": {
+    "A": {
+      "src/summary/db/reader.ts": "876f89a0034cac1d7361336aa714e322e25ac8b5dd8c4c93ea2ac233014e71de",
+      "src/summary/db/memoryStore.ts": "b7e3a8339f643c179799ba94977fd2ffc7f8a689d8098a2d32b354bf1dab6818",
+      "src/summary/db/billing.ts": "4ca5d7c3a92eaa1f00a9d48c1148c320d38fe301af45409f30189c89c39bf106",
+      "dist/src/summary/db/reader.js": "cecaf1d815183e0f3aefe4adeed665af1572e09c8bf26ba774eb80188b98f356",
+      "dist/src/summary/db/memoryStore.js": "94274f96819467b4894d641ab4307033940c152f45fc2c38f1607632313fe52f",
+      "dist/src/summary/db/billing.js": "91ac8c88e94eabb71ace21ed88f05a02b964dbb8f1dd76ab967df54b39262c40"
+    },
+    "B": {
+      "src/summary/db/reader.ts": "9a73ec719152ff54ec413b9553014f93b71b68f56401089068c023fc6a851018",
+      "src/summary/db/memoryStore.ts": "35a58a17d27bc3f7028f3e127b24b9bf0967ccef95eef77a72fb1caa304afdb5",
+      "src/summary/db/billing.ts": "19d53dcfa088f02ddb44900b78fa8170bbe749bbdf3dc905a0f0763e95994835",
+      "dist/src/summary/db/reader.js": "d4528e439728f5a2d6d68cd1222b3e77e539cc5503498d168ca2d444559ce11f",
+      "dist/src/summary/db/memoryStore.js": "561a5af1f3f37c4f0742e94a07c9bc079d8e14f269bf43ed0730b6ff78dee29e",
+      "dist/src/summary/db/billing.js": "335a10dccc45c4d129060cd781a3ae681347c5e4f675b9f551acd8450f7e8b35"
+    }
+  },
+  "pages": {
+    "requests": 96,
+    "fixedSeed": "index-0..95",
+    "independentAggregateChecks": 80,
+    "fullComparisons": 2376,
+    "pageComparisons": 10386,
+    "sortComparisons": 792,
+    "cursorComparisons": 10,
+    "modes": [
+      "rollup",
+      "forced-raw",
+      "costs"
+    ],
+    "timezones": [
+      "Asia/Seoul",
+      "America/New_York"
+    ],
+    "internalMetadataNeverExposed": true
+  },
+  "namesCapabilitiesAndCoverage": {
+    "nameComparisons": 32,
+    "capabilityComparisons": 112,
+    "coverageComparisons": 5,
+    "independentIdentityCounts": true,
+    "independentCapabilityTotalsAndPercentages": true,
+    "nameDatesIgnored": true
+  },
+  "storageAndBilling": {
+    "requestsBefore": 14,
+    "requestsAfter": 15,
+    "independentCostChecks": 8,
+    "rollbackChecks": 4,
+    "preservedCapabilityChecks": 2,
+    "modelCounts": [
+      0,
+      2
+    ],
+    "knownAndNullEstimates": true,
+    "pricingVersionAndMissingCostRepair": true
+  },
+  "retentionAndReconnection": {
+    "sameSessionMissingFiles": 2,
+    "eligibleRequestRetained": true,
+    "emptyRequestRemoved": true,
+    "reconnectSkippedBeforeSessionDeduplication": true,
+    "diagnosticReferenceMovedToNewFile": true
+  },
+  "sqlCalls": {
+    "A": {
+      "groupedPage": {
+        "statements": 4,
+        "get": 3,
+        "all": 1,
+        "run": 0,
+        "sqlShapes": [
+          {
+            "sha256": "573b7a0d81919cb1f60a6c8ed1ac1b9da62e4f2dea5f594fccd862b1213bd275",
+            "executions": 1,
+            "prefix": "SELECT timezone, format_version FROM usage_rollup_meta WHERE singleton = 1"
+          },
+          {
+            "sha256": "ff34cbb904e94cc72df34a61ac8bdcf6fd8e123ea18db491a4b44d348d52d88b",
+            "executions": 1,
+            "prefix": "SELECT (SELECT MIN(started_at_ms) FROM turn_summary) AS first, (SELECT MAX(started_at_ms) FROM turn_summary) AS last"
+          },
+          {
+            "sha256": "b4877c7ebe444a6d28ffff85dbba846ef16472adb403f7ffe667e93f9a68560f",
+            "executions": 1,
+            "prefix": "SELECT provider, NULL AS project_key, NULL AS project_name, NULL AS session_id, NULL AS session_name, NULL AS session_started"
+          },
+          {
+            "sha256": "15a460aa6b24fecf2284c62871dd96f0f158d50aefc33927a5102751f41374be",
+            "executions": 1,
+            "prefix": "SELECT COUNT(*) AS count FROM ( SELECT NULLIF(local_day, '') AS period FROM ( SELECT provider, project_key, session_id, local"
+          }
+        ]
+      },
+      "emptyFirstPage": {
+        "statements": 4,
+        "get": 3,
+        "all": 1,
+        "run": 0,
+        "sqlShapes": [
+          {
+            "sha256": "573b7a0d81919cb1f60a6c8ed1ac1b9da62e4f2dea5f594fccd862b1213bd275",
+            "executions": 1,
+            "prefix": "SELECT timezone, format_version FROM usage_rollup_meta WHERE singleton = 1"
+          },
+          {
+            "sha256": "ff34cbb904e94cc72df34a61ac8bdcf6fd8e123ea18db491a4b44d348d52d88b",
+            "executions": 1,
+            "prefix": "SELECT (SELECT MIN(started_at_ms) FROM turn_summary) AS first, (SELECT MAX(started_at_ms) FROM turn_summary) AS last"
+          },
+          {
+            "sha256": "8aabbd7708372f723cdc8d6d3c1fb71d40db135d188c68b1c0184541d2e97b95",
+            "executions": 1,
+            "prefix": "SELECT provider, NULL AS project_key, NULL AS project_name, NULL AS session_id, NULL AS session_name, NULL AS session_started"
+          },
+          {
+            "sha256": "33661626112c77225c600c806e98c240e1b84816c25f00a171482ae149a361a1",
+            "executions": 1,
+            "prefix": "SELECT COUNT(*) AS count FROM ( SELECT NULLIF(local_day, '') AS period FROM ( SELECT provider, project_key, session_id, local"
+          }
+        ]
+      },
+      "beyondLastPage": {
+        "statements": 4,
+        "get": 3,
+        "all": 1,
+        "run": 0,
+        "sqlShapes": [
+          {
+            "sha256": "573b7a0d81919cb1f60a6c8ed1ac1b9da62e4f2dea5f594fccd862b1213bd275",
+            "executions": 1,
+            "prefix": "SELECT timezone, format_version FROM usage_rollup_meta WHERE singleton = 1"
+          },
+          {
+            "sha256": "ff34cbb904e94cc72df34a61ac8bdcf6fd8e123ea18db491a4b44d348d52d88b",
+            "executions": 1,
+            "prefix": "SELECT (SELECT MIN(started_at_ms) FROM turn_summary) AS first, (SELECT MAX(started_at_ms) FROM turn_summary) AS last"
+          },
+          {
+            "sha256": "b4877c7ebe444a6d28ffff85dbba846ef16472adb403f7ffe667e93f9a68560f",
+            "executions": 1,
+            "prefix": "SELECT provider, NULL AS project_key, NULL AS project_name, NULL AS session_id, NULL AS session_name, NULL AS session_started"
+          },
+          {
+            "sha256": "15a460aa6b24fecf2284c62871dd96f0f158d50aefc33927a5102751f41374be",
+            "executions": 1,
+            "prefix": "SELECT COUNT(*) AS count FROM ( SELECT NULLIF(local_day, '') AS period FROM ( SELECT provider, project_key, session_id, local"
+          }
+        ]
+      },
+      "names": {
+        "statements": 2,
+        "get": 1,
+        "all": 1,
+        "run": 0,
+        "sqlShapes": [
+          {
+            "sha256": "113f15b28fee8c32a233d7ac7d8f3051d6237b627adde179dcb9c6047e32c61b",
+            "executions": 1,
+            "prefix": "SELECT COUNT(*) AS count FROM ( SELECT 1 FROM turn_summary WHERE 1 = 1 GROUP BY provider, project_key, session_id )"
+          },
+          {
+            "sha256": "a2e05ec371828417864485c240c7082ab4148a844782bc6caf27f7a31abe597f",
+            "executions": 1,
+            "prefix": "SELECT project_key, ( SELECT project_name FROM projects p WHERE p.project_key = turn_summary.project_key ) AS project_name, p"
+          }
+        ]
+      },
+      "fourCapabilities": {
+        "statements": 8,
+        "get": 4,
+        "all": 4,
+        "run": 0,
+        "sqlShapes": [
+          {
+            "sha256": "0243452e595045be30f72bdc10f65d591549399af822e5417f9f3d0de1308be6",
+            "executions": 4,
+            "prefix": "SELECT count(*) AS total, coalesce(sum(uses), 0) AS totalUses, coalesce(max(uses), 0) AS maxUses FROM ( SELECT sum(usage_coun"
+          },
+          {
+            "sha256": "475951349f3a27088c12dc8e43f6948c1e6ae2c68b0fb12f5cbc270b351667b7",
+            "executions": 4,
+            "prefix": "SELECT provider, category, name, sum(usage_count) AS usage_count FROM ( SELECT t.*, u.category, u.name, u.usage_count FROM tu"
+          }
+        ]
+      },
+      "coverage": {
+        "statements": 3,
+        "get": 1,
+        "all": 2,
+        "run": 0,
+        "sqlShapes": [
+          {
+            "sha256": "7f6aafbd2992ce0b3cd591c29c02d885d62764c429af266f89e061bf552253d3",
+            "executions": 1,
+            "prefix": "SELECT * FROM manifest WHERE 1 = 1 AND id > ? ORDER BY id LIMIT ? OFFSET ?"
+          },
+          {
+            "sha256": "c9f8909a2c7fc14e36e98b7c489a6c8566cb839034a99e859ef13404964497c9",
+            "executions": 1,
+            "prefix": "SELECT * FROM ( SELECT t.*, p.project_name, s.session_name FROM ( SELECT t.*, EXISTS( SELECT 1 FROM turn_model_usage m WHERE "
+          },
+          {
+            "sha256": "676f4f5a79799d9cf69cc727c1c771d71ec709f42f941b3ed6d87c3b3d8b7839",
+            "executions": 1,
+            "prefix": "SELECT COUNT(*) AS files, COALESCE(SUM(processing_status = 'processing'), 0) AS processing, COALESCE(SUM(processing_status = "
+          }
+        ]
+      },
+      "unchangedSave": {
+        "statements": 114,
+        "get": 49,
+        "all": 49,
+        "run": 16,
+        "sqlShapes": [
+          {
+            "sha256": "2dbeeb2f2adb338b5e2a6b25450f09761acadb8c06bc9fa7cc68785a856995f8",
+            "executions": 7,
+            "prefix": "INSERT INTO projects VALUES(?,?) ON CONFLICT(project_key) DO UPDATE SET project_name=excluded.project_name WHERE project_name"
+          },
+          {
+            "sha256": "5152849ca962774535b76f026d716d922622806948829c17a24dabc30df5f1d6",
+            "executions": 1,
+            "prefix": "INSERT INTO sessions VALUES(?,?,?) ON CONFLICT(provider,session_id) DO UPDATE SET session_name=excluded.session_name WHERE ex"
+          },
+          {
+            "sha256": "b6ccb7f9866d2c65a4a847eadc90588d81c1c9edbc60fe58c7bf8bb6654401d7",
+            "executions": 1,
+            "prefix": "SELECT billing_mode FROM session_billing WHERE provider=? AND session_id=?"
+          },
+          {
+            "sha256": "198aa7a8978b3803db1c4d508c5ab477e0b2069215b6979db6b99d831aa42553",
+            "executions": 1,
+            "prefix": "SELECT id,root_turn_id,project_key FROM turn_summary WHERE provider=? AND session_id=?"
+          },
+          {
+            "sha256": "589a0909ae893ddd5a5f0034b6e592549a7e41883926b125bf60cbafb5b723c9",
+            "executions": 24,
+            "prefix": "SELECT * FROM turn_summary WHERE provider=? AND session_id=? AND root_turn_id=?"
+          },
+          {
+            "sha256": "71a3e36ea9e77757fb2a3247c42168d7f29449dee772630711186505cef5e0f9",
+            "executions": 24,
+            "prefix": "SELECT model,input_tokens,output_tokens,cache_write_input_tokens,cache_read_input_tokens, estimated_cost_usd,pricing_version "
+          },
+          {
+            "sha256": "6518e45200159409e9d9f1a42669c3b7b5283c1f7fa4b59c755ca3e0c0b738a9",
+            "executions": 24,
+            "prefix": "SELECT category,name,usage_count FROM turn_capability_usage WHERE turn_id=? ORDER BY category,name"
+          },
+          {
+            "sha256": "dbc1a681fd5aafc0b769572986bad1e377609f19d8fe556c2cdff8fcdf55ab99",
+            "executions": 24,
+            "prefix": "SELECT billing_mode,pricing_version FROM turn_costs WHERE turn_id=?"
+          },
+          {
+            "sha256": "dbf615164695a52774509d5099a8ad99219272c6c85230b334adbe91cb441495",
+            "executions": 1,
+            "prefix": "DELETE FROM sessions WHERE provider=? AND session_id=? AND NOT EXISTS( SELECT 1 FROM turn_summary t WHERE t.provider=sessions"
+          },
+          {
+            "sha256": "ba9b668441821adaac1907825c17c21b46b99b22804003eeec899917e8127c36",
+            "executions": 7,
+            "prefix": "DELETE FROM projects WHERE project_key=? AND NOT EXISTS(SELECT 1 FROM turn_summary t WHERE t.project_key=projects.project_key"
+          }
+        ]
+      },
+      "preservedSave": {
+        "statements": 114,
+        "get": 49,
+        "all": 49,
+        "run": 16,
+        "sqlShapes": [
+          {
+            "sha256": "2dbeeb2f2adb338b5e2a6b25450f09761acadb8c06bc9fa7cc68785a856995f8",
+            "executions": 7,
+            "prefix": "INSERT INTO projects VALUES(?,?) ON CONFLICT(project_key) DO UPDATE SET project_name=excluded.project_name WHERE project_name"
+          },
+          {
+            "sha256": "5152849ca962774535b76f026d716d922622806948829c17a24dabc30df5f1d6",
+            "executions": 1,
+            "prefix": "INSERT INTO sessions VALUES(?,?,?) ON CONFLICT(provider,session_id) DO UPDATE SET session_name=excluded.session_name WHERE ex"
+          },
+          {
+            "sha256": "b6ccb7f9866d2c65a4a847eadc90588d81c1c9edbc60fe58c7bf8bb6654401d7",
+            "executions": 1,
+            "prefix": "SELECT billing_mode FROM session_billing WHERE provider=? AND session_id=?"
+          },
+          {
+            "sha256": "198aa7a8978b3803db1c4d508c5ab477e0b2069215b6979db6b99d831aa42553",
+            "executions": 1,
+            "prefix": "SELECT id,root_turn_id,project_key FROM turn_summary WHERE provider=? AND session_id=?"
+          },
+          {
+            "sha256": "589a0909ae893ddd5a5f0034b6e592549a7e41883926b125bf60cbafb5b723c9",
+            "executions": 24,
+            "prefix": "SELECT * FROM turn_summary WHERE provider=? AND session_id=? AND root_turn_id=?"
+          },
+          {
+            "sha256": "71a3e36ea9e77757fb2a3247c42168d7f29449dee772630711186505cef5e0f9",
+            "executions": 24,
+            "prefix": "SELECT model,input_tokens,output_tokens,cache_write_input_tokens,cache_read_input_tokens, estimated_cost_usd,pricing_version "
+          },
+          {
+            "sha256": "6518e45200159409e9d9f1a42669c3b7b5283c1f7fa4b59c755ca3e0c0b738a9",
+            "executions": 24,
+            "prefix": "SELECT category,name,usage_count FROM turn_capability_usage WHERE turn_id=? ORDER BY category,name"
+          },
+          {
+            "sha256": "dbc1a681fd5aafc0b769572986bad1e377609f19d8fe556c2cdff8fcdf55ab99",
+            "executions": 24,
+            "prefix": "SELECT billing_mode,pricing_version FROM turn_costs WHERE turn_id=?"
+          },
+          {
+            "sha256": "dbf615164695a52774509d5099a8ad99219272c6c85230b334adbe91cb441495",
+            "executions": 1,
+            "prefix": "DELETE FROM sessions WHERE provider=? AND session_id=? AND NOT EXISTS( SELECT 1 FROM turn_summary t WHERE t.provider=sessions"
+          },
+          {
+            "sha256": "ba9b668441821adaac1907825c17c21b46b99b22804003eeec899917e8127c36",
+            "executions": 7,
+            "prefix": "DELETE FROM projects WHERE project_key=? AND NOT EXISTS(SELECT 1 FROM turn_summary t WHERE t.project_key=projects.project_key"
+          }
+        ]
+      },
+      "sessionBilling": {
+        "statements": 27,
+        "get": 0,
+        "all": 2,
+        "run": 25,
+        "sqlShapes": [
+          {
+            "sha256": "8ff033b3e5c16677fad8bfb286b2168040c5adc79dee3d117385aed675b973f3",
+            "executions": 1,
+            "prefix": "INSERT INTO session_billing VALUES (?, ?, ?) ON CONFLICT(provider, session_id) DO UPDATE SET billing_mode = excluded.billing_"
+          },
+          {
+            "sha256": "210b2d9dc631aa1abc8cdd68c5fd79373a1b46b0ccc45a2eabf1fbcd181fd429",
+            "executions": 2,
+            "prefix": "SELECT id FROM turn_summary WHERE provider=? AND session_id=? AND id>? ORDER BY id LIMIT 100"
+          },
+          {
+            "sha256": "e3c53aeecdf61040ae42e5229c65f47c81eaadb0744507d382b9bbf71c9fb117",
+            "executions": 24,
+            "prefix": "INSERT OR REPLACE INTO turn_costs SELECT ?, ?, CASE WHEN ? = 'subscription' THEN 0 WHEN ? = 'api' THEN sum(estimated_cost_usd"
+          }
+        ]
+      }
+    },
+    "B": {
+      "groupedPage": {
+        "statements": 3,
+        "get": 2,
+        "all": 1,
+        "run": 0,
+        "sqlShapes": [
+          {
+            "sha256": "573b7a0d81919cb1f60a6c8ed1ac1b9da62e4f2dea5f594fccd862b1213bd275",
+            "executions": 1,
+            "prefix": "SELECT timezone, format_version FROM usage_rollup_meta WHERE singleton = 1"
+          },
+          {
+            "sha256": "ff34cbb904e94cc72df34a61ac8bdcf6fd8e123ea18db491a4b44d348d52d88b",
+            "executions": 1,
+            "prefix": "SELECT (SELECT MIN(started_at_ms) FROM turn_summary) AS first, (SELECT MAX(started_at_ms) FROM turn_summary) AS last"
+          },
+          {
+            "sha256": "22f96c61f5dc40eac997f68a750dd33e27d80de6d545bbb594bf25d03c45e0bf",
+            "executions": 1,
+            "prefix": "SELECT provider, NULL AS project_key, NULL AS project_name, NULL AS session_id, NULL AS session_name, NULL AS session_started"
+          }
+        ]
+      },
+      "emptyFirstPage": {
+        "statements": 3,
+        "get": 2,
+        "all": 1,
+        "run": 0,
+        "sqlShapes": [
+          {
+            "sha256": "573b7a0d81919cb1f60a6c8ed1ac1b9da62e4f2dea5f594fccd862b1213bd275",
+            "executions": 1,
+            "prefix": "SELECT timezone, format_version FROM usage_rollup_meta WHERE singleton = 1"
+          },
+          {
+            "sha256": "ff34cbb904e94cc72df34a61ac8bdcf6fd8e123ea18db491a4b44d348d52d88b",
+            "executions": 1,
+            "prefix": "SELECT (SELECT MIN(started_at_ms) FROM turn_summary) AS first, (SELECT MAX(started_at_ms) FROM turn_summary) AS last"
+          },
+          {
+            "sha256": "8601d46fb7d491ca5b9a1ae8f7a6ddb6f77d3337df1ba5d60222ad0fbe09c027",
+            "executions": 1,
+            "prefix": "SELECT provider, NULL AS project_key, NULL AS project_name, NULL AS session_id, NULL AS session_name, NULL AS session_started"
+          }
+        ]
+      },
+      "beyondLastPage": {
+        "statements": 4,
+        "get": 3,
+        "all": 1,
+        "run": 0,
+        "sqlShapes": [
+          {
+            "sha256": "573b7a0d81919cb1f60a6c8ed1ac1b9da62e4f2dea5f594fccd862b1213bd275",
+            "executions": 1,
+            "prefix": "SELECT timezone, format_version FROM usage_rollup_meta WHERE singleton = 1"
+          },
+          {
+            "sha256": "ff34cbb904e94cc72df34a61ac8bdcf6fd8e123ea18db491a4b44d348d52d88b",
+            "executions": 1,
+            "prefix": "SELECT (SELECT MIN(started_at_ms) FROM turn_summary) AS first, (SELECT MAX(started_at_ms) FROM turn_summary) AS last"
+          },
+          {
+            "sha256": "22f96c61f5dc40eac997f68a750dd33e27d80de6d545bbb594bf25d03c45e0bf",
+            "executions": 1,
+            "prefix": "SELECT provider, NULL AS project_key, NULL AS project_name, NULL AS session_id, NULL AS session_name, NULL AS session_started"
+          },
+          {
+            "sha256": "15a460aa6b24fecf2284c62871dd96f0f158d50aefc33927a5102751f41374be",
+            "executions": 1,
+            "prefix": "SELECT COUNT(*) AS count FROM ( SELECT NULLIF(local_day, '') AS period FROM ( SELECT provider, project_key, session_id, local"
+          }
+        ]
+      },
+      "names": {
+        "statements": 1,
+        "get": 0,
+        "all": 1,
+        "run": 0,
+        "sqlShapes": [
+          {
+            "sha256": "f6371164172bb085feeb011659de6ab532aab736e16ab9566446557f09d0e0e0",
+            "executions": 1,
+            "prefix": "SELECT project_key, ( SELECT project_name FROM projects p WHERE p.project_key = turn_summary.project_key ) AS project_name, p"
+          }
+        ]
+      },
+      "fourCapabilities": {
+        "statements": 4,
+        "get": 0,
+        "all": 4,
+        "run": 0,
+        "sqlShapes": [
+          {
+            "sha256": "75df7c451d4c0ef81f291371c1c20acd94dbb8273d582e16bbb36a409ce00d9d",
+            "executions": 4,
+            "prefix": "SELECT provider, category, name, sum(usage_count) AS usage_count, count(*) OVER() AS _total, sum(sum(usage_count)) OVER() AS "
+          }
+        ]
+      },
+      "coverage": {
+        "statements": 1,
+        "get": 1,
+        "all": 0,
+        "run": 0,
+        "sqlShapes": [
+          {
+            "sha256": "676f4f5a79799d9cf69cc727c1c771d71ec709f42f941b3ed6d87c3b3d8b7839",
+            "executions": 1,
+            "prefix": "SELECT COUNT(*) AS files, COALESCE(SUM(processing_status = 'processing'), 0) AS processing, COALESCE(SUM(processing_status = "
+          }
+        ]
+      },
+      "unchangedSave": {
+        "statements": 90,
+        "get": 25,
+        "all": 49,
+        "run": 16,
+        "sqlShapes": [
+          {
+            "sha256": "2dbeeb2f2adb338b5e2a6b25450f09761acadb8c06bc9fa7cc68785a856995f8",
+            "executions": 7,
+            "prefix": "INSERT INTO projects VALUES(?,?) ON CONFLICT(project_key) DO UPDATE SET project_name=excluded.project_name WHERE project_name"
+          },
+          {
+            "sha256": "5152849ca962774535b76f026d716d922622806948829c17a24dabc30df5f1d6",
+            "executions": 1,
+            "prefix": "INSERT INTO sessions VALUES(?,?,?) ON CONFLICT(provider,session_id) DO UPDATE SET session_name=excluded.session_name WHERE ex"
+          },
+          {
+            "sha256": "b6ccb7f9866d2c65a4a847eadc90588d81c1c9edbc60fe58c7bf8bb6654401d7",
+            "executions": 1,
+            "prefix": "SELECT billing_mode FROM session_billing WHERE provider=? AND session_id=?"
+          },
+          {
+            "sha256": "198aa7a8978b3803db1c4d508c5ab477e0b2069215b6979db6b99d831aa42553",
+            "executions": 1,
+            "prefix": "SELECT id,root_turn_id,project_key FROM turn_summary WHERE provider=? AND session_id=?"
+          },
+          {
+            "sha256": "0be2a7fb3944c1ee0272edcbfc43cddea7ee8f658bf249bd437596afacf09e87",
+            "executions": 24,
+            "prefix": "SELECT t.*, c.billing_mode AS stored_billing_mode, c.pricing_version AS stored_pricing_version FROM turn_summary t LEFT JOIN "
+          },
+          {
+            "sha256": "6299376e1e98b88c2157628762b2085a6695695220335c829dc5af8c986aab0a",
+            "executions": 24,
+            "prefix": "SELECT model,input_tokens,output_tokens,cache_write_input_tokens,cache_read_input_tokens, estimated_cost_usd,pricing_version "
+          },
+          {
+            "sha256": "6518e45200159409e9d9f1a42669c3b7b5283c1f7fa4b59c755ca3e0c0b738a9",
+            "executions": 24,
+            "prefix": "SELECT category,name,usage_count FROM turn_capability_usage WHERE turn_id=? ORDER BY category,name"
+          },
+          {
+            "sha256": "dbf615164695a52774509d5099a8ad99219272c6c85230b334adbe91cb441495",
+            "executions": 1,
+            "prefix": "DELETE FROM sessions WHERE provider=? AND session_id=? AND NOT EXISTS( SELECT 1 FROM turn_summary t WHERE t.provider=sessions"
+          },
+          {
+            "sha256": "ba9b668441821adaac1907825c17c21b46b99b22804003eeec899917e8127c36",
+            "executions": 7,
+            "prefix": "DELETE FROM projects WHERE project_key=? AND NOT EXISTS(SELECT 1 FROM turn_summary t WHERE t.project_key=projects.project_key"
+          }
+        ]
+      },
+      "preservedSave": {
+        "statements": 66,
+        "get": 25,
+        "all": 25,
+        "run": 16,
+        "sqlShapes": [
+          {
+            "sha256": "2dbeeb2f2adb338b5e2a6b25450f09761acadb8c06bc9fa7cc68785a856995f8",
+            "executions": 7,
+            "prefix": "INSERT INTO projects VALUES(?,?) ON CONFLICT(project_key) DO UPDATE SET project_name=excluded.project_name WHERE project_name"
+          },
+          {
+            "sha256": "5152849ca962774535b76f026d716d922622806948829c17a24dabc30df5f1d6",
+            "executions": 1,
+            "prefix": "INSERT INTO sessions VALUES(?,?,?) ON CONFLICT(provider,session_id) DO UPDATE SET session_name=excluded.session_name WHERE ex"
+          },
+          {
+            "sha256": "b6ccb7f9866d2c65a4a847eadc90588d81c1c9edbc60fe58c7bf8bb6654401d7",
+            "executions": 1,
+            "prefix": "SELECT billing_mode FROM session_billing WHERE provider=? AND session_id=?"
+          },
+          {
+            "sha256": "198aa7a8978b3803db1c4d508c5ab477e0b2069215b6979db6b99d831aa42553",
+            "executions": 1,
+            "prefix": "SELECT id,root_turn_id,project_key FROM turn_summary WHERE provider=? AND session_id=?"
+          },
+          {
+            "sha256": "0be2a7fb3944c1ee0272edcbfc43cddea7ee8f658bf249bd437596afacf09e87",
+            "executions": 24,
+            "prefix": "SELECT t.*, c.billing_mode AS stored_billing_mode, c.pricing_version AS stored_pricing_version FROM turn_summary t LEFT JOIN "
+          },
+          {
+            "sha256": "6299376e1e98b88c2157628762b2085a6695695220335c829dc5af8c986aab0a",
+            "executions": 24,
+            "prefix": "SELECT model,input_tokens,output_tokens,cache_write_input_tokens,cache_read_input_tokens, estimated_cost_usd,pricing_version "
+          },
+          {
+            "sha256": "dbf615164695a52774509d5099a8ad99219272c6c85230b334adbe91cb441495",
+            "executions": 1,
+            "prefix": "DELETE FROM sessions WHERE provider=? AND session_id=? AND NOT EXISTS( SELECT 1 FROM turn_summary t WHERE t.provider=sessions"
+          },
+          {
+            "sha256": "ba9b668441821adaac1907825c17c21b46b99b22804003eeec899917e8127c36",
+            "executions": 7,
+            "prefix": "DELETE FROM projects WHERE project_key=? AND NOT EXISTS(SELECT 1 FROM turn_summary t WHERE t.project_key=projects.project_key"
+          }
+        ]
+      },
+      "sessionBilling": {
+        "statements": 2,
+        "get": 0,
+        "all": 0,
+        "run": 2,
+        "sqlShapes": [
+          {
+            "sha256": "8ff033b3e5c16677fad8bfb286b2168040c5adc79dee3d117385aed675b973f3",
+            "executions": 1,
+            "prefix": "INSERT INTO session_billing VALUES (?, ?, ?) ON CONFLICT(provider, session_id) DO UPDATE SET billing_mode = excluded.billing_"
+          },
+          {
+            "sha256": "3be54c062efeb76b2c04ac102f58abfb809a46b3e8a0a8fa950127459bef7f3a",
+            "executions": 1,
+            "prefix": "INSERT OR REPLACE INTO turn_costs SELECT t.id, ?, CASE WHEN ? = 'subscription' THEN 0 WHEN ? = 'api' THEN sum(estimated_cost_"
+          }
+        ]
+      }
+    }
+  },
+  "limitations": [
+    "Synthetic DTOs, not an independent JSONL parser oracle",
+    "No UI, quota, forced process termination, power loss or competing writer validation",
+    "JS cost oracle independently reduces persisted model estimates; model pricing itself is not independently reimplemented",
+    "Floating values are compared at 12 significant digits; recorded_at is excluded from cross-run persisted snapshots"
+  ]
+}

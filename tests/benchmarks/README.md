@@ -2,7 +2,11 @@
 
 요약·JSONL·SQL·quota 처리의 정확성과 성능을 비교하는 도구를 모은다.
 
+- [algorithm-minimize-db-validation.cjs](algorithm-minimize-db-validation.cjs) — `--before --after --output`으로 페이지·정렬·이름·도구·coverage·비용·저장·삭제 보존의 A/B 결과와 독립 집계를 검증하고 SQL 실행 수를 기록한다. [algorithm-minimize-parsing-validation.cjs](algorithm-minimize-parsing-validation.cjs)는 같은 인자로 제목·도구·이벤트·계보·JSONL·Zstd·원본 identity를 고정 seed와 독립 기대값에 대조한다. 성능 타이밍과 별도로 실행한다.
+
 - [query-minimize-ab.cjs](query-minimize-ab.cjs) — 현재·10,000·100요청의 저장 구간과 비용·정렬·이름·도구·coverage의 실제 조회 API를 대조한다. `--workspace=... --before=... --after=... --output=<새 JSON>`은 준비 3쌍·교대 10쌍이며, `--baseline-only`는 A 구간 순위, `--profile-only --after=...`는 별도 SQL 실행 수·계획 진단이다. [query-minimize-validation.cjs](query-minimize-validation.cjs)는 같은 `--before --after --output`으로 이번 A/B의 신규 요청 경계·부분 날짜·NULL·실패 rollback을 대조한다.
+
+  `--experiment=<이름> --dateSeoul=<YYYY-MM-DD>`로 실험 식별자와 날짜를 기록한다. `--billing`은 기존 비용·사용자 선택을 매번 복원한 뒤 가장 큰 Codex 세션의 api/subscription/unknown 변경과 COMMIT을 별도 측정한다. coverage는 제품에 counts 전용 API가 있으면 실제 Worker와 같은 진입점을 사용한다.
 
 - [query-minimize-plan.cjs](query-minimize-plan.cjs) — `--before --after --db --workspace --output`으로 보존 DB의 새 사본에서 실제 일별 집계 계획·날짜 UDF 호출 수·결과 해시를 대조한다. 시간 표본에 섞지 않는다. 최종 저장 집중 비교는 `query-minimize-ab.cjs --storage-only`로 넓은 화면 조회를 생략하고 실제 갱신·8개 평균 조회를 유지한다.
 
