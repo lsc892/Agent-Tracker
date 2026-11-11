@@ -180,16 +180,11 @@ export class ClaudeParserAdapter {
    * 알고리즘: stop hook의 계속 실행 여부를 우선하고 차단 상태가 아닐 때만 duration·완료 이벤트를 반영하며 API 실패 상태를 유지한다.
    */
   private recordSystemLifecycle(context: ClaudeRowContext): void {
-    const { type, rootId, subtype, preventedContinuation, durationMs, time, offset } = context;
+    const { type, rootId, subtype, durationMs, time, offset } = context;
     if (type !== 'system' || !rootId) return;
+    // Stop hook 결과를 먼저 반영한 뒤, 차단되지 않은 요청의 종료 기록만 허용한다.
     if (subtype === 'stop_hook_summary') {
-      // Only an explicit outcome can supersede the assistant timestamp fallback.
-      if (preventedContinuation === undefined) return;
-      this.stopBlocked = preventedContinuation;
-      const completed = !this.stopBlocked && !this.apiFailed;
-      this.sink.event({ kind: 'turn', rootId, isMain: this.identityValue.isMain, completed,
-        completedAt: completed ? time : null, durationQuality: 'derived',
-        status: this.stopBlocked ? 'in_progress' : this.apiFailed ? 'failed' : 'completed', statusAt: time, offset });
+      this.recordStopHook(context, rootId);
       return;
     }
     // A blocked stop hook must keep the request open, including later duration records.
@@ -200,10 +195,26 @@ export class ClaudeParserAdapter {
         status: this.apiFailed ? 'failed' : 'completed', statusAt: time, offset });
       return;
     }
-    if (!['stop', 'turn_complete', 'task_complete'].includes(String(subtype))) return;
-    this.sink.event({ kind: 'turn', rootId, isMain: this.identityValue.isMain, completed: !this.apiFailed,
-      completedAt: this.apiFailed ? null : time, durationQuality: 'derived',
-      status: this.apiFailed ? 'failed' : 'completed', statusAt: time, offset });
+    switch (String(subtype)) {
+      case 'stop':
+      case 'turn_complete':
+      case 'task_complete':
+        this.sink.event({ kind: 'turn', rootId, isMain: this.identityValue.isMain, completed: !this.apiFailed,
+          completedAt: this.apiFailed ? null : time, durationQuality: 'derived',
+          status: this.apiFailed ? 'failed' : 'completed', statusAt: time, offset });
+        break;
+    }
+  }
+
+  /** 명시 hook 결과만 assistant 시각에 의한 완료 추정을 덮어쓸 수 있다. */
+  private recordStopHook(context: ClaudeRowContext, rootId: string): void {
+    const { preventedContinuation, time, offset } = context;
+    if (preventedContinuation === undefined) return;
+    this.stopBlocked = preventedContinuation;
+    const completed = !this.stopBlocked && !this.apiFailed;
+    this.sink.event({ kind: 'turn', rootId, isMain: this.identityValue.isMain, completed,
+      completedAt: completed ? time : null, durationQuality: 'derived',
+      status: this.stopBlocked ? 'in_progress' : this.apiFailed ? 'failed' : 'completed', statusAt: time, offset });
   }
 
   finish(): void {

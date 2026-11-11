@@ -66,21 +66,12 @@ export async function commitComponents(context: RefreshContext, aggregated: Memo
     for (const entry of pendingBatch) finish(entry);
   };
   for (const seed of [...affected].sort()) {
-    if (!affected.has(seed) || queued.has(seed))
-      continue;
-    const component = new Set([seed]), pending = [seed];
-    for (let index = 0; index < pending.length; index++)
-      for (const linked of links.get(pending[index]) ?? [])
-        if (!component.has(linked)) {
-          component.add(linked);
-          pending.push(linked);
-        }
+    if (!affected.has(seed) || queued.has(seed)) continue;
+    const component = linkedComponent(seed, links);
     const members = memberGroups.members(component);
     const grouped = { summaries: summaryGroups.members(component), orphans: orphanGroups.members(component) };
     const entry = { component, members, aggregated: grouped };
-    const special = grouped.summaries.length > MAX_COMMIT_BATCH_SUMMARIES || grouped.orphans.length > 0
-      || members.some(file => file.deferred || file.error || file.removed || reconnectedIds.has(file.id));
-    if (special) {
+    if (requiresIndividualCommit(entry, reconnectedIds)) {
       await flush();
       await yieldToWorker();
       check();
@@ -97,8 +88,28 @@ export async function commitComponents(context: RefreshContext, aggregated: Memo
   await flush();
 }
 
+/** 연결된 세션을 기존 너비 우선 탐색 순서로 모아 하나의 원자적 저장 범위를 만든다. */
+function linkedComponent(seed: string, links: ReadonlyMap<string, ReadonlySet<string>>): Set<string> {
+  const component = new Set([seed]), pending = [seed];
+  for (let index = 0; index < pending.length; index++) {
+    for (const linked of links.get(pending[index]) ?? []) {
+      if (component.has(linked)) continue;
+      component.add(linked);
+      pending.push(linked);
+    }
+  }
+  return component;
+}
+
+/** 큰 성분과 보류·오류·삭제·재연결은 기존 개별 복구 경로로 처리한다. */
+function requiresIndividualCommit(entry: ComponentCommit, reconnectedIds: ReadonlySet<number>): boolean {
+  return entry.aggregated.summaries.length > MAX_COMMIT_BATCH_SUMMARIES || entry.aggregated.orphans.length > 0
+    || entry.members.some(file => file.deferred || file.error || file.removed || reconnectedIds.has(file.id));
+}
+
+/** 보류 → 원본 오류 → 고아 요청 → 실제 쓰기 순으로 검사해 앞선 보존·복구 정책을 우선한다. */
 function commitComponent(context: RefreshContext, component: Set<string>, members: FileState[], aggregated: MemoryAggregateResult): void {
-  const { database, result, storage, state, collect, retain } = context;
+  const { database, storage, state, retain } = context;
   if (members.some(file => file.deferred)) {
     settleDeferredComponent(context, members);
     return;
