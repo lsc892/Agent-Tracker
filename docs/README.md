@@ -2,6 +2,7 @@
 
 설계 기준·의사결정·개발 절차와 조사·성능 검증 기록을 둔다.
 
+- [Performance-v0.3.0.ko.md](Performance-v0.3.0.ko.md): v0.2.0 대비 v0.3.0의 알고리즘 구간별 구조·기존 실측 개선량·실제 로그의 동등성 한계와 남은 병목을 정리한다.
 - [AgentTracker.md](AgentTracker.md): 현재 기능과 데이터 처리 구조의 설계 기준을 정의한다.
 - [AgentTracker-일지.md](AgentTracker-일지.md): 기능별 의사결정과 검증 이력을 보존한다.
 - [Development.ko.md](Development.ko.md): 사용법·설정·개발·패키징 절차를 안내한다.

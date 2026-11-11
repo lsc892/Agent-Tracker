@@ -129,6 +129,8 @@ Usa **Agent Tracker: Eliminar datos estadísticos** para borrar los resultados a
 - **Idioma predeterminado para idiomas no compatibles** — Muestra inglés cuando el idioma de VS Code no es compatible.
 - **Nuevo icono de la extensión** — Sustituye el icono y reduce el tamaño del archivo de imagen.
 
+[Cambios de algoritmos, mejoras medidas frente a v0.2.0 y limitaciones (en coreano)](docs/Performance-v0.3.0.ko.md)
+
 </details>
 
 <details>
