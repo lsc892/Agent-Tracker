@@ -239,8 +239,12 @@ export class MemoryStore {
   ): RetainedUsage {
     const retained: RetainedUsage = { turnIds: new Set(), roots: new Set(), sessions: new Set() };
     if (!enabled) return retained;
+    const checkedSessions = new Set<string>();
     for (const [id, file] of removed) {
       if (reconnected.has(id) || file.session_id === null) continue;
+      const key = sessionKey(file.provider, file.session_id);
+      if (checkedSessions.has(key)) continue;
+      checkedSessions.add(key);
       this.retainSourceUsage(file, retained);
     }
     return retained;
@@ -344,7 +348,9 @@ export class MemoryStore {
   ): void {
     const compareStarted = performance.now();
     const key = sessionKey(summary.provider, summary.session_id);
-    const previous = this.database.statement('SELECT * FROM turn_summary WHERE provider=? AND session_id=? AND root_turn_id=?')
+    const previous = this.database.statement(`SELECT t.*, c.billing_mode AS stored_billing_mode, c.pricing_version AS stored_pricing_version
+      FROM turn_summary t LEFT JOIN turn_costs c ON c.turn_id=t.id
+      WHERE t.provider=? AND t.session_id=? AND t.root_turn_id=?`)
       .get(summary.provider, summary.session_id, summary.root_turn_id);
     const incoming = summaryValues(summary, now);
     const models = this.modelValues(summary);
@@ -352,11 +358,11 @@ export class MemoryStore {
     affectedProjects.add(summary.project_key);
 
     const previousModels = this.readModels(previous);
-    const previousCapabilities = this.readCapabilities(previous);
+    const previousCapabilities = preserveCapabilities ? [] : this.readCapabilities(previous);
     const modelsChanged = !equal(previousModels, models);
     const capabilitiesChanged = !preserveCapabilities && !equal(previousCapabilities, capabilities ?? []);
     const mode = billing.get(key) ?? summary.billing ?? 'unknown';
-    const costChanged = this.hasCostChanged(previous, mode);
+    const costChanged = !previous || previous.stored_billing_mode !== mode || previous.stored_pricing_version !== PRICING_VERSION;
     const factsChanged = this.hasFactsChanged(previous, incoming, summary);
     this.profile.record('summaryCompare', compareStarted);
     if (!factsChanged && !modelsChanged && !capabilitiesChanged && !costChanged) return;
@@ -366,7 +372,7 @@ export class MemoryStore {
       const id = this.profile.measure('facts', () => this.saveFacts(previous, incoming));
       if (!previous || modelsChanged) this.profile.measure('models', () => this.replaceModels(id, models, previous !== undefined));
       if (!previous || capabilitiesChanged) {
-        this.profile.measure('capabilities', () => this.replaceCapabilities(id, preserveCapabilities && previous ? previousCapabilities : capabilities ?? [], previous !== undefined));
+        this.profile.measure('capabilities', () => this.replaceCapabilities(id, capabilities ?? [], previous !== undefined));
       }
       this.profile.measure('costs', () => this.billing.saveTurnCost(id, mode));
       changedSessions.add(key);
@@ -405,7 +411,7 @@ export class MemoryStore {
   private readModels(previous: StoredRow | undefined): SQLInputValue[][] {
     if (!previous) return [];
     const models = this.database.statement(`SELECT model,input_tokens,output_tokens,cache_write_input_tokens,cache_read_input_tokens,
-      estimated_cost_usd,pricing_version FROM turn_model_usage WHERE turn_id=? ORDER BY model`)
+      estimated_cost_usd,pricing_version FROM turn_model_usage WHERE turn_id=?`)
       .all(previous.id).map(Object.values);
     return models.sort(compareModels);
   }
@@ -413,17 +419,10 @@ export class MemoryStore {
   /** 기존 Skill 행을 값 배열로 읽어 분류·이름의 기존 비교 순서로 정렬한다. */
   private readCapabilities(previous: StoredRow | undefined): SQLInputValue[][] {
     if (!previous) return [];
+    // localeCompare can tie distinct Unicode spellings; keep the original SQL tie order.
     const capabilities = this.database.statement('SELECT category,name,usage_count FROM turn_capability_usage WHERE turn_id=? ORDER BY category,name')
       .all(previous.id).map(Object.values);
     return capabilities.sort(compareCapabilities);
-  }
-
-  /** 기존 비용의 결제 방식·단가 버전을 비교해 비용 재계산 필요 여부를 판정한다. */
-  private hasCostChanged(previous: StoredRow | undefined, mode: BillingMode): boolean {
-    const cost = previous
-      ? this.database.statement('SELECT billing_mode,pricing_version FROM turn_costs WHERE turn_id=?').get(previous.id)
-      : undefined;
-    return !cost || cost.billing_mode !== mode || cost.pricing_version !== PRICING_VERSION;
   }
 
   /** 요청 열을 바인딩 값과 비교하되 updated_at은 입력이 명시한 경우에만 비교한다. */
