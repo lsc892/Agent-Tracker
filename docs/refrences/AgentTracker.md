@@ -558,7 +558,7 @@ agent_role = parent_thread_id가 없으면 main, 있으면 subagent
 
 파일의 첫 `session_meta`가 소유 thread를 정한다. fork 로그 안에 복제된 다른 thread의 부모 `session_meta`는 소유 식별자·프로젝트·lineage를 덮어쓰지 않는다. 같은 thread의 반복 metadata는 기존 부모·fork·프로젝트 정보를 유지하면서 제공된 제목 등을 갱신한다.
 
-부모 세션 연결은 원본의 parent_thread_id로 계산한다. 직접 자식만 있는 계보는 부모 그룹에 바로 모으고, 다단계 계보는 경로 압축 Union-Find와 Small-to-Large로 작은 소스 membership Map을 큰 Map에 합친다. Union-Find의 물리적 대표와 최상위 부모 ID는 구분한다. forked_from_id는 복사 이력 검증에만 사용한다. 부모 누락·충돌·순환과 그 의존 경로는 missing-parent-agent를 남긴다. parser v17은 관련 원본을 한 번 읽으며 원본 전체 DTO 캐시는 사용하지 않는다.
+부모 세션 연결은 원본의 parent_thread_id로 계산한다. 직접 자식과 다단계 계보 모두 각 thread의 최상위 root를 비재귀 순회로 한 번 해소한 뒤 root별로 직접 묶는다. 경로의 확정 결과와 임시 null 방문 표시를 같은 Map에 저장하며 Union-Find 재병합과 별도 방문 Set은 두지 않는다. 같은 정상 계보는 같은 그룹 객체를 공유하고 root별 원본 배열의 순서를 유지한다. forked_from_id는 복사 이력 검증에만 사용한다. 부모 누락·충돌·순환과 그 의존 경로는 독립 그룹으로 남기고 missing-parent-agent를 표시한다. parser v17은 관련 원본을 한 번 읽으며 원본 전체 DTO 캐시는 사용하지 않는다.
 
 파일 전체에 `root_turn_id`가 없는 구형 subagent도 독립 세션·요청으로 승격하지 않는다. 부모 로그의 spawn_agent call_id와 호출 당시 요청 ID를 기억하고 반환된 agent_id 또는 task_name을 자식 thread_id 또는 agent_path와 연결한다. root 없는 부모를 가진 손자는 그 부모가 귀속된 최상위 요청으로 합산한다. 복사 이력 제외는 원래 root·index로 먼저 판정한 뒤 부모 root로 변환하며 response/thread/turn 식별자는 유지한다. 자식의 시간·상태 이벤트는 부모 수명주기를 바꾸지 않는다. 실제 이벤트가 없는 원본은 manifest만 유지하고, 비어 있지 않지만 귀속을 확정하지 못한 자식은 관련 성분의 저장을 보류해 이전 정상 통계를 보존한다. 원본 진단·도구 사용 횟수는 유지하지만 자식별 사용량·요청 행은 저장하지 않는다.
 
