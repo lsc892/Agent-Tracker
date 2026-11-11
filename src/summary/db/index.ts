@@ -129,4 +129,8 @@ export class SummaryDatabase {
   diagnostics(page: KeysetPage & { afterSummaryId?: number; offset?: number; providers?: Provider[] } = {}): DiagnosticsPage {
     return this.reader.diagnostics(page);
   }
+
+  diagnosticCounts(providers?: Provider[]): DiagnosticsPage['counts'] {
+    return this.reader.diagnosticCounts(providers);
+  }
 }
