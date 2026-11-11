@@ -5,7 +5,8 @@ import { DatabaseSync, type StatementSync } from 'node:sqlite';
 import { migrateSchema } from './migrations';
 import { calendarPeriod } from './timezone';
 import { UsageRollupStore } from './rollups';
-import { modelOrderKey, modelRelease } from '../modelOrder';
+import { modelOrderKey, modelRelease } from '../models/modelOrder';
+import type { StageProfiler, StorageStage } from '../profiling';
 
 export type SqliteSessionOptions = string | { databasePath: string; cacheKiB?: number };
 
@@ -62,14 +63,18 @@ export class SqliteSession {
    * 책임: 동기 DB 변경을 하나의 원자적 쓰기로 묶는다.
    * 알고리즘: BEGIN IMMEDIATE로 쓰기 잠금을 확보한 뒤 콜백 성공 시 COMMIT하고 오류 시 ROLLBACK 후 같은 오류를 전달한다.
    */
-  transaction<T>(action: () => T): T {
-    this.connection.exec('BEGIN IMMEDIATE');
+  transaction<T>(action: () => T, profile?: StageProfiler<StorageStage>): T {
+    const execute = (stage: 'begin' | 'commit' | 'rollback', sql: string): void => {
+      if (profile) profile.measure(stage, () => this.connection.exec(sql));
+      else this.connection.exec(sql);
+    };
+    execute('begin', 'BEGIN IMMEDIATE');
     try {
       const result = action();
-      this.connection.exec('COMMIT');
+      execute('commit', 'COMMIT');
       return result;
     } catch (error) {
-      this.connection.exec('ROLLBACK');
+      execute('rollback', 'ROLLBACK');
       throw error;
     }
   }
@@ -95,7 +100,7 @@ export class SqliteSession {
 
   private optimizeConnection(onOpen = false): boolean {
     try {
-      // Limit maintenance to persistent tables, even when scan staging exists.
+      // Limit maintenance to persistent tables.
       this.connection.exec(onOpen ? 'PRAGMA main.optimize=0x10002;' : 'PRAGMA main.optimize;');
       return true;
     } catch {

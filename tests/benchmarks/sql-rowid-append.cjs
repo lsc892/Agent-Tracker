@@ -10,7 +10,7 @@ const { performance } = require('node:perf_hooks');
 const { SqliteSession } = require('../../dist/src/summary/db/connection');
 const { aggregateUsageSource, buildRollupUsageQueries } = require('../../dist/src/summary/db/rollup-queries');
 const { buildUsageQuery } = require('../../dist/src/summary/db/queries');
-const { ROLLUP_STATES, ROLLUP_TABLES } = require('../../dist/src/summary/db/rollup-state');
+const { rollupStates, ROLLUP_TABLES } = require('../../dist/src/summary/db/rollup-state');
 const { compareResults } = require('./sql-rollup.cjs');
 const { stats } = require('./sql-explain.cjs');
 const { querySourceFiles } = require('./query-source-files.cjs');
@@ -111,7 +111,7 @@ function insertStatements(db) {
   const model = db.statement('INSERT INTO turn_model_usage VALUES(?,?,?,?,?,?,NULL,?)');
   const merges = Object.fromEntries(['provider', 'model'].map(by => {
     const table = ROLLUP_TABLES[by], keys = `provider,session_id,project_key,local_day${by === 'model' ? ',model_key' : ''}`;
-    const updates = ROLLUP_STATES.map(state => {
+    const updates = rollupStates(by).map(state => {
       const current = `${table}.${state.name}`, incoming = `excluded.${state.name}`;
       const expression = state.merge === 'SUM' ? `${current}+${incoming}`
         : `CASE WHEN ${current} IS NULL THEN ${incoming} WHEN ${incoming} IS NULL THEN ${current} ELSE ${state.merge}(${current},${incoming}) END`;

@@ -1,0 +1,67 @@
+{
+  "date": "2026-11-07",
+  "experimentDate": "2026-11-06",
+  "timezone": "Asia/Seoul",
+  "branch": "experiment/jsonl-source-cache-2026-11-06",
+  "environment": {
+    "node": "v24.14.1",
+    "cpu": "AMD Ryzen 5 7500F 6-Core Processor             ",
+    "platform": "win32",
+    "timezone": "Asia/Seoul"
+  },
+  "baseline": "Original full-DTO implementation with original SQL-compatible signatures; exact original measured B source/build match",
+  "frozenSourcesAndBuildsMatch": true,
+  "jsonlReaderUnchanged": true,
+  "runnerMatchesRecordedHash": true,
+  "npmCheck": {
+    "exitCode": 0,
+    "tests": 426,
+    "pass": 426,
+    "fail": 0,
+    "logSha256": "3f25a3320051ca767fe56129cffe746bb8190be797de4e5a6d5af945ae6bbf37"
+  },
+  "tests": {
+    "sourceCache": 12,
+    "winnerIndex": 8,
+    "fullEventAndSqlWinnerOracle": 4,
+    "fixedSeed": "0x20261106",
+    "indexedReplacementSequences": 100
+  },
+  "correctness": {
+    "finalCheckedMeasuredAndDiagnosticStates": 528,
+    "finalCheckedColdReopenStates": 88,
+    "measuredStates": 480,
+    "warmupStates": 144,
+    "diagnosticStates": 48,
+    "coldReopenStates": 112,
+    "matches": [
+      "requests",
+      "tokens",
+      "failed",
+      "factsSha256",
+      "aggregatesSha256",
+      "metadataSha256",
+      "dependencySha256",
+      "independent"
+    ],
+    "rawRollupPages": "all pages match original SQL query",
+    "groupAverages": "independent JS sums over normalized requests",
+    "fileSnapshots": "full input byte hashes verified before and after all runs",
+    "database": "foreign key and integrity checks passed"
+  },
+  "artifacts": {
+    "JsonlSourceCacheAB-2026-11-06.json": "1359ac4bd826275518ea9046cffa2e40db71b8fb1e68d9f4251a64c7b51e248f",
+    "JsonlSourceCacheMultiSourceAB-2026-11-06.json": "2229d47330d906ece1ee779a7e3750977c8309c1ee65c2e27f83bfaaf7ea291b"
+  },
+  "runnerHashes": {
+    "jsonl-source-cache-ab.cjs": "ac3402a0247269e1c56dbac54b3bc6b3e4b5da1236e13e2092badf49640ba56d",
+    "incremental-refresh.cjs": "f5cb7a68c4d8b0d745dd85b4b3c69811e1009cd3cb7701ce80d90d2f23a5f601",
+    "temp-batch-ab.cjs": "9567311fbf7746c537fcdc7eaa05bf35e92e7dc04931075c03d8ba6bb03b10b0"
+  },
+  "testHashes": {
+    "summary-source-cache.test.ts": "812d1216c926ec01e1e11a3f15ddefaf7bb8ef63d09da0ee0c3eb8b279573aba",
+    "winner-index.test.ts": "2af9e1771c9194fbad9d61e0dca5c3c79fe345845277136ced6ac78dcb743d98",
+    "memory-winner-oracle.test.ts": "840bd21765c71e7770a7a3815f049fbcf05154789c44975ebff87c25c325a2f8"
+  },
+  "packageLockSha256": "e68e2e27a461d00c9f58a9d069eeacf036738e3a7834dd893c7ad112f3a5c395"
+}

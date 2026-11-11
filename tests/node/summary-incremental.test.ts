@@ -14,7 +14,7 @@ function row(id: string, date: string | null, tokens = 10): TurnSummaryInput {
 
 const sessions = [{ provider: 'codex' as const, session_id: 's' }];
 function replace(db: SummaryDatabase, summaries: Iterable<TurnSummaryInput>): void {
-  db.replaceSessions({ sessions, files: [], summaries });
+  db.replaceMemory({scanId: 'test', sessions, files: [], summaries });
 }
 
 function audit(db: SummaryDatabase): void {
@@ -58,7 +58,7 @@ test('large sparse snapshots keep unchanged IDs and skip unchanged facts, childr
   replace(db,(function*(){yield* next;})());
   assert.deepEqual(db.connection.prepare("SELECT DISTINCT key FROM writes WHERE name='turn_summary'").all().map(r=>r.key),['large-5']);
   assert.deepEqual(ids(),before);
-  assert.equal(db.connection.prepare('SELECT count(*) n FROM session_next').get()?.n,0,'release staged rows after commit');
+  assert.equal(db.connection.prepare("SELECT count(*) n FROM sqlite_temp_master WHERE name='session_next'").get()?.n,0,'no duplicate SQL snapshot is allocated');
   exact(db);
 });
 
@@ -73,12 +73,12 @@ test('large additions and removals update only changed logical requests and exac
   exact(db);
 });
 
-test('large dense changes use full replacement and invalid staged streams roll back atomically', t => {
+test('large dense changes update only changed rows and invalid streams roll back atomically', t => {
   const db=new SummaryDatabase(':memory:');t.after(()=>db.close());
   const rows=largeRows();replace(db,rows);db.queryUsage({},'month','Asia/Seoul');audit(db);
   const next=structuredClone(rows);next.slice(0,33).forEach(r=>r.request_title='dense change');
   replace(db,next);
-  assert.equal(db.connection.prepare("SELECT count(*) n FROM writes WHERE name='turn_summary'").get()?.n,2000,'33 changes exceed the absolute change budget');
+  assert.equal(db.connection.prepare("SELECT count(*) n FROM writes WHERE name='turn_summary'").get()?.n,33,'only changed requests are written regardless of session size');
   exact(db);
   const before=db.queryTurns({}, {limit:1000});
   assert.throws(()=>replace(db,(function*(){yield* next.slice(0,-1);yield {...next.at(-1)!,total_tokens:-1};})()));
@@ -125,12 +125,12 @@ test('medium 300-request sessions keep streaming replacement without allocating 
   const db=new SummaryDatabase(':memory:');t.after(()=>db.close());
   const rows=largeRows(300);replace(db,rows);db.queryUsage({},'month','Asia/Seoul');audit(db);
   replace(db,rows);
-  assert.equal(db.connection.prepare("SELECT count(*) n FROM writes WHERE name='turn_summary'").get()?.n,600);
+  assert.equal(db.connection.prepare("SELECT count(*) n FROM writes WHERE name='turn_summary'").get()?.n,0);
   assert.equal(db.connection.prepare("SELECT count(*) n FROM sqlite_temp_master WHERE name='session_next'").get()?.n,0);
   exact(db);
 });
 
-test('identical streamed snapshots replace session rows and preserve their semantic statistics', t => {
+test('identical streamed snapshots preserve session rows and their semantic statistics', t => {
   const db = new SummaryDatabase(':memory:'); t.after(() => db.close());
   const rows = [row('a', '2026-10-01T00:00:00Z'), row('b', null)];
   replace(db, rows); db.queryUsage({}, 'total', 'Asia/Seoul');
@@ -138,7 +138,7 @@ test('identical streamed snapshots replace session rows and preserve their seman
   const before = semantics(); audit(db);
   replace(db, (function* () { yield* rows; })());
   assert.deepEqual(semantics(), before);
-  assert.ok(db.connection.prepare("SELECT 1 FROM writes WHERE name='turn_summary'").get(), 'Accepted sessions use the restored bulk replacement path');
+  assert.equal(db.connection.prepare("SELECT count(*) n FROM writes WHERE name='turn_summary'").get()?.n,0, 'Unchanged snapshots preserve accepted rows');
   assert.equal(db.connection.prepare("SELECT count(*) n FROM sqlite_temp_master WHERE name IN ('db_next_models','db_next_capabilities','db_replacement_turns','db_rollup_dirty','db_rollup_inputs')").get()?.n, 0);
   exact(db);
 });
@@ -149,7 +149,7 @@ test('session replacement rebuilds existing day buckets and historical moves and
   replace(db, [a, b]); db.queryUsage({}, 'total', 'America/New_York'); audit(db);
   const added = row('c', '2026-03-08T07:30:00Z', 20);
   replace(db, [a, b, added]);
-  assert.deepEqual(db.connection.prepare("SELECT DISTINCT key FROM writes WHERE name='turn_summary' ORDER BY key").all().map(r => r.key), ['a', 'b', 'c']);
+  assert.deepEqual(db.connection.prepare("SELECT DISTINCT key FROM writes WHERE name='turn_summary' ORDER BY key").all().map(r => r.key), ['c']);
   assert.deepEqual(db.connection.prepare("SELECT DISTINCT key FROM writes WHERE name LIKE 'usage_%' ORDER BY key").all().map(r => r.key), ['2026-03-08', '2026-03-09']);
   exact(db);
   const moved = { ...a, started_at_ms: null, project_key: 'other', project_name: 'Other', model_usage: undefined };
@@ -164,7 +164,7 @@ test('model replacement, preserved Skill counts and invalid one-shot snapshots r
   db.queryUsage({}, 'total', 'Asia/Seoul');
   const changed = { ...original, capability_usage: undefined,
     model_usage: [{ model: 'new-model', input_tokens: 10, output_tokens: 0, cache_write_input_tokens: 0, cache_read_input_tokens: 0 }] };
-  db.replaceSessions({ sessions, files: [], summaries: [changed], preserveCapabilities: true });
+  db.replaceMemory({scanId: 'test', sessions, files: [], summaries: [changed], preserveCapabilities: true });
   assert.equal(db.queryTurns()[0].root_turn_id, original.root_turn_id);
   assert.equal(db.queryCapabilities({}, 'skill').totalUses, 1);
   exact(db);

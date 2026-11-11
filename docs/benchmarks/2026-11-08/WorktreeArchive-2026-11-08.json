@@ -1,0 +1,557 @@
+{
+  "dateSeoul": "2026-11-08",
+  "purpose": "Preserve benchmark reports, raw results and verification records before removing experiment worktrees.",
+  "preservedRecords": 37,
+  "rawJsonUnchanged": true,
+  "disposition": "The memory-incremental implementation was applied to dev separately. Other experiment implementations, runners, ignored smoke output, input copies and local caches are not archived. Git experiment branches remain.",
+  "notes": [
+    "Original verification records and their source/build/report hashes describe the measured experiment versions.",
+    "Repeated identical files were deduplicated. The Map ingestion report includes the later source-cache analysis supplement.",
+    "Archived report source links follow the summary responsibility folders; numerical measurements and all raw JSON remain unchanged. Source and current archive hashes are recorded separately."
+  ],
+  "files": [
+    {
+      "path": "docs/benchmarks/2026-11-06/JsonlDtoRestoreVerification-2026-11-06.json",
+      "sourceSha256": "898fb5ca6daa125b661b63c2544c687a3e90523a2eab41567d5daa4a3d107a92",
+      "archivedSha256": "898fb5ca6daa125b661b63c2544c687a3e90523a2eab41567d5daa4a3d107a92",
+      "bytes": 2629,
+      "sources": [
+        {
+          "worktree": "Agent-Tracker-jsonl-greedy-minimal-2026-11-07",
+          "sha256": "898fb5ca6daa125b661b63c2544c687a3e90523a2eab41567d5daa4a3d107a92"
+        },
+        {
+          "worktree": "Agent-Tracker-jsonl-map-2026-11-06",
+          "sha256": "898fb5ca6daa125b661b63c2544c687a3e90523a2eab41567d5daa4a3d107a92"
+        },
+        {
+          "worktree": "Agent-Tracker-jsonl-memory-incremental-2026-11-07",
+          "sha256": "898fb5ca6daa125b661b63c2544c687a3e90523a2eab41567d5daa4a3d107a92"
+        },
+        {
+          "worktree": "Agent-Tracker-jsonl-source-cache-2026-11-06",
+          "sha256": "898fb5ca6daa125b661b63c2544c687a3e90523a2eab41567d5daa4a3d107a92"
+        }
+      ]
+    },
+    {
+      "path": "docs/benchmarks/2026-11-06/JsonlGreedyMapAB-2026-11-06.json",
+      "sourceSha256": "109b42181682fa305f2e4512daffa27e179407f619f2d8dabf8079c2981f9de5",
+      "archivedSha256": "109b42181682fa305f2e4512daffa27e179407f619f2d8dabf8079c2981f9de5",
+      "bytes": 1775366,
+      "sources": [
+        {
+          "worktree": "Agent-Tracker-jsonl-greedy-minimal-2026-11-07",
+          "sha256": "109b42181682fa305f2e4512daffa27e179407f619f2d8dabf8079c2981f9de5"
+        },
+        {
+          "worktree": "Agent-Tracker-jsonl-map-2026-11-06",
+          "sha256": "109b42181682fa305f2e4512daffa27e179407f619f2d8dabf8079c2981f9de5"
+        },
+        {
+          "worktree": "Agent-Tracker-jsonl-memory-incremental-2026-11-07",
+          "sha256": "109b42181682fa305f2e4512daffa27e179407f619f2d8dabf8079c2981f9de5"
+        },
+        {
+          "worktree": "Agent-Tracker-jsonl-source-cache-2026-11-06",
+          "sha256": "109b42181682fa305f2e4512daffa27e179407f619f2d8dabf8079c2981f9de5"
+        }
+      ]
+    },
+    {
+      "path": "docs/benchmarks/2026-11-06/JsonlGreedyMapAB-2026-11-06.md",
+      "sourceSha256": "eb67b32b8b9cd148f7ee3c3b6345762329b715abe2a78b5894dc5b81b1d8433f",
+      "archivedSha256": "eb67b32b8b9cd148f7ee3c3b6345762329b715abe2a78b5894dc5b81b1d8433f",
+      "bytes": 14187,
+      "sources": [
+        {
+          "worktree": "Agent-Tracker-jsonl-greedy-minimal-2026-11-07",
+          "sha256": "eb67b32b8b9cd148f7ee3c3b6345762329b715abe2a78b5894dc5b81b1d8433f"
+        },
+        {
+          "worktree": "Agent-Tracker-jsonl-map-2026-11-06",
+          "sha256": "eb67b32b8b9cd148f7ee3c3b6345762329b715abe2a78b5894dc5b81b1d8433f"
+        },
+        {
+          "worktree": "Agent-Tracker-jsonl-memory-incremental-2026-11-07",
+          "sha256": "eb67b32b8b9cd148f7ee3c3b6345762329b715abe2a78b5894dc5b81b1d8433f"
+        },
+        {
+          "worktree": "Agent-Tracker-jsonl-source-cache-2026-11-06",
+          "sha256": "eb67b32b8b9cd148f7ee3c3b6345762329b715abe2a78b5894dc5b81b1d8433f"
+        }
+      ]
+    },
+    {
+      "path": "docs/benchmarks/2026-11-06/JsonlGreedyMapVerification-2026-11-06.json",
+      "sourceSha256": "96815c951a5eaa1aba6c9c0610efa8b9a7c7daf5bee78de7a0decfac588a81f0",
+      "archivedSha256": "96815c951a5eaa1aba6c9c0610efa8b9a7c7daf5bee78de7a0decfac588a81f0",
+      "bytes": 2211,
+      "sources": [
+        {
+          "worktree": "Agent-Tracker-jsonl-greedy-minimal-2026-11-07",
+          "sha256": "96815c951a5eaa1aba6c9c0610efa8b9a7c7daf5bee78de7a0decfac588a81f0"
+        },
+        {
+          "worktree": "Agent-Tracker-jsonl-map-2026-11-06",
+          "sha256": "96815c951a5eaa1aba6c9c0610efa8b9a7c7daf5bee78de7a0decfac588a81f0"
+        },
+        {
+          "worktree": "Agent-Tracker-jsonl-memory-incremental-2026-11-07",
+          "sha256": "96815c951a5eaa1aba6c9c0610efa8b9a7c7daf5bee78de7a0decfac588a81f0"
+        },
+        {
+          "worktree": "Agent-Tracker-jsonl-source-cache-2026-11-06",
+          "sha256": "96815c951a5eaa1aba6c9c0610efa8b9a7c7daf5bee78de7a0decfac588a81f0"
+        }
+      ]
+    },
+    {
+      "path": "docs/benchmarks/2026-11-06/JsonlMapIngestionAB-2026-11-06.json",
+      "sourceSha256": "8b6ba6fa80922ed7b2ef3b9274c26aecb8a089304d116a022fb59144427c8fe5",
+      "archivedSha256": "8b6ba6fa80922ed7b2ef3b9274c26aecb8a089304d116a022fb59144427c8fe5",
+      "bytes": 1578439,
+      "sources": [
+        {
+          "worktree": "Agent-Tracker-jsonl-greedy-minimal-2026-11-07",
+          "sha256": "8b6ba6fa80922ed7b2ef3b9274c26aecb8a089304d116a022fb59144427c8fe5"
+        },
+        {
+          "worktree": "Agent-Tracker-jsonl-map-2026-11-06",
+          "sha256": "8b6ba6fa80922ed7b2ef3b9274c26aecb8a089304d116a022fb59144427c8fe5"
+        },
+        {
+          "worktree": "Agent-Tracker-jsonl-memory-incremental-2026-11-07",
+          "sha256": "8b6ba6fa80922ed7b2ef3b9274c26aecb8a089304d116a022fb59144427c8fe5"
+        },
+        {
+          "worktree": "Agent-Tracker-jsonl-source-cache-2026-11-06",
+          "sha256": "8b6ba6fa80922ed7b2ef3b9274c26aecb8a089304d116a022fb59144427c8fe5"
+        }
+      ]
+    },
+    {
+      "path": "docs/benchmarks/2026-11-06/JsonlMapIngestionAB-2026-11-06.md",
+      "sourceSha256": "b142ce1f607ca2733821154e2596a835e11ec234a9f779772308b37fabceabc4",
+      "archivedSha256": "b142ce1f607ca2733821154e2596a835e11ec234a9f779772308b37fabceabc4",
+      "bytes": 16210,
+      "sources": [
+        {
+          "worktree": "Agent-Tracker-jsonl-greedy-minimal-2026-11-07",
+          "sha256": "8b65b4618352dcbba007d6ff38afdd8cbbc1ae4ade0c65ee14fe25915d8b11d5"
+        },
+        {
+          "worktree": "Agent-Tracker-jsonl-map-2026-11-06",
+          "sha256": "8b65b4618352dcbba007d6ff38afdd8cbbc1ae4ade0c65ee14fe25915d8b11d5"
+        },
+        {
+          "worktree": "Agent-Tracker-jsonl-memory-incremental-2026-11-07",
+          "sha256": "8b65b4618352dcbba007d6ff38afdd8cbbc1ae4ade0c65ee14fe25915d8b11d5"
+        },
+        {
+          "worktree": "Agent-Tracker-jsonl-source-cache-2026-11-06",
+          "sha256": "b142ce1f607ca2733821154e2596a835e11ec234a9f779772308b37fabceabc4"
+        }
+      ],
+      "selection": "Includes the later analysis supplement; numerical results are unchanged."
+    },
+    {
+      "path": "docs/benchmarks/2026-11-06/JsonlMapIngestionVerification-2026-11-06.json",
+      "sourceSha256": "a1277cfa60c480b7b2699cda69a4a64293a26547c83f230ca7114d46c841b189",
+      "archivedSha256": "a1277cfa60c480b7b2699cda69a4a64293a26547c83f230ca7114d46c841b189",
+      "bytes": 1522,
+      "sources": [
+        {
+          "worktree": "Agent-Tracker-jsonl-greedy-minimal-2026-11-07",
+          "sha256": "a1277cfa60c480b7b2699cda69a4a64293a26547c83f230ca7114d46c841b189"
+        },
+        {
+          "worktree": "Agent-Tracker-jsonl-map-2026-11-06",
+          "sha256": "a1277cfa60c480b7b2699cda69a4a64293a26547c83f230ca7114d46c841b189"
+        },
+        {
+          "worktree": "Agent-Tracker-jsonl-memory-incremental-2026-11-07",
+          "sha256": "a1277cfa60c480b7b2699cda69a4a64293a26547c83f230ca7114d46c841b189"
+        },
+        {
+          "worktree": "Agent-Tracker-jsonl-source-cache-2026-11-06",
+          "sha256": "a1277cfa60c480b7b2699cda69a4a64293a26547c83f230ca7114d46c841b189"
+        }
+      ]
+    },
+    {
+      "path": "docs/benchmarks/2026-11-07/JsonlGreedyMinimalAB-2026-11-07.json",
+      "sourceSha256": "0537341f85f32a1d08e221a73a5615f29944567459c0bc29bae5fa484307660b",
+      "archivedSha256": "0537341f85f32a1d08e221a73a5615f29944567459c0bc29bae5fa484307660b",
+      "bytes": 1706380,
+      "sources": [
+        {
+          "worktree": "Agent-Tracker-jsonl-greedy-minimal-2026-11-07",
+          "sha256": "0537341f85f32a1d08e221a73a5615f29944567459c0bc29bae5fa484307660b"
+        },
+        {
+          "worktree": "Agent-Tracker-jsonl-memory-incremental-2026-11-07",
+          "sha256": "0537341f85f32a1d08e221a73a5615f29944567459c0bc29bae5fa484307660b"
+        }
+      ]
+    },
+    {
+      "path": "docs/benchmarks/2026-11-07/JsonlGreedyMinimalAB-2026-11-07.md",
+      "sourceSha256": "b5f2318b91622a387459b2805ad49b6a1bef716df1fc59ca3efc278c858fe061",
+      "archivedSha256": "e880b68fa8cd7c9fb7fae5027132926676a320cdf6ea82d76ce6cb61c6f30ba3",
+      "bytes": 18049,
+      "sources": [
+        {
+          "worktree": "Agent-Tracker-jsonl-greedy-minimal-2026-11-07",
+          "sha256": "b5f2318b91622a387459b2805ad49b6a1bef716df1fc59ca3efc278c858fe061"
+        },
+        {
+          "worktree": "Agent-Tracker-jsonl-memory-incremental-2026-11-07",
+          "sha256": "b5f2318b91622a387459b2805ad49b6a1bef716df1fc59ca3efc278c858fe061"
+        }
+      ],
+      "archiveEdit": "Converted the removed historical runner link to a literal path and clarified historical implementation links. Measurements are unchanged. Source links updated for the summary responsibility folders; measurements are unchanged."
+    },
+    {
+      "path": "docs/benchmarks/2026-11-07/JsonlGreedyMinimalVerification-2026-11-07.json",
+      "sourceSha256": "470304e154b2c903726f568706bcf0088b8ad4cfd837ea8730be6499f9c3efa2",
+      "archivedSha256": "470304e154b2c903726f568706bcf0088b8ad4cfd837ea8730be6499f9c3efa2",
+      "bytes": 5383,
+      "sources": [
+        {
+          "worktree": "Agent-Tracker-jsonl-greedy-minimal-2026-11-07",
+          "sha256": "470304e154b2c903726f568706bcf0088b8ad4cfd837ea8730be6499f9c3efa2"
+        },
+        {
+          "worktree": "Agent-Tracker-jsonl-memory-incremental-2026-11-07",
+          "sha256": "470304e154b2c903726f568706bcf0088b8ad4cfd837ea8730be6499f9c3efa2"
+        }
+      ]
+    },
+    {
+      "path": "docs/benchmarks/2026-11-07/JsonlMemory100kMemory-2026-11-08.json",
+      "sourceSha256": "aec2a87211c7568e7e97eb850a997a87059bca4761edbc014a4727ced2e01f06",
+      "archivedSha256": "aec2a87211c7568e7e97eb850a997a87059bca4761edbc014a4727ced2e01f06",
+      "bytes": 23463,
+      "sources": [
+        {
+          "worktree": "Agent-Tracker-jsonl-memory-incremental-2026-11-07",
+          "sha256": "aec2a87211c7568e7e97eb850a997a87059bca4761edbc014a4727ced2e01f06"
+        }
+      ]
+    },
+    {
+      "path": "docs/benchmarks/2026-11-07/JsonlMemoryIncrementalAB-2026-11-07.json",
+      "sourceSha256": "59aadbe7beed5dc9c3ce5f158edad83fd9e8932638783fa14f91ae9e4e2327b7",
+      "archivedSha256": "59aadbe7beed5dc9c3ce5f158edad83fd9e8932638783fa14f91ae9e4e2327b7",
+      "bytes": 1979204,
+      "sources": [
+        {
+          "worktree": "Agent-Tracker-jsonl-memory-incremental-2026-11-07",
+          "sha256": "59aadbe7beed5dc9c3ce5f158edad83fd9e8932638783fa14f91ae9e4e2327b7"
+        }
+      ]
+    },
+    {
+      "path": "docs/benchmarks/2026-11-07/JsonlMemoryIncrementalAB-2026-11-07.md",
+      "sourceSha256": "c746603d28f0b62d6de96c4257c2bfd888c7171dc7867e7e1569a86a2ac1d85b",
+      "archivedSha256": "2d9223c20214bd3c64e099e9bacab8a0e6f5d0d184073c75f3328661f8e26799",
+      "bytes": 19776,
+      "sources": [
+        {
+          "worktree": "Agent-Tracker-jsonl-memory-incremental-2026-11-07",
+          "sha256": "c746603d28f0b62d6de96c4257c2bfd888c7171dc7867e7e1569a86a2ac1d85b"
+        }
+      ],
+      "archiveEdit": "Source links updated for the summary responsibility folders; measurements are unchanged."
+    },
+    {
+      "path": "docs/benchmarks/2026-11-07/JsonlMemoryIncrementalMultiSourceAB-2026-11-07.json",
+      "sourceSha256": "479aeafe4c29629c24c7af0d57be678771037de53eb43b8877c110fe40b68308",
+      "archivedSha256": "479aeafe4c29629c24c7af0d57be678771037de53eb43b8877c110fe40b68308",
+      "bytes": 699575,
+      "sources": [
+        {
+          "worktree": "Agent-Tracker-jsonl-memory-incremental-2026-11-07",
+          "sha256": "479aeafe4c29629c24c7af0d57be678771037de53eb43b8877c110fe40b68308"
+        }
+      ]
+    },
+    {
+      "path": "docs/benchmarks/2026-11-07/JsonlMemoryIncrementalVerification-2026-11-07.json",
+      "sourceSha256": "d3ae5ff43c9f0524bb5a431a9f981340dbb22c3a9d2bf5ba7fae450453aec613",
+      "archivedSha256": "d3ae5ff43c9f0524bb5a431a9f981340dbb22c3a9d2bf5ba7fae450453aec613",
+      "bytes": 10186,
+      "sources": [
+        {
+          "worktree": "Agent-Tracker-jsonl-memory-incremental-2026-11-07",
+          "sha256": "d3ae5ff43c9f0524bb5a431a9f981340dbb22c3a9d2bf5ba7fae450453aec613"
+        }
+      ]
+    },
+    {
+      "path": "docs/benchmarks/2026-11-07/JsonlOnlineGreedyCorrectness-2026-11-07.json",
+      "sourceSha256": "fb7c4ebb0aa730f43848fd3fcf4c51e3c815410b208a0d8727ef9412cc99c2d7",
+      "archivedSha256": "fb7c4ebb0aa730f43848fd3fcf4c51e3c815410b208a0d8727ef9412cc99c2d7",
+      "bytes": 285469,
+      "sources": [
+        {
+          "worktree": "Agent-Tracker-jsonl-online-greedy-2026-11-07",
+          "sha256": "fb7c4ebb0aa730f43848fd3fcf4c51e3c815410b208a0d8727ef9412cc99c2d7"
+        }
+      ]
+    },
+    {
+      "path": "docs/benchmarks/2026-11-07/JsonlOnlineGreedyCorrectness-2026-11-07.md",
+      "sourceSha256": "85fc5e8882d63bb90cf647588f4ee6eefc2ced06cdd0a1425d0e31c86cae5f98",
+      "archivedSha256": "85fc5e8882d63bb90cf647588f4ee6eefc2ced06cdd0a1425d0e31c86cae5f98",
+      "bytes": 9396,
+      "sources": [
+        {
+          "worktree": "Agent-Tracker-jsonl-online-greedy-2026-11-07",
+          "sha256": "85fc5e8882d63bb90cf647588f4ee6eefc2ced06cdd0a1425d0e31c86cae5f98"
+        }
+      ]
+    },
+    {
+      "path": "docs/benchmarks/2026-11-07/JsonlOnlineGreedyVerification-2026-11-07.json",
+      "sourceSha256": "04669b0c6426949b985107a41419f6181807f1d4122b810aa9fbace431227d44",
+      "archivedSha256": "04669b0c6426949b985107a41419f6181807f1d4122b810aa9fbace431227d44",
+      "bytes": 1892,
+      "sources": [
+        {
+          "worktree": "Agent-Tracker-jsonl-online-greedy-2026-11-07",
+          "sha256": "04669b0c6426949b985107a41419f6181807f1d4122b810aa9fbace431227d44"
+        }
+      ]
+    },
+    {
+      "path": "docs/benchmarks/2026-11-06/JsonlParsingDedupAB-2026-11-06.json",
+      "sourceSha256": "f8ee85b7bf042ee07de0d1a8d882f404e964254f9ecd01e3ddca442b6514ccb0",
+      "archivedSha256": "f8ee85b7bf042ee07de0d1a8d882f404e964254f9ecd01e3ddca442b6514ccb0",
+      "bytes": 71272,
+      "sources": [
+        {
+          "worktree": "Agent-Tracker-jsonl-parsing-2026-11-06",
+          "sha256": "f8ee85b7bf042ee07de0d1a8d882f404e964254f9ecd01e3ddca442b6514ccb0"
+        }
+      ]
+    },
+    {
+      "path": "docs/benchmarks/2026-11-06/JsonlParsingOptimizationAB-2026-11-06.md",
+      "sourceSha256": "366e3652c40a6e2df6b920b509624b2e07d96bb0ec9910e848d78b347e6a1c38",
+      "archivedSha256": "366e3652c40a6e2df6b920b509624b2e07d96bb0ec9910e848d78b347e6a1c38",
+      "bytes": 24305,
+      "sources": [
+        {
+          "worktree": "Agent-Tracker-jsonl-parsing-2026-11-06",
+          "sha256": "366e3652c40a6e2df6b920b509624b2e07d96bb0ec9910e848d78b347e6a1c38"
+        }
+      ]
+    },
+    {
+      "path": "docs/benchmarks/2026-11-06/JsonlParsingReaderR1AB-2026-11-06.json",
+      "sourceSha256": "d0b82e4e8dd3b4cfb9e413bd6a2cd60762392b4af709355ea1f5e20f4cf4475a",
+      "archivedSha256": "d0b82e4e8dd3b4cfb9e413bd6a2cd60762392b4af709355ea1f5e20f4cf4475a",
+      "bytes": 64883,
+      "sources": [
+        {
+          "worktree": "Agent-Tracker-jsonl-parsing-2026-11-06",
+          "sha256": "d0b82e4e8dd3b4cfb9e413bd6a2cd60762392b4af709355ea1f5e20f4cf4475a"
+        }
+      ]
+    },
+    {
+      "path": "docs/benchmarks/2026-11-06/JsonlParsingReaderR1R2AB-2026-11-06.json",
+      "sourceSha256": "84ad3a7d30cf1aa5aa811d7571f937ac1c0c3a3ce5aa9aab744d8f96fe88abc7",
+      "archivedSha256": "84ad3a7d30cf1aa5aa811d7571f937ac1c0c3a3ce5aa9aab744d8f96fe88abc7",
+      "bytes": 65060,
+      "sources": [
+        {
+          "worktree": "Agent-Tracker-jsonl-parsing-2026-11-06",
+          "sha256": "84ad3a7d30cf1aa5aa811d7571f937ac1c0c3a3ce5aa9aab744d8f96fe88abc7"
+        }
+      ]
+    },
+    {
+      "path": "docs/benchmarks/2026-11-06/JsonlParsingReaderR2AB-2026-11-06.json",
+      "sourceSha256": "6c21b8b43abf4e1a0c16e6442899a689fb5c9c6accc3cfb38264236ae322a6a8",
+      "archivedSha256": "6c21b8b43abf4e1a0c16e6442899a689fb5c9c6accc3cfb38264236ae322a6a8",
+      "bytes": 65098,
+      "sources": [
+        {
+          "worktree": "Agent-Tracker-jsonl-parsing-2026-11-06",
+          "sha256": "6c21b8b43abf4e1a0c16e6442899a689fb5c9c6accc3cfb38264236ae322a6a8"
+        }
+      ]
+    },
+    {
+      "path": "docs/benchmarks/2026-11-06/JsonlParsingReaderR2Validation-2026-11-06.json",
+      "sourceSha256": "5525dff8e9e20666d19467086c9b84c08f39d8634c803bfcb290e0d12372be80",
+      "archivedSha256": "5525dff8e9e20666d19467086c9b84c08f39d8634c803bfcb290e0d12372be80",
+      "bytes": 1270,
+      "sources": [
+        {
+          "worktree": "Agent-Tracker-jsonl-parsing-2026-11-06",
+          "sha256": "5525dff8e9e20666d19467086c9b84c08f39d8634c803bfcb290e0d12372be80"
+        }
+      ]
+    },
+    {
+      "path": "docs/benchmarks/2026-11-06/JsonlParsingRefreshAB-2026-11-06.json",
+      "sourceSha256": "db52d74b4c94d3d6f2885fc997e55e5637e149d675a959ad2ea99e36e22f1dbc",
+      "archivedSha256": "db52d74b4c94d3d6f2885fc997e55e5637e149d675a959ad2ea99e36e22f1dbc",
+      "bytes": 1404957,
+      "sources": [
+        {
+          "worktree": "Agent-Tracker-jsonl-parsing-2026-11-06",
+          "sha256": "db52d74b4c94d3d6f2885fc997e55e5637e149d675a959ad2ea99e36e22f1dbc"
+        }
+      ]
+    },
+    {
+      "path": "docs/benchmarks/2026-11-06/JsonlParsingVerification-2026-11-06.json",
+      "sourceSha256": "b3a957b3f491f9f3bc04c8a9e3ca3d71fa751e749822b2bcac3157179b34d6d1",
+      "archivedSha256": "b3a957b3f491f9f3bc04c8a9e3ca3d71fa751e749822b2bcac3157179b34d6d1",
+      "bytes": 1737,
+      "sources": [
+        {
+          "worktree": "Agent-Tracker-jsonl-parsing-2026-11-06",
+          "sha256": "b3a957b3f491f9f3bc04c8a9e3ca3d71fa751e749822b2bcac3157179b34d6d1"
+        }
+      ]
+    },
+    {
+      "path": "docs/benchmarks/2026-11-06/JsonlNameBatchDiagnostic-2026-11-06.json",
+      "sourceSha256": "793858b47725d52cd4f09600f6a01552f7c45183d95cd53737c6ce043f7d0dd8",
+      "archivedSha256": "793858b47725d52cd4f09600f6a01552f7c45183d95cd53737c6ce043f7d0dd8",
+      "bytes": 19847,
+      "sources": [
+        {
+          "worktree": "Agent-Tracker-jsonl-source-cache-2026-11-06",
+          "sha256": "793858b47725d52cd4f09600f6a01552f7c45183d95cd53737c6ce043f7d0dd8"
+        }
+      ]
+    },
+    {
+      "path": "docs/benchmarks/2026-11-06/JsonlNameBatchEmptyScanControl-2026-11-06.json",
+      "sourceSha256": "d74ee3b7d07ec8f81f5fea368df29aa2c8b12d7d3ec89419883dbe5967a49a5d",
+      "archivedSha256": "d74ee3b7d07ec8f81f5fea368df29aa2c8b12d7d3ec89419883dbe5967a49a5d",
+      "bytes": 12967,
+      "sources": [
+        {
+          "worktree": "Agent-Tracker-jsonl-source-cache-2026-11-06",
+          "sha256": "d74ee3b7d07ec8f81f5fea368df29aa2c8b12d7d3ec89419883dbe5967a49a5d"
+        }
+      ]
+    },
+    {
+      "path": "docs/benchmarks/2026-11-06/JsonlNameBatchMemoryControl-2026-11-06.json",
+      "sourceSha256": "9f3c5e47bf7f4e2b95c1d22304be73c99502f151ffc34529bceeb0f82a6efc96",
+      "archivedSha256": "9f3c5e47bf7f4e2b95c1d22304be73c99502f151ffc34529bceeb0f82a6efc96",
+      "bytes": 12894,
+      "sources": [
+        {
+          "worktree": "Agent-Tracker-jsonl-source-cache-2026-11-06",
+          "sha256": "9f3c5e47bf7f4e2b95c1d22304be73c99502f151ffc34529bceeb0f82a6efc96"
+        }
+      ]
+    },
+    {
+      "path": "docs/benchmarks/2026-11-06/JsonlNameBatchPopulatedScanControl-2026-11-06.json",
+      "sourceSha256": "ecc40075d6c5fcbfbae1591a0bcaacd55223ed49e78718b5e313400f21440302",
+      "archivedSha256": "ecc40075d6c5fcbfbae1591a0bcaacd55223ed49e78718b5e313400f21440302",
+      "bytes": 12953,
+      "sources": [
+        {
+          "worktree": "Agent-Tracker-jsonl-source-cache-2026-11-06",
+          "sha256": "ecc40075d6c5fcbfbae1591a0bcaacd55223ed49e78718b5e313400f21440302"
+        }
+      ]
+    },
+    {
+      "path": "docs/benchmarks/2026-11-06/JsonlSourceCacheAB-2026-11-06.json",
+      "sourceSha256": "1359ac4bd826275518ea9046cffa2e40db71b8fb1e68d9f4251a64c7b51e248f",
+      "archivedSha256": "1359ac4bd826275518ea9046cffa2e40db71b8fb1e68d9f4251a64c7b51e248f",
+      "bytes": 1891394,
+      "sources": [
+        {
+          "worktree": "Agent-Tracker-jsonl-source-cache-2026-11-06",
+          "sha256": "1359ac4bd826275518ea9046cffa2e40db71b8fb1e68d9f4251a64c7b51e248f"
+        }
+      ]
+    },
+    {
+      "path": "docs/benchmarks/2026-11-06/JsonlSourceCacheAB-2026-11-06.md",
+      "sourceSha256": "b3f6e4f3f97182e4a5c638bd024cd52f2af0cf9e7abe88a785f9854816385938",
+      "archivedSha256": "b3f6e4f3f97182e4a5c638bd024cd52f2af0cf9e7abe88a785f9854816385938",
+      "bytes": 15742,
+      "sources": [
+        {
+          "worktree": "Agent-Tracker-jsonl-source-cache-2026-11-06",
+          "sha256": "b3f6e4f3f97182e4a5c638bd024cd52f2af0cf9e7abe88a785f9854816385938"
+        }
+      ]
+    },
+    {
+      "path": "docs/benchmarks/2026-11-06/JsonlSourceCacheMultiSourceAB-2026-11-06.json",
+      "sourceSha256": "2229d47330d906ece1ee779a7e3750977c8309c1ee65c2e27f83bfaaf7ea291b",
+      "archivedSha256": "2229d47330d906ece1ee779a7e3750977c8309c1ee65c2e27f83bfaaf7ea291b",
+      "bytes": 657370,
+      "sources": [
+        {
+          "worktree": "Agent-Tracker-jsonl-source-cache-2026-11-06",
+          "sha256": "2229d47330d906ece1ee779a7e3750977c8309c1ee65c2e27f83bfaaf7ea291b"
+        }
+      ]
+    },
+    {
+      "path": "docs/benchmarks/2026-11-06/JsonlSourceCacheVerification-2026-11-06.json",
+      "sourceSha256": "cd75307e02fc6ef077c9a74b8cb667be609a3034b8bc7ba98117ed6a76a02316",
+      "archivedSha256": "cd75307e02fc6ef077c9a74b8cb667be609a3034b8bc7ba98117ed6a76a02316",
+      "bytes": 2569,
+      "sources": [
+        {
+          "worktree": "Agent-Tracker-jsonl-source-cache-2026-11-06",
+          "sha256": "cd75307e02fc6ef077c9a74b8cb667be609a3034b8bc7ba98117ed6a76a02316"
+        }
+      ]
+    },
+    {
+      "path": "docs/benchmarks/2026-11-06/JsonlStageCostAB-2026-11-06.json",
+      "sourceSha256": "234d463fec5407e65410c6f8e70e1de9f4850a197b5038cf2a2d71891f654903",
+      "archivedSha256": "234d463fec5407e65410c6f8e70e1de9f4850a197b5038cf2a2d71891f654903",
+      "bytes": 2966220,
+      "sources": [
+        {
+          "worktree": "Agent-Tracker-jsonl-source-cache-2026-11-06",
+          "sha256": "234d463fec5407e65410c6f8e70e1de9f4850a197b5038cf2a2d71891f654903"
+        }
+      ]
+    },
+    {
+      "path": "docs/benchmarks/2026-11-06/JsonlStageCostAB-2026-11-06.md",
+      "sourceSha256": "ba2da1b8b37ef9be76b2f2edd034016ecda078e4090bebad7e836c3a9121727f",
+      "archivedSha256": "ba2da1b8b37ef9be76b2f2edd034016ecda078e4090bebad7e836c3a9121727f",
+      "bytes": 18938,
+      "sources": [
+        {
+          "worktree": "Agent-Tracker-jsonl-source-cache-2026-11-06",
+          "sha256": "ba2da1b8b37ef9be76b2f2edd034016ecda078e4090bebad7e836c3a9121727f"
+        }
+      ]
+    },
+    {
+      "path": "docs/benchmarks/2026-11-06/JsonlStageCostVerification-2026-11-06.json",
+      "sourceSha256": "1f924c766b11c10ce6aad445435c0ef55b9bdd65a360df7c01cc01bda0fd3e32",
+      "archivedSha256": "1f924c766b11c10ce6aad445435c0ef55b9bdd65a360df7c01cc01bda0fd3e32",
+      "bytes": 1734,
+      "sources": [
+        {
+          "worktree": "Agent-Tracker-jsonl-source-cache-2026-11-06",
+          "sha256": "1f924c766b11c10ce6aad445435c0ef55b9bdd65a360df7c01cc01bda0fd3e32"
+        }
+      ]
+    }
+  ]
+}

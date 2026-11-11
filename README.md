@@ -117,6 +117,22 @@ Use **Agent Tracker: Delete Statistics Data** to clear aggregated statistics. Or
 
 ## Release notes
 
+<details open>
+<summary>v0.3.0</summary>
+
+- **Faster statistics refresh** — Read and aggregate JSONL logs in a single pass, and process multiple files in parallel for large log sets. Duplicate responses select the preferred record and update totals only by the difference in contributions.
+- **Database writes and queries** — Update only changed requests and batch writes and daily rollups across sessions. Fewer duplicate queries are needed, and tables, charts, and total row counts share the same query results.
+- **Codex subagent usage** — Combine child and nested subagent usage into the parent request. Creation records link children without request identifiers, with improved handling of deep parent chains, cycles, and missing parents.
+- **Moved log updates** — Verify source identity and content before linking a log at its new path and removing the old path record, so usage added after a move continues to update statistics.
+- **Usage card and accessibility** — Restore the full card on hover and, with the local workbench patch, pin or dismiss the same card by clicking. Accessible summaries announce weekly and 5-hour remaining usage and reset times with Codex first, even in compact mode.
+- **Usage query compatibility** — Remove the arbitrary 100-window limit from Claude and Codex responses and use the installed extension version in communication metadata.
+- **Unsupported language fallback** — Display English when the VS Code language is unsupported.
+- **Updated extension icon** — Replace the icon and reduce its image file size.
+
+[Algorithm changes, measured gains over v0.2.0, and limitations (Korean)](docs/Performance-v0.3.0.ko.md)
+
+</details>
+
 <details>
 <summary>v0.2.0</summary>
 

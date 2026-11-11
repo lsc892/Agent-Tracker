@@ -1,0 +1,210 @@
+{
+  "dateSeoul": "2026-11-08",
+  "branch": "experiment/jsonl-memory-incremental-2026-11-07",
+  "baseCommit": "80fc586d4c0cee0da4e925db395cbebb47d2aa0d",
+  "check": {
+    "command": "npm run check",
+    "exitCode": 0,
+    "typecheck": "pass",
+    "lint": "pass",
+    "tests": 430,
+    "passed": 430,
+    "failed": 0,
+    "skipped": 0,
+    "cancelled": 0,
+    "logSha256": "d4120964004041b6f6e57c54bd302d0e9a080d3db21d8d24b812f382dea881db",
+    "testSourceSha256": {
+      "tests/node/memory-aggregate.test.ts": "78bb4da25a9dad3ec877e6d7649b3cf540dc76f7766a07995c94fc57adc9078b",
+      "tests/node/memory-incremental.test.ts": "1204534c027c7b574a5c14246bfaf41483c6eb8184aec778cdcfe3173a2bc82c",
+      "tests/node/greedy-streaming-metadata.test.ts": "f3b1ef5ce649d0f7dfc96178f4269bcd6343217a190b3562e33f4a9ac376a8c5",
+      "tests/node/summary-metadata.test.ts": "1c89836b9ebf0b2906bbb04fb4360410b4ca8479f9eec72181d0ce1c9d341c01",
+      "tests/node/summary.integration.test.ts": "5cf43589fafe0ca4f9ff94cca1b2c764f674395cc78538c391e08cadb52d4f8e"
+    }
+  },
+  "benchmark": {
+    "raw": [
+      {
+        "file": "JsonlMemoryIncrementalAB-2026-11-07.json",
+        "sha256": "59aadbe7beed5dc9c3ce5f158edad83fd9e8932638783fa14f91ae9e4e2327b7",
+        "startedAtSeoul": "2026-11-07 22:16:20",
+        "completedAtSeoul": "2026-11-07 22:35:55"
+      },
+      {
+        "file": "JsonlMemoryIncrementalMultiSourceAB-2026-11-07.json",
+        "sha256": "479aeafe4c29629c24c7af0d57be678771037de53eb43b8877c110fe40b68308",
+        "startedAtSeoul": "2026-11-08 10:40:16",
+        "completedAtSeoul": "2026-11-08 10:48:55"
+      }
+    ],
+    "report": "JsonlMemoryIncrementalAB-2026-11-07.md",
+    "reportSha256": "c746603d28f0b62d6de96c4257c2bfd888c7171dc7867e7e1569a86a2ac1d85b",
+    "runnerSha256": "f020ee909cfb659f48c21fd769ed1702ef75fbf28aa0c86c3358161911e38c01",
+    "helperSha256": {
+      "incremental-refresh.cjs": "f5cb7a68c4d8b0d745dd85b4b3c69811e1009cd3cb7701ce80d90d2f23a5f601",
+      "temp-batch-ab.cjs": "9567311fbf7746c537fcdc7eaa05bf35e92e7dc04931075c03d8ba6bb03b10b0"
+    },
+    "logSha256": {
+      "tests/.cache/memory-v4-full-2026-11-07.log": "040c24e32c2bdd3a105972356b67658a075e1b42f696de4d488981182804b55c",
+      "tests/.cache/memory-v4-multi-source-2026-11-08.log": "aa264d9b32be798c8ff841ace4a3070b13857d52a34a9e7114cbccfd92e84724"
+    },
+    "datasets": [
+      {
+        "name": "current",
+        "requests": 1473,
+        "tokens": 2169957606,
+        "inputSha256": "59e806089e09799c20b65234976c93068d2fd4c5685a3101ecf0a512699c0010",
+        "warmupStates": 42,
+        "measuredWarmStates": 120,
+        "measuredColdStates": 20,
+        "diagnosticStates": 14,
+        "sqlSeedTransitionStates": 7,
+        "passedStates": 161,
+        "correctness": "A/B requests, tokens, complete normalized facts, aggregate pages, independent JS group averages, cold/warm reopen, raw/rollup queries, FK/integrity and restored input hashes passed. Literal metadata/dependency hashes recorded but excluded: B recomputes complete affected aggregates instead of metadata dependency pruning."
+      },
+      {
+        "name": "synthetic-10000",
+        "requests": 10000,
+        "tokens": 6340000,
+        "inputSha256": "0b2ecd37faa5c29385cd3def00cad4bdf5adddc581e4a5d4cc4c02b9cdceea0f",
+        "warmupStates": 42,
+        "measuredWarmStates": 120,
+        "measuredColdStates": 20,
+        "diagnosticStates": 14,
+        "sqlSeedTransitionStates": 7,
+        "passedStates": 161,
+        "correctness": "A/B requests, tokens, complete normalized facts, aggregate pages, independent JS group averages, cold/warm reopen, raw/rollup queries, FK/integrity and restored input hashes passed. Literal metadata/dependency hashes recorded but excluded: B recomputes complete affected aggregates instead of metadata dependency pruning."
+      },
+      {
+        "name": "synthetic-100",
+        "requests": 100,
+        "tokens": 18400,
+        "inputSha256": "0b5b30314e8445f83eaedcd291b3a065707c646fba18b093b4883ea90faa6291",
+        "warmupStates": 42,
+        "measuredWarmStates": 120,
+        "measuredColdStates": 20,
+        "diagnosticStates": 14,
+        "sqlSeedTransitionStates": 7,
+        "passedStates": 161,
+        "correctness": "A/B requests, tokens, complete normalized facts, aggregate pages, independent JS group averages, cold/warm reopen, raw/rollup queries, FK/integrity and restored input hashes passed. Literal metadata/dependency hashes recorded but excluded: B recomputes complete affected aggregates instead of metadata dependency pruning."
+      },
+      {
+        "name": "synthetic-10000-multi-source",
+        "requests": 10000,
+        "tokens": 6340000,
+        "inputSha256": "b4a9be57bfb568a4501afa957cbcadaaa4f2c73b0bb3c33dd64b9495c552ac9b",
+        "warmupStates": 42,
+        "measuredWarmStates": 120,
+        "measuredColdStates": 20,
+        "diagnosticStates": 14,
+        "sqlSeedTransitionStates": 7,
+        "passedStates": 161,
+        "correctness": "A/B requests, tokens, complete normalized facts, aggregate pages, independent JS group averages, cold/warm reopen, raw/rollup queries, FK/integrity and restored input hashes passed. Literal metadata/dependency hashes recorded but excluded: B recomputes complete affected aggregates instead of metadata dependency pruning."
+      }
+    ],
+    "totalPassedRecordedStates": 644,
+    "excludedWarmupStates": 168,
+    "exclusions": [
+      "Interrupted v3 main run and incomplete 2026-11-07 multi-source run are not timing samples in final results.",
+      "Warmups, diagnostic profiles, SQL-seed M and cold-reopen results are excluded from warm timing summaries."
+    ],
+    "equalityFields": [
+      "requests",
+      "tokens",
+      "failed",
+      "factsSha256",
+      "aggregatesSha256",
+      "independent"
+    ],
+    "literalMetadataAndDependencyHashEqualityRequired": false,
+    "independentCheckScope": "Independent JS recalculates group means from stored facts; raw parser correctness is not independently reimplemented. Memory aggregation has separate SQL-oracle fixtures and generated streams."
+  },
+  "identity": {
+    "liveCandidateMatchesMeasuredSource": true,
+    "liveCandidateMatchesMeasuredBuild": true,
+    "originalDevMatchesFrozenSqlSource": true,
+    "sourceAndBuildStableThroughoutBothCompletedMeasurements": true,
+    "sourceFingerprintA": "61def5f4568c8c0df7662b940fb76d07e9c73edd2e8b7b7751d479abbda475bc",
+    "sourceFingerprintB": "9b21257e99c8e6a554447cd3ee3d25d4fcc819b95a956d545c256c29a66b6bfc",
+    "buildFingerprintA": "506192e38d41cea45c0a268d8974f4d09072c8ce7d35f7eaaff27298560e7dcc",
+    "buildFingerprintB": "adaf2ff264be8d0f20a32e9414085faffbfdac5546354504e036c1dbfd9a041c",
+    "originalDevHead": "80fc586d4c0cee0da4e925db395cbebb47d2aa0d",
+    "changedSourceFiles": [
+      "src/summary/db/index.ts",
+      "src/summary/metadata.ts",
+      "src/summary/scanner.ts",
+      "src/summary/staging.ts",
+      "src/summary/db/memoryStore.ts",
+      "src/summary/eventValues.ts",
+      "src/summary/memoryAggregate.ts",
+      "src/summary/memoryEvents.ts",
+      "src/summary/memoryScanner.ts"
+    ],
+    "readerParsersPricingSchemaQueriesAndRollupsUnchanged": true,
+    "unchangedFiles": [
+      "src/summary/db/migrations.ts",
+      "src/summary/db/queries.ts",
+      "src/summary/db/queries/common/filters.ts",
+      "src/summary/db/queries/common/sorting.ts",
+      "src/summary/db/queries/common/types.ts",
+      "src/summary/db/queries/raw/capabilities.ts",
+      "src/summary/db/queries/raw/diagnostics.ts",
+      "src/summary/db/queries/raw/names.ts",
+      "src/summary/db/queries/raw/source.ts",
+      "src/summary/db/queries/raw/turns.ts",
+      "src/summary/db/queries/raw/usage.ts",
+      "src/summary/db/queries/rollup/metrics.ts",
+      "src/summary/db/queries/rollup/source.ts",
+      "src/summary/db/queries/rollup/usage.ts",
+      "src/summary/db/rollup-queries.ts",
+      "src/summary/db/rollup-state.ts",
+      "src/summary/db/rollups.ts",
+      "src/summary/db/schema.ts",
+      "src/summary/jsonl.ts",
+      "src/summary/parsers/capabilities.ts",
+      "src/summary/parsers/claude.ts",
+      "src/summary/parsers/codex.ts",
+      "src/summary/parsers/common.ts",
+      "src/summary/parsers/index.ts",
+      "src/summary/pricing.ts"
+    ]
+  },
+  "algorithm": {
+    "activePath": "scanner -> memoryScanner -> aggregateMemory -> MemoryStore.replaceMemory",
+    "sourceCache": "Per DB connection accepted normalized file DTO snapshots including losing usage candidates; unchanged related snapshots reused; no raw conversation/base64 retained.",
+    "incrementality": "File-level replacement, full parse of a changed file; no byte cursor or persistent DTO cache; affected DTOs are reaggregated.",
+    "sqlite": "No explicit intermediate TEMP events/winners/prepared tables on new refresh; compares and persists final facts/models/capabilities/costs/manifest/metadata transactionally. Existing permanent-table rollups and queries remain.",
+    "cachePromotion": "Only accepted after successful component transaction; failures keep previous accepted snapshots."
+  },
+  "scope": {
+    "separateWorktree": true,
+    "originalDevPreserved": true,
+    "commit": false,
+    "merge": false,
+    "package": false,
+    "install": false
+  },
+  "documentation": {
+    "utf8AndWhitespace": "pass",
+    "relativeLinks": "pass",
+    "documents": [
+      "docs/AgentTracker-일지.md",
+      "docs/AgentTracker.md",
+      "docs/benchmarks/README.md",
+      "docs/benchmarks/2026-11-07/README.md",
+      "docs/benchmarks/2026-11-07/JsonlMemoryIncrementalAB-2026-11-07.md",
+      "src/summary/README.md",
+      "src/summary/db/README.md",
+      "tests/benchmarks/README.md"
+    ],
+    "checkedLinks": 192
+  },
+  "additionalMemoryProbe": {
+    "file": "docs/benchmarks/2026-11-07/JsonlMemory100kMemory-2026-11-08.json",
+    "sha256": "aec2a87211c7568e7e97eb850a997a87059bca4761edbc014a4727ced2e01f06",
+    "independentFreshProcesses": 3,
+    "requests": 100000,
+    "normalizedDtos": 300000,
+    "sourceAndBuildMatchMeasuredB": true,
+    "correctnessScope": "Generated request/token expectations and FK/integrity; not an additional SQL A/B comparison."
+  }
+}

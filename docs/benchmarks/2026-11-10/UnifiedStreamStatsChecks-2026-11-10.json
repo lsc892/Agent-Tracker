@@ -1,0 +1,145 @@
+{
+  "dateSeoul": "2026-11-10",
+  "checks": {
+    "typecheck": true,
+    "lint": true,
+    "fullTests": {
+      "total": 432,
+      "pass": 426,
+      "fail": 6
+    },
+    "baselineAffectedTests": {
+      "total": 59,
+      "pass": 53,
+      "fail": 6
+    },
+    "sameBaselineFailures": [
+      "rootless Codex subagents retain their local turns and become independent sessions",
+      "copied parent metadata preserves child lineage and only the verified inherited usage is removed",
+      "rootless legacy subagents become separate sessions without counting verified inherited usage twice",
+      "rootless usage-only subagents work without the parent source and keep sibling sessions distinct",
+      "subagent fallback reassigns an accepted parent session without leaving old totals behind",
+      "cancellation after one session commits does not mark that successful session stale"
+    ],
+    "sqlOracleSeeds": 32,
+    "newBoundaryTests": 5,
+    "eventDifferential": {
+      "seedCount": 96,
+      "filesPerSeed": 4,
+      "eventsPerFile": 154,
+      "fullSummaryAndOrphanEquality": true,
+      "baseline": "frozen A source winner and event-order aggregate",
+      "candidate": "B-final compact source aggregate"
+    },
+    "metadataCompaction": {
+      "inputEvents": 4001,
+      "usageWinners": 1,
+      "requestRoots": 1,
+      "turnStates": 1,
+      "latestChecks": 1,
+      "workerSnapshotEquality": true
+    },
+    "allMeasuredTypeScriptFilesMatch": 99
+  },
+  "datasets": [
+    {
+      "name": "current",
+      "inputSha256": "32d9128cbbda060e987334480b6249592ffd8e81c6b03ebdd3e50ceec789af3a",
+      "distribution": {
+        "requests": 823,
+        "tokens": 1538591540,
+        "sessions": 190,
+        "projects": 14,
+        "firstRequestAtMs": 1786858107000,
+        "lastRequestAtMs": 1794309799000,
+        "providers": [
+          {
+            "provider": "claude",
+            "requests": 48
+          },
+          {
+            "provider": "codex",
+            "requests": 775
+          }
+        ]
+      },
+      "correctness": {
+        "allAbPairs": true,
+        "sameSourceReadSetAndOrder": true,
+        "semanticFactsAndManifest": true,
+        "rawSqlRollup10Dimensions": true,
+        "independentJsProviderAndModelAverages": true,
+        "exactAppendDelta": true,
+        "unchangedSkippedBodyAndReplaceMemory": true,
+        "frozenSourcesRestored": true,
+        "foreignKeysAndIntegrity": true,
+        "independentRealDataParserOracle": "not performed; synthetic totals checked against generator"
+      }
+    },
+    {
+      "name": "synthetic-10000",
+      "inputSha256": "0b2ecd37faa5c29385cd3def00cad4bdf5adddc581e4a5d4cc4c02b9cdceea0f",
+      "distribution": {
+        "requests": 10000,
+        "tokens": 6340000,
+        "sessions": 100,
+        "projects": 10,
+        "firstRequestAtMs": 1782864000000,
+        "lastRequestAtMs": 1783987497000,
+        "providers": [
+          {
+            "provider": "claude",
+            "requests": 5000
+          },
+          {
+            "provider": "codex",
+            "requests": 5000
+          }
+        ]
+      },
+      "correctness": {
+        "allAbPairs": true,
+        "sameSourceReadSetAndOrder": true,
+        "semanticFactsAndManifest": true,
+        "rawSqlRollup10Dimensions": true,
+        "independentJsProviderAndModelAverages": true,
+        "exactAppendDelta": true,
+        "unchangedSkippedBodyAndReplaceMemory": true,
+        "frozenSourcesRestored": true,
+        "foreignKeysAndIntegrity": true,
+        "independentRealDataParserOracle": "not performed; synthetic totals checked against generator"
+      }
+    }
+  ],
+  "scope": {
+    "schemaChanged": false,
+    "jsonParserChanged": false,
+    "fullSingleLoopClaim": false,
+    "realLogParserIndependentOracle": false,
+    "allocationGcOrPeakMemoryMeasured": false,
+    "performanceRepeatExperiment": false,
+    "finalValidationPairs": 1
+  },
+  "products": {
+    "A": {
+      "source": {
+        "files": 120,
+        "sha256": "195ff5b50dfaf1d46c75f7067afdac05014b80583c5df88348705e79d21904c2"
+      },
+      "build": {
+        "files": 199,
+        "sha256": "79ea5b232f93c4801b328a9ade228ac6f7fefaeeeb57e5f3c07870c62d7f56d7"
+      }
+    },
+    "B": {
+      "source": {
+        "files": 120,
+        "sha256": "685b105a5fdd5ced269f12559f7d798a3d8335e8f18a24088e95c9c404e5076f"
+      },
+      "build": {
+        "files": 199,
+        "sha256": "cfc095abbe42bd2c91bdb0d8d205659557b173565d43db04bc3b47c770351ace"
+      }
+    }
+  }
+}

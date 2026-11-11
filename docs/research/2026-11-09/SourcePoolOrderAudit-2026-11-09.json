@@ -1,0 +1,206 @@
+{
+  "dateSeoul": "2026-11-09",
+  "method": "Read-only analysis of existing benchmark JSON and retained post-append databases; no refresh, test runner or new benchmark executed",
+  "benchmarkSha256": "4133699f140a1ac42277164f320a6be2fff9e1227de1eec35491520d2f9d15d1",
+  "physicalScope": "Request and manifest ID-to-identity mapping after append and unchanged refresh; this is not a trace of every SQL statement",
+  "exclusions": [
+    "Physical Worker finish order was not recorded",
+    "No GC, Worker CPU or heap profile",
+    "No early-termination comparison",
+    "No error/cancellation or live file rewrite scenario"
+  ],
+  "datasets": [
+    {
+      "name": "current",
+      "pairs": 10,
+      "physicalDb": [
+        {
+          "pair": 1,
+          "requestIdOrderEqual": true,
+          "manifestIdOrderEqual": true
+        },
+        {
+          "pair": 2,
+          "requestIdOrderEqual": true,
+          "manifestIdOrderEqual": true
+        },
+        {
+          "pair": 3,
+          "requestIdOrderEqual": true,
+          "manifestIdOrderEqual": true
+        },
+        {
+          "pair": 4,
+          "requestIdOrderEqual": true,
+          "manifestIdOrderEqual": true
+        },
+        {
+          "pair": 5,
+          "requestIdOrderEqual": true,
+          "manifestIdOrderEqual": true
+        },
+        {
+          "pair": 6,
+          "requestIdOrderEqual": true,
+          "manifestIdOrderEqual": true
+        },
+        {
+          "pair": 7,
+          "requestIdOrderEqual": true,
+          "manifestIdOrderEqual": true
+        },
+        {
+          "pair": 8,
+          "requestIdOrderEqual": true,
+          "manifestIdOrderEqual": true
+        },
+        {
+          "pair": 9,
+          "requestIdOrderEqual": true,
+          "manifestIdOrderEqual": true
+        },
+        {
+          "pair": 10,
+          "requestIdOrderEqual": true,
+          "manifestIdOrderEqual": true
+        }
+      ],
+      "scenarios": {
+        "initial": {
+          "logicalOrderEqual": true,
+          "sourceSetEqual": true,
+          "semanticResultsEqual": true,
+          "allSubmittedJobsConsumed": true,
+          "storageStageCallMismatches": []
+        },
+        "append-one": {
+          "logicalOrderEqual": true,
+          "sourceSetEqual": true,
+          "semanticResultsEqual": true,
+          "allSubmittedJobsConsumed": true,
+          "storageStageCallMismatches": []
+        },
+        "unchanged": {
+          "logicalOrderEqual": true,
+          "sourceSetEqual": true,
+          "semanticResultsEqual": true,
+          "allSubmittedJobsConsumed": true,
+          "storageStageCallMismatches": []
+        }
+      },
+      "initialStorage": {
+        "replace": {
+          "aMedianMs": 397.91404999997985,
+          "bMedianMs": 421.68284999999923,
+          "bSlowerPairs": 8
+        },
+        "summaryWrites": {
+          "aMedianMs": 36.5339500000141,
+          "bMedianMs": 42.273599999991575,
+          "bSlowerPairs": 10
+        },
+        "commit": {
+          "aMedianMs": 248.84204999999292,
+          "bMedianMs": 258.3955499999968,
+          "bSlowerPairs": 7
+        }
+      }
+    },
+    {
+      "name": "synthetic-10000",
+      "pairs": 10,
+      "physicalDb": [
+        {
+          "pair": 1,
+          "requestIdOrderEqual": true,
+          "manifestIdOrderEqual": true
+        },
+        {
+          "pair": 2,
+          "requestIdOrderEqual": true,
+          "manifestIdOrderEqual": true
+        },
+        {
+          "pair": 3,
+          "requestIdOrderEqual": true,
+          "manifestIdOrderEqual": true
+        },
+        {
+          "pair": 4,
+          "requestIdOrderEqual": true,
+          "manifestIdOrderEqual": true
+        },
+        {
+          "pair": 5,
+          "requestIdOrderEqual": true,
+          "manifestIdOrderEqual": true
+        },
+        {
+          "pair": 6,
+          "requestIdOrderEqual": true,
+          "manifestIdOrderEqual": true
+        },
+        {
+          "pair": 7,
+          "requestIdOrderEqual": true,
+          "manifestIdOrderEqual": true
+        },
+        {
+          "pair": 8,
+          "requestIdOrderEqual": true,
+          "manifestIdOrderEqual": true
+        },
+        {
+          "pair": 9,
+          "requestIdOrderEqual": true,
+          "manifestIdOrderEqual": true
+        },
+        {
+          "pair": 10,
+          "requestIdOrderEqual": true,
+          "manifestIdOrderEqual": true
+        }
+      ],
+      "scenarios": {
+        "initial": {
+          "logicalOrderEqual": true,
+          "sourceSetEqual": true,
+          "semanticResultsEqual": true,
+          "allSubmittedJobsConsumed": true,
+          "storageStageCallMismatches": []
+        },
+        "append-one": {
+          "logicalOrderEqual": true,
+          "sourceSetEqual": true,
+          "semanticResultsEqual": true,
+          "allSubmittedJobsConsumed": true,
+          "storageStageCallMismatches": []
+        },
+        "unchanged": {
+          "logicalOrderEqual": true,
+          "sourceSetEqual": true,
+          "semanticResultsEqual": true,
+          "allSubmittedJobsConsumed": true,
+          "storageStageCallMismatches": []
+        }
+      },
+      "initialStorage": {
+        "replace": {
+          "aMedianMs": 521.4012000000002,
+          "bMedianMs": 531.7828,
+          "bSlowerPairs": 6
+        },
+        "summaryWrites": {
+          "aMedianMs": 198.87450000000106,
+          "bMedianMs": 201.70920000000146,
+          "bSlowerPairs": 6
+        },
+        "commit": {
+          "aMedianMs": 108.92924999999954,
+          "bMedianMs": 108.57055000000005,
+          "bSlowerPairs": 5
+        }
+      }
+    }
+  ]
+}

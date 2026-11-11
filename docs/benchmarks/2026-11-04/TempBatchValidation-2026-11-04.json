@@ -1,0 +1,17 @@
+{
+  "scope": "Existing summary and capability test files, unmodified, against isolated candidate build",
+  "files": [
+    "capabilities.test.js",
+    "summary-db.test.js",
+    "summary-incremental.test.js",
+    "summary-lock.test.js",
+    "summary-rollup.test.js",
+    "summary-staging.test.js",
+    "summary.integration.test.js"
+  ],
+  "tests": 126,
+  "pass": 126,
+  "fail": 0,
+  "exitCode": 0,
+  "candidateSha256": "f4e013de9fd396ed6c91cc8afe61a07f42a3948a93c8386340496a8ebaba442f"
+}

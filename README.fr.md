@@ -117,6 +117,22 @@ Utilisez **Agent Tracker : Supprimer les données statistiques** pour effacer le
 
 ## Notes de version
 
+<details open>
+<summary>v0.3.0</summary>
+
+- **Actualisation des statistiques plus efficace** — Lit et agrège les journaux JSONL en un seul passage et traite plusieurs fichiers en parallèle pour les ensembles volumineux. Pour les réponses en double, sélectionne l'enregistrement privilégié et ajuste les totaux uniquement de la différence entre leurs contributions.
+- **Écritures et requêtes de base de données** — Met à jour uniquement les requêtes modifiées et regroupe les écritures et agrégations quotidiennes de plusieurs sessions. Réduit les requêtes en double et partage les mêmes résultats entre tableaux, graphiques et nombre total de lignes.
+- **Utilisation des sous-agents Codex** — Additionne l'utilisation des sous-agents, y compris imbriqués, à la requête parente. Relie ceux sans identifiant de requête grâce à leur historique de création et améliore la gestion des longues chaînes, des cycles et des parents manquants.
+- **Actualisation des journaux déplacés** — Vérifie l'identité et le contenu avant de relier le nouveau chemin et de supprimer l'ancien enregistrement, afin que l'utilisation ajoutée après un déplacement continue d'actualiser les statistiques.
+- **Carte d'utilisation et accessibilité** — Rétablit la carte complète au survol et, avec le correctif local de workbench, permet de l'épingler ou de la fermer par un clic. Les résumés accessibles annoncent Codex en premier, avec les quotas restants hebdomadaires et sur 5 heures et les délais de réinitialisation, même en mode compact.
+- **Compatibilité des requêtes d'utilisation** — Supprime la limite arbitraire de 100 fenêtres d'utilisation dans les réponses Claude et Codex et utilise la version installée de l'extension dans les métadonnées de communication.
+- **Langue par défaut pour les langues non prises en charge** — Affiche l'anglais lorsque la langue de VS Code n'est pas prise en charge.
+- **Nouvelle icône de l'extension** — Remplace l'icône et réduit la taille du fichier image.
+
+[Évolution des algorithmes, gains mesurés depuis v0.2.0 et limites (en coréen)](docs/Performance-v0.3.0.ko.md)
+
+</details>
+
 <details>
 <summary>v0.2.0</summary>
 

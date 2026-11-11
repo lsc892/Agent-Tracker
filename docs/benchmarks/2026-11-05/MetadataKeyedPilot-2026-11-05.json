@@ -1,0 +1,4334 @@
+{
+  "startedAtSeoul": "2026-11-05 21:48:24",
+  "hypothesis": "Keep full parsing; persist normalized metadata and recalculate only changed response/turn keys.",
+  "pairs": 1,
+  "warmups": 0,
+  "environment": {
+    "node": "v24.19.0",
+    "sqlite": "3.53.3",
+    "cpu": "Intel(R) Core(TM) i5-8250U CPU @ 1.60GHz",
+    "platform": "win32",
+    "timezone": "Asia/Seoul",
+    "tempStore": "FILE",
+    "cacheKiB": 4096,
+    "mmapBytes": 0
+  },
+  "gitHead": "02bcffc9b0ad1723347ce9b68e26af48c21b43bf",
+  "sources": {
+    "A": {
+      "src/app.ts": "5fa7a79afd4356aaab7cd3322221dc3544997f2ac72e5cf8fd634ce19fea79f9",
+      "src/claudeSettings.ts": "b1a75438a08df4a986aea30868431bf7d7734918998c3ede3a111530bcd94cad",
+      "src/configuration.ts": "aa80778c22f5b6d038b9110c3647ad86cee42327b2524a9f65d93d4052566d74",
+      "src/configuration/reader.ts": "6bb8a9c1e555056dc6538cb992b18610495833ab262b34b4d8b8722a4d753915",
+      "src/configuration/schema.ts": "302483826dd4750d3afff31598b39165c8f55ca408a47db908f2647b2cdfb0d6",
+      "src/extension.ts": "5f4b769e88ae1c7b02cfe7445dbe9ad88a750280b38a43d32fa9a22f138802b1",
+      "src/localization/index.ts": "35f9872282db8951eda841a594847802bc64de6842fe5e81fb4e2289e83bcb55",
+      "src/quota/base.ts": "be72adf71413ecc94bccc35f264f70978d3918187b5f403b5019e94db4675c17",
+      "src/quota/claude.ts": "7ec0a05837a634052c67be3a1147715c9ff060427ca77d679f9f5baf517c5baa",
+      "src/quota/claudeCredentials/common.ts": "8cc0754f50b263ca416ab872c2aa48e1f5050250485a538b13949f58429b9536",
+      "src/quota/claudeCredentials/index.ts": "b9e8cffc9fbc16ae3fcc31566cfaf147b779cb7515e99b8b794f7e2139bc154f",
+      "src/quota/claudeCredentials/mac.ts": "1eb90aefa1bdf695ecaeb9ee4cae5f2183590774a5998a0cd99201c6c236c854",
+      "src/quota/claudeCredentials/windows.ts": "8ebaf9becf71b9a777f1b39c844ec432556ec8b722d2bf572d25c5bdf837f97a",
+      "src/quota/claude/httpBody.ts": "6e53aa050c4c747b6ca2a579b3948e875b46452e19ada4139abd8734230e4124",
+      "src/quota/claude/response.ts": "c1898a4980b498e49cb4341c78ba072fd934ea326fcdd0d5999f285cde5961f2",
+      "src/quota/codex.ts": "1c7d19d391266f490ce672c0c8b578b13668281b60fa2b2327cc74dc919f5882",
+      "src/quota/codex/errors.ts": "3efd178e0f43f2dae367f49710fc99d4c30d9a246b975c41abd5aca85031a9f1",
+      "src/quota/codex/executable.ts": "e7652bd56d0cf0b0b2989b11bdb6b75403c545a02a5b709e7845e6affc6db2ef",
+      "src/quota/codex/response.ts": "46630a45b7ace600d0d2ceaf2fe2a3b29c7bfbc1b7b5b79513fa10ef8eae20ce",
+      "src/quota/codex/rpcSession.ts": "7f222eaeafcafef5145cdddcece7b3965200a9a5071eb2994f9799c90c1d92d1",
+      "src/quota/index.ts": "bb4e279ce4f1be95235c4211275a938d44395d810c86147eef8a34b73c00fd7e",
+      "src/quota/providerState.ts": "1930bd183810e21e2eaccb3d8b197741845dfba9727583558755e8e8f371ab31",
+      "src/quota/service.ts": "cd15cd2c0233f0eaea92ac2626f6c011910550fb9d5c9211581bc20bb9e05349",
+      "src/quota/types.ts": "8f1673a6d50d90b12145c486174dc9d83df57eaa120c4d9341ec355d3656ad6a",
+      "src/summary/client.ts": "ae9239a161f9303a95175ccd2f6dbd98b7c308747a973d8217e71bcc32d59767",
+      "src/summary/db/billing.ts": "e92c37cfc9527cd67cc05cb238d14d873aa846b15076010c754a9e55841f872f",
+      "src/summary/db/chart.ts": "68a6510fed96e3d1a82646a1b2bc9d8ffbb02bf60f0433119b549000d2c30572",
+      "src/summary/db/connection.ts": "4ef4459463789e5dd7bf73f8439f3956d487d9cd942cf3cc30226e13ffc276e6",
+      "src/summary/db/index.ts": "a7b76c7751222d895535edd28c6746433a031d0f219a870157099a9913173631",
+      "src/summary/db/manifest.ts": "834e4be31f6b1e1f26cc73fd9b7dafd0f909269eae6af601e49f155f9626859e",
+      "src/summary/db/migrations.ts": "9c8c91a424e19b30a5210dc64cd20a93c112b6408e19d39a8381c37263082112",
+      "src/summary/db/queries.ts": "11ae07ef0dcf165955ad9b521756316a4b3a4ad73482158cea2da431df36019c",
+      "src/summary/db/queries/common/filters.ts": "8242430d32552807e68b35c9f63a9ee2966265627756c6c29bb0fb3cd202943a",
+      "src/summary/db/queries/common/sorting.ts": "63c9d899f83834012f761a4005ae16924566cea712aca9eb28d3220631bc4318",
+      "src/summary/db/queries/common/types.ts": "38d3fba70005de09f74396fe916c63a77cf7a4ead2c9f6b7a7509cf61150de6a",
+      "src/summary/db/queries/raw/capabilities.ts": "17d228205c1f7b7160401800dd75cfe51dfb86449b3d0006846a3a6c35b3e2fe",
+      "src/summary/db/queries/raw/diagnostics.ts": "70893e69eaf177d53663307abc87618c3c6ff5ebcacd12d50aab8d6521eb3178",
+      "src/summary/db/queries/raw/names.ts": "1f65ece88979e7fad5b8546557aa3460eb53c29a19b97302e0a2a1be2c98e260",
+      "src/summary/db/queries/raw/source.ts": "bd5167d8289839521467e186a582c4f94b54ad3fd5bf589c2863eb6978540a52",
+      "src/summary/db/queries/raw/turns.ts": "6bf0080ad017e6f0cdb2544112f0077a231fe80c10d3ed862cdddd3abafb89d5",
+      "src/summary/db/queries/raw/usage.ts": "57c6376cf0f44923050f460a946a8464b3b8f71aa3829b4279df37fbf4557531",
+      "src/summary/db/queries/rollup/metrics.ts": "1e23104b679a3d402364b4c6cdd1e1f1a2ace234a5ba9fb1f0a24cfd843f7e8b",
+      "src/summary/db/queries/rollup/source.ts": "764a8a01378fc4c1c43e979e3de61f747d13ba599596cd329cdc2b0820a3eed3",
+      "src/summary/db/queries/rollup/usage.ts": "3079a8537d1a0d1b811bfb600c6edcd3a0def4ee5fa926ae1113c9053140d4f6",
+      "src/summary/db/reader.ts": "876f89a0034cac1d7361336aa714e322e25ac8b5dd8c4c93ea2ac233014e71de",
+      "src/summary/db/rollup-queries.ts": "8ce7602a597339dc64aa822af43c4fe7c388fd342bd83f4cd1dbab55040cf395",
+      "src/summary/db/rollup-state.ts": "5520606d4da922b080686e602942e5e3c5ff4b4cd0d58db138209f1ad93f591f",
+      "src/summary/db/rollups.ts": "51f573dce49cbe48a0cc7d7150de1c59346d07a69cf01680f5815cfc7fc751e6",
+      "src/summary/db/schema.ts": "3d265a956eec888fb6b5c05206fafdb92df23677c24904b440360a6d19de3870",
+      "src/summary/db/sessionChanges.ts": "691e9c4d3ff94a5cc51c03037b72675519a6b4c16e392059e84fe2d27e9c348c",
+      "src/summary/db/sessions.ts": "f442c168772515ecc8080e9e733caab81e2a3885041d919e5c9560b74167c70c",
+      "src/summary/db/timezone.ts": "cde010d2db6a521638e143eb44cfef6588cd36deef15b0ea255848e9b167ae18",
+      "src/summary/db/types.ts": "efd6a874c07ca9208435f5871d3ca3b42b4b2f23a1e867c6849c0831706eac59",
+      "src/summary/db/validation.ts": "1f68f408fc09c90a6a722f5fa6d22a74f52d58c56fa8d83e7e37e22ce008cd9d",
+      "src/summary/jsonl.ts": "5c269d9027029b1effae8f32c4d055ae4242eb103ea73dc7802f1fb4a177cd53",
+      "src/summary/lock.ts": "6459ec4d0599779ef402f1b24d814ed8256e634c5932c9d0c25a00cd27d80bea",
+      "src/summary/modelOrder.ts": "63d7983e78c494f5cda20bd375f53e02c3db4ed905659a03ba8afa986510cb55",
+      "src/summary/names.ts": "10ccce9b7173bfb0ffbf1d3018b6d2cbf8222631a88109fa12c7b4674b11a4bd",
+      "src/summary/parsers/capabilities.ts": "e0c1e8c1fe3fa47aba9cad34b087ffb55cfe8b832c06f2d8be7e15069b282856",
+      "src/summary/parsers/claude.ts": "b08f3c4070debd4bbc3f0d7da06ad4aa141d99c62e011bf3ad901ac454814581",
+      "src/summary/parsers/codex.ts": "6bce5598f3ecc03dfe1c2678db2f28ddf4c1ed7f4779e619344e2153651b12f5",
+      "src/summary/parsers/common.ts": "0794166d56d04bc16496440dae61123a5b9679adfc6259f7c2cbd22438290a65",
+      "src/summary/parsers/index.ts": "3d430e3a1ad30763533238b278f502b8323ed3481aa77ac2d50b1ca20be08c81",
+      "src/summary/pricing.ts": "ace8cc1a0bb1698cc8ead0edff57e2246339e5e79199b1bce2c28503bab67fc4",
+      "src/summary/refresh.ts": "a6b29b26e4a82a86b455ebcac83249e9420af86711961748491fc6bafc4de59c",
+      "src/summary/scanner.ts": "2c44569123accb1cf5fa126632f46b361094f6470f13fa3060165826ad6d721b",
+      "src/summary/sourceFingerprint.ts": "8c7b3a03832ca2831ad8f2c4e0a6f9e40d7b7c30f773a8f352b98f0936df291b",
+      "src/summary/staging.ts": "a79a0f0769b6c0f3b254036c7784867ea27fceeced9fdafd35454e0225ada6d6",
+      "src/summary/transport.ts": "dc21790255a2bce51a231645824481b8bec220d7c9541012506a97cd6c4ef7ea",
+      "src/summary/types.ts": "824fcda213868f551c50e7503ea262d3f370960557029260f48dfc018d98718e",
+      "src/summary/worker.ts": "48fe77347cfc58d4a21418244560c11994d35eb3a89470049762a1da5bf20c28",
+      "src/summary/zstd.ts": "b0f8eab00979b9e7d6d3f8616b56bb2f41ddd8b6dee1d4059f9fbc8aedd00586",
+      "src/ui/colorSettings.ts": "96734a9ad9bda5f261449891245a2e40c0c4fa8a5a483706ea83786c6cc78d28",
+      "src/ui/colors.ts": "105969be9f26c4e4b5f217ab0993e358afa6f46d3f39a678afa42b8fdd505d07",
+      "src/ui/dashboard.ts": "7333c503d4129a00041b87ca1dc83b92a4387a23bb1b44a811a7ba138fda85b7",
+      "src/ui/html.ts": "02fae316fce990224668a7e27da888ebf7d78891d8d1e5cfc8639c6495ac0fce",
+      "src/ui/presentation.ts": "c586a445296966884f08121759d9238a5ad82a23ff743ab2c24494e6333350a0",
+      "src/ui/quotaTooltip.ts": "a76b73b56db863ca408a40601d9d985fb574bd9ce541ca841484f9638653dcc0",
+      "src/ui/statusBar.ts": "d60d0c78cd9e981215e24896d228dea89deca86c20ca91d8a19a1403e3633f04",
+      "src/ui/statusBarPresentation.ts": "5a50531a7caff3610dcf6188cfba821a90408fd6dfd5b7d9e135fc5ab76248b2",
+      "src/version.ts": "784b6aaef6fa632552d50fb0878c45e696c10ad8d7caecf3902ae4cc36dc4793"
+    },
+    "B": {
+      "src/app.ts": "5fa7a79afd4356aaab7cd3322221dc3544997f2ac72e5cf8fd634ce19fea79f9",
+      "src/claudeSettings.ts": "b1a75438a08df4a986aea30868431bf7d7734918998c3ede3a111530bcd94cad",
+      "src/configuration.ts": "aa80778c22f5b6d038b9110c3647ad86cee42327b2524a9f65d93d4052566d74",
+      "src/configuration/reader.ts": "6bb8a9c1e555056dc6538cb992b18610495833ab262b34b4d8b8722a4d753915",
+      "src/configuration/schema.ts": "302483826dd4750d3afff31598b39165c8f55ca408a47db908f2647b2cdfb0d6",
+      "src/extension.ts": "5f4b769e88ae1c7b02cfe7445dbe9ad88a750280b38a43d32fa9a22f138802b1",
+      "src/localization/index.ts": "35f9872282db8951eda841a594847802bc64de6842fe5e81fb4e2289e83bcb55",
+      "src/quota/base.ts": "be72adf71413ecc94bccc35f264f70978d3918187b5f403b5019e94db4675c17",
+      "src/quota/claude.ts": "7ec0a05837a634052c67be3a1147715c9ff060427ca77d679f9f5baf517c5baa",
+      "src/quota/claudeCredentials/common.ts": "8cc0754f50b263ca416ab872c2aa48e1f5050250485a538b13949f58429b9536",
+      "src/quota/claudeCredentials/index.ts": "b9e8cffc9fbc16ae3fcc31566cfaf147b779cb7515e99b8b794f7e2139bc154f",
+      "src/quota/claudeCredentials/mac.ts": "1eb90aefa1bdf695ecaeb9ee4cae5f2183590774a5998a0cd99201c6c236c854",
+      "src/quota/claudeCredentials/windows.ts": "8ebaf9becf71b9a777f1b39c844ec432556ec8b722d2bf572d25c5bdf837f97a",
+      "src/quota/claude/httpBody.ts": "6e53aa050c4c747b6ca2a579b3948e875b46452e19ada4139abd8734230e4124",
+      "src/quota/claude/response.ts": "c1898a4980b498e49cb4341c78ba072fd934ea326fcdd0d5999f285cde5961f2",
+      "src/quota/codex.ts": "1c7d19d391266f490ce672c0c8b578b13668281b60fa2b2327cc74dc919f5882",
+      "src/quota/codex/errors.ts": "3efd178e0f43f2dae367f49710fc99d4c30d9a246b975c41abd5aca85031a9f1",
+      "src/quota/codex/executable.ts": "e7652bd56d0cf0b0b2989b11bdb6b75403c545a02a5b709e7845e6affc6db2ef",
+      "src/quota/codex/response.ts": "46630a45b7ace600d0d2ceaf2fe2a3b29c7bfbc1b7b5b79513fa10ef8eae20ce",
+      "src/quota/codex/rpcSession.ts": "7f222eaeafcafef5145cdddcece7b3965200a9a5071eb2994f9799c90c1d92d1",
+      "src/quota/index.ts": "bb4e279ce4f1be95235c4211275a938d44395d810c86147eef8a34b73c00fd7e",
+      "src/quota/providerState.ts": "1930bd183810e21e2eaccb3d8b197741845dfba9727583558755e8e8f371ab31",
+      "src/quota/service.ts": "cd15cd2c0233f0eaea92ac2626f6c011910550fb9d5c9211581bc20bb9e05349",
+      "src/quota/types.ts": "8f1673a6d50d90b12145c486174dc9d83df57eaa120c4d9341ec355d3656ad6a",
+      "src/summary/client.ts": "ae9239a161f9303a95175ccd2f6dbd98b7c308747a973d8217e71bcc32d59767",
+      "src/summary/db/billing.ts": "e92c37cfc9527cd67cc05cb238d14d873aa846b15076010c754a9e55841f872f",
+      "src/summary/db/chart.ts": "68a6510fed96e3d1a82646a1b2bc9d8ffbb02bf60f0433119b549000d2c30572",
+      "src/summary/db/connection.ts": "4ef4459463789e5dd7bf73f8439f3956d487d9cd942cf3cc30226e13ffc276e6",
+      "src/summary/db/index.ts": "a7b76c7751222d895535edd28c6746433a031d0f219a870157099a9913173631",
+      "src/summary/db/manifest.ts": "834e4be31f6b1e1f26cc73fd9b7dafd0f909269eae6af601e49f155f9626859e",
+      "src/summary/db/migrations.ts": "80c32611afd2d6225df571f67d05442734adbfba0a12db62f61a36f088266fe0",
+      "src/summary/db/queries.ts": "11ae07ef0dcf165955ad9b521756316a4b3a4ad73482158cea2da431df36019c",
+      "src/summary/db/queries/common/filters.ts": "8242430d32552807e68b35c9f63a9ee2966265627756c6c29bb0fb3cd202943a",
+      "src/summary/db/queries/common/sorting.ts": "63c9d899f83834012f761a4005ae16924566cea712aca9eb28d3220631bc4318",
+      "src/summary/db/queries/common/types.ts": "38d3fba70005de09f74396fe916c63a77cf7a4ead2c9f6b7a7509cf61150de6a",
+      "src/summary/db/queries/raw/capabilities.ts": "17d228205c1f7b7160401800dd75cfe51dfb86449b3d0006846a3a6c35b3e2fe",
+      "src/summary/db/queries/raw/diagnostics.ts": "70893e69eaf177d53663307abc87618c3c6ff5ebcacd12d50aab8d6521eb3178",
+      "src/summary/db/queries/raw/names.ts": "1f65ece88979e7fad5b8546557aa3460eb53c29a19b97302e0a2a1be2c98e260",
+      "src/summary/db/queries/raw/source.ts": "bd5167d8289839521467e186a582c4f94b54ad3fd5bf589c2863eb6978540a52",
+      "src/summary/db/queries/raw/turns.ts": "6bf0080ad017e6f0cdb2544112f0077a231fe80c10d3ed862cdddd3abafb89d5",
+      "src/summary/db/queries/raw/usage.ts": "57c6376cf0f44923050f460a946a8464b3b8f71aa3829b4279df37fbf4557531",
+      "src/summary/db/queries/rollup/metrics.ts": "1e23104b679a3d402364b4c6cdd1e1f1a2ace234a5ba9fb1f0a24cfd843f7e8b",
+      "src/summary/db/queries/rollup/source.ts": "764a8a01378fc4c1c43e979e3de61f747d13ba599596cd329cdc2b0820a3eed3",
+      "src/summary/db/queries/rollup/usage.ts": "3079a8537d1a0d1b811bfb600c6edcd3a0def4ee5fa926ae1113c9053140d4f6",
+      "src/summary/db/reader.ts": "876f89a0034cac1d7361336aa714e322e25ac8b5dd8c4c93ea2ac233014e71de",
+      "src/summary/db/rollup-queries.ts": "8ce7602a597339dc64aa822af43c4fe7c388fd342bd83f4cd1dbab55040cf395",
+      "src/summary/db/rollup-state.ts": "5520606d4da922b080686e602942e5e3c5ff4b4cd0d58db138209f1ad93f591f",
+      "src/summary/db/rollups.ts": "51f573dce49cbe48a0cc7d7150de1c59346d07a69cf01680f5815cfc7fc751e6",
+      "src/summary/db/schema.ts": "fbfca9b37220d7664dfb2370fcc86888df252fba4b6d2a3500805a13139b23e6",
+      "src/summary/db/sessionChanges.ts": "d40c5a7358bf1086fe8e4d7fbe10a3702ed3a5c2559c4859d5891b8abd4ac311",
+      "src/summary/db/sessions.ts": "96ec6b323c9316d17218c7d900b8cccf0939ef62fbf5f921162016c40414a7cd",
+      "src/summary/db/timezone.ts": "cde010d2db6a521638e143eb44cfef6588cd36deef15b0ea255848e9b167ae18",
+      "src/summary/db/types.ts": "37af62f1c0830aa59b8b0c7fb42d5f8f8bfc824be6aca03343da3eba169bb2a7",
+      "src/summary/db/validation.ts": "1f68f408fc09c90a6a722f5fa6d22a74f52d58c56fa8d83e7e37e22ce008cd9d",
+      "src/summary/jsonl.ts": "5c269d9027029b1effae8f32c4d055ae4242eb103ea73dc7802f1fb4a177cd53",
+      "src/summary/lock.ts": "6459ec4d0599779ef402f1b24d814ed8256e634c5932c9d0c25a00cd27d80bea",
+      "src/summary/metadata.ts": "0591d0504a4a9aba7b2e44fb2436919ce0ff59f840c2885787b25d2688479829",
+      "src/summary/modelOrder.ts": "63d7983e78c494f5cda20bd375f53e02c3db4ed905659a03ba8afa986510cb55",
+      "src/summary/names.ts": "10ccce9b7173bfb0ffbf1d3018b6d2cbf8222631a88109fa12c7b4674b11a4bd",
+      "src/summary/parsers/capabilities.ts": "e0c1e8c1fe3fa47aba9cad34b087ffb55cfe8b832c06f2d8be7e15069b282856",
+      "src/summary/parsers/claude.ts": "b08f3c4070debd4bbc3f0d7da06ad4aa141d99c62e011bf3ad901ac454814581",
+      "src/summary/parsers/codex.ts": "6bce5598f3ecc03dfe1c2678db2f28ddf4c1ed7f4779e619344e2153651b12f5",
+      "src/summary/parsers/common.ts": "0794166d56d04bc16496440dae61123a5b9679adfc6259f7c2cbd22438290a65",
+      "src/summary/parsers/index.ts": "3d430e3a1ad30763533238b278f502b8323ed3481aa77ac2d50b1ca20be08c81",
+      "src/summary/pricing.ts": "ace8cc1a0bb1698cc8ead0edff57e2246339e5e79199b1bce2c28503bab67fc4",
+      "src/summary/refresh.ts": "a6b29b26e4a82a86b455ebcac83249e9420af86711961748491fc6bafc4de59c",
+      "src/summary/scanner.ts": "34b0ea5f381ef0e79eb543be25b4e1d368d0ea2bf805560101f68b481d58a853",
+      "src/summary/sourceFingerprint.ts": "8c7b3a03832ca2831ad8f2c4e0a6f9e40d7b7c30f773a8f352b98f0936df291b",
+      "src/summary/staging.ts": "bd6c65aa96322aff6bb12d6905f32169f0e13932a97f723a384557ca9ecfa14e",
+      "src/summary/transport.ts": "dc21790255a2bce51a231645824481b8bec220d7c9541012506a97cd6c4ef7ea",
+      "src/summary/types.ts": "824fcda213868f551c50e7503ea262d3f370960557029260f48dfc018d98718e",
+      "src/summary/worker.ts": "48fe77347cfc58d4a21418244560c11994d35eb3a89470049762a1da5bf20c28",
+      "src/summary/zstd.ts": "b0f8eab00979b9e7d6d3f8616b56bb2f41ddd8b6dee1d4059f9fbc8aedd00586",
+      "src/ui/colorSettings.ts": "96734a9ad9bda5f261449891245a2e40c0c4fa8a5a483706ea83786c6cc78d28",
+      "src/ui/colors.ts": "105969be9f26c4e4b5f217ab0993e358afa6f46d3f39a678afa42b8fdd505d07",
+      "src/ui/dashboard.ts": "7333c503d4129a00041b87ca1dc83b92a4387a23bb1b44a811a7ba138fda85b7",
+      "src/ui/html.ts": "02fae316fce990224668a7e27da888ebf7d78891d8d1e5cfc8639c6495ac0fce",
+      "src/ui/presentation.ts": "c586a445296966884f08121759d9238a5ad82a23ff743ab2c24494e6333350a0",
+      "src/ui/quotaTooltip.ts": "a76b73b56db863ca408a40601d9d985fb574bd9ce541ca841484f9638653dcc0",
+      "src/ui/statusBar.ts": "d60d0c78cd9e981215e24896d228dea89deca86c20ca91d8a19a1403e3633f04",
+      "src/ui/statusBarPresentation.ts": "5a50531a7caff3610dcf6188cfba821a90408fd6dfd5b7d9e135fc5ab76248b2",
+      "src/version.ts": "784b6aaef6fa632552d50fb0878c45e696c10ad8d7caecf3902ae4cc36dc4793"
+    }
+  },
+  "builds": {
+    "A": {
+      "dist/src/app.js": "a6afc263bf8bcb9214ea125b9bb89bcb9f9f006ac6c7cc6c921b8f6d163b1272",
+      "dist/src/claudeSettings.js": "b8a47cf996a3481d2f1dd945524dd8b905844d2c4ef2b00d6a9121b20e88b8d6",
+      "dist/src/configuration.js": "5ce7ffe36c75f3bdf29db9d4581c8649fd3bbb1ecb814385620564fc3aa9f8c2",
+      "dist/src/configuration/reader.js": "43cd9f6e9eda98487c1a79eee849edbce3bfbbe31490791d0ca4398d58ba16b8",
+      "dist/src/configuration/schema.js": "41b9af7f2c6fc27034d950c8989b386a860b23ed85a93d28b72d7fb41741fefb",
+      "dist/src/extension.js": "44afbb3de663b587480e1f29f97c49135c4017825672ece58484fe62b1830c5e",
+      "dist/src/localization/i18next.cjs": "fb300ecb021afd38f4eacbf02e895e5504eea122754e093026261e8edeb6f069",
+      "dist/src/localization/index.js": "723c740a8509b7827692c7f773328b399acc7b50c93de0aae1c57a7931bf7b16",
+      "dist/src/quota/base.js": "9b8812675c08ebb3e2b940a73ebc5d6bcd0eaab6affa26a3d995ddaec554d7d3",
+      "dist/src/quota/claude.js": "9414b0a35441a13c7acfca15c0b67b6cbb6ae0b61ba7230f883760cde885cb05",
+      "dist/src/quota/claudeCredentials/common.js": "c04ba529176b58353c782c12813ba1639d6f39865e547b7793778cb7d1083b1e",
+      "dist/src/quota/claudeCredentials/index.js": "0961f2e5c062ec835af188501d92d1edb2ccefdc705c36cadc024fffe21bd2bc",
+      "dist/src/quota/claudeCredentials/mac.js": "b0cf7194f03c1d8c83263ad7e581697c2a1d05c35c3fc72dd865d7703f783f65",
+      "dist/src/quota/claudeCredentials/windows.js": "3f7788e36d423ed9d6367d1ce437d20c6f7ced6cd34daee13dea837072c45cee",
+      "dist/src/quota/claude/httpBody.js": "ad48328049c4c64e0e5a5e7cec56e0c283588e94d927b657c84d48f8f4c9f9c2",
+      "dist/src/quota/claude/response.js": "2262b83c108274c0e17c182776eef1af7236958dd000b616390c9c53059a52e2",
+      "dist/src/quota/codex.js": "1baa76bb09366113ef37a9121d5418eb00f83fd509c4bd7d6619c328757bf131",
+      "dist/src/quota/codex/errors.js": "2d5bd697be1eee5a8f44193afb0fd07417286ef8fb9d4f94df954327c31decde",
+      "dist/src/quota/codex/executable.js": "c118b37f160e3b8c0ff4920e9510c4918894004f74d51be5056bb3bf2a7b45bd",
+      "dist/src/quota/codex/response.js": "3623e75a3cfae6eb5a2ad26c3a304263f7dfed5ffb1fb621c8e1fc4122cc26fb",
+      "dist/src/quota/codex/rpcSession.js": "9daaf7272b76876ad1d047ef2ee6074fe1e46d7503f8ed2de319ef9b8fc3d0f4",
+      "dist/src/quota/index.js": "0080dee234e0bf6f83f34fb28259423c88a96f3a0d4b070c3c050e40a1bc1f71",
+      "dist/src/quota/providerState.js": "ea926e842b4763622d28969c92dd8c210612e6b1559e7f0c378033c09c57e5f6",
+      "dist/src/quota/service.js": "8ab5ceb49989d03f66ada10df1e164081c0b71e396145cc8df76f0c64553f67c",
+      "dist/src/quota/types.js": "b3d3152e3698146e21f02801527d6fde13db167539d5c33908c7fd3eaf19cb34",
+      "dist/src/summary/client.js": "5acfa3b80568dbf8106d28a9cd2e497fe85507a9f58377af96cdd66b74a67193",
+      "dist/src/summary/db/billing.js": "4eb908149e43a931b5cbe1511ef8decb7c2c8752690beaa099a64f580546f295",
+      "dist/src/summary/db/chart.js": "5596b3139160e683ca6594a38fb2a0eb88f75d52ae1d0741a0b9e78f9170b29a",
+      "dist/src/summary/db/connection.js": "1fd48d565791fdaab067c2a235df229cfa20ee1fbaed36400cbfbc35a3b21c89",
+      "dist/src/summary/db/index.js": "08daaae3735a3915f32bf3acae4053357872cefbef5932ea352c71f9cd0f9865",
+      "dist/src/summary/db/manifest.js": "7996a2bd73d4778af2606a2a48341fffcf7c3d93778f4f2106a3bd29ed22aeb4",
+      "dist/src/summary/db/migrations.js": "377bb83e6840129ee445dab621adb0a47f354f6e0e7be7b5d5b77dc18892c348",
+      "dist/src/summary/db/queries.js": "b2371822278676139857f1704e74bf19f05848c9af8c5cfd0528b068a24e6473",
+      "dist/src/summary/db/queries/common/filters.js": "34dbcbcdc3db48610300756341bfca636957081100c9e1a98fbaf9c607393e27",
+      "dist/src/summary/db/queries/common/sorting.js": "78f4d900954fc8d1042b6d92277479a5235b6e8c059f10546a3c261e9e1eeab7",
+      "dist/src/summary/db/queries/common/types.js": "b0d2bc4142d0c62d43f996aaeb64f22c4889ac853f8a3765758b505d972d0149",
+      "dist/src/summary/db/queries/raw/capabilities.js": "17f9445a4b29de38186b65cfef2312b66c974311cb0d6e3b37360fdd9e9af2eb",
+      "dist/src/summary/db/queries/raw/diagnostics.js": "1188d828a9f6489f0c38fb8d37a39029ad5bbed80747fab67149a6c7b1e65a4f",
+      "dist/src/summary/db/queries/raw/names.js": "b6b2379aac9fad1d91b19130cddd25a08706ab99c9bf66c6a27e19de76ec9f7f",
+      "dist/src/summary/db/queries/raw/source.js": "d4cfb8de86635eca7328841b00dfbb7904f5fcf7af7ddb747e7197d31658fce6",
+      "dist/src/summary/db/queries/raw/turns.js": "5672efb611e02a964f1f9fcfda875a3f3ae5d99e7e3f2d42c50215545e7f65ce",
+      "dist/src/summary/db/queries/raw/usage.js": "e175467bb919f7c9f3730e65e40242696bc3c6630dbe9b9fc4da51f27ea7385b",
+      "dist/src/summary/db/queries/rollup/metrics.js": "a319799b77e20cbeeabfbd6b11ae22a86de8ef7129037945fb10205aec2e0d95",
+      "dist/src/summary/db/queries/rollup/source.js": "9c2f3d59a0d56b61293b1455585528379707a27cd74d5003fae282023b82988d",
+      "dist/src/summary/db/queries/rollup/usage.js": "7427f555ccfac3675f66483529a36c5ee07243dd3fa753ba7cea0dc8d1169b32",
+      "dist/src/summary/db/reader.js": "cecaf1d815183e0f3aefe4adeed665af1572e09c8bf26ba774eb80188b98f356",
+      "dist/src/summary/db/rollup-queries.js": "1dd5ef2c1f0fdf31bc7fa2b896f1b5434d4acbef690567af0e64636081ab937e",
+      "dist/src/summary/db/rollup-state.js": "b0c2c108a09f96c6c584419ca3d400f578c11343a5c95f384ea3a24fb24bae6e",
+      "dist/src/summary/db/rollups.js": "e9c9f5c9b4ad25906435888e92dc842fc9f3af97d27df9d2291a1f4b311012d1",
+      "dist/src/summary/db/schema.js": "24f47df07b888f2fa7c4e17d9d5a5476750ae2a5b2916452d4fda56b6916e90d",
+      "dist/src/summary/db/sessionChanges.js": "2132e88fc858237e0aa153f76166111fd945df230f6ba49a17faddae34d30f10",
+      "dist/src/summary/db/sessions.js": "e283582839e5d2ffa7860c6bdb474178a5f6b65fa08db831a082b0a56ebe30ae",
+      "dist/src/summary/db/timezone.js": "fd3b5694fd55411e4630e1705cf30633c8efe69a09ddd02e56ceeabafca3fa18",
+      "dist/src/summary/db/types.js": "ff7dd8093c2ae517f1761db45f84562a9463e6ef46c06275a6f47c3ae31c437f",
+      "dist/src/summary/db/validation.js": "25a5f17dd1e13d835fb1bb6f7c7576ed34d07e663c1f92fd59f30e9327faacfe",
+      "dist/src/summary/jsonl.js": "0d3aa19442dab4f124f6cc8a5f2464355a32b0a34aa6ab3aa22ace69e3677285",
+      "dist/src/summary/lock.js": "7cc427875a681cb5b2b4c6d59f4fbd63829d774a0fcb3ddedda33172944bfa4e",
+      "dist/src/summary/modelOrder.js": "559f822f5640ea2296f132ab9e3ac2032de7d670ce3f4ee9497e5d3611f5919f",
+      "dist/src/summary/names.js": "7cad1a32e5b4a0d098a4700b58b36e5325b4b212f69d3077ee757e8cdefd322b",
+      "dist/src/summary/parsers/capabilities.js": "a63489967b4f8fff74513dbd235ce815ba0cd48bf3bdd78660cc5e49ce4e28de",
+      "dist/src/summary/parsers/claude.js": "f2daaa0e8adc421511eb5d874d4db5f59f9999ba3ce35f0762faebcafbfe3e73",
+      "dist/src/summary/parsers/codex.js": "9d81e14def2d56690f6d2ab0846d3ec8568d3c5feb81017566665a7e2f62a6e7",
+      "dist/src/summary/parsers/common.js": "808880fb506c8089b76bb80d922c10c2404109a648d8485f2df90f9334daec0a",
+      "dist/src/summary/parsers/index.js": "599e1e5f9f6c6640d6519f560a8a27a070fbe72be57353b9f6ba52e0eca30a71",
+      "dist/src/summary/pricing.js": "04763e933398ec7eff352ec2928ddd4d254c1e380daff9b7920a12d155af5f26",
+      "dist/src/summary/refresh.js": "834f93fed964da19990c9174d7e0642b2468e2be08d6f4216837b1e3388baa02",
+      "dist/src/summary/scanner.js": "8853b52272ddcdd25977c580f85a023f81d69758d3be52b14612ebc39298670d",
+      "dist/src/summary/sourceFingerprint.js": "c15fd6ac7d26a3da27a8dbed62377f353cd574809d0368f470bb999d4beefe5e",
+      "dist/src/summary/staging.js": "905a91051b4f13bb2afd7794864faaff916b81279ba5007f6cb9589f494d02e1",
+      "dist/src/summary/transport.js": "34bc09e4ecf9995a6fa1953d888b0f6d0011b97a3974e3ff5ecfa4717c3e01e4",
+      "dist/src/summary/types.js": "b0d2bc4142d0c62d43f996aaeb64f22c4889ac853f8a3765758b505d972d0149",
+      "dist/src/summary/worker.js": "43134ef89176b70a5a16e540800e9dad3ddd5c3f3f543f751c3f0aef2fffb881",
+      "dist/src/summary/zstd.js": "ec8224f129cfd57393cd57f1f0029d4ed397929c4de85d2f37ac3866c65ff4f8",
+      "dist/src/ui/colorSettings.js": "0bd2c4c1d206a0ab233043e54d612c1497ed26fc166892831faaedf376c7c223",
+      "dist/src/ui/colors.js": "3cfbf37d1d6e4f7760a5955e465b5c424961872b171aaffd7080e5debfd11bfa",
+      "dist/src/ui/dashboard.js": "70a68c56ce2f612ea5d2b2421c55233be763695439787a1f099babc1c5062f48",
+      "dist/src/ui/html.js": "abf904e9b6dc3f3365aacff49b9978dfa0d8816141855f070b0634b8cf62508d",
+      "dist/src/ui/presentation.js": "8a487bba46e15cd898bd04a944636795cb8a26901602c3ecc0996aaee03eba74",
+      "dist/src/ui/quotaTooltip.js": "b4c9341aaaf025420d0ed07b5674d73402222d66fe65970b2e781306c919329f",
+      "dist/src/ui/statusBar.js": "d6497525c39ff6cac389533e8a547d1925f4a73a843110e4a2bb5f3607338283",
+      "dist/src/ui/statusBarPresentation.js": "f08c038db446eb901a418aad03a8554671c2f8da7ef20282ea725148b7f5e687",
+      "dist/src/version.js": "e060fadc8f4250d115a3b1ac24f08fda509016bc94830259c427660ed3c46690"
+    },
+    "B": {
+      "dist/src/app.js": "a6afc263bf8bcb9214ea125b9bb89bcb9f9f006ac6c7cc6c921b8f6d163b1272",
+      "dist/src/claudeSettings.js": "b8a47cf996a3481d2f1dd945524dd8b905844d2c4ef2b00d6a9121b20e88b8d6",
+      "dist/src/configuration.js": "5ce7ffe36c75f3bdf29db9d4581c8649fd3bbb1ecb814385620564fc3aa9f8c2",
+      "dist/src/configuration/reader.js": "43cd9f6e9eda98487c1a79eee849edbce3bfbbe31490791d0ca4398d58ba16b8",
+      "dist/src/configuration/schema.js": "41b9af7f2c6fc27034d950c8989b386a860b23ed85a93d28b72d7fb41741fefb",
+      "dist/src/extension.js": "44afbb3de663b587480e1f29f97c49135c4017825672ece58484fe62b1830c5e",
+      "dist/src/localization/i18next.cjs": "fb300ecb021afd38f4eacbf02e895e5504eea122754e093026261e8edeb6f069",
+      "dist/src/localization/index.js": "723c740a8509b7827692c7f773328b399acc7b50c93de0aae1c57a7931bf7b16",
+      "dist/src/quota/base.js": "9b8812675c08ebb3e2b940a73ebc5d6bcd0eaab6affa26a3d995ddaec554d7d3",
+      "dist/src/quota/claude.js": "9414b0a35441a13c7acfca15c0b67b6cbb6ae0b61ba7230f883760cde885cb05",
+      "dist/src/quota/claudeCredentials/common.js": "c04ba529176b58353c782c12813ba1639d6f39865e547b7793778cb7d1083b1e",
+      "dist/src/quota/claudeCredentials/index.js": "0961f2e5c062ec835af188501d92d1edb2ccefdc705c36cadc024fffe21bd2bc",
+      "dist/src/quota/claudeCredentials/mac.js": "b0cf7194f03c1d8c83263ad7e581697c2a1d05c35c3fc72dd865d7703f783f65",
+      "dist/src/quota/claudeCredentials/windows.js": "3f7788e36d423ed9d6367d1ce437d20c6f7ced6cd34daee13dea837072c45cee",
+      "dist/src/quota/claude/httpBody.js": "ad48328049c4c64e0e5a5e7cec56e0c283588e94d927b657c84d48f8f4c9f9c2",
+      "dist/src/quota/claude/response.js": "2262b83c108274c0e17c182776eef1af7236958dd000b616390c9c53059a52e2",
+      "dist/src/quota/codex.js": "1baa76bb09366113ef37a9121d5418eb00f83fd509c4bd7d6619c328757bf131",
+      "dist/src/quota/codex/errors.js": "2d5bd697be1eee5a8f44193afb0fd07417286ef8fb9d4f94df954327c31decde",
+      "dist/src/quota/codex/executable.js": "c118b37f160e3b8c0ff4920e9510c4918894004f74d51be5056bb3bf2a7b45bd",
+      "dist/src/quota/codex/response.js": "3623e75a3cfae6eb5a2ad26c3a304263f7dfed5ffb1fb621c8e1fc4122cc26fb",
+      "dist/src/quota/codex/rpcSession.js": "9daaf7272b76876ad1d047ef2ee6074fe1e46d7503f8ed2de319ef9b8fc3d0f4",
+      "dist/src/quota/index.js": "0080dee234e0bf6f83f34fb28259423c88a96f3a0d4b070c3c050e40a1bc1f71",
+      "dist/src/quota/providerState.js": "ea926e842b4763622d28969c92dd8c210612e6b1559e7f0c378033c09c57e5f6",
+      "dist/src/quota/service.js": "8ab5ceb49989d03f66ada10df1e164081c0b71e396145cc8df76f0c64553f67c",
+      "dist/src/quota/types.js": "b3d3152e3698146e21f02801527d6fde13db167539d5c33908c7fd3eaf19cb34",
+      "dist/src/summary/client.js": "5acfa3b80568dbf8106d28a9cd2e497fe85507a9f58377af96cdd66b74a67193",
+      "dist/src/summary/db/billing.js": "4eb908149e43a931b5cbe1511ef8decb7c2c8752690beaa099a64f580546f295",
+      "dist/src/summary/db/chart.js": "5596b3139160e683ca6594a38fb2a0eb88f75d52ae1d0741a0b9e78f9170b29a",
+      "dist/src/summary/db/connection.js": "1fd48d565791fdaab067c2a235df229cfa20ee1fbaed36400cbfbc35a3b21c89",
+      "dist/src/summary/db/index.js": "08daaae3735a3915f32bf3acae4053357872cefbef5932ea352c71f9cd0f9865",
+      "dist/src/summary/db/manifest.js": "7996a2bd73d4778af2606a2a48341fffcf7c3d93778f4f2106a3bd29ed22aeb4",
+      "dist/src/summary/db/migrations.js": "064b06069cb3de8db575984f39aceb358cf174c31c509c250505af8602db2fe4",
+      "dist/src/summary/db/queries.js": "b2371822278676139857f1704e74bf19f05848c9af8c5cfd0528b068a24e6473",
+      "dist/src/summary/db/queries/common/filters.js": "34dbcbcdc3db48610300756341bfca636957081100c9e1a98fbaf9c607393e27",
+      "dist/src/summary/db/queries/common/sorting.js": "78f4d900954fc8d1042b6d92277479a5235b6e8c059f10546a3c261e9e1eeab7",
+      "dist/src/summary/db/queries/common/types.js": "b0d2bc4142d0c62d43f996aaeb64f22c4889ac853f8a3765758b505d972d0149",
+      "dist/src/summary/db/queries/raw/capabilities.js": "17f9445a4b29de38186b65cfef2312b66c974311cb0d6e3b37360fdd9e9af2eb",
+      "dist/src/summary/db/queries/raw/diagnostics.js": "1188d828a9f6489f0c38fb8d37a39029ad5bbed80747fab67149a6c7b1e65a4f",
+      "dist/src/summary/db/queries/raw/names.js": "b6b2379aac9fad1d91b19130cddd25a08706ab99c9bf66c6a27e19de76ec9f7f",
+      "dist/src/summary/db/queries/raw/source.js": "d4cfb8de86635eca7328841b00dfbb7904f5fcf7af7ddb747e7197d31658fce6",
+      "dist/src/summary/db/queries/raw/turns.js": "5672efb611e02a964f1f9fcfda875a3f3ae5d99e7e3f2d42c50215545e7f65ce",
+      "dist/src/summary/db/queries/raw/usage.js": "e175467bb919f7c9f3730e65e40242696bc3c6630dbe9b9fc4da51f27ea7385b",
+      "dist/src/summary/db/queries/rollup/metrics.js": "a319799b77e20cbeeabfbd6b11ae22a86de8ef7129037945fb10205aec2e0d95",
+      "dist/src/summary/db/queries/rollup/source.js": "9c2f3d59a0d56b61293b1455585528379707a27cd74d5003fae282023b82988d",
+      "dist/src/summary/db/queries/rollup/usage.js": "7427f555ccfac3675f66483529a36c5ee07243dd3fa753ba7cea0dc8d1169b32",
+      "dist/src/summary/db/reader.js": "cecaf1d815183e0f3aefe4adeed665af1572e09c8bf26ba774eb80188b98f356",
+      "dist/src/summary/db/rollup-queries.js": "1dd5ef2c1f0fdf31bc7fa2b896f1b5434d4acbef690567af0e64636081ab937e",
+      "dist/src/summary/db/rollup-state.js": "b0c2c108a09f96c6c584419ca3d400f578c11343a5c95f384ea3a24fb24bae6e",
+      "dist/src/summary/db/rollups.js": "e9c9f5c9b4ad25906435888e92dc842fc9f3af97d27df9d2291a1f4b311012d1",
+      "dist/src/summary/db/schema.js": "4ca2c15b41325cc74c04cef92627a74849430f0a3ce119b648138e16b7850434",
+      "dist/src/summary/db/sessionChanges.js": "111dd1033cb4c689b519095789088ca008db78e28e832eddf6ad1b0aa91b649f",
+      "dist/src/summary/db/sessions.js": "0aa265aa3ea55a14adad996b62b7607509d5fb3bc6ebf32d979ebf8fe6a0f291",
+      "dist/src/summary/db/sorting.js": "0923155e94469d0e3c24eac21b08293d6a5c8cca7fae730027fca85e283edadb",
+      "dist/src/summary/db/timezone.js": "fd3b5694fd55411e4630e1705cf30633c8efe69a09ddd02e56ceeabafca3fa18",
+      "dist/src/summary/db/types.js": "ff7dd8093c2ae517f1761db45f84562a9463e6ef46c06275a6f47c3ae31c437f",
+      "dist/src/summary/db/validation.js": "25a5f17dd1e13d835fb1bb6f7c7576ed34d07e663c1f92fd59f30e9327faacfe",
+      "dist/src/summary/jsonl.js": "0d3aa19442dab4f124f6cc8a5f2464355a32b0a34aa6ab3aa22ace69e3677285",
+      "dist/src/summary/lock.js": "7cc427875a681cb5b2b4c6d59f4fbd63829d774a0fcb3ddedda33172944bfa4e",
+      "dist/src/summary/metadata.js": "7555a184ff9f3c62f2806384d16f79246651a0f45dd8d99e98642d7a9d2ecac0",
+      "dist/src/summary/modelOrder.js": "559f822f5640ea2296f132ab9e3ac2032de7d670ce3f4ee9497e5d3611f5919f",
+      "dist/src/summary/names.js": "7cad1a32e5b4a0d098a4700b58b36e5325b4b212f69d3077ee757e8cdefd322b",
+      "dist/src/summary/parsers/capabilities.js": "a63489967b4f8fff74513dbd235ce815ba0cd48bf3bdd78660cc5e49ce4e28de",
+      "dist/src/summary/parsers/claude.js": "f2daaa0e8adc421511eb5d874d4db5f59f9999ba3ce35f0762faebcafbfe3e73",
+      "dist/src/summary/parsers/codex.js": "9d81e14def2d56690f6d2ab0846d3ec8568d3c5feb81017566665a7e2f62a6e7",
+      "dist/src/summary/parsers/common.js": "808880fb506c8089b76bb80d922c10c2404109a648d8485f2df90f9334daec0a",
+      "dist/src/summary/parsers/index.js": "599e1e5f9f6c6640d6519f560a8a27a070fbe72be57353b9f6ba52e0eca30a71",
+      "dist/src/summary/pricing.js": "04763e933398ec7eff352ec2928ddd4d254c1e380daff9b7920a12d155af5f26",
+      "dist/src/summary/refresh.js": "834f93fed964da19990c9174d7e0642b2468e2be08d6f4216837b1e3388baa02",
+      "dist/src/summary/scanner.js": "5f1fb347803aa80deec90592ed9eca2c137f53fbd0dfb13dacfd1c7ec0961869",
+      "dist/src/summary/sourceFingerprint.js": "c15fd6ac7d26a3da27a8dbed62377f353cd574809d0368f470bb999d4beefe5e",
+      "dist/src/summary/staging.js": "25289bc30df6e1f453c801126f4dbaf667dcbb37b670a11ed0c9c4b64195ff59",
+      "dist/src/summary/transport.js": "34bc09e4ecf9995a6fa1953d888b0f6d0011b97a3974e3ff5ecfa4717c3e01e4",
+      "dist/src/summary/types.js": "b0d2bc4142d0c62d43f996aaeb64f22c4889ac853f8a3765758b505d972d0149",
+      "dist/src/summary/worker.js": "43134ef89176b70a5a16e540800e9dad3ddd5c3f3f543f751c3f0aef2fffb881",
+      "dist/src/summary/zstd.js": "ec8224f129cfd57393cd57f1f0029d4ed397929c4de85d2f37ac3866c65ff4f8",
+      "dist/src/ui/colorSettings.js": "0bd2c4c1d206a0ab233043e54d612c1497ed26fc166892831faaedf376c7c223",
+      "dist/src/ui/colors.js": "3cfbf37d1d6e4f7760a5955e465b5c424961872b171aaffd7080e5debfd11bfa",
+      "dist/src/ui/dashboard.js": "70a68c56ce2f612ea5d2b2421c55233be763695439787a1f099babc1c5062f48",
+      "dist/src/ui/html.js": "abf904e9b6dc3f3365aacff49b9978dfa0d8816141855f070b0634b8cf62508d",
+      "dist/src/ui/presentation.js": "8a487bba46e15cd898bd04a944636795cb8a26901602c3ecc0996aaee03eba74",
+      "dist/src/ui/quotaTooltip.js": "b4c9341aaaf025420d0ed07b5674d73402222d66fe65970b2e781306c919329f",
+      "dist/src/ui/quotaView.js": "fdbaff525efee2d48f6c132a469739388a0732c5ffddee1fce9351f73b997aa7",
+      "dist/src/ui/quotaViewPresentation.js": "cd651bea2d295cb672dc3013a15390476e26cbeacba85563a18c025f0a612025",
+      "dist/src/ui/statusBar.js": "d6497525c39ff6cac389533e8a547d1925f4a73a843110e4a2bb5f3607338283",
+      "dist/src/ui/statusBarPresentation.js": "f08c038db446eb901a418aad03a8554671c2f8da7ef20282ea725148b7f5e687",
+      "dist/src/version.js": "e060fadc8f4250d115a3b1ac24f08fda509016bc94830259c427660ed3c46690"
+    }
+  },
+  "runnerSha256": "ce1fb0fb3b33b250e623fb7ca1b0674526e0b88955e69b097f3678a7b74b0d7c",
+  "helperSha256": "f5cb7a68c4d8b0d745dd85b4b3c69811e1009cd3cb7701ce80d90d2f23a5f601",
+  "aggregationHelperSha256": "9567311fbf7746c537fcdc7eaa05bf35e92e7dc04931075c03d8ba6bb03b10b0",
+  "packageLockSha256": "e68e2e27a461d00c9f58a9d069eeacf036738e3a7834dd893c7ad112f3a5c395",
+  "datasets": [
+    {
+      "name": "current",
+      "requests": 1050,
+      "tokens": 1362264996,
+      "sessions": 287,
+      "inventory": [
+        {
+          "provider": "claude",
+          "rootOrdinal": 0,
+          "files": 30,
+          "bytes": 142845572,
+          "compressed": 0
+        },
+        {
+          "provider": "codex",
+          "rootOrdinal": 1,
+          "files": 346,
+          "bytes": 399795169,
+          "compressed": 0,
+          "metadata": {
+            "indexBytes": 23882,
+            "threads": 346
+          }
+        },
+        {
+          "provider": "codex",
+          "rootOrdinal": 2,
+          "files": 0,
+          "bytes": 0,
+          "compressed": 0,
+          "metadata": {
+            "indexBytes": 23882,
+            "threads": 346
+          }
+        }
+      ],
+      "inputSha256": "c54c2421c9353394a2631f6ffcff34023076d5f466745b298d302ebe6f9d4aca",
+      "range": {
+        "minMs": 1786858107000,
+        "maxMs": 1793880402000
+      },
+      "filter": {
+        "fromMs": 1786752000000,
+        "toMs": 1794009600000,
+        "unknownTime": "include",
+        "excludeEmptyUsage": true
+      },
+      "initial": {
+        "A": {
+          "requests": 1050,
+          "tokens": 1362264996,
+          "sessions": 287,
+          "initialRefreshMs": 21855.5777,
+          "openAndMigrationMs": 12.742599999999584,
+          "seedFailures": 0,
+          "bodyBytes": 542640741,
+          "databaseBytes": 1675264
+        },
+        "B": {
+          "requests": 1050,
+          "tokens": 1362264996,
+          "sessions": 287,
+          "initialRefreshMs": 23836.498499999998,
+          "openAndMigrationMs": 14.16190000000006,
+          "seedFailures": 0,
+          "bodyBytes": 542640741,
+          "databaseBytes": 9728000,
+          "metadataTables": {
+            "turn_metadata": 1156,
+            "turn_metadata_capabilities": 1494,
+            "turn_metadata_dependencies": 14604,
+            "turn_metadata_models": 1019
+          }
+        }
+      },
+      "trials": [
+        {
+          "variant": "A",
+          "pair": 0,
+          "kind": "result",
+          "samples": [
+            {
+              "scenario": "rewrite-same",
+              "variant": "A",
+              "pair": 0,
+              "refreshMs": 16433.710600000002,
+              "aggregatePasses": 10,
+              "aggregateSqlMs": 471.28640000000087,
+              "prepareCalls": 296,
+              "prepareMs": 546.6049000000003,
+              "stores": 296,
+              "storeMs": 1357.3864000000085,
+              "tempCreates": 1497,
+              "aggregateInputEvents": 28674,
+              "aggregateWinnerRows": 13524,
+              "aggregatePreparedTurns": 1050,
+              "metadataPrepareMs": 0,
+              "metadataConsideredTurns": 0,
+              "metadataDirtyTurns": 0,
+              "requests": 1050,
+              "tokens": 1362264996,
+              "factsSha256": "480ddbf8094fb394d0df75a94d978aef26d71171d88623be622b3fdf3388e448",
+              "aggregatesSha256": "0d4ff2794d9b527c5f21d1c3b90e4dc08b55f698a9cf6d437769011243724525",
+              "rawChecks": 10,
+              "independent": {
+                "day": {
+                  "groups": 44,
+                  "requests": 1050,
+                  "tokens": 1362264996,
+                  "sha256": "db17df54bdfa1bb4416cb9fd49804c149310ba84bece86eb9e1c410673aa2a2c"
+                },
+                "month": {
+                  "groups": 8,
+                  "requests": 1050,
+                  "tokens": 1362264996,
+                  "sha256": "a661a4de8ce2c9d36f8d82a3b6a77a0f2e35a7f213242a5b29fb835c1152df8e"
+                },
+                "session": {
+                  "groups": 287,
+                  "requests": 1050,
+                  "tokens": 1362264996,
+                  "sha256": "a1aaabacca2bc931ac6f395d374d05f1c9b9e2e04623d44fe0009e0290842397"
+                },
+                "project": {
+                  "groups": 17,
+                  "requests": 1050,
+                  "tokens": 1362264996,
+                  "sha256": "256b82eeca7630de17b255c23d0dabe697b2fb09e9b07d207955da671c76a74e"
+                }
+              },
+              "parsed": 376,
+              "failed": 0,
+              "bodyBytes": 542640741,
+              "databaseBytes": 1691648,
+              "walBytes": 4301312,
+              "rssBytesAfterValidation": 155807744,
+              "processPeakRssBytes": 190558208
+            },
+            {
+              "scenario": "codex-append",
+              "variant": "A",
+              "pair": 0,
+              "refreshMs": 654.9858000000022,
+              "aggregatePasses": 1,
+              "aggregateSqlMs": 9.547299999998359,
+              "prepareCalls": 1,
+              "prepareMs": 9.678500000001804,
+              "stores": 1,
+              "storeMs": 18.73660000000018,
+              "tempCreates": 20,
+              "aggregateInputEvents": 370,
+              "aggregateWinnerRows": 256,
+              "aggregatePreparedTurns": 42,
+              "metadataPrepareMs": 0,
+              "metadataConsideredTurns": 0,
+              "metadataDirtyTurns": 0,
+              "requests": 1051,
+              "tokens": 1362265126,
+              "factsSha256": "b4abc02bb6305423d7c6704b49f43e0ded3df19246cf769c1fc2cfabe1f4b73b",
+              "aggregatesSha256": "f63807c85a0a3bc32cca35095d0da71ff4b9c3bd18fe89c7b57b32ceba948b2b",
+              "rawChecks": 10,
+              "independent": {
+                "day": {
+                  "groups": 45,
+                  "requests": 1051,
+                  "tokens": 1362265126,
+                  "sha256": "49c5e36c9f19e2016f90f5c5f5a4617a2fc2e549cdb0e0824d4434ba88d7dba5"
+                },
+                "month": {
+                  "groups": 8,
+                  "requests": 1051,
+                  "tokens": 1362265126,
+                  "sha256": "c87713564ef6155a4f9ae1e9f288366f878f6be883f45bfe66a4227d80db604f"
+                },
+                "session": {
+                  "groups": 287,
+                  "requests": 1051,
+                  "tokens": 1362265126,
+                  "sha256": "084167e60a1c18af6cac368c79d3c6dd3849a54ef664d9357cd07172bd6288d7"
+                },
+                "project": {
+                  "groups": 17,
+                  "requests": 1051,
+                  "tokens": 1362265126,
+                  "sha256": "eac09b7c8cab8cebf800daf2e9f3133241668ae96b96bf446138bea2f8da4036"
+                }
+              },
+              "parsed": 1,
+              "failed": 0,
+              "bodyBytes": 3822838,
+              "targetSourceBytesBefore": 3822121,
+              "targetRequests": 41,
+              "databaseBytes": 1675264,
+              "walBytes": 527392,
+              "rssBytesAfterValidation": 152080384,
+              "processPeakRssBytes": 190558208
+            },
+            {
+              "scenario": "claude-append",
+              "variant": "A",
+              "pair": 0,
+              "refreshMs": 209.16460000000006,
+              "aggregatePasses": 1,
+              "aggregateSqlMs": 5.400500000003376,
+              "prepareCalls": 1,
+              "prepareMs": 5.50340000000142,
+              "stores": 1,
+              "storeMs": 9.569400000000314,
+              "tempCreates": 20,
+              "aggregateInputEvents": 293,
+              "aggregateWinnerRows": 52,
+              "aggregatePreparedTurns": 14,
+              "metadataPrepareMs": 0,
+              "metadataConsideredTurns": 0,
+              "metadataDirtyTurns": 0,
+              "requests": 1051,
+              "tokens": 1362265126,
+              "factsSha256": "80efbbf974492d9b85a22a90d8b44f4b4ada3eaddc2d260f775099568645d0ea",
+              "aggregatesSha256": "2376ad203de7a46346b03c2a0fb2866cb5ff1bcdaacd0cbe1d52ccbe5ccb4c0c",
+              "rawChecks": 10,
+              "independent": {
+                "day": {
+                  "groups": 45,
+                  "requests": 1051,
+                  "tokens": 1362265126,
+                  "sha256": "437b83f165eac87452201c8a2b6ad1a9a5157fd4d635c22c4713302073abc3b2"
+                },
+                "month": {
+                  "groups": 8,
+                  "requests": 1051,
+                  "tokens": 1362265126,
+                  "sha256": "b9ef4f5f136e16d1ad15519708c2132cf31fda6d603ed38d1da02fcda61074f7"
+                },
+                "session": {
+                  "groups": 287,
+                  "requests": 1051,
+                  "tokens": 1362265126,
+                  "sha256": "20ae6319e3f74e66992277e9089bc36d0e2fa2f2bd6deff2e7d9d56e722ec5af"
+                },
+                "project": {
+                  "groups": 17,
+                  "requests": 1051,
+                  "tokens": 1362265126,
+                  "sha256": "2de0b858bbc002ea4b6e27b1d6b34d0ac83fcc5fedbfb8b0fc049185cc986a43"
+                }
+              },
+              "parsed": 1,
+              "failed": 0,
+              "bodyBytes": 1112844,
+              "targetSourceBytesBefore": 1112300,
+              "targetRequests": 13,
+              "databaseBytes": 1675264,
+              "walBytes": 428512,
+              "rssBytesAfterValidation": 154624000,
+              "processPeakRssBytes": 190558208
+            },
+            {
+              "scenario": "unchanged",
+              "variant": "A",
+              "pair": 0,
+              "refreshMs": 168.38609999999971,
+              "aggregatePasses": 0,
+              "aggregateSqlMs": 0,
+              "prepareCalls": 0,
+              "prepareMs": 0,
+              "stores": 0,
+              "storeMs": 0,
+              "tempCreates": 11,
+              "aggregateInputEvents": 0,
+              "aggregateWinnerRows": 0,
+              "aggregatePreparedTurns": 0,
+              "metadataPrepareMs": 0,
+              "metadataConsideredTurns": 0,
+              "metadataDirtyTurns": 0,
+              "requests": 1050,
+              "tokens": 1362264996,
+              "factsSha256": "480ddbf8094fb394d0df75a94d978aef26d71171d88623be622b3fdf3388e448",
+              "aggregatesSha256": "0d4ff2794d9b527c5f21d1c3b90e4dc08b55f698a9cf6d437769011243724525",
+              "rawChecks": 10,
+              "independent": {
+                "day": {
+                  "groups": 44,
+                  "requests": 1050,
+                  "tokens": 1362264996,
+                  "sha256": "db17df54bdfa1bb4416cb9fd49804c149310ba84bece86eb9e1c410673aa2a2c"
+                },
+                "month": {
+                  "groups": 8,
+                  "requests": 1050,
+                  "tokens": 1362264996,
+                  "sha256": "a661a4de8ce2c9d36f8d82a3b6a77a0f2e35a7f213242a5b29fb835c1152df8e"
+                },
+                "session": {
+                  "groups": 287,
+                  "requests": 1050,
+                  "tokens": 1362264996,
+                  "sha256": "a1aaabacca2bc931ac6f395d374d05f1c9b9e2e04623d44fe0009e0290842397"
+                },
+                "project": {
+                  "groups": 17,
+                  "requests": 1050,
+                  "tokens": 1362264996,
+                  "sha256": "256b82eeca7630de17b255c23d0dabe697b2fb09e9b07d207955da671c76a74e"
+                }
+              },
+              "parsed": 0,
+              "failed": 0,
+              "bodyBytes": 0,
+              "databaseBytes": 1675264,
+              "walBytes": 276072,
+              "rssBytesAfterValidation": 155324416,
+              "processPeakRssBytes": 190558208
+            }
+          ],
+          "reads": {
+            "day": {
+              "medianMs": 5.685699999998178,
+              "minMs": 4.922499999996944,
+              "maxMs": 6.2819000000017695,
+              "samplesMs": [
+                4.922499999996944,
+                6.2819000000017695,
+                5.685699999998178
+              ],
+              "groups": 44,
+              "requests": 1050,
+              "tokens": 1362264996,
+              "sha256": "db17df54bdfa1bb4416cb9fd49804c149310ba84bece86eb9e1c410673aa2a2c"
+            },
+            "month": {
+              "medianMs": 5.083599999998114,
+              "minMs": 4.983400000000984,
+              "maxMs": 6.101399999999558,
+              "samplesMs": [
+                4.983400000000984,
+                6.101399999999558,
+                5.083599999998114
+              ],
+              "groups": 8,
+              "requests": 1050,
+              "tokens": 1362264996,
+              "sha256": "a661a4de8ce2c9d36f8d82a3b6a77a0f2e35a7f213242a5b29fb835c1152df8e"
+            },
+            "session": {
+              "medianMs": 8.617299999998068,
+              "minMs": 7.960900000001857,
+              "maxMs": 9.320800000001327,
+              "samplesMs": [
+                8.617299999998068,
+                7.960900000001857,
+                9.320800000001327
+              ],
+              "groups": 287,
+              "requests": 1050,
+              "tokens": 1362264996,
+              "sha256": "a1aaabacca2bc931ac6f395d374d05f1c9b9e2e04623d44fe0009e0290842397"
+            },
+            "project": {
+              "medianMs": 5.393899999999121,
+              "minMs": 5.121800000000803,
+              "maxMs": 5.909799999997631,
+              "samplesMs": [
+                5.909799999997631,
+                5.393899999999121,
+                5.121800000000803
+              ],
+              "groups": 17,
+              "requests": 1050,
+              "tokens": 1362264996,
+              "sha256": "256b82eeca7630de17b255c23d0dabe697b2fb09e9b07d207955da671c76a74e"
+            }
+          }
+        },
+        {
+          "variant": "B",
+          "pair": 0,
+          "kind": "result",
+          "samples": [
+            {
+              "scenario": "rewrite-same",
+              "variant": "B",
+              "pair": 0,
+              "refreshMs": 17123.5386,
+              "aggregatePasses": 10,
+              "aggregateSqlMs": 47.122999999995955,
+              "prepareCalls": 296,
+              "prepareMs": 1191.1621999999988,
+              "stores": 296,
+              "storeMs": 825.3623999999672,
+              "tempCreates": 1786,
+              "aggregateInputEvents": 137,
+              "aggregateWinnerRows": 90,
+              "aggregatePreparedTurns": 0,
+              "metadataPrepareMs": 1066.684000000003,
+              "metadataConsideredTurns": 1171,
+              "metadataDirtyTurns": 15,
+              "requests": 1050,
+              "tokens": 1362264996,
+              "factsSha256": "480ddbf8094fb394d0df75a94d978aef26d71171d88623be622b3fdf3388e448",
+              "aggregatesSha256": "0d4ff2794d9b527c5f21d1c3b90e4dc08b55f698a9cf6d437769011243724525",
+              "rawChecks": 10,
+              "independent": {
+                "day": {
+                  "groups": 44,
+                  "requests": 1050,
+                  "tokens": 1362264996,
+                  "sha256": "db17df54bdfa1bb4416cb9fd49804c149310ba84bece86eb9e1c410673aa2a2c"
+                },
+                "month": {
+                  "groups": 8,
+                  "requests": 1050,
+                  "tokens": 1362264996,
+                  "sha256": "a661a4de8ce2c9d36f8d82a3b6a77a0f2e35a7f213242a5b29fb835c1152df8e"
+                },
+                "session": {
+                  "groups": 287,
+                  "requests": 1050,
+                  "tokens": 1362264996,
+                  "sha256": "a1aaabacca2bc931ac6f395d374d05f1c9b9e2e04623d44fe0009e0290842397"
+                },
+                "project": {
+                  "groups": 17,
+                  "requests": 1050,
+                  "tokens": 1362264996,
+                  "sha256": "256b82eeca7630de17b255c23d0dabe697b2fb09e9b07d207955da671c76a74e"
+                }
+              },
+              "parsed": 376,
+              "failed": 0,
+              "bodyBytes": 542640741,
+              "databaseBytes": 9728000,
+              "walBytes": 4136512,
+              "rssBytesAfterValidation": 157007872,
+              "processPeakRssBytes": 167104512
+            },
+            {
+              "scenario": "codex-append",
+              "variant": "B",
+              "pair": 0,
+              "refreshMs": 830.4314000000013,
+              "aggregatePasses": 1,
+              "aggregateSqlMs": 15.162400000001071,
+              "prepareCalls": 1,
+              "prepareMs": 88.39870000000155,
+              "stores": 1,
+              "storeMs": 30.14890000000014,
+              "tempCreates": 29,
+              "aggregateInputEvents": 3,
+              "aggregateWinnerRows": 1,
+              "aggregatePreparedTurns": 1,
+              "metadataPrepareMs": 72.859800000002,
+              "metadataConsideredTurns": 48,
+              "metadataDirtyTurns": 1,
+              "requests": 1051,
+              "tokens": 1362265126,
+              "factsSha256": "b4abc02bb6305423d7c6704b49f43e0ded3df19246cf769c1fc2cfabe1f4b73b",
+              "aggregatesSha256": "f63807c85a0a3bc32cca35095d0da71ff4b9c3bd18fe89c7b57b32ceba948b2b",
+              "rawChecks": 10,
+              "independent": {
+                "day": {
+                  "groups": 45,
+                  "requests": 1051,
+                  "tokens": 1362265126,
+                  "sha256": "49c5e36c9f19e2016f90f5c5f5a4617a2fc2e549cdb0e0824d4434ba88d7dba5"
+                },
+                "month": {
+                  "groups": 8,
+                  "requests": 1051,
+                  "tokens": 1362265126,
+                  "sha256": "c87713564ef6155a4f9ae1e9f288366f878f6be883f45bfe66a4227d80db604f"
+                },
+                "session": {
+                  "groups": 287,
+                  "requests": 1051,
+                  "tokens": 1362265126,
+                  "sha256": "084167e60a1c18af6cac368c79d3c6dd3849a54ef664d9357cd07172bd6288d7"
+                },
+                "project": {
+                  "groups": 17,
+                  "requests": 1051,
+                  "tokens": 1362265126,
+                  "sha256": "eac09b7c8cab8cebf800daf2e9f3133241668ae96b96bf446138bea2f8da4036"
+                }
+              },
+              "parsed": 1,
+              "failed": 0,
+              "bodyBytes": 3822838,
+              "targetSourceBytesBefore": 3822121,
+              "targetRequests": 41,
+              "databaseBytes": 9728000,
+              "walBytes": 482072,
+              "rssBytesAfterValidation": 148475904,
+              "processPeakRssBytes": 167104512
+            },
+            {
+              "scenario": "claude-append",
+              "variant": "B",
+              "pair": 0,
+              "refreshMs": 447.15409999999974,
+              "aggregatePasses": 1,
+              "aggregateSqlMs": 7.605800000001182,
+              "prepareCalls": 1,
+              "prepareMs": 36.61109999999826,
+              "stores": 1,
+              "storeMs": 32.97949999999764,
+              "tempCreates": 29,
+              "aggregateInputEvents": 293,
+              "aggregateWinnerRows": 52,
+              "aggregatePreparedTurns": 14,
+              "metadataPrepareMs": 28.778200000000652,
+              "metadataConsideredTurns": 14,
+              "metadataDirtyTurns": 14,
+              "requests": 1051,
+              "tokens": 1362265126,
+              "factsSha256": "80efbbf974492d9b85a22a90d8b44f4b4ada3eaddc2d260f775099568645d0ea",
+              "aggregatesSha256": "2376ad203de7a46346b03c2a0fb2866cb5ff1bcdaacd0cbe1d52ccbe5ccb4c0c",
+              "rawChecks": 10,
+              "independent": {
+                "day": {
+                  "groups": 45,
+                  "requests": 1051,
+                  "tokens": 1362265126,
+                  "sha256": "437b83f165eac87452201c8a2b6ad1a9a5157fd4d635c22c4713302073abc3b2"
+                },
+                "month": {
+                  "groups": 8,
+                  "requests": 1051,
+                  "tokens": 1362265126,
+                  "sha256": "b9ef4f5f136e16d1ad15519708c2132cf31fda6d603ed38d1da02fcda61074f7"
+                },
+                "session": {
+                  "groups": 287,
+                  "requests": 1051,
+                  "tokens": 1362265126,
+                  "sha256": "20ae6319e3f74e66992277e9089bc36d0e2fa2f2bd6deff2e7d9d56e722ec5af"
+                },
+                "project": {
+                  "groups": 17,
+                  "requests": 1051,
+                  "tokens": 1362265126,
+                  "sha256": "2de0b858bbc002ea4b6e27b1d6b34d0ac83fcc5fedbfb8b0fc049185cc986a43"
+                }
+              },
+              "parsed": 1,
+              "failed": 0,
+              "bodyBytes": 1112844,
+              "targetSourceBytesBefore": 1112300,
+              "targetRequests": 13,
+              "databaseBytes": 9728000,
+              "walBytes": 519152,
+              "rssBytesAfterValidation": 152489984,
+              "processPeakRssBytes": 167104512
+            },
+            {
+              "scenario": "unchanged",
+              "variant": "B",
+              "pair": 0,
+              "refreshMs": 401.97859999999855,
+              "aggregatePasses": 0,
+              "aggregateSqlMs": 0,
+              "prepareCalls": 0,
+              "prepareMs": 0,
+              "stores": 0,
+              "storeMs": 0,
+              "tempCreates": 13,
+              "aggregateInputEvents": 0,
+              "aggregateWinnerRows": 0,
+              "aggregatePreparedTurns": 0,
+              "metadataPrepareMs": 0,
+              "metadataConsideredTurns": 0,
+              "metadataDirtyTurns": 0,
+              "requests": 1050,
+              "tokens": 1362264996,
+              "factsSha256": "480ddbf8094fb394d0df75a94d978aef26d71171d88623be622b3fdf3388e448",
+              "aggregatesSha256": "0d4ff2794d9b527c5f21d1c3b90e4dc08b55f698a9cf6d437769011243724525",
+              "rawChecks": 10,
+              "independent": {
+                "day": {
+                  "groups": 44,
+                  "requests": 1050,
+                  "tokens": 1362264996,
+                  "sha256": "db17df54bdfa1bb4416cb9fd49804c149310ba84bece86eb9e1c410673aa2a2c"
+                },
+                "month": {
+                  "groups": 8,
+                  "requests": 1050,
+                  "tokens": 1362264996,
+                  "sha256": "a661a4de8ce2c9d36f8d82a3b6a77a0f2e35a7f213242a5b29fb835c1152df8e"
+                },
+                "session": {
+                  "groups": 287,
+                  "requests": 1050,
+                  "tokens": 1362264996,
+                  "sha256": "a1aaabacca2bc931ac6f395d374d05f1c9b9e2e04623d44fe0009e0290842397"
+                },
+                "project": {
+                  "groups": 17,
+                  "requests": 1050,
+                  "tokens": 1362264996,
+                  "sha256": "256b82eeca7630de17b255c23d0dabe697b2fb09e9b07d207955da671c76a74e"
+                }
+              },
+              "parsed": 0,
+              "failed": 0,
+              "bodyBytes": 0,
+              "databaseBytes": 9728000,
+              "walBytes": 276072,
+              "rssBytesAfterValidation": 150335488,
+              "processPeakRssBytes": 167104512
+            }
+          ],
+          "reads": {
+            "day": {
+              "medianMs": 5.761800000000221,
+              "minMs": 4.906200000001263,
+              "maxMs": 7.31590000000142,
+              "samplesMs": [
+                5.761800000000221,
+                7.31590000000142,
+                4.906200000001263
+              ],
+              "groups": 44,
+              "requests": 1050,
+              "tokens": 1362264996,
+              "sha256": "db17df54bdfa1bb4416cb9fd49804c149310ba84bece86eb9e1c410673aa2a2c"
+            },
+            "month": {
+              "medianMs": 7.044200000000274,
+              "minMs": 5.240699999998469,
+              "maxMs": 9.722300000001269,
+              "samplesMs": [
+                7.044200000000274,
+                5.240699999998469,
+                9.722300000001269
+              ],
+              "groups": 8,
+              "requests": 1050,
+              "tokens": 1362264996,
+              "sha256": "a661a4de8ce2c9d36f8d82a3b6a77a0f2e35a7f213242a5b29fb835c1152df8e"
+            },
+            "session": {
+              "medianMs": 10.661400000000867,
+              "minMs": 8.940699999999197,
+              "maxMs": 11.808999999997468,
+              "samplesMs": [
+                8.940699999999197,
+                11.808999999997468,
+                10.661400000000867
+              ],
+              "groups": 287,
+              "requests": 1050,
+              "tokens": 1362264996,
+              "sha256": "a1aaabacca2bc931ac6f395d374d05f1c9b9e2e04623d44fe0009e0290842397"
+            },
+            "project": {
+              "medianMs": 5.888999999999214,
+              "minMs": 5.26929999999993,
+              "maxMs": 5.992099999999482,
+              "samplesMs": [
+                5.888999999999214,
+                5.26929999999993,
+                5.992099999999482
+              ],
+              "groups": 17,
+              "requests": 1050,
+              "tokens": 1362264996,
+              "sha256": "256b82eeca7630de17b255c23d0dabe697b2fb09e9b07d207955da671c76a74e"
+            }
+          }
+        }
+      ],
+      "upgrade": {
+        "openAndMigrationMs": 10.468500000002678,
+        "firstRefreshMs": 198.67819999999847,
+        "bodyBytes": 0,
+        "databaseBytes": 1695744,
+        "metadataTables": {
+          "turn_metadata": 0,
+          "turn_metadata_capabilities": 0,
+          "turn_metadata_dependencies": 0,
+          "turn_metadata_models": 0
+        }
+      },
+      "summary": {
+        "rewrite-same": {
+          "A": {
+            "refreshMs": {
+              "medianMs": 16433.710600000002,
+              "minMs": 16433.710600000002,
+              "maxMs": 16433.710600000002,
+              "samplesMs": [
+                16433.710600000002
+              ]
+            },
+            "prepareMs": {
+              "medianMs": 546.6049000000003,
+              "minMs": 546.6049000000003,
+              "maxMs": 546.6049000000003,
+              "samplesMs": [
+                546.6049000000003
+              ]
+            },
+            "metadataPrepareMs": {
+              "medianMs": 0,
+              "minMs": 0,
+              "maxMs": 0,
+              "samplesMs": [
+                0
+              ]
+            },
+            "aggregateSqlMs": {
+              "medianMs": 471.28640000000087,
+              "minMs": 471.28640000000087,
+              "maxMs": 471.28640000000087,
+              "samplesMs": [
+                471.28640000000087
+              ]
+            },
+            "storeMs": {
+              "medianMs": 1357.3864000000085,
+              "minMs": 1357.3864000000085,
+              "maxMs": 1357.3864000000085,
+              "samplesMs": [
+                1357.3864000000085
+              ]
+            },
+            "walBytes": {
+              "medianBytes": 4301312,
+              "minBytes": 4301312,
+              "maxBytes": 4301312,
+              "samplesBytes": [
+                4301312
+              ]
+            },
+            "bodyBytes": {
+              "medianBytes": 542640741,
+              "minBytes": 542640741,
+              "maxBytes": 542640741,
+              "samplesBytes": [
+                542640741
+              ]
+            },
+            "processPeakRssBytes": {
+              "medianBytes": 190558208,
+              "minBytes": 190558208,
+              "maxBytes": 190558208,
+              "samplesBytes": [
+                190558208
+              ]
+            }
+          },
+          "B": {
+            "refreshMs": {
+              "medianMs": 17123.5386,
+              "minMs": 17123.5386,
+              "maxMs": 17123.5386,
+              "samplesMs": [
+                17123.5386
+              ]
+            },
+            "prepareMs": {
+              "medianMs": 1191.1621999999988,
+              "minMs": 1191.1621999999988,
+              "maxMs": 1191.1621999999988,
+              "samplesMs": [
+                1191.1621999999988
+              ]
+            },
+            "metadataPrepareMs": {
+              "medianMs": 1066.684000000003,
+              "minMs": 1066.684000000003,
+              "maxMs": 1066.684000000003,
+              "samplesMs": [
+                1066.684000000003
+              ]
+            },
+            "aggregateSqlMs": {
+              "medianMs": 47.122999999995955,
+              "minMs": 47.122999999995955,
+              "maxMs": 47.122999999995955,
+              "samplesMs": [
+                47.122999999995955
+              ]
+            },
+            "storeMs": {
+              "medianMs": 825.3623999999672,
+              "minMs": 825.3623999999672,
+              "maxMs": 825.3623999999672,
+              "samplesMs": [
+                825.3623999999672
+              ]
+            },
+            "walBytes": {
+              "medianBytes": 4136512,
+              "minBytes": 4136512,
+              "maxBytes": 4136512,
+              "samplesBytes": [
+                4136512
+              ]
+            },
+            "bodyBytes": {
+              "medianBytes": 542640741,
+              "minBytes": 542640741,
+              "maxBytes": 542640741,
+              "samplesBytes": [
+                542640741
+              ]
+            },
+            "processPeakRssBytes": {
+              "medianBytes": 167104512,
+              "minBytes": 167104512,
+              "maxBytes": 167104512,
+              "samplesBytes": [
+                167104512
+              ]
+            }
+          }
+        },
+        "codex-append": {
+          "A": {
+            "refreshMs": {
+              "medianMs": 654.9858000000022,
+              "minMs": 654.9858000000022,
+              "maxMs": 654.9858000000022,
+              "samplesMs": [
+                654.9858000000022
+              ]
+            },
+            "prepareMs": {
+              "medianMs": 9.678500000001804,
+              "minMs": 9.678500000001804,
+              "maxMs": 9.678500000001804,
+              "samplesMs": [
+                9.678500000001804
+              ]
+            },
+            "metadataPrepareMs": {
+              "medianMs": 0,
+              "minMs": 0,
+              "maxMs": 0,
+              "samplesMs": [
+                0
+              ]
+            },
+            "aggregateSqlMs": {
+              "medianMs": 9.547299999998359,
+              "minMs": 9.547299999998359,
+              "maxMs": 9.547299999998359,
+              "samplesMs": [
+                9.547299999998359
+              ]
+            },
+            "storeMs": {
+              "medianMs": 18.73660000000018,
+              "minMs": 18.73660000000018,
+              "maxMs": 18.73660000000018,
+              "samplesMs": [
+                18.73660000000018
+              ]
+            },
+            "walBytes": {
+              "medianBytes": 527392,
+              "minBytes": 527392,
+              "maxBytes": 527392,
+              "samplesBytes": [
+                527392
+              ]
+            },
+            "bodyBytes": {
+              "medianBytes": 3822838,
+              "minBytes": 3822838,
+              "maxBytes": 3822838,
+              "samplesBytes": [
+                3822838
+              ]
+            },
+            "processPeakRssBytes": {
+              "medianBytes": 190558208,
+              "minBytes": 190558208,
+              "maxBytes": 190558208,
+              "samplesBytes": [
+                190558208
+              ]
+            }
+          },
+          "B": {
+            "refreshMs": {
+              "medianMs": 830.4314000000013,
+              "minMs": 830.4314000000013,
+              "maxMs": 830.4314000000013,
+              "samplesMs": [
+                830.4314000000013
+              ]
+            },
+            "prepareMs": {
+              "medianMs": 88.39870000000155,
+              "minMs": 88.39870000000155,
+              "maxMs": 88.39870000000155,
+              "samplesMs": [
+                88.39870000000155
+              ]
+            },
+            "metadataPrepareMs": {
+              "medianMs": 72.859800000002,
+              "minMs": 72.859800000002,
+              "maxMs": 72.859800000002,
+              "samplesMs": [
+                72.859800000002
+              ]
+            },
+            "aggregateSqlMs": {
+              "medianMs": 15.162400000001071,
+              "minMs": 15.162400000001071,
+              "maxMs": 15.162400000001071,
+              "samplesMs": [
+                15.162400000001071
+              ]
+            },
+            "storeMs": {
+              "medianMs": 30.14890000000014,
+              "minMs": 30.14890000000014,
+              "maxMs": 30.14890000000014,
+              "samplesMs": [
+                30.14890000000014
+              ]
+            },
+            "walBytes": {
+              "medianBytes": 482072,
+              "minBytes": 482072,
+              "maxBytes": 482072,
+              "samplesBytes": [
+                482072
+              ]
+            },
+            "bodyBytes": {
+              "medianBytes": 3822838,
+              "minBytes": 3822838,
+              "maxBytes": 3822838,
+              "samplesBytes": [
+                3822838
+              ]
+            },
+            "processPeakRssBytes": {
+              "medianBytes": 167104512,
+              "minBytes": 167104512,
+              "maxBytes": 167104512,
+              "samplesBytes": [
+                167104512
+              ]
+            }
+          }
+        },
+        "claude-append": {
+          "A": {
+            "refreshMs": {
+              "medianMs": 209.16460000000006,
+              "minMs": 209.16460000000006,
+              "maxMs": 209.16460000000006,
+              "samplesMs": [
+                209.16460000000006
+              ]
+            },
+            "prepareMs": {
+              "medianMs": 5.50340000000142,
+              "minMs": 5.50340000000142,
+              "maxMs": 5.50340000000142,
+              "samplesMs": [
+                5.50340000000142
+              ]
+            },
+            "metadataPrepareMs": {
+              "medianMs": 0,
+              "minMs": 0,
+              "maxMs": 0,
+              "samplesMs": [
+                0
+              ]
+            },
+            "aggregateSqlMs": {
+              "medianMs": 5.400500000003376,
+              "minMs": 5.400500000003376,
+              "maxMs": 5.400500000003376,
+              "samplesMs": [
+                5.400500000003376
+              ]
+            },
+            "storeMs": {
+              "medianMs": 9.569400000000314,
+              "minMs": 9.569400000000314,
+              "maxMs": 9.569400000000314,
+              "samplesMs": [
+                9.569400000000314
+              ]
+            },
+            "walBytes": {
+              "medianBytes": 428512,
+              "minBytes": 428512,
+              "maxBytes": 428512,
+              "samplesBytes": [
+                428512
+              ]
+            },
+            "bodyBytes": {
+              "medianBytes": 1112844,
+              "minBytes": 1112844,
+              "maxBytes": 1112844,
+              "samplesBytes": [
+                1112844
+              ]
+            },
+            "processPeakRssBytes": {
+              "medianBytes": 190558208,
+              "minBytes": 190558208,
+              "maxBytes": 190558208,
+              "samplesBytes": [
+                190558208
+              ]
+            }
+          },
+          "B": {
+            "refreshMs": {
+              "medianMs": 447.15409999999974,
+              "minMs": 447.15409999999974,
+              "maxMs": 447.15409999999974,
+              "samplesMs": [
+                447.15409999999974
+              ]
+            },
+            "prepareMs": {
+              "medianMs": 36.61109999999826,
+              "minMs": 36.61109999999826,
+              "maxMs": 36.61109999999826,
+              "samplesMs": [
+                36.61109999999826
+              ]
+            },
+            "metadataPrepareMs": {
+              "medianMs": 28.778200000000652,
+              "minMs": 28.778200000000652,
+              "maxMs": 28.778200000000652,
+              "samplesMs": [
+                28.778200000000652
+              ]
+            },
+            "aggregateSqlMs": {
+              "medianMs": 7.605800000001182,
+              "minMs": 7.605800000001182,
+              "maxMs": 7.605800000001182,
+              "samplesMs": [
+                7.605800000001182
+              ]
+            },
+            "storeMs": {
+              "medianMs": 32.97949999999764,
+              "minMs": 32.97949999999764,
+              "maxMs": 32.97949999999764,
+              "samplesMs": [
+                32.97949999999764
+              ]
+            },
+            "walBytes": {
+              "medianBytes": 519152,
+              "minBytes": 519152,
+              "maxBytes": 519152,
+              "samplesBytes": [
+                519152
+              ]
+            },
+            "bodyBytes": {
+              "medianBytes": 1112844,
+              "minBytes": 1112844,
+              "maxBytes": 1112844,
+              "samplesBytes": [
+                1112844
+              ]
+            },
+            "processPeakRssBytes": {
+              "medianBytes": 167104512,
+              "minBytes": 167104512,
+              "maxBytes": 167104512,
+              "samplesBytes": [
+                167104512
+              ]
+            }
+          }
+        },
+        "unchanged": {
+          "A": {
+            "refreshMs": {
+              "medianMs": 168.38609999999971,
+              "minMs": 168.38609999999971,
+              "maxMs": 168.38609999999971,
+              "samplesMs": [
+                168.38609999999971
+              ]
+            },
+            "prepareMs": {
+              "medianMs": 0,
+              "minMs": 0,
+              "maxMs": 0,
+              "samplesMs": [
+                0
+              ]
+            },
+            "metadataPrepareMs": {
+              "medianMs": 0,
+              "minMs": 0,
+              "maxMs": 0,
+              "samplesMs": [
+                0
+              ]
+            },
+            "aggregateSqlMs": {
+              "medianMs": 0,
+              "minMs": 0,
+              "maxMs": 0,
+              "samplesMs": [
+                0
+              ]
+            },
+            "storeMs": {
+              "medianMs": 0,
+              "minMs": 0,
+              "maxMs": 0,
+              "samplesMs": [
+                0
+              ]
+            },
+            "walBytes": {
+              "medianBytes": 276072,
+              "minBytes": 276072,
+              "maxBytes": 276072,
+              "samplesBytes": [
+                276072
+              ]
+            },
+            "bodyBytes": {
+              "medianBytes": 0,
+              "minBytes": 0,
+              "maxBytes": 0,
+              "samplesBytes": [
+                0
+              ]
+            },
+            "processPeakRssBytes": {
+              "medianBytes": 190558208,
+              "minBytes": 190558208,
+              "maxBytes": 190558208,
+              "samplesBytes": [
+                190558208
+              ]
+            }
+          },
+          "B": {
+            "refreshMs": {
+              "medianMs": 401.97859999999855,
+              "minMs": 401.97859999999855,
+              "maxMs": 401.97859999999855,
+              "samplesMs": [
+                401.97859999999855
+              ]
+            },
+            "prepareMs": {
+              "medianMs": 0,
+              "minMs": 0,
+              "maxMs": 0,
+              "samplesMs": [
+                0
+              ]
+            },
+            "metadataPrepareMs": {
+              "medianMs": 0,
+              "minMs": 0,
+              "maxMs": 0,
+              "samplesMs": [
+                0
+              ]
+            },
+            "aggregateSqlMs": {
+              "medianMs": 0,
+              "minMs": 0,
+              "maxMs": 0,
+              "samplesMs": [
+                0
+              ]
+            },
+            "storeMs": {
+              "medianMs": 0,
+              "minMs": 0,
+              "maxMs": 0,
+              "samplesMs": [
+                0
+              ]
+            },
+            "walBytes": {
+              "medianBytes": 276072,
+              "minBytes": 276072,
+              "maxBytes": 276072,
+              "samplesBytes": [
+                276072
+              ]
+            },
+            "bodyBytes": {
+              "medianBytes": 0,
+              "minBytes": 0,
+              "maxBytes": 0,
+              "samplesBytes": [
+                0
+              ]
+            },
+            "processPeakRssBytes": {
+              "medianBytes": 167104512,
+              "minBytes": 167104512,
+              "maxBytes": 167104512,
+              "samplesBytes": [
+                167104512
+              ]
+            }
+          }
+        }
+      },
+      "readSummary": {
+        "day": {
+          "A": {
+            "medianMs": 5.685699999998178,
+            "minMs": 4.922499999996944,
+            "maxMs": 6.2819000000017695,
+            "samplesMs": [
+              4.922499999996944,
+              6.2819000000017695,
+              5.685699999998178
+            ]
+          },
+          "B": {
+            "medianMs": 5.761800000000221,
+            "minMs": 4.906200000001263,
+            "maxMs": 7.31590000000142,
+            "samplesMs": [
+              5.761800000000221,
+              7.31590000000142,
+              4.906200000001263
+            ]
+          }
+        },
+        "month": {
+          "A": {
+            "medianMs": 5.083599999998114,
+            "minMs": 4.983400000000984,
+            "maxMs": 6.101399999999558,
+            "samplesMs": [
+              4.983400000000984,
+              6.101399999999558,
+              5.083599999998114
+            ]
+          },
+          "B": {
+            "medianMs": 7.044200000000274,
+            "minMs": 5.240699999998469,
+            "maxMs": 9.722300000001269,
+            "samplesMs": [
+              7.044200000000274,
+              5.240699999998469,
+              9.722300000001269
+            ]
+          }
+        },
+        "session": {
+          "A": {
+            "medianMs": 8.617299999998068,
+            "minMs": 7.960900000001857,
+            "maxMs": 9.320800000001327,
+            "samplesMs": [
+              8.617299999998068,
+              7.960900000001857,
+              9.320800000001327
+            ]
+          },
+          "B": {
+            "medianMs": 10.661400000000867,
+            "minMs": 8.940699999999197,
+            "maxMs": 11.808999999997468,
+            "samplesMs": [
+              8.940699999999197,
+              11.808999999997468,
+              10.661400000000867
+            ]
+          }
+        },
+        "project": {
+          "A": {
+            "medianMs": 5.393899999999121,
+            "minMs": 5.121800000000803,
+            "maxMs": 5.909799999997631,
+            "samplesMs": [
+              5.909799999997631,
+              5.393899999999121,
+              5.121800000000803
+            ]
+          },
+          "B": {
+            "medianMs": 5.888999999999214,
+            "minMs": 5.26929999999993,
+            "maxMs": 5.992099999999482,
+            "samplesMs": [
+              5.888999999999214,
+              5.26929999999993,
+              5.992099999999482
+            ]
+          }
+        }
+      },
+      "correctness": {
+        "abAllSamples": "passed",
+        "javascriptRequestAggregation": "passed",
+        "rawSqlVsRollups": "passed",
+        "foreignKeysAndIntegrity": "passed",
+        "snapshotRestored": true
+      }
+    },
+    {
+      "name": "synthetic-10000",
+      "requests": 10000,
+      "tokens": 6340000,
+      "sessions": 100,
+      "inventory": [
+        {
+          "provider": "claude",
+          "rootOrdinal": 0,
+          "files": 50,
+          "bytes": 2327560,
+          "compressed": 0
+        },
+        {
+          "provider": "codex",
+          "rootOrdinal": 1,
+          "files": 50,
+          "bytes": 3309650,
+          "compressed": 0,
+          "metadata": {
+            "indexBytes": 0,
+            "threads": 0
+          }
+        }
+      ],
+      "inputSha256": "0b2ecd37faa5c29385cd3def00cad4bdf5adddc581e4a5d4cc4c02b9cdceea0f",
+      "expected": {
+        "requests": 10000,
+        "tokens": 6340000,
+        "sessions": 100,
+        "turnsPerSession": 100
+      },
+      "range": {
+        "minMs": 1782864000000,
+        "maxMs": 1783987497000
+      },
+      "filter": {
+        "fromMs": 1782777600000,
+        "toMs": 1784160000000,
+        "unknownTime": "include",
+        "excludeEmptyUsage": true
+      },
+      "generator": {
+        "deterministic": true,
+        "seed": "ordinal-v1 (no RNG)",
+        "providers": "alternating sessions",
+        "projects": 10,
+        "turnsPerSession": 100,
+        "timestamps": "2026-07-01 plus sessionIndex%14 and floor(index/100) days",
+        "status": "all completed",
+        "models": "two per provider alternating by request"
+      },
+      "initial": {
+        "A": {
+          "requests": 10000,
+          "tokens": 6340000,
+          "sessions": 100,
+          "initialRefreshMs": 7210.113100000002,
+          "openAndMigrationMs": 13.22190000000046,
+          "seedFailures": 0,
+          "bodyBytes": 5637210,
+          "databaseBytes": 4952064
+        },
+        "B": {
+          "requests": 10000,
+          "tokens": 6340000,
+          "sessions": 100,
+          "initialRefreshMs": 14131.747100000004,
+          "openAndMigrationMs": 10.377599999999802,
+          "seedFailures": 0,
+          "bodyBytes": 5637210,
+          "databaseBytes": 19353600,
+          "metadataTables": {
+            "turn_metadata": 10000,
+            "turn_metadata_capabilities": 10000,
+            "turn_metadata_dependencies": 20000,
+            "turn_metadata_models": 10000
+          }
+        }
+      },
+      "trials": [
+        {
+          "variant": "A",
+          "pair": 0,
+          "kind": "result",
+          "samples": [
+            {
+              "scenario": "rewrite-same",
+              "variant": "A",
+              "pair": 0,
+              "refreshMs": 6577.7733,
+              "aggregatePasses": 4,
+              "aggregateSqlMs": 713.5854999999999,
+              "prepareCalls": 100,
+              "prepareMs": 740.6667999999997,
+              "stores": 100,
+              "storeMs": 4071.522100000003,
+              "tempCreates": 516,
+              "aggregateInputEvents": 30000,
+              "aggregateWinnerRows": 10000,
+              "aggregatePreparedTurns": 10000,
+              "metadataPrepareMs": 0,
+              "metadataConsideredTurns": 0,
+              "metadataDirtyTurns": 0,
+              "requests": 10000,
+              "tokens": 6340000,
+              "factsSha256": "73ce0ab16c041841951e100141ccac31bb9ab6cb3b4dd7c6e8e15b401f13201d",
+              "aggregatesSha256": "b5a523957412b258705762e4bfe08f27f596663092795eeb734d578740bbb2cf",
+              "rawChecks": 10,
+              "independent": {
+                "day": {
+                  "groups": 14,
+                  "requests": 10000,
+                  "tokens": 6340000,
+                  "sha256": "680544496467112fe42948798e6df80d38d2692aefd0b08442eb4118b466ef08"
+                },
+                "month": {
+                  "groups": 2,
+                  "requests": 10000,
+                  "tokens": 6340000,
+                  "sha256": "d38604e9a59e274552c423bdbdc7501cb77a0cc9f8ed993caadcb83d823b0513"
+                },
+                "session": {
+                  "groups": 100,
+                  "requests": 10000,
+                  "tokens": 6340000,
+                  "sha256": "8855dd61c99e2c0a963745bd612e5bbda7bf162d4e749bcd6147d436bcad1747"
+                },
+                "project": {
+                  "groups": 10,
+                  "requests": 10000,
+                  "tokens": 6340000,
+                  "sha256": "d90d88a00b72f04276d7cee9438bf0345a1c4ff7951b20cd5e0981c487867c4c"
+                }
+              },
+              "parsed": 100,
+              "failed": 0,
+              "bodyBytes": 5637210,
+              "databaseBytes": 4972544,
+              "walBytes": 4338392,
+              "rssBytesAfterValidation": 147357696,
+              "processPeakRssBytes": 149864448
+            },
+            {
+              "scenario": "codex-append",
+              "variant": "A",
+              "pair": 0,
+              "refreshMs": 120.79899999999907,
+              "aggregatePasses": 1,
+              "aggregateSqlMs": 8.687299999999595,
+              "prepareCalls": 1,
+              "prepareMs": 8.892800000001444,
+              "stores": 1,
+              "storeMs": 46.02009999999973,
+              "tempCreates": 20,
+              "aggregateInputEvents": 303,
+              "aggregateWinnerRows": 101,
+              "aggregatePreparedTurns": 101,
+              "metadataPrepareMs": 0,
+              "metadataConsideredTurns": 0,
+              "metadataDirtyTurns": 0,
+              "requests": 10001,
+              "tokens": 6340130,
+              "factsSha256": "d17cda3e9c02b7340cb8664bae701d9fa703c360718ac38a0ee081810a6bb617",
+              "aggregatesSha256": "405f92ace713e82126f7d623fcc9873b73c7490704b07bc4889413add315ed1d",
+              "rawChecks": 10,
+              "independent": {
+                "day": {
+                  "groups": 14,
+                  "requests": 10000,
+                  "tokens": 6340000,
+                  "sha256": "680544496467112fe42948798e6df80d38d2692aefd0b08442eb4118b466ef08"
+                },
+                "month": {
+                  "groups": 2,
+                  "requests": 10000,
+                  "tokens": 6340000,
+                  "sha256": "d38604e9a59e274552c423bdbdc7501cb77a0cc9f8ed993caadcb83d823b0513"
+                },
+                "session": {
+                  "groups": 100,
+                  "requests": 10000,
+                  "tokens": 6340000,
+                  "sha256": "8855dd61c99e2c0a963745bd612e5bbda7bf162d4e749bcd6147d436bcad1747"
+                },
+                "project": {
+                  "groups": 10,
+                  "requests": 10000,
+                  "tokens": 6340000,
+                  "sha256": "d90d88a00b72f04276d7cee9438bf0345a1c4ff7951b20cd5e0981c487867c4c"
+                }
+              },
+              "parsed": 1,
+              "failed": 0,
+              "bodyBytes": 66194,
+              "targetSourceBytesBefore": 65543,
+              "targetRequests": 100,
+              "databaseBytes": 4952064,
+              "walBytes": 358472,
+              "rssBytesAfterValidation": 191053824,
+              "processPeakRssBytes": 191090688
+            },
+            {
+              "scenario": "claude-append",
+              "variant": "A",
+              "pair": 0,
+              "refreshMs": 120.83790000000045,
+              "aggregatePasses": 1,
+              "aggregateSqlMs": 9.060100000000602,
+              "prepareCalls": 1,
+              "prepareMs": 9.208800000000338,
+              "stores": 1,
+              "storeMs": 46.38330000000133,
+              "tempCreates": 20,
+              "aggregateInputEvents": 303,
+              "aggregateWinnerRows": 101,
+              "aggregatePreparedTurns": 101,
+              "metadataPrepareMs": 0,
+              "metadataConsideredTurns": 0,
+              "metadataDirtyTurns": 0,
+              "requests": 10001,
+              "tokens": 6340130,
+              "factsSha256": "80ded03f06cf0323ac8621788e4c9b8272dd1968d3953897bdd2743ecc5524ed",
+              "aggregatesSha256": "414d0f8bef784426c88248f23fcb3704647f995951de0fb317a11597eb98340f",
+              "rawChecks": 10,
+              "independent": {
+                "day": {
+                  "groups": 14,
+                  "requests": 10000,
+                  "tokens": 6340000,
+                  "sha256": "680544496467112fe42948798e6df80d38d2692aefd0b08442eb4118b466ef08"
+                },
+                "month": {
+                  "groups": 2,
+                  "requests": 10000,
+                  "tokens": 6340000,
+                  "sha256": "d38604e9a59e274552c423bdbdc7501cb77a0cc9f8ed993caadcb83d823b0513"
+                },
+                "session": {
+                  "groups": 100,
+                  "requests": 10000,
+                  "tokens": 6340000,
+                  "sha256": "8855dd61c99e2c0a963745bd612e5bbda7bf162d4e749bcd6147d436bcad1747"
+                },
+                "project": {
+                  "groups": 10,
+                  "requests": 10000,
+                  "tokens": 6340000,
+                  "sha256": "d90d88a00b72f04276d7cee9438bf0345a1c4ff7951b20cd5e0981c487867c4c"
+                }
+              },
+              "parsed": 1,
+              "failed": 0,
+              "bodyBytes": 46254,
+              "targetSourceBytesBefore": 45760,
+              "targetRequests": 100,
+              "databaseBytes": 4952064,
+              "walBytes": 341992,
+              "rssBytesAfterValidation": 211222528,
+              "processPeakRssBytes": 216539136
+            },
+            {
+              "scenario": "unchanged",
+              "variant": "A",
+              "pair": 0,
+              "refreshMs": 33.33289999999943,
+              "aggregatePasses": 0,
+              "aggregateSqlMs": 0,
+              "prepareCalls": 0,
+              "prepareMs": 0,
+              "stores": 0,
+              "storeMs": 0,
+              "tempCreates": 11,
+              "aggregateInputEvents": 0,
+              "aggregateWinnerRows": 0,
+              "aggregatePreparedTurns": 0,
+              "metadataPrepareMs": 0,
+              "metadataConsideredTurns": 0,
+              "metadataDirtyTurns": 0,
+              "requests": 10000,
+              "tokens": 6340000,
+              "factsSha256": "73ce0ab16c041841951e100141ccac31bb9ab6cb3b4dd7c6e8e15b401f13201d",
+              "aggregatesSha256": "b5a523957412b258705762e4bfe08f27f596663092795eeb734d578740bbb2cf",
+              "rawChecks": 10,
+              "independent": {
+                "day": {
+                  "groups": 14,
+                  "requests": 10000,
+                  "tokens": 6340000,
+                  "sha256": "680544496467112fe42948798e6df80d38d2692aefd0b08442eb4118b466ef08"
+                },
+                "month": {
+                  "groups": 2,
+                  "requests": 10000,
+                  "tokens": 6340000,
+                  "sha256": "d38604e9a59e274552c423bdbdc7501cb77a0cc9f8ed993caadcb83d823b0513"
+                },
+                "session": {
+                  "groups": 100,
+                  "requests": 10000,
+                  "tokens": 6340000,
+                  "sha256": "8855dd61c99e2c0a963745bd612e5bbda7bf162d4e749bcd6147d436bcad1747"
+                },
+                "project": {
+                  "groups": 10,
+                  "requests": 10000,
+                  "tokens": 6340000,
+                  "sha256": "d90d88a00b72f04276d7cee9438bf0345a1c4ff7951b20cd5e0981c487867c4c"
+                }
+              },
+              "parsed": 0,
+              "failed": 0,
+              "bodyBytes": 0,
+              "databaseBytes": 4952064,
+              "walBytes": 74192,
+              "rssBytesAfterValidation": 218345472,
+              "processPeakRssBytes": 218349568
+            }
+          ],
+          "reads": {
+            "day": {
+              "medianMs": 7.758099999999104,
+              "minMs": 6.454299999999421,
+              "maxMs": 8.727499999999054,
+              "samplesMs": [
+                7.758099999999104,
+                6.454299999999421,
+                8.727499999999054
+              ],
+              "groups": 14,
+              "requests": 10000,
+              "tokens": 6340000,
+              "sha256": "680544496467112fe42948798e6df80d38d2692aefd0b08442eb4118b466ef08"
+            },
+            "month": {
+              "medianMs": 8.27809999999954,
+              "minMs": 7.910299999999552,
+              "maxMs": 8.45929999999862,
+              "samplesMs": [
+                8.27809999999954,
+                7.910299999999552,
+                8.45929999999862
+              ],
+              "groups": 2,
+              "requests": 10000,
+              "tokens": 6340000,
+              "sha256": "d38604e9a59e274552c423bdbdc7501cb77a0cc9f8ed993caadcb83d823b0513"
+            },
+            "session": {
+              "medianMs": 6.862299999998868,
+              "minMs": 6.6481000000003405,
+              "maxMs": 9.757200000000012,
+              "samplesMs": [
+                9.757200000000012,
+                6.862299999998868,
+                6.6481000000003405
+              ],
+              "groups": 100,
+              "requests": 10000,
+              "tokens": 6340000,
+              "sha256": "8855dd61c99e2c0a963745bd612e5bbda7bf162d4e749bcd6147d436bcad1747"
+            },
+            "project": {
+              "medianMs": 7.707700000000841,
+              "minMs": 5.203499999999622,
+              "maxMs": 8.504899999999907,
+              "samplesMs": [
+                7.707700000000841,
+                5.203499999999622,
+                8.504899999999907
+              ],
+              "groups": 10,
+              "requests": 10000,
+              "tokens": 6340000,
+              "sha256": "d90d88a00b72f04276d7cee9438bf0345a1c4ff7951b20cd5e0981c487867c4c"
+            }
+          }
+        },
+        {
+          "variant": "B",
+          "pair": 0,
+          "kind": "result",
+          "samples": [
+            {
+              "scenario": "rewrite-same",
+              "variant": "B",
+              "pair": 0,
+              "refreshMs": 5884.7699,
+              "aggregatePasses": 4,
+              "aggregateSqlMs": 39.206000000000586,
+              "prepareCalls": 100,
+              "prepareMs": 3289.101199999999,
+              "stores": 100,
+              "storeMs": 438.4707000000003,
+              "tempCreates": 618,
+              "aggregateInputEvents": 0,
+              "aggregateWinnerRows": 0,
+              "aggregatePreparedTurns": 0,
+              "metadataPrepareMs": 3222.2976,
+              "metadataConsideredTurns": 10000,
+              "metadataDirtyTurns": 0,
+              "requests": 10000,
+              "tokens": 6340000,
+              "factsSha256": "73ce0ab16c041841951e100141ccac31bb9ab6cb3b4dd7c6e8e15b401f13201d",
+              "aggregatesSha256": "b5a523957412b258705762e4bfe08f27f596663092795eeb734d578740bbb2cf",
+              "rawChecks": 10,
+              "independent": {
+                "day": {
+                  "groups": 14,
+                  "requests": 10000,
+                  "tokens": 6340000,
+                  "sha256": "680544496467112fe42948798e6df80d38d2692aefd0b08442eb4118b466ef08"
+                },
+                "month": {
+                  "groups": 2,
+                  "requests": 10000,
+                  "tokens": 6340000,
+                  "sha256": "d38604e9a59e274552c423bdbdc7501cb77a0cc9f8ed993caadcb83d823b0513"
+                },
+                "session": {
+                  "groups": 100,
+                  "requests": 10000,
+                  "tokens": 6340000,
+                  "sha256": "8855dd61c99e2c0a963745bd612e5bbda7bf162d4e749bcd6147d436bcad1747"
+                },
+                "project": {
+                  "groups": 10,
+                  "requests": 10000,
+                  "tokens": 6340000,
+                  "sha256": "d90d88a00b72f04276d7cee9438bf0345a1c4ff7951b20cd5e0981c487867c4c"
+                }
+              },
+              "parsed": 100,
+              "failed": 0,
+              "bodyBytes": 5637210,
+              "databaseBytes": 19353600,
+              "walBytes": 2628592,
+              "rssBytesAfterValidation": 159465472,
+              "processPeakRssBytes": 161984512
+            },
+            {
+              "scenario": "codex-append",
+              "variant": "B",
+              "pair": 0,
+              "refreshMs": 222.23680000000058,
+              "aggregatePasses": 1,
+              "aggregateSqlMs": 3.3946999999989202,
+              "prepareCalls": 1,
+              "prepareMs": 61.98450000000048,
+              "stores": 1,
+              "storeMs": 70.42799999999988,
+              "tempCreates": 29,
+              "aggregateInputEvents": 3,
+              "aggregateWinnerRows": 1,
+              "aggregatePreparedTurns": 1,
+              "metadataPrepareMs": 58.380699999999706,
+              "metadataConsideredTurns": 101,
+              "metadataDirtyTurns": 1,
+              "requests": 10001,
+              "tokens": 6340130,
+              "factsSha256": "d17cda3e9c02b7340cb8664bae701d9fa703c360718ac38a0ee081810a6bb617",
+              "aggregatesSha256": "405f92ace713e82126f7d623fcc9873b73c7490704b07bc4889413add315ed1d",
+              "rawChecks": 10,
+              "independent": {
+                "day": {
+                  "groups": 14,
+                  "requests": 10000,
+                  "tokens": 6340000,
+                  "sha256": "680544496467112fe42948798e6df80d38d2692aefd0b08442eb4118b466ef08"
+                },
+                "month": {
+                  "groups": 2,
+                  "requests": 10000,
+                  "tokens": 6340000,
+                  "sha256": "d38604e9a59e274552c423bdbdc7501cb77a0cc9f8ed993caadcb83d823b0513"
+                },
+                "session": {
+                  "groups": 100,
+                  "requests": 10000,
+                  "tokens": 6340000,
+                  "sha256": "8855dd61c99e2c0a963745bd612e5bbda7bf162d4e749bcd6147d436bcad1747"
+                },
+                "project": {
+                  "groups": 10,
+                  "requests": 10000,
+                  "tokens": 6340000,
+                  "sha256": "d90d88a00b72f04276d7cee9438bf0345a1c4ff7951b20cd5e0981c487867c4c"
+                }
+              },
+              "parsed": 1,
+              "failed": 0,
+              "bodyBytes": 66194,
+              "targetSourceBytesBefore": 65543,
+              "targetRequests": 100,
+              "databaseBytes": 19353600,
+              "walBytes": 292552,
+              "rssBytesAfterValidation": 210264064,
+              "processPeakRssBytes": 210292736
+            },
+            {
+              "scenario": "claude-append",
+              "variant": "B",
+              "pair": 0,
+              "refreshMs": 140.1216000000004,
+              "aggregatePasses": 1,
+              "aggregateSqlMs": 2.5473999999994703,
+              "prepareCalls": 1,
+              "prepareMs": 37.51050000000032,
+              "stores": 1,
+              "storeMs": 50.54310000000078,
+              "tempCreates": 29,
+              "aggregateInputEvents": 3,
+              "aggregateWinnerRows": 1,
+              "aggregatePreparedTurns": 1,
+              "metadataPrepareMs": 34.790899999999965,
+              "metadataConsideredTurns": 101,
+              "metadataDirtyTurns": 1,
+              "requests": 10001,
+              "tokens": 6340130,
+              "factsSha256": "80ded03f06cf0323ac8621788e4c9b8272dd1968d3953897bdd2743ecc5524ed",
+              "aggregatesSha256": "414d0f8bef784426c88248f23fcb3704647f995951de0fb317a11597eb98340f",
+              "rawChecks": 10,
+              "independent": {
+                "day": {
+                  "groups": 14,
+                  "requests": 10000,
+                  "tokens": 6340000,
+                  "sha256": "680544496467112fe42948798e6df80d38d2692aefd0b08442eb4118b466ef08"
+                },
+                "month": {
+                  "groups": 2,
+                  "requests": 10000,
+                  "tokens": 6340000,
+                  "sha256": "d38604e9a59e274552c423bdbdc7501cb77a0cc9f8ed993caadcb83d823b0513"
+                },
+                "session": {
+                  "groups": 100,
+                  "requests": 10000,
+                  "tokens": 6340000,
+                  "sha256": "8855dd61c99e2c0a963745bd612e5bbda7bf162d4e749bcd6147d436bcad1747"
+                },
+                "project": {
+                  "groups": 10,
+                  "requests": 10000,
+                  "tokens": 6340000,
+                  "sha256": "d90d88a00b72f04276d7cee9438bf0345a1c4ff7951b20cd5e0981c487867c4c"
+                }
+              },
+              "parsed": 1,
+              "failed": 0,
+              "bodyBytes": 46254,
+              "targetSourceBytesBefore": 45760,
+              "targetRequests": 100,
+              "databaseBytes": 19353600,
+              "walBytes": 255472,
+              "rssBytesAfterValidation": 238264320,
+              "processPeakRssBytes": 239845376
+            },
+            {
+              "scenario": "unchanged",
+              "variant": "B",
+              "pair": 0,
+              "refreshMs": 35.295899999999165,
+              "aggregatePasses": 0,
+              "aggregateSqlMs": 0,
+              "prepareCalls": 0,
+              "prepareMs": 0,
+              "stores": 0,
+              "storeMs": 0,
+              "tempCreates": 13,
+              "aggregateInputEvents": 0,
+              "aggregateWinnerRows": 0,
+              "aggregatePreparedTurns": 0,
+              "metadataPrepareMs": 0,
+              "metadataConsideredTurns": 0,
+              "metadataDirtyTurns": 0,
+              "requests": 10000,
+              "tokens": 6340000,
+              "factsSha256": "73ce0ab16c041841951e100141ccac31bb9ab6cb3b4dd7c6e8e15b401f13201d",
+              "aggregatesSha256": "b5a523957412b258705762e4bfe08f27f596663092795eeb734d578740bbb2cf",
+              "rawChecks": 10,
+              "independent": {
+                "day": {
+                  "groups": 14,
+                  "requests": 10000,
+                  "tokens": 6340000,
+                  "sha256": "680544496467112fe42948798e6df80d38d2692aefd0b08442eb4118b466ef08"
+                },
+                "month": {
+                  "groups": 2,
+                  "requests": 10000,
+                  "tokens": 6340000,
+                  "sha256": "d38604e9a59e274552c423bdbdc7501cb77a0cc9f8ed993caadcb83d823b0513"
+                },
+                "session": {
+                  "groups": 100,
+                  "requests": 10000,
+                  "tokens": 6340000,
+                  "sha256": "8855dd61c99e2c0a963745bd612e5bbda7bf162d4e749bcd6147d436bcad1747"
+                },
+                "project": {
+                  "groups": 10,
+                  "requests": 10000,
+                  "tokens": 6340000,
+                  "sha256": "d90d88a00b72f04276d7cee9438bf0345a1c4ff7951b20cd5e0981c487867c4c"
+                }
+              },
+              "parsed": 0,
+              "failed": 0,
+              "bodyBytes": 0,
+              "databaseBytes": 19353600,
+              "walBytes": 74192,
+              "rssBytesAfterValidation": 244826112,
+              "processPeakRssBytes": 246665216
+            }
+          ],
+          "reads": {
+            "day": {
+              "medianMs": 9.339599999999336,
+              "minMs": 8.10360000000037,
+              "maxMs": 10.050699999999779,
+              "samplesMs": [
+                10.050699999999779,
+                9.339599999999336,
+                8.10360000000037
+              ],
+              "groups": 14,
+              "requests": 10000,
+              "tokens": 6340000,
+              "sha256": "680544496467112fe42948798e6df80d38d2692aefd0b08442eb4118b466ef08"
+            },
+            "month": {
+              "medianMs": 10.014600000000428,
+              "minMs": 9.798800000000483,
+              "maxMs": 10.628300000000309,
+              "samplesMs": [
+                10.628300000000309,
+                9.798800000000483,
+                10.014600000000428
+              ],
+              "groups": 2,
+              "requests": 10000,
+              "tokens": 6340000,
+              "sha256": "d38604e9a59e274552c423bdbdc7501cb77a0cc9f8ed993caadcb83d823b0513"
+            },
+            "session": {
+              "medianMs": 10.069400000000314,
+              "minMs": 9.410299999999552,
+              "maxMs": 11.16479999999865,
+              "samplesMs": [
+                10.069400000000314,
+                9.410299999999552,
+                11.16479999999865
+              ],
+              "groups": 100,
+              "requests": 10000,
+              "tokens": 6340000,
+              "sha256": "8855dd61c99e2c0a963745bd612e5bbda7bf162d4e749bcd6147d436bcad1747"
+            },
+            "project": {
+              "medianMs": 10.234800000000178,
+              "minMs": 7.729199999999764,
+              "maxMs": 10.407600000000457,
+              "samplesMs": [
+                10.407600000000457,
+                7.729199999999764,
+                10.234800000000178
+              ],
+              "groups": 10,
+              "requests": 10000,
+              "tokens": 6340000,
+              "sha256": "d90d88a00b72f04276d7cee9438bf0345a1c4ff7951b20cd5e0981c487867c4c"
+            }
+          }
+        }
+      ],
+      "upgrade": {
+        "openAndMigrationMs": 5.848599999997532,
+        "firstRefreshMs": 34.66229999999632,
+        "bodyBytes": 0,
+        "databaseBytes": 4972544,
+        "metadataTables": {
+          "turn_metadata": 0,
+          "turn_metadata_capabilities": 0,
+          "turn_metadata_dependencies": 0,
+          "turn_metadata_models": 0
+        }
+      },
+      "summary": {
+        "rewrite-same": {
+          "A": {
+            "refreshMs": {
+              "medianMs": 6577.7733,
+              "minMs": 6577.7733,
+              "maxMs": 6577.7733,
+              "samplesMs": [
+                6577.7733
+              ]
+            },
+            "prepareMs": {
+              "medianMs": 740.6667999999997,
+              "minMs": 740.6667999999997,
+              "maxMs": 740.6667999999997,
+              "samplesMs": [
+                740.6667999999997
+              ]
+            },
+            "metadataPrepareMs": {
+              "medianMs": 0,
+              "minMs": 0,
+              "maxMs": 0,
+              "samplesMs": [
+                0
+              ]
+            },
+            "aggregateSqlMs": {
+              "medianMs": 713.5854999999999,
+              "minMs": 713.5854999999999,
+              "maxMs": 713.5854999999999,
+              "samplesMs": [
+                713.5854999999999
+              ]
+            },
+            "storeMs": {
+              "medianMs": 4071.522100000003,
+              "minMs": 4071.522100000003,
+              "maxMs": 4071.522100000003,
+              "samplesMs": [
+                4071.522100000003
+              ]
+            },
+            "walBytes": {
+              "medianBytes": 4338392,
+              "minBytes": 4338392,
+              "maxBytes": 4338392,
+              "samplesBytes": [
+                4338392
+              ]
+            },
+            "bodyBytes": {
+              "medianBytes": 5637210,
+              "minBytes": 5637210,
+              "maxBytes": 5637210,
+              "samplesBytes": [
+                5637210
+              ]
+            },
+            "processPeakRssBytes": {
+              "medianBytes": 149864448,
+              "minBytes": 149864448,
+              "maxBytes": 149864448,
+              "samplesBytes": [
+                149864448
+              ]
+            }
+          },
+          "B": {
+            "refreshMs": {
+              "medianMs": 5884.7699,
+              "minMs": 5884.7699,
+              "maxMs": 5884.7699,
+              "samplesMs": [
+                5884.7699
+              ]
+            },
+            "prepareMs": {
+              "medianMs": 3289.101199999999,
+              "minMs": 3289.101199999999,
+              "maxMs": 3289.101199999999,
+              "samplesMs": [
+                3289.101199999999
+              ]
+            },
+            "metadataPrepareMs": {
+              "medianMs": 3222.2976,
+              "minMs": 3222.2976,
+              "maxMs": 3222.2976,
+              "samplesMs": [
+                3222.2976
+              ]
+            },
+            "aggregateSqlMs": {
+              "medianMs": 39.206000000000586,
+              "minMs": 39.206000000000586,
+              "maxMs": 39.206000000000586,
+              "samplesMs": [
+                39.206000000000586
+              ]
+            },
+            "storeMs": {
+              "medianMs": 438.4707000000003,
+              "minMs": 438.4707000000003,
+              "maxMs": 438.4707000000003,
+              "samplesMs": [
+                438.4707000000003
+              ]
+            },
+            "walBytes": {
+              "medianBytes": 2628592,
+              "minBytes": 2628592,
+              "maxBytes": 2628592,
+              "samplesBytes": [
+                2628592
+              ]
+            },
+            "bodyBytes": {
+              "medianBytes": 5637210,
+              "minBytes": 5637210,
+              "maxBytes": 5637210,
+              "samplesBytes": [
+                5637210
+              ]
+            },
+            "processPeakRssBytes": {
+              "medianBytes": 161984512,
+              "minBytes": 161984512,
+              "maxBytes": 161984512,
+              "samplesBytes": [
+                161984512
+              ]
+            }
+          }
+        },
+        "codex-append": {
+          "A": {
+            "refreshMs": {
+              "medianMs": 120.79899999999907,
+              "minMs": 120.79899999999907,
+              "maxMs": 120.79899999999907,
+              "samplesMs": [
+                120.79899999999907
+              ]
+            },
+            "prepareMs": {
+              "medianMs": 8.892800000001444,
+              "minMs": 8.892800000001444,
+              "maxMs": 8.892800000001444,
+              "samplesMs": [
+                8.892800000001444
+              ]
+            },
+            "metadataPrepareMs": {
+              "medianMs": 0,
+              "minMs": 0,
+              "maxMs": 0,
+              "samplesMs": [
+                0
+              ]
+            },
+            "aggregateSqlMs": {
+              "medianMs": 8.687299999999595,
+              "minMs": 8.687299999999595,
+              "maxMs": 8.687299999999595,
+              "samplesMs": [
+                8.687299999999595
+              ]
+            },
+            "storeMs": {
+              "medianMs": 46.02009999999973,
+              "minMs": 46.02009999999973,
+              "maxMs": 46.02009999999973,
+              "samplesMs": [
+                46.02009999999973
+              ]
+            },
+            "walBytes": {
+              "medianBytes": 358472,
+              "minBytes": 358472,
+              "maxBytes": 358472,
+              "samplesBytes": [
+                358472
+              ]
+            },
+            "bodyBytes": {
+              "medianBytes": 66194,
+              "minBytes": 66194,
+              "maxBytes": 66194,
+              "samplesBytes": [
+                66194
+              ]
+            },
+            "processPeakRssBytes": {
+              "medianBytes": 191090688,
+              "minBytes": 191090688,
+              "maxBytes": 191090688,
+              "samplesBytes": [
+                191090688
+              ]
+            }
+          },
+          "B": {
+            "refreshMs": {
+              "medianMs": 222.23680000000058,
+              "minMs": 222.23680000000058,
+              "maxMs": 222.23680000000058,
+              "samplesMs": [
+                222.23680000000058
+              ]
+            },
+            "prepareMs": {
+              "medianMs": 61.98450000000048,
+              "minMs": 61.98450000000048,
+              "maxMs": 61.98450000000048,
+              "samplesMs": [
+                61.98450000000048
+              ]
+            },
+            "metadataPrepareMs": {
+              "medianMs": 58.380699999999706,
+              "minMs": 58.380699999999706,
+              "maxMs": 58.380699999999706,
+              "samplesMs": [
+                58.380699999999706
+              ]
+            },
+            "aggregateSqlMs": {
+              "medianMs": 3.3946999999989202,
+              "minMs": 3.3946999999989202,
+              "maxMs": 3.3946999999989202,
+              "samplesMs": [
+                3.3946999999989202
+              ]
+            },
+            "storeMs": {
+              "medianMs": 70.42799999999988,
+              "minMs": 70.42799999999988,
+              "maxMs": 70.42799999999988,
+              "samplesMs": [
+                70.42799999999988
+              ]
+            },
+            "walBytes": {
+              "medianBytes": 292552,
+              "minBytes": 292552,
+              "maxBytes": 292552,
+              "samplesBytes": [
+                292552
+              ]
+            },
+            "bodyBytes": {
+              "medianBytes": 66194,
+              "minBytes": 66194,
+              "maxBytes": 66194,
+              "samplesBytes": [
+                66194
+              ]
+            },
+            "processPeakRssBytes": {
+              "medianBytes": 210292736,
+              "minBytes": 210292736,
+              "maxBytes": 210292736,
+              "samplesBytes": [
+                210292736
+              ]
+            }
+          }
+        },
+        "claude-append": {
+          "A": {
+            "refreshMs": {
+              "medianMs": 120.83790000000045,
+              "minMs": 120.83790000000045,
+              "maxMs": 120.83790000000045,
+              "samplesMs": [
+                120.83790000000045
+              ]
+            },
+            "prepareMs": {
+              "medianMs": 9.208800000000338,
+              "minMs": 9.208800000000338,
+              "maxMs": 9.208800000000338,
+              "samplesMs": [
+                9.208800000000338
+              ]
+            },
+            "metadataPrepareMs": {
+              "medianMs": 0,
+              "minMs": 0,
+              "maxMs": 0,
+              "samplesMs": [
+                0
+              ]
+            },
+            "aggregateSqlMs": {
+              "medianMs": 9.060100000000602,
+              "minMs": 9.060100000000602,
+              "maxMs": 9.060100000000602,
+              "samplesMs": [
+                9.060100000000602
+              ]
+            },
+            "storeMs": {
+              "medianMs": 46.38330000000133,
+              "minMs": 46.38330000000133,
+              "maxMs": 46.38330000000133,
+              "samplesMs": [
+                46.38330000000133
+              ]
+            },
+            "walBytes": {
+              "medianBytes": 341992,
+              "minBytes": 341992,
+              "maxBytes": 341992,
+              "samplesBytes": [
+                341992
+              ]
+            },
+            "bodyBytes": {
+              "medianBytes": 46254,
+              "minBytes": 46254,
+              "maxBytes": 46254,
+              "samplesBytes": [
+                46254
+              ]
+            },
+            "processPeakRssBytes": {
+              "medianBytes": 216539136,
+              "minBytes": 216539136,
+              "maxBytes": 216539136,
+              "samplesBytes": [
+                216539136
+              ]
+            }
+          },
+          "B": {
+            "refreshMs": {
+              "medianMs": 140.1216000000004,
+              "minMs": 140.1216000000004,
+              "maxMs": 140.1216000000004,
+              "samplesMs": [
+                140.1216000000004
+              ]
+            },
+            "prepareMs": {
+              "medianMs": 37.51050000000032,
+              "minMs": 37.51050000000032,
+              "maxMs": 37.51050000000032,
+              "samplesMs": [
+                37.51050000000032
+              ]
+            },
+            "metadataPrepareMs": {
+              "medianMs": 34.790899999999965,
+              "minMs": 34.790899999999965,
+              "maxMs": 34.790899999999965,
+              "samplesMs": [
+                34.790899999999965
+              ]
+            },
+            "aggregateSqlMs": {
+              "medianMs": 2.5473999999994703,
+              "minMs": 2.5473999999994703,
+              "maxMs": 2.5473999999994703,
+              "samplesMs": [
+                2.5473999999994703
+              ]
+            },
+            "storeMs": {
+              "medianMs": 50.54310000000078,
+              "minMs": 50.54310000000078,
+              "maxMs": 50.54310000000078,
+              "samplesMs": [
+                50.54310000000078
+              ]
+            },
+            "walBytes": {
+              "medianBytes": 255472,
+              "minBytes": 255472,
+              "maxBytes": 255472,
+              "samplesBytes": [
+                255472
+              ]
+            },
+            "bodyBytes": {
+              "medianBytes": 46254,
+              "minBytes": 46254,
+              "maxBytes": 46254,
+              "samplesBytes": [
+                46254
+              ]
+            },
+            "processPeakRssBytes": {
+              "medianBytes": 239845376,
+              "minBytes": 239845376,
+              "maxBytes": 239845376,
+              "samplesBytes": [
+                239845376
+              ]
+            }
+          }
+        },
+        "unchanged": {
+          "A": {
+            "refreshMs": {
+              "medianMs": 33.33289999999943,
+              "minMs": 33.33289999999943,
+              "maxMs": 33.33289999999943,
+              "samplesMs": [
+                33.33289999999943
+              ]
+            },
+            "prepareMs": {
+              "medianMs": 0,
+              "minMs": 0,
+              "maxMs": 0,
+              "samplesMs": [
+                0
+              ]
+            },
+            "metadataPrepareMs": {
+              "medianMs": 0,
+              "minMs": 0,
+              "maxMs": 0,
+              "samplesMs": [
+                0
+              ]
+            },
+            "aggregateSqlMs": {
+              "medianMs": 0,
+              "minMs": 0,
+              "maxMs": 0,
+              "samplesMs": [
+                0
+              ]
+            },
+            "storeMs": {
+              "medianMs": 0,
+              "minMs": 0,
+              "maxMs": 0,
+              "samplesMs": [
+                0
+              ]
+            },
+            "walBytes": {
+              "medianBytes": 74192,
+              "minBytes": 74192,
+              "maxBytes": 74192,
+              "samplesBytes": [
+                74192
+              ]
+            },
+            "bodyBytes": {
+              "medianBytes": 0,
+              "minBytes": 0,
+              "maxBytes": 0,
+              "samplesBytes": [
+                0
+              ]
+            },
+            "processPeakRssBytes": {
+              "medianBytes": 218349568,
+              "minBytes": 218349568,
+              "maxBytes": 218349568,
+              "samplesBytes": [
+                218349568
+              ]
+            }
+          },
+          "B": {
+            "refreshMs": {
+              "medianMs": 35.295899999999165,
+              "minMs": 35.295899999999165,
+              "maxMs": 35.295899999999165,
+              "samplesMs": [
+                35.295899999999165
+              ]
+            },
+            "prepareMs": {
+              "medianMs": 0,
+              "minMs": 0,
+              "maxMs": 0,
+              "samplesMs": [
+                0
+              ]
+            },
+            "metadataPrepareMs": {
+              "medianMs": 0,
+              "minMs": 0,
+              "maxMs": 0,
+              "samplesMs": [
+                0
+              ]
+            },
+            "aggregateSqlMs": {
+              "medianMs": 0,
+              "minMs": 0,
+              "maxMs": 0,
+              "samplesMs": [
+                0
+              ]
+            },
+            "storeMs": {
+              "medianMs": 0,
+              "minMs": 0,
+              "maxMs": 0,
+              "samplesMs": [
+                0
+              ]
+            },
+            "walBytes": {
+              "medianBytes": 74192,
+              "minBytes": 74192,
+              "maxBytes": 74192,
+              "samplesBytes": [
+                74192
+              ]
+            },
+            "bodyBytes": {
+              "medianBytes": 0,
+              "minBytes": 0,
+              "maxBytes": 0,
+              "samplesBytes": [
+                0
+              ]
+            },
+            "processPeakRssBytes": {
+              "medianBytes": 246665216,
+              "minBytes": 246665216,
+              "maxBytes": 246665216,
+              "samplesBytes": [
+                246665216
+              ]
+            }
+          }
+        }
+      },
+      "readSummary": {
+        "day": {
+          "A": {
+            "medianMs": 7.758099999999104,
+            "minMs": 6.454299999999421,
+            "maxMs": 8.727499999999054,
+            "samplesMs": [
+              7.758099999999104,
+              6.454299999999421,
+              8.727499999999054
+            ]
+          },
+          "B": {
+            "medianMs": 9.339599999999336,
+            "minMs": 8.10360000000037,
+            "maxMs": 10.050699999999779,
+            "samplesMs": [
+              10.050699999999779,
+              9.339599999999336,
+              8.10360000000037
+            ]
+          }
+        },
+        "month": {
+          "A": {
+            "medianMs": 8.27809999999954,
+            "minMs": 7.910299999999552,
+            "maxMs": 8.45929999999862,
+            "samplesMs": [
+              8.27809999999954,
+              7.910299999999552,
+              8.45929999999862
+            ]
+          },
+          "B": {
+            "medianMs": 10.014600000000428,
+            "minMs": 9.798800000000483,
+            "maxMs": 10.628300000000309,
+            "samplesMs": [
+              10.628300000000309,
+              9.798800000000483,
+              10.014600000000428
+            ]
+          }
+        },
+        "session": {
+          "A": {
+            "medianMs": 6.862299999998868,
+            "minMs": 6.6481000000003405,
+            "maxMs": 9.757200000000012,
+            "samplesMs": [
+              9.757200000000012,
+              6.862299999998868,
+              6.6481000000003405
+            ]
+          },
+          "B": {
+            "medianMs": 10.069400000000314,
+            "minMs": 9.410299999999552,
+            "maxMs": 11.16479999999865,
+            "samplesMs": [
+              10.069400000000314,
+              9.410299999999552,
+              11.16479999999865
+            ]
+          }
+        },
+        "project": {
+          "A": {
+            "medianMs": 7.707700000000841,
+            "minMs": 5.203499999999622,
+            "maxMs": 8.504899999999907,
+            "samplesMs": [
+              7.707700000000841,
+              5.203499999999622,
+              8.504899999999907
+            ]
+          },
+          "B": {
+            "medianMs": 10.234800000000178,
+            "minMs": 7.729199999999764,
+            "maxMs": 10.407600000000457,
+            "samplesMs": [
+              10.407600000000457,
+              7.729199999999764,
+              10.234800000000178
+            ]
+          }
+        }
+      },
+      "correctness": {
+        "abAllSamples": "passed",
+        "javascriptRequestAggregation": "passed",
+        "rawSqlVsRollups": "passed",
+        "foreignKeysAndIntegrity": "passed",
+        "snapshotRestored": true
+      }
+    },
+    {
+      "name": "synthetic-100",
+      "requests": 100,
+      "tokens": 18400,
+      "sessions": 10,
+      "inventory": [
+        {
+          "provider": "claude",
+          "rootOrdinal": 0,
+          "files": 5,
+          "bytes": 22860,
+          "compressed": 0
+        },
+        {
+          "provider": "codex",
+          "rootOrdinal": 1,
+          "files": 5,
+          "bytes": 32840,
+          "compressed": 0,
+          "metadata": {
+            "indexBytes": 0,
+            "threads": 0
+          }
+        }
+      ],
+      "inputSha256": "0b5b30314e8445f83eaedcd291b3a065707c646fba18b093b4883ea90faa6291",
+      "expected": {
+        "requests": 100,
+        "tokens": 18400,
+        "sessions": 10,
+        "turnsPerSession": 10
+      },
+      "range": {
+        "minMs": 1782864000000,
+        "maxMs": 1783641627000
+      },
+      "filter": {
+        "fromMs": 1782777600000,
+        "toMs": 1783814400000,
+        "unknownTime": "include",
+        "excludeEmptyUsage": true
+      },
+      "generator": {
+        "deterministic": true,
+        "seed": "ordinal-v1 (no RNG)",
+        "providers": "alternating sessions",
+        "projects": 10,
+        "turnsPerSession": 10,
+        "timestamps": "2026-07-01 plus sessionIndex%14 and floor(index/100) days",
+        "status": "all completed",
+        "models": "two per provider alternating by request"
+      },
+      "initial": {
+        "A": {
+          "requests": 100,
+          "tokens": 18400,
+          "sessions": 10,
+          "initialRefreshMs": 115.52999999999884,
+          "openAndMigrationMs": 14.069599999995262,
+          "seedFailures": 0,
+          "bodyBytes": 55700,
+          "databaseBytes": 163840
+        },
+        "B": {
+          "requests": 100,
+          "tokens": 18400,
+          "sessions": 10,
+          "initialRefreshMs": 141.2367000000013,
+          "openAndMigrationMs": 9.253599999996368,
+          "seedFailures": 0,
+          "bodyBytes": 55700,
+          "databaseBytes": 323584,
+          "metadataTables": {
+            "turn_metadata": 100,
+            "turn_metadata_capabilities": 100,
+            "turn_metadata_dependencies": 200,
+            "turn_metadata_models": 100
+          }
+        }
+      },
+      "trials": [
+        {
+          "variant": "A",
+          "pair": 0,
+          "kind": "result",
+          "samples": [
+            {
+              "scenario": "rewrite-same",
+              "variant": "A",
+              "pair": 0,
+              "refreshMs": 189.9753,
+              "aggregatePasses": 1,
+              "aggregateSqlMs": 9.834600000000023,
+              "prepareCalls": 10,
+              "prepareMs": 11.258600000000001,
+              "stores": 10,
+              "storeMs": 100.68619999999999,
+              "tempCreates": 66,
+              "aggregateInputEvents": 300,
+              "aggregateWinnerRows": 100,
+              "aggregatePreparedTurns": 100,
+              "metadataPrepareMs": 0,
+              "metadataConsideredTurns": 0,
+              "metadataDirtyTurns": 0,
+              "requests": 100,
+              "tokens": 18400,
+              "factsSha256": "28558a7a96cf39696d17bc80abc13f6ab9d16677af392e9d30bafbb29cd2ce3a",
+              "aggregatesSha256": "48a295a0ee8e5ae2a2d3b102afaaa810bb5ab64a5d25f7dabedf5ada09848a85",
+              "rawChecks": 10,
+              "independent": {
+                "day": {
+                  "groups": 10,
+                  "requests": 100,
+                  "tokens": 18400,
+                  "sha256": "f2f140b9f746a1eb9a94d95af39cb06552c9324c211184f41a2ee653a0c6dfd0"
+                },
+                "month": {
+                  "groups": 2,
+                  "requests": 100,
+                  "tokens": 18400,
+                  "sha256": "4e818ce2fc2d701769e879bb52a4e87121e2670e548dac35d8057c640138bb14"
+                },
+                "session": {
+                  "groups": 10,
+                  "requests": 100,
+                  "tokens": 18400,
+                  "sha256": "e63fabb3cb696fa51502fc5c3f488f92e1f41bd9a068dccba8c52121bd0fbf7f"
+                },
+                "project": {
+                  "groups": 10,
+                  "requests": 100,
+                  "tokens": 18400,
+                  "sha256": "7b5a8ecf6f77db0ca75936806a7d526c2acb5345199eeb9639de58f53fa69840"
+                }
+              },
+              "parsed": 10,
+              "failed": 0,
+              "bodyBytes": 55700,
+              "databaseBytes": 163840,
+              "walBytes": 1100072,
+              "rssBytesAfterValidation": 59641856,
+              "processPeakRssBytes": 61788160
+            },
+            {
+              "scenario": "codex-append",
+              "variant": "A",
+              "pair": 0,
+              "refreshMs": 213.4908999999999,
+              "aggregatePasses": 1,
+              "aggregateSqlMs": 3.1258000000000266,
+              "prepareCalls": 1,
+              "prepareMs": 3.250799999999913,
+              "stores": 1,
+              "storeMs": 9.123800000000074,
+              "tempCreates": 20,
+              "aggregateInputEvents": 33,
+              "aggregateWinnerRows": 11,
+              "aggregatePreparedTurns": 11,
+              "metadataPrepareMs": 0,
+              "metadataConsideredTurns": 0,
+              "metadataDirtyTurns": 0,
+              "requests": 101,
+              "tokens": 18530,
+              "factsSha256": "c238af32a4547c426095ba88317382562e6a3be7b7c678454c3bdd9c8dc6b35f",
+              "aggregatesSha256": "47233ba14d2a823eea6ea22706a1b33817dcbb8d9d2b50dd1e043603d0b9ce83",
+              "rawChecks": 10,
+              "independent": {
+                "day": {
+                  "groups": 10,
+                  "requests": 100,
+                  "tokens": 18400,
+                  "sha256": "f2f140b9f746a1eb9a94d95af39cb06552c9324c211184f41a2ee653a0c6dfd0"
+                },
+                "month": {
+                  "groups": 2,
+                  "requests": 100,
+                  "tokens": 18400,
+                  "sha256": "4e818ce2fc2d701769e879bb52a4e87121e2670e548dac35d8057c640138bb14"
+                },
+                "session": {
+                  "groups": 10,
+                  "requests": 100,
+                  "tokens": 18400,
+                  "sha256": "e63fabb3cb696fa51502fc5c3f488f92e1f41bd9a068dccba8c52121bd0fbf7f"
+                },
+                "project": {
+                  "groups": 10,
+                  "requests": 100,
+                  "tokens": 18400,
+                  "sha256": "7b5a8ecf6f77db0ca75936806a7d526c2acb5345199eeb9639de58f53fa69840"
+                }
+              },
+              "parsed": 1,
+              "failed": 0,
+              "bodyBytes": 7219,
+              "targetSourceBytesBefore": 6568,
+              "targetRequests": 10,
+              "databaseBytes": 163840,
+              "walBytes": 119512,
+              "rssBytesAfterValidation": 64819200,
+              "processPeakRssBytes": 65290240
+            },
+            {
+              "scenario": "claude-append",
+              "variant": "A",
+              "pair": 0,
+              "refreshMs": 26.266399999999976,
+              "aggregatePasses": 1,
+              "aggregateSqlMs": 2.5194999999999936,
+              "prepareCalls": 1,
+              "prepareMs": 2.61869999999999,
+              "stores": 1,
+              "storeMs": 7.9950999999999794,
+              "tempCreates": 20,
+              "aggregateInputEvents": 33,
+              "aggregateWinnerRows": 11,
+              "aggregatePreparedTurns": 11,
+              "metadataPrepareMs": 0,
+              "metadataConsideredTurns": 0,
+              "metadataDirtyTurns": 0,
+              "requests": 101,
+              "tokens": 18530,
+              "factsSha256": "9b24bd3461c4326eaceb4549399ffb52a6828da7137310854744c0b3af6ddafc",
+              "aggregatesSha256": "01caff001c9544f58a1c962349784bdd3ea11b455c43c8e94601297ec3c2b9e0",
+              "rawChecks": 10,
+              "independent": {
+                "day": {
+                  "groups": 10,
+                  "requests": 100,
+                  "tokens": 18400,
+                  "sha256": "f2f140b9f746a1eb9a94d95af39cb06552c9324c211184f41a2ee653a0c6dfd0"
+                },
+                "month": {
+                  "groups": 2,
+                  "requests": 100,
+                  "tokens": 18400,
+                  "sha256": "4e818ce2fc2d701769e879bb52a4e87121e2670e548dac35d8057c640138bb14"
+                },
+                "session": {
+                  "groups": 10,
+                  "requests": 100,
+                  "tokens": 18400,
+                  "sha256": "e63fabb3cb696fa51502fc5c3f488f92e1f41bd9a068dccba8c52121bd0fbf7f"
+                },
+                "project": {
+                  "groups": 10,
+                  "requests": 100,
+                  "tokens": 18400,
+                  "sha256": "7b5a8ecf6f77db0ca75936806a7d526c2acb5345199eeb9639de58f53fa69840"
+                }
+              },
+              "parsed": 1,
+              "failed": 0,
+              "bodyBytes": 5034,
+              "targetSourceBytesBefore": 4540,
+              "targetRequests": 10,
+              "databaseBytes": 163840,
+              "walBytes": 127752,
+              "rssBytesAfterValidation": 65900544,
+              "processPeakRssBytes": 65904640
+            },
+            {
+              "scenario": "unchanged",
+              "variant": "A",
+              "pair": 0,
+              "refreshMs": 10.761099999999942,
+              "aggregatePasses": 0,
+              "aggregateSqlMs": 0,
+              "prepareCalls": 0,
+              "prepareMs": 0,
+              "stores": 0,
+              "storeMs": 0,
+              "tempCreates": 11,
+              "aggregateInputEvents": 0,
+              "aggregateWinnerRows": 0,
+              "aggregatePreparedTurns": 0,
+              "metadataPrepareMs": 0,
+              "metadataConsideredTurns": 0,
+              "metadataDirtyTurns": 0,
+              "requests": 100,
+              "tokens": 18400,
+              "factsSha256": "28558a7a96cf39696d17bc80abc13f6ab9d16677af392e9d30bafbb29cd2ce3a",
+              "aggregatesSha256": "48a295a0ee8e5ae2a2d3b102afaaa810bb5ab64a5d25f7dabedf5ada09848a85",
+              "rawChecks": 10,
+              "independent": {
+                "day": {
+                  "groups": 10,
+                  "requests": 100,
+                  "tokens": 18400,
+                  "sha256": "f2f140b9f746a1eb9a94d95af39cb06552c9324c211184f41a2ee653a0c6dfd0"
+                },
+                "month": {
+                  "groups": 2,
+                  "requests": 100,
+                  "tokens": 18400,
+                  "sha256": "4e818ce2fc2d701769e879bb52a4e87121e2670e548dac35d8057c640138bb14"
+                },
+                "session": {
+                  "groups": 10,
+                  "requests": 100,
+                  "tokens": 18400,
+                  "sha256": "e63fabb3cb696fa51502fc5c3f488f92e1f41bd9a068dccba8c52121bd0fbf7f"
+                },
+                "project": {
+                  "groups": 10,
+                  "requests": 100,
+                  "tokens": 18400,
+                  "sha256": "7b5a8ecf6f77db0ca75936806a7d526c2acb5345199eeb9639de58f53fa69840"
+                }
+              },
+              "parsed": 0,
+              "failed": 0,
+              "bodyBytes": 0,
+              "databaseBytes": 163840,
+              "walBytes": 12392,
+              "rssBytesAfterValidation": 65376256,
+              "processPeakRssBytes": 66428928
+            }
+          ],
+          "reads": {
+            "day": {
+              "medianMs": 4.950900000000047,
+              "minMs": 3.0972000000000435,
+              "maxMs": 6.226999999999975,
+              "samplesMs": [
+                6.226999999999975,
+                4.950900000000047,
+                3.0972000000000435
+              ],
+              "groups": 10,
+              "requests": 100,
+              "tokens": 18400,
+              "sha256": "f2f140b9f746a1eb9a94d95af39cb06552c9324c211184f41a2ee653a0c6dfd0"
+            },
+            "month": {
+              "medianMs": 3.305500000000052,
+              "minMs": 2.9874999999999545,
+              "maxMs": 3.856200000000058,
+              "samplesMs": [
+                3.305500000000052,
+                3.856200000000058,
+                2.9874999999999545
+              ],
+              "groups": 2,
+              "requests": 100,
+              "tokens": 18400,
+              "sha256": "4e818ce2fc2d701769e879bb52a4e87121e2670e548dac35d8057c640138bb14"
+            },
+            "session": {
+              "medianMs": 3.800200000000018,
+              "minMs": 3.2853000000000065,
+              "maxMs": 5.060899999999947,
+              "samplesMs": [
+                3.800200000000018,
+                5.060899999999947,
+                3.2853000000000065
+              ],
+              "groups": 10,
+              "requests": 100,
+              "tokens": 18400,
+              "sha256": "e63fabb3cb696fa51502fc5c3f488f92e1f41bd9a068dccba8c52121bd0fbf7f"
+            },
+            "project": {
+              "medianMs": 3.2368000000000166,
+              "minMs": 3.0334000000000287,
+              "maxMs": 4.02170000000001,
+              "samplesMs": [
+                4.02170000000001,
+                3.0334000000000287,
+                3.2368000000000166
+              ],
+              "groups": 10,
+              "requests": 100,
+              "tokens": 18400,
+              "sha256": "7b5a8ecf6f77db0ca75936806a7d526c2acb5345199eeb9639de58f53fa69840"
+            }
+          }
+        },
+        {
+          "variant": "B",
+          "pair": 0,
+          "kind": "result",
+          "samples": [
+            {
+              "scenario": "rewrite-same",
+              "variant": "B",
+              "pair": 0,
+              "refreshMs": 133.97859999999997,
+              "aggregatePasses": 1,
+              "aggregateSqlMs": 3.19399999999996,
+              "prepareCalls": 10,
+              "prepareMs": 23.896900000000016,
+              "stores": 10,
+              "storeMs": 18.670100000000105,
+              "tempCreates": 78,
+              "aggregateInputEvents": 0,
+              "aggregateWinnerRows": 0,
+              "aggregatePreparedTurns": 0,
+              "metadataPrepareMs": 19.30419999999998,
+              "metadataConsideredTurns": 100,
+              "metadataDirtyTurns": 0,
+              "requests": 100,
+              "tokens": 18400,
+              "factsSha256": "28558a7a96cf39696d17bc80abc13f6ab9d16677af392e9d30bafbb29cd2ce3a",
+              "aggregatesSha256": "48a295a0ee8e5ae2a2d3b102afaaa810bb5ab64a5d25f7dabedf5ada09848a85",
+              "rawChecks": 10,
+              "independent": {
+                "day": {
+                  "groups": 10,
+                  "requests": 100,
+                  "tokens": 18400,
+                  "sha256": "f2f140b9f746a1eb9a94d95af39cb06552c9324c211184f41a2ee653a0c6dfd0"
+                },
+                "month": {
+                  "groups": 2,
+                  "requests": 100,
+                  "tokens": 18400,
+                  "sha256": "4e818ce2fc2d701769e879bb52a4e87121e2670e548dac35d8057c640138bb14"
+                },
+                "session": {
+                  "groups": 10,
+                  "requests": 100,
+                  "tokens": 18400,
+                  "sha256": "e63fabb3cb696fa51502fc5c3f488f92e1f41bd9a068dccba8c52121bd0fbf7f"
+                },
+                "project": {
+                  "groups": 10,
+                  "requests": 100,
+                  "tokens": 18400,
+                  "sha256": "7b5a8ecf6f77db0ca75936806a7d526c2acb5345199eeb9639de58f53fa69840"
+                }
+              },
+              "parsed": 10,
+              "failed": 0,
+              "bodyBytes": 55700,
+              "databaseBytes": 323584,
+              "walBytes": 259592,
+              "rssBytesAfterValidation": 59428864,
+              "processPeakRssBytes": 59432960
+            },
+            {
+              "scenario": "codex-append",
+              "variant": "B",
+              "pair": 0,
+              "refreshMs": 30.474000000000046,
+              "aggregatePasses": 1,
+              "aggregateSqlMs": 2.4365000000000236,
+              "prepareCalls": 1,
+              "prepareMs": 5.28469999999993,
+              "stores": 1,
+              "storeMs": 10.86710000000005,
+              "tempCreates": 29,
+              "aggregateInputEvents": 3,
+              "aggregateWinnerRows": 1,
+              "aggregatePreparedTurns": 1,
+              "metadataPrepareMs": 2.7129000000001042,
+              "metadataConsideredTurns": 11,
+              "metadataDirtyTurns": 1,
+              "requests": 101,
+              "tokens": 18530,
+              "factsSha256": "c238af32a4547c426095ba88317382562e6a3be7b7c678454c3bdd9c8dc6b35f",
+              "aggregatesSha256": "47233ba14d2a823eea6ea22706a1b33817dcbb8d9d2b50dd1e043603d0b9ce83",
+              "rawChecks": 10,
+              "independent": {
+                "day": {
+                  "groups": 10,
+                  "requests": 100,
+                  "tokens": 18400,
+                  "sha256": "f2f140b9f746a1eb9a94d95af39cb06552c9324c211184f41a2ee653a0c6dfd0"
+                },
+                "month": {
+                  "groups": 2,
+                  "requests": 100,
+                  "tokens": 18400,
+                  "sha256": "4e818ce2fc2d701769e879bb52a4e87121e2670e548dac35d8057c640138bb14"
+                },
+                "session": {
+                  "groups": 10,
+                  "requests": 100,
+                  "tokens": 18400,
+                  "sha256": "e63fabb3cb696fa51502fc5c3f488f92e1f41bd9a068dccba8c52121bd0fbf7f"
+                },
+                "project": {
+                  "groups": 10,
+                  "requests": 100,
+                  "tokens": 18400,
+                  "sha256": "7b5a8ecf6f77db0ca75936806a7d526c2acb5345199eeb9639de58f53fa69840"
+                }
+              },
+              "parsed": 1,
+              "failed": 0,
+              "bodyBytes": 7219,
+              "targetSourceBytesBefore": 6568,
+              "targetRequests": 10,
+              "databaseBytes": 323584,
+              "walBytes": 177192,
+              "rssBytesAfterValidation": 64749568,
+              "processPeakRssBytes": 65040384
+            },
+            {
+              "scenario": "claude-append",
+              "variant": "B",
+              "pair": 0,
+              "refreshMs": 27.55740000000003,
+              "aggregatePasses": 1,
+              "aggregateSqlMs": 2.296899999999937,
+              "prepareCalls": 1,
+              "prepareMs": 5.403999999999996,
+              "stores": 1,
+              "storeMs": 8.879299999999944,
+              "tempCreates": 29,
+              "aggregateInputEvents": 3,
+              "aggregateWinnerRows": 1,
+              "aggregatePreparedTurns": 1,
+              "metadataPrepareMs": 2.9702000000000908,
+              "metadataConsideredTurns": 11,
+              "metadataDirtyTurns": 1,
+              "requests": 101,
+              "tokens": 18530,
+              "factsSha256": "9b24bd3461c4326eaceb4549399ffb52a6828da7137310854744c0b3af6ddafc",
+              "aggregatesSha256": "01caff001c9544f58a1c962349784bdd3ea11b455c43c8e94601297ec3c2b9e0",
+              "rawChecks": 10,
+              "independent": {
+                "day": {
+                  "groups": 10,
+                  "requests": 100,
+                  "tokens": 18400,
+                  "sha256": "f2f140b9f746a1eb9a94d95af39cb06552c9324c211184f41a2ee653a0c6dfd0"
+                },
+                "month": {
+                  "groups": 2,
+                  "requests": 100,
+                  "tokens": 18400,
+                  "sha256": "4e818ce2fc2d701769e879bb52a4e87121e2670e548dac35d8057c640138bb14"
+                },
+                "session": {
+                  "groups": 10,
+                  "requests": 100,
+                  "tokens": 18400,
+                  "sha256": "e63fabb3cb696fa51502fc5c3f488f92e1f41bd9a068dccba8c52121bd0fbf7f"
+                },
+                "project": {
+                  "groups": 10,
+                  "requests": 100,
+                  "tokens": 18400,
+                  "sha256": "7b5a8ecf6f77db0ca75936806a7d526c2acb5345199eeb9639de58f53fa69840"
+                }
+              },
+              "parsed": 1,
+              "failed": 0,
+              "bodyBytes": 5034,
+              "targetSourceBytesBefore": 4540,
+              "targetRequests": 10,
+              "databaseBytes": 323584,
+              "walBytes": 160712,
+              "rssBytesAfterValidation": 65081344,
+              "processPeakRssBytes": 65085440
+            },
+            {
+              "scenario": "unchanged",
+              "variant": "B",
+              "pair": 0,
+              "refreshMs": 10.563200000000052,
+              "aggregatePasses": 0,
+              "aggregateSqlMs": 0,
+              "prepareCalls": 0,
+              "prepareMs": 0,
+              "stores": 0,
+              "storeMs": 0,
+              "tempCreates": 13,
+              "aggregateInputEvents": 0,
+              "aggregateWinnerRows": 0,
+              "aggregatePreparedTurns": 0,
+              "metadataPrepareMs": 0,
+              "metadataConsideredTurns": 0,
+              "metadataDirtyTurns": 0,
+              "requests": 100,
+              "tokens": 18400,
+              "factsSha256": "28558a7a96cf39696d17bc80abc13f6ab9d16677af392e9d30bafbb29cd2ce3a",
+              "aggregatesSha256": "48a295a0ee8e5ae2a2d3b102afaaa810bb5ab64a5d25f7dabedf5ada09848a85",
+              "rawChecks": 10,
+              "independent": {
+                "day": {
+                  "groups": 10,
+                  "requests": 100,
+                  "tokens": 18400,
+                  "sha256": "f2f140b9f746a1eb9a94d95af39cb06552c9324c211184f41a2ee653a0c6dfd0"
+                },
+                "month": {
+                  "groups": 2,
+                  "requests": 100,
+                  "tokens": 18400,
+                  "sha256": "4e818ce2fc2d701769e879bb52a4e87121e2670e548dac35d8057c640138bb14"
+                },
+                "session": {
+                  "groups": 10,
+                  "requests": 100,
+                  "tokens": 18400,
+                  "sha256": "e63fabb3cb696fa51502fc5c3f488f92e1f41bd9a068dccba8c52121bd0fbf7f"
+                },
+                "project": {
+                  "groups": 10,
+                  "requests": 100,
+                  "tokens": 18400,
+                  "sha256": "7b5a8ecf6f77db0ca75936806a7d526c2acb5345199eeb9639de58f53fa69840"
+                }
+              },
+              "parsed": 0,
+              "failed": 0,
+              "bodyBytes": 0,
+              "databaseBytes": 323584,
+              "walBytes": 12392,
+              "rssBytesAfterValidation": 65622016,
+              "processPeakRssBytes": 66400256
+            }
+          ],
+          "reads": {
+            "day": {
+              "medianMs": 2.5779999999999745,
+              "minMs": 2.414099999999962,
+              "maxMs": 2.6014999999999873,
+              "samplesMs": [
+                2.5779999999999745,
+                2.414099999999962,
+                2.6014999999999873
+              ],
+              "groups": 10,
+              "requests": 100,
+              "tokens": 18400,
+              "sha256": "f2f140b9f746a1eb9a94d95af39cb06552c9324c211184f41a2ee653a0c6dfd0"
+            },
+            "month": {
+              "medianMs": 2.882099999999923,
+              "minMs": 2.563199999999938,
+              "maxMs": 3.2380999999999176,
+              "samplesMs": [
+                3.2380999999999176,
+                2.882099999999923,
+                2.563199999999938
+              ],
+              "groups": 2,
+              "requests": 100,
+              "tokens": 18400,
+              "sha256": "4e818ce2fc2d701769e879bb52a4e87121e2670e548dac35d8057c640138bb14"
+            },
+            "session": {
+              "medianMs": 4.761600000000044,
+              "minMs": 2.6798,
+              "maxMs": 37.89179999999999,
+              "samplesMs": [
+                37.89179999999999,
+                4.761600000000044,
+                2.6798
+              ],
+              "groups": 10,
+              "requests": 100,
+              "tokens": 18400,
+              "sha256": "e63fabb3cb696fa51502fc5c3f488f92e1f41bd9a068dccba8c52121bd0fbf7f"
+            },
+            "project": {
+              "medianMs": 2.5161999999999125,
+              "minMs": 2.3333999999999833,
+              "maxMs": 2.5480999999999767,
+              "samplesMs": [
+                2.5480999999999767,
+                2.5161999999999125,
+                2.3333999999999833
+              ],
+              "groups": 10,
+              "requests": 100,
+              "tokens": 18400,
+              "sha256": "7b5a8ecf6f77db0ca75936806a7d526c2acb5345199eeb9639de58f53fa69840"
+            }
+          }
+        }
+      ],
+      "upgrade": {
+        "openAndMigrationMs": 5.151799999999639,
+        "firstRefreshMs": 10.200700000001234,
+        "bodyBytes": 0,
+        "databaseBytes": 184320,
+        "metadataTables": {
+          "turn_metadata": 0,
+          "turn_metadata_capabilities": 0,
+          "turn_metadata_dependencies": 0,
+          "turn_metadata_models": 0
+        }
+      },
+      "summary": {
+        "rewrite-same": {
+          "A": {
+            "refreshMs": {
+              "medianMs": 189.9753,
+              "minMs": 189.9753,
+              "maxMs": 189.9753,
+              "samplesMs": [
+                189.9753
+              ]
+            },
+            "prepareMs": {
+              "medianMs": 11.258600000000001,
+              "minMs": 11.258600000000001,
+              "maxMs": 11.258600000000001,
+              "samplesMs": [
+                11.258600000000001
+              ]
+            },
+            "metadataPrepareMs": {
+              "medianMs": 0,
+              "minMs": 0,
+              "maxMs": 0,
+              "samplesMs": [
+                0
+              ]
+            },
+            "aggregateSqlMs": {
+              "medianMs": 9.834600000000023,
+              "minMs": 9.834600000000023,
+              "maxMs": 9.834600000000023,
+              "samplesMs": [
+                9.834600000000023
+              ]
+            },
+            "storeMs": {
+              "medianMs": 100.68619999999999,
+              "minMs": 100.68619999999999,
+              "maxMs": 100.68619999999999,
+              "samplesMs": [
+                100.68619999999999
+              ]
+            },
+            "walBytes": {
+              "medianBytes": 1100072,
+              "minBytes": 1100072,
+              "maxBytes": 1100072,
+              "samplesBytes": [
+                1100072
+              ]
+            },
+            "bodyBytes": {
+              "medianBytes": 55700,
+              "minBytes": 55700,
+              "maxBytes": 55700,
+              "samplesBytes": [
+                55700
+              ]
+            },
+            "processPeakRssBytes": {
+              "medianBytes": 61788160,
+              "minBytes": 61788160,
+              "maxBytes": 61788160,
+              "samplesBytes": [
+                61788160
+              ]
+            }
+          },
+          "B": {
+            "refreshMs": {
+              "medianMs": 133.97859999999997,
+              "minMs": 133.97859999999997,
+              "maxMs": 133.97859999999997,
+              "samplesMs": [
+                133.97859999999997
+              ]
+            },
+            "prepareMs": {
+              "medianMs": 23.896900000000016,
+              "minMs": 23.896900000000016,
+              "maxMs": 23.896900000000016,
+              "samplesMs": [
+                23.896900000000016
+              ]
+            },
+            "metadataPrepareMs": {
+              "medianMs": 19.30419999999998,
+              "minMs": 19.30419999999998,
+              "maxMs": 19.30419999999998,
+              "samplesMs": [
+                19.30419999999998
+              ]
+            },
+            "aggregateSqlMs": {
+              "medianMs": 3.19399999999996,
+              "minMs": 3.19399999999996,
+              "maxMs": 3.19399999999996,
+              "samplesMs": [
+                3.19399999999996
+              ]
+            },
+            "storeMs": {
+              "medianMs": 18.670100000000105,
+              "minMs": 18.670100000000105,
+              "maxMs": 18.670100000000105,
+              "samplesMs": [
+                18.670100000000105
+              ]
+            },
+            "walBytes": {
+              "medianBytes": 259592,
+              "minBytes": 259592,
+              "maxBytes": 259592,
+              "samplesBytes": [
+                259592
+              ]
+            },
+            "bodyBytes": {
+              "medianBytes": 55700,
+              "minBytes": 55700,
+              "maxBytes": 55700,
+              "samplesBytes": [
+                55700
+              ]
+            },
+            "processPeakRssBytes": {
+              "medianBytes": 59432960,
+              "minBytes": 59432960,
+              "maxBytes": 59432960,
+              "samplesBytes": [
+                59432960
+              ]
+            }
+          }
+        },
+        "codex-append": {
+          "A": {
+            "refreshMs": {
+              "medianMs": 213.4908999999999,
+              "minMs": 213.4908999999999,
+              "maxMs": 213.4908999999999,
+              "samplesMs": [
+                213.4908999999999
+              ]
+            },
+            "prepareMs": {
+              "medianMs": 3.250799999999913,
+              "minMs": 3.250799999999913,
+              "maxMs": 3.250799999999913,
+              "samplesMs": [
+                3.250799999999913
+              ]
+            },
+            "metadataPrepareMs": {
+              "medianMs": 0,
+              "minMs": 0,
+              "maxMs": 0,
+              "samplesMs": [
+                0
+              ]
+            },
+            "aggregateSqlMs": {
+              "medianMs": 3.1258000000000266,
+              "minMs": 3.1258000000000266,
+              "maxMs": 3.1258000000000266,
+              "samplesMs": [
+                3.1258000000000266
+              ]
+            },
+            "storeMs": {
+              "medianMs": 9.123800000000074,
+              "minMs": 9.123800000000074,
+              "maxMs": 9.123800000000074,
+              "samplesMs": [
+                9.123800000000074
+              ]
+            },
+            "walBytes": {
+              "medianBytes": 119512,
+              "minBytes": 119512,
+              "maxBytes": 119512,
+              "samplesBytes": [
+                119512
+              ]
+            },
+            "bodyBytes": {
+              "medianBytes": 7219,
+              "minBytes": 7219,
+              "maxBytes": 7219,
+              "samplesBytes": [
+                7219
+              ]
+            },
+            "processPeakRssBytes": {
+              "medianBytes": 65290240,
+              "minBytes": 65290240,
+              "maxBytes": 65290240,
+              "samplesBytes": [
+                65290240
+              ]
+            }
+          },
+          "B": {
+            "refreshMs": {
+              "medianMs": 30.474000000000046,
+              "minMs": 30.474000000000046,
+              "maxMs": 30.474000000000046,
+              "samplesMs": [
+                30.474000000000046
+              ]
+            },
+            "prepareMs": {
+              "medianMs": 5.28469999999993,
+              "minMs": 5.28469999999993,
+              "maxMs": 5.28469999999993,
+              "samplesMs": [
+                5.28469999999993
+              ]
+            },
+            "metadataPrepareMs": {
+              "medianMs": 2.7129000000001042,
+              "minMs": 2.7129000000001042,
+              "maxMs": 2.7129000000001042,
+              "samplesMs": [
+                2.7129000000001042
+              ]
+            },
+            "aggregateSqlMs": {
+              "medianMs": 2.4365000000000236,
+              "minMs": 2.4365000000000236,
+              "maxMs": 2.4365000000000236,
+              "samplesMs": [
+                2.4365000000000236
+              ]
+            },
+            "storeMs": {
+              "medianMs": 10.86710000000005,
+              "minMs": 10.86710000000005,
+              "maxMs": 10.86710000000005,
+              "samplesMs": [
+                10.86710000000005
+              ]
+            },
+            "walBytes": {
+              "medianBytes": 177192,
+              "minBytes": 177192,
+              "maxBytes": 177192,
+              "samplesBytes": [
+                177192
+              ]
+            },
+            "bodyBytes": {
+              "medianBytes": 7219,
+              "minBytes": 7219,
+              "maxBytes": 7219,
+              "samplesBytes": [
+                7219
+              ]
+            },
+            "processPeakRssBytes": {
+              "medianBytes": 65040384,
+              "minBytes": 65040384,
+              "maxBytes": 65040384,
+              "samplesBytes": [
+                65040384
+              ]
+            }
+          }
+        },
+        "claude-append": {
+          "A": {
+            "refreshMs": {
+              "medianMs": 26.266399999999976,
+              "minMs": 26.266399999999976,
+              "maxMs": 26.266399999999976,
+              "samplesMs": [
+                26.266399999999976
+              ]
+            },
+            "prepareMs": {
+              "medianMs": 2.61869999999999,
+              "minMs": 2.61869999999999,
+              "maxMs": 2.61869999999999,
+              "samplesMs": [
+                2.61869999999999
+              ]
+            },
+            "metadataPrepareMs": {
+              "medianMs": 0,
+              "minMs": 0,
+              "maxMs": 0,
+              "samplesMs": [
+                0
+              ]
+            },
+            "aggregateSqlMs": {
+              "medianMs": 2.5194999999999936,
+              "minMs": 2.5194999999999936,
+              "maxMs": 2.5194999999999936,
+              "samplesMs": [
+                2.5194999999999936
+              ]
+            },
+            "storeMs": {
+              "medianMs": 7.9950999999999794,
+              "minMs": 7.9950999999999794,
+              "maxMs": 7.9950999999999794,
+              "samplesMs": [
+                7.9950999999999794
+              ]
+            },
+            "walBytes": {
+              "medianBytes": 127752,
+              "minBytes": 127752,
+              "maxBytes": 127752,
+              "samplesBytes": [
+                127752
+              ]
+            },
+            "bodyBytes": {
+              "medianBytes": 5034,
+              "minBytes": 5034,
+              "maxBytes": 5034,
+              "samplesBytes": [
+                5034
+              ]
+            },
+            "processPeakRssBytes": {
+              "medianBytes": 65904640,
+              "minBytes": 65904640,
+              "maxBytes": 65904640,
+              "samplesBytes": [
+                65904640
+              ]
+            }
+          },
+          "B": {
+            "refreshMs": {
+              "medianMs": 27.55740000000003,
+              "minMs": 27.55740000000003,
+              "maxMs": 27.55740000000003,
+              "samplesMs": [
+                27.55740000000003
+              ]
+            },
+            "prepareMs": {
+              "medianMs": 5.403999999999996,
+              "minMs": 5.403999999999996,
+              "maxMs": 5.403999999999996,
+              "samplesMs": [
+                5.403999999999996
+              ]
+            },
+            "metadataPrepareMs": {
+              "medianMs": 2.9702000000000908,
+              "minMs": 2.9702000000000908,
+              "maxMs": 2.9702000000000908,
+              "samplesMs": [
+                2.9702000000000908
+              ]
+            },
+            "aggregateSqlMs": {
+              "medianMs": 2.296899999999937,
+              "minMs": 2.296899999999937,
+              "maxMs": 2.296899999999937,
+              "samplesMs": [
+                2.296899999999937
+              ]
+            },
+            "storeMs": {
+              "medianMs": 8.879299999999944,
+              "minMs": 8.879299999999944,
+              "maxMs": 8.879299999999944,
+              "samplesMs": [
+                8.879299999999944
+              ]
+            },
+            "walBytes": {
+              "medianBytes": 160712,
+              "minBytes": 160712,
+              "maxBytes": 160712,
+              "samplesBytes": [
+                160712
+              ]
+            },
+            "bodyBytes": {
+              "medianBytes": 5034,
+              "minBytes": 5034,
+              "maxBytes": 5034,
+              "samplesBytes": [
+                5034
+              ]
+            },
+            "processPeakRssBytes": {
+              "medianBytes": 65085440,
+              "minBytes": 65085440,
+              "maxBytes": 65085440,
+              "samplesBytes": [
+                65085440
+              ]
+            }
+          }
+        },
+        "unchanged": {
+          "A": {
+            "refreshMs": {
+              "medianMs": 10.761099999999942,
+              "minMs": 10.761099999999942,
+              "maxMs": 10.761099999999942,
+              "samplesMs": [
+                10.761099999999942
+              ]
+            },
+            "prepareMs": {
+              "medianMs": 0,
+              "minMs": 0,
+              "maxMs": 0,
+              "samplesMs": [
+                0
+              ]
+            },
+            "metadataPrepareMs": {
+              "medianMs": 0,
+              "minMs": 0,
+              "maxMs": 0,
+              "samplesMs": [
+                0
+              ]
+            },
+            "aggregateSqlMs": {
+              "medianMs": 0,
+              "minMs": 0,
+              "maxMs": 0,
+              "samplesMs": [
+                0
+              ]
+            },
+            "storeMs": {
+              "medianMs": 0,
+              "minMs": 0,
+              "maxMs": 0,
+              "samplesMs": [
+                0
+              ]
+            },
+            "walBytes": {
+              "medianBytes": 12392,
+              "minBytes": 12392,
+              "maxBytes": 12392,
+              "samplesBytes": [
+                12392
+              ]
+            },
+            "bodyBytes": {
+              "medianBytes": 0,
+              "minBytes": 0,
+              "maxBytes": 0,
+              "samplesBytes": [
+                0
+              ]
+            },
+            "processPeakRssBytes": {
+              "medianBytes": 66428928,
+              "minBytes": 66428928,
+              "maxBytes": 66428928,
+              "samplesBytes": [
+                66428928
+              ]
+            }
+          },
+          "B": {
+            "refreshMs": {
+              "medianMs": 10.563200000000052,
+              "minMs": 10.563200000000052,
+              "maxMs": 10.563200000000052,
+              "samplesMs": [
+                10.563200000000052
+              ]
+            },
+            "prepareMs": {
+              "medianMs": 0,
+              "minMs": 0,
+              "maxMs": 0,
+              "samplesMs": [
+                0
+              ]
+            },
+            "metadataPrepareMs": {
+              "medianMs": 0,
+              "minMs": 0,
+              "maxMs": 0,
+              "samplesMs": [
+                0
+              ]
+            },
+            "aggregateSqlMs": {
+              "medianMs": 0,
+              "minMs": 0,
+              "maxMs": 0,
+              "samplesMs": [
+                0
+              ]
+            },
+            "storeMs": {
+              "medianMs": 0,
+              "minMs": 0,
+              "maxMs": 0,
+              "samplesMs": [
+                0
+              ]
+            },
+            "walBytes": {
+              "medianBytes": 12392,
+              "minBytes": 12392,
+              "maxBytes": 12392,
+              "samplesBytes": [
+                12392
+              ]
+            },
+            "bodyBytes": {
+              "medianBytes": 0,
+              "minBytes": 0,
+              "maxBytes": 0,
+              "samplesBytes": [
+                0
+              ]
+            },
+            "processPeakRssBytes": {
+              "medianBytes": 66400256,
+              "minBytes": 66400256,
+              "maxBytes": 66400256,
+              "samplesBytes": [
+                66400256
+              ]
+            }
+          }
+        }
+      },
+      "readSummary": {
+        "day": {
+          "A": {
+            "medianMs": 4.950900000000047,
+            "minMs": 3.0972000000000435,
+            "maxMs": 6.226999999999975,
+            "samplesMs": [
+              6.226999999999975,
+              4.950900000000047,
+              3.0972000000000435
+            ]
+          },
+          "B": {
+            "medianMs": 2.5779999999999745,
+            "minMs": 2.414099999999962,
+            "maxMs": 2.6014999999999873,
+            "samplesMs": [
+              2.5779999999999745,
+              2.414099999999962,
+              2.6014999999999873
+            ]
+          }
+        },
+        "month": {
+          "A": {
+            "medianMs": 3.305500000000052,
+            "minMs": 2.9874999999999545,
+            "maxMs": 3.856200000000058,
+            "samplesMs": [
+              3.305500000000052,
+              3.856200000000058,
+              2.9874999999999545
+            ]
+          },
+          "B": {
+            "medianMs": 2.882099999999923,
+            "minMs": 2.563199999999938,
+            "maxMs": 3.2380999999999176,
+            "samplesMs": [
+              3.2380999999999176,
+              2.882099999999923,
+              2.563199999999938
+            ]
+          }
+        },
+        "session": {
+          "A": {
+            "medianMs": 3.800200000000018,
+            "minMs": 3.2853000000000065,
+            "maxMs": 5.060899999999947,
+            "samplesMs": [
+              3.800200000000018,
+              5.060899999999947,
+              3.2853000000000065
+            ]
+          },
+          "B": {
+            "medianMs": 4.761600000000044,
+            "minMs": 2.6798,
+            "maxMs": 37.89179999999999,
+            "samplesMs": [
+              37.89179999999999,
+              4.761600000000044,
+              2.6798
+            ]
+          }
+        },
+        "project": {
+          "A": {
+            "medianMs": 3.2368000000000166,
+            "minMs": 3.0334000000000287,
+            "maxMs": 4.02170000000001,
+            "samplesMs": [
+              4.02170000000001,
+              3.0334000000000287,
+              3.2368000000000166
+            ]
+          },
+          "B": {
+            "medianMs": 2.5161999999999125,
+            "minMs": 2.3333999999999833,
+            "maxMs": 2.5480999999999767,
+            "samplesMs": [
+              2.5480999999999767,
+              2.5161999999999125,
+              2.3333999999999833
+            ]
+          }
+        }
+      },
+      "correctness": {
+        "abAllSamples": "passed",
+        "javascriptRequestAggregation": "passed",
+        "rawSqlVsRollups": "passed",
+        "foreignKeysAndIntegrity": "passed",
+        "snapshotRestored": true
+      }
+    }
+  ],
+  "completedAtSeoul": "2026-11-05 21:49:39"
+}

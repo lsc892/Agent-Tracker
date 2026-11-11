@@ -1,4 +1,5 @@
 // 빌드된 두 워크트리에서 같은 로그 사본의 실제 갱신·저장·조회 시간과 결과를 비교한다.
+const { summaryPath } = require('./summary-paths.cjs');
 const assert = require('node:assert/strict');
 const { fork, execFileSync } = require('node:child_process');
 const { createHash } = require('node:crypto');
@@ -231,7 +232,7 @@ function normalized(row) {
   return result;
 }
 
-function verify(db, buildUsageQuery) {
+function verify(db, buildUsageQuery, normalizeUsage = normalized) {
   const facts = createHash('sha256'), aggregates = createHash('sha256');
   const tables = [
     ['requests', 'SELECT * FROM turn_summary ORDER BY provider,session_id,root_turn_id'],
@@ -249,11 +250,11 @@ function verify(db, buildUsageQuery) {
   let rawChecks = 0;
   for (const by of ['provider', 'model']) for (const group of ['total', 'project', 'session', 'day', 'month']) {
     const query = buildUsageQuery({}, group, 'Asia/Seoul', by);
-    const expected = db.connection.prepare(query.sql).all(...query.values, 10000000, 0).map(normalized);
+    const expected = db.connection.prepare(query.sql).all(...query.values, 10000000, 0).map(normalizeUsage);
     const actual = [];
     for (let offset = 0; ; offset += 1000) {
       const page = db.queryUsagePage({}, group, 'Asia/Seoul', { offset, limit: 1000 }, by);
-      actual.push(...page.rows.map(normalized));
+      actual.push(...page.rows.map(normalizeUsage));
       assert.equal(page.total, expected.length);
       if (page.rows.length < 1000) break;
     }
@@ -420,7 +421,7 @@ async function main() {
   assert.ok(Number.isSafeInteger(options.requests) && options.requests >= 0 && options.requests <= 1000000);
   assert.ok(Number.isSafeInteger(options['turns-per-session']) && options['turns-per-session'] >= 1 && options['turns-per-session'] <= 100000);
   assert.ok(!options.real || options.requests === 0, 'Choose real transcripts or generated requests');
-  for (const variant of variants) assert.ok(options[variant] && existsSync(join(options[variant], 'dist/src/summary/scanner.js')), 'Build both worktrees first');
+  for (const variant of variants) assert.ok(options[variant] && existsSync(summaryPath(options[variant], "dist/src/summary/scanner/index.js")), 'Build both worktrees first');
   const jsonPath = options.report.replace(/\.md$/, '') + '.json';
   assert.ok(!existsSync(options.report) && !existsSync(jsonPath), 'Report already exists');
   const directory = await mkdtemp(join(tmpdir(), 'agent-tracker-incremental-refresh-'));
@@ -465,10 +466,10 @@ async function main() {
       return result;
     });
     const git = (variant, ...args) => execFileSync('git', ['-C', options[variant], ...args], { encoding: 'utf8', windowsHide: true }).trim();
-    const sourcePaths = ['src/summary/scanner.ts', 'src/summary/staging.ts', 'src/summary/db/sessions.ts', 'src/summary/db/rollups.ts', 'src/summary/db/billing.ts', 'package-lock.json', 'dist/src/summary/db/sessions.js', 'dist/src/summary/db/rollups.js'];
+    const sourcePaths = ['src/summary/scanner/index.ts', 'src/summary/staging/index.ts', 'src/summary/db/sessions.ts', 'src/summary/db/rollups.ts', 'src/summary/db/billing.ts', 'package-lock.json', 'dist/src/summary/db/sessions.js', 'dist/src/summary/db/rollups.js'];
     const report = { startedAtSeoul, completedAtSeoul: seoulTime(), input: options.real ? 'real' : options.requests ? 'synthetic' : 'fixture', pairs: options.pairs, warmups: options.warmups,
       revisions: Object.fromEntries(variants.map(variant => [variant, git(variant, 'rev-parse', 'HEAD')])),
-      sources: Object.fromEntries(variants.map(variant => [variant, Object.fromEntries(sourcePaths.map(path => [path, sha(readFileSync(join(options[variant], path)))]))])),
+      sources: Object.fromEntries(variants.map(variant => [variant, Object.fromEntries(sourcePaths.map(path => [path, sha(readFileSync(summaryPath(options[variant], path)))]))])),
       runnerSha256: sha(readFileSync(__filename)), environment: { node: process.version, sqlite: trials[0].sqlite, schema: trials[0].schema, parser: trials[0].parser, cpu: cpus()[0].model, platform: process.platform },
       inventory: snapshot.inventory, expected: snapshot.expected, inputSha256: snapshot.sha256, rawChecks: samples.reduce((sum, row) => sum + row.rawChecks, 0), summary, samples };
     await mkdir(dirname(options.report), { recursive: true });

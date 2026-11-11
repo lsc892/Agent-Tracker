@@ -96,18 +96,6 @@ export interface SessionRef {
   session_id: string;
 }
 
-export interface SessionReplacement {
-  preserveCapabilities?: boolean;
-  /** Keep usable request snapshots while any source of their session is missing. */
-  retainDeletedSourceUsage?: boolean;
-  sessions: Iterable<SessionRef>;
-  summaries: Iterable<TurnSummaryInput>;
-  files: Iterable<FileMetadata & { id: number }>;
-  removedFileIds?: Iterable<number>;
-  /** Verified replacements of missing source snapshots; bypass deleted-source retention. */
-  reconnectedFiles?: Iterable<{ old_id: number; new_id: number }>;
-}
-
 export interface SummaryFilter {
   excludeEmptyUsage?: boolean;
   includeCosts?: boolean;
@@ -186,9 +174,6 @@ export interface UsageRow extends CostFields {
   derived_duration_turns: number;
   approximate_duration_turns: number;
   missing_duration_turns: number;
-  unknown_time_turns: number;
-  stale_turns: number;
-  last_successful_update: string | null;
 }
 
 export interface DiagnosticsPage {

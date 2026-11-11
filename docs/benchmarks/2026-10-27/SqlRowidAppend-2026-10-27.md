@@ -114,7 +114,7 @@ WAL은 표본 중앙값이며 각 작업 직전 TRUNCATE checkpoint 뒤의 파�
 | 기존 요청 확인 | 자연키로 기존 요청을 SELECT하고 컬럼·모델·capability를 비교 | 기존 요청에 대한 애플리케이션 사전 SELECT 생략 |
 | 일별 집계 | 실제 변경이 닿은 구간을 다시 집계 | 새 facts의 집계 상태를 기존 일별 상태에 병합 |
 
-근거는 [scanner.ts](../../../src/summary/scanner.ts)의 `discoverSources`, `parseSource`, `expandAffectedSessions`, [sessions.ts](../../../src/summary/db/sessions.ts)의 `applySummaries`, [staging.ts](../../../src/summary/staging.ts)의 응답 중복 정리다. 현재 `readJsonl(file.path,file.size_bytes,...)` 호출은 이전 위치 다음부터 읽는 호출이 아니다.
+근거는 [scanner.ts](../../../src/summary/scanner/index.ts)의 `discoverSources`, `parseSource`, `expandAffectedSessions`, [sessions.ts](../../../src/summary/db/sessions.ts)의 `applySummaries`, [staging.ts](../../../src/summary/staging/index.ts)의 응답 중복 정리다. 현재 `readJsonl(file.path,file.size_bytes,...)` 호출은 이전 위치 다음부터 읽는 호출이 아니다.
 
 여기서 **중복 검사 생략은 기존 facts에 대한 사전 SELECT를 하지 않는다는 뜻**이다. SQLite의 PRIMARY KEY·UNIQUE 검증은 양쪽에 유지한다. 이미 수집한 파일 구간은 읽지 않지만, 새 구간에 같은 요청 키가 다시 나오거나 기존 요청의 내용이 수정되는 일반 로그까지 처리한다는 뜻은 아니다. [SQLite 공식 설명](https://www.sqlite.org/rowidtable.html).
 

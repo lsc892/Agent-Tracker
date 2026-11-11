@@ -6,4 +6,4 @@ export { buildUsageQuery, buildUsageCountQuery } from './queries/raw/usage';
 export { buildTurnsQuery, buildTurnsCountQuery } from './queries/raw/turns';
 export { buildNameQueries } from './queries/raw/names';
 export { buildCapabilityQueries } from './queries/raw/capabilities';
-export { buildDiagnosticQueries } from './queries/raw/diagnostics';
+export { buildDiagnosticQueries, buildDiagnosticCountsQuery } from './queries/raw/diagnostics';

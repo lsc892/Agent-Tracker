@@ -1,0 +1,54 @@
+{
+  "baseRevision": "80fc586d4c0cee0da4e925db395cbebb47d2aa0d",
+  "sqlBaseline": {
+    "revision": "80fc586d4c0cee0da4e925db395cbebb47d2aa0d",
+    "normalizedSourcesMatch": [
+      "src/summary/staging.ts",
+      "src/summary/metadata.ts",
+      "src/summary/jsonl.ts",
+      "src/summary/scanner.ts"
+    ]
+  },
+  "branch": "experiment/jsonl-map-ingestion-2026-11-06",
+  "npmCheck": {
+    "exitCode": 0,
+    "tests": 412,
+    "pass": 412,
+    "fail": 0,
+    "logSha256": "a2305c4275326ea6f30223b1f49776c25c75369cefa7ad93273fc23f8d5e55b6"
+  },
+  "algorithmOracle": {
+    "tests": 10,
+    "seed": "0x20261106",
+    "randomStreams": 80,
+    "randomEvents": 7200,
+    "reference": "full-event brute force plus previous SQL canonical/ROW_NUMBER and five BigInt token totals",
+    "corrections10000RetainedDtos": 1
+  },
+  "fingerprints": {
+    "frozenSourcesAndBuildsMatch": true,
+    "jsonlReaderUnchanged": true,
+    "runnerMatchesRecordedHash": true
+  },
+  "runnerHashes": {
+    "jsonl-map-ab.cjs": "bdb40854e2a5bb9e192f104e021d8aa2f26920c92d1c8ba625245defc3c068bb",
+    "incremental-refresh.cjs": "f5cb7a68c4d8b0d745dd85b4b3c69811e1009cd3cb7701ce80d90d2f23a5f601",
+    "temp-batch-ab.cjs": "9567311fbf7746c537fcdc7eaa05bf35e92e7dc04931075c03d8ba6bb03b10b0"
+  },
+  "packageLockSha256": "e68e2e27a461d00c9f58a9d069eeacf036738e3a7834dd893c7ad112f3a5c395",
+  "correctness": {
+    "measuredStates": 360,
+    "warmupStates": 108,
+    "diagnosticStates": 36,
+    "sqlAndMigrationStates": 36,
+    "finalIndependentRechecks": 108,
+    "outputs": "requests, all facts (models, capabilities, costs, names, diagnostics), full aggregate pages, independent JS averages and dependencies match",
+    "signatures": "hierarchical v1 intentionally differs from previous SHA; fresh B/M matches; unchanged migration retains old SHA",
+    "integrity": "foreign keys, integrity and restored full source hashes passed in runner"
+  },
+  "artifacts": {
+    "rawSha256": "109b42181682fa305f2e4512daffa27e179407f619f2d8dabf8079c2981f9de5",
+    "previousBaselineReportSha256": "8b6ba6fa80922ed7b2ef3b9274c26aecb8a089304d116a022fb59144427c8fe5",
+    "testSourceSha256": "c15b9b1975254a3f2d6321745b34bab44ab505bfe8000b8631eac17edc62f430"
+  }
+}

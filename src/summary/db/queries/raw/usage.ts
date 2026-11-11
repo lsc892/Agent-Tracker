@@ -92,10 +92,7 @@ function usageSums(excludeEmptyUsage = false): string {
     SUM(${completed} AND duration_quality = 'exact') AS exact_duration_turns,
     SUM(${completed} AND duration_quality = 'derived') AS derived_duration_turns,
     SUM(${completed} AND duration_quality = 'approximate') AS approximate_duration_turns,
-    SUM(${completed} AND duration_ms IS NULL) AS missing_duration_turns,
-    SUM(started_at_ms IS NULL) AS unknown_time_turns,
-    SUM(last_error IS NOT NULL) AS stale_turns,
-    MAX(updated_at) AS last_successful_update`;
+    SUM(${completed} AND duration_ms IS NULL) AS missing_duration_turns`;
 }
 
 /**
@@ -142,7 +139,7 @@ function usageDimensions(scope: UsageScope, by: UsageBasis): string[] {
  * 알고리즘: 공통 scope와 지표 식을 조합해 GROUP BY하고 미상 우선순위·전체 결과 정렬을 적용한 뒤 LIMIT·OFFSET을 붙인다.
  */
 export function buildUsageQuery(filter: SummaryFilter, groupBy: UsageGrouping, timezone: string,
-  by: UsageBasis, sortBy?: ChartMetric, tableSort?: UsageSort): QuerySql {
+  by: UsageBasis, sortBy?: ChartMetric, tableSort?: UsageSort, withTotal = false): QuerySql {
   const scope = usageScope(filter, groupBy, timezone, by);
   const groups = scope.groups.join(', ');
   const metrics = {
@@ -157,7 +154,7 @@ export function buildUsageQuery(filter: SummaryFilter, groupBy: UsageGrouping, t
   const costs = filter.includeCosts ? `, ${COST_SUMS}` : '';
   const aggregateSql = `SELECT
       ${dimensions},
-      ${sums}${costs}
+      ${sums}${costs}${withTotal ? ', COUNT(*) OVER() AS _total' : ''}
     FROM ${usageTurns(filter.includeCosts, by)} AS turn_summary
     WHERE ${scope.where}
     GROUP BY ${groups}`;

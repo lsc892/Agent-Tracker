@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { SummaryDatabase, type TurnSummaryInput } from '../../src/summary/db';
 import { SummaryClient } from '../../src/summary/client';
 import { refreshSummary } from '../../src/summary/scanner';
-import { estimateCost, PRICING_VERSION } from '../../src/summary/pricing';
+import { estimateCost, PRICING_VERSION } from '../../src/summary/models/pricing';
 import { parseDashboardMessage } from '../../src/ui/presentation';
 
 const text = (rows: unknown[]): string => rows.map(row=>JSON.stringify(row)).join('\n')+'\n';
@@ -123,7 +123,7 @@ test('v4 migration retains historical totals and ids while model and billing cov
   const path = join(directory,'db.sqlite');
   let db = new SummaryDatabase(path);
   t.after(async()=>{db.close();await rm(directory,{recursive:true,force:true});});
-  db.replaceSessions({sessions:[{provider:'claude',session_id:'s'}],files:[],summaries:[summary('r','claude-sonnet-4-6')]});
+  db.replaceMemory({scanId: 'test',sessions:[{provider:'claude',session_id:'s'}],files:[],summaries:[summary('r','claude-sonnet-4-6')]});
   const id = db.queryTurns()[0].id;
   db.connection.exec('DROP TABLE turn_costs; DROP TABLE turn_model_usage; DROP TABLE session_billing; PRAGMA user_version=4;');
   db.close();db = new SummaryDatabase(path);
@@ -138,22 +138,22 @@ test('model total pages include the full scope, retain unknown legacy totals and
   const db = new SummaryDatabase(':memory:');
   try {
     const rows = Array.from({length:105},(_,index)=>summary(String(index),`model-${String(index).padStart(3,'0')}`));
-    db.replaceSessions({sessions:[{provider:'claude',session_id:'s'}],files:[],summaries:rows});
+    db.replaceMemory({scanId: 'test',sessions:[{provider:'claude',session_id:'s'}],files:[],summaries:rows});
     const first = db.queryUsagePage({},'total','UTC',{sortBy:'tokens'},'model');
     const second = db.queryUsagePage({},'total','UTC',{sortBy:'tokens',offset:100},'model');
     assert.equal(first.total,105);assert.equal(first.rows.length,100);assert.equal(second.rows.length,5);
     assert.equal(new Set([...first.rows,...second.rows].map(row=>row.model)).size,105);
     assert.equal([...first.rows,...second.rows].reduce((sum,row)=>sum+row.total_tokens,0),db.queryUsagePage({},'total').rows[0].total_tokens);
-    assert.throws(()=>db.replaceSessions({sessions:[{provider:'claude',session_id:'s'}],files:[],summaries:[{...rows[0],total_tokens:999}]}));
+    assert.throws(()=>db.replaceMemory({scanId: 'test',sessions:[{provider:'claude',session_id:'s'}],files:[],summaries:[{...rows[0],total_tokens:999}]}));
     assert.equal(db.queryUsagePage({},'total','UTC',{sortBy:'tokens'},'model').total,105);
-    db.replaceSessions({sessions:[{provider:'claude',session_id:'s'}],files:[],summaries:[{...rows[0],model_usage:undefined}]});
+    db.replaceMemory({scanId: 'test',sessions:[{provider:'claude',session_id:'s'}],files:[],summaries:[{...rows[0],model_usage:undefined}]});
     assert.equal(db.queryUsagePage({},'total','UTC',{sortBy:'tokens'},'model').rows[0].model,'');
     db.setSessionBilling('claude','s','api');
     assert.equal(db.queryUsage({includeCosts:true})[0].cost_usd,null);
     assert.equal(db.queryUsage({includeCosts:true})[0].unknown_costs,1);
     db.setSessionBilling('claude','s','subscription');
     assert.equal(db.queryTurns({includeCosts:true})[0].cost_usd,0);
-    assert.throws(()=>db.replaceSessions({sessions:[{provider:'claude',session_id:'s'}],files:[],summaries:[{...rows[0],model_usage:[]}]}),/Model totals/);
+    assert.throws(()=>db.replaceMemory({scanId: 'test',sessions:[{provider:'claude',session_id:'s'}],files:[],summaries:[{...rows[0],model_usage:[]}]}),/Model totals/);
     assert.equal(db.queryTurns({includeCosts:true})[0].cost_usd,0,'invalid replacement preserves earlier costs and billing');
   } finally {db.close();}
 });

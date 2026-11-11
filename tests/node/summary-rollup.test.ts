@@ -12,7 +12,6 @@ import {
 } from '../../src/summary/db';
 import { buildUsageCountQuery, buildUsageQuery, type UsageBasis } from '../../src/summary/db/queries';
 import { SCHEMA_VERSION } from '../../src/summary/db/schema';
-import { applySessionNames } from '../../src/summary/names';
 import type { SqliteSession } from '../../src/summary/db/connection';
 import { SummaryReader } from '../../src/summary/db/reader';
 import { UsageRollupStore } from '../../src/summary/db/rollups';
@@ -42,7 +41,7 @@ function model(name: string, tokens: number): ModelUsageInput {
 
 function replace(db: SummaryDatabase, rows: TurnSummaryInput[], sessions = [...new Map(rows.map(row =>
   [`${row.provider}:${row.session_id}`, { provider: row.provider, session_id: row.session_id }])).values()]): void {
-  db.replaceSessions({ sessions, files: [], summaries: rows });
+  db.replaceMemory({scanId: 'test', sessions, files: [], summaries: rows });
 }
 
 function fixture(t: TestContext, rows: TurnSummaryInput[] = []): SummaryDatabase {
@@ -180,9 +179,9 @@ test('public daily range decomposition counts exact partial boundaries once and 
     turn('unknown', null, 40),
   ]);
   const range = { fromMs: epoch('2026-10-01T12:00:00'), toMs: epoch('2026-10-03T12:00:00') };
-  expect(oracle(db, range)[0], { total_tokens: 60, turn_count: 3, avg_tokens_per_turn: 20, unknown_time_turns: 0 });
-  expect(oracle(db, { ...range, unknownTime: 'include' })[0], { total_tokens: 100, turn_count: 4, unknown_time_turns: 1 });
-  expect(oracle(db, { ...range, unknownTime: 'only' })[0], { total_tokens: 40, turn_count: 1, unknown_time_turns: 1 });
+  expect(oracle(db, range)[0], { total_tokens: 60, turn_count: 3, avg_tokens_per_turn: 20 });
+  expect(oracle(db, { ...range, unknownTime: 'include' })[0], { total_tokens: 100, turn_count: 4 });
+  expect(oracle(db, { ...range, unknownTime: 'only' })[0], { total_tokens: 40, turn_count: 1 });
   assert.deepEqual(oracle(db, range, 'day').map(row => [row.period, row.total_tokens]), [
     ['2026-10-01', 10], ['2026-10-02', 20], ['2026-10-03', 30], [null, 40],
   ]);
@@ -343,16 +342,21 @@ test('manifest diagnostic updates refresh stale counts and successful replacemen
   const manifest = db.observeFile(file, 'first');
   const rows = [turn('one', '2026-10-01T12:00:00', 100, { model_usage: [model('A', 100)] }),
     turn('two', '2026-10-02T12:00:00', 200, { model_usage: [model('B', 200)] })];
-  const install = (): void => db.replaceSessions({ sessions: [{ provider: 'claude', session_id: 'session-a' }],
-    files: [{ ...file, id: manifest.id }], summaries: rows });
+  const install = (): void => { db.replaceMemory({scanId: 'test', sessions: [{ provider: 'claude', session_id: 'session-a' }],
+    files: [{ ...file, id: manifest.id }], summaries: rows }); };
   install();
-  expect(oracle(db)[0], { stale_turns: 0, total_tokens: 300 });
+  expect(oracle(db)[0], { total_tokens: 300 });
+  assert.equal(db.diagnostics().counts.stale_summaries, 0);
   for (const status of ['error', 'interrupted'] as const) {
+    const beforeDiagnostic = snapshot(db, rollupTables);
     db.setManifestDiagnostic(manifest.id, status, 'failed-line', null, 17);
-    expect(oracle(db)[0], { stale_turns: 2, total_tokens: 300 });
+    assert.deepEqual(snapshot(db, rollupTables), beforeDiagnostic, 'Diagnostic-only updates do not rebuild usage aggregates');
+    expect(oracle(db)[0], { total_tokens: 300 });
+    assert.equal(db.diagnostics().counts.stale_summaries, 2);
     for (const by of ['provider', 'model'] as const) oracle(db, {}, 'day', 'Asia/Seoul', by);
     install();
-    expect(oracle(db)[0], { stale_turns: 0, total_tokens: 300 });
+    expect(oracle(db)[0], { total_tokens: 300 });
+    assert.equal(db.diagnostics().counts.stale_summaries, 0);
   }
   const before = snapshot(db, rollupTables);
   db.markSeen(manifest.id, 'later');
@@ -366,7 +370,7 @@ test('v10 upgrade preserves existing IDs, diagnostic/model/cost rows and lazily 
   const previous = files.open();
   const file = metadata();
   const manifest = previous.observeFile(file, 'old');
-  previous.replaceSessions({ sessions: [{ provider: 'claude', session_id: 'session-a' }], files: [{ ...file, id: manifest.id }],
+  previous.replaceMemory({scanId: 'test', sessions: [{ provider: 'claude', session_id: 'session-a' }], files: [{ ...file, id: manifest.id }],
     summaries: [turn('preserved', '2026-10-01T12:00:00', 100, {
       diagnostic_file_id: manifest.id, diagnostic_offset: 42, last_error: 'stored-error', billing: 'api',
       model_usage: [model('claude-sonnet-4-6', 100)], capability_usage: [{ category: 'skill', name: 'fixture', usage_count: 2 }],
@@ -385,7 +389,7 @@ test('v10 upgrade preserves existing IDs, diagnostic/model/cost rows and lazily 
   assert.equal(migrated.connection.prepare('SELECT COUNT(*) count FROM usage_request_daily').get()?.count, 0);
   assert.equal(migrated.connection.prepare('SELECT COUNT(*) count FROM usage_model_daily').get()?.count, 0);
   for (const by of ['provider', 'model'] as const) {
-    expect(oracle(migrated, {}, 'total', 'Asia/Seoul', by)[0], { total_tokens: 100, stale_turns: 1 });
+    expect(oracle(migrated, {}, 'total', 'Asia/Seoul', by)[0], { total_tokens: 100 });
     oracle(migrated, { includeCosts: true }, 'total', 'Asia/Seoul', by);
   }
   assert.deepEqual(snapshot(migrated, factTables), facts, 'Backfill does not rewrite source/model pricing records');
@@ -400,7 +404,7 @@ test('v10 upgrade preserves existing IDs, diagnostic/model/cost rows and lazily 
 for (const version of [14, 15]) test(`v${version} month layout returns to session clustering without rewriting facts`, t => {
   const files = disk(t), previous = files.open();
   const file = metadata(), manifest = previous.observeFile(file, 'v13');
-  previous.replaceSessions({ sessions: [{ provider: 'claude', session_id: 'session-a' }], files: [{ ...file, id: manifest.id }], summaries: [
+  previous.replaceMemory({scanId: 'test', sessions: [{ provider: 'claude', session_id: 'session-a' }], files: [{ ...file, id: manifest.id }], summaries: [
     turn('before-month', '2026-09-30T23:59:00', 100, { diagnostic_file_id: manifest.id, model_usage: [model('A', 100)],
       capability_usage: [{ category: 'skill', name: 'preserved', usage_count: 2 }], billing: 'api' }),
     turn('after-month', '2026-10-01T00:01:00', 200, { model_usage: [model('A', 200)] }),
@@ -444,26 +448,86 @@ for (const version of [14, 15]) test(`v${version} month layout returns to sessio
   assert.deepEqual(snapshot(migrated, factTables), facts);
 });
 
-test('v13 upgrade reuses the populated session-clustered cache without backfill', t => {
+test('v13 upgrade recreates only the derived cache and preserves source facts', t => {
   const files=disk(t),previous=files.open();
   replace(previous,[turn('preserved','2026-10-01T00:00:00',200),turn('unknown',null,10)]);
-  oracle(previous);const before=snapshot(previous);previous.connection.exec('PRAGMA user_version=13');previous.close();
-  const migrated=files.open();assert.deepEqual(snapshot(migrated),before);oracle(migrated);
-  assert.deepEqual(snapshot(migrated),before);
+  oracle(previous);const before=snapshot(previous,factTables);previous.connection.exec('PRAGMA user_version=13');previous.close();
+  const migrated=files.open();assert.deepEqual(snapshot(migrated,factTables),before);
+  assert.equal(migrated.connection.prepare('SELECT COUNT(*) count FROM usage_request_daily').get()?.count,0);
+  oracle(migrated);
+  assert.deepEqual(snapshot(migrated,factTables),before);
+});
+
+test('v18 upgrade removes unused daily columns and lazily rebuilds without changing facts or IDs', t => {
+  const files = disk(t), previous = files.open();
+  const file = metadata(), manifest = previous.observeFile(file, 'v18');
+  previous.replaceMemory({ scanId: 'v18', sessions: [{ provider: 'claude', session_id: 'session-a' }],
+    files: [{ ...file, id: manifest.id }], summaries: [
+      turn('first', '2026-09-30T23:59:00', 100, { diagnostic_file_id: manifest.id, diagnostic_offset: 42,
+        last_error: 'stored-error', billing: 'api', model_usage: [model('A', 100)],
+        capability_usage: [{ category: 'skill', name: 'preserved', usage_count: 2 }] }),
+      turn('second', '2026-10-01T00:01:00', 200, { model_usage: [model('B', 200)] }),
+      turn('unknown', null, 30),
+    ] });
+  const expectedStart = epoch('2026-09-30T23:59:00');
+  for (const by of ['provider', 'model'] as const) {
+    expect(oracle(previous, {}, 'session', 'Asia/Seoul', by)[0], { session_started_at_ms: expectedStart });
+  }
+  const facts = snapshot(previous, factTables), originalID = previous.queryTurns()[0].id;
+  const removed = ['unknown_time_turns', 'stale_turns', 'last_successful_update'];
+  // Recreate the old 41-state layout, including fields whose values are no longer consumed.
+  for (const table of ['usage_request_daily', 'usage_model_daily']) {
+    for (const column of removed) {
+      previous.connection.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${column === 'last_successful_update' ? 'TEXT' : 'INTEGER'}`);
+    }
+  }
+  previous.connection.exec(`ALTER TABLE usage_model_daily ADD COLUMN min_started_at_ms INTEGER;
+    UPDATE usage_rollup_meta SET format_version=1; PRAGMA user_version=18;`);
+  previous.close();
+
+  const migrated = files.open();
+  assert.equal(migrated.connection.prepare('PRAGMA user_version').get()?.user_version, SCHEMA_VERSION);
+  assert.deepEqual(snapshot(migrated, factTables), facts);
+  assert.equal(migrated.queryTurns()[0].id, originalID);
+  assert.equal(migrated.diagnostics().counts.stale_summaries, 1);
+  assert.equal(migrated.connection.prepare('SELECT COUNT(*) count FROM usage_rollup_meta').get()?.count, 0);
+  for (const table of ['usage_request_daily', 'usage_model_daily']) {
+    const columns = migrated.connection.prepare(`PRAGMA table_info(${table})`).all().map(column => column.name);
+    assert.ok(removed.every(column => !columns.includes(column)));
+    assert.equal(columns.includes('min_started_at_ms'), table === 'usage_request_daily');
+    assert.equal(migrated.connection.prepare(`SELECT COUNT(*) count FROM ${table}`).get()?.count, 0);
+  }
+  const range = { fromMs: epoch('2026-10-01T00:00:30'), toMs: epoch('2026-10-02T00:00:00') };
+  for (const by of ['provider', 'model'] as const) {
+    expect(oracle(migrated, {}, 'session', 'Asia/Seoul', by)[0], { session_started_at_ms: expectedStart });
+    for (const unknownTime of ['only', 'include', 'exclude'] as const) {
+      oracle(migrated, { ...range, unknownTime }, 'day', 'Asia/Seoul', by);
+    }
+    const row = oracle(migrated, {}, 'total', 'Asia/Seoul', by)[0];
+    assert.ok(removed.every(column => !Object.hasOwn(row, column)));
+  }
+  assert.deepEqual(snapshot(migrated, factTables), facts);
+  const rebuilt = snapshot(migrated, rollupTables);
+  migrated.close();
+  const reopened = files.open();
+  assert.deepEqual(snapshot(reopened, factTables), facts);
+  assert.deepEqual(snapshot(reopened, rollupTables), rebuilt);
+  oracle(reopened, {}, 'session', 'Asia/Seoul', 'model');
+  assert.deepEqual(snapshot(reopened, rollupTables), rebuilt, 'Reopen reuses the new materialization');
 });
 
 test('a failure after request rollup refresh rolls back facts, model rollup, diagnostics, names and costs', t => {
   const db = fixture(t);
   const file = metadata();
   const manifest = db.observeFile(file, 'first');
-  const install = (tokens: number, name: string): void => db.replaceSessions({
+  const install = (tokens: number, name: string): void => { db.replaceMemory({scanId: 'test',
     sessions: [{ provider: 'claude', session_id: 'session-a' }],
     files: [{ ...file, size_bytes: tokens, id: manifest.id }],
     summaries: [turn('same', '2026-10-01T12:00:00', tokens, {
       project_name: name, session_name: name, model_usage: [model('A', tokens)], billing: 'api',
       capability_usage: [{ category: 'skill', name, usage_count: 1 }],
     })],
-  });
+  }); };
   install(100, 'Before');
   oracle(db);
   oracle(db, {}, 'total', 'Asia/Seoul', 'model');
@@ -518,9 +582,8 @@ test('metadata-only session renames immediately affect rollup dimensions and nam
   const db = fixture(t, [turn('same', '2026-10-01T12:00:00', 100)]);
   oracle(db, {}, 'session');
   const before = snapshot(db, rollupTables);
-  db.connection.exec(`CREATE TEMP TABLE session_names(provider TEXT,session_id TEXT,session_name TEXT);
-    INSERT INTO session_names VALUES ('claude','session-a','Metadata-only rename');`);
-  db.transaction(() => applySessionNames(db.connection));
+  db.replaceMemory({scanId:'rename',sessions:[{provider:'claude',session_id:'session-a'}],files:[],
+    summaries:[{...turn('same', '2026-10-01T12:00:00', 100),session_name:'Metadata-only rename'}]});
   expect(oracle(db, { sessionName: 'Metadata-only' }, 'session')[0], { session_name: 'Metadata-only rename', total_tokens: 100 });
   assert.deepEqual(oracle(db, { sessionName: 'Session%_' }, 'session'), []);
   assert.deepEqual(snapshot(db, rollupTables), before, 'Names remain normalized instead of duplicating them in rollups');
@@ -626,7 +689,8 @@ test('legacy page count failures release their savepoint and preserve the caller
   const reader = new SummaryReader(compatible);
   db.transaction(() => {
     db.connection.exec("UPDATE projects SET project_name = 'Caller change'");
-    assert.throws(() => reader.queryUsagePage({ includeCosts: true }, 'project'), /injected page count failure/);
+    // Empty later pages still execute the full-range count after window-counted rows.
+    assert.throws(() => reader.queryUsagePage({ includeCosts: true }, 'project', 'UTC', { offset: 100 }), /injected page count failure/);
     assert.equal(db.connection.isTransaction, true);
     assert.equal(db.connection.prepare('SELECT project_name FROM projects').get()?.project_name, 'Caller change');
     failCount = false;

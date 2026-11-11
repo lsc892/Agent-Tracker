@@ -7,7 +7,7 @@ export interface RollupState {
   merge: 'SUM' | 'MAX' | 'MIN';
 }
 
-// #region 집계 상태: 총량·완료 표본·진단
+// #region 집계 상태: 총량·완료 표본·세션 시작
 
 // 평균 대신 합계와 분모를 저장해 여러 날짜를 다시 병합할 수 있게 한다.
 const states: RollupState[] = [];
@@ -20,7 +20,7 @@ const addState = (
   states.push({ name, expression, type, merge });
 };
 
-const RECORDED_USAGE = '(total_tokens > 0 OR has_model = 1)';
+const RECORDED_USAGE = '(has_recorded_usage = 1)';
 const TOKEN_FIELDS = ['input_tokens', 'output_tokens', 'total_tokens'];
 const CACHE_FIELDS = ['cache_write_input_tokens', 'cache_read_input_tokens'];
 
@@ -61,13 +61,17 @@ for (const { prefix, condition } of COMPLETED_SAMPLES) {
   addState(`${prefix}_duration_missing`, `SUM(${condition} AND duration_ms IS NULL)`);
 }
 
-addState('unknown_time_turns', 'SUM(started_at_ms IS NULL)');
-addState('stale_turns', 'SUM(last_error IS NOT NULL)');
-addState('last_successful_update', 'MAX(updated_at)', 'TEXT', 'MAX');
 addState('min_started_at_ms', 'MIN(started_at_ms)', 'INTEGER', 'MIN');
 
 export const ROLLUP_STATES: readonly RollupState[] = states;
-export const ROLLUP_FORMAT_VERSION = 1;
+const MODEL_ROLLUP_STATES = states.filter(state => state.name !== 'min_started_at_ms');
+
+/** 모델별 조회의 세션 시작은 요청 daily에서 읽으므로 모델 상태에서는 제외한다. */
+export function rollupStates(by: 'provider' | 'model'): readonly RollupState[] {
+  return by === 'model' ? MODEL_ROLLUP_STATES : ROLLUP_STATES;
+}
+
+export const ROLLUP_FORMAT_VERSION = 2;
 export const ROLLUP_TABLES = {
   provider: 'usage_request_daily',
   model: 'usage_model_daily',
@@ -80,7 +84,7 @@ export const ROLLUP_TABLES = {
 const dailyTablesSql = (['provider', 'model'] as const).map(by => {
   const table = ROLLUP_TABLES[by];
   const modelColumns = by === 'model' ? 'model TEXT,\n  model_key TEXT NOT NULL,' : '';
-  const stateColumns = states.map(state => `${state.name} ${state.type}`).join(',\n  ');
+  const stateColumns = rollupStates(by).map(state => `${state.name} ${state.type}`).join(',\n  ');
   const modelKey = by === 'model' ? ', model_key' : '';
 
   return `

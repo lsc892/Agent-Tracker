@@ -1,9 +1,10 @@
 // 요청별 TEMP/EXCEPT와 한 번 적재한 TEMP/JOIN 비교, 기존 일괄 교체와 크기별 혼합 경로를 측정한다.
+const { summaryPath } = require('./summary-paths.cjs');
 const { join } = require('node:path');
 const { assert, productRoot: root, IncrementalDatabase, incrementalHelpers, timezone, replacement, summary, state, integrity, stats, order, write } = require('./storage-ab-common.cjs');
 const { SummaryDatabase: BulkDatabase } = require(join(root, 'dist/src/summary/db'));
 const { SessionStore: BulkSessionStore } = require(join(root, 'dist/src/summary/db/sessions'));
-const { estimateCost, PRICING_VERSION } = require(join(root, 'dist/src/summary/pricing'));
+const { estimateCost, PRICING_VERSION } = require(summaryPath(root, "dist/src/summary/models/pricing"));
 const { turnValues, TURN_COLUMNS } = incrementalHelpers;
 const modelColumns = ['model','input_tokens','output_tokens','cache_write_input_tokens','cache_read_input_tokens','estimated_cost_usd','pricing_version'];
 const capColumns = ['category','name','usage_count'];
