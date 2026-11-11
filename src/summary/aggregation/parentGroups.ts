@@ -1,4 +1,4 @@
-// 직접 자식은 부모 그룹에 모으고 다단계 계보만 Union-Find와 작은 Map 병합으로 연결한다.
+// 최상위 부모를 한 번 해소하고 같은 계보를 root별로 직접 그룹화한다.
 export interface ParentItem<T> {
   id: string;
   parentId: string | null;
@@ -6,7 +6,7 @@ export interface ParentItem<T> {
 }
 
 export interface ParentGroup<T> {
-  /** Union-Find 대표와 별개인 원본 계보의 최상위 부모 식별자. */
+  /** 원본 계보의 최상위 부모 식별자. */
   rootId: string;
   members: Map<string, T[]>;
 }
@@ -32,54 +32,21 @@ export function groupParents<T>(items: readonly ParentItem<T>[]): ParentGroups<T
   }
 
   const roots = resolveRoots(parents, conflicts);
-  const nestedRoots = new Set<string>();
-  for (const [id, parent] of parents) {
-    const root = roots.get(id);
-    if (root !== null && root !== undefined && parent !== null && parents.get(parent) != null) nestedRoots.add(root);
-  }
-
   const groups = new Map<string, ParentGroup<T>>();
   const unresolved = new Set<string>();
-  const direct = new Map<string, ParentGroup<T>>();
-  const representatives = new Map<string, string>();
-  const components = new Map<string, ParentGroup<T>>();
+  const resolved = new Map<string, ParentGroup<T>>();
   for (const [id, members] of values) {
-    const root = roots.get(id);
-    if (root === null || root === undefined) {
+    const root = roots.get(id)!;
+    if (root === null) {
       unresolved.add(id);
       groups.set(id, { rootId: id, members: new Map([[id, members]]) });
-    } else if (nestedRoots.has(root)) {
-      representatives.set(id, id);
-      components.set(id, { rootId: root, members: new Map([[id, members]]) });
     } else {
-      let group = direct.get(root);
-      if (!group) direct.set(root, group = { rootId: root, members: new Map() });
+      let group = resolved.get(root);
+      if (!group) resolved.set(root, group = { rootId: root, members: new Map() });
       group.members.set(id, members);
       groups.set(id, group);
     }
   }
-
-  const find = (id: string): string => {
-    let representative = id;
-    while (representatives.get(representative) !== representative) representative = representatives.get(representative)!;
-    while (id !== representative) {
-      const parent = representatives.get(id)!;
-      representatives.set(id, representative);
-      id = parent;
-    }
-    return representative;
-  };
-  for (const [id, parent] of parents) {
-    if (parent === null || !representatives.has(id)) continue;
-    let left = find(id), right = find(parent);
-    if (left === right) continue;
-    if (components.get(left)!.members.size < components.get(right)!.members.size) [left, right] = [right, left];
-    const target = components.get(left)!, source = components.get(right)!;
-    for (const [member, bucket] of source.members) target.members.set(member, bucket);
-    representatives.set(right, left);
-    components.delete(right);
-  }
-  for (const id of representatives.keys()) groups.set(id, components.get(find(id))!);
   return { groups, unresolved };
 }
 
@@ -88,12 +55,13 @@ function resolveRoots(parents: Map<string, string | null>, conflicts: Set<string
   const roots = new Map<string, string | null>();
   for (const start of parents.keys()) {
     if (roots.has(start)) continue;
-    const path: string[] = [], visiting = new Set<string>();
+    const path: string[] = [];
     let current = start, root: string | null = null;
     while (true) {
       if (roots.has(current)) { root = roots.get(current)!; break; }
-      if (!parents.has(current) || conflicts.has(current) || visiting.has(current)) break;
-      visiting.add(current);
+      if (!parents.has(current) || conflicts.has(current)) break;
+      // 해소 중인 노드는 null로 표시해 같은 경로로 돌아오는 순환도 감지한다.
+      roots.set(current, null);
       path.push(current);
       const parent = parents.get(current)!;
       if (parent === null) { root = current; break; }
