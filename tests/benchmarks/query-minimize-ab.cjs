@@ -41,6 +41,18 @@ function fingerprint(directory) {
   return { files: entries.length, sha256: sha(JSON.stringify(entries)) };
 }
 
+function metadataFiles(snapshot, directory) {
+  const files = [];
+  for (const home of new Set(snapshot.roots.map(source => source.dataHome).filter(Boolean))) {
+    for (const file of fs.readdirSync(home, { withFileTypes: true })) {
+      if (!file.isFile()) continue;
+      const path = join(home, file.name), bytes = fs.readFileSync(path);
+      files.push({ path, name: relative(directory, path).replaceAll('\\', '/'), bytes: bytes.length, sha256: sha(bytes) });
+    }
+  }
+  return files.sort((a, b) => a.name.localeCompare(b.name, 'en'));
+}
+
 function allUsage(db, group, usageFilter, by) {
   const rows = []; let total;
   for (let offset = 0; ; offset += 1000) {
@@ -112,7 +124,8 @@ function queryWorkloads(db) {
     return Object.fromEntries(categories.map(category => [category, db.queryCapabilities(filter, category, 0, 100)]));
   } });
   operations.push({ name: 'coverage/counts-consumer', family: 'coverage', invoke: () =>
-    typeof db.queryCoverageCounts === 'function' ? db.queryCoverageCounts(filter.providers)
+    typeof db.diagnosticCounts === 'function' ? db.diagnosticCounts(filter.providers)
+      : typeof db.queryCoverageCounts === 'function' ? db.queryCoverageCounts(filter.providers)
       : db.diagnostics({ limit: 1, providers: filter.providers }).counts });
   return operations;
 }
@@ -172,6 +185,47 @@ function totals(db) {
   return { ...db.connection.prepare('SELECT COUNT(*) requests,COALESCE(SUM(total_tokens),0) tokens FROM turn_summary').get() };
 }
 
+function measureBilling(db, observer, target, config) {
+  if (!config.includeBilling) return [];
+  const scope = [target.provider ?? 'codex', target.session_id];
+  const costs = () => db.connection.prepare(`SELECT c.* FROM turn_costs c
+    JOIN turn_summary t ON t.id=c.turn_id WHERE t.provider=? AND t.session_id=? ORDER BY c.turn_id`).all(...scope);
+  const originalCosts = costs();
+  const selection = () => db.connection.prepare('SELECT * FROM session_billing WHERE provider=? AND session_id=?').get(...scope);
+  const originalSelection = selection();
+  const result = () => ({ costs: costs(), selection: selection() });
+  const restore = () => db.transaction(() => {
+    db.connection.prepare('DELETE FROM session_billing WHERE provider=? AND session_id=?').run(...scope);
+    if (originalSelection) db.connection.prepare('INSERT INTO session_billing VALUES(?,?,?)')
+      .run(originalSelection.provider, originalSelection.session_id, originalSelection.billing_mode);
+    db.connection.prepare(`DELETE FROM turn_costs WHERE turn_id IN (
+      SELECT id FROM turn_summary WHERE provider=? AND session_id=?)`).run(...scope);
+    const insert = db.connection.prepare('INSERT INTO turn_costs VALUES(?,?,?,?,?)');
+    for (const cost of originalCosts) insert.run(cost.turn_id, cost.billing_mode, cost.cost_usd, cost.unknown_costs, cost.pricing_version);
+  });
+  const results = [];
+  try {
+    for (const mode of ['api', 'subscription', 'unknown']) {
+      restore(); db.setSessionBilling(...scope, mode);
+      assert.equal(selection()?.billing_mode, mode);
+      const expected = digest(result());
+      for (let n = 0; n < config.readWarmups; n++) { restore(); db.setSessionBilling(...scope, mode); }
+      const samples = [];
+      for (let n = 0; n < config.readSamples; n++) {
+        restore(); const started = performance.now();
+        db.setSessionBilling(...scope, mode); samples.push(performance.now() - started);
+        assert.equal(digest(result()), expected, 'Stable billing results from the same original state');
+      }
+      restore(); observer.start(); db.setSessionBilling(...scope, mode);
+      const sql = observer.finish(config.profileOnly);
+      assert.equal(digest(result()), expected);
+      results.push({ mode, requests: originalCosts.length, timing: stats(samples), resultSha256: expected, sqlDiagnostic: sql });
+    }
+  } finally { restore(); }
+  assert.deepEqual(costs(), originalCosts); assert.deepEqual(selection(), originalSelection);
+  return results;
+}
+
 async function worker(configPath, variant, pairText, directory) {
   const config = JSON.parse(fs.readFileSync(configPath, 'utf8')), product = config.products[variant];
   const { SummaryDatabase } = require(join(product, 'dist/src/summary/db'));
@@ -179,7 +233,9 @@ async function worker(configPath, variant, pairText, directory) {
   const { buildUsageQuery } = require(join(product, 'dist/src/summary/db/queries'));
   await fsp.mkdir(directory, { recursive: true });
   const dbPath = join(directory, 'summary.sqlite'), openStart = performance.now(), db = new SummaryDatabase(dbPath);
-  const openMs = performance.now() - openStart, observer = observeSql(db), samples = [];
+  const openMs = performance.now() - openStart;
+  const observer = config.profileOnly ? observeSql(db) : { start() {}, finish() { return []; }, restore() {} };
+  const samples = [];
   let target;
   try {
     const activationStart = performance.now();
@@ -228,6 +284,7 @@ async function worker(configPath, variant, pairText, directory) {
       }
     }
     const checked = helpers.verify(db, buildUsageQuery);
+    const billing = measureBilling(db, observer, target, config);
     const unchanged = await refresh('unchanged');
     assert.deepEqual(unchanged.totals, appended.totals); assert.equal(unchanged.refresh.bodyBytes, 0);
     assert.equal(unchanged.refresh.parsed, 0); assert.deepEqual(unchanged.refresh.timings.storage, {});
@@ -235,7 +292,7 @@ async function worker(configPath, variant, pairText, directory) {
     const pragmas = Object.fromEntries(['journal_mode', 'synchronous', 'wal_autocheckpoint', 'cache_size', 'temp_store', 'mmap_size']
       .map(name => [name, Object.values(db.connection.prepare(`PRAGMA ${name}`).get())[0]]));
     process.send({ kind: 'result', result: { variant, pair: Number(pairText), openMs, emptyRollupActivationMs,
-      samples, reads, averages, independent, checked, initialDistribution, pragmas, parserVersion: PARSER_VERSION,
+      samples, reads, averages, billing, independent, checked, initialDistribution, pragmas, parserVersion: PARSER_VERSION,
       sqlite: db.connection.prepare('SELECT sqlite_version() version').get().version,
       appendTarget: { provider: 'codex', existingSessionRequests: target.requests, sourceBytesBefore: target.originalBytes } } });
   } finally {
@@ -267,6 +324,8 @@ function assertPair(pair) {
     pair.A.samples.find(sample => sample.scenario === scenario).totals,
     pair.B.samples.find(sample => sample.scenario === scenario).totals, `Totals/${scenario}`);
   assert.deepEqual(pair.A.reads.map(item => [item.name, item.resultSha256]), pair.B.reads.map(item => [item.name, item.resultSha256]), 'All public read results equal');
+  assert.deepEqual(pair.A.billing.map(item => [item.mode, item.requests, item.resultSha256]),
+    pair.B.billing.map(item => [item.mode, item.requests, item.resultSha256]), 'Billing writes and restored state equal');
   assert.deepEqual(pair.A.independent, pair.B.independent, 'Independent provider/model means equal');
 }
 
@@ -296,6 +355,8 @@ function summarize(trials) {
   storage, topTwoPeerStages,
   reads: Object.fromEntries(trials[0].A.reads.map(item => [item.name,
     compare(value => value.reads.find(read => read.name === item.name).timing.medianMs)])),
+  billing: Object.fromEntries(trials[0].A.billing.map(item => [item.mode,
+    compare(value => value.billing.find(operation => operation.mode === item.mode).timing.medianMs)])),
   averages: Object.fromEntries(Object.keys(trials[0].A.averages).map(name => [name,
     compare(value => value.averages[name].elapsedMs)])) };
 }
@@ -310,12 +371,14 @@ function baselineRanks(result) {
 
 async function main() {
   const options = { workspace: '', before: '', after: '', output: '', pairs: 10, warmups: 3,
-    readWarmups: 3, readSamples: 0, datasets: 'current,synthetic-10000,synthetic-100' };
-  let profileOnly = false, prepareOnly = false, storageOnly = false;
+    readWarmups: 3, readSamples: 0, datasets: 'current,synthetic-10000,synthetic-100',
+    experiment: 'query-minimize', dateSeoul: clock().slice(0, 10) };
+  let profileOnly = false, prepareOnly = false, storageOnly = false, includeBilling = false;
   for (const arg of process.argv.slice(2)) {
     if (['--baseline-only', '--profile-only'].includes(arg)) { profileOnly = true; continue; }
     if (arg === '--prepare-only') { prepareOnly = true; continue; }
     if (arg === '--storage-only') { storageOnly = true; continue; }
+    if (arg === '--billing') { includeBilling = true; continue; }
     const match = /^--([^=]+)=(.+)$/.exec(arg);
     assert.ok(match && Object.hasOwn(options, match[1]), 'Unknown or incomplete argument');
     options[match[1]] = ['pairs', 'warmups', 'readWarmups', 'readSamples'].includes(match[1]) ? Number(match[2]) : match[2];
@@ -347,7 +410,7 @@ async function main() {
   const paired = Boolean(options.after);
   const products = paired ? { A: options.before, B: options.after } : { A: options.before };
   const trialRoot = await fsp.mkdtemp(join(options.workspace, profileOnly ? 'profile-' : 'trials-'));
-  const report = { experiment: 'query-minimize', dateSeoul: '2026-11-10', startedAtSeoul: clock(), profileOnly, storageOnly,
+  const report = { experiment: options.experiment, dateSeoul: options.dateSeoul, startedAtSeoul: clock(), profileOnly, storageOnly, includeBilling,
     timezone, filter, warmupPairs: profileOnly ? 0 : options.warmups, measuredPairs: profileOnly ? 1 : options.pairs,
     readWarmups: options.readWarmups, readSamplesPerProcess: options.readSamples,
     command: ['node', '--no-warnings', relative(root, __filename).replaceAll('\\', '/'), ...process.argv.slice(2)],
@@ -360,18 +423,24 @@ async function main() {
     method: { timing: 'Actual refreshSummary through COMMIT/optimize and full public query API return; no process startup, copy, append, source restore or correctness checks inside timers.',
       reads: storageOnly ? 'Focused storage comparison: broad UI read workloads omitted; all-page day/month/session/project token means on provider/model bases remain timed and independently checked.'
         : 'Warm cache; fixed 2026 calendar interval; limit100/offset0; three request sorts, costs on/off, provider/model, all four categories as one consumer operation. All-page averages are also measured separately.',
-      instrumentation: 'SQL diagnostics use a separate invocation after timed read samples. Baseline-only refresh captures SQL execution and includes wrapper overhead; full A/B refresh does not capture SQL execution timings. Product StageProfiler retains every nested storage field. Overlapping timers are not summed.',
+      instrumentation: profileOnly
+        ? 'SQL instrumentation wraps prepare/all/get/run and retains wrapper overhead; these diagnostic timings are not pure product latency.'
+        : 'No SQL prepare/all/get/run wrappers are installed. SQL execution counts are measured by separate correctness validation. Built-in product StageProfiler remains enabled; overlapping timers are not summed.',
       rankings: 'Read operations ranked separately from storage peer stages. Different user operations/frequencies are not a single combined bottleneck ranking.',
       cache: 'OS cache uncontrolled; no forced GC or cache reset. Each variant/trial uses a fresh process and new DB; empty rollup activation occurs before refresh timing.',
+      billing: includeBilling ? 'Largest accepted Codex session; api/subscription/unknown each time starts from restored original selection and costs. Timing includes public setSessionBilling through COMMIT; restore and result checks are outside timers.' : 'not measured',
       correctness: 'A/B semantic facts and public result hashes; raw/rollup10 dimensions; independent JS provider/model token means for four groups with empty usage both included/excluded; +1request/+130tokens, prior rows unchanged, unchanged refresh skip, FK/integrity.',
       limitations: 'No independent parser oracle for private real logs, UI/extension-host IPC/network/quota/heap peak or hostile cancellation cases. Generated synthetic logs are ordinary deterministic requests; capability density is reported rather than manufactured.' }, datasets: [] };
   for (const dataset of snapshots) {
     for (const file of dataset.snapshot.files) assert.equal(sha(fs.readFileSync(file.path)), file.sha256, 'Frozen input hash');
+    const metadata = metadataFiles(dataset.snapshot, dataset.directory);
+    const publicMetadata = metadata.map(({ path: _path, ...file }) => file);
     const work = join(trialRoot, dataset.name); await fsp.mkdir(work, { recursive: true });
     const configPath = join(work, 'config.json');
     await fsp.writeFile(configPath, JSON.stringify({ products, directory: dataset.directory, snapshot: dataset.snapshot,
-      profileOnly, storageOnly, readWarmups: options.readWarmups, readSamples: options.readSamples }));
-    const entry = { name: dataset.name, inputSha256: dataset.snapshot.sha256, inventory: dataset.snapshot.inventory,
+      profileOnly, storageOnly, includeBilling, readWarmups: options.readWarmups, readSamples: options.readSamples }));
+    const entry = { name: dataset.name, transcriptSha256: dataset.snapshot.sha256, metadata: publicMetadata,
+      inputSha256: sha(JSON.stringify({ transcripts: dataset.snapshot.sha256, metadata: publicMetadata })), inventory: dataset.snapshot.inventory,
       expected: dataset.snapshot.expected ?? null, trials: [], warmupChecks: [] };
     const startPair = profileOnly ? 0 : -options.warmups, endPair = profileOnly ? 1 : options.pairs;
     for (let pair = startPair; pair < endPair; pair++) {
@@ -379,11 +448,12 @@ async function main() {
       for (const variant of order) both[variant] = await runWorker(configPath, variant, pair, join(work, `pair-${pair}`, variant));
       if (paired) assertPair(both);
       if (pair < 0) entry.warmupChecks.push({ pair, equal: true }); else entry.trials.push(both);
-      await fsp.writeFile(join(options.workspace, 'query-minimize-partial.json'), JSON.stringify({ ...report, currentDataset: entry }, null, 2));
+      await fsp.writeFile(join(options.workspace, `${options.experiment}-partial.json`), JSON.stringify({ ...report, currentDataset: entry }, null, 2));
     }
     for (const file of dataset.snapshot.files) assert.equal(sha(fs.readFileSync(file.path)), file.sha256, 'Frozen sources restored');
+    assert.deepEqual(metadataFiles(dataset.snapshot, dataset.directory), metadata, 'Frozen name metadata unchanged');
     entry.distribution = entry.trials[0].A.initialDistribution;
-    entry.correctness = { frozenSourcesRestored: true, rawAndRollup: true, independentMeans: true, exactAppendDelta: true,
+    entry.correctness = { frozenSourcesRestored: true, frozenNamesUnchanged: true, rawAndRollup: true, independentMeans: true, exactAppendDelta: true,
       foreignKeysAndIntegrity: true, allAbPairs: paired ? true : 'not applicable' };
     if (profileOnly) entry.rankings = paired ? Object.fromEntries(['A', 'B'].map(variant => [variant, baselineRanks(entry.trials[0][variant])]))
       : baselineRanks(entry.trials[0].A);
@@ -392,7 +462,10 @@ async function main() {
     console.log(`${dataset.name}: ${entry.distribution.requests} initial requests; completed.`);
   }
   report.completedAtSeoul = clock();
-  for (const [variant, product] of Object.entries(products)) assert.deepEqual(fingerprint(join(product, 'dist/src')), report.products[variant].build, 'Fixed product fingerprint');
+  for (const [variant, product] of Object.entries(products)) {
+    assert.deepEqual(fingerprint(join(product, 'src')), report.products[variant].source, 'Fixed source fingerprint');
+    assert.deepEqual(fingerprint(join(product, 'dist/src')), report.products[variant].build, 'Fixed build fingerprint');
+  }
   await fsp.mkdir(dirname(options.output), { recursive: true });
   await fsp.writeFile(options.output, JSON.stringify(report, null, 2) + '\n', { flag: 'wx' });
   console.log(`Saved ${relative(root, options.output)}`);

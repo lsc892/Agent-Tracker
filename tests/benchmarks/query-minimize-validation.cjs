@@ -141,7 +141,7 @@ const boundariesAndFilters = paired(databases => {
   return { comparisons, partialDateUnionAll: true, unknownPolicies: 3, timezones: 2, emptyPageTotals: true };
 });
 
-const report = { dateSeoul: '2026-11-10', runnerSha256: hash(fs.readFileSync(__filename)),
+const report = { dateSeoul: new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Seoul' }).format(new Date()), runnerSha256: hash(fs.readFileSync(__filename)),
   products: Object.fromEntries(Object.entries(options).filter(([name]) => ['before', 'after'].includes(name))
     .map(([name, directory]) => [name, Object.fromEntries(['src/summary/db/memoryStore.ts',
       'src/summary/db/queries/rollup/source.ts', 'dist/src/summary/db/memoryStore.js',

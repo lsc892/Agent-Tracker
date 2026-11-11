@@ -1,0 +1,68 @@
+{
+  "dateSeoul": "2026-11-11",
+  "runnerSha256": "30872653d86b1ab96d1383a019bcb386a594c2455f722b58e7aca54fbcd100c3",
+  "products": {
+    "before": {
+      "src/summary/db/memoryStore.ts": "b7e3a8339f643c179799ba94977fd2ffc7f8a689d8098a2d32b354bf1dab6818",
+      "src/summary/db/queries/rollup/source.ts": "bc3730d6261eb8731c09e0d0c0d61d489ac4cce87bec5996e46b1337f6910b8e",
+      "dist/src/summary/db/memoryStore.js": "94274f96819467b4894d641ab4307033940c152f45fc2c38f1607632313fe52f",
+      "dist/src/summary/db/queries/rollup/source.js": "48f5518406d8b2524f25db3f9f5dbbbbab37887b37286e901e02d4559febf0d2"
+    },
+    "after": {
+      "src/summary/db/memoryStore.ts": "35a58a17d27bc3f7028f3e127b24b9bf0967ccef95eef77a72fb1caa304afdb5",
+      "src/summary/db/queries/rollup/source.ts": "bc3730d6261eb8731c09e0d0c0d61d489ac4cce87bec5996e46b1337f6910b8e",
+      "dist/src/summary/db/memoryStore.js": "561a5af1f3f37c4f0742e94a07c9bc079d8e14f269bf43ed0730b6ff78dee29e",
+      "dist/src/summary/db/queries/rollup/source.js": "48f5518406d8b2524f25db3f9f5dbbbbab37887b37286e901e02d4559febf0d2"
+    }
+  },
+  "scope": "Correctness checks for the explicitly requested query A/B; no general test suite",
+  "boundaries": [
+    {
+      "requests": 0,
+      "independentAggregateChecks": 40,
+      "exactIdsAndChildren": true
+    },
+    {
+      "requests": 1,
+      "independentAggregateChecks": 40,
+      "exactIdsAndChildren": true
+    },
+    {
+      "requests": 31,
+      "independentAggregateChecks": 40,
+      "exactIdsAndChildren": true
+    },
+    {
+      "requests": 32,
+      "independentAggregateChecks": 40,
+      "exactIdsAndChildren": true
+    },
+    {
+      "requests": 33,
+      "independentAggregateChecks": 40,
+      "exactIdsAndChildren": true
+    },
+    {
+      "requests": 64,
+      "independentAggregateChecks": 40,
+      "exactIdsAndChildren": true
+    },
+    {
+      "requests": 65,
+      "independentAggregateChecks": 40,
+      "exactIdsAndChildren": true
+    }
+  ],
+  "mixed": {
+    "mixedNewExistingOrder": true,
+    "singleUseIterableConsumptions": 120,
+    "childFailureRollbackAndRetry": true
+  },
+  "boundariesAndFilters": {
+    "comparisons": 96,
+    "partialDateUnionAll": true,
+    "unknownPolicies": 3,
+    "timezones": 2,
+    "emptyPageTotals": true
+  }
+}

@@ -1,0 +1,46 @@
+{
+    "dateSeoul":  "2026-11-11",
+    "scope":  "Eleven affected Node test files, same shared suite against frozen baseline and candidate",
+    "variants":  {
+                     "A":  {
+                               "tests":  135,
+                               "passed":  134,
+                               "failed":  1,
+                               "failingNames":  [
+                                                    "rootless Codex subagents retain their local turns and become independent sessions"
+                                                ],
+                               "junitSha256":  "a3bc6ea7337950fd2beca38c7ba06c6c223ecd019e6890f4f0bc29f3e7744eac"
+                           },
+                     "B":  {
+                               "tests":  135,
+                               "passed":  134,
+                               "failed":  1,
+                               "failingNames":  [
+                                                    "rootless Codex subagents retain their local turns and become independent sessions"
+                                                ],
+                               "junitSha256":  "6c17a8e63a7e9a5b136119a20c7c456f665bbe69795b78746ba657ef1ab8b7d0"
+                           }
+                 },
+    "sameFailureNames":  true,
+    "countFailureInjection":  {
+                                  "updated":  true,
+                                  "reason":  "Normal grouped pages no longer issue a separate count SELECT; the failure injection now uses an empty later page where count fallback still runs",
+                                  "passedBothVariants":  true,
+                                  "sourceSha256":  "ac8114ba7b5da4e1ccc38097ae0a575c7d25de9677eb70239cf64c8beb18f4e3"
+                              },
+    "baselineFailure":  "Rootless subagent assertion expects an independent child session; the same baseline and candidate return the parent session",
+    "files":  [
+                  "request-titles",
+                  "parsers",
+                  "capabilities",
+                  "summary-lineage",
+                  "summary-incremental",
+                  "costs-models",
+                  "summary-db",
+                  "names",
+                  "summary-rollup",
+                  "source-reconnection",
+                  "source-retention"
+              ],
+    "privacy":  "Only case names, totals and hashes; raw stack traces and local paths remain in ignored local results"
+}
