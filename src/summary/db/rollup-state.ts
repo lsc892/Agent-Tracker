@@ -20,7 +20,7 @@ const addState = (
   states.push({ name, expression, type, merge });
 };
 
-const RECORDED_USAGE = '(total_tokens > 0 OR has_model = 1)';
+const RECORDED_USAGE = '(has_recorded_usage = 1)';
 const TOKEN_FIELDS = ['input_tokens', 'output_tokens', 'total_tokens'];
 const CACHE_FIELDS = ['cache_write_input_tokens', 'cache_read_input_tokens'];
 

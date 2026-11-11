@@ -126,13 +126,20 @@ function rawBoundarySource(filter: SummaryFilter, bounds: FullDayBounds, timezon
 
 /**
  * 책임: 원본 요청을 다시 병합할 수 있는 일별 상태로 변환한다.
- * 알고리즘: 시간대 바인딩과 제공자·프로젝트·세션·현지 일·모델 키로 공통 합계·표본 수를 집계한다.
+ * 알고리즘: 대상 범위를 먼저 좁혀 집계 입력·모델 기록 여부·현지 일을 한 번 계산하고 공통 합계·표본 수를 집계한다.
  */
 export function aggregateUsageSource(by: UsageBasis, where = '1 = 1'): string {
-  const columns = [
+  const input = [
     'provider', 'project_key', 'session_id',
     "coalesce(agent_tracker_period(started_at_ms, ?, 'day'), '') AS local_day",
+    ...(by === 'model' ? ['model'] : ['started_at_ms']),
+    'input_tokens', 'output_tokens', 'total_tokens',
+    'cache_write_input_tokens', 'cache_read_input_tokens',
+    'status', 'duration_ms', 'duration_quality',
+    // Positive tokens already qualify; only zero-token requests need the model lookup.
+    'CASE WHEN total_tokens > 0 THEN 1 ELSE has_model END AS has_recorded_usage',
   ];
+  const columns = ['provider', 'project_key', 'session_id', 'local_day'];
   const groups = ['provider', 'project_key', 'session_id', 'local_day'];
   if (by === 'model') {
     columns.push('model', `CASE
@@ -143,11 +150,20 @@ export function aggregateUsageSource(by: UsageBasis, where = '1 = 1'): string {
   }
   columns.push(...rollupStates(by).map(state => `${state.expression} AS ${state.name}`));
 
-  return `SELECT
+  // A SELECT wrapper keeps this source valid after UNION ALL and in INSERT SELECT.
+  // The timezone placeholder stays before every source filter placeholder.
+  return `SELECT * FROM (
+    WITH scoped AS MATERIALIZED (
+      SELECT
+        ${input.join(',\n        ')}
+      FROM ${usageTurns(false, by)} AS turn_summary
+      WHERE ${where}
+    )
+    SELECT
       ${columns.join(',\n      ')}
-    FROM ${usageTurns(false, by)} AS turn_summary
-    WHERE ${where}
-    GROUP BY ${groups.join(', ')}`;
+    FROM scoped
+    GROUP BY ${groups.join(', ')}
+  )`;
 }
 
 // #endregion

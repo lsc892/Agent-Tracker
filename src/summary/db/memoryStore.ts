@@ -364,9 +364,9 @@ export class MemoryStore {
     const writeStarted = performance.now();
     try {
       const id = this.profile.measure('facts', () => this.saveFacts(previous, incoming));
-      if (!previous || modelsChanged) this.profile.measure('models', () => this.replaceModels(id, models));
+      if (!previous || modelsChanged) this.profile.measure('models', () => this.replaceModels(id, models, previous !== undefined));
       if (!previous || capabilitiesChanged) {
-        this.profile.measure('capabilities', () => this.replaceCapabilities(id, preserveCapabilities && previous ? previousCapabilities : capabilities ?? []));
+        this.profile.measure('capabilities', () => this.replaceCapabilities(id, preserveCapabilities && previous ? previousCapabilities : capabilities ?? [], previous !== undefined));
       }
       this.profile.measure('costs', () => this.billing.saveTurnCost(id, mode));
       changedSessions.add(key);
@@ -446,15 +446,15 @@ export class MemoryStore {
     return id;
   }
 
-  /** 한 요청의 모델 행을 삭제하고 검증·정렬한 최종 모델 snapshot을 순서대로 저장한다. */
-  private replaceModels(id: number | bigint, models: SQLInputValue[][]): void {
-    this.database.statement('DELETE FROM turn_model_usage WHERE turn_id=?').run(id);
+  /** 기존 요청의 모델만 삭제하고 검증·정렬한 최종 snapshot을 저장한다. */
+  private replaceModels(id: number | bigint, models: SQLInputValue[][], existing: boolean): void {
+    if (existing) this.database.statement('DELETE FROM turn_model_usage WHERE turn_id=?').run(id);
     for (const model of models) this.database.statement('INSERT INTO turn_model_usage VALUES(?,?,?,?,?,?,?,?)').run(id, ...model);
   }
 
-  /** 한 요청의 Skill 행을 삭제하고 보존 또는 새 집계로 선택한 횟수 snapshot을 저장한다. */
-  private replaceCapabilities(id: number | bigint, capabilities: SQLInputValue[][]): void {
-    this.database.statement('DELETE FROM turn_capability_usage WHERE turn_id=?').run(id);
+  /** 기존 요청의 Skill만 삭제하고 최종 횟수 snapshot을 저장한다. */
+  private replaceCapabilities(id: number | bigint, capabilities: SQLInputValue[][], existing: boolean): void {
+    if (existing) this.database.statement('DELETE FROM turn_capability_usage WHERE turn_id=?').run(id);
     for (const usage of capabilities) this.database.statement('INSERT INTO turn_capability_usage VALUES(?,?,?,?)').run(id, ...usage);
   }
 

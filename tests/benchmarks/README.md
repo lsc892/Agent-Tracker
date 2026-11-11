@@ -2,6 +2,10 @@
 
 요약·JSONL·SQL·quota 처리의 정확성과 성능을 비교하는 도구를 모은다.
 
+- [query-minimize-ab.cjs](query-minimize-ab.cjs) — 현재·10,000·100요청의 저장 구간과 비용·정렬·이름·도구·coverage의 실제 조회 API를 대조한다. `--workspace=... --before=... --after=... --output=<새 JSON>`은 준비 3쌍·교대 10쌍이며, `--baseline-only`는 A 구간 순위, `--profile-only --after=...`는 별도 SQL 실행 수·계획 진단이다. [query-minimize-validation.cjs](query-minimize-validation.cjs)는 같은 `--before --after --output`으로 이번 A/B의 신규 요청 경계·부분 날짜·NULL·실패 rollback을 대조한다.
+
+- [query-minimize-plan.cjs](query-minimize-plan.cjs) — `--before --after --db --workspace --output`으로 보존 DB의 새 사본에서 실제 일별 집계 계획·날짜 UDF 호출 수·결과 해시를 대조한다. 시간 표본에 섞지 않는다. 최종 저장 집중 비교는 `query-minimize-ab.cjs --storage-only`로 넓은 화면 조회를 생략하고 실제 갱신·8개 평균 조회를 유지한다.
+
 - [unified-stream-stats-validation.cjs](unified-stream-stats-validation.cjs) — `--workspace --before --after --output`으로 원본 통계 누적 통합 전후의 고정 실로그·합성 10,000요청을 대조한다. 기본은 예열 없이 1쌍이며 최초·추가·무변경의 facts·평균·진단·사본 복원을 검증한다.
 
 - [metadata-batch-ab.cjs](metadata-batch-ab.cjs) — 최종 프로젝트·세션 이름과 세션 결제 설정 처리의 중복 제거를 실제 갱신·SQL 실행 횟수로 비교한다. `--workspace=... --before=... --after=... --output=<새 JSON> --pairs=1 --warmups=0`으로 현재·10,000요청을 각 1회 측정하고, 모든 잔존 조회 결과·독립 JS 집계·facts·manifest·FK/integrity를 대조한다.

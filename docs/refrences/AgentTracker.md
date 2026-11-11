@@ -774,11 +774,15 @@ DB당 시간대 하나의 집계만 유지하며 첫 집계·시간대 변경 �
 
 복수 변경 세션은 JSON tuple 목록 하나를 고정 SQL에 바인딩한다. daily 삭제는 `(provider, session_id)` PK를 사용하고, 재집계는 각 tuple의 기존 요청 UNIQUE 인덱스에서 요청 ID를 찾은 뒤 INTEGER PK로 최종 facts를 읽는다. 목록 길이별 SQL·TEMP 키 표·새 인덱스·스키마는 만들지 않는다. 집계 실패 시 해당 transaction의 facts·두 daily 표를 함께 rollback하며 기존 성분별 재시도를 유지한다. 시간대·형식·지원 시각은 최종 facts를 기준으로 확인한다. 묶음 중간에 미지원 시각이 생겼다가 최종 snapshot에서 제거되는 경우에는 중간 캐시를 폐기하는 대신 유효한 최종 캐시를 유지할 수 있고 공개 조회 결과는 같다. 근거는 [rollup 묶음 A/B](../benchmarks/2026-11-10/RollupBatchAB-2026-11-10.md)에 둔다.
 
+일별 집계 SQL은 그 범위 조건을 먼저 적용한 뒤 필요한 지표 열·현지 일·사용량 유무만 `scoped AS MATERIALIZED` 입력으로 만든다. 사용량 유무는 토큰이 양수이면 1, 0토큰이면 모델 기록 여부로 한 번 확정하여 완료/기록 표본 식들이 공유한다. 날짜 UDF 호출 수 자체는 기존과 같다. 제공자/모델의 원본 fallback·NULL·38/37개 영속 집계 상태를 유지하며 부분 날짜의 raw `UNION ALL`도 같은 입력 생성기를 쓴다. 이 임시 결과는 SQL 실행 동안만 존재하며 파싱용 영속/명시적 TEMP 테이블을 추가하지 않는다. [저장·집계 SQL A/B](../benchmarks/2026-11-10/QueryMinimizeAB-2026-11-10.md).
+
 DB 모듈은 변경 이유별로 책임을 나눈다. `src/summary/db/index.ts`의 `SummaryDatabase`는 worker·scanner API를 연결하고 `connection.ts`는 연결·PRAGMA·statement cache·transaction·optimize·close를 소유한다. `migrations.ts`는 버전 전환, `manifest.ts`는 파일 관측·진단, `memoryStore.ts`는 최종 결과 저장, `billing.ts`는 비용 분류·재계산을 맡는다. 이전 SessionStore·SessionChanges와 SQL staging·metadata 구현은 제거했다.
 
 갱신 저장은 `SummaryDatabase.replaceMemory()`와 정상 성분 묶음용 `replaceMemoryBatch()`를 통해 `memoryStore.ts`의 같은 저장 계획 경로를 사용한다. 정상·비중첩 세션 snapshot은 입력 Iterable을 한 번 색인하고 보존으로 제외되는 요청을 뺀 최종 이름을 모은다. 프로젝트는 마지막 이름, 세션은 마지막 비어 있지 않은 이름을 선택하여 저장 묶음 안에서 키별 한 번 UPSERT하고 FK 부모 행을 요청보다 먼저 만든다. 사용자 결제 설정은 제공자·세션 키별 한 번 조회하며 설정이 없을 때의 `summary.billing` fallback은 요청별로 유지한다. 이름·결제 조회 캐시는 해당 transaction 밖으로 유지하지 않는다.
 
 정상 묶음의 facts·manifest는 snapshot 순서대로 반영하고 이름 prune은 영향 키를 모아 마지막에 한 번 처리한다. 같은 세션을 반복 교체하거나 삭제·재연결을 포함하는 직접 batch 입력은 중간 prune·결제 선택 cascade 의미를 보존하도록 snapshot별 계획 경로를 사용한다. 묶음 API는 변경 세션을 모아 마지막에 한 번 rollup하고, 단일 snapshot은 기존 세션별 rollup 경로를 유지한다. 입력 Iterable을 자체 재시도하지 않으며 scanner의 배열 DTO만 실패 후 개별 재시도한다. 스트리밍 winner에서 완성한 요청·모델·도구 snapshot을 기존 facts와 비교해 달라진 행만 저장하고 manifest·삭제 보존·이름 정리·rollup을 같은 BEGIN IMMEDIATE/COMMIT으로 묶는다. 변경 없는 ID·updated_at과 Skill OFF의 기존 횟수를 유지하며 어느 단계가 실패해도 해당 transaction 전체를 rollback한다. 호환 replaceSessions API와 이벤트 TEMP 경로는 제공하지 않는다.
+
+신규 요청은 facts를 INSERT한 뒤 모델·도구를 바로 INSERT하고, 없는 자식을 대상으로 하는 DELETE는 실행하지 않는다. 기존 요청의 모델·도구 snapshot이 변경됐을 때만 기존 DELETE/INSERT 교체를 수행한다. facts INSERT와 요청별 비용 저장·ID 연결·updated_at 의미는 기존과 같으며 신규 facts를 별도 RETURNING 묶음/ID Map으로 모으지 않는다.
 
 저장 API는 COMMIT에 성공한 세션 이름을 반환한다. scanner는 그 이름만 이번 스캔 상태에 기록하고 마무리 단계의 Codex metadata 이름과 같으면 중복 UPDATE를 생략한다. 실패·rollback한 이름은 기록하지 않고, 원본 변경 없이 이름만 바뀐 세션과 저장 결과에 없는 이름의 후단 갱신은 유지한다.
 

@@ -1,5 +1,7 @@
 # 2026-11-10 벤치마크
 
+- [QueryMinimizeAB-2026-11-10.md](QueryMinimizeAB-2026-11-10.md): 세 서브에이전트의 구간 조사로 요청 저장·일별 집계를 선택하고 신규 자식 DELETE 제거와 집계 사용량 플래그 공유를 현재 1,355·10,000·100건에서 준비 3쌍·교대 10쌍 대조했다. 묶음 INSERT RETURNING 후보는 회귀로 제거했다. [최종 원시](QueryMinimizeAB-2026-11-10.json), [기준 진단](QueryMinimizeBaseline-2026-11-10.json), [SQL 실행 수](QueryMinimizeProfile-2026-11-10.json), [계획·함수 호출 수](QueryMinimizePlans-2026-11-10.json), [경계 검증](QueryMinimizeValidation-2026-11-10.json), [transaction 대조](QueryMinimizeTransactionValidation-2026-11-10.json), [소스/실험 ZIP](QueryMinimizeSources-2026-11-10.zip), [SHA](QueryMinimizeSources-2026-11-10.json).
+
 - [원본 순회 중 통계 누적 통합](../../research/2026-11-10/UnifiedStreamingStats-2026-11-10.md): 현재 823·합성 10,000요청의 최초·추가·무변경 저장·평균 정합성을 변경 전과 대조했다. [최종 원시 검증](UnifiedStreamStatsValidationFinal-2026-11-10.json), [검사 요약](UnifiedStreamStatsChecks-2026-11-10.json). 시간은 정합성 실행의 단일 참고값이다.
 
 - [SelectiveWinnerAB-2026-11-10.md](SelectiveWinnerAB-2026-11-10.md): 선택 JSON 파싱·winner 비교 재사용 실패 기록. 현재 817·합성 10,000·100요청을 각 1회 비교해 결과는 일치했지만 실데이터 최초 갱신이 27.41% 느려졌다. 코드는 실험 전으로 복원하고 실험 산출물은 제거했다.
