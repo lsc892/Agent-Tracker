@@ -64,7 +64,7 @@ Codex 응답의 [parseCodexQuota()](../src/quota/codex/response.ts#L15)는 응�
 
 SQL staging·metadata 폴더와 호환 저장 경로는 제거했다. [sourceEvidence](../src/summary/aggregation/sourceEvidence.ts)가 토큰 벡터 없이 포맷·복사·요청 ID 근거를 수집하고 [winners](../src/summary/aggregation/winners.ts)가 한 그룹의 winner DTO를 갱신한다. [turns](../src/summary/aggregation/turns.ts)는 최종 요청·모델·도구·진단 결과를 만든다.
 
-[Worker](../src/summary/client/worker.ts)는 메시지 큐·DB 지연 생성·취소·갱신 잠금을 조율한다. [JSONL](../src/summary/jsonl/index.ts)은 줄·이미지·바이트 예산을 담당하고 [수집기](../src/summary/scanner/index.ts)는 근거 수집과 winner 선택의 읽기 경계를 확인한다. [통계 SQL](../src/summary/db/queries/README.md)은 공통 정책·원본·롤업 조회로 나눈다.
+[Worker](../src/summary/client/worker.ts)는 메시지 큐·DB 지연 생성·취소·갱신 잠금을 조율한다. [JSONL 진입점](../../src/summary/jsonl/index.ts)은 파일·압축·행 콜백·offset·취소와 자원 수명을 조율하고, [line.ts](../../src/summary/jsonl/line.ts)는 행의 이미지 제거·문자열 문법·바이트 예산 상태를 맡는다. [errors.ts](../../src/summary/jsonl/errors.ts)의 단일 SummaryError를 진입점에서 재노출하여 기존 오류 식별과 호출 경로를 유지한다. [수집기](../src/summary/scanner/index.ts)는 근거 수집과 winner 선택의 읽기 경계를 확인한다. [통계 SQL](../src/summary/db/queries/README.md)은 공통 정책·원본·롤업 조회로 나눈다.
 
 [화면 메시지 파서](../src/ui/presentation.ts)는 종류별 파서를 선택하고 사용량의 필수 제어값과 선택 표현·대상·epoch·달력 범위를 구분한다. 제어값 오류는 메시지를 거부하고 잘못된 선택 필터는 생략한다. [quota 카드](../src/ui/quotaTooltip.ts)는 제공자 창·credit·조회 상태를 순서대로 조립하고, [Webview](../media/dashboard.js)는 날짜 검증·요청 구성·표 머리글/행·state 갱신을 같은 파일의 함수로 연결한다.
 
