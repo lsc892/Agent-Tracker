@@ -98,7 +98,7 @@ function compareSnapshot(snapshot, expected) {
   }
 }
 /**
- * 책임: quota 표시 모드별 백분율과 잔여 막대가 서버 값과 맞는지 검증한다.
+ * 책임: quota 표시 모드별 백분율과 막대가 서버 값과 맞는지 검증한다.
  * 알고리즘: 상세·간단 및 사용·잔여 조합을 순회해 선택 창의 반올림 백분율·10단계 막대를 독립 계산하고 표시 결과에서 추출한 값과 비교한다.
  */
 function checkPresentation(snapshot, expected, present) {
@@ -120,7 +120,10 @@ function checkPresentation(snapshot, expected, present) {
       });
       requireValue(JSON.stringify(numbers) === JSON.stringify(wanted), 'presentation-mismatch');
       const bars = [...view.text.matchAll(/\$\(agent-tracker-quota-(\d+)\)/g)].map(match => Number(match[1]));
-      const wantedBars = selected.map(row => Math.round(Math.max(0, Math.min(100, 100 - row.usedPercent)) / 10));
+      const wantedBars = selected.map(row => {
+        const used = Math.max(0, Math.min(100, row.usedPercent));
+        return Math.round((mode === 'used' ? used : 100 - used) / 10);
+      });
       requireValue(JSON.stringify(bars) === JSON.stringify(wantedBars), 'presentation-mismatch');
       result[`${detail}-${mode}`] = numbers;
     }
