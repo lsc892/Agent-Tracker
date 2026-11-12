@@ -241,6 +241,7 @@
   "dashboard.last7Days": "최근 7일",
   "dashboard.last30Days": "최근 30일",
   "dashboard.last90Days": "최근 90일",
+  "dashboard.allTime": "전체 기간",
   "dashboard.customDateRange": "직접 설정",
   "dashboard.fromDate": "시작일",
   "dashboard.toDate": "종료일",

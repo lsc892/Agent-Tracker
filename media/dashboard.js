@@ -50,7 +50,7 @@
   if (saved && Object.hasOwn(chartMetrics, saved.chartMetric)) $('chart-metric').value = saved.chartMetric;
   if (saved?.chartBy === 'model') chartBy = 'model';
   if (saved?.section === 'skills') section = 'skills';
-  if (['7', '30', '90', 'custom'].includes(saved?.dateRange)) $('date-range').value = saved.dateRange;
+  if (['7', '30', '90', 'all', 'custom'].includes(saved?.dateRange)) $('date-range').value = saved.dateRange;
   if (typeof saved?.fromDay === 'string') $('from-day').value = saved.fromDay;
   if (typeof saved?.toDay === 'string') $('to-day').value = saved.toDay;
   updateDateControls();
@@ -125,7 +125,7 @@
     if ($('date-range').value === 'custom') {
       if ($('from-day').value) request.fromDay = $('from-day').value;
       if ($('to-day').value) request.toDay = $('to-day').value;
-    } else {
+    } else if ($('date-range').value !== 'all') {
       request.recentDays = Number($('date-range').value);
     }
     return request;
