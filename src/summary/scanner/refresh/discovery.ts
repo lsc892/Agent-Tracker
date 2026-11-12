@@ -3,7 +3,6 @@ import { lstat, opendir } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import type { FileMetadata, ManifestRow } from '../../db/types';
 import { SummaryError } from '../../jsonl';
-import { addMember } from '../worklist';
 import type { RefreshContext } from './context';
 import { PARSER_VERSION, sessionKey } from './state';
 import type { FileState } from './state';
@@ -16,9 +15,6 @@ export async function discoverSources(context: RefreshContext): Promise<void> {
   const { database, state, roots, collect, retain, result, check, report } = context;
   const manifest = database.connection.prepare('SELECT * FROM manifest ORDER BY id').all() as unknown as ManifestRow[];
   const paths = new Map(manifest.map(file => [sessionKey(file.provider, file.path), file]));
-  const inodes = new Map<string, Set<ManifestRow>>();
-  if (process.platform !== 'win32')
-    for (const file of manifest) addMember(inodes, JSON.stringify([file.provider, file.dev, file.inode]), file);
   let nextId = manifest.reduce((max, file) => Math.max(max, file.id), 0) + 1;
   const observed = new Set<number>();
   for (const root of roots) {
@@ -27,20 +23,8 @@ export async function discoverSources(context: RefreshContext): Promise<void> {
         const stat = await lstat(path);
         if (!stat.isFile())
           continue;
-        let previous = paths.get(sessionKey(root.provider, resolve(path)));
-        if (!previous && process.platform !== 'win32') {
-          const candidates = [...inodes.get(JSON.stringify([root.provider, String(stat.dev), String(stat.ino)])) ?? []]
-            .filter(file => !observed.has(file.id));
-          if (candidates.length === 1) {
-            try {
-              await lstat(candidates[0].path);
-            }
-            catch (error) {
-              if ((error as NodeJS.ErrnoException).code === 'ENOENT')
-                previous = candidates[0];
-            }
-          }
-        }
+        // Deleted inodes can be reused. Cross-path matches need the parsed content proof in reconnectSources.
+        const previous = paths.get(sessionKey(root.provider, resolve(path)));
         const metadata: FileMetadata = { provider: root.provider, source_root: root.path, path: resolve(path), session_id: previous?.session_id ?? null,
           size_bytes: stat.size, mtime_ms: stat.mtimeMs, dev: String(stat.dev), inode: String(stat.ino), parser_version: PARSER_VERSION,
           capabilities_collected: collect ? 1 : 0, source_identity: previous?.source_identity, content_hash: previous?.content_hash };
