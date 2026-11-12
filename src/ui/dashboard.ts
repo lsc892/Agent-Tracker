@@ -6,7 +6,7 @@ import type { TrackerConfiguration } from '../configuration';
 import type { SummaryClient } from '../summary/client';
 import type { UsageQuery } from '../summary/types';
 import { dashboardHtml, diagnosticsHtml } from './html';
-import { periodBounds } from '../summary/db/timezone';
+import { calendarPeriod, periodBounds } from '../summary/db/timezone';
 import { parseDashboardMessage, type DashboardMessage } from './presentation';
 
 export interface DashboardDependencies {
@@ -26,6 +26,7 @@ export class Dashboard implements vscode.Disposable {
   private diagnosticsVersion = 0;
   private fromDay: string | undefined;
   private toDay: string | undefined;
+  private recentDays: 7 | 30 | 90 | undefined;
   private refreshPromise: Promise<void> | undefined;
   private readonly unsubscribe: () => void;
 
@@ -113,6 +114,7 @@ export class Dashboard implements vscode.Disposable {
         this.query = message.query;
         this.fromDay = message.fromDay;
         this.toDay = message.toDay;
+        this.recentDays = message.recentDays;
         if (this.ready) await this.loadUsage();
         break;
       case 'queryNames': await this.loadNames(message); break;
@@ -236,8 +238,16 @@ export class Dashboard implements vscode.Disposable {
     const timezone = settings.usage.timezone;
     const query = { ...this.query, timezone, providers: this.providers(), includeCosts: settings.usage.showApiCosts,
       excludeEmptyUsage: settings.usage.excludeEmptyUsage };
-    if (this.fromDay) query.fromMs = periodBounds(this.fromDay, timezone).fromMs;
-    if (this.toDay) query.toMs = periodBounds(this.toDay, timezone).toMs;
+    let fromDay = this.fromDay;
+    let toDay = this.toDay;
+    if (this.recentDays !== undefined) {
+      toDay = calendarPeriod(Date.now(), timezone, 'day');
+      const start = new Date(`${toDay}T00:00:00.000Z`);
+      start.setUTCDate(start.getUTCDate() - this.recentDays + 1);
+      fromDay = start.toISOString().slice(0, 10);
+    }
+    if (fromDay) query.fromMs = periodBounds(fromDay, timezone).fromMs;
+    if (toDay) query.toMs = periodBounds(toDay, timezone).toMs;
     if (query.fromMs !== undefined && query.toMs !== undefined && query.fromMs >= query.toMs) throw new Error(t('dashboard.invalidDateRange'));
     const result = await this.dependencies.summary.query(query);
     if (version === this.queryVersion) this.post({ type: 'usage', result: { ...result, groupBy: this.query.groupBy } });
