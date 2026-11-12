@@ -97,7 +97,6 @@ npm 包和 VS Code 扩展需要分别卸载。
 | `claude.enabled` / `codex.enabled` | `true` | 分别启用各提供商的用量查询与日志统计 |
 | `quota.refreshPolicy` | `automatic` | 自动查询。`manual` 仅在点击刷新时查询 |
 | `quota.pollingIntervalSeconds` | `900` | 自动查询间隔（秒），最小 30 秒；非活动窗口中暂停 |
-| `codex.showStatusBar` | `true` | 在状态栏显示 Codex，隐藏后仍继续查询用量 |
 | `display.percentage` | `used` | 显示已用比例；`remaining` 显示剩余比例 |
 | `display.detail` | `detailed` | 显示 7 天和 5 小时用量；`compact` 仅显示 5 小时用量 |
 | `display.colorMode` | `automatic` | 使用主题颜色，也可选 `white`、`black` 或 `custom` |

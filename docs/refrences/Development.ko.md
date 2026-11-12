@@ -101,7 +101,6 @@ npm run restore:vscode         # 원본 복원
 | `agentTracker.codex.executable` | PATH의 `codex` |
 | `agentTracker.usage.timezone` | 시스템 시간대; 예: `Asia/Seoul` |
 | `agentTracker.quota.pollingIntervalSeconds` | Claude·Codex 공통 900초, 최소 30초 |
-| `agentTracker.codex.showStatusBar` | Codex 상태 표시줄 표시 |
 | `agentTracker.display.percentage` | `used`; 남은 비율은 `remaining` |
 | `agentTracker.display.detail` | `detailed`; 간략 표시는 `compact` |
 | `agentTracker.display.colorMode` | `automatic`; 자동·흰색·검은색·사용자 지정 |
@@ -111,7 +110,7 @@ npm run restore:vscode         # 원본 복원
 
 Windows의 npm Codex 설치는 `.cmd` 옆 패키지에서 네이티브 실행 파일을 찾습니다. 다른 설치 방식이면 `.exe` 경로를 지정하세요. WSL·SSH·컨테이너에서는 확장이 실행되는 환경의 CLI·로그 경로를 사용합니다.
 
-추적을 끈 제공자는 quota 조회·통계 수집을 중단하고 카드와 통계에서 숨깁니다. 기존 통계 데이터는 보관하며 다시 켜면 표시합니다. Claude는 추적이 켜져 있으면 상태 표시줄에 표시합니다. `codex.showStatusBar`는 Codex의 상태 표시줄만 숨기는 설정입니다. 자동 갱신은 Claude·Codex에 같은 간격을 적용하며 활성 창에서만 동작합니다. 창으로 돌아올 때 마지막 성공 조회가 5분 이상 지났거나 조회에 실패했다면 재시도합니다. 수동 정책은 시작 시에도 조회하지 않고 새로고침을 누를 때만 조회합니다.
+`claude.enabled`와 `codex.enabled`는 각 제공자의 추적과 표시를 함께 제어합니다. 켜면 상태 표시줄·사용량 카드·통계에 표시하고, 끄면 quota 조회·통계 수집을 중단하며 모두 숨깁니다. 기존 통계 데이터는 보관하며 다시 켜면 표시합니다. 별도 상태 표시줄 표시 토글은 없으며, 과거 `codex.showStatusBar` 저장값은 사용하지 않습니다. 자동 갱신은 Claude·Codex에 같은 간격을 적용하며 활성 창에서만 동작합니다. 창으로 돌아올 때 마지막 성공 조회가 5분 이상 지났거나 조회에 실패했다면 재시도합니다. 수동 정책은 시작 시에도 조회하지 않고 새로고침을 누를 때만 조회합니다.
 
 **Claude: Cleanup Period Days**에 보존 일수를 입력하면 Claude 데이터 홈의 `settings.json`에서 `cleanupPeriodDays`만 변경하고 나머지 설정을 유지합니다. `null`로 돌리면 기존 Claude 값을 유지하며 이후 자동 반영을 중단합니다. 기본 보존 기간은 Claude의 30일이며 삭제는 Claude Code가 처리합니다. Agent Tracker는 대화 로그를 직접 삭제하지 않습니다. [Claude 설정](https://code.claude.com/docs/en/settings-reference#cleanupperioddays)
 

@@ -94,10 +94,9 @@ All setting keys below use the `agentTracker.` prefix.
 | Setting | Default | Description |
 | --- | --- | --- |
 | `language` | `auto` | Follow the VS Code language. Choose Korean, English, Simplified Chinese, Japanese, Spanish, or French |
-| `claude.enabled` / `codex.enabled` | `true` | Track subscription usage and log statistics for each provider |
+| `claude.enabled` / `codex.enabled` | `true` | Track subscription usage and logs, and show each provider in the status bar, usage card, and statistics |
 | `quota.refreshPolicy` | `automatic` | Refresh automatically. `manual` fetches usage only when you click refresh |
 | `quota.pollingIntervalSeconds` | `900` | Automatic refresh interval in seconds. Minimum 30; pauses in inactive windows |
-| `codex.showStatusBar` | `true` | Show Codex in the status bar. Usage queries continue when hidden |
 | `display.percentage` | `used` | Show the used percentage. `remaining` shows the remaining percentage |
 | `display.detail` | `detailed` | Show 7-day and 5-hour usage. `compact` shows only 5-hour usage |
 | `display.colorMode` | `automatic` | Use the theme color. Also supports `white`, `black`, and `custom` |

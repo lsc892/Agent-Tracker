@@ -204,6 +204,8 @@ manual refresh
 
 ### 3.5 카드 내용과 설정
 
+제공자의 추적과 표시는 `agentTracker.claude.enabled`·`agentTracker.codex.enabled` 두 토글로 제어한다. 켜진 제공자는 상태 표시줄·사용량 카드·통계에 표시하고, 꺼진 제공자는 quota 조회와 원본 로그 수집을 중단하며 모두 숨긴다. 기존 계산 데이터는 보관한다. 상태 표시줄만 별도로 숨기는 `codex.showStatusBar`는 제거하며 기존 저장값도 사용하지 않는다. 두 제공자를 모두 끄면 통합 상태 표시줄 항목과 새로고침 버튼을 숨긴다.
+
 상태 표시줄 전경색은 확장 설정의 `agentTracker.display.colorMode`에서 자동(`automatic`, 기본)·흰색(`white`)·검은색(`black`)·사용자 지정(`custom`)을 선택한다. 자동은 `StatusBarItem.color`에 CSS 값 `inherit`를 지정해 현재 테마의 상태 표시줄 색상과 `workbench.colorCustomizations`, 작업공간의 기본 색상을 상속한다. VS Code는 이 값을 항목 label의 인라인 `style.color`에 반영하므로 마우스를 올렸을 때도 상태 표시줄의 전경색을 유지한다. 밝음/어두움만 보고 순백·검정을 지정하지 않으므로 2026 Dark의 기본 회색, 밝은 테마, 고대비·디버깅·폴더 없는 창의 색상도 VS Code가 결정한다. 흰색·검은색·사용자 지정은 검증한 HEX를 인라인 CSS 색상으로 고정하므로 테마가 바뀌어도 선택한 색상과 투명도를 유지한다. 로고·잔량 막대·문자는 하나의 항목이므로 같은 전경색을 사용하며 새로고침 버튼에도 같은 모드를 적용한다. [StatusBarItem API](https://code.visualstudio.com/api/references/vscode-api#StatusBarItem), [상태표시줄 테마 색상](https://code.visualstudio.com/api/references/theme-color#status-bar-colors), [VS Code의 인라인 색상 반영 구현](https://github.com/microsoft/vscode/blob/main/src/vs/workbench/browser/parts/statusbar/statusbarItem.ts)
 
 `agentTracker.display.customColor`는 `#RGB`·`#RGBA`·`#RRGGBB`·`#RRGGBBAA`를 받으며 짧은 값을 확장하고 투명도를 유지한다. 기본값은 `#ffffff`이고 사용자 지정 모드에서만 사용한다. 잘못된 HEX나 알 수 없는 모드는 테마 기본 색상으로 처리한다. 두 설정은 window scope로 사용자·작업공간에 저장하고 VS Code의 작업공간 우선순위를 따른다.

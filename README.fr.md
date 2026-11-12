@@ -97,7 +97,6 @@ Toutes les clés ci-dessous portent le préfixe `agentTracker.`.
 | `claude.enabled` / `codex.enabled` | `true` | Active les requêtes d'utilisation et les statistiques des journaux par fournisseur |
 | `quota.refreshPolicy` | `automatic` | Actualise automatiquement. `manual` consulte l'utilisation uniquement au clic sur Actualiser |
 | `quota.pollingIntervalSeconds` | `900` | Intervalle d'actualisation automatique en secondes. Minimum : 30 ; pause dans les fenêtres inactives |
-| `codex.showStatusBar` | `true` | Affiche Codex dans la barre d'état. Les requêtes continuent même lorsqu'il est masqué |
 | `display.percentage` | `used` | Affiche le pourcentage utilisé. `remaining` affiche le pourcentage restant |
 | `display.detail` | `detailed` | Affiche l'utilisation sur 7 jours et 5 heures. `compact` affiche uniquement celle sur 5 heures |
 | `display.colorMode` | `automatic` | Utilise la couleur du thème. Accepte aussi `white`, `black` et `custom` |

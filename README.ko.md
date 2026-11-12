@@ -94,10 +94,9 @@ npm 패키지 삭제와 VS Code 확장 삭제는 별도입니다.
 | 설정 | 기본값 | 설명 |
 | --- | --- | --- |
 | `language` | `auto` | VS Code 언어 따르기. 한국어·영어·중국어 간체·일본어·스페인어·프랑스어 선택 가능 |
-| `claude.enabled` / `codex.enabled` | `true` | 제공자별 사용량 조회·로그 통계 추적 |
+| `claude.enabled` / `codex.enabled` | `true` | 제공자별 사용량 조회·로그 통계 추적 및 상태 표시줄·카드·통계 표시 |
 | `quota.refreshPolicy` | `automatic` | 자동 조회. `manual`은 새로고침을 누를 때만 조회 |
 | `quota.pollingIntervalSeconds` | `900` | 자동 조회 간격(초). 최소 30초, 비활성 창에서는 일시 중지 |
-| `codex.showStatusBar` | `true` | Codex 상태 표시줄 표시. 숨겨도 사용량 조회는 유지 |
 | `display.percentage` | `used` | 사용률 표시. `remaining`은 남은 비율 표시 |
 | `display.detail` | `detailed` | 7일·5시간 표시. `compact`는 5시간만 표시 |
 | `display.colorMode` | `automatic` | 테마 색상 사용. `white`·`black`·`custom` 선택 가능 |

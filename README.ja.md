@@ -97,7 +97,6 @@ npm パッケージと VS Code 拡張機能はそれぞれアンインストー�
 | `claude.enabled` / `codex.enabled` | `true` | プロバイダー別の使用量取得・ログ統計の追跡 |
 | `quota.refreshPolicy` | `automatic` | 自動で取得。`manual` は更新ボタンを押したときのみ取得 |
 | `quota.pollingIntervalSeconds` | `900` | 自動取得の間隔（秒）。最小30秒、非アクティブなウィンドウでは一時停止 |
-| `codex.showStatusBar` | `true` | ステータスバーに Codex を表示。非表示でも使用量の取得は継続 |
 | `display.percentage` | `used` | 使用率を表示。`remaining` は残りの割合を表示 |
 | `display.detail` | `detailed` | 7日・5時間の使用量を表示。`compact` は5時間のみ表示 |
 | `display.colorMode` | `automatic` | テーマの色を使用。`white`・`black`・`custom` も選択可能 |
