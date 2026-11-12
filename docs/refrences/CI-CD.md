@@ -38,7 +38,7 @@
 - append/truncate/replace 후 session 전체 재집계가 full rebuild 결과와 일치
 - newline 없는 마지막 row 보류
 - winner 파일 삭제 후 남은 원본을 재파싱하여 duplicate runner-up 복구
-- move는 신뢰 가능한 inode에서만 최적화
+- 경로 이동은 source_identity와 이전 byte 범위의 SHA-256으로 검증하며, inode가 재사용돼도 내용이 다른 원본은 별도로 보존
 - 파일 session 귀속 변경 시 이전·새 session의 summary와 manifest를 함께 교체
 - n개보다 많은 파일과 큰 session도 metadata·parser buffer·대기열 한도 유지
 - 묶음 경계의 duplicate와 main/subagent 기록도 사용자 요청당 summary 한 행
