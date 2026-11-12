@@ -59,15 +59,24 @@ function usageScope(filter: SummaryFilter, groupBy: UsageGrouping, timezone: str
 
 /**
  * 책임: 요청 총량·완료 표본 평균·미상 캐시를 일관되게 집계한다.
- * 알고리즘: 합계는 모든 상태를 포함하고 평균은 완료 표본만 사용하며, 캐시는 알려진 값의 개수가 표본 수와 같을 때만 합계·평균을 반환한다.
+ * 알고리즘: 완료 표본의 평균과 캐시 미상 규칙을 적용하고, 도표에 필요한 경우에만 토큰 구성별 평균을 계산한다.
  */
-function usageSums(excludeEmptyUsage = false): string {
+function usageSums(excludeEmptyUsage = false, includeComponentAverages = true): string {
   // Totals include every status; averages use completed requests and optionally recorded usage only.
   const completed = `status = 'completed'${excludeEmptyUsage ? ` AND ${RECORDED_USAGE}` : ''}`;
   const averageCache = (column: string): string => `CASE
     WHEN COUNT(CASE WHEN ${completed} THEN ${column} END) = SUM(${completed})
     THEN AVG(CASE WHEN ${completed} THEN ${column} END)
   END AS avg_${column}`;
+  const componentAverages = includeComponentAverages
+    ? `AVG(CASE WHEN ${completed} THEN input_tokens END) AS avg_input_tokens,
+    AVG(CASE WHEN ${completed} THEN output_tokens END) AS avg_output_tokens,
+    ${averageCache('cache_write_input_tokens')},
+    ${averageCache('cache_read_input_tokens')}`
+    : `NULL AS avg_input_tokens,
+    NULL AS avg_output_tokens,
+    NULL AS avg_cache_write_input_tokens,
+    NULL AS avg_cache_read_input_tokens`;
   return `
     SUM(input_tokens) AS input_tokens,
     SUM(output_tokens) AS output_tokens,
@@ -83,10 +92,7 @@ function usageSums(excludeEmptyUsage = false): string {
     SUM(${RECORDED_USAGE}) AS recorded_turns,
     SUM(status = 'completed' AND ${RECORDED_USAGE}) AS recorded_completed_turns,
     AVG(CASE WHEN ${completed} THEN total_tokens END) AS avg_tokens_per_turn,
-    AVG(CASE WHEN ${completed} THEN input_tokens END) AS avg_input_tokens,
-    AVG(CASE WHEN ${completed} THEN output_tokens END) AS avg_output_tokens,
-    ${averageCache('cache_write_input_tokens')},
-    ${averageCache('cache_read_input_tokens')},
+    ${componentAverages},
     AVG(CASE WHEN ${completed} THEN duration_ms END) AS avg_duration_ms,
     SUM(${completed} AND duration_ms IS NOT NULL) AS turns_with_duration,
     SUM(${completed} AND duration_quality = 'exact') AS exact_duration_turns,
@@ -150,7 +156,8 @@ export function buildUsageQuery(filter: SummaryFilter, groupBy: UsageGrouping, t
   };
   const metricOrder = sortBy ? `${metrics[sortBy]} DESC, ${groups}` : groups;
   const dimensions = usageDimensions(scope, by).join(',\n      ');
-  const sums = usageSums(filter.excludeEmptyUsage);
+  const includeComponentAverages = filter.chartMetric === undefined || filter.chartMetric === 'averageTokens';
+  const sums = usageSums(filter.excludeEmptyUsage, includeComponentAverages);
   const costs = filter.includeCosts ? `, ${COST_SUMS}` : '';
   const aggregateSql = `SELECT
       ${dimensions},
