@@ -117,7 +117,7 @@ Utilisez **Agent Tracker : Supprimer les données statistiques** pour effacer le
 ## Notes de version
 
 <details open>
-<summary>v0.2.1</summary>
+<summary>v0.3.1</summary>
 
 - **Sélection rapide des périodes** — Choisissez les 7, 30 ou 90 derniers jours, tout l'historique ou des dates personnalisées. La période par défaut comprend aujourd'hui et les 6 jours précédents. Les dates personnalisées affichent les champs de début et de fin et leurs calendriers.
 - **Actualisation des statistiques plus efficace** — Lit et agrège les journaux JSONL en un seul passage et traite plusieurs fichiers en parallèle pour les ensembles volumineux. Pour les réponses en double, sélectionne l'enregistrement privilégié et ajuste les totaux uniquement de la différence entre leurs contributions.

@@ -1,10 +1,10 @@
 <p align="center">
-  <strong><a href="README.md">English</a></strong> |
-  <a href="README.ko.md">한국어</a> |
-  <a href="README.zh.md">简体中文</a> |
-  <a href="README.ja.md">日本語</a> |
-  <a href="README.es.md">Español</a> |
-  <a href="README.fr.md">Français</a>
+  <strong><a href="https://github.com/lsc892/Agent-Tracker/blob/main/README.md">English</a></strong> |
+  <a href="https://github.com/lsc892/Agent-Tracker/blob/main/README.ko.md">한국어</a> |
+  <a href="https://github.com/lsc892/Agent-Tracker/blob/main/README.zh.md">简体中文</a> |
+  <a href="https://github.com/lsc892/Agent-Tracker/blob/main/README.ja.md">日本語</a> |
+  <a href="https://github.com/lsc892/Agent-Tracker/blob/main/README.es.md">Español</a> |
+  <a href="https://github.com/lsc892/Agent-Tracker/blob/main/README.fr.md">Français</a>
 </p>
 
 # Agent Tracker
@@ -20,7 +20,7 @@ A VS Code extension that shows current Claude and Codex usage and time until res
 - **Automatic and manual refresh** — Usage refreshes every 15 minutes by default. Use the refresh button for an immediate update.
 
 <p align="center">
-  <img src="resource/readme/at-1.png" alt="Status bar and usage details card">
+  <img src="https://raw.githubusercontent.com/lsc892/Agent-Tracker/main/resource/readme/at-1.png" alt="Status bar and usage details card">
 </p>
 
 ### Compare tokens and time by conversation, period, and model
@@ -30,7 +30,7 @@ A VS Code extension that shows current Claude and Codex usage and time until res
 - **Improve your workflow** — Compare average tokens and time per request before and after changing models or adopting skills and plugins to refine how you use agents.
 
 <p align="center">
-  <img src="resource/readme/at-2.png" alt="Average tokens by model and skill usage statistics">
+  <img src="https://raw.githubusercontent.com/lsc892/Agent-Tracker/main/resource/readme/at-2.png" alt="Average tokens by model and skill usage statistics">
 </p>
 
 Open **Usage statistics** from the card or run **Agent Tracker: Open Usage Statistics** from the Command Palette. Statistics are calculated from local conversation logs when you open the view.
@@ -117,7 +117,7 @@ Use **Agent Tracker: Delete Statistics Data** to clear aggregated statistics. Or
 ## Release notes
 
 <details open>
-<summary>v0.2.1</summary>
+<summary>v0.3.1</summary>
 
 - **Quick date ranges** — Choose the last 7, 30, or 90 days, all time, or custom dates. The default is the last 7 days including today, and custom dates provide start/end inputs and calendars.
 - **Faster statistics refresh** — Read and aggregate JSONL logs in a single pass, and process multiple files in parallel for large log sets. Duplicate responses select the preferred record and update totals only by the difference in contributions.
@@ -131,7 +131,7 @@ Use **Agent Tracker: Delete Statistics Data** to clear aggregated statistics. Or
 - **Unsupported language fallback** — Display English when the VS Code language is unsupported.
 - **Updated extension icon** — Replace the icon and reduce its image file size.
 
-[Algorithm changes, measured gains over v0.2.0, and limitations (Korean)](docs/Performance-v0.3.0.ko.md)
+[Algorithm changes, measured gains over v0.2.0, and limitations (Korean)](https://github.com/lsc892/Agent-Tracker/blob/main/docs/Performance-v0.3.0.ko.md)
 
 </details>
 
@@ -148,6 +148,6 @@ Use **Agent Tracker: Delete Statistics Data** to clear aggregated statistics. Or
 
 <br><br>
 
-[Usage and development reference (Korean)](docs/refrences/Development.ko.md)
+[Usage and development reference (Korean)](https://github.com/lsc892/Agent-Tracker/blob/main/docs/refrences/Development.ko.md)
 
-[Code responsibilities (Korean)](src/README.md) · [Tools](tools/README.md) · [Tests](tests/README.md) · [Webview](media/README.md) · [Localization](localization/README.md) · [Resources](resource/README.md) · [Documents](docs/README.md)
+[Code responsibilities (Korean)](https://github.com/lsc892/Agent-Tracker/blob/main/src/README.md) · [Tools](https://github.com/lsc892/Agent-Tracker/blob/main/tools/README.md) · [Tests](https://github.com/lsc892/Agent-Tracker/blob/main/tests/README.md) · [Webview](https://github.com/lsc892/Agent-Tracker/blob/main/media/README.md) · [Localization](https://github.com/lsc892/Agent-Tracker/blob/main/localization/README.md) · [Resources](https://github.com/lsc892/Agent-Tracker/blob/main/resource/README.md) · [Documents](https://github.com/lsc892/Agent-Tracker/blob/main/docs/README.md)
