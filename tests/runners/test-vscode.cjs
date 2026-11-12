@@ -15,10 +15,12 @@ async function main() {
   const source = join(sandbox, '.claude', 'projects');
   await mkdir(join(userData, 'User'), { recursive: true });
   await mkdir(source, { recursive: true });
+  const fixtureStart = Date.now() - 3000;
+  const fixtureDay = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Seoul', dateStyle: 'short' }).format(new Date(fixtureStart));
   const fixture = [
     { type: 'ai-title', sessionId: 'ui-session', aiTitle: '통계 화면 검증' },
-    { type: 'user', sessionId: 'ui-session', promptId: 'ui-turn', timestamp: '2026-10-03T00:00:00Z', cwd: '/synthetic/project', message: { content: 'synthetic request' } },
-    { type: 'assistant', promptId: 'ui-turn', requestId: 'ui-request', timestamp: '2026-10-03T00:00:03Z', message: { id: 'ui-response', model: 'claude-sonnet-4-6', stop_reason: 'end_turn', content: [
+    { type: 'user', sessionId: 'ui-session', promptId: 'ui-turn', timestamp: new Date(fixtureStart).toISOString(), cwd: '/synthetic/project', message: { content: 'synthetic request' } },
+    { type: 'assistant', promptId: 'ui-turn', requestId: 'ui-request', timestamp: new Date(fixtureStart + 3000).toISOString(), message: { id: 'ui-response', model: 'claude-sonnet-4-6', stop_reason: 'end_turn', content: [
       { type: 'tool_use', id: 'ui-skill', name: 'Skill', input: { skill: 'review:check' } },
       { type: 'tool_use', id: 'ui-agent', name: 'Agent', input: { subagent_type: 'Explore' } },
     ], usage: { input_tokens: 50, output_tokens: 50, cache_creation_input_tokens: 20, cache_read_input_tokens: 30 } } },
@@ -41,7 +43,8 @@ async function main() {
     ...(executable ? { vscodeExecutablePath: executable } : { version: process.env.VSCODE_TEST_VERSION || 'stable' }),
     extensionDevelopmentPath: extension,
     extensionTestsPath: join(extension, 'dist', 'tests', 'vscode', 'suite.js'),
-    extensionTestsEnv: { ELECTRON_RUN_AS_NODE: undefined, VSCODE_IPC_HOOK_CLI: undefined, AGENT_TRACKER_TEST_ROOT: sandbox, AGENT_TRACKER_TEST_USER_DATA: userData },
+    extensionTestsEnv: { ELECTRON_RUN_AS_NODE: undefined, VSCODE_IPC_HOOK_CLI: undefined, AGENT_TRACKER_TEST_ROOT: sandbox, AGENT_TRACKER_TEST_USER_DATA: userData,
+      AGENT_TRACKER_TEST_USAGE_DAY: fixtureDay },
     launchArgs: ['--user-data-dir', userData, '--extensions-dir', join(sandbox, 'extensions'), '--disable-extensions', '--skip-welcome', '--skip-release-notes', '--disable-gpu', '--disable-workspace-trust', '--no-sandbox'],
   }));
 }
