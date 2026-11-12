@@ -117,12 +117,15 @@ Use **Agent Tracker: Delete Statistics Data** to clear aggregated statistics. Or
 ## Release notes
 
 <details open>
-<summary>v0.3.0</summary>
+<summary>v0.2.1</summary>
 
+- **Quick date ranges** — Choose the last 7, 30, or 90 days, all time, or custom dates. The default is the last 7 days including today, and custom dates provide start/end inputs and calendars.
 - **Faster statistics refresh** — Read and aggregate JSONL logs in a single pass, and process multiple files in parallel for large log sets. Duplicate responses select the preferred record and update totals only by the difference in contributions.
-- **Database writes and queries** — Update only changed requests and batch writes and daily rollups across sessions. Fewer duplicate queries are needed, and tables, charts, and total row counts share the same query results.
+- **Database writes and queries** — Update only changed requests and batch writes and daily rollups across sessions. Fewer duplicate queries are needed, and tables, charts, and total row counts share the same query results. Token-component averages are calculated when the average-token chart needs them, reducing work for other charts.
 - **Codex subagent usage** — Combine child and nested subagent usage into the parent request. Creation records link children without request identifiers, with improved handling of deep parent chains, cycles, and missing parents.
-- **Moved log updates** — Verify source identity and content before linking a log at its new path and removing the old path record, so usage added after a move continues to update statistics.
+- **Moved log updates** — Verify source identity and content before linking a log at its new path and removing the old path record, so usage added after a move continues to update statistics. Content checks also protect stored usage when the operating system reuses a deleted file's identifier for a different file.
+- **Provider controls** — The Claude and Codex enabled settings each control usage tracking and visibility in the status bar, usage card, and statistics.
+- **Usage and remaining gauges** — Bars and percentages follow the selected display mode. Usage bars fill from the left, and remaining bars shrink from the right.
 - **Usage card and accessibility** — Restore the full card on hover and, with the local workbench patch, pin or dismiss the same card by clicking. Accessible summaries announce weekly and 5-hour remaining usage and reset times with Codex first, even in compact mode.
 - **Usage query compatibility** — Remove the arbitrary 100-window limit from Claude and Codex responses and use the installed extension version in communication metadata.
 - **Unsupported language fallback** — Display English when the VS Code language is unsupported.
