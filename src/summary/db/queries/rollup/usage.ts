@@ -57,9 +57,10 @@ export function buildRollupUsageQueries(
   const source = buildDailyUsageSource(filter, grouping, timezone, by);
   const dimensions = rollupDimensions(grouping, by);
   const groupColumns = dimensions.groups.join(', ');
+  const includeComponentAverages = filter.chartMetric === undefined || filter.chartMetric === 'averageTokens';
   const groupedRows = `SELECT
       ${dimensions.columns.join(',\n      ')},
-      ${mergeRollupMetrics(filter.excludeEmptyUsage)}${withTotal ? ', COUNT(*) OVER() AS _total' : ''}
+      ${mergeRollupMetrics(filter.excludeEmptyUsage, includeComponentAverages)}${withTotal ? ', COUNT(*) OVER() AS _total' : ''}
     FROM (
       ${source.sql}
     ) AS turn_summary
