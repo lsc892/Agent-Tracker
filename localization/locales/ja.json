@@ -241,6 +241,7 @@
   "dashboard.last7Days": "過去7日間",
   "dashboard.last30Days": "過去30日間",
   "dashboard.last90Days": "過去90日間",
+  "dashboard.allTime": "全期間",
   "dashboard.customDateRange": "期間を指定",
   "dashboard.fromDate": "開始日",
   "dashboard.toDate": "終了日",

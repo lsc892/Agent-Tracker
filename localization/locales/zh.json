@@ -241,6 +241,7 @@
   "dashboard.last7Days": "最近7天",
   "dashboard.last30Days": "最近30天",
   "dashboard.last90Days": "最近90天",
+  "dashboard.allTime": "全部时间",
   "dashboard.customDateRange": "自定义范围",
   "dashboard.fromDate": "开始日期",
   "dashboard.toDate": "结束日期",

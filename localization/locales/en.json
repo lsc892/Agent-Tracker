@@ -241,6 +241,7 @@
   "dashboard.last7Days": "Last 7 days",
   "dashboard.last30Days": "Last 30 days",
   "dashboard.last90Days": "Last 90 days",
+  "dashboard.allTime": "All time",
   "dashboard.customDateRange": "Custom range",
   "dashboard.fromDate": "Start date",
   "dashboard.toDate": "End date",
