@@ -45,12 +45,13 @@ export class QuotaStatusBar implements vscode.Disposable {
     this.quota.color = color;
     this.refresh.color = color;
     const tracked = ['claude', 'codex'].flatMap(provider => states.filter(state => state.provider === provider && settings[state.provider].enabled));
-    const views = tracked.map(state => statusBarPresentation(state, settings.display.percentage, settings.display.detail));
+    const now = Date.now();
+    const views = tracked.map(state => statusBarPresentation(state, settings.display.percentage, settings.display.detail, now));
     this.quota.text = views.map(view => view.text).join('  │  ');
-    this.quota.tooltip = createQuotaTooltip(tracked, settings);
+    this.quota.tooltip = createQuotaTooltip(tracked, settings, now);
     // Mouse hover and the native click toggle share the Markdown card above.
     // Keep the plain-text quota summary available to screen readers.
-    this.quota.accessibilityInformation = { label: quotaHoverSummary(tracked), role: 'button' };
+    this.quota.accessibilityInformation = { label: quotaHoverSummary(tracked, now), role: 'button' };
     this.refresh.text = tracked.some(state => state.refreshing) ? '$(sync~spin)' : '$(refresh)';
     if (tracked.length) {
       this.quota.show();

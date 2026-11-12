@@ -97,7 +97,7 @@ npm 패키지 삭제와 VS Code 확장 삭제는 별도입니다.
 | `claude.enabled` / `codex.enabled` | `true` | 제공자별 사용량 조회·로그 통계 추적 및 상태 표시줄·카드·통계 표시 |
 | `quota.refreshPolicy` | `automatic` | 자동 조회. `manual`은 새로고침을 누를 때만 조회 |
 | `quota.pollingIntervalSeconds` | `900` | 자동 조회 간격(초). 최소 30초, 비활성 창에서는 일시 중지 |
-| `display.percentage` | `used` | 사용률 표시. `remaining`은 남은 비율 표시 |
+| `display.percentage` | `used` | 막대와 숫자로 사용률 표시. 사용률은 왼쪽부터 차고, `remaining`은 잔여량이 오른쪽 끝부터 줄어듦 |
 | `display.detail` | `detailed` | 7일·5시간 표시. `compact`는 5시간만 표시 |
 | `display.colorMode` | `automatic` | 테마 색상 사용. `white`·`black`·`custom` 선택 가능 |
 | `display.customColor` | `#ffffff` | `custom` 모드에서 사용할 HEX 색상 |
