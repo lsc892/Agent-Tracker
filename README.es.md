@@ -145,4 +145,4 @@ Usa **Agent Tracker: Eliminar datos estadísticos** para borrar los resultados a
 
 <br><br>
 
-[Referencia de uso y desarrollo (en coreano)](docs/Development.ko.md)
+[Referencia de uso y desarrollo (en coreano)](docs/refrences/Development.ko.md)

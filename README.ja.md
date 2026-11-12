@@ -145,4 +145,4 @@ npm パッケージと VS Code 拡張機能はそれぞれアンインストー�
 
 <br><br>
 
-[利用・開発リファレンス（韓国語）](docs/Development.ko.md)
+[利用・開発リファレンス（韓国語）](docs/refrences/Development.ko.md)
