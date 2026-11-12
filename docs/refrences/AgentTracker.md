@@ -204,6 +204,10 @@ manual refresh
 
 ### 3.5 카드 내용과 설정
 
+제공자의 추적과 표시는 `agentTracker.claude.enabled`·`agentTracker.codex.enabled` 두 토글로 제어한다. 켜진 제공자는 상태 표시줄·사용량 카드·통계에 표시하고, 꺼진 제공자는 quota 조회와 원본 로그 수집을 중단하며 모두 숨긴다. 기존 계산 데이터는 보관한다. 상태 표시줄만 별도로 숨기는 `codex.showStatusBar`는 제거하며 기존 저장값도 사용하지 않는다. 두 제공자를 모두 끄면 통합 상태 표시줄 항목과 새로고침 버튼을 숨긴다.
+
+`agentTracker.display.percentage`는 상태 표시줄과 사용량 카드의 막대·숫자에 함께 적용한다. 기본값 `used`는 사용량을, `remaining`은 `100 - 사용률`로 계산한 잔여량을 표시한다. 채워진 영역은 왼쪽 끝에 붙여 잔여량은 오른쪽 끝부터 줄고 사용량은 왼쪽부터 차도록 고정한다. 상태 표시줄은 선택한 백분율을 10% 단위 폰트 글리프로, 카드는 같은 백분율을 SVG 막대로 표시한다. 카드의 색상은 실제 사용률을 기준으로 한다. 표시 모드를 바꾸면 기존 snapshot으로 즉시 다시 표시한다.
+
 상태 표시줄 전경색은 확장 설정의 `agentTracker.display.colorMode`에서 자동(`automatic`, 기본)·흰색(`white`)·검은색(`black`)·사용자 지정(`custom`)을 선택한다. 자동은 `StatusBarItem.color`에 CSS 값 `inherit`를 지정해 현재 테마의 상태 표시줄 색상과 `workbench.colorCustomizations`, 작업공간의 기본 색상을 상속한다. VS Code는 이 값을 항목 label의 인라인 `style.color`에 반영하므로 마우스를 올렸을 때도 상태 표시줄의 전경색을 유지한다. 밝음/어두움만 보고 순백·검정을 지정하지 않으므로 2026 Dark의 기본 회색, 밝은 테마, 고대비·디버깅·폴더 없는 창의 색상도 VS Code가 결정한다. 흰색·검은색·사용자 지정은 검증한 HEX를 인라인 CSS 색상으로 고정하므로 테마가 바뀌어도 선택한 색상과 투명도를 유지한다. 로고·잔량 막대·문자는 하나의 항목이므로 같은 전경색을 사용하며 새로고침 버튼에도 같은 모드를 적용한다. [StatusBarItem API](https://code.visualstudio.com/api/references/vscode-api#StatusBarItem), [상태표시줄 테마 색상](https://code.visualstudio.com/api/references/theme-color#status-bar-colors), [VS Code의 인라인 색상 반영 구현](https://github.com/microsoft/vscode/blob/main/src/vs/workbench/browser/parts/statusbar/statusbarItem.ts)
 
 `agentTracker.display.customColor`는 `#RGB`·`#RGBA`·`#RRGGBB`·`#RRGGBBAA`를 받으며 짧은 값을 확장하고 투명도를 유지한다. 기본값은 `#ffffff`이고 사용자 지정 모드에서만 사용한다. 잘못된 HEX나 알 수 없는 모드는 테마 기본 색상으로 처리한다. 두 설정은 window scope로 사용자·작업공간에 저장하고 VS Code의 작업공간 우선순위를 따른다.
@@ -246,13 +250,13 @@ Agent Tracker의 VS Code 설정은 다음 순서의 소제목과 목차 하위 �
 | 사용량 통계 | 통계 사용 여부, Skill 집계, API 추정 비용, 빈 사용량 제외, 시간대 |
 | 데이터 및 로그 | 공통 상위 데이터 홈, Claude 로그 보존 기간, Codex CLI 실행 파일 |
 
-`package.json`의 `contributes.configuration`을 여섯 카테고리의 배열로 등록한다. 설정은 총 21개이며 데이터 위치는 `agentTracker.dataHome` 하나로 지정한다. 카드·통계 화면·명령 팔레트의 설정 열기는 `@ext:AgentTracker.agent-tracker`로 필터링한 VS Code Settings를 연다. 카테고리·설명·선택지는 VS Code의 현재 표시 언어로 번역하며 비율의 사용률·남은 비율과 표시 방식의 압축·상세 선택지도 번역한다. 별도의 전체 설정 Webview는 제공하지 않는다. 설정 키·기본값·scope·입력 제약과 VS Code의 사용자·작업공간 저장 및 초기화 동작을 유지한다. 설정 화면을 여는 것만으로 quota 조회·원본 재집계를 실행하지 않는다. [VS Code 설정 카테고리와 정렬 규칙](https://code.visualstudio.com/api/references/contribution-points#contributesconfiguration)
+`package.json`의 `contributes.configuration`을 여섯 카테고리의 배열로 등록한다. 설정은 총 20개이며 데이터 위치는 `agentTracker.dataHome` 하나로 지정한다. 카드·통계 화면·명령 팔레트의 설정 열기는 `@ext:AgentTracker.agent-tracker`로 필터링한 VS Code Settings를 연다. 카테고리·설명·선택지는 VS Code의 현재 표시 언어로 번역하며 비율의 사용률·남은 비율과 표시 방식의 압축·상세 선택지도 번역한다. 별도의 전체 설정 Webview는 제공하지 않는다. 설정 키·기본값·scope·입력 제약과 VS Code의 사용자·작업공간 저장 및 초기화 동작을 유지한다. 설정 화면을 여는 것만으로 quota 조회·원본 재집계를 실행하지 않는다. [VS Code 설정 카테고리와 정렬 규칙](https://code.visualstudio.com/api/references/contribution-points#contributesconfiguration)
 
 설정 원본은 `src/configuration/schema.ts`의 `settingDefinitions`이며 키는 중첩 경로에서 만들고 기본값·선택지·입력 제약·category·설명도 같은 항목에서 관리한다. `tools/configuration.cjs`는 컴파일 전 원본 schema만 메모리에서 변환해 전체 설정 manifest를 구성하며 `tools/localization.cjs`가 동기화하거나 오래된 생성물을 검사한다. 언어 선택지만 `localization/languages.json`에서 확장한다. 실행 시에는 같은 정의를 순회해 설정을 한 번씩 읽고 `configuration.ts`가 표시·통계·제공자별 정규화와 경로 파생을 수행한다. 내부 객체는 `display`·`quota`·`usage`·`claude`·`codex`로 묶고 타입은 공통 정의와 반환값에서 추론한다. 매번 새 스냅샷을 만들어 이전 설정과 비교하며 앱이 최신 설정을 소유한다. 단순 설정은 해당 영역의 정의만 추가하면 읽기·타입·설정 UI에 반영되고, 파생값이나 기능의 실제 처리는 별도 구현한다.
 
 ### 3.8 표시 언어와 번역 리소스
 
-통계의 시작일·종료일 입력칸은 표시 언어와 관계없이 `year-month-day`를 안내하고 `YYYY-MM-DD` 값을 사용한다. 직접 입력과 기본 달력 선택을 함께 제공하며 유효하지 않은 날짜는 조회하지 않는다.
+통계 기간은 `최근 7일`·`최근 30일`·`최근 90일`·`전체 기간`·`직접 설정` 순서의 선택 목록으로 제공하며 기본값과 초기화 값은 최근 7일이다. 최근 기간을 선택하면 첫 페이지부터 바로 조회하고, 호스트에서 조회할 때마다 통계 시간대의 오늘을 포함한 N일의 달력 경계를 계산한다. 전체 기간을 선택하면 날짜 제한 없이 첫 페이지부터 바로 조회한다. 토큰·Skill 통계에 같은 기간을 적용한다. 직접 설정을 선택하면 시작일·종료일 입력칸을 펼치고 조회 버튼으로 적용한다. 입력칸은 표시 언어와 관계없이 `year-month-day`를 안내하고 `YYYY-MM-DD` 값을 사용한다. 직접 입력과 기본 달력 선택을 함께 제공하며 유효하지 않은 날짜는 조회하지 않는다. 양쪽 날짜가 비어 있으면 전체 기간을 조회한다. 적용한 기간 선택과 직접 입력 날짜는 Webview state에 보존한다.
 
 `agentTracker.language`는 기본 `auto`로 VS Code 표시 언어를 따르며 여섯 언어를 명시적으로 지정할 수 있다. 확장의 실행 중 문구는 명시적 언어를 우선하고 `auto`일 때 VS Code 표시 언어를 사용하며, 지원하지 않는 언어는 영어로 fallback한다. 지역 태그는 지원하는 기본 언어로 묶는다. 누락된 번역 키는 한국어로 fallback하며 한국어 JSON을 원문과 번역 키의 기준으로 둔다. 상태 표시줄·카드·안내와 열린 통계·데이터 확인·색상 화면을 현재 언어로 다시 표시한다. 숫자·날짜도 언어를 따르며 집계 시간대·원본 이름·진단 코드는 보존한다. 언어 전환은 서버 조회나 원본 재집계를 유발하지 않는다.
 
@@ -348,18 +352,14 @@ new / previous error or interruption
   이전 정상 metadata가 없거나 최근 시도가 오류·중단으로 끝남
   → 사용자가 다시 열거나 새로 고침을 요청했을 때 해당 session을 다시 처리
 
-moved
-  path는 달라졌지만 신뢰 가능한 dev/inode가 동일
-  → 같은 파일 id로 path와 source_root 갱신; 내용·session 귀속 변화는 별도 판정
-
-reconnected
+moved / reconnected
   이전 경로가 실제로 없고 provider·source_identity가 같은 정상 원본 후보가 새 위치에 하나 있음
   새 원본이 이전 정상 byte 범위 전체를 SHA-256 검증으로 포함함
   → 새 위치의 manifest id를 유지하고 이전 행은 세션 통계 반영 transaction에서 삭제
      다른 누락 원본이 없으면 기존 요청도 현재 원본으로 다시 집계
 ```
 
-Windows는 dev/inode 이동 최적화를 사용하지 않는다. 그 외 운영체제도 dev/inode가 0·누락·모호하면 새 경로를 신규 행으로 발견한다. 이후 모든 운영체제에서 정상 파싱된 source_identity와 content_hash로 누락 원본의 연결을 검증한다. 전체 탐색과 초기 파싱이 끝난 뒤 연결을 판정하므로 session_id만 같은 main·subagent나 여러 정상 복사본을 임의로 합치지 않는다. 현재 탐색 루트 밖의 이전 원본도 실제 ENOENT와 내용 포함을 확인하면 연결하며, 다른 제외 원본의 읽기 실패는 기존 보존 정책을 따른다.
+모든 운영체제에서 새 경로는 신규 행으로 발견하고 정상 파싱된 source_identity와 content_hash로 누락 원본의 연결을 검증한다. 삭제된 파일의 dev/inode가 새 파일에 재사용되는 경우에도 내용이 다른 이전 원본은 보존한다. 전체 탐색과 초기 파싱이 끝난 뒤 연결을 판정하므로 session_id만 같은 main·subagent나 여러 정상 복사본을 임의로 합치지 않는다. 현재 탐색 루트 밖의 이전 원본도 실제 ENOENT와 내용 포함을 확인하면 연결하며, 다른 제외 원본의 읽기 실패는 기존 보존 정책을 따른다.
 
 content_hash는 이미지 생략·Zstd 해제 전 원본 byte를 스트리밍하며 계산한다. 같은 크기는 저장된 해시를 비교하고, 새 원본이 더 크면 이전 크기까지의 prefix와 새 원본 전체를 고정 크기 버퍼로 재검증해 append를 허용한다. 재검증 I/O도 읽은 byte 통계에 포함한다. 연결된 이전 행은 보존 대상에서 제외하고, 다른 원본 누락으로 유지되는 요청의 진단 파일 참조는 새 행으로 옮긴다. 파싱·취소·연결 성분 실패나 DB 반영 실패에서는 기존 통계와 이전 행을 보존한다. 내용이 다르거나 정상 새 원본이 여러 개여서 연결이 모호한 경우에도 기존 누락 보존을 유지한다.
 
@@ -935,7 +935,7 @@ schema version 2는 기존 `turn_summary`의 행·id·manifest 참조를 보존�
 
 도표는 기존 필터와 집계 기준을 공유하고 `총 토큰 / 평균 토큰 / 평균 시간 / 요청 수` 순서로 지표를 선택한다. 요청 수는 완료·진행 중·실패 요청을 합친 전체 요청 수이며 완료 수를 상세 정보에 함께 표시한다. 평균 토큰은 완료 요청 수, 평균 시간은 유효한 시간을 가진 완료 요청 수를 표본으로 사용한다. 사용자 요청별 조회에서는 `총 토큰 / 소요 시간`만 선택하고 각 요청의 개별 값을 표시한다.
 
-평균 토큰의 input/output/cache 평균은 합계 평균과 같은 완료 요청 표본에서 SQL로 계산하며 빈 사용량 제외 설정도 동일하게 적용한다. 캐시 구성은 표본 중 한 요청이라도 미확인 값이 있으면 해당 평균을 null로 보존해 막대 전체를 회색으로 표시한다. 진행 중·실패 요청의 미확인 구성은 평균에 영향을 주지 않는다. 완료 표본이 없으면 평균을 ‘—’로 표시하고 막대를 그리지 않으며, 확인된 0토큰 평균은 0으로 표시한다. 집계 조회는 일별 상태의 합계·건수를 병합하고 fallback은 저장된 요청·모델 행을 사용하며 원본 로그를 다시 읽지 않는다.
+평균 토큰의 input/output/cache 평균은 평균 토큰 도표가 선택된 경우에만 합계 평균과 같은 완료 요청 표본에서 SQL로 계산하며 빈 사용량 제외 설정도 동일하게 적용한다. `chartMetric`이 총 토큰·요청 수·평균 시간이면 구성별 네 평균은 NULL로 반환하고 관련 집계식을 생략한다. 도표 선택이 없는 직접 조회 API는 전체 지표를 계산한다. 이 선택은 일별 사전 집계와 비용 포함 등 원본 조회에 함께 적용한다. 하단 표의 총 토큰 평균·평균 시간·표본·품질 정보는 모든 도표에서 계산한다. 캐시 구성은 표본 중 한 요청이라도 미확인 값이 있으면 해당 평균을 null로 보존해 막대 전체를 회색으로 표시한다. 진행 중·실패 요청의 미확인 구성은 평균에 영향을 주지 않는다. 완료 표본이 없으면 평균을 ‘—’로 표시하고 막대를 그리지 않으며, 확인된 0토큰 평균은 0으로 표시한다. 집계 조회는 일별 상태의 합계·건수를 병합하고 fallback은 저장된 요청·모델 행을 사용하며 원본 로그를 다시 읽지 않는다.
 
 조회 단위에 따라 다음 모양과 범위를 사용한다.
 

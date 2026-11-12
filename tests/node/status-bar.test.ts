@@ -31,9 +31,9 @@ test('hover preview shows weekly and five-hour remaining quotas, reset countdown
   assert.equal(quotaHoverSummary([weeklyOnly], 0), 'Codex: 7일 - 8% 남음, 재설정까지 5d 21h\n클릭해서 사용량 창 켜기');
 });
 
-test('status uses logo glyphs, remaining meters, reset times, and accessible provider names', () => {
+test('status uses logo glyphs, mode-specific meters, reset times, and accessible provider names', () => {
   const view = statusBarPresentation(state, 'used', 'detailed', 0);
-  assert.equal(view.text, '$(agent-tracker-codex) 7일 $(agent-tracker-quota-1) 92% 사용 5d 21h · 5시간 $(agent-tracker-quota-8) 23% 사용 2h 52m');
+  assert.equal(view.text, '$(agent-tracker-codex) 7일 $(agent-tracker-quota-9) 92% 사용 5d 21h · 5시간 $(agent-tracker-quota-2) 23% 사용 2h 52m');
   assert.match(view.accessibleText, /Codex: 7일: 92% 사용, 재설정 5d 21h, 5시간: 23% 사용/);
   assert.doesNotMatch(view.accessibleText, /\$\(/);
   const compact = statusBarPresentation(state, 'remaining', 'compact', 0);

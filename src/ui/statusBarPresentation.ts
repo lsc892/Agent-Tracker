@@ -1,12 +1,16 @@
-// quota 상태를 상태바 문구·잔량 아이콘·접근성 설명으로 변환한다.
+// quota 상태를 상태바 문구·백분율 아이콘·접근성 설명으로 변환한다.
 import { t } from '../localization';
 import type { QuotaState, QuotaWindow } from '../quota/types';
 import type { DisplayPercentage, DisplayDetail } from '../configuration/schema';
 
 /** StatusBarItem accepts contributed font icons, rather than SVG or HTML. */
+function quotaBar(percent: number): string {
+  const filled = Math.max(0, Math.min(100, percent));
+  return `$(agent-tracker-quota-${Math.round(filled / 10)})`;
+}
+
 export function remainingBar(usedPercent: number): string {
-  const remaining = Math.max(0, Math.min(100, 100 - usedPercent));
-  return `$(agent-tracker-quota-${Math.round(remaining / 10)})`;
+  return quotaBar(100 - usedPercent);
 }
 
 function resetTime(window: QuotaWindow, now: number): string {
@@ -62,7 +66,7 @@ export function statusBarPresentation(
     const resets = resetTime(window, now);
     const period = windowPeriod(window);
     return {
-      text: `${period} ${remainingBar(used)} ${label}${resets ? ` ${resets}` : ''}`,
+      text: `${period} ${quotaBar(percent)} ${label}${resets ? ` ${resets}` : ''}`,
       accessibleText: `${period}${hover ? ' -' : ':'} ${label}${resets ? t(hover ? 'status.resetUntil' : 'status.resetSuffix', { value0: resets }) : ''}`,
     };
   });

@@ -101,17 +101,18 @@ npm run restore:vscode         # 원본 복원
 | `agentTracker.codex.executable` | PATH의 `codex` |
 | `agentTracker.usage.timezone` | 시스템 시간대; 예: `Asia/Seoul` |
 | `agentTracker.quota.pollingIntervalSeconds` | Claude·Codex 공통 900초, 최소 30초 |
-| `agentTracker.codex.showStatusBar` | Codex 상태 표시줄 표시 |
 | `agentTracker.display.percentage` | `used`; 남은 비율은 `remaining` |
 | `agentTracker.display.detail` | `detailed`; 간략 표시는 `compact` |
 | `agentTracker.display.colorMode` | `automatic`; 자동·흰색·검은색·사용자 지정 |
 | `agentTracker.display.customColor` | `#ffffff`; 사용자 지정 모드의 HEX 색상 |
 
+상태 표시줄과 사용량 카드의 막대·숫자는 `display.percentage`를 따릅니다. 잔여량은 오른쪽 끝부터 줄고 사용량은 왼쪽부터 차도록 고정합니다. 표시 모드 변경은 저장된 quota에 즉시 반영됩니다.
+
 확장 설정의 **Display: Color Mode**에서 상태 표시줄 색상을 선택합니다. 기본 **자동**은 2026 Dark·Light·고대비를 포함한 현재 테마와 작업공간의 상태 표시줄 색상을 따릅니다. **Display: Custom Color**에 `#abc`·`#aabbcc`·`#ffffffcc`처럼 입력하거나 설정 설명의 **색상 선택 열기**를 누른 뒤 색상 견본을 클릭해 고를 수 있습니다. 선택 화면은 HEX 입력·불투명도·미리 보기와 사용자/현재 작업공간 저장을 제공합니다. 적용하면 로고·잔량 막대·글자와 새로고침 버튼 색상이 즉시 바뀝니다.
 
 Windows의 npm Codex 설치는 `.cmd` 옆 패키지에서 네이티브 실행 파일을 찾습니다. 다른 설치 방식이면 `.exe` 경로를 지정하세요. WSL·SSH·컨테이너에서는 확장이 실행되는 환경의 CLI·로그 경로를 사용합니다.
 
-추적을 끈 제공자는 quota 조회·통계 수집을 중단하고 카드와 통계에서 숨깁니다. 기존 통계 데이터는 보관하며 다시 켜면 표시합니다. Claude는 추적이 켜져 있으면 상태 표시줄에 표시합니다. `codex.showStatusBar`는 Codex의 상태 표시줄만 숨기는 설정입니다. 자동 갱신은 Claude·Codex에 같은 간격을 적용하며 활성 창에서만 동작합니다. 창으로 돌아올 때 마지막 성공 조회가 5분 이상 지났거나 조회에 실패했다면 재시도합니다. 수동 정책은 시작 시에도 조회하지 않고 새로고침을 누를 때만 조회합니다.
+`claude.enabled`와 `codex.enabled`는 각 제공자의 추적과 표시를 함께 제어합니다. 켜면 상태 표시줄·사용량 카드·통계에 표시하고, 끄면 quota 조회·통계 수집을 중단하며 모두 숨깁니다. 기존 통계 데이터는 보관하며 다시 켜면 표시합니다. 별도 상태 표시줄 표시 토글은 없으며, 과거 `codex.showStatusBar` 저장값은 사용하지 않습니다. 자동 갱신은 Claude·Codex에 같은 간격을 적용하며 활성 창에서만 동작합니다. 창으로 돌아올 때 마지막 성공 조회가 5분 이상 지났거나 조회에 실패했다면 재시도합니다. 수동 정책은 시작 시에도 조회하지 않고 새로고침을 누를 때만 조회합니다.
 
 **Claude: Cleanup Period Days**에 보존 일수를 입력하면 Claude 데이터 홈의 `settings.json`에서 `cleanupPeriodDays`만 변경하고 나머지 설정을 유지합니다. `null`로 돌리면 기존 Claude 값을 유지하며 이후 자동 반영을 중단합니다. 기본 보존 기간은 Claude의 30일이며 삭제는 Claude Code가 처리합니다. Agent Tracker는 대화 로그를 직접 삭제하지 않습니다. [Claude 설정](https://code.claude.com/docs/en/settings-reference#cleanupperioddays)
 
@@ -193,7 +194,7 @@ PR CI는 Windows·Linux·macOS, Node 22·24의 단위·통합 테스트와 Linux
 
 ## 현재 제약
 
-- 사용량 카드는 `StatusBarItem.tooltip`과 `MarkdownString`을 사용합니다. 클릭 토글에는 로컬 VS Code 패치가 필요하며 드래그 이동은 제공하지 않습니다. 카드의 위치·크기·테마는 VS Code가 결정합니다. 상태줄은 SVG 원본에서 만든 폰트 아이콘을 쓰며 기본 자동 색상은 VS Code 상태 표시줄 색상을 상속합니다. 흰색·검은색·사용자 지정은 사용량 항목 전체와 새로고침 버튼에 함께 적용합니다. 막대는 남은 잔량을 표시하며, 숫자는 `display.percentage` 설정을 따릅니다. API 조사와 구현 지점은 [상태표시줄 팝업 문서](research/2026-10-05/StatusBarPopup.md)를 참고하세요.
+- 사용량 카드는 `StatusBarItem.tooltip`과 `MarkdownString`을 사용합니다. 클릭 토글에는 로컬 VS Code 패치가 필요하며 드래그 이동은 제공하지 않습니다. 카드의 위치·크기·테마는 VS Code가 결정합니다. 상태줄은 SVG 원본에서 만든 폰트 아이콘을 쓰며 기본 자동 색상은 VS Code 상태 표시줄 색상을 상속합니다. 흰색·검은색·사용자 지정은 사용량 항목 전체와 새로고침 버튼에 함께 적용합니다. 막대와 숫자는 모두 `display.percentage` 설정을 따릅니다. `remaining`은 잔여량이 오른쪽 끝부터 줄고 `used`는 사용량이 왼쪽부터 찹니다. API 조사와 구현 지점은 [상태표시줄 팝업 문서](research/2026-10-05/StatusBarPopup.md)를 참고하세요.
 - Claude OAuth usage는 비공개 endpoint입니다. 401이면 CLI가 보관한 credential을 한 번 다시 읽고, 계속 실패하면 CLI 재로그인을 안내합니다. refresh token을 직접 교체하지 않습니다.
 - 로컬 JSONL은 제공자의 안정된 API 계약이 아닙니다. 확인할 수 없는 부모 관계나 요청은 임의로 합산하지 않고 별도 데이터 확인 Webview에 표시합니다. fork 이력은 부모와 일치하는 순차 legacy prefix만 제외합니다.
 - 2026-10-08 실제 계정 QA에서 Claude·Codex의 서버 quota와 제품 provider 값·상태 표시줄 formatter가 일치하고 Codex 조회 프로세스가 종료되는 것을 확인했습니다. `$quota-qa`로 다시 검증할 수 있습니다. 이 QA는 설치된 VS Code 창이나 제공자 웹 화면을 관찰하지 않습니다. 실제 VS Code light/dark 테마의 필터·도표·데이터 확인 표시 동작은 별도 자동 검증하며, 화면 가독성과 원격 환경은 수동 검증 대상입니다. 일반 자동 테스트는 합성 fixture와 대체 App Server 프로세스를 사용합니다.

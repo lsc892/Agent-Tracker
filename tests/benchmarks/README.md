@@ -2,6 +2,8 @@
 
 요약·JSONL·SQL·quota 처리의 정확성과 성능을 비교하는 도구를 모은다.
 
+- [chart-metric-ab.cjs](chart-metric-ab.cjs)는 현재 작업 트리와 구성별 평균을 항상 계산하는 사본을 고정하고 설치 DB 사본·합성 10,000·100요청의 조회·1건 추가를 준비 3쌍·교대 10쌍 비교한다. 제공자·모델·비용 표시·선택 도표별 96조건을 독립 JS 평균과 대조한다. 재실행은 `node tests/benchmarks/chart-metric-ab.cjs --output=tests/results/benchmarks/<새 파일>.json`을 사용한다. [측정 보고서](../../docs/benchmarks/2026-11-12/ChartMetricAB-2026-11-12.md)
+
 - [algorithm-minimize-db-validation.cjs](algorithm-minimize-db-validation.cjs) — `--before --after --output`으로 페이지·정렬·이름·도구·coverage·비용·저장·삭제 보존의 A/B 결과와 독립 집계를 검증하고 SQL 실행 수를 기록한다. [algorithm-minimize-parsing-validation.cjs](algorithm-minimize-parsing-validation.cjs)는 같은 인자로 제목·도구·이벤트·계보·JSONL·Zstd·원본 identity를 고정 seed와 독립 기대값에 대조한다. 성능 타이밍과 별도로 실행한다.
 
 - [query-minimize-ab.cjs](query-minimize-ab.cjs) — 현재·10,000·100요청의 저장 구간과 비용·정렬·이름·도구·coverage의 실제 조회 API를 대조한다. `--workspace=... --before=... --after=... --output=<새 JSON>`은 준비 3쌍·교대 10쌍이며, `--baseline-only`는 A 구간 순위, `--profile-only --after=...`는 별도 SQL 실행 수·계획 진단이다. [query-minimize-validation.cjs](query-minimize-validation.cjs)는 같은 `--before --after --output`으로 이번 A/B의 신규 요청 경계·부분 날짜·NULL·실패 rollback을 대조한다.

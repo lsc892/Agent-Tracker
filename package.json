@@ -164,12 +164,6 @@
         "title": "%manifest.statusBar%",
         "order": 2,
         "properties": {
-          "agentTracker.codex.showStatusBar": {
-            "type": "boolean",
-            "default": true,
-            "order": 1,
-            "description": "%manifest.codexStatusBar%"
-          },
           "agentTracker.display.percentage": {
             "type": "string",
             "default": "used",
