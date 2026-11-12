@@ -11,6 +11,9 @@ interface SmokeReport { type: 'smoke-report'; ok: boolean; detail: string; stage
 /** Runs in a real Extension Development Host; the ordinary node:test suite skips this file. */
 export async function run(): Promise<void> {
   const extensionRoot = resolve(__dirname, '../../..');
+  const fixtureDay = process.env.AGENT_TRACKER_TEST_USAGE_DAY;
+  assert.match(fixtureDay ?? '', /^\d{4}-\d{2}-\d{2}$/);
+  const emptyFromDay = new Date(Date.parse(`${fixtureDay}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
   const extension = vscode.extensions.getExtension('AgentTracker.agent-tracker');
   assert.ok(extension, 'Extension is discoverable by VS Code');
   const themes = vscode.extensions.getExtension('vscode.theme-defaults')?.packageJSON.contributes.themes as
@@ -171,8 +174,10 @@ export async function run(): Promise<void> {
               check(!document.getElementById('diagnostics') && !document.getElementById('diagnostic-files'),'diagnostic logs are absent from the statistics page');
               check(!document.getElementById('quota') && !document.querySelector('[data-tab="quota"]') && !document.getElementById('refresh-usage'),'quota and summary refresh controls are absent from statistics');
               check(document.getElementById('configuration-warning').hidden === ${JSON.stringify(!expectTimezoneWarning)},'invalid timezone warning is visible and clears after correction');
-            } else if (phase === 'usage' && message.type === 'usage' && message.result.rows.length) {
-              check(message.result.rows[0].total_tokens === 150,'worker usage reached Webview');
+            } else if (phase === 'usage' && message.type === 'usage') {
+              check(message.result.rows.length === 1 && message.result.rows[0].total_tokens === 150,'recent seven days include the fixture request');
+              check(document.getElementById('date-range').value === '7','statistics defaults to recent seven days');
+              check(document.getElementById('from-date-control').hidden && document.getElementById('to-date-control').hidden,'preset periods hide custom date inputs');
               check(document.getElementById('usage-table').textContent.includes('150'),'usage table renders total');
               check(document.getElementById('usage').hidden === false,'usage stays visible in the statistics page');
               check(message.result.chart.mode === 'calendar','calendar chart arrives from the worker');
@@ -312,7 +317,10 @@ export async function run(): Promise<void> {
               phase = 'skill-restored'; document.getElementById('section-skills').click();
             } else if (phase === 'skill-restored' && message.type === 'usage') {
               for (const category of ['skill','subagent','plugin','model']) check(message.result.capabilities[category].totalUses === 1,'re-enable preserves '+category+' counts without duplication');
-              phase = 'skills-empty'; document.getElementById('from-day').value = '2026-10-04';
+              phase = 'skills-empty'; document.getElementById('date-range').value = 'custom';
+              document.getElementById('date-range').dispatchEvent(new Event('change'));
+              check(!document.getElementById('from-date-control').hidden && !document.getElementById('from-day').disabled,'custom period enables date inputs');
+              document.getElementById('from-day').value = ${JSON.stringify(emptyFromDay)};
               document.getElementById('usage-filters').requestSubmit();
             } else if (phase === 'skills-empty' && message.type === 'usage') {
               for (const category of ['skill','subagent','plugin','model']) {
@@ -321,7 +329,7 @@ export async function run(): Promise<void> {
               phase = 'tokens-return'; document.getElementById('section-tokens').click();
             } else if (phase === 'tokens-return' && message.type === 'usage') {
               check(!document.getElementById('token-section').hidden && document.getElementById('skill-section').hidden,'token statistics return with the same filters');
-              phase = 'empty'; document.getElementById('from-day').value = '2026-10-04';
+              phase = 'empty'; document.getElementById('from-day').value = ${JSON.stringify(emptyFromDay)};
               document.getElementById('usage-filters').requestSubmit();
             } else if (phase === 'empty' && message.type === 'usage') {
               check(message.result.total === 0,'date filter excludes earlier requests');
@@ -336,6 +344,7 @@ export async function run(): Promise<void> {
               phase = 'reset'; document.getElementById('reset-filters').click();
             } else if (phase === 'reset' && message.type === 'usage') {
               check(message.result.groupBy === 'day' && message.result.total === 1,'reset restores daily query results');
+              check(document.getElementById('date-range').value === '7' && document.getElementById('from-date-control').hidden,'reset restores recent seven days and hides custom dates');
               for (const id of ['provider','from-day','to-day']) check(document.getElementById(id).value === '','reset clears '+id);
               check(document.getElementById('project-name').textContent === '전체 프로젝트' && document.getElementById('session-name').textContent === '전체 세션','reset clears selected identities');
               check(document.getElementById('chart-metric').value === 'tokens' && document.getElementById('chart-provider').getAttribute('aria-pressed')==='true','reset restores metric and provider chart');
