@@ -9,4 +9,4 @@ quota와 사용량 통계를 VS Code 상태바·툴팁·Webview에 표시한다.
 - [presentation.ts](presentation.ts): 문자열을 안전하게 변환하고 Webview 메시지와 조회 범위를 검증한다.
 - [quotaTooltip.ts](quotaTooltip.ts): 제공자별 quota·초기화 시각·조회 상태를 Markdown 카드로 구성한다.
 - [statusBar.ts](statusBar.ts) — `QuotaStatusBar`: quota 항목·툴팁·새로고침 버튼과 남은 시간 표시를 관리한다.
-- [statusBarPresentation.ts](statusBarPresentation.ts): quota를 상태바 문구·잔량 아이콘·접근성 설명으로 변환한다.
+- [statusBarPresentation.ts](statusBarPresentation.ts): quota를 상태바 문구·백분율 아이콘·접근성 설명으로 변환한다.

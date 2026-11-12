@@ -97,7 +97,7 @@ All setting keys below use the `agentTracker.` prefix.
 | `claude.enabled` / `codex.enabled` | `true` | Track subscription usage and logs, and show each provider in the status bar, usage card, and statistics |
 | `quota.refreshPolicy` | `automatic` | Refresh automatically. `manual` fetches usage only when you click refresh |
 | `quota.pollingIntervalSeconds` | `900` | Automatic refresh interval in seconds. Minimum 30; pauses in inactive windows |
-| `display.percentage` | `used` | Show the used percentage. `remaining` shows the remaining percentage |
+| `display.percentage` | `used` | Bars and numbers show usage. Used bars fill from the left. `remaining` bars shrink from the right |
 | `display.detail` | `detailed` | Show 7-day and 5-hour usage. `compact` shows only 5-hour usage |
 | `display.colorMode` | `automatic` | Use the theme color. Also supports `white`, `black`, and `custom` |
 | `display.customColor` | `#ffffff` | HEX color for `custom` mode |
