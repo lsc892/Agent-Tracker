@@ -98,7 +98,7 @@ test('invalid token schemas do not silently become zero usage', () => {
   assert.throws(() => claudeTokens({unknown_token_field:30}), /unsupported-token-schema/);
 });
 
-test('rootless Codex subagents retain their local turns and become independent sessions', () => {
+test('rootless Codex subagents retain local turns and lineage for parent request binding', () => {
   const events: ParseEvent[] = [];let identity: ParsedIdentity | undefined;
   const parser = new CodexCurrentParserAdapter({provider:'codex',path:'/sessions/child.jsonl',sourceRoot:'/sessions',fileId:1},
     {identity:value=>{identity=value;},event:event=>events.push(event)});
@@ -109,8 +109,8 @@ test('rootless Codex subagents retain their local turns and become independent s
   }
   parser.finish();
   assert.deepEqual(events.filter(event=>event.kind==='usage').map(event=>event.rootId),['child-turn-one','child-turn-two']);
-  assert.equal(identity!.sessionId,'child');assert.equal(identity!.isMain,true);assert.equal(identity!.parentThreadId,null);
-  assert.equal(identity!.forkedFromId,'parent');assert.equal(identity!.standaloneSubagent,true);
+  assert.equal(identity!.sessionId,'parent');assert.equal(identity!.isMain,false);assert.equal(identity!.parentThreadId,'parent');
+  assert.equal(identity!.rootlessSubagent,true);assert.equal(identity!.standaloneSubagent,undefined);
 });
 
 test('a later explicit root keeps a Codex subagent attached despite rootless inherited history', () => {
