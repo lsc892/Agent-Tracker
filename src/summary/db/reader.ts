@@ -6,7 +6,7 @@ import type {
 } from './types';
 import { SqliteSession } from './connection';
 import {
-  buildCapabilityQueries, buildDiagnosticQueries, buildNameQueries, buildQueryFilter,
+  buildCapabilityQueries, buildDiagnosticCountsQuery, buildDiagnosticQueries, buildNameQueries, buildQueryFilter,
   buildTurnsCountQuery, buildTurnsQuery, buildUsageCountQuery, buildUsageQuery,
 } from './queries';
 import { nonnegative, pageLimit } from './validation';
@@ -37,23 +37,33 @@ export class SummaryReader {
    * 알고리즘: 비용·미지원 기간은 raw로 보내고 그 외에는 rollup의 시간대·형식 준비 여부를 확인한 같은 트랜잭션에서 쿼리를 실행한다.
    */
   private usageQueries<T>(filter: SummaryFilter, groupBy: UsageGrouping, timezone: string,
-    by: UsageBasis, sortBy: ChartMetric | undefined, action: (queries: { rows: QuerySql; count: QuerySql }) => T, tableSort?: UsageSort): T {
+    by: UsageBasis, sortBy: ChartMetric | undefined, action: (queries: { rows: QuerySql; count: QuerySql }) => T,
+    tableSort?: UsageSort, withTotal = false): T {
     const raw = (): { rows: QuerySql; count: QuerySql } => ({
-      rows: buildUsageQuery(filter, groupBy, timezone, by, sortBy, tableSort),
+      rows: buildUsageQuery(filter, groupBy, timezone, by, sortBy, tableSort, withTotal),
       count: buildUsageCountQuery(filter, groupBy, timezone, by),
     });
-    const candidate = buildRollupUsageQueries(filter, groupBy, timezone, by, sortBy, tableSort);
+    const candidate = buildRollupUsageQueries(filter, groupBy, timezone, by, sortBy, tableSort, withTotal);
     if (!candidate) return action(raw());
     return this.database.rollups.read(timezone, ready => action(ready ? candidate : raw()));
   }
 
   /** Name choices cover all stored usage, independently of dates and the table page. */
   queryNames(query: NameQuery): NameResult {
-    const queries = buildNameQueries(query);
-    const total = (this.database.connection.prepare(queries.count.sql)
-      .get(...queries.count.values) as { count: number }).count;
+    return this.countedPage<NameResult['rows'][number]>(buildNameQueries(query, true), query);
+  }
+
+  /** A returned group carries the total; an empty later page needs its full-range count. */
+  private countedPage<T>(queries: { rows: QuerySql; count: QuerySql }, page: OffsetPage): { rows: T[]; total: number } {
+    const limit = pageLimit(page.limit);
+    const offset = nonnegative(page.offset ?? 0, 'offset');
     const rows = this.database.connection.prepare(queries.rows.sql)
-      .all(...queries.rows.values, pageLimit(query.limit), nonnegative(query.offset ?? 0, 'offset')) as unknown as NameResult['rows'];
+      .all(...queries.rows.values, limit, offset) as unknown as (T & { _total: number })[];
+    let total = rows[0]?._total ?? 0;
+    if (!rows.length && offset) {
+      total = (this.database.connection.prepare(queries.count.sql).get(...queries.count.values) as { count: number }).count;
+    }
+    for (const row of rows) delete (row as { _total?: number })._total;
     return { rows, total };
   }
 
@@ -76,20 +86,24 @@ export class SummaryReader {
 
   /**
    * 책임: 분류별 사용 횟수와 페이지에 독립적인 비율을 반환한다.
-   * 알고리즘: 전체 필터 범위의 합계·최댓값과 요청 페이지를 조회해 전체 합계를 비율 분모로 사용한다.
+   * 알고리즘: 순위의 window 지표로 전체 합계·최댓값을 함께 읽고 빈 후속 페이지만 별도 집계하며 전체 합계를 비율 분모로 사용한다.
    */
   queryCapabilities(filter: SummaryFilter, category: CapabilityCategory, offset = 0, limit = 100): CapabilityPage {
     pageLimit(limit);
-    const queries = buildCapabilityQueries(filter, category);
-    const counts = this.database.connection.prepare(queries.counts.sql)
-      .get(...queries.counts.values) as { total: number; totalUses: number; maxUses: number };
+    const queries = buildCapabilityQueries(filter, category, true);
     const ranking = this.database.connection.prepare(queries.ranking.sql);
     const pageOffset = nonnegative(offset, 'offset');
-    const rows = ranking.all(...queries.ranking.values, limit, pageOffset) as unknown as CapabilityRow[];
-    const withPercentage = (row: CapabilityRow): CapabilityRow => ({
+    const rows = ranking.all(...queries.ranking.values, limit, pageOffset) as unknown as
+      (CapabilityRow & { _total: number; _totalUses: number; _maxUses: number })[];
+    let counts = { total: 0, totalUses: 0, maxUses: 0 };
+    if (rows.length) {
+      counts = { total: rows[0]._total, totalUses: rows[0]._totalUses, maxUses: rows[0]._maxUses };
+    } else if (pageOffset) {
+      counts = this.database.connection.prepare(queries.counts.sql).get(...queries.counts.values) as typeof counts;
+    }
+    return { ...counts, rows: rows.map(({ _total, _totalUses, _maxUses, ...row }) => ({
       ...row, percentage: counts.totalUses ? row.usage_count / counts.totalUses * 100 : 0,
-    });
-    return { ...counts, rows: rows.map(withPercentage) };
+    })) };
   }
 
   queryUsageCount(filter: SummaryFilter = {}, groupBy: UsageGrouping = 'total', timezone = 'UTC', by: 'provider' | 'model' = 'provider'): number {
@@ -113,11 +127,13 @@ export class SummaryReader {
         total: this.queryTurnsCount(filter, by),
       }));
     }
-    return this.usageQueries(filter, grouping, timezone, by, page.sortBy, queries => this.readPage(() => ({
-      rows: this.database.connection.prepare(queries.rows.sql)
-        .all(...queries.rows.values, pageLimit(page.limit), nonnegative(page.offset ?? 0, 'offset')) as unknown as UsageRow[],
-      total: (this.database.connection.prepare(queries.count.sql).get(...queries.count.values) as { count: number }).count,
-    })), page.tableSort);
+    return this.usageQueries(filter, grouping, timezone, by, page.sortBy,
+      queries => this.readPage(() => this.countedPage<UsageRow>(queries, page)), page.tableSort, true);
+  }
+
+  diagnosticCounts(providers?: Provider[]): DiagnosticsPage['counts'] {
+    const query = buildDiagnosticCountsQuery(providers);
+    return this.database.connection.prepare(query.sql).get(...query.values) as unknown as DiagnosticsPage['counts'];
   }
 
   /**

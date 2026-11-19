@@ -120,10 +120,6 @@ export const settingDefinitions = {
       type: 'string', default: 'codex', category: 'data', order: 4, scope: 'machine',
       description: '%manifest.codexExecutable%',
     },
-    showStatusBar: {
-      type: 'boolean', default: true, category: 'statusBar', order: 1,
-      description: '%manifest.codexStatusBar%',
-    },
     showReserve: {
       type: 'boolean', default: false, category: 'quotaDetails', order: 1,
       description: '%manifest.showReserve%',

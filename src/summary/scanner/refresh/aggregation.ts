@@ -22,8 +22,6 @@ function sourceFlags(context: RefreshContext, file: FileState): { rootId: string
   const flags: { rootId: string; flag: string }[] = [];
   if (file.prepared?.partialLine)
     flags.push({ rootId: '*', flag: 'partial-line' });
-  if (file.prepared?.identity.standaloneSubagent)
-    flags.push({ rootId: '*', flag: 'standalone-subagent' });
   if (context.state.missingParents.has(file.id))
     flags.push({ rootId: '*', flag: 'missing-parent-agent' });
   return flags;

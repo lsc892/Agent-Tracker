@@ -41,6 +41,7 @@ function view(saved?: Record<string,unknown>) {
   let receive: ((event:{data:unknown})=>void) | undefined;
   let state: unknown;
   get('group').value='session';
+  get('date-range').value='7';
   new Script(readFileSync(join(__dirname,'../../../media/dashboard.js'),'utf8')).runInNewContext({ agentTrackerI18n: createTranslator('ko'),
     acquireVsCodeApi:()=>({getState:()=>saved,setState:(value:unknown)=>{state=value;},postMessage:(message:typeof messages[number])=>messages.push(message)}),
     document:{getElementById:(id:string)=>id.startsWith('skill-chart') ? null : get(id),createElement:(tag:string)=>new Element(tag),createElementNS:(_namespace:string,tag:string)=>new Element(tag),querySelectorAll:()=>[]},
@@ -56,7 +57,7 @@ const sessions = [
 ];
 
 test('Skill section shares project and period filters, renders four count/percentage tables and pages categories independently',()=>{
-  const {get,messages,receive,respond,state}=view();
+  const {get,messages,receive,respond,state}=view({dateRange:'custom'});
   get('from-day').value='2026-10-01';get('to-day').value='2026-10-07';
   get('project-name').listeners.get('click')!();respond({rows:[sessions[0]],total:1});
   get('project-list').children[1].listeners.get('click')!();
@@ -118,7 +119,7 @@ test('Skill off clears cached counts, shows settings guidance and leaves token s
 });
 
 test('reset returns query controls and chart grouping to defaults while retaining extension cost settings',()=>{
-  const {get,messages,receive,respond,state} = view({group:'month',chartMetric:'averageTokens',chartBy:'model',showCosts:true});
+  const {get,messages,receive,respond,state} = view({group:'month',chartMetric:'averageTokens',chartBy:'model',showCosts:true,dateRange:'custom'});
   assert.equal(messages[0].query?.chartBy,'model');assert.equal(messages[0].query?.includeCosts,undefined);
   receive({type:'state',timezone:'UTC',showApiCosts:true});
   get('from-day').value='2026-10-01';get('to-day').value='2026-10-02';
@@ -132,15 +133,16 @@ test('reset returns query controls and chart grouping to defaults while retainin
   assert.equal(query?.groupBy,'day');assert.equal(query?.chartMetric,'tokens');
   for (const name of ['provider','sessionId','projectKey','fromDay','toDay']) assert.equal(query?.[name],undefined);
   assert.equal(query?.offset,0);assert.equal(query?.chartBy,'provider');
+  assert.equal(query?.recentDays,7);
   assert.equal(get('cost-note').hidden,false);assert.equal(get('project-options').hidden,true);
   assert.equal(get('billing-control').hidden,true);assert.equal(get('project-name').textContent,'전체 프로젝트');
   assert.equal(get('session-name').textContent,'전체 세션');
   assert.deepEqual(JSON.parse(JSON.stringify(state())),{section:'tokens',group:'day',chartMetric:'tokens',chartBy:'provider',pageSize:100,
-    capabilityPageSizes:{skill:100,subagent:100,plugin:100,model:100}});
+    capabilityPageSizes:{skill:100,subagent:100,plugin:100,model:100},dateRange:'7',fromDay:'',toDay:''});
 });
 
 test('typed token page sizes synchronize chart controls, reset the page and preserve filters and sorting',()=>{
-  const {get,messages,state}=view({pageSize:37,capabilityPageSizes:{skill:19}});
+  const {get,messages,state}=view({pageSize:37,capabilityPageSizes:{skill:19},dateRange:'custom'});
   assert.equal(messages[0].query?.limit,37);
   assert.equal(get('page-size').value,'37');assert.equal(get('chart-page-size').value,'37');
   get('provider').value='codex';get('from-day').value='2026-10-01';

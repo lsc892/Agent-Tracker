@@ -50,6 +50,10 @@
   if (saved && Object.hasOwn(chartMetrics, saved.chartMetric)) $('chart-metric').value = saved.chartMetric;
   if (saved?.chartBy === 'model') chartBy = 'model';
   if (saved?.section === 'skills') section = 'skills';
+  if (['7', '30', '90', 'all', 'custom'].includes(saved?.dateRange)) $('date-range').value = saved.dateRange;
+  if (typeof saved?.fromDay === 'string') $('from-day').value = saved.fromDay;
+  if (typeof saved?.toDay === 'string') $('to-day').value = saved.toDay;
+  updateDateControls();
   if (validPageSize(saved?.pageSize)) pageSize = saved.pageSize;
   for (const category of capabilityCategories) {
     if (validPageSize(saved?.capabilityPageSizes?.[category])) capabilityPageSizes[category] = saved.capabilityPageSizes[category];
@@ -78,6 +82,7 @@
     for (const by of ['provider', 'model']) $(`chart-${by}`).setAttribute('aria-pressed', String(chartBy === by));
   }
   function validateDateFilters() {
+    if ($('date-range').value !== 'custom') return true;
     for (const id of ['from-day', 'to-day']) {
       const input = $(id);
       const picker = $(`${id}-picker`);
@@ -89,6 +94,14 @@
       return false;
     }
     return true;
+  }
+  function updateDateControls() {
+    const custom = $('date-range').value === 'custom';
+    for (const bound of ['from', 'to']) {
+      $(`${bound}-date-control`).hidden = !custom;
+      $(`${bound}-day`).disabled = !custom;
+      $(`${bound}-day-picker`).disabled = !custom;
+    }
   }
   function updateSectionControls() {
     $('token-section').hidden = section !== 'tokens';
@@ -109,8 +122,12 @@
     if ($('provider').value) request.provider = $('provider').value;
     if (selectedProject) request.projectKey = selectedProject;
     if (selectedSession) request.sessionId = selectedSession;
-    if ($('from-day').value) request.fromDay = $('from-day').value;
-    if ($('to-day').value) request.toDay = $('to-day').value;
+    if ($('date-range').value === 'custom') {
+      if ($('from-day').value) request.fromDay = $('from-day').value;
+      if ($('to-day').value) request.toDay = $('to-day').value;
+    } else if ($('date-range').value !== 'all') {
+      request.recentDays = Number($('date-range').value);
+    }
     return request;
   }
   function updateCostControls() {
@@ -118,7 +135,9 @@
     $('billing-control').hidden = !showCosts || !selectedSession || !$('provider').value;
   }
   function saveState() {
-    vscode.setState({ section, group: $('group').value, chartMetric: $('chart-metric').value, chartBy, pageSize, capabilityPageSizes: { ...capabilityPageSizes } });
+    vscode.setState({ section, group: $('group').value, chartMetric: $('chart-metric').value, chartBy, pageSize,
+      capabilityPageSizes: { ...capabilityPageSizes }, dateRange: $('date-range').value,
+      fromDay: $('from-day').value, toDay: $('to-day').value });
   }
   function validPageSize(value) {
     return Number.isSafeInteger(value) && value >= 1 && value <= 1000;
@@ -769,6 +788,15 @@
   $('settings').addEventListener('click', () => send({ type: 'settings' }));
   $('cancel-usage').addEventListener('click', () => send({ type: 'cancelUsage' }));
   $('usage-filters').addEventListener('submit', event => { event.preventDefault(); offset = 0; query(); });
+  $('date-range').addEventListener('change', () => {
+    updateDateControls();
+    if ($('date-range').value === 'custom') {
+      $('from-day').focus();
+      return;
+    }
+    offset = 0;
+    query();
+  });
   for (const id of ['from-day', 'to-day']) {
     $(id).addEventListener('input', () => { $(`${id}-picker`).value = $(id).value; });
     $(`${id}-picker`).addEventListener('change', () => { $(id).value = $(`${id}-picker`).value; });
@@ -776,6 +804,8 @@
   $('reset-filters').addEventListener('click', () => {
     closeNames(); selectedProject = undefined; selectedSession = undefined;
     for (const id of ['provider', 'from-day', 'to-day', 'from-day-picker', 'to-day-picker']) $(id).value = '';
+    $('date-range').value = '7';
+    updateDateControls();
     $('group').value = 'day'; $('chart-metric').value = 'tokens';
     pageSize = 100;
     for (const category of capabilityCategories) capabilityPageSizes[category] = 100;

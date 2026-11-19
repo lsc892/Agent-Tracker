@@ -2,7 +2,7 @@
 import type { ChartMetric, SummaryFilter, UsageGrouping, UsageSort } from '../../types';
 import { buildQueryFilter } from '../common/filters';
 import type { QuerySql, UsageBasis } from '../common/types';
-import { usageTableOrder } from '../common/sorting';
+import { unknownOrder, usageTableOrder } from '../common/sorting';
 import { mergeRollupMetrics } from './metrics';
 import { buildDailyUsageSource } from './source';
 import { ROLLUP_TABLES } from '../../rollup-state';
@@ -36,7 +36,7 @@ const METRIC_COLUMNS: Record<ChartMetric, string> = {
  */
 export function buildRollupUsageQueries(
   filter: SummaryFilter, grouping: UsageGrouping, timezone: string,
-  by: UsageBasis, sortBy?: ChartMetric, tableSort?: UsageSort,
+  by: UsageBasis, sortBy?: ChartMetric, tableSort?: UsageSort, withTotal = false,
 ): RollupUsageQueries | undefined {
   if (!['total', 'project', 'session', 'day', 'month'].includes(grouping)) throw new RangeError('Unknown usage grouping');
   if (by !== 'provider' && by !== 'model') throw new RangeError('Unknown usage grouping basis');
@@ -57,9 +57,10 @@ export function buildRollupUsageQueries(
   const source = buildDailyUsageSource(filter, grouping, timezone, by);
   const dimensions = rollupDimensions(grouping, by);
   const groupColumns = dimensions.groups.join(', ');
+  const includeComponentAverages = filter.chartMetric === undefined || filter.chartMetric === 'averageTokens';
   const groupedRows = `SELECT
       ${dimensions.columns.join(',\n      ')},
-      ${mergeRollupMetrics(filter.excludeEmptyUsage)}
+      ${mergeRollupMetrics(filter.excludeEmptyUsage, includeComponentAverages)}${withTotal ? ', COUNT(*) OVER() AS _total' : ''}
     FROM (
       ${source.sql}
     ) AS turn_summary
@@ -73,7 +74,7 @@ export function buildRollupUsageQueries(
     : groupedRows;
   const order = tableSort
     ? usageTableOrder(tableSort, grouping, by === 'model')
-    : rollupUnknownOrder(dimensions.calendar, by) + metricOrder;
+    : unknownOrder(by, dimensions.calendar ? 'period IS NULL' : undefined) + metricOrder;
   const rowsSql = `${orderedSource}
     ORDER BY ${order}
     LIMIT ?
@@ -153,16 +154,6 @@ function rollupPeriod(grouping: UsageGrouping): string {
     default:
       return 'NULL';
   }
-}
-
-function rollupUnknownOrder(calendar: boolean, by: UsageBasis): string {
-  const unknown: string[] = [];
-  if (calendar) unknown.push('period IS NULL');
-  if (by === 'model') unknown.push("coalesce(model, '') = ''");
-
-  if (unknown.length > 1) return `(${unknown.join(' OR ')}), ${unknown.join(', ')}, `;
-  if (unknown.length) return `${unknown[0]}, `;
-  return '';
 }
 
 // #endregion

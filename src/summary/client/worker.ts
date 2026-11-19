@@ -22,16 +22,16 @@ function queryUsage(query: UsageQuery, db: SummaryDatabase): unknown {
   const {rows,total} = db.queryUsagePage(query,query.groupBy ?? 'all',query.timezone ?? options.timezone ?? 'UTC',page,by);
   const chart = query.chartMetric ? usageChartFromPage(rows, total, query.groupBy ?? 'all', query.chartMetric, by, query.excludeEmptyUsage) : undefined;
   const billing = query.includeCosts && query.provider && query.sessionId ? db.sessionBilling(query.provider,query.sessionId) : undefined;
-  return {rows,total,by,chart,billing,coverage:db.diagnostics({limit:1,providers:query.providers}).counts};
+  return {rows,total,by,chart,billing,coverage:db.diagnosticCounts(query.providers)};
 }
 
 function queryCapabilities(query: UsageQuery, db: SummaryDatabase): unknown {
   if (options.collectCapabilities === false) {
-    return {rows:[],total:0,capabilitiesEnabled:false,coverage:db.diagnostics({limit:1,providers:query.providers}).counts};
+    return {rows:[],total:0,capabilitiesEnabled:false,coverage:db.diagnosticCounts(query.providers)};
   }
   const capabilities = Object.fromEntries((['skill','subagent','plugin','model'] as const)
     .map(category=>[category,db.queryCapabilities(query,category,query.capabilityOffsets?.[category],query.capabilityLimits?.[category] ?? query.limit)]));
-  return {rows:[],total:0,capabilities,capabilitiesEnabled:true,coverage:db.diagnostics({limit:1,providers:query.providers}).counts};
+  return {rows:[],total:0,capabilities,capabilitiesEnabled:true,coverage:db.diagnosticCounts(query.providers)};
 }
 /**
  * 책임: Worker 안에서 DB 작업을 직렬화하고 통계 결과를 반환한다.

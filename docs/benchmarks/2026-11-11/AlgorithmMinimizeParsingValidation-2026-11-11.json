@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-11",
+  "timezone": "Asia/Seoul",
+  "passed": true,
+  "scope": "Synthetic parsing, capability extraction, JSONL, Zstd, file identity and parent lineage correctness",
+  "initialSeed": 85008422,
+  "finalSeed": 4259561481,
+  "checks": {
+    "titles": 22,
+    "titlesSeeded": 160,
+    "capabilities": 19,
+    "capabilitiesSeeded": 120,
+    "parserEvents": 3,
+    "parserIndependent": 3,
+    "parserFailures": 6,
+    "parserLineage": 3,
+    "parserSeeded": 80,
+    "parserIndependentSeeded": 80,
+    "tokenSchema": 12,
+    "parentGroups": 170,
+    "jsonl": 90,
+    "jsonlIndependent": 90,
+    "zstd": 7,
+    "zstdIndependent": 7,
+    "sourceReader": 7,
+    "sourceReaderIndependent": 7,
+    "sourceFingerprint": 7,
+    "sourceFingerprintIndependent": 7
+  },
+  "totalChecks": 900,
+  "filesystem": {
+    "symbolicLink": "unavailable-EPERM"
+  },
+  "resultDigest": "55ae7adf06972466c368a8b1bf974995e4c54b3e1922f052f63f5d50dbd08207",
+  "privacy": "Synthetic inputs only; no raw records, paths, account identifiers or credentials in this report",
+  "limitations": [
+    "No performance measurements in this validation",
+    "No private real-log parser oracle",
+    "Parent-group Map key iteration order is excluded; per-root member arrays and shared group object identity are checked"
+  ]
+}

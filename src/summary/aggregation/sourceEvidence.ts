@@ -20,9 +20,11 @@ export const capabilityKey = (event: Extract<ParseEvent, { kind: 'capability' }>
 export function normalizedEvent(event: ParseEvent): ParseEvent {
   let result = event;
   for (const [name, value] of Object.entries(event)) {
-    if (typeof value !== 'string' || text(value) === value) continue;
+    if (typeof value !== 'string') continue;
+    const normalized = text(value);
+    if (normalized === value) continue;
     if (result === event) result = { ...event };
-    Reflect.set(result, name, text(value));
+    Reflect.set(result, name, normalized);
   }
   if ('flags' in event && event.flags?.some(flag => text(flag) !== flag)) {
     if (result === event) result = { ...event };

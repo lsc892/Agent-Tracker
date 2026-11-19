@@ -5,14 +5,17 @@ import type { QuerySql } from '../common/types';
 
 /**
  * 책임: 도구 분류별 순위와 전체 비율 계산용 SQL을 만든다.
- * 알고리즘: 동일한 필터·category 조건으로 제공자·이름별 횟수를 합산하고 전체 합계·최댓값과 페이지 순위를 각각 조회한다.
+ * 알고리즘: 제공자·이름별 횟수를 합산하고 선택적으로 같은 그룹 결과에 전체 개수·합계·최댓값의 window 지표를 붙인다.
  */
-export function buildCapabilityQueries(filter: SummaryFilter, category: string): { counts: QuerySql; ranking: QuerySql } {
+export function buildCapabilityQueries(filter: SummaryFilter, category: string, withTotals = false): { counts: QuerySql; ranking: QuerySql } {
   if (!['skill', 'subagent', 'plugin', 'model'].includes(category)) throw new RangeError('Unknown capability category');
   const where = buildQueryFilter(filter);
   const source = `(
     SELECT
-      t.*,
+      t.provider,
+      t.project_key,
+      t.session_id,
+      t.started_at_ms,
       u.category,
       u.name,
       u.usage_count
@@ -40,7 +43,10 @@ export function buildCapabilityQueries(filter: SummaryFilter, category: string):
           provider,
           category,
           name,
-          sum(usage_count) AS usage_count
+          sum(usage_count) AS usage_count${withTotals ? `,
+          count(*) OVER() AS _total,
+          sum(sum(usage_count)) OVER() AS _totalUses,
+          max(sum(usage_count)) OVER() AS _maxUses` : ''}
         FROM ${source}
         WHERE ${scope}
         GROUP BY provider, name

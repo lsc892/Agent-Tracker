@@ -2,6 +2,18 @@
 
 요약·JSONL·SQL·quota 처리의 정확성과 성능을 비교하는 도구를 모은다.
 
+- [jsonl-algorithms](jsonl-algorithms/README.md)는 고정 제품·원본 사본에서 SHA-256·XXH3-128·BLAKE3 전체 파싱과 검증 후 재개, 부분 fingerprint, 고정 블록·rolling·Merkle 조합을 준비 3회·교대 10회 비교한다. 새 요청 추가와 기존 요청의 사용량 갱신을 알고리즘별 두 행으로 놓고 구간 시간·공간복잡도·최종 시간·개선율·피크 RAM을 함께 표시한다. 순수 해시 CPU·평균 조회·캐시·변경 반례와 USN 접근 가능성도 기록한다. [측정 보고서](../../docs/benchmarks/2026-11-16/JsonlAlgorithmsAB-2026-11-16.md)
+
+- [chart-metric-ab.cjs](chart-metric-ab.cjs)는 현재 작업 트리와 구성별 평균을 항상 계산하는 사본을 고정하고 설치 DB 사본·합성 10,000·100요청의 조회·1건 추가를 준비 3쌍·교대 10쌍 비교한다. 제공자·모델·비용 표시·선택 도표별 96조건을 독립 JS 평균과 대조한다. 재실행은 `node tests/benchmarks/chart-metric-ab.cjs --output=tests/results/benchmarks/<새 파일>.json`을 사용한다. [측정 보고서](../../docs/benchmarks/2026-11-12/ChartMetricAB-2026-11-12.md)
+
+- [algorithm-minimize-db-validation.cjs](algorithm-minimize-db-validation.cjs) — `--before --after --output`으로 페이지·정렬·이름·도구·coverage·비용·저장·삭제 보존의 A/B 결과와 독립 집계를 검증하고 SQL 실행 수를 기록한다. [algorithm-minimize-parsing-validation.cjs](algorithm-minimize-parsing-validation.cjs)는 같은 인자로 제목·도구·이벤트·계보·JSONL·Zstd·원본 identity를 고정 seed와 독립 기대값에 대조한다. 성능 타이밍과 별도로 실행한다.
+
+- [query-minimize-ab.cjs](query-minimize-ab.cjs) — 현재·10,000·100요청의 저장 구간과 비용·정렬·이름·도구·coverage의 실제 조회 API를 대조한다. `--workspace=... --before=... --after=... --output=<새 JSON>`은 준비 3쌍·교대 10쌍이며, `--baseline-only`는 A 구간 순위, `--profile-only --after=...`는 별도 SQL 실행 수·계획 진단이다. [query-minimize-validation.cjs](query-minimize-validation.cjs)는 같은 `--before --after --output`으로 이번 A/B의 신규 요청 경계·부분 날짜·NULL·실패 rollback을 대조한다.
+
+  `--experiment=<이름> --dateSeoul=<YYYY-MM-DD>`로 실험 식별자와 날짜를 기록한다. `--billing`은 기존 비용·사용자 선택을 매번 복원한 뒤 가장 큰 Codex 세션의 api/subscription/unknown 변경과 COMMIT을 별도 측정한다. coverage는 제품에 counts 전용 API가 있으면 실제 Worker와 같은 진입점을 사용한다.
+
+- [query-minimize-plan.cjs](query-minimize-plan.cjs) — `--before --after --db --workspace --output`으로 보존 DB의 새 사본에서 실제 일별 집계 계획·날짜 UDF 호출 수·결과 해시를 대조한다. 시간 표본에 섞지 않는다. 최종 저장 집중 비교는 `query-minimize-ab.cjs --storage-only`로 넓은 화면 조회를 생략하고 실제 갱신·8개 평균 조회를 유지한다.
+
 - [unified-stream-stats-validation.cjs](unified-stream-stats-validation.cjs) — `--workspace --before --after --output`으로 원본 통계 누적 통합 전후의 고정 실로그·합성 10,000요청을 대조한다. 기본은 예열 없이 1쌍이며 최초·추가·무변경의 facts·평균·진단·사본 복원을 검증한다.
 
 - [metadata-batch-ab.cjs](metadata-batch-ab.cjs) — 최종 프로젝트·세션 이름과 세션 결제 설정 처리의 중복 제거를 실제 갱신·SQL 실행 횟수로 비교한다. `--workspace=... --before=... --after=... --output=<새 JSON> --pairs=1 --warmups=0`으로 현재·10,000요청을 각 1회 측정하고, 모든 잔존 조회 결과·독립 JS 집계·facts·manifest·FK/integrity를 대조한다.

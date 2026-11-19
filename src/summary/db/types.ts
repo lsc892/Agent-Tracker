@@ -99,6 +99,8 @@ export interface SessionRef {
 export interface SummaryFilter {
   excludeEmptyUsage?: boolean;
   includeCosts?: boolean;
+  /** A selected chart requests component averages only for averageTokens; omission returns all metrics. */
+  chartMetric?: ChartMetric;
   provider?: Provider;
   providers?: Provider[];
   projectKey?: string;
@@ -162,7 +164,7 @@ export interface UsageRow extends CostFields {
   recorded_turns?: number;
   recorded_completed_turns?: number;
   avg_tokens_per_turn: number | null;
-  /** Same completed-request sample as avg_tokens_per_turn; input includes caches. */
+  /** Same completed-request sample as avg_tokens_per_turn; input includes caches. Null when chartMetric omits component averages. */
   avg_input_tokens: number | null;
   avg_output_tokens: number | null;
   /** null if any sampled request has an unknown cache component, or no samples exist. */

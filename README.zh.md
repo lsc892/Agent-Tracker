@@ -97,8 +97,7 @@ npm 包和 VS Code 扩展需要分别卸载。
 | `claude.enabled` / `codex.enabled` | `true` | 分别启用各提供商的用量查询与日志统计 |
 | `quota.refreshPolicy` | `automatic` | 自动查询。`manual` 仅在点击刷新时查询 |
 | `quota.pollingIntervalSeconds` | `900` | 自动查询间隔（秒），最小 30 秒；非活动窗口中暂停 |
-| `codex.showStatusBar` | `true` | 在状态栏显示 Codex，隐藏后仍继续查询用量 |
-| `display.percentage` | `used` | 显示已用比例；`remaining` 显示剩余比例 |
+| `display.percentage` | `used` | 进度条和数字显示已用比例。已用进度从左侧填充。`remaining` 的剩余进度从右端减少 |
 | `display.detail` | `detailed` | 显示 7 天和 5 小时用量；`compact` 仅显示 5 小时用量 |
 | `display.colorMode` | `automatic` | 使用主题颜色，也可选 `white`、`black` 或 `custom` |
 | `display.customColor` | `#ffffff` | `custom` 模式使用的 HEX 颜色 |
@@ -116,6 +115,22 @@ npm 包和 VS Code 扩展需要分别卸载。
 运行 **Agent Tracker：删除统计数据** 可清空汇总结果。原始对话日志会保留，重新打开统计页面时会重新计算。
 
 ## 更新说明
+
+<details open>
+<summary>v0.3.0</summary>
+
+- **统计刷新性能优化** — 单次读取 JSONL 日志即可完成聚合，大量日志文件可并行处理。重复响应会选取更合适的记录，仅将贡献值的差额计入总量。
+- **数据库写入与查询优化** — 仅更新发生变化的请求，批量处理多个会话的写入和每日聚合。减少重复查询，让表格、图表和总行数共享同一查询结果。
+- **Codex 子代理用量合并** — 将子代理及嵌套子代理的用量合并到父请求。通过创建记录关联缺少请求标识的子代理，并改进深层父子关系、循环和父代理缺失的处理。
+- **修复日志移动后的统计更新** — 验证源标识和内容后关联新路径并清理旧路径记录，使移动后新增的用量仍可计入统计。
+- **用量卡片与无障碍改进** — 恢复悬停显示完整卡片的行为；应用本地 workbench 补丁后，可点击固定或关闭同一卡片。即使使用简洁模式，无障碍摘要也会优先播报 Codex 的每周、5 小时剩余用量和重置时间。
+- **用量查询兼容性改进** — 移除 Claude 和 Codex 响应中最多 100 个用量窗口的人为限制，并在通信元数据中使用实际安装的扩展版本。
+- **修复不支持语言的默认显示** — VS Code 使用不支持的语言时，默认显示英语。
+- **更新扩展图标** — 替换图标并缩小图片文件体积。
+
+[相较 v0.2.0 的分阶段算法改进、实测收益与局限（韩语）](docs/Performance-v0.3.0.ko.md)
+
+</details>
 
 <details>
 <summary>v0.2.0</summary>

@@ -6,8 +6,8 @@ import type { TrackerConfiguration } from '../configuration';
 import type { SummaryClient } from '../summary/client';
 import type { UsageQuery } from '../summary/types';
 import { dashboardHtml, diagnosticsHtml } from './html';
-import { periodBounds } from '../summary/db/timezone';
-import { parseDashboardMessage } from './presentation';
+import { calendarPeriod, periodBounds } from '../summary/db/timezone';
+import { parseDashboardMessage, type DashboardMessage } from './presentation';
 
 export interface DashboardDependencies {
   extensionUri: vscode.Uri;
@@ -26,6 +26,7 @@ export class Dashboard implements vscode.Disposable {
   private diagnosticsVersion = 0;
   private fromDay: string | undefined;
   private toDay: string | undefined;
+  private recentDays: 7 | 30 | 90 | undefined;
   private refreshPromise: Promise<void> | undefined;
   private readonly unsubscribe: () => void;
 
@@ -66,19 +67,25 @@ export class Dashboard implements vscode.Disposable {
 
   update(): void {
     const settings = this.dependencies.settings();
-    const message = { type: 'state', localization: localizationBundle(), timezone: settings.usage.timezone, timezoneWarning: settings.usage.timezoneWarning, providers: this.providers(),capabilitiesEnabled:settings.usage.skillsEnabled,showApiCosts:settings.usage.showApiCosts };
+    const message = {
+      type: 'state', localization: localizationBundle(), timezone: settings.usage.timezone,
+      timezoneWarning: settings.usage.timezoneWarning, providers: this.providers(),
+      capabilitiesEnabled: settings.usage.skillsEnabled, showApiCosts: settings.usage.showApiCosts,
+    };
     if (this.diagnosticsPanel) this.diagnosticsPanel.title = t('diagnostics.title');
     this.post(message);
     this.postDiagnostics(message);
   }
 
-  configurationChanged(rebuildCapabilities=false): void {
+  configurationChanged(rebuildCapabilities = false): void {
     this.queryVersion++;
     this.update();
     if (rebuildCapabilities && this.ready) {
-      void (this.refreshPromise ?? Promise.resolve()).then(()=>{
-        if (this.ready && this.dependencies.settings().usage.enabled && this.dependencies.settings().usage.skillsEnabled) return this.refreshUsage();
-      }).catch(error=>this.error(error));
+      void (this.refreshPromise ?? Promise.resolve()).then(() => {
+        if (this.ready && this.dependencies.settings().usage.enabled && this.dependencies.settings().usage.skillsEnabled) {
+          return this.refreshUsage();
+        }
+      }).catch(error => this.error(error));
       return;
     }
     if (this.ready || this.diagnosticsReady) void this.loadDashboard().catch(error => this.error(error));
@@ -91,7 +98,7 @@ export class Dashboard implements vscode.Disposable {
    * 책임: 검증된 화면 요청을 통계·설정 동작에 연결한다.
    * 알고리즘: 활성 상태와 ready를 확인해 명령을 분배하고 결제 변경은 현재 선택 세션에만 허용하며 이름 응답은 같은 패널에만 전달한다.
    */
-  private async handle(message: NonNullable<ReturnType<typeof parseDashboardMessage>>): Promise<void> {
+  private async handle(message: DashboardMessage): Promise<void> {
     if (!this.dependencies.settings().usage.enabled) return;
     switch (message.type) {
       case 'ready':
@@ -102,24 +109,35 @@ export class Dashboard implements vscode.Disposable {
       case 'openDiagnostics': this.openDiagnostics(); break;
       case 'settings': await vscode.commands.executeCommand('agentTracker.openSettings'); break;
       case 'cancelUsage': this.dependencies.summary.cancel(); break;
-      case 'setSessionBilling': {
-        if (!this.ready || !this.providers().includes(message.provider) || this.query.provider !== message.provider || this.query.sessionId !== message.sessionId) break;
-        await this.dependencies.summary.setSessionBilling(message.provider,message.sessionId,message.mode);
+      case 'setSessionBilling': await this.setSelectedSessionBilling(message); break;
+      case 'queryUsage':
+        this.query = message.query;
+        this.fromDay = message.fromDay;
+        this.toDay = message.toDay;
+        this.recentDays = message.recentDays;
         if (this.ready) await this.loadUsage();
         break;
-      }
-      case 'queryUsage': this.query = message.query; this.fromDay = message.fromDay; this.toDay = message.toDay; if (this.ready) await this.loadUsage(); break;
-      case 'queryNames': {
-        if (!this.ready) break;
-        const panel = this.panel;
-        try {
-          const result = await this.dependencies.summary.queryNames({ ...message.query, providers: this.providers() });
-          if (this.panel === panel) this.post({ type: 'names', kind: message.query.kind, requestId: message.requestId, offset: message.query.offset, result });
-        } catch {
-          if (this.panel === panel) this.post({ type: 'names', kind: message.query.kind, requestId: message.requestId, error: t('dashboard.namesFailed') });
-        }
-        break;
-      }
+      case 'queryNames': await this.loadNames(message); break;
+    }
+  }
+
+  /** 화면에서 선택한 활성 제공자의 세션만 결제 방식을 변경할 수 있다. */
+  private async setSelectedSessionBilling(message: Extract<DashboardMessage, { type: 'setSessionBilling' }>): Promise<void> {
+    if (!this.ready || !this.providers().includes(message.provider)
+      || this.query.provider !== message.provider || this.query.sessionId !== message.sessionId) return;
+    await this.dependencies.summary.setSessionBilling(message.provider, message.sessionId, message.mode);
+    if (this.ready) await this.loadUsage();
+  }
+
+  /** 이름 검색의 성공·실패 응답은 요청을 보낸 패널에만 전달한다. */
+  private async loadNames(message: Extract<DashboardMessage, { type: 'queryNames' }>): Promise<void> {
+    if (!this.ready) return;
+    const panel = this.panel;
+    try {
+      const result = await this.dependencies.summary.queryNames({ ...message.query, providers: this.providers() });
+      if (this.panel === panel) this.post({ type: 'names', kind: message.query.kind, requestId: message.requestId, offset: message.query.offset, result });
+    } catch {
+      if (this.panel === panel) this.post({ type: 'names', kind: message.query.kind, requestId: message.requestId, error: t('dashboard.namesFailed') });
     }
   }
 
@@ -151,7 +169,7 @@ export class Dashboard implements vscode.Disposable {
     });
   }
 
-  private handleDiagnostics(message: NonNullable<ReturnType<typeof parseDashboardMessage>>): void {
+  private handleDiagnostics(message: DashboardMessage): void {
     switch (message.type) {
       case 'ready':
         if (this.diagnosticsReady) return;
@@ -220,8 +238,16 @@ export class Dashboard implements vscode.Disposable {
     const timezone = settings.usage.timezone;
     const query = { ...this.query, timezone, providers: this.providers(), includeCosts: settings.usage.showApiCosts,
       excludeEmptyUsage: settings.usage.excludeEmptyUsage };
-    if (this.fromDay) query.fromMs = periodBounds(this.fromDay, timezone).fromMs;
-    if (this.toDay) query.toMs = periodBounds(this.toDay, timezone).toMs;
+    let fromDay = this.fromDay;
+    let toDay = this.toDay;
+    if (this.recentDays !== undefined) {
+      toDay = calendarPeriod(Date.now(), timezone, 'day');
+      const start = new Date(`${toDay}T00:00:00.000Z`);
+      start.setUTCDate(start.getUTCDate() - this.recentDays + 1);
+      fromDay = start.toISOString().slice(0, 10);
+    }
+    if (fromDay) query.fromMs = periodBounds(fromDay, timezone).fromMs;
+    if (toDay) query.toMs = periodBounds(toDay, timezone).toMs;
     if (query.fromMs !== undefined && query.toMs !== undefined && query.fromMs >= query.toMs) throw new Error(t('dashboard.invalidDateRange'));
     const result = await this.dependencies.summary.query(query);
     if (version === this.queryVersion) this.post({ type: 'usage', result: { ...result, groupBy: this.query.groupBy } });

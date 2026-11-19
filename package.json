@@ -3,7 +3,7 @@
   "displayName": "Agent Tracker",
   "icon": "resource/icon/AgentTracker_Icon.png",
   "description": "%manifest.description%",
-  "version": "2.2.0",
+  "version": "0.3.0",
   "publisher": "AgentTracker",
   "repository": {
     "type": "git",
@@ -164,12 +164,6 @@
         "title": "%manifest.statusBar%",
         "order": 2,
         "properties": {
-          "agentTracker.codex.showStatusBar": {
-            "type": "boolean",
-            "default": true,
-            "order": 1,
-            "description": "%manifest.codexStatusBar%"
-          },
           "agentTracker.display.percentage": {
             "type": "string",
             "default": "used",

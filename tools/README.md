@@ -3,6 +3,7 @@
 설정·번역 생성, 배포 패키징, quota 실계정 QA와 로컬 VS Code 보조 작업을 수행한다.
 
 - [configuration.cjs](configuration.cjs) — 공통 TypeScript 설정 정의로 VS Code manifest의 설정 항목을 생성한다.
+- [diagnostics](diagnostics/) — 반복 통계 집계의 GC 전후 메모리·객체 수명과 Worker 수별 RAM을 관측한다.
 - [localization-manifest.cjs](localization-manifest.cjs) — 패키징·테스트·디버깅 중 manifest 번역을 임시 배치하고 원본을 복원한다.
 - [localization.cjs](localization.cjs) — 번역 사전·사용처를 검증하고 manifest 번역과 실행용 다국어 자산을 동기화한다.
 - [npm](npm/) — VSIX를 동봉한 npm 설치 CLI와 공개 패키지 구성을 관리한다.

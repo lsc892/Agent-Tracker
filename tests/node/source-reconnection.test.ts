@@ -1,7 +1,7 @@
 // 원본 로그의 이동 검증·이전 manifest 정리·통계 재집계와 실패 시 보존을 검증한다.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { appendFile, copyFile, mkdir, mkdtemp, rename, rm, unlink, writeFile } from 'node:fs/promises';
+import { appendFile, copyFile, lstat, mkdir, mkdtemp, rename, rm, unlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { zstdCompressSync } from 'node:zlib';
@@ -98,10 +98,12 @@ test('main and subagent sources reconnect independently when their folder moves'
   assert.equal(db.diagnostics().counts.files,2);assert.equal(db.queryTurns()[0].total_tokens,34);
 }));
 
-test('another source with the same session cannot replace a missing source with different contents',async()=>fixture(async(db,options,root)=>{
+test('another source with the same session and reused inode cannot replace a missing source with different contents',async()=>fixture(async(db,options,root)=>{
   const oldPath=join(root,'old.jsonl'),newPath=join(root,'new.jsonl');
   await writeFile(oldPath,jsonl([user(),response()]));await refreshSummary(db,options);
   await unlink(oldPath);await writeFile(newPath,jsonl([user('two'),response('two',20)]));
+  const replacement=await lstat(newPath);
+  db.connection.prepare('UPDATE manifest SET dev=?,inode=? WHERE path=?').run(String(replacement.dev),String(replacement.ino),oldPath);
   assert.equal((await refreshSummary(db,options)).failed,0);
   assert.equal(db.findManifest('claude',oldPath)?.source_missing,1);
   assert.equal(db.diagnostics().counts.files,2);assert.equal(db.queryTurnsCount(),2);

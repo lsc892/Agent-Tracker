@@ -689,7 +689,8 @@ test('legacy page count failures release their savepoint and preserve the caller
   const reader = new SummaryReader(compatible);
   db.transaction(() => {
     db.connection.exec("UPDATE projects SET project_name = 'Caller change'");
-    assert.throws(() => reader.queryUsagePage({ includeCosts: true }, 'project'), /injected page count failure/);
+    // Empty later pages still execute the full-range count after window-counted rows.
+    assert.throws(() => reader.queryUsagePage({ includeCosts: true }, 'project', 'UTC', { offset: 100 }), /injected page count failure/);
     assert.equal(db.connection.isTransaction, true);
     assert.equal(db.connection.prepare('SELECT project_name FROM projects').get()?.project_name, 'Caller change');
     failCount = false;

@@ -402,7 +402,7 @@ async function main(args) {
   assert.equal(typeof apis.B.Database.prototype.replaceMemoryBatch, 'function', 'Compile candidate B first');
   const directory = await fsp.mkdtemp(join(tmpdir(), 'agent-tracker-transaction-validation-'));
   try {
-    const report = { dateSeoul: '2026-11-10', runnerSha256: sha(fs.readFileSync(__filename)),
+    const report = { dateSeoul: new Intl.DateTimeFormat('sv-SE', { timeZone: timezone }).format(new Date()), runnerSha256: sha(fs.readFileSync(__filename)),
       products: Object.fromEntries(Object.entries(apis).map(([variant, api]) => [variant,
         Object.fromEntries(['src/summary/db/index.ts', 'src/summary/db/memoryStore.ts', 'src/summary/scanner/refresh/persistence.ts',
           'dist/src/summary/db/index.js', 'dist/src/summary/db/memoryStore.js', 'dist/src/summary/scanner/refresh/persistence.js']

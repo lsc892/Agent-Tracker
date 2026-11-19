@@ -64,7 +64,7 @@ Codex 응답의 [parseCodexQuota()](../src/quota/codex/response.ts#L15)는 응�
 
 SQL staging·metadata 폴더와 호환 저장 경로는 제거했다. [sourceEvidence](../src/summary/aggregation/sourceEvidence.ts)가 토큰 벡터 없이 포맷·복사·요청 ID 근거를 수집하고 [winners](../src/summary/aggregation/winners.ts)가 한 그룹의 winner DTO를 갱신한다. [turns](../src/summary/aggregation/turns.ts)는 최종 요청·모델·도구·진단 결과를 만든다.
 
-[Worker](../src/summary/client/worker.ts)는 메시지 큐·DB 지연 생성·취소·갱신 잠금을 조율한다. [JSONL](../src/summary/jsonl/index.ts)은 줄·이미지·바이트 예산을 담당하고 [수집기](../src/summary/scanner/index.ts)는 근거 수집과 winner 선택의 읽기 경계를 확인한다. [통계 SQL](../src/summary/db/queries/README.md)은 공통 정책·원본·롤업 조회로 나눈다.
+[Worker](../src/summary/client/worker.ts)는 메시지 큐·DB 지연 생성·취소·갱신 잠금을 조율한다. [JSONL 진입점](../../src/summary/jsonl/index.ts)은 파일·압축·행 콜백·offset·취소와 자원 수명을 조율하고, [line.ts](../../src/summary/jsonl/line.ts)는 행의 이미지 제거·문자열 문법·바이트 예산 상태를 맡는다. [errors.ts](../../src/summary/jsonl/errors.ts)의 단일 SummaryError를 진입점에서 재노출하여 기존 오류 식별과 호출 경로를 유지한다. [수집기](../src/summary/scanner/index.ts)는 근거 수집과 winner 선택의 읽기 경계를 확인한다. [통계 SQL](../src/summary/db/queries/README.md)은 공통 정책·원본·롤업 조회로 나눈다.
 
 [화면 메시지 파서](../src/ui/presentation.ts)는 종류별 파서를 선택하고 사용량의 필수 제어값과 선택 표현·대상·epoch·달력 범위를 구분한다. 제어값 오류는 메시지를 거부하고 잘못된 선택 필터는 생략한다. [quota 카드](../src/ui/quotaTooltip.ts)는 제공자 창·credit·조회 상태를 순서대로 조립하고, [Webview](../media/dashboard.js)는 날짜 검증·요청 구성·표 머리글/행·state 갱신을 같은 파일의 함수로 연결한다.
 
@@ -204,6 +204,10 @@ manual refresh
 
 ### 3.5 카드 내용과 설정
 
+제공자의 추적과 표시는 `agentTracker.claude.enabled`·`agentTracker.codex.enabled` 두 토글로 제어한다. 켜진 제공자는 상태 표시줄·사용량 카드·통계에 표시하고, 꺼진 제공자는 quota 조회와 원본 로그 수집을 중단하며 모두 숨긴다. 기존 계산 데이터는 보관한다. 상태 표시줄만 별도로 숨기는 `codex.showStatusBar`는 제거하며 기존 저장값도 사용하지 않는다. 두 제공자를 모두 끄면 통합 상태 표시줄 항목과 새로고침 버튼을 숨긴다.
+
+`agentTracker.display.percentage`는 상태 표시줄과 사용량 카드의 막대·숫자에 함께 적용한다. 기본값 `used`는 사용량을, `remaining`은 `100 - 사용률`로 계산한 잔여량을 표시한다. 채워진 영역은 왼쪽 끝에 붙여 잔여량은 오른쪽 끝부터 줄고 사용량은 왼쪽부터 차도록 고정한다. 상태 표시줄은 선택한 백분율을 10% 단위 폰트 글리프로, 카드는 같은 백분율을 SVG 막대로 표시한다. 카드의 색상은 실제 사용률을 기준으로 한다. 표시 모드를 바꾸면 기존 snapshot으로 즉시 다시 표시한다.
+
 상태 표시줄 전경색은 확장 설정의 `agentTracker.display.colorMode`에서 자동(`automatic`, 기본)·흰색(`white`)·검은색(`black`)·사용자 지정(`custom`)을 선택한다. 자동은 `StatusBarItem.color`에 CSS 값 `inherit`를 지정해 현재 테마의 상태 표시줄 색상과 `workbench.colorCustomizations`, 작업공간의 기본 색상을 상속한다. VS Code는 이 값을 항목 label의 인라인 `style.color`에 반영하므로 마우스를 올렸을 때도 상태 표시줄의 전경색을 유지한다. 밝음/어두움만 보고 순백·검정을 지정하지 않으므로 2026 Dark의 기본 회색, 밝은 테마, 고대비·디버깅·폴더 없는 창의 색상도 VS Code가 결정한다. 흰색·검은색·사용자 지정은 검증한 HEX를 인라인 CSS 색상으로 고정하므로 테마가 바뀌어도 선택한 색상과 투명도를 유지한다. 로고·잔량 막대·문자는 하나의 항목이므로 같은 전경색을 사용하며 새로고침 버튼에도 같은 모드를 적용한다. [StatusBarItem API](https://code.visualstudio.com/api/references/vscode-api#StatusBarItem), [상태표시줄 테마 색상](https://code.visualstudio.com/api/references/theme-color#status-bar-colors), [VS Code의 인라인 색상 반영 구현](https://github.com/microsoft/vscode/blob/main/src/vs/workbench/browser/parts/statusbar/statusbarItem.ts)
 
 `agentTracker.display.customColor`는 `#RGB`·`#RGBA`·`#RRGGBB`·`#RRGGBBAA`를 받으며 짧은 값을 확장하고 투명도를 유지한다. 기본값은 `#ffffff`이고 사용자 지정 모드에서만 사용한다. 잘못된 HEX나 알 수 없는 모드는 테마 기본 색상으로 처리한다. 두 설정은 window scope로 사용자·작업공간에 저장하고 VS Code의 작업공간 우선순위를 따른다.
@@ -246,13 +250,13 @@ Agent Tracker의 VS Code 설정은 다음 순서의 소제목과 목차 하위 �
 | 사용량 통계 | 통계 사용 여부, Skill 집계, API 추정 비용, 빈 사용량 제외, 시간대 |
 | 데이터 및 로그 | 공통 상위 데이터 홈, Claude 로그 보존 기간, Codex CLI 실행 파일 |
 
-`package.json`의 `contributes.configuration`을 여섯 카테고리의 배열로 등록한다. 설정은 총 21개이며 데이터 위치는 `agentTracker.dataHome` 하나로 지정한다. 카드·통계 화면·명령 팔레트의 설정 열기는 `@ext:AgentTracker.agent-tracker`로 필터링한 VS Code Settings를 연다. 카테고리·설명·선택지는 VS Code의 현재 표시 언어로 번역하며 비율의 사용률·남은 비율과 표시 방식의 압축·상세 선택지도 번역한다. 별도의 전체 설정 Webview는 제공하지 않는다. 설정 키·기본값·scope·입력 제약과 VS Code의 사용자·작업공간 저장 및 초기화 동작을 유지한다. 설정 화면을 여는 것만으로 quota 조회·원본 재집계를 실행하지 않는다. [VS Code 설정 카테고리와 정렬 규칙](https://code.visualstudio.com/api/references/contribution-points#contributesconfiguration)
+`package.json`의 `contributes.configuration`을 여섯 카테고리의 배열로 등록한다. 설정은 총 20개이며 데이터 위치는 `agentTracker.dataHome` 하나로 지정한다. 카드·통계 화면·명령 팔레트의 설정 열기는 `@ext:AgentTracker.agent-tracker`로 필터링한 VS Code Settings를 연다. 카테고리·설명·선택지는 VS Code의 현재 표시 언어로 번역하며 비율의 사용률·남은 비율과 표시 방식의 압축·상세 선택지도 번역한다. 별도의 전체 설정 Webview는 제공하지 않는다. 설정 키·기본값·scope·입력 제약과 VS Code의 사용자·작업공간 저장 및 초기화 동작을 유지한다. 설정 화면을 여는 것만으로 quota 조회·원본 재집계를 실행하지 않는다. [VS Code 설정 카테고리와 정렬 규칙](https://code.visualstudio.com/api/references/contribution-points#contributesconfiguration)
 
 설정 원본은 `src/configuration/schema.ts`의 `settingDefinitions`이며 키는 중첩 경로에서 만들고 기본값·선택지·입력 제약·category·설명도 같은 항목에서 관리한다. `tools/configuration.cjs`는 컴파일 전 원본 schema만 메모리에서 변환해 전체 설정 manifest를 구성하며 `tools/localization.cjs`가 동기화하거나 오래된 생성물을 검사한다. 언어 선택지만 `localization/languages.json`에서 확장한다. 실행 시에는 같은 정의를 순회해 설정을 한 번씩 읽고 `configuration.ts`가 표시·통계·제공자별 정규화와 경로 파생을 수행한다. 내부 객체는 `display`·`quota`·`usage`·`claude`·`codex`로 묶고 타입은 공통 정의와 반환값에서 추론한다. 매번 새 스냅샷을 만들어 이전 설정과 비교하며 앱이 최신 설정을 소유한다. 단순 설정은 해당 영역의 정의만 추가하면 읽기·타입·설정 UI에 반영되고, 파생값이나 기능의 실제 처리는 별도 구현한다.
 
 ### 3.8 표시 언어와 번역 리소스
 
-통계의 시작일·종료일 입력칸은 표시 언어와 관계없이 `year-month-day`를 안내하고 `YYYY-MM-DD` 값을 사용한다. 직접 입력과 기본 달력 선택을 함께 제공하며 유효하지 않은 날짜는 조회하지 않는다.
+통계 기간은 `최근 7일`·`최근 30일`·`최근 90일`·`전체 기간`·`직접 설정` 순서의 선택 목록으로 제공하며 기본값과 초기화 값은 최근 7일이다. 최근 기간을 선택하면 첫 페이지부터 바로 조회하고, 호스트에서 조회할 때마다 통계 시간대의 오늘을 포함한 N일의 달력 경계를 계산한다. 전체 기간을 선택하면 날짜 제한 없이 첫 페이지부터 바로 조회한다. 토큰·Skill 통계에 같은 기간을 적용한다. 직접 설정을 선택하면 시작일·종료일 입력칸을 펼치고 조회 버튼으로 적용한다. 입력칸은 표시 언어와 관계없이 `year-month-day`를 안내하고 `YYYY-MM-DD` 값을 사용한다. 직접 입력과 기본 달력 선택을 함께 제공하며 유효하지 않은 날짜는 조회하지 않는다. 양쪽 날짜가 비어 있으면 전체 기간을 조회한다. 적용한 기간 선택과 직접 입력 날짜는 Webview state에 보존한다.
 
 `agentTracker.language`는 기본 `auto`로 VS Code 표시 언어를 따르며 여섯 언어를 명시적으로 지정할 수 있다. 확장의 실행 중 문구는 명시적 언어를 우선하고 `auto`일 때 VS Code 표시 언어를 사용하며, 지원하지 않는 언어는 영어로 fallback한다. 지역 태그는 지원하는 기본 언어로 묶는다. 누락된 번역 키는 한국어로 fallback하며 한국어 JSON을 원문과 번역 키의 기준으로 둔다. 상태 표시줄·카드·안내와 열린 통계·데이터 확인·색상 화면을 현재 언어로 다시 표시한다. 숫자·날짜도 언어를 따르며 집계 시간대·원본 이름·진단 코드는 보존한다. 언어 전환은 서버 조회나 원본 재집계를 유발하지 않는다.
 
@@ -348,18 +352,14 @@ new / previous error or interruption
   이전 정상 metadata가 없거나 최근 시도가 오류·중단으로 끝남
   → 사용자가 다시 열거나 새로 고침을 요청했을 때 해당 session을 다시 처리
 
-moved
-  path는 달라졌지만 신뢰 가능한 dev/inode가 동일
-  → 같은 파일 id로 path와 source_root 갱신; 내용·session 귀속 변화는 별도 판정
-
-reconnected
+moved / reconnected
   이전 경로가 실제로 없고 provider·source_identity가 같은 정상 원본 후보가 새 위치에 하나 있음
   새 원본이 이전 정상 byte 범위 전체를 SHA-256 검증으로 포함함
   → 새 위치의 manifest id를 유지하고 이전 행은 세션 통계 반영 transaction에서 삭제
      다른 누락 원본이 없으면 기존 요청도 현재 원본으로 다시 집계
 ```
 
-Windows는 dev/inode 이동 최적화를 사용하지 않는다. 그 외 운영체제도 dev/inode가 0·누락·모호하면 새 경로를 신규 행으로 발견한다. 이후 모든 운영체제에서 정상 파싱된 source_identity와 content_hash로 누락 원본의 연결을 검증한다. 전체 탐색과 초기 파싱이 끝난 뒤 연결을 판정하므로 session_id만 같은 main·subagent나 여러 정상 복사본을 임의로 합치지 않는다. 현재 탐색 루트 밖의 이전 원본도 실제 ENOENT와 내용 포함을 확인하면 연결하며, 다른 제외 원본의 읽기 실패는 기존 보존 정책을 따른다.
+모든 운영체제에서 새 경로는 신규 행으로 발견하고 정상 파싱된 source_identity와 content_hash로 누락 원본의 연결을 검증한다. 삭제된 파일의 dev/inode가 새 파일에 재사용되는 경우에도 내용이 다른 이전 원본은 보존한다. 전체 탐색과 초기 파싱이 끝난 뒤 연결을 판정하므로 session_id만 같은 main·subagent나 여러 정상 복사본을 임의로 합치지 않는다. 현재 탐색 루트 밖의 이전 원본도 실제 ENOENT와 내용 포함을 확인하면 연결하며, 다른 제외 원본의 읽기 실패는 기존 보존 정책을 따른다.
 
 content_hash는 이미지 생략·Zstd 해제 전 원본 byte를 스트리밍하며 계산한다. 같은 크기는 저장된 해시를 비교하고, 새 원본이 더 크면 이전 크기까지의 prefix와 새 원본 전체를 고정 크기 버퍼로 재검증해 append를 허용한다. 재검증 I/O도 읽은 byte 통계에 포함한다. 연결된 이전 행은 보존 대상에서 제외하고, 다른 원본 누락으로 유지되는 요청의 진단 파일 참조는 새 행으로 옮긴다. 파싱·취소·연결 성분 실패나 DB 반영 실패에서는 기존 통계와 이전 행을 보존한다. 내용이 다르거나 정상 새 원본이 여러 개여서 연결이 모호한 경우에도 기존 누락 보존을 유지한다.
 
@@ -558,7 +558,7 @@ agent_role = parent_thread_id가 없으면 main, 있으면 subagent
 
 파일의 첫 `session_meta`가 소유 thread를 정한다. fork 로그 안에 복제된 다른 thread의 부모 `session_meta`는 소유 식별자·프로젝트·lineage를 덮어쓰지 않는다. 같은 thread의 반복 metadata는 기존 부모·fork·프로젝트 정보를 유지하면서 제공된 제목 등을 갱신한다.
 
-부모 세션 연결은 원본의 parent_thread_id로 계산한다. 직접 자식만 있는 계보는 부모 그룹에 바로 모으고, 다단계 계보는 경로 압축 Union-Find와 Small-to-Large로 작은 소스 membership Map을 큰 Map에 합친다. Union-Find의 물리적 대표와 최상위 부모 ID는 구분한다. forked_from_id는 복사 이력 검증에만 사용한다. 부모 누락·충돌·순환과 그 의존 경로는 missing-parent-agent를 남긴다. parser v17은 관련 원본을 한 번 읽으며 원본 전체 DTO 캐시는 사용하지 않는다.
+부모 세션 연결은 원본의 parent_thread_id로 계산한다. 직접 자식과 다단계 계보 모두 각 thread의 최상위 root를 비재귀 순회로 한 번 해소한 뒤 root별로 직접 묶는다. 경로의 확정 결과와 임시 null 방문 표시를 같은 Map에 저장하며 Union-Find 재병합과 별도 방문 Set은 두지 않는다. 같은 정상 계보는 같은 그룹 객체를 공유하고 root별 원본 배열의 순서를 유지한다. forked_from_id는 복사 이력 검증에만 사용한다. 부모 누락·충돌·순환과 그 의존 경로는 독립 그룹으로 남기고 missing-parent-agent를 표시한다. parser v17은 관련 원본을 한 번 읽으며 원본 전체 DTO 캐시는 사용하지 않는다.
 
 파일 전체에 `root_turn_id`가 없는 구형 subagent도 독립 세션·요청으로 승격하지 않는다. 부모 로그의 spawn_agent call_id와 호출 당시 요청 ID를 기억하고 반환된 agent_id 또는 task_name을 자식 thread_id 또는 agent_path와 연결한다. root 없는 부모를 가진 손자는 그 부모가 귀속된 최상위 요청으로 합산한다. 복사 이력 제외는 원래 root·index로 먼저 판정한 뒤 부모 root로 변환하며 response/thread/turn 식별자는 유지한다. 자식의 시간·상태 이벤트는 부모 수명주기를 바꾸지 않는다. 실제 이벤트가 없는 원본은 manifest만 유지하고, 비어 있지 않지만 귀속을 확정하지 못한 자식은 관련 성분의 저장을 보류해 이전 정상 통계를 보존한다. 원본 진단·도구 사용 횟수는 유지하지만 자식별 사용량·요청 행은 저장하지 않는다.
 
@@ -774,11 +774,15 @@ DB당 시간대 하나의 집계만 유지하며 첫 집계·시간대 변경 �
 
 복수 변경 세션은 JSON tuple 목록 하나를 고정 SQL에 바인딩한다. daily 삭제는 `(provider, session_id)` PK를 사용하고, 재집계는 각 tuple의 기존 요청 UNIQUE 인덱스에서 요청 ID를 찾은 뒤 INTEGER PK로 최종 facts를 읽는다. 목록 길이별 SQL·TEMP 키 표·새 인덱스·스키마는 만들지 않는다. 집계 실패 시 해당 transaction의 facts·두 daily 표를 함께 rollback하며 기존 성분별 재시도를 유지한다. 시간대·형식·지원 시각은 최종 facts를 기준으로 확인한다. 묶음 중간에 미지원 시각이 생겼다가 최종 snapshot에서 제거되는 경우에는 중간 캐시를 폐기하는 대신 유효한 최종 캐시를 유지할 수 있고 공개 조회 결과는 같다. 근거는 [rollup 묶음 A/B](../benchmarks/2026-11-10/RollupBatchAB-2026-11-10.md)에 둔다.
 
-DB 모듈은 변경 이유별로 책임을 나눈다. `src/summary/db/index.ts`의 `SummaryDatabase`는 worker·scanner API를 연결하고 `connection.ts`는 연결·PRAGMA·statement cache·transaction·optimize·close를 소유한다. `migrations.ts`는 버전 전환, `manifest.ts`는 파일 관측·진단, `memoryStore.ts`는 최종 결과 저장, `billing.ts`는 비용 분류·재계산을 맡는다. 이전 SessionStore·SessionChanges와 SQL staging·metadata 구현은 제거했다.
+일별 집계 SQL은 그 범위 조건을 먼저 적용한 뒤 필요한 지표 열·현지 일·사용량 유무만 `scoped AS MATERIALIZED` 입력으로 만든다. 사용량 유무는 토큰이 양수이면 1, 0토큰이면 모델 기록 여부로 한 번 확정하여 완료/기록 표본 식들이 공유한다. 날짜 UDF 호출 수 자체는 기존과 같다. 제공자/모델의 원본 fallback·NULL·38/37개 영속 집계 상태를 유지하며 부분 날짜의 raw `UNION ALL`도 같은 입력 생성기를 쓴다. 이 임시 결과는 SQL 실행 동안만 존재하며 파싱용 영속/명시적 TEMP 테이블을 추가하지 않는다. [저장·집계 SQL A/B](../benchmarks/2026-11-10/QueryMinimizeAB-2026-11-10.md).
 
-갱신 저장은 `SummaryDatabase.replaceMemory()`와 정상 성분 묶음용 `replaceMemoryBatch()`를 통해 `memoryStore.ts`의 같은 저장 계획 경로를 사용한다. 정상·비중첩 세션 snapshot은 입력 Iterable을 한 번 색인하고 보존으로 제외되는 요청을 뺀 최종 이름을 모은다. 프로젝트는 마지막 이름, 세션은 마지막 비어 있지 않은 이름을 선택하여 저장 묶음 안에서 키별 한 번 UPSERT하고 FK 부모 행을 요청보다 먼저 만든다. 사용자 결제 설정은 제공자·세션 키별 한 번 조회하며 설정이 없을 때의 `summary.billing` fallback은 요청별로 유지한다. 이름·결제 조회 캐시는 해당 transaction 밖으로 유지하지 않는다.
+DB 모듈은 변경 이유별로 책임을 나눈다. `src/summary/db/index.ts`의 `SummaryDatabase`는 worker·scanner API를 연결하고 `connection.ts`는 연결·PRAGMA·statement cache·transaction·optimize·close를 소유한다. `migrations.ts`는 버전 전환, `manifest.ts`는 파일 관측·진단, [memoryStore/index.ts](../../src/summary/db/memoryStore/index.ts)는 최종 결과의 트랜잭션·비교·영속 반영, `billing.ts`는 비용 분류·재계산을 맡는다. [memoryStore/values.ts](../../src/summary/db/memoryStore/values.ts)는 상태 없는 입력 검증·SQL 값 변환·비교 정렬을, [types.ts](../../src/summary/db/memoryStore/types.ts)는 저장 입력·결과 계약을 정의한다. 기존 [memoryStore.ts](../../src/summary/db/memoryStore.ts)는 같은 API를 재노출한다. 이전 SessionStore·SessionChanges와 SQL staging·metadata 구현은 제거했다.
+
+갱신 저장은 `SummaryDatabase.replaceMemory()`와 정상 성분 묶음용 `replaceMemoryBatch()`를 통해 `memoryStore/index.ts`의 같은 저장 계획 경로를 사용한다. 정상·비중첩 세션 snapshot은 입력 Iterable을 한 번 색인하고 보존으로 제외되는 요청을 뺀 최종 이름을 모은다. 프로젝트는 마지막 이름, 세션은 마지막 비어 있지 않은 이름을 선택하여 저장 묶음 안에서 키별 한 번 UPSERT하고 FK 부모 행을 요청보다 먼저 만든다. 사용자 결제 설정은 제공자·세션 키별 한 번 조회하며 설정이 없을 때의 `summary.billing` fallback은 요청별로 유지한다. 이름·결제 조회 캐시는 해당 transaction 밖으로 유지하지 않는다.
 
 정상 묶음의 facts·manifest는 snapshot 순서대로 반영하고 이름 prune은 영향 키를 모아 마지막에 한 번 처리한다. 같은 세션을 반복 교체하거나 삭제·재연결을 포함하는 직접 batch 입력은 중간 prune·결제 선택 cascade 의미를 보존하도록 snapshot별 계획 경로를 사용한다. 묶음 API는 변경 세션을 모아 마지막에 한 번 rollup하고, 단일 snapshot은 기존 세션별 rollup 경로를 유지한다. 입력 Iterable을 자체 재시도하지 않으며 scanner의 배열 DTO만 실패 후 개별 재시도한다. 스트리밍 winner에서 완성한 요청·모델·도구 snapshot을 기존 facts와 비교해 달라진 행만 저장하고 manifest·삭제 보존·이름 정리·rollup을 같은 BEGIN IMMEDIATE/COMMIT으로 묶는다. 변경 없는 ID·updated_at과 Skill OFF의 기존 횟수를 유지하며 어느 단계가 실패해도 해당 transaction 전체를 rollback한다. 호환 replaceSessions API와 이벤트 TEMP 경로는 제공하지 않는다.
+
+신규 요청은 facts를 INSERT한 뒤 모델·도구를 바로 INSERT하고, 없는 자식을 대상으로 하는 DELETE는 실행하지 않는다. 기존 요청의 모델·도구 snapshot이 변경됐을 때만 기존 DELETE/INSERT 교체를 수행한다. facts INSERT와 요청별 비용 저장·ID 연결·updated_at 의미는 기존과 같으며 신규 facts를 별도 RETURNING 묶음/ID Map으로 모으지 않는다.
 
 저장 API는 COMMIT에 성공한 세션 이름을 반환한다. scanner는 그 이름만 이번 스캔 상태에 기록하고 마무리 단계의 Codex metadata 이름과 같으면 중복 UPDATE를 생략한다. 실패·rollback한 이름은 기록하지 않고, 원본 변경 없이 이름만 바뀐 세션과 저장 결과에 없는 이름의 후단 갱신은 유지한다.
 
@@ -891,6 +895,10 @@ Codex `response_item`의 function/custom tool 호출과 `exec` 안의 정적인 
 
 수치는 제공자별에서는 `turn_summary`, 모델별에서는 `turn_model_usage`를 연결한 요청·모델 행에 filter와 `GROUP BY`를 적용해 조회하고 이름은 projects·sessions에서 연결한다. 이름 목록에서 선택한 project_key·session_id·provider로 조회하므로 중복 제목이 합쳐지지 않는다. 일·월은 configured timezone의 시작·끝 경계를 UTC millisecond로 변환한 뒤 `started_at_ms`에 적용한다. 한 요청의 token과 duration은 시작 시점의 일·월에 귀속하고 날짜 경계에서 나누지 않는다. timezone 변경은 조회 경계를 바꾸며 원본 재파싱은 요구하지 않는다.
 
+그룹 통계·이름 목록·도구 순위는 같은 GROUP BY 결과의 window 지표로 전체 개수와 도구 사용량의 전체 합계·최댓값을 함께 구한다. 첫 빈 페이지의 전체 개수는 0이며, 범위를 벗어난 후속 빈 페이지에만 별도 count SQL을 실행한다. 요청별 cursor 페이지는 cursor 이전까지 포함한 전체 개수가 필요하므로 기존 별도 count를 유지한다. 내부 window 필드는 반환 행에서 제거한다. 통계 화면의 coverage는 진단 counts만 읽고 진단 목록을 조회하지 않는다.
+
+요청 snapshot 저장은 기존 facts와 비용의 결제 방식·단가 버전을 함께 읽고, Skill 보존 모드에서 기존 Skill SELECT를 생략한다. 모델·Skill 비교는 JavaScript의 기존 문자열 정렬을 유지하고 모델 SQL의 중복 정렬을 제거한다. Skill은 Unicode 표기의 localeCompare 동점 순서를 보존하도록 기존 SQL 정렬도 유지한다. 동일 세션의 누락 파일에서 삭제 보존 요청은 한 번만 읽는다. 세션 결제 변경은 선택 저장과 요청별 비용 GROUP BY 교체를 같은 transaction에서 수행한다. 모델 없는 요청의 미상 비용 표본 1개·API 비용 NULL·구독 비용 0 의미는 유지한다. [알고리즘 최소화 기록](../research/2026-11-11/AlgorithmMinimize-2026-11-11.md)에 실제 적용 범위와 미실측 한계를 둔다.
+
 이름 목록은 통계가 저장된 전체 프로젝트·세션을 대상으로 하고 날짜·표 페이지·선택된 세션 조건을 적용하지 않는다. 활성 제공자와 제공자 필터를 따르며 세션 목록에는 선택된 프로젝트 조건만 추가한다. 프로젝트는 project_key당 한 항목, 세션은 provider·project_key·session_id당 한 항목으로 이름순 정렬한다. 목록을 열 때 worker가 100개씩 조회하고 아래로 스크롤하면 다음 묶음을 표시한다. Extension Host는 한 묶음만 전달하고 Webview는 열린 목록의 이름 metadata만 누적하며 닫으면 해제한다. 선택은 표의 첫 페이지부터 적용하고 ‘전체 프로젝트’·‘전체 세션’으로 해제한다. 프로젝트를 바꾸면 기존 세션 선택을 해제하며 세션을 고르면 프로젝트·제공자도 맞춘다. 목록 조회와 선택은 원본 재스캔을 시작하지 않는다.
 
 ```sql
@@ -927,7 +935,7 @@ schema version 2는 기존 `turn_summary`의 행·id·manifest 참조를 보존�
 
 도표는 기존 필터와 집계 기준을 공유하고 `총 토큰 / 평균 토큰 / 평균 시간 / 요청 수` 순서로 지표를 선택한다. 요청 수는 완료·진행 중·실패 요청을 합친 전체 요청 수이며 완료 수를 상세 정보에 함께 표시한다. 평균 토큰은 완료 요청 수, 평균 시간은 유효한 시간을 가진 완료 요청 수를 표본으로 사용한다. 사용자 요청별 조회에서는 `총 토큰 / 소요 시간`만 선택하고 각 요청의 개별 값을 표시한다.
 
-평균 토큰의 input/output/cache 평균은 합계 평균과 같은 완료 요청 표본에서 SQL로 계산하며 빈 사용량 제외 설정도 동일하게 적용한다. 캐시 구성은 표본 중 한 요청이라도 미확인 값이 있으면 해당 평균을 null로 보존해 막대 전체를 회색으로 표시한다. 진행 중·실패 요청의 미확인 구성은 평균에 영향을 주지 않는다. 완료 표본이 없으면 평균을 ‘—’로 표시하고 막대를 그리지 않으며, 확인된 0토큰 평균은 0으로 표시한다. 집계 조회는 일별 상태의 합계·건수를 병합하고 fallback은 저장된 요청·모델 행을 사용하며 원본 로그를 다시 읽지 않는다.
+평균 토큰의 input/output/cache 평균은 평균 토큰 도표가 선택된 경우에만 합계 평균과 같은 완료 요청 표본에서 SQL로 계산하며 빈 사용량 제외 설정도 동일하게 적용한다. `chartMetric`이 총 토큰·요청 수·평균 시간이면 구성별 네 평균은 NULL로 반환하고 관련 집계식을 생략한다. 도표 선택이 없는 직접 조회 API는 전체 지표를 계산한다. 이 선택은 일별 사전 집계와 비용 포함 등 원본 조회에 함께 적용한다. 하단 표의 총 토큰 평균·평균 시간·표본·품질 정보는 모든 도표에서 계산한다. 캐시 구성은 표본 중 한 요청이라도 미확인 값이 있으면 해당 평균을 null로 보존해 막대 전체를 회색으로 표시한다. 진행 중·실패 요청의 미확인 구성은 평균에 영향을 주지 않는다. 완료 표본이 없으면 평균을 ‘—’로 표시하고 막대를 그리지 않으며, 확인된 0토큰 평균은 0으로 표시한다. 집계 조회는 일별 상태의 합계·건수를 병합하고 fallback은 저장된 요청·모델 행을 사용하며 원본 로그를 다시 읽지 않는다.
 
 조회 단위에 따라 다음 모양과 범위를 사용한다.
 

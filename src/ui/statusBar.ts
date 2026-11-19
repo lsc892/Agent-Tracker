@@ -33,7 +33,7 @@ export class QuotaStatusBar implements vscode.Disposable {
 
   /**
    * 책임: 현재 설정에 맞는 상태바 텍스트·quota 카드·새로고침 상태를 반영한다.
-   * 알고리즘: 활성·표시 설정으로 제공자를 선택해 순서대로 조합하고 공통 색상·접근성 설명·갱신 아이콘을 적용하며 표시 대상이 없으면 항목을 숨긴다.
+   * 알고리즘: 추적 중인 제공자를 순서대로 조합하고 공통 색상·접근성 설명·갱신 아이콘을 적용하며 추적 대상이 없으면 항목을 숨긴다.
    */
   update(states: readonly QuotaState[], settings: StatusSettings): void {
     this.quota.name = t('status.name');
@@ -44,16 +44,16 @@ export class QuotaStatusBar implements vscode.Disposable {
     const color = statusForeground(settings.display.colorMode, settings.display.customColor);
     this.quota.color = color;
     this.refresh.color = color;
-    const tracked = states.filter(state => settings[state.provider].enabled);
-    const visible = ['claude', 'codex'].flatMap(provider => tracked.filter(state => state.provider === provider && (state.provider === 'claude' || settings.codex.showStatusBar)));
-    const views = visible.map(state => statusBarPresentation(state, settings.display.percentage, settings.display.detail));
+    const tracked = ['claude', 'codex'].flatMap(provider => states.filter(state => state.provider === provider && settings[state.provider].enabled));
+    const now = Date.now();
+    const views = tracked.map(state => statusBarPresentation(state, settings.display.percentage, settings.display.detail, now));
     this.quota.text = views.map(view => view.text).join('  │  ');
-    this.quota.tooltip = createQuotaTooltip(tracked, settings);
+    this.quota.tooltip = createQuotaTooltip(tracked, settings, now);
     // Mouse hover and the native click toggle share the Markdown card above.
     // Keep the plain-text quota summary available to screen readers.
-    this.quota.accessibilityInformation = { label: quotaHoverSummary(tracked), role: 'button' };
+    this.quota.accessibilityInformation = { label: quotaHoverSummary(tracked, now), role: 'button' };
     this.refresh.text = tracked.some(state => state.refreshing) ? '$(sync~spin)' : '$(refresh)';
-    if (visible.length) {
+    if (tracked.length) {
       this.quota.show();
       this.refresh.show();
     } else {

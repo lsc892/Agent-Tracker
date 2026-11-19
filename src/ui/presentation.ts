@@ -19,7 +19,7 @@ export type DashboardMessage =
   | { type: 'settings' }
   | { type: 'cancelUsage' }
   | { type: 'setSessionBilling'; provider: 'claude' | 'codex'; sessionId: string; mode: BillingMode }
-  | { type: 'queryUsage'; query: UsageQuery; fromDay?: string; toDay?: string }
+  | { type: 'queryUsage'; query: UsageQuery; fromDay?: string; toDay?: string; recentDays?: 7 | 30 | 90 }
   | { type: 'queryNames'; query: NameQuery; requestId: number }
   | { type: 'diagnostics'; offset: number };
 
@@ -75,6 +75,7 @@ function parseUsageMessage(value: Record<string, unknown>): DashboardMessage | n
   const raw = value.query as Record<string, unknown>;
   const query = parseUsageControls(raw);
   if (!query) return null;
+  if (raw.recentDays !== undefined && ![7, 30, 90].includes(raw.recentDays as number)) return null;
   applyUsagePresentation(query, raw);
   applyUsageFilters(query, raw);
   applyTimestampRange(query, raw);
@@ -168,6 +169,10 @@ function applyTimestampRange(query: UsageQuery, raw: Record<string, unknown>): v
 }
 
 function applyCalendarRange(message: Extract<DashboardMessage, { type: 'queryUsage' }>, raw: Record<string, unknown>): void {
+  if (raw.recentDays === 7 || raw.recentDays === 30 || raw.recentDays === 90) {
+    message.recentDays = raw.recentDays;
+    return;
+  }
   for (const key of ['fromDay', 'toDay'] as const) {
     if (typeof raw[key] !== 'string') continue;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(raw[key])) continue;

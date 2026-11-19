@@ -1,5 +1,5 @@
 // 저장된 파일·요청의 진단 목록과 처리 상태 개수를 조회하는 SQL을 만든다.
-import type { SummaryFilter } from '../../types';
+import type { Provider, SummaryFilter } from '../../types';
 import { buildQueryFilter } from '../common/filters';
 import type { QuerySql } from '../common/types';
 import { namedTurns } from './source';
@@ -32,8 +32,17 @@ export function buildDiagnosticQueries(filter: SummaryFilter): { files: QuerySql
         OFFSET ?`,
       values: where.values,
     },
-    counts: {
-      sql: `SELECT
+    counts: diagnosticCounts(where),
+  };
+}
+
+export function buildDiagnosticCountsQuery(providers?: Provider[]): QuerySql {
+  return diagnosticCounts(buildQueryFilter({ providers }));
+}
+
+function diagnosticCounts(where: QuerySql): QuerySql {
+  return {
+    sql: `SELECT
         COUNT(*) AS files,
         COALESCE(SUM(processing_status = 'processing'), 0) AS processing,
         COALESCE(SUM(processing_status = 'done'), 0) AS done,
@@ -46,7 +55,6 @@ export function buildDiagnosticQueries(filter: SummaryFilter): { files: QuerySql
         ) AS stale_summaries
       FROM manifest
       WHERE ${where.sql}`,
-      values: [...where.values, ...where.values],
-    },
+    values: [...where.values, ...where.values],
   };
 }

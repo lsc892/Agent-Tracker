@@ -94,11 +94,10 @@ All setting keys below use the `agentTracker.` prefix.
 | Setting | Default | Description |
 | --- | --- | --- |
 | `language` | `auto` | Follow the VS Code language. Choose Korean, English, Simplified Chinese, Japanese, Spanish, or French |
-| `claude.enabled` / `codex.enabled` | `true` | Track subscription usage and log statistics for each provider |
+| `claude.enabled` / `codex.enabled` | `true` | Track subscription usage and logs, and show each provider in the status bar, usage card, and statistics |
 | `quota.refreshPolicy` | `automatic` | Refresh automatically. `manual` fetches usage only when you click refresh |
 | `quota.pollingIntervalSeconds` | `900` | Automatic refresh interval in seconds. Minimum 30; pauses in inactive windows |
-| `codex.showStatusBar` | `true` | Show Codex in the status bar. Usage queries continue when hidden |
-| `display.percentage` | `used` | Show the used percentage. `remaining` shows the remaining percentage |
+| `display.percentage` | `used` | Bars and numbers show usage. Used bars fill from the left. `remaining` bars shrink from the right |
 | `display.detail` | `detailed` | Show 7-day and 5-hour usage. `compact` shows only 5-hour usage |
 | `display.colorMode` | `automatic` | Use the theme color. Also supports `white`, `black`, and `custom` |
 | `display.customColor` | `#ffffff` | HEX color for `custom` mode |
@@ -116,6 +115,22 @@ All setting keys below use the `agentTracker.` prefix.
 Use **Agent Tracker: Delete Statistics Data** to clear aggregated statistics. Original conversation logs are preserved, and statistics are recalculated when you reopen the view.
 
 ## Release notes
+
+<details open>
+<summary>v0.3.0</summary>
+
+- **Faster statistics refresh** — Read and aggregate JSONL logs in a single pass, and process multiple files in parallel for large log sets. Duplicate responses select the preferred record and update totals only by the difference in contributions.
+- **Database writes and queries** — Update only changed requests and batch writes and daily rollups across sessions. Fewer duplicate queries are needed, and tables, charts, and total row counts share the same query results.
+- **Codex subagent usage** — Combine child and nested subagent usage into the parent request. Creation records link children without request identifiers, with improved handling of deep parent chains, cycles, and missing parents.
+- **Moved log updates** — Verify source identity and content before linking a log at its new path and removing the old path record, so usage added after a move continues to update statistics.
+- **Usage card and accessibility** — Restore the full card on hover and, with the local workbench patch, pin or dismiss the same card by clicking. Accessible summaries announce weekly and 5-hour remaining usage and reset times with Codex first, even in compact mode.
+- **Usage query compatibility** — Remove the arbitrary 100-window limit from Claude and Codex responses and use the installed extension version in communication metadata.
+- **Unsupported language fallback** — Display English when the VS Code language is unsupported.
+- **Updated extension icon** — Replace the icon and reduce its image file size.
+
+[Algorithm changes, measured gains over v0.2.0, and limitations (Korean)](docs/Performance-v0.3.0.ko.md)
+
+</details>
 
 <details>
 <summary>v0.2.0</summary>

@@ -74,7 +74,6 @@ export class ClaudeParserAdapter {
     const type = string(row.type);
     const message = object(row.message);
     const content = message.content;
-    const toolResult = Array.isArray(content) && content.some((item: unknown) => object(item).type === 'tool_result');
     return {
       type, offset, time: timestamp(row.timestamp),
       hasBillingMetadata: row.billing_mode !== undefined || row.auth_mode !== undefined,
@@ -83,7 +82,8 @@ export class ClaudeParserAdapter {
       sessionName: type === 'custom-title' ? displayName(row.customTitle)
         : type === 'ai-title' ? displayName(row.aiTitle) : undefined,
       promptId: string(row.promptId), uuid: string(row.uuid),
-      external: type === 'user' && row.isMeta !== true && !toolResult && row.isSidechain !== true,
+      external: type === 'user' && row.isMeta !== true && row.isSidechain !== true
+        && !(Array.isArray(content) && content.some((item: unknown) => object(item).type === 'tool_result')),
       content, usage: object(message.usage), responseId: string(message.id), requestId: string(row.requestId),
       model: displayName(message.model), usageBillingValue: message.billing_mode ?? row.billing_mode ?? row.auth_mode,
       apiError: row.isApiErrorMessage === true, stopReason: message.stop_reason, subtype: row.subtype,
@@ -124,8 +124,7 @@ export class ClaudeParserAdapter {
     const { promptId, uuid, external } = context;
     const previousRoot = this.currentRoot;
     if (promptId) this.currentRoot = promptId;
-    if (external && !this.currentRoot) this.currentRoot = uuid;
-    if (external && !promptId && uuid) this.currentRoot = uuid;
+    else if (external && uuid) this.currentRoot = uuid;
     context.rootId = this.currentRoot;
     if (external || context.rootId !== previousRoot) { this.apiFailed = false; this.stopBlocked = false; }
   }
@@ -181,16 +180,11 @@ export class ClaudeParserAdapter {
    * 알고리즘: stop hook의 계속 실행 여부를 우선하고 차단 상태가 아닐 때만 duration·완료 이벤트를 반영하며 API 실패 상태를 유지한다.
    */
   private recordSystemLifecycle(context: ClaudeRowContext): void {
-    const { type, rootId, subtype, preventedContinuation, durationMs, time, offset } = context;
+    const { type, rootId, subtype, durationMs, time, offset } = context;
     if (type !== 'system' || !rootId) return;
+    // Stop hook 결과를 먼저 반영한 뒤, 차단되지 않은 요청의 종료 기록만 허용한다.
     if (subtype === 'stop_hook_summary') {
-      // Only an explicit outcome can supersede the assistant timestamp fallback.
-      if (preventedContinuation === undefined) return;
-      this.stopBlocked = preventedContinuation;
-      const completed = !this.stopBlocked && !this.apiFailed;
-      this.sink.event({ kind: 'turn', rootId, isMain: this.identityValue.isMain, completed,
-        completedAt: completed ? time : null, durationQuality: 'derived',
-        status: this.stopBlocked ? 'in_progress' : this.apiFailed ? 'failed' : 'completed', statusAt: time, offset });
+      this.recordStopHook(context, rootId);
       return;
     }
     // A blocked stop hook must keep the request open, including later duration records.
@@ -201,10 +195,26 @@ export class ClaudeParserAdapter {
         status: this.apiFailed ? 'failed' : 'completed', statusAt: time, offset });
       return;
     }
-    if (!['stop', 'turn_complete', 'task_complete'].includes(String(subtype))) return;
-    this.sink.event({ kind: 'turn', rootId, isMain: this.identityValue.isMain, completed: !this.apiFailed,
-      completedAt: this.apiFailed ? null : time, durationQuality: 'derived',
-      status: this.apiFailed ? 'failed' : 'completed', statusAt: time, offset });
+    switch (String(subtype)) {
+      case 'stop':
+      case 'turn_complete':
+      case 'task_complete':
+        this.sink.event({ kind: 'turn', rootId, isMain: this.identityValue.isMain, completed: !this.apiFailed,
+          completedAt: this.apiFailed ? null : time, durationQuality: 'derived',
+          status: this.apiFailed ? 'failed' : 'completed', statusAt: time, offset });
+        break;
+    }
+  }
+
+  /** 명시 hook 결과만 assistant 시각에 의한 완료 추정을 덮어쓸 수 있다. */
+  private recordStopHook(context: ClaudeRowContext, rootId: string): void {
+    const { preventedContinuation, time, offset } = context;
+    if (preventedContinuation === undefined) return;
+    this.stopBlocked = preventedContinuation;
+    const completed = !this.stopBlocked && !this.apiFailed;
+    this.sink.event({ kind: 'turn', rootId, isMain: this.identityValue.isMain, completed,
+      completedAt: completed ? time : null, durationQuality: 'derived',
+      status: this.stopBlocked ? 'in_progress' : this.apiFailed ? 'failed' : 'completed', statusAt: time, offset });
   }
 
   finish(): void {

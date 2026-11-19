@@ -3,48 +3,33 @@ import { lstat, opendir } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import type { FileMetadata, ManifestRow } from '../../db/types';
 import { SummaryError } from '../../jsonl';
-import { addMember } from '../worklist';
 import type { RefreshContext } from './context';
 import { PARSER_VERSION, sessionKey } from './state';
 import type { FileState } from './state';
 
-const fingerprint = (file: FileMetadata): string => JSON.stringify([file.provider, file.path, file.source_root,
-  file.size_bytes, file.mtime_ms, file.dev, file.inode, file.parser_version]);
+const sameFingerprint = (a: FileMetadata, b: FileMetadata): boolean => a.provider === b.provider
+  && a.path === b.path && a.source_root === b.source_root && a.size_bytes === b.size_bytes
+  && a.mtime_ms === b.mtime_ms && a.dev === b.dev && a.inode === b.inode && a.parser_version === b.parser_version;
 
 export async function discoverSources(context: RefreshContext): Promise<void> {
   const { database, state, roots, collect, retain, result, check, report } = context;
   const manifest = database.connection.prepare('SELECT * FROM manifest ORDER BY id').all() as unknown as ManifestRow[];
   const paths = new Map(manifest.map(file => [sessionKey(file.provider, file.path), file]));
-  const inodes = new Map<string, Set<ManifestRow>>();
-  if (process.platform !== 'win32')
-    for (const file of manifest) addMember(inodes, JSON.stringify([file.provider, file.dev, file.inode]), file);
   let nextId = manifest.reduce((max, file) => Math.max(max, file.id), 0) + 1;
   const observed = new Set<number>();
   for (const root of roots) {
     try {
       for await (const path of walk(root.path, check, root.provider === 'codex')) {
         const stat = await lstat(path);
-        if (!stat.isFile() || stat.isSymbolicLink())
+        if (!stat.isFile())
           continue;
-        let previous = paths.get(sessionKey(root.provider, resolve(path)));
-        if (!previous && process.platform !== 'win32') {
-          const candidates = [...inodes.get(JSON.stringify([root.provider, String(stat.dev), String(stat.ino)])) ?? []]
-            .filter(file => !observed.has(file.id));
-          if (candidates.length === 1) {
-            try {
-              await lstat(candidates[0].path);
-            }
-            catch (error) {
-              if ((error as NodeJS.ErrnoException).code === 'ENOENT')
-                previous = candidates[0];
-            }
-          }
-        }
+        // Deleted inodes can be reused. Cross-path matches need the parsed content proof in reconnectSources.
+        const previous = paths.get(sessionKey(root.provider, resolve(path)));
         const metadata: FileMetadata = { provider: root.provider, source_root: root.path, path: resolve(path), session_id: previous?.session_id ?? null,
           size_bytes: stat.size, mtime_ms: stat.mtimeMs, dev: String(stat.dev), inode: String(stat.ino), parser_version: PARSER_VERSION,
           capabilities_collected: collect ? 1 : 0, source_identity: previous?.source_identity, content_hash: previous?.content_hash };
         const changed = !previous || previous.source_missing === 1 || previous.processing_status !== 'done'
-          || fingerprint(previous) !== fingerprint(metadata) || collect && previous.capabilities_collected !== 1
+          || !sameFingerprint(previous, metadata) || collect && previous.capabilities_collected !== 1
           || previous.session_id !== null && previous.size_bytes > 0 && (!previous.source_identity || !previous.content_hash);
         const file: FileState = { ...metadata, id: previous?.id ?? nextId++, previous, changed, removed: false, selected: true, session: metadata.session_id };
         state.trackFile(file);
@@ -77,13 +62,11 @@ export async function discoverSources(context: RefreshContext): Promise<void> {
 async function* walk(directory: string, check: () => void, compressed: boolean): AsyncGenerator<string> {
   check();
   const stat = await lstat(directory);
-  if (!stat.isDirectory() || stat.isSymbolicLink())
+  if (!stat.isDirectory())
     throw new SummaryError('source-root-not-directory');
   const handle = await opendir(directory, { bufferSize: 32 });
   for await (const entry of handle) {
     check();
-    if (entry.isSymbolicLink())
-      continue;
     const path = join(directory, entry.name);
     if (entry.isDirectory())
       yield* walk(path, check, compressed);

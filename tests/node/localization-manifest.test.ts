@@ -30,7 +30,9 @@ test('native settings have complete manifest translations in all editor language
     }
   }
   const properties = Object.assign({}, ...manifest.contributes.configuration.map((section: {properties:Record<string,unknown>}) => section.properties));
-  assert.equal(Object.keys(properties).length, 21);
+  assert.equal(Object.keys(properties).length, 20);
+  assert.equal(properties['agentTracker.codex.showStatusBar'], undefined);
+  assert.equal(properties['agentTracker.display.barAlignment'], undefined);
   const data=manifest.contributes.configuration.find((section: {id:string})=>section.id==='agentTracker.data');
   assert.equal(data.properties['agentTracker.usage.retainDeletedSourceUsage'].default,true);
   assert.ok(data.properties['agentTracker.usage.retainDeletedSourceUsage'].order>data.properties['agentTracker.claude.cleanupPeriodDays'].order);

@@ -4,9 +4,9 @@ const CACHE_COLUMNS = ['cache_write_input_tokens', 'cache_read_input_tokens'];
 
 /**
  * 책임: 일별 상태를 병합해 원본 조회와 같은 합계·평균을 복원한다.
- * 알고리즘: 완료 표본의 합계와 분모로 평균을 구하고, 전체 표본에서 알려진 캐시만 확정한다.
+ * 알고리즘: 완료 표본의 합계·분모와 캐시 미상 규칙으로 평균을 구하고, 도표에 필요한 토큰 구성별 평균만 병합한다.
  */
-export function mergeRollupMetrics(excludeEmptyUsage = false): string {
+export function mergeRollupMetrics(excludeEmptyUsage = false, includeComponentAverages = true): string {
   const prefix = excludeEmptyUsage ? 'r' : 'c';
   const completedTurns = excludeEmptyUsage ? 'recorded_completed_turns' : 'completed_turns';
 
@@ -22,15 +22,22 @@ export function mergeRollupMetrics(excludeEmptyUsage = false): string {
   // #endregion
 
   // #region 완료 표본의 토큰·캐시 평균
-  const tokenAverages = [
-    ['total_tokens', 'avg_tokens_per_turn'],
-    ['input_tokens', 'avg_input_tokens'],
-    ['output_tokens', 'avg_output_tokens'],
-  ].map(([field, alias]) => `${average(`${prefix}_${field}`, completedTurns)} AS ${alias}`);
-  const cacheAverages = CACHE_COLUMNS.map(field => `CASE
+  const totalTokenAverage = `${average(`${prefix}_total_tokens`, completedTurns)} AS avg_tokens_per_turn`;
+  const componentAverages = includeComponentAverages
+    ? [
+      `${average(`${prefix}_input_tokens`, completedTurns)} AS avg_input_tokens`,
+      `${average(`${prefix}_output_tokens`, completedTurns)} AS avg_output_tokens`,
+      ...CACHE_COLUMNS.map(field => `CASE
         WHEN ${sum(`${prefix}_${field}_known`)} = ${sum(completedTurns)}
         THEN ${average(`${prefix}_${field}`, completedTurns)}
-      END AS avg_${field}`);
+      END AS avg_${field}`),
+    ]
+    : [
+      'NULL AS avg_input_tokens',
+      'NULL AS avg_output_tokens',
+      'NULL AS avg_cache_write_input_tokens',
+      'NULL AS avg_cache_read_input_tokens',
+    ];
   // #endregion
 
   // #region 알려진 소요 시간의 평균·품질
@@ -44,7 +51,7 @@ export function mergeRollupMetrics(excludeEmptyUsage = false): string {
 
   return [
     ...tokenTotals, ...cacheTotals, ...requestTotals,
-    ...tokenAverages, ...cacheAverages,
+    totalTokenAverage, ...componentAverages,
     ...durationMetrics,
   ].join(',\n      ');
 }
