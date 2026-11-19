@@ -19,7 +19,7 @@ import { buildRollupUsageQueries } from '../../src/summary/db/rollup-queries';
 
 const epoch = (local: string): number => Date.parse(`${local}+09:00`);
 const rollupTables = ['usage_request_daily', 'usage_model_daily', 'usage_rollup_meta'];
-const factTables = ['manifest', 'projects', 'sessions', 'turn_summary', 'turn_model_usage',
+const factTables = ['source_file', 'projects', 'sessions', 'turn_summary', 'turn_model_usage',
   'turn_capability_usage', 'turn_costs', 'session_billing'];
 
 function turn(id: string, local: string | null, tokens: number, overrides: Partial<TurnSummaryInput> = {}): TurnSummaryInput {
@@ -336,20 +336,20 @@ function metadata(): FileMetadata {
     size_bytes: 512, mtime_ms: 123456, dev: '1', inode: '2', parser_version: 1 };
 }
 
-test('manifest diagnostic updates refresh stale counts and successful replacement clears stale state', t => {
+test('source_file diagnostic updates refresh stale counts and successful replacement clears stale state', t => {
   const db = fixture(t);
   const file = metadata();
-  const manifest = db.observeFile(file, 'first');
+  const source_file = db.observeFile(file, 'first');
   const rows = [turn('one', '2026-10-01T12:00:00', 100, { model_usage: [model('A', 100)] }),
     turn('two', '2026-10-02T12:00:00', 200, { model_usage: [model('B', 200)] })];
   const install = (): void => { db.replaceMemory({scanId: 'test', sessions: [{ provider: 'claude', session_id: 'session-a' }],
-    files: [{ ...file, id: manifest.id }], summaries: rows }); };
+    files: [{ ...file, id: source_file.id }], summaries: rows }); };
   install();
   expect(oracle(db)[0], { total_tokens: 300 });
   assert.equal(db.diagnostics().counts.stale_summaries, 0);
   for (const status of ['error', 'interrupted'] as const) {
     const beforeDiagnostic = snapshot(db, rollupTables);
-    db.setManifestDiagnostic(manifest.id, status, 'failed-line', null, 17);
+    db.setSourceDiagnostic(source_file.id, status, 'failed-line', null, 17);
     assert.deepEqual(snapshot(db, rollupTables), beforeDiagnostic, 'Diagnostic-only updates do not rebuild usage aggregates');
     expect(oracle(db)[0], { total_tokens: 300 });
     assert.equal(db.diagnostics().counts.stale_summaries, 2);
@@ -359,9 +359,9 @@ test('manifest diagnostic updates refresh stale counts and successful replacemen
     assert.equal(db.diagnostics().counts.stale_summaries, 0);
   }
   const before = snapshot(db, rollupTables);
-  db.markSeen(manifest.id, 'later');
+  db.markSeen(source_file.id, 'later');
   db.observeFile(file, 'latest');
-  db.setManifestDiagnostic(manifest.id, 'done', 'committed', null);
+  db.setSourceDiagnostic(source_file.id, 'done', 'committed', null);
   assert.deepEqual(snapshot(db, rollupTables), before, 'Presence and non-error file diagnostics do not alter aggregate state');
 });
 
@@ -369,10 +369,10 @@ test('v10 upgrade preserves existing IDs, diagnostic/model/cost rows and lazily 
   const files = disk(t);
   const previous = files.open();
   const file = metadata();
-  const manifest = previous.observeFile(file, 'old');
-  previous.replaceMemory({scanId: 'test', sessions: [{ provider: 'claude', session_id: 'session-a' }], files: [{ ...file, id: manifest.id }],
+  const source_file = previous.observeFile(file, 'old');
+  previous.replaceMemory({scanId: 'test', sessions: [{ provider: 'claude', session_id: 'session-a' }], files: [{ ...file, id: source_file.id }],
     summaries: [turn('preserved', '2026-10-01T12:00:00', 100, {
-      diagnostic_file_id: manifest.id, diagnostic_offset: 42, last_error: 'stored-error', billing: 'api',
+      diagnostic_file_id: source_file.id, diagnostic_offset: 42, last_error: 'stored-error', billing: 'api',
       model_usage: [model('claude-sonnet-4-6', 100)], capability_usage: [{ category: 'skill', name: 'fixture', usage_count: 2 }],
     })] });
   const facts = snapshot(previous, factTables);
@@ -403,9 +403,9 @@ test('v10 upgrade preserves existing IDs, diagnostic/model/cost rows and lazily 
 
 for (const version of [14, 15]) test(`v${version} month layout returns to session clustering without rewriting facts`, t => {
   const files = disk(t), previous = files.open();
-  const file = metadata(), manifest = previous.observeFile(file, 'v13');
-  previous.replaceMemory({scanId: 'test', sessions: [{ provider: 'claude', session_id: 'session-a' }], files: [{ ...file, id: manifest.id }], summaries: [
-    turn('before-month', '2026-09-30T23:59:00', 100, { diagnostic_file_id: manifest.id, model_usage: [model('A', 100)],
+  const file = metadata(), source_file = previous.observeFile(file, 'v13');
+  previous.replaceMemory({scanId: 'test', sessions: [{ provider: 'claude', session_id: 'session-a' }], files: [{ ...file, id: source_file.id }], summaries: [
+    turn('before-month', '2026-09-30T23:59:00', 100, { diagnostic_file_id: source_file.id, model_usage: [model('A', 100)],
       capability_usage: [{ category: 'skill', name: 'preserved', usage_count: 2 }], billing: 'api' }),
     turn('after-month', '2026-10-01T00:01:00', 200, { model_usage: [model('A', 200)] }),
     turn('unknown-month', null, 30),
@@ -460,10 +460,10 @@ test('v13 upgrade recreates only the derived cache and preserves source facts', 
 
 test('v18 upgrade removes unused daily columns and lazily rebuilds without changing facts or IDs', t => {
   const files = disk(t), previous = files.open();
-  const file = metadata(), manifest = previous.observeFile(file, 'v18');
+  const file = metadata(), source_file = previous.observeFile(file, 'v18');
   previous.replaceMemory({ scanId: 'v18', sessions: [{ provider: 'claude', session_id: 'session-a' }],
-    files: [{ ...file, id: manifest.id }], summaries: [
-      turn('first', '2026-09-30T23:59:00', 100, { diagnostic_file_id: manifest.id, diagnostic_offset: 42,
+    files: [{ ...file, id: source_file.id }], summaries: [
+      turn('first', '2026-09-30T23:59:00', 100, { diagnostic_file_id: source_file.id, diagnostic_offset: 42,
         last_error: 'stored-error', billing: 'api', model_usage: [model('A', 100)],
         capability_usage: [{ category: 'skill', name: 'preserved', usage_count: 2 }] }),
       turn('second', '2026-10-01T00:01:00', 200, { model_usage: [model('B', 200)] }),
@@ -519,10 +519,10 @@ test('v18 upgrade removes unused daily columns and lazily rebuilds without chang
 test('a failure after request rollup refresh rolls back facts, model rollup, diagnostics, names and costs', t => {
   const db = fixture(t);
   const file = metadata();
-  const manifest = db.observeFile(file, 'first');
+  const source_file = db.observeFile(file, 'first');
   const install = (tokens: number, name: string): void => { db.replaceMemory({scanId: 'test',
     sessions: [{ provider: 'claude', session_id: 'session-a' }],
-    files: [{ ...file, size_bytes: tokens, id: manifest.id }],
+    files: [{ ...file, size_bytes: tokens, id: source_file.id }],
     summaries: [turn('same', '2026-10-01T12:00:00', tokens, {
       project_name: name, session_name: name, model_usage: [model('A', tokens)], billing: 'api',
       capability_usage: [{ category: 'skill', name, usage_count: 1 }],

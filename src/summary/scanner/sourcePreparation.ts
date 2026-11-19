@@ -7,12 +7,22 @@ import type { ParsedIdentity } from '../types';
 import { readSource, type SourceRead } from './sourceReader';
 
 export type SourceFile = FileMetadata & { id: number };
+export interface SourceCheckpoint {
+  id: number;
+  sourceRoot: string;
+  parserVersion: number;
+  collectCapabilities: boolean;
+  maxLineBytes: number;
+  read: SourceRead;
+  winners: SourceWinnersSnapshot;
+}
 export interface SourcePreparationOptions {
   collectCapabilities: boolean;
   maxLineBytes?: number;
   cancelled: () => boolean;
   signal?: AbortSignal;
   onBytes?: (bytes: number) => void;
+  checkpoint?: SourceCheckpoint;
 }
 export type SourcePreparation = {
   bytes: number;
@@ -23,12 +33,18 @@ export type SourcePreparation = {
 /** 읽기·파싱·해시·winner 선택은 파일 안에서 끝내고 오류도 값으로 반환한다. */
 export async function prepareSource(file: SourceFile, options: SourcePreparationOptions): Promise<SourcePreparation> {
   const startedAtMs = performance.now();
-  const winners = new SourceWinners(file.provider);
+  let winners = new SourceWinners(file.provider);
   let bytes = 0;
   let identity: ParsedIdentity | undefined;
   try {
+    const saved = options.checkpoint;
+    const checkpoint = saved?.id === file.id && saved.sourceRoot === file.source_root && saved.parserVersion === file.parser_version
+      && saved.collectCapabilities === options.collectCapabilities && saved.maxLineBytes === (options.maxLineBytes ?? 4 * 1024 * 1024)
+      ? saved : undefined;
     const read = await readSource(file, (event, index) => winners.add(event, index), {
       ...options,
+      checkpoint: checkpoint?.read,
+      onResume: () => { winners = new SourceWinners(file.provider, checkpoint!.winners); },
       onBytes: count => {
         bytes += count;
         options.onBytes?.(count);

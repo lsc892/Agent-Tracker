@@ -5,7 +5,8 @@ import { sessionKey, type FileState } from './state';
 
 export async function collectWinners(context: RefreshContext, names: Map<string, string>): Promise<MemoryAggregateResult> {
   const { state, collect, check } = context;
-  const sources = [...state.files.values()].filter(file => !file.removed && !file.error && file.prepared && file.session)
+  const sources = [...state.files.values()].filter(file => !file.removed && !file.error && file.prepared && file.session
+    && state.affected.has(sessionKey(file.provider, file.session)))
     .sort((a, b) => a.sequence! - b.sequence!);
   const inputs: StreamingAggregateFile[] = sources.map(file => ({ id: file.id, provider: file.provider, session_id: file.session!,
     identity: { ...file.prepared!.identity, sessionName: names.get(sessionKey(file.provider, file.session!)) ?? file.prepared!.identity.sessionName },

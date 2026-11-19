@@ -2,6 +2,7 @@
 
 Node 테스트 러너로 파서·DB·quota·설정·UI와 배포 도구의 회귀를 검증한다.
 
+- [prefix-hash.test.ts](prefix-hash.test.ts): 원본 prefix 해시·완성 줄 재개·중간 수정/삽입·축소·실패 복구·파일 Worker·DB 이관/재시작을 전체 파싱과 대조한다.
 - [capabilities.test.ts](capabilities.test.ts) — Skill·MCP·명령·에이전트 호출 집계와 필터·페이지·수집 설정을 검증한다.
 - [claude-credentials.test.ts](claude-credentials.test.ts) — 플랫폼별 Claude 인증 파일·Keychain 선택과 실패·취소 처리를 검증한다.
 - [claude-settings.test.ts](claude-settings.test.ts) — Claude 로그 보존 기간 설정의 갱신·보존·입력 검증을 확인한다.

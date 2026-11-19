@@ -3,15 +3,16 @@ import type { DatabaseSync } from 'node:sqlite';
 import type { NameQuery, NameResult } from '../types';
 import type {
   BillingMode, CapabilityCategory, CapabilityPage, ChartMetric, DiagnosticsPage, FileMetadata,
-  KeysetPage, ManifestRow, OffsetPage, ProcessingStatus, Provider, SummaryFilter,
+  KeysetPage, SourceFileRow, OffsetPage, ProcessingStatus, Provider, SummaryFilter,
   TurnSummaryRow, UsagePage, UsageGrouping, UsageRow, UsageSort,
 } from './types';
 import { SqliteSession, type SqliteSessionOptions } from './connection';
-import { ManifestStore } from './manifest';
+import { SourceFileStore } from './sourceFiles';
 import { SessionBillingStore } from './billing';
 import { SummaryReader } from './reader';
 import { MemoryStore, type MemoryReplacement, type SavedSessionNames } from './memoryStore';
 import type { StageProfiler, StorageStage } from '../profiling';
+import type { SourceCheckpoint } from '../scanner/sourcePreparation';
 
 export * from './types';
 export { usageChartFromPage } from './chart';
@@ -19,21 +20,23 @@ export { periodBounds } from './timezone';
 
 /** 하나의 DB 연결을 공유하는 저장소들을 구성하고 통계 작업을 위임한다. */
 export class SummaryDatabase {
+  readonly sourceCheckpoints = new Map<string, SourceCheckpoint>();
   readonly connection: DatabaseSync;
   private readonly sqlite: SqliteSession;
-  private readonly manifest: ManifestStore;
+  private readonly sources: SourceFileStore;
   private readonly billing: SessionBillingStore;
   private readonly reader: SummaryReader;
 
   constructor(options: SqliteSessionOptions) {
     this.sqlite = new SqliteSession(options);
     this.connection = this.sqlite.connection;
-    this.manifest = new ManifestStore(this.sqlite);
+    this.sources = new SourceFileStore(this.sqlite);
     this.billing = new SessionBillingStore(this.sqlite);
     this.reader = new SummaryReader(this.sqlite);
   }
 
   close(): void {
+    this.sourceCheckpoints.clear();
     return this.sqlite.close();
   }
 
@@ -48,36 +51,37 @@ export class SummaryDatabase {
   clearData(): void {
     this.sqlite.transaction(() => {
       this.sqlite.rollups.clear();
-      this.connection.exec('DELETE FROM turn_summary; DELETE FROM manifest; DELETE FROM sessions; DELETE FROM projects;');
+      this.connection.exec('DELETE FROM turn_summary; DELETE FROM source_file; DELETE FROM sessions; DELETE FROM projects;');
     });
+    this.sourceCheckpoints.clear();
   }
 
-  findManifest(provider: Provider, path: string): ManifestRow | undefined {
-    return this.manifest.findManifest(provider, path);
+  findSourceFile(provider: Provider, path: string): SourceFileRow | undefined {
+    return this.sources.findSourceFile(provider, path);
   }
 
-  findIdentity(provider: Provider, dev: string | null, inode: string | null): ManifestRow[] {
-    return this.manifest.findIdentity(provider, dev, inode);
+  findIdentity(provider: Provider, dev: string | null, inode: string | null): SourceFileRow[] {
+    return this.sources.findIdentity(provider, dev, inode);
   }
 
-  observeFile(metadata: FileMetadata, scanId: string): ManifestRow {
-    return this.manifest.observeFile(metadata, scanId);
+  observeFile(metadata: FileMetadata, scanId: string): SourceFileRow {
+    return this.sources.observeFile(metadata, scanId);
   }
 
   markSeen(id: number, scanId: string): void {
-    return this.manifest.markSeen(id, scanId);
+    return this.sources.markSeen(id, scanId);
   }
 
-  setManifestDiagnostic(id: number, status: ProcessingStatus, position: string | null, error: string | null, offset: number | null = null): void {
-    return this.manifest.setManifestDiagnostic(id, status, position, error, offset);
+  setSourceDiagnostic(id: number, status: ProcessingStatus, position: string | null, error: string | null, offset: number | null = null): void {
+    return this.sources.setSourceDiagnostic(id, status, position, error, offset);
   }
 
-  sessionFiles(provider: Provider, sessionId: string, limit = 100): IterableIterator<ManifestRow> {
-    return this.manifest.sessionFiles(provider, sessionId, limit);
+  sessionFiles(provider: Provider, sessionId: string, limit = 100): IterableIterator<SourceFileRow> {
+    return this.sources.sessionFiles(provider, sessionId, limit);
   }
 
-  unseenFiles(provider: Provider, sourceRoot: string, scanId: string, limit = 100): IterableIterator<ManifestRow> {
-    return this.manifest.unseenFiles(provider, sourceRoot, scanId, limit);
+  unseenFiles(provider: Provider, sourceRoot: string, scanId: string, limit = 100): IterableIterator<SourceFileRow> {
+    return this.sources.unseenFiles(provider, sourceRoot, scanId, limit);
   }
 
   replaceMemory(replacement: MemoryReplacement, profile?: StageProfiler<StorageStage>): SavedSessionNames {

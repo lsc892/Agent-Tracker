@@ -3,7 +3,7 @@ import { performance } from 'node:perf_hooks';
 
 export type ScanStage = 'lock' | 'discover' | 'names' | 'parseChanged' | 'expandRelated'
   | 'resolveParents' | 'reconnect' | 'aggregate' | 'commitComponents' | 'finishScan' | 'optimize' | 'readSources' | 'sourcePoolClose';
-export type StorageStage = 'replace' | 'begin' | 'commit' | 'rollback' | 'prepare' | 'manifest'
+export type StorageStage = 'replace' | 'begin' | 'commit' | 'rollback' | 'prepare' | 'source_file'
   | 'indexSummaries' | 'deleteMissing' | 'metadata' | 'summaries' | 'summaryCompare' | 'summaryWrites'
   | 'reconnectDiagnostics' | 'removeSources' | 'rollups' | 'pruneNames'
   | 'rollupRequestDelete' | 'rollupRequestInsert' | 'rollupModelDelete' | 'rollupModelInsert'

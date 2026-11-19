@@ -1,21 +1,17 @@
-// 디렉터리를 탐색하고 manifest와 비교하여 관측·변경·소실 파일을 등록한다.
+// 디렉터리를 탐색하고 source_file와 비교하여 관측·변경·소실 파일을 등록한다.
 import { lstat, opendir } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import type { FileMetadata, ManifestRow } from '../../db/types';
+import type { FileMetadata, SourceFileRow } from '../../db/types';
 import { SummaryError } from '../../jsonl';
 import type { RefreshContext } from './context';
 import { PARSER_VERSION, sessionKey } from './state';
 import type { FileState } from './state';
 
-const sameFingerprint = (a: FileMetadata, b: FileMetadata): boolean => a.provider === b.provider
-  && a.path === b.path && a.source_root === b.source_root && a.size_bytes === b.size_bytes
-  && a.mtime_ms === b.mtime_ms && a.dev === b.dev && a.inode === b.inode && a.parser_version === b.parser_version;
-
 export async function discoverSources(context: RefreshContext): Promise<void> {
   const { database, state, roots, collect, retain, result, check, report } = context;
-  const manifest = database.connection.prepare('SELECT * FROM manifest ORDER BY id').all() as unknown as ManifestRow[];
-  const paths = new Map(manifest.map(file => [sessionKey(file.provider, file.path), file]));
-  let nextId = manifest.reduce((max, file) => Math.max(max, file.id), 0) + 1;
+  const source_file = database.connection.prepare('SELECT * FROM source_file ORDER BY id').all() as unknown as SourceFileRow[];
+  const paths = new Map(source_file.map(file => [sessionKey(file.provider, file.path), file]));
+  let nextId = source_file.reduce((max, file) => Math.max(max, file.id), 0) + 1;
   const observed = new Set<number>();
   for (const root of roots) {
     try {
@@ -25,30 +21,25 @@ export async function discoverSources(context: RefreshContext): Promise<void> {
           continue;
         // Deleted inodes can be reused. Cross-path matches need the parsed content proof in reconnectSources.
         const previous = paths.get(sessionKey(root.provider, resolve(path)));
+        if (previous && previous.parser_version !== PARSER_VERSION)
+          database.sourceCheckpoints.delete(sessionKey(root.provider, resolve(path)));
         const metadata: FileMetadata = { provider: root.provider, source_root: root.path, path: resolve(path), session_id: previous?.session_id ?? null,
           size_bytes: stat.size, mtime_ms: stat.mtimeMs, dev: String(stat.dev), inode: String(stat.ino), parser_version: PARSER_VERSION,
           capabilities_collected: collect ? 1 : 0, source_identity: previous?.source_identity, content_hash: previous?.content_hash };
-        const changed = !previous || previous.source_missing === 1 || previous.processing_status !== 'done'
-          || !sameFingerprint(previous, metadata) || collect && previous.capabilities_collected !== 1
-          || previous.session_id !== null && previous.size_bytes > 0 && (!previous.source_identity || !previous.content_hash);
-        const file: FileState = { ...metadata, id: previous?.id ?? nextId++, previous, changed, removed: false, selected: true, session: metadata.session_id };
+        const file: FileState = { ...metadata, id: previous?.id ?? nextId++, previous, changed: true, removed: false, selected: true, session: metadata.session_id };
         state.trackFile(file);
         observed.add(file.id);
         result.discovered++;
-        if (changed)
-          state.affect(file.provider, file.session);
-        else
-          result.reused++;
         report();
       }
     }
     catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT'
-        || manifest.some(file => file.provider === root.provider && file.source_root === root.path))
+        || source_file.some(file => file.provider === root.provider && file.source_root === root.path))
         throw error;
     }
   }
-  for (const previous of manifest)
+  for (const previous of source_file)
     if (!observed.has(previous.id)) {
       const selected = roots.some(root => root.provider === previous.provider && root.path === previous.source_root);
       const file: FileState = { ...previous, id: previous.id, previous, changed: selected && (!previous.source_missing || !retain),
@@ -57,6 +48,8 @@ export async function discoverSources(context: RefreshContext): Promise<void> {
       if (file.changed)
         state.affect(file.provider, file.session);
     }
+  for (const [key, checkpoint] of database.sourceCheckpoints)
+    if (!observed.has(checkpoint.id)) database.sourceCheckpoints.delete(key);
 }
 
 async function* walk(directory: string, check: () => void, compressed: boolean): AsyncGenerator<string> {

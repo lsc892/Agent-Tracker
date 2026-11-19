@@ -70,7 +70,7 @@ function enqueueParents(context: RefreshContext): void {
   const state = context.state;
   for (const reference of state.unsearchedReferences) {
     if (!state.missingReferences.has(reference)) continue;
-    // manifest에 thread가 없으므로 새 미해결 참조마다 기존 substring 후보를 한 번 찾는다.
+    // source_file에 thread가 없으므로 새 미해결 참조마다 기존 substring 후보를 한 번 찾는다.
     for (const candidate of state.codexFiles) {
       if (!state.ready(candidate) || !candidate.path.includes(reference)) continue;
       let reasons = state.parentReasons.get(candidate);

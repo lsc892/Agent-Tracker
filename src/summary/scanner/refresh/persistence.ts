@@ -170,7 +170,7 @@ function settleDeferredComponent(context: RefreshContext, members: FileState[]):
     for (const file of members) {
       file.settled = true;
       if (file.deferred)
-        database.connection.prepare(`UPDATE manifest SET processing_status='done',
+        database.connection.prepare(`UPDATE source_file SET processing_status='done',
             processing_position='partial-line: waiting for newline',recorded_at=?,last_error=NULL WHERE id=?`)
           .run(new Date().toISOString(), file.id);
     }
@@ -195,7 +195,7 @@ export function finishScan(context: RefreshContext, names: Map<string, string>):
       const [provider, session] = JSON.parse(value) as [Provider, string];
       update.run(name, provider, session, name);
     }
-    const seen = database.connection.prepare('UPDATE manifest SET last_seen_scan_id=? WHERE id=?');
+    const seen = database.connection.prepare('UPDATE source_file SET last_seen_scan_id=? WHERE id=?');
     for (const file of files.values())
       if (file.selected && file.previous)
         seen.run(result.scanId, file.id);
@@ -209,17 +209,18 @@ function finalFile(file: FileState): FileMetadata & { id: number } {
   return { id: file.id, provider: file.provider, source_root: file.source_root, path: file.path,
     session_id: file.session, size_bytes: file.size_bytes, mtime_ms: file.mtime_ms, dev: file.dev, inode: file.inode,
     parser_version: file.parser_version, capabilities_collected: file.capabilities_collected,
-    source_identity: file.prepared?.sourceIdentity ?? file.source_identity, content_hash: file.prepared?.contentHash ?? file.content_hash };
+    source_identity: file.prepared?.sourceIdentity ?? file.source_identity, content_hash: file.prepared?.contentHash ?? file.content_hash,
+    complete_position: file.prepared?.position ?? file.complete_position ?? 0, prefix_hash: file.prepared?.prefixHash ?? file.prefix_hash ?? null };
 }
 
 export function recordFailure(context: RefreshContext, file: FileState): void {
   const { database, result } = context;
-  let previous = database.findManifest(file.provider, file.path);
+  let previous = database.findSourceFile(file.provider, file.path);
   if (!previous) {
     previous = database.observeFile(file, result.scanId);
     file.id = previous.id;
   }
-  database.setManifestDiagnostic(previous.id, file.error!.code === 'interrupted' ? 'interrupted' : 'error', `parse: byte=${file.error!.offset}`, file.error!.code, file.error!.offset);
+  database.setSourceDiagnostic(previous.id, file.error!.code === 'interrupted' ? 'interrupted' : 'error', `parse: byte=${file.error!.offset}`, file.error!.code, file.error!.offset);
 }
 
 function preserveMissingSources(context: RefreshContext, members: FileState[]): void {

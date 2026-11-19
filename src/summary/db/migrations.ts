@@ -2,7 +2,7 @@
 import type { DatabaseSync } from 'node:sqlite';
 import {
   SCHEMA_SQL, SCHEMA_VERSION, SCHEMA_LEGACY_MIGRATION_SQL, SCHEMA_CACHE_MIGRATION_SQL,
-  SCHEMA_MODEL_SQL, SCHEMA_CAPABILITY_SQL, SCHEMA_ROLLUP_SQL, SCHEMA_TURN_INDEX_MIGRATION_SQL, manifestIdentityIndexSql,
+  SCHEMA_MODEL_SQL, SCHEMA_CAPABILITY_SQL, SCHEMA_ROLLUP_SQL, SCHEMA_TURN_INDEX_MIGRATION_SQL, sourceIdentityIndexSql,
 } from './schema';
 
 function initialMigrationSql(version: number): string {
@@ -27,13 +27,27 @@ export function migrateSchema(connection: DatabaseSync, transaction: (action: ()
       const current = connection.prepare('PRAGMA user_version').get() as { user_version: number };
       if (current.user_version > SCHEMA_VERSION) throw new Error('Database schema is newer than this extension');
       if (current.user_version === SCHEMA_VERSION) return;
-      const manifestColumns = connection.prepare('PRAGMA table_info(manifest)').all();
+      // The former metadata manifest becomes a source/diagnostic registry only.
+      if (connection.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='manifest'").get()) {
+        connection.exec(`ALTER TABLE manifest RENAME TO source_file;
+          DROP INDEX IF EXISTS idx_manifest_root_id; DROP INDEX IF EXISTS idx_manifest_session;
+          DROP INDEX IF EXISTS idx_manifest_source; DROP INDEX IF EXISTS idx_manifest_identity;`);
+      }
+      const existingSourceColumns = connection.prepare('PRAGMA table_info(source_file)').all();
       for (const column of ['source_identity', 'content_hash']) {
-        if (manifestColumns.length && !manifestColumns.some(existing => existing.name === column)) {
-          connection.exec(`ALTER TABLE manifest ADD COLUMN ${column} TEXT`);
+        if (existingSourceColumns.length && !existingSourceColumns.some(existing => existing.name === column)) {
+          connection.exec(`ALTER TABLE source_file ADD COLUMN ${column} TEXT`);
         }
       }
       connection.exec(initialMigrationSql(current.user_version));
+      // v1/v2/v3 use targeted migrations instead of SCHEMA_SQL; restore renamed indexes too.
+      connection.exec(`CREATE INDEX IF NOT EXISTS idx_source_root_id ON source_file(provider, source_root, id);
+        CREATE INDEX IF NOT EXISTS idx_source_session ON source_file(provider, session_id, id);`);
+      const sourceColumns = connection.prepare('PRAGMA table_info(source_file)').all();
+      if (!sourceColumns.some(column => column.name === 'complete_position'))
+        connection.exec('ALTER TABLE source_file ADD COLUMN complete_position INTEGER NOT NULL DEFAULT 0 CHECK(complete_position >= 0)');
+      if (!sourceColumns.some(column => column.name === 'prefix_hash'))
+        connection.exec('ALTER TABLE source_file ADD COLUMN prefix_hash TEXT');
       connection.exec(SCHEMA_MODEL_SQL);
       connection.exec(SCHEMA_CAPABILITY_SQL);
       // Removed aggregate columns change the derived layout; source facts and IDs stay intact.
@@ -44,13 +58,13 @@ export function migrateSchema(connection: DatabaseSync, transaction: (action: ()
       connection.exec(SCHEMA_ROLLUP_SQL);
       connection.exec(`DROP TABLE IF EXISTS turn_metadata_dependencies; DROP TABLE IF EXISTS turn_metadata_capabilities;
         DROP TABLE IF EXISTS turn_metadata_models; DROP TABLE IF EXISTS turn_metadata;`);
-      if (!connection.prepare('PRAGMA table_info(manifest)').all().some(column => column.name === 'capabilities_collected')) {
-        connection.exec('ALTER TABLE manifest ADD COLUMN capabilities_collected INTEGER NOT NULL DEFAULT 0 CHECK(capabilities_collected IN (0,1))');
+      if (!connection.prepare('PRAGMA table_info(source_file)').all().some(column => column.name === 'capabilities_collected')) {
+        connection.exec('ALTER TABLE source_file ADD COLUMN capabilities_collected INTEGER NOT NULL DEFAULT 0 CHECK(capabilities_collected IN (0,1))');
       }
-      if (!connection.prepare('PRAGMA table_info(manifest)').all().some(column => column.name === 'source_missing')) {
-        connection.exec('ALTER TABLE manifest ADD COLUMN source_missing INTEGER NOT NULL DEFAULT 0 CHECK(source_missing IN (0,1))');
+      if (!connection.prepare('PRAGMA table_info(source_file)').all().some(column => column.name === 'source_missing')) {
+        connection.exec('ALTER TABLE source_file ADD COLUMN source_missing INTEGER NOT NULL DEFAULT 0 CHECK(source_missing IN (0,1))');
       }
-      connection.exec('CREATE INDEX IF NOT EXISTS idx_manifest_source ON manifest(provider, source_identity, id)');
+      connection.exec('CREATE INDEX IF NOT EXISTS idx_source_source ON source_file(provider, source_identity, id)');
       if (!connection.prepare('PRAGMA table_info(turn_summary)').all().some(column => column.name === 'request_title')) {
         connection.exec('ALTER TABLE turn_summary ADD COLUMN request_title TEXT');
       }
@@ -58,10 +72,10 @@ export function migrateSchema(connection: DatabaseSync, transaction: (action: ()
         connection.exec(SCHEMA_TURN_INDEX_MIGRATION_SQL);
       }
       connection.exec('DROP INDEX IF EXISTS idx_summary_session;');
-      connection.exec(manifestIdentityIndexSql(process.platform));
+      connection.exec(sourceIdentityIndexSql(process.platform));
       connection.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
     });
   }
   // Reconcile an already-current database copied from another operating system.
-  connection.exec(manifestIdentityIndexSql(process.platform));
+  connection.exec(sourceIdentityIndexSql(process.platform));
 }

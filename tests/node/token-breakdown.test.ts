@@ -59,7 +59,7 @@ test('Claude cache components survive response deduplication, subagents and ever
     assert.deepEqual(breakdown(usage), [120, 15, 40, 100], grouping);
     assert.equal(usage.total_tokens, 275);
   }
-  assert.equal((await refreshSummary(database, options)).bodyBytes, 0, 'unchanged summaries reuse saved components');
+  assert.ok((await refreshSummary(database, options)).bodyBytes > 0, 'unchanged summaries verify the original prefix');
 });
 
 test('Codex reads its official flat and API detail cache fields without adding them to total input twice', async t => {
@@ -109,7 +109,7 @@ test('v3 migration preserves totals and marks cache counts unknown until unchang
     ALTER TABLE turn_summary ADD COLUMN turn_index INTEGER NOT NULL DEFAULT 1;
     DROP INDEX IF EXISTS idx_summary_session;
     CREATE INDEX idx_summary_session ON turn_summary(provider,session_id,turn_index);
-    UPDATE manifest SET parser_version=4;
+    UPDATE source_file SET parser_version=4;
     PRAGMA user_version=3;`);
   state.database.close();
   state.database = new SummaryDatabase(state.options.dbPath);
@@ -121,7 +121,7 @@ test('v3 migration preserves totals and marks cache counts unknown until unchang
   assert.equal(refreshed.failed, 0);
   assert.equal(refreshed.parsed, 1, 'parser version rebuilds even when file size and mtime match');
   assert.deepEqual(breakdown(state.database.queryTurns()[0]), [100, 10, 30, 60]);
-  assert.equal(state.database.findManifest('claude', file)!.parser_version, PARSER_VERSION);
+  assert.equal(state.database.findSourceFile('claude', file)!.parser_version, PARSER_VERSION);
   await appendFile(file, '{bad}\n');
   assert.equal((await refreshSummary(state.database, state.options)).failed, 1);
   assert.deepEqual(breakdown(state.database.queryTurns()[0]), [100, 10, 30, 60], 'failed scans preserve the last successful breakdown');

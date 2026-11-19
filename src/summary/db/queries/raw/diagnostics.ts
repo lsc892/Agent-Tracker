@@ -6,14 +6,14 @@ import { namedTurns } from './source';
 
 /**
  * 책임: 원본을 다시 스캔하지 않고 저장된 진단과 처리 범위를 조회한다.
- * 알고리즘: 같은 필터로 manifest 페이지·오류 또는 품질 플래그가 있는 요청 페이지·상태별 개수를 각각 만들고 ID 기반 페이지 조건을 붙인다.
+ * 알고리즘: 같은 필터로 source_file 페이지·오류 또는 품질 플래그가 있는 요청 페이지·상태별 개수를 각각 만들고 ID 기반 페이지 조건을 붙인다.
  */
 export function buildDiagnosticQueries(filter: SummaryFilter): { files: QuerySql; summaries: QuerySql; counts: QuerySql } {
   const where = buildQueryFilter(filter);
   return {
     files: {
       sql: `SELECT *
-        FROM manifest
+        FROM source_file
         WHERE ${where.sql} AND id > ?
         ORDER BY id
         LIMIT ?
@@ -53,7 +53,7 @@ function diagnosticCounts(where: QuerySql): QuerySql {
           FROM turn_summary
           WHERE ${where.sql} AND last_error IS NOT NULL
         ) AS stale_summaries
-      FROM manifest
+      FROM source_file
       WHERE ${where.sql}`,
     values: [...where.values, ...where.values],
   };

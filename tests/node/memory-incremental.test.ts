@@ -59,10 +59,10 @@ test('refresh streams winners without TEMP staging and rereads related sources a
   const initial=await refreshSummary(db,options);assert.equal(initial.failed,0);assert.equal(initial.parsed,2);
   assert.deepEqual(db.connection.prepare("SELECT name FROM sqlite_temp_master WHERE type='table'").all(),[],
     'the refresh path must not leave event, winner, prepared or replacement staging tables');
-  const unchanged=await refreshSummary(db,options);assert.equal(unchanged.failed,0);assert.equal(unchanged.parsed,0);assert.equal(unchanged.bodyBytes,0);
+  const unchanged=await refreshSummary(db,options);assert.equal(unchanged.failed,0);assert.equal(unchanged.parsed,0);assert.ok(unchanged.bodyBytes > 0);
   await appendFile(main,jsonl([user('extra'),response(20,'extra','extra-response')]));
   const changed=await refreshSummary(db,options);assert.equal(changed.failed,0);
-  assert.equal(changed.parsed,2,'the changed source and its sibling are read again without a retained DTO cache');
+  assert.equal(changed.parsed,1,'only appended rows are parsed; sibling winners are reused after hashing');
   assert.equal(changed.bodyBytes,(await stat(main)).size+(await stat(sibling)).size,
     'every related source is read only once while its winner DTOs are selected');
   assert.equal(db.queryTurns().reduce((sum,row)=>sum+row.total_tokens,0),124);
@@ -89,7 +89,7 @@ test('a failed final transaction preserves facts and retry rereads the same sour
   assert.ok((await refreshSummary(db,options)).failed>0);assert.equal(db.queryTurns().length,1);
   assert.equal(db.queryTurns()[0].total_tokens,original.total_tokens);
   db.connection.exec('DROP TRIGGER reject_new_memory_request');
-  const retried=await refreshSummary(db,options);assert.equal(retried.failed,0);assert.equal(retried.parsed,1);
+  const retried=await refreshSummary(db,options);assert.equal(retried.failed,0);assert.equal(retried.parsed,0);
   assert.equal(db.queryTurns().length,2);assert.equal(db.queryTurns().reduce((n,row)=>n+row.total_tokens,0),124);
 }));
 
@@ -130,28 +130,28 @@ test('an accepted file rewritten to an incomplete first line waits without stale
   await writeFile(path,JSON.stringify(user()));
   const waiting=await refreshSummary(db,options);
   assert.equal(waiting.failed,0);assert.equal(waiting.interrupted,false);
-  assert.equal(db.findManifest('claude',path)?.processing_status,'done');
-  assert.equal(db.findManifest('claude',path)?.last_error,null);
+  assert.equal(db.findSourceFile('claude',path)?.processing_status,'done');
+  assert.equal(db.findSourceFile('claude',path)?.last_error,null);
   assert.deepEqual(db.queryTurns(),before,'an incomplete replacement cannot invalidate accepted facts');
   await appendFile(path,'\n'+jsonl([response(200)]));
   assert.equal((await refreshSummary(db,options)).failed,0);assert.equal(db.queryTurns()[0].total_tokens,202);
 }));
 
-test('new sources and changed sources break equal-score ties by manifest parse order',async()=>fixture(async(db,options,root)=>{
+test('new sources and changed sources break equal-score ties by source_file parse order',async()=>fixture(async(db,options,root)=>{
   const existing=join(root,'z-existing.jsonl'),added=join(root,'a-new.jsonl');
   const source=(rootId:string,model:string)=>jsonl([user(rootId),{...response(100,rootId,'shared'),
     message:{...response(100,rootId,'shared').message,model}}]);
   await writeFile(existing,source('existing','claude-sonnet-4-6'));
   assert.equal((await refreshSummary(db,options)).failed,0);
-  const firstId=db.findManifest('claude',existing)!.id;
+  const firstId=db.findSourceFile('claude',existing)!.id;
   await writeFile(added,source('added','claude-opus-4-7'));
   await writeFile(existing,source('existing','claude-sonnet-4-6')+jsonl([{type:'progress'}]));
   const refreshed=await refreshSummary(db,options);assert.equal(refreshed.failed,0);assert.equal(refreshed.parsed,2);
-  assert.ok(db.findManifest('claude',added)!.id>firstId);
+  assert.ok(db.findSourceFile('claude',added)!.id>firstId);
   const rows=db.queryTurns();
   assert.equal(rows.find(row=>row.root_turn_id==='existing')!.total_tokens,0);
   assert.equal(rows.find(row=>row.root_turn_id==='added')!.total_tokens,102,
-    'both changed sources follow accepted manifest order rather than current directory enumeration');
+    'both changed sources follow accepted source_file order rather than current directory enumeration');
   assert.equal(db.queryTurns({}, {},'model').find(row=>row.root_turn_id==='added')!.model,'claude-opus-4-7');
 }));
 
@@ -167,5 +167,5 @@ test('lineage identifiers use SQLite UTF-8 normalization while raw source identi
   const refreshed=await refreshSummary(db,codexOptions);assert.equal(refreshed.failed,0);assert.equal(refreshed.interrupted,false);
   const rows=db.queryTurns();assert.equal(rows.length,1);assert.equal(rows[0].session_id,'\ufffd');assert.equal(rows[0].total_tokens,34);
   assert.doesNotMatch(rows[0].quality_flags??'',/missing-parent-agent/);
-  assert.equal(db.findManifest('codex',parent)?.source_identity,JSON.stringify(['\ud800',true]));
+  assert.equal(db.findSourceFile('codex',parent)?.source_identity,JSON.stringify(['\ud800',true]));
 }));

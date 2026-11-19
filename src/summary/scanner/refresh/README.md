@@ -5,7 +5,7 @@
 - [index.ts](index.ts) — 단계 실행 순서와 잠금·진행·취소·Worker 종료 수명을 조율한다.
 - [context.ts](context.ts) — 각 단계에 전달하는 실행 환경·상태 참조의 계약을 정의한다.
 - [state.ts](state.ts) — 파일 상태·역인덱스·큐를 소유하고 상태 변경 시 색인 일관성을 유지한다.
-- [discovery.ts](discovery.ts) — 디렉터리 탐색·manifest 비교·변경과 소실 판정을 담당한다.
+- [discovery.ts](discovery.ts) — 디렉터리 탐색·원본 목록·소실 범위를 구성하고 모든 선택 파일을 해시 검사에 보낸다.
 - [preparation.ts](preparation.ts) — Worker 준비 결과를 기존 순서로 반영하고 부분 파일·원본 소실을 처리한다.
 - [relations.ts](relations.ts) — 관계 큐·계보·부모 요청 귀속·원본 이동 검증을 담당한다.
 - [aggregation.ts](aggregation.ts) — 준비된 원본 winner를 sequence·이벤트 index 순서로 최종 집계기에 전달한다.

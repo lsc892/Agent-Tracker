@@ -48,7 +48,7 @@ test('deleted sources retain known positive usage despite warnings, failed/runni
   assert.equal(db.queryCapabilities({},'skill').totalUses,3);
   assert.equal(db.queryUsage({},'day','UTC')[0].total_tokens,46);
   assert.equal(db.queryUsage({},'day','UTC',{},'model')[0].total_tokens,46);
-  assert.equal(db.findManifest('claude',path)?.source_missing,1);
+  assert.equal(db.findSourceFile('claude',path)?.source_missing,1);
   assert.equal(db.sessionBilling('claude','session'),'api');
   assert.deepEqual(db.connection.prepare('PRAGMA foreign_key_check').all(),[]);
   const warm=await refreshSummary(db,options);assert.equal(warm.bodyBytes,0);assert.equal(warm.failed,0);
@@ -66,8 +66,8 @@ test('partial source loss freezes existing requests, collects new requests and a
   db.queryUsage({},'day','UTC');
   await unlink(child);assert.equal((await refreshSummary(db,{...options,collectCapabilities:false})).failed,0);
   assert.deepEqual(db.queryTurns()[0],before);assert.equal(db.queryCapabilities({},'skill').totalUses,2);
-  assert.equal(db.findManifest('claude',child)?.source_missing,1);
-  const warm=await refreshSummary(db,{...options,collectCapabilities:false});assert.equal(warm.parsed,0);assert.equal(warm.bodyBytes,0);
+  assert.equal(db.findSourceFile('claude',child)?.source_missing,1);
+  const warm=await refreshSummary(db,{...options,collectCapabilities:false});assert.equal(warm.parsed,0);assert.ok(warm.bodyBytes>0);
   await appendFile(main,jsonl([response('one',5,'claude-sonnet-4-6','extra'),user('two'),response('two',30)]));
   assert.equal((await refreshSummary(db,options)).failed,0);
   assert.equal(db.queryTurns().find(row=>row.root_turn_id==='one')?.total_tokens,34);
@@ -77,7 +77,7 @@ test('partial source loss freezes existing requests, collects new requests and a
   await writeFile(child,childSource);assert.equal((await refreshSummary(db,options)).failed,0);
   assert.equal(db.queryTurnsCount(),2);
   assert.equal(db.queryTurns().find(row=>row.root_turn_id==='one')?.total_tokens,41);
-  assert.equal(db.findManifest('claude',child)?.source_missing,0);
+  assert.equal(db.findSourceFile('claude',child)?.source_missing,0);
   assert.equal(db.queryUsage({},'day','UTC')[0].total_tokens,73);
 }));
 
@@ -88,7 +88,7 @@ test('deleting the main source retains its usable request while ignoring orphan-
   await writeFile(child,jsonl([response('one',20,'claude-sonnet-4-6','child')]));
   await refreshSummary(db,options);const before=db.queryTurns()[0];
   await unlink(main);assert.equal((await refreshSummary(db,options)).failed,0);
-  assert.deepEqual(db.queryTurns()[0],before);assert.equal(db.findManifest('claude',main)?.source_missing,1);
+  assert.deepEqual(db.queryTurns()[0],before);assert.equal(db.findSourceFile('claude',main)?.source_missing,1);
 }));
 
 test('a remaining source parse failure still retains usable deleted-source history',async()=>fixture(async(db,options,root)=>{
@@ -98,18 +98,18 @@ test('a remaining source parse failure still retains usable deleted-source histo
   await unlink(copy);await appendFile(main,'{broken}\n');
   assert.equal((await refreshSummary(db,options)).failed,1);
   assert.equal(db.queryTurns()[0].id,id);assert.equal(db.queryTurns()[0].total_tokens,12);
-  assert.equal(db.queryTurns()[0].last_error,'parse-error');assert.equal(db.findManifest('claude',copy)?.source_missing,1);
+  assert.equal(db.queryTurns()[0].last_error,'parse-error');assert.equal(db.findSourceFile('claude',copy)?.source_missing,1);
 }));
 
 test('unknown models and zero usage are removed with their last source and disabling retention removes previously retained data',async()=>fixture(async(db,options,root)=>{
   const path=join(root,'session.jsonl');
   await writeFile(path,jsonl([user('unknown'),response('unknown',10,''),user('empty'),response('empty',0)]));
   await refreshSummary(db,options);await unlink(path);await refreshSummary(db,options);
-  assert.equal(db.queryTurnsCount(),0);assert.equal(db.findManifest('claude',path),undefined);
+  assert.equal(db.queryTurnsCount(),0);assert.equal(db.findSourceFile('claude',path),undefined);
   await writeFile(path,jsonl([user('known'),response('known')]));await refreshSummary(db,options);
   await unlink(path);await refreshSummary(db,options);assert.equal(db.queryTurnsCount(),1);
   await refreshSummary(db,{...options,retainDeletedSourceUsage:false});
-  assert.equal(db.queryTurnsCount(),0);assert.equal(db.findManifest('claude',path),undefined);
+  assert.equal(db.queryTurnsCount(),0);assert.equal(db.findSourceFile('claude',path),undefined);
   assert.equal(db.queryUsage().length,0);
 }));
 
@@ -126,11 +126,11 @@ test('compressed Codex usage survives deletion and reopening with its model, ses
   const reopened=new SummaryDatabase(options.dbPath);
   try {
     assert.deepEqual(reopened.queryTurns()[0],before);
-    assert.equal(reopened.findManifest('codex',path)?.source_missing,1);
+    assert.equal(reopened.findSourceFile('codex',path)?.source_missing,1);
     assert.equal(reopened.queryUsagePage({},'total','UTC',{},'model').rows[0].model,'gpt-6.1-sol');
     assert.equal((await refreshSummary(reopened,config)).bodyBytes,0);
     await writeFile(path,source);assert.equal((await refreshSummary(reopened,config)).failed,0);
-    assert.equal(reopened.queryTurnsCount(),1);assert.equal(reopened.findManifest('codex',path)?.source_missing,0);
+    assert.equal(reopened.queryTurnsCount(),1);assert.equal(reopened.findSourceFile('codex',path)?.source_missing,0);
   } finally { reopened.close(); }
 }));
 

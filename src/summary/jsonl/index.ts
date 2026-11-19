@@ -25,18 +25,22 @@ export async function readJsonl(
   options: { maxLineBytes?: number; signal?: AbortSignal; isCancelled?: () => boolean; onBytes?: (bytes: number) => void;
     /** Raw file bytes, before image filtering or decompression; valid only during the callback. */
     onChunk?: (chunk: Buffer) => void;
+    /** Uncompressed JSONL only; an already verified complete-line boundary. */
+    startOffset?: number;
     /** Synchronous processing of at most one chunk; file reads stay outside the callback. */
     processBatch?: (parseRows: () => void) => void } = {},
-): Promise<{ partialLine: boolean; bytes: number; rows: number }> {
+): Promise<{ partialLine: boolean; bytes: number; rows: number; completeOffset: number }> {
   const maxLine = options.maxLineBytes ?? 4 * 1024 * 1024;
   if (!Number.isSafeInteger(maxLine) || maxLine < 1) throw new RangeError('maxLineBytes must be a positive integer');
+  const start = options.startOffset ?? 0;
+  const compressed = path.toLowerCase().endsWith('.jsonl.zst');
+  if (!Number.isSafeInteger(start) || start < 0 || start > size || compressed && start !== 0) throw new RangeError('Invalid JSONL startOffset');
   const file = await open(path, 'r');
   const chunk = Buffer.allocUnsafe(Math.min(64 * 1024, Math.max(1, size)));
   let line: JsonlLine | undefined;
-  let read = 0;
-  let lineOffset = 0;
+  let read = start;
+  let lineOffset = start;
   let rows = 0;
-  const compressed = path.toLowerCase().endsWith('.jsonl.zst');
   const chunks = async function* (): AsyncGenerator<Buffer> {
     while (read < size) {
       if (options.signal?.aborted || options.isCancelled?.()) throw new SummaryError('interrupted', read);
@@ -90,9 +94,9 @@ export async function readJsonl(
         }
       };
       if (options.processBatch) options.processBatch(parseRows); else parseRows();
-      if (stopped) return { partialLine: false, bytes: read, rows };
+      if (stopped) return { partialLine: false, bytes: read - start, rows, completeOffset: lineOffset };
     }
-    return { partialLine: (line?.bytes ?? 0) > 0, bytes: read, rows };
+    return { partialLine: (line?.bytes ?? 0) > 0, bytes: read - start, rows, completeOffset: lineOffset };
   } catch (error) {
     if (error instanceof ZstdError) throw new SummaryError('decompression-error', lineOffset);
     throw error;

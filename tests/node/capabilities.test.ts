@@ -61,7 +61,7 @@ test('Claude counts deduplicate tool identities and model responses, survive rep
     assert.equal(db.queryCapabilities(filter,'skill').totalUses,0);
   }
   assert.equal((await refreshSummary(db,options)).reused,1);
-  db.connection.exec('DELETE FROM turn_capability_usage; UPDATE manifest SET parser_version=10;');
+  db.connection.exec('DELETE FROM turn_capability_usage; UPDATE source_file SET parser_version=10;');
   assert.equal((await refreshSummary(db,options)).parsed,1,'previous parser versions rebuild unchanged sources');
   assert.equal(db.queryCapabilities({},'skill').totalUses,2);
   await appendFile(file,text([{type:'custom-title',customTitle:'new'}]));
@@ -260,7 +260,7 @@ test('default collection includes autonomous AI calls; disabling freezes counts 
   try {
     assert.equal(db.queryCapabilities({},'skill').totalUses,1,'off preserves previous counts through a token rebuild');
     assert.equal(db.queryCapabilities({},'model').totalUses,1,'off does not accumulate model response counts');
-    assert.equal(db.findManifest('claude',file)?.capabilities_collected,0);
+    assert.equal(db.findSourceFile('claude',file)?.capabilities_collected,0);
   } finally {db.close();}
   assert.equal((await client.refresh()).reused,1,'off does not repeatedly reparse an unchanged source');
   await client.dispose();client=new SummaryClient({...options,collectCapabilities:false});
@@ -276,10 +276,10 @@ test('default collection includes autonomous AI calls; disabling freezes counts 
   db=new SummaryDatabase(dbPath);
   try {
     const before=db.queryTurns();
-    db.connection.exec('ALTER TABLE manifest DROP COLUMN capabilities_collected; PRAGMA user_version=6;');
+    db.connection.exec('ALTER TABLE source_file DROP COLUMN capabilities_collected; PRAGMA user_version=6;');
     db.close();db=new SummaryDatabase(dbPath);
     assert.deepEqual(db.queryTurns(),before,'v6 migration preserves tokens and request identities');
     assert.equal(db.queryCapabilities({},'skill').totalUses,2,'v6 migration preserves historical counts');
-    assert.equal(db.findManifest('claude',file)?.capabilities_collected,0,'legacy coverage is rebuilt on the next enabled scan');
+    assert.equal(db.findSourceFile('claude',file)?.capabilities_collected,0,'legacy coverage is rebuilt on the next enabled scan');
   } finally {db.close();}
 });

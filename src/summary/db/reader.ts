@@ -2,7 +2,7 @@
 import type { NameQuery, NameResult } from '../types';
 import type {
   CapabilityCategory, CapabilityPage, CapabilityRow, ChartMetric, DiagnosticsPage,
-  KeysetPage, ManifestRow, OffsetPage, Provider, SummaryFilter, TurnSummaryRow, UsagePage, UsageGrouping, UsageRow, UsageSort,
+  KeysetPage, SourceFileRow, OffsetPage, Provider, SummaryFilter, TurnSummaryRow, UsagePage, UsageGrouping, UsageRow, UsageSort,
 } from './types';
 import { SqliteSession } from './connection';
 import {
@@ -145,7 +145,7 @@ export class SummaryReader {
     const offset = nonnegative(page.offset ?? 0, 'offset');
     const queries = buildDiagnosticQueries({ providers: page.providers });
     const files = this.database.connection.prepare(queries.files.sql)
-      .all(...queries.files.values, nonnegative(page.afterId ?? 0, 'afterId'), limit, offset) as unknown as ManifestRow[];
+      .all(...queries.files.values, nonnegative(page.afterId ?? 0, 'afterId'), limit, offset) as unknown as SourceFileRow[];
     const summaries = this.database.connection.prepare(queries.summaries.sql)
       .all(...queries.summaries.values, nonnegative(page.afterSummaryId ?? 0, 'afterSummaryId'), limit, offset) as unknown as TurnSummaryRow[];
     const counts = this.database.connection.prepare(queries.counts.sql)

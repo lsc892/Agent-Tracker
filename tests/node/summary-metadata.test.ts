@@ -39,7 +39,7 @@ async function fixture(run: (value: Fixture) => Promise<void>): Promise<void> {
 }
 
 const metadata = (db: SummaryDatabase) => db.connection.prepare(
-  'SELECT id,source_identity,content_hash FROM manifest ORDER BY id').all();
+  'SELECT id,source_identity,content_hash FROM source_file ORDER BY id').all();
 
 test('a full reread with unchanged statistics preserves request identities across database reopen',async () => fixture(async value => {
   const {root,options} = value,path = join(root,'session.jsonl');
@@ -166,7 +166,7 @@ test('changed main-source project metadata updates roots recorded only in anothe
   await writeFile(second,jsonl([user('two'),response(40,'two','response-two','request-two')]));
   assert.equal((await refreshSummary(db,options)).failed,0);
   assert.ok(db.queryTurns().every(row=>row.project_key===project('/synthetic/project').projectKey));
-  const selected = db.findManifest('claude',first)!.id < db.findManifest('claude',second)!.id ? first : second;
+  const selected = db.findSourceFile('claude',first)!.id < db.findSourceFile('claude',second)!.id ? first : second;
   const selectedRoot = selected===first?'one':'two';
   await writeFile(selected,jsonl([{...user(selectedRoot),cwd:'/synthetic/renamed-project'},
     selected===first?response():response(40,'two','response-two','request-two')]));
@@ -216,7 +216,7 @@ test('clearing statistics removes source state and all derived facts',async () =
   await writeFile(join(root,'session.jsonl'),jsonl([user(),response()]));
   assert.equal((await refreshSummary(db,options)).failed,0);assert.equal(metadata(db).length,1);
   db.clearData();assert.equal(db.queryTurnsCount(),0);
-  for (const table of ['manifest','turn_summary','turn_model_usage','turn_capability_usage','turn_costs','sessions','projects']) {
+  for (const table of ['source_file','turn_summary','turn_model_usage','turn_capability_usage','turn_costs','sessions','projects']) {
     assert.equal(db.connection.prepare(`SELECT count(*) AS n FROM ${table}`).get()?.n,0);
   }
   assert.deepEqual(db.connection.prepare('PRAGMA foreign_key_check').all(),[]);
@@ -252,5 +252,5 @@ test('disabling source retention revalidates a previously suppressed orphan calc
   const result = await refreshSummary(db,options);
   assert.equal(result.failed,1);
   assert.equal(db.queryTurns()[0].total_tokens,124);
-  assert.equal(db.findManifest('claude',child)?.last_error,'missing-root-turn');
+  assert.equal(db.findSourceFile('claude',child)?.last_error,'missing-root-turn');
 }));
