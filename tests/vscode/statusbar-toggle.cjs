@@ -155,13 +155,16 @@ async function verifyStatusLocalization(cdp, settingsPath, root, editor) {
     await cdp.call('Input.dispatchMouseEvent', { type: 'mouseMoved', ...point });
     await until(cardText, `${locale}: hover opens the card again`);
     await cdp.click(point);
+    await until(async () => !await cardText(), `${locale}: click closes the hovered card`);
+    await cdp.click(point);
+    await until(cardText, `${locale}: next click reopens the card`);
     await cdp.call('Input.dispatchMouseEvent', { type: 'mouseMoved', ...editor });
     await sleep(500);
-    assert.ok(await cardText(), `${locale}: click pins the hovered card`);
+    assert.ok(await cardText(), `${locale}: a card opened by clicking stays open`);
     await cdp.click(point);
     for (let attempt = 0; attempt < 5; attempt++) {
       await sleep(100);
-      assert.equal(await cardText(), null, `${locale}: second click keeps the card closed`);
+      assert.equal(await cardText(), null, `${locale}: closing click keeps the card closed`);
     }
     await cdp.click(point);
     await until(cardText, `${locale}: click reopens the card`);
@@ -289,13 +292,22 @@ async function main() {
     await until(async () => !await visible(), 'leaving closes the unpinned card');
     outcomes.push('hover opens the full quota card and moving away dismisses it');
     await cdp.call('Input.dispatchMouseEvent', { type: 'mouseMoved', x: button.x, y: button.y });
-    await until(visible, 'hover opens the card again before pinning');
+    await until(visible, 'hover opens the card again before clicking');
+    const clickPoint = { x: button.x, y: button.y, button: 'left', clickCount: 1 };
+    await cdp.call('Input.dispatchMouseEvent', { type: 'mousePressed', ...clickPoint });
+    await sleep(150);
+    assert.ok(await visible(), 'pressing the status item keeps the card visible until click');
+    await cdp.call('Input.dispatchMouseEvent', { type: 'mouseReleased', ...clickPoint });
+    await until(async () => !await visible(), 'first click closes the hovered card');
+    await cdp.call('Input.dispatchMouseEvent', { type: 'mouseMoved', x: button.x + 8, y: button.y });
+    await assertStaysClosed('the hovered card stays closed while the pointer moves within the button');
+    outcomes.push('the hovered card stays visible through mousedown and closes on click');
     await cdp.click(button);
-    const card = await until(visible, 'first click pins quota card');
+    const card = await until(visible, 'next click opens quota card');
     assert.ok(card.bottom <= button.top + 8, 'card is anchored above the status bar');
     await cdp.call('Input.dispatchMouseEvent', { type: 'mouseMoved', x: editor.x, y: editor.y });
     await sleep(500); assert.ok(await visible(), 'card remains pinned after the mouse leaves');
-    outcomes.push('first click pins the hovered card above the status bar');
+    outcomes.push('the next click opens the card and it stays visible after the pointer leaves');
     await cdp.call('Input.dispatchMouseEvent', { type: 'mouseMoved', x: button.x, y: button.y });
     for (let attempt = 0; attempt < 15; attempt++) {
       await sleep(100);
@@ -396,7 +408,7 @@ async function main() {
     const screenshot = await cdp.call('Page.captureScreenshot', { format: 'png' });
     await writeFile(join(resultDirectory, 'statusbar-toggle.png'), Buffer.from(screenshot.data, 'base64'));
     await cdp.click(button);
-    await until(async () => !await visible(), 'second click closes quota card');
+    await until(async () => !await visible(), 'click closes the pinned quota card');
     await assertStaysClosed('the card stays closed while the mouse remains over the button');
     await cdp.call('Input.dispatchMouseEvent', { type: 'mouseMoved', x: editor.x, y: editor.y });
     await cdp.call('Input.dispatchMouseEvent', { type: 'mouseMoved', x: button.x, y: button.y });
@@ -404,7 +416,7 @@ async function main() {
     await cdp.call('Input.dispatchMouseEvent', { type: 'mouseMoved', ...editor });
     await until(async () => !await visible(), 'leaving closes the card after mouse reentry');
     await assertStaysClosed('an unpinned card stays closed after moving away');
-    outcomes.push('second click closes the pinned card');
+    outcomes.push('click closes the pinned card');
     outcomes.push('mouse reentry restores temporary hover after toggling the pinned card closed');
     for (let attempt = 0; attempt < 3; attempt++) {
       await cdp.click(button); await until(visible, 'repeated click opens');
