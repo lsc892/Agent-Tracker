@@ -34,6 +34,7 @@ export async function refreshSummary(
     if (cancelled()) throw new SummaryError('interrupted');
   };
   const sourcePool = new SourceReaderPool({ workers: options.sourceWorkers, collectCapabilities: options.collectCapabilities !== false,
+    checkpoints: database.sourceCheckpoints,
     maxLineBytes: options.maxLineBytes, signal, cancelled, externalCancellation: options.cancellation,
     onBytes: bytes => { result.bodyBytes += bytes; report(); } });
   let phase: SummaryProgress['phase'] = 'scanning', lastProgress = 0, release: (() => void) | undefined;

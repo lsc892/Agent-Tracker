@@ -78,7 +78,7 @@ test('discarded image strings still reject invalid JSON escapes and control byte
   });
 });
 
-async function observed(reader: typeof readJsonl, path: string, size: number, maxLineBytes = 4 * 1024 * 1024,
+async function observed(reader: (...args: Parameters<typeof readJsonl>) => Promise<{ partialLine: boolean; bytes: number; rows: number }>, path: string, size: number, maxLineBytes = 4 * 1024 * 1024,
   stopAfter = Infinity): Promise<unknown> {
   const rows: { row: Record<string, unknown>; offset: number }[] = [];
   let bytes = 0, batches = 0;
@@ -86,7 +86,7 @@ async function observed(reader: typeof readJsonl, path: string, size: number, ma
     const result = await reader(path, size, (row, offset) => {
       rows.push({ row, offset }); return rows.length < stopAfter;
     }, { maxLineBytes, onBytes: count => { bytes += count; }, processBatch: parse => { batches++; parse(); } });
-    return { result, rows, bytes, batches };
+    return { result: { rows: result.rows, bytes: result.bytes, partialLine: result.partialLine }, rows, bytes, batches };
   } catch (error) {
     const value = error as { code?: string; offset?: number };
     return { error: { code: value.code, offset: value.offset }, rows, bytes, batches };
@@ -181,7 +181,7 @@ test('unfinished ordinary lines keep UTF-8 bytes across reused chunks and emit o
       },
     });
     assert.deepEqual(rows, [{ row: JSON.parse(first), offset: 0 }, { row: { next: true }, offset: Buffer.byteLength(first) }]);
-    assert.deepEqual(result, { rows: 2, bytes: size, partialLine: true });
+    assert.deepEqual(result, { rows: 2, bytes: size, partialLine: true, completeOffset: Buffer.byteLength(first + '{"next":true}\n') });
     assert.deepEqual(await observed(readJsonl, path, size), await observed(readByteJsonl, path, size));
   });
 });

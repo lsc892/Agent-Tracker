@@ -1,13 +1,13 @@
 // 한 갱신의 파일 상태·관계 색인·큐를 소유하고 상태 변경 시 색인 일관성을 유지한다.
 import type { SourceEvidence } from '../../aggregation/sourceEvidence';
 import type { SourceWinners } from '../../aggregation/sourceWinners';
-import type { FileMetadata, ManifestRow, Provider } from '../../db/types';
+import type { FileMetadata, SourceFileRow, Provider } from '../../db/types';
 import { SummaryError } from '../../jsonl';
 import type { ParsedIdentity, RefreshResult } from '../../types';
 import { sqlText } from '../sourceReader';
 import { addMember, removeMember, SourceQueue } from '../worklist';
 
-export const PARSER_VERSION = 17;
+export const PARSER_VERSION = 18;
 export const sessionKey = (provider: Provider, session: string): string => JSON.stringify([provider, sqlText(session)]);
 
 export interface PreparedSource {
@@ -17,11 +17,13 @@ export interface PreparedSource {
   partialLine: boolean;
   sourceIdentity: string;
   contentHash: string;
+  position: number;
+  prefixHash: string;
 }
 
 export interface FileState extends FileMetadata {
   id: number;
-  previous?: ManifestRow;
+  previous?: SourceFileRow;
   changed: boolean;
   removed: boolean;
   selected: boolean;

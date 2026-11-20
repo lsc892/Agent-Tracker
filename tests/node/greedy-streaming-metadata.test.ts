@@ -49,7 +49,7 @@ test('discarded source usage is absorbed into the source hash without rewriting 
   await writeFile(path,source(response(100)));
   assert.equal((await refreshSummary(db,options)).failed,0);
   const before=db.queryTurns()[0];
-  const signature=()=>db.findManifest('codex',path)?.content_hash;
+  const signature=()=>db.findSourceFile('codex',path)?.content_hash;
   const originalSignature=signature();assert.equal(typeof originalSignature,'string');
   db.connection.exec(`CREATE TABLE greedy_fact_writes(operation TEXT);
     CREATE TRIGGER greedy_fact_insert AFTER INSERT ON turn_summary BEGIN INSERT INTO greedy_fact_writes VALUES('insert'); END;

@@ -8,6 +8,9 @@ import type { FileState } from './state';
 export async function prepareChanged(context: RefreshContext): Promise<void> {
   const changed = [...context.state.files.values()].filter(file => file.changed && !file.removed).sort((a, b) => a.id - b.id);
   await inspectBatch(context, changed);
+  // Hash validation visits every file; preserve the previous changed-first tie order.
+  for (const file of changed)
+    if (!file.changed && file.prepared) file.sequence = ++context.state.sequence;
 }
 
 export async function inspectBatch(context: RefreshContext, batch: readonly FileState[]): Promise<void> {
@@ -42,8 +45,12 @@ export async function inspectSource(context: RefreshContext, file: FileState): P
     }
     check();
     const read = preparation.read, winners = new SourceWinners(file.provider, preparation.winners), evidence = winners.evidence;
-    result.parsed++;
+    file.complete_position = read.position;
+    file.prefix_hash = read.prefixHash;
+    if (read.parsedRows || !read.resumed) result.parsed++;
+    else result.reused++;
     if (!read.rows) {
+      state.affect(file.provider, file.previous?.session_id);
       if (read.partialLine && file.previous?.session_id) {
         file.deferred = true;
         return;
@@ -54,12 +61,19 @@ export async function inspectSource(context: RefreshContext, file: FileState): P
       return;
     }
     state.setSession(file, read.identity!.sessionId);
-    file.prepared = { identity: read.identity!, evidence, winners, partialLine: read.partialLine, sourceIdentity: read.sourceIdentity!, contentHash: read.contentHash };
+    file.prepared = { identity: read.identity!, evidence, winners, partialLine: read.partialLine, sourceIdentity: read.sourceIdentity!,
+      contentHash: read.contentHash, position: read.position, prefixHash: read.prefixHash };
     state.setSourceIdentity(file, read.sourceIdentity);
     file.content_hash = read.contentHash;
     state.registerPrepared(file);
-    state.affect(file.provider, file.session);
-    state.connect(file.provider, file.previous?.session_id, file.session);
+    const previous = file.previous;
+    file.changed = !previous || previous.source_missing === 1 || previous.processing_status !== 'done'
+      || previous.content_hash !== read.contentHash || previous.source_root !== file.source_root
+      || previous.parser_version !== file.parser_version || context.collect && previous.capabilities_collected !== 1;
+    if (file.changed) {
+      state.affect(file.provider, file.session);
+      state.connect(file.provider, previous?.session_id, file.session);
+    }
   }
   catch (error) {
     state.fail(file, error);

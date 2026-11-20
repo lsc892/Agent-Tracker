@@ -43,7 +43,7 @@ test('Claude error notices retain request outcomes without model responses and v
   assert.equal(db.queryTurns({}, {}, 'model').find(row => row.root_turn_id === 'notice-only')!.model, null);
   assert.equal(db.queryUsage({}, 'total', 'UTC', {}, 'model').some(row => row.model === '<synthetic>'), false);
 
-  db.connection.exec(`UPDATE manifest SET parser_version=11;
+  db.connection.exec(`UPDATE source_file SET parser_version=11;
     INSERT INTO turn_model_usage SELECT id,'<synthetic>',0,0,0,0,NULL,'old' FROM turn_summary WHERE root_turn_id='notice-only';
     INSERT INTO turn_capability_usage SELECT id,'model','<synthetic>',1 FROM turn_summary WHERE root_turn_id='notice-only';`);
   assert.equal(db.queryCapabilities({}, 'model').totalUses, 3);
@@ -52,7 +52,7 @@ test('Claude error notices retain request outcomes without model responses and v
   assert.equal(rebuilt.parsed, 2, 'both unchanged sources are reparsed');
   assert.equal(db.queryCapabilities({}, 'model').totalUses, 2);
   assert.equal(db.queryUsage()[0].total_tokens, 40);
-  assert.ok(db.connection.prepare('SELECT parser_version FROM manifest').all().every(row => row.parser_version === PARSER_VERSION));
+  assert.ok(db.connection.prepare('SELECT parser_version FROM source_file').all().every(row => row.parser_version === PARSER_VERSION));
   assert.equal((await refreshSummary(db, options)).parsed, 0, 'the repair runs only once');
 });
 

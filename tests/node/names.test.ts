@@ -106,7 +106,7 @@ test('Codex index renames update unchanged transcripts, survive missing metadata
   const turnsBefore = db.connection.prepare('SELECT * FROM turn_summary').all();
   appendFileSync(index,jsonl([{id:'one',thread_name:'바뀐 이름'}]));
   const refresh = await refreshSummary(db,options);
-  assert.equal(refresh.parsed,0);assert.equal(refresh.reused,1);assert.equal(refresh.bodyBytes,0);
+  assert.equal(refresh.parsed,0);assert.equal(refresh.reused,1);assert.ok(refresh.bodyBytes > 0);
   assert.equal(db.queryUsage({sessionName:'바뀐 이름'},'session')[0].session_name,'바뀐 이름');
   assert.deepEqual(db.connection.prepare('SELECT * FROM turn_summary').all(),turnsBefore);
   assert.equal(readFileSync(join(root,'one.jsonl'),'utf8'),log);

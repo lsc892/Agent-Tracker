@@ -287,6 +287,13 @@ export class CodexCurrentParserAdapter {
     this.sink.identity(identity);
   }
 
+  snapshot(): Record<string, unknown> {
+    const { context: _context, sink: _sink, ...state } = this;
+    return state;
+  }
+
+  restore(state: Record<string, unknown>): void { Object.assign(this, state); }
+
   /**
    * 책임: 부모 요청을 뒤에서 연결할 수 있도록 root 없는 subagent의 원래 계보를 보존한다.
    * 알고리즘: 명시 root가 없는 자식은 독립 메인으로 승격하지 않고 rootless 표시만 추가한다.

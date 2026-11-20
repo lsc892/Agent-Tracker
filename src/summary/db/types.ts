@@ -26,11 +26,14 @@ export interface FileMetadata {
   /** Parsed source thread/role and SHA-256 of the accepted raw file snapshot. */
   source_identity?: string | null;
   content_hash?: string | null;
+  /** Incremental validation: complete raw JSONL line boundary and hash of [0, P). */
+  complete_position?: number;
+  prefix_hash?: string | null;
   /** 0 when Skill counts were skipped; re-enable rebuilds these sources. */
   capabilities_collected?: 0 | 1;
 }
 
-export interface ManifestRow extends FileMetadata {
+export interface SourceFileRow extends FileMetadata {
   id: number;
   source_identity: string | null;
   content_hash: string | null;
@@ -179,7 +182,7 @@ export interface UsageRow extends CostFields {
 }
 
 export interface DiagnosticsPage {
-  files: ManifestRow[];
+  files: SourceFileRow[];
   summaries: TurnSummaryRow[];
   counts: {
     files: number;

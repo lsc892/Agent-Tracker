@@ -129,7 +129,7 @@ export class MemoryStore {
     const affectedSessions: ReplacementSessions = new Map(), affectedProjects = new Set<string>();
     for (const { replacement, sessions, next, removed, reconnected, retained, now } of plans) {
       const changedSessions = new Set<string>();
-      this.profile.measure('manifest', () => this.saveFiles(replacement, sessions, now));
+      this.profile.measure('source_file', () => this.saveFiles(replacement, sessions, now));
       this.profile.measure('deleteMissing', () => this.deleteMissingSummaries(sessions, next, retained.turnIds, changedSessions, affectedProjects));
       this.profile.measure('summaries', () => this.saveSummaries(next, retained.roots, replacement.preserveCapabilities,
         now, changedSessions, affectedProjects, metadata.billing));
@@ -149,11 +149,11 @@ export class MemoryStore {
     }
   }
 
-  /** 삭제 ID의 manifest를 순서대로 읽고 교체 범위를 검증해 삭제 후보 Map을 만든다. */
+  /** 삭제 ID의 source_file를 순서대로 읽고 교체 범위를 검증해 삭제 후보 Map을 만든다. */
   private collectRemovedSources(ids: Iterable<number>, sessions: ReplacementSessions): RemovedSources {
     const removed: RemovedSources = new Map();
     for (const id of ids) {
-      const file = this.database.statement('SELECT provider,session_id FROM manifest WHERE id=?')
+      const file = this.database.statement('SELECT provider,session_id FROM source_file WHERE id=?')
         .get(id) as SourceSession | undefined;
       if (!file) continue;
       this.requireSession(file.provider, file.session_id, sessions);
@@ -170,7 +170,7 @@ export class MemoryStore {
     for (const link of replacement.reconnectedFiles ?? []) {
       const previous = removed.get(link.old_id);
       const current = replacement.files.find(file => file.id === link.new_id)
-        ?? this.database.statement('SELECT provider,session_id FROM manifest WHERE id=?').get(link.new_id);
+        ?? this.database.statement('SELECT provider,session_id FROM source_file WHERE id=?').get(link.new_id);
       if (!previous || !current || link.old_id === link.new_id || previous.provider !== current.provider) {
         throw new Error('Invalid reconnected source');
       }
@@ -205,27 +205,29 @@ export class MemoryStore {
     return retained;
   }
 
-  /** 요청의 진단 참조가 가리킬 수 있도록 manifest를 요청 저장보다 먼저 반영한다. */
+  /** 요청의 진단 참조가 가리킬 수 있도록 source_file를 요청 저장보다 먼저 반영한다. */
   private saveFiles(replacement: MemoryReplacement, sessions: ReplacementSessions, now: string): void {
     for (const file of replacement.files) {
       const scanId = replacement.scanId;
       nonnegative(file.size_bytes, 'size_bytes');
-      const previous = this.database.statement('SELECT provider,session_id FROM manifest WHERE id=?').get(file.id);
+      const previous = this.database.statement('SELECT provider,session_id FROM source_file WHERE id=?').get(file.id);
       if (previous) {
         if (previous.provider !== file.provider) throw new Error('Manifest provider cannot change');
         this.requireSession(previous.provider, previous.session_id, sessions);
       }
       this.requireSession(file.provider, file.session_id, sessions);
-      this.database.statement(`INSERT INTO manifest(id,provider,source_root,path,session_id,size_bytes,mtime_ms,dev,inode,parser_version,
-          source_identity,content_hash,capabilities_collected,source_missing,last_seen_scan_id,processing_status,processing_position,recorded_at,last_error)
-        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,0,?,'done','committed',?,NULL)
+      this.database.statement(`INSERT INTO source_file(id,provider,source_root,path,session_id,size_bytes,mtime_ms,dev,inode,parser_version,
+          source_identity,content_hash,complete_position,prefix_hash,capabilities_collected,source_missing,last_seen_scan_id,processing_status,processing_position,recorded_at,last_error)
+        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0,?,'done','committed',?,NULL)
         ON CONFLICT(id) DO UPDATE SET source_root=excluded.source_root,path=excluded.path,session_id=excluded.session_id,
           size_bytes=excluded.size_bytes,mtime_ms=excluded.mtime_ms,dev=excluded.dev,inode=excluded.inode,
           parser_version=excluded.parser_version,source_identity=excluded.source_identity,content_hash=excluded.content_hash,
+          complete_position=excluded.complete_position,prefix_hash=excluded.prefix_hash,
           capabilities_collected=excluded.capabilities_collected,source_missing=0,last_seen_scan_id=excluded.last_seen_scan_id,
           processing_status='done',processing_position='committed',recorded_at=excluded.recorded_at,last_error=NULL`)
         .run(file.id, file.provider, file.source_root, file.path, file.session_id, file.size_bytes, file.mtime_ms, file.dev, file.inode,
-          file.parser_version, file.source_identity ?? null, file.content_hash ?? null, file.capabilities_collected ?? 1, scanId, now);
+          file.parser_version, file.source_identity ?? null, file.content_hash ?? null, file.complete_position ?? 0, file.prefix_hash ?? null,
+          file.capabilities_collected ?? 1, scanId, now);
     }
   }
 
@@ -363,23 +365,23 @@ export class MemoryStore {
     }
   }
 
-  /** 검증된 이동 쌍의 이전 진단 원본 ID를 새 manifest ID로 바꾼다. */
+  /** 검증된 이동 쌍의 이전 진단 원본 ID를 새 source_file ID로 바꾼다. */
   private reconnectDiagnostics(reconnected: Map<number, number>): void {
     for (const [oldId, newId] of reconnected) {
       this.database.statement('UPDATE turn_summary SET diagnostic_file_id=? WHERE diagnostic_file_id=?').run(newId, oldId);
     }
   }
 
-  /** 이동·보존 여부에 따라 삭제 후보 manifest를 제거하거나 source_missing으로 남긴다. */
+  /** 이동·보존 여부에 따라 삭제 후보 source_file를 제거하거나 source_missing으로 남긴다. */
   private removeSources(
     removed: RemovedSources, reconnected: Map<number, number>, retainedSessions: Set<string>, now: string,
   ): void {
     for (const [id, file] of removed) {
       if (!reconnected.has(id) && retainedSessions.has(sessionKey(file.provider, file.session_id))) {
-        this.database.statement('UPDATE manifest SET source_missing=1,recorded_at=? WHERE id=? AND source_missing=0').run(now, id);
+        this.database.statement('UPDATE source_file SET source_missing=1,recorded_at=? WHERE id=? AND source_missing=0').run(now, id);
         continue;
       }
-      this.database.statement('DELETE FROM manifest WHERE id=?').run(id);
+      this.database.statement('DELETE FROM source_file WHERE id=?').run(id);
     }
   }
 

@@ -2,7 +2,7 @@
 import { availableParallelism } from 'node:os';
 import { join } from 'node:path';
 import { Worker } from 'node:worker_threads';
-import { prepareSource, type SourceFile, type SourcePreparation, type SourcePreparationOptions } from './sourcePreparation';
+import { prepareSource, type SourceCheckpoint, type SourceFile, type SourcePreparation, type SourcePreparationOptions } from './sourcePreparation';
 
 const MAX_SOURCE_WORKERS = 4;
 const PREFETCH_PER_WORKER = 2;
@@ -12,9 +12,10 @@ interface SourceJob {
   file: SourceFile;
   promise: Promise<SourcePreparation>;
   resolve: (value: SourcePreparation) => void;
+  checkpoint?: SourceCheckpoint;
 }
 interface WorkerSlot { worker: Worker; job?: SourceJob }
-interface PoolOptions extends SourcePreparationOptions { workers?: number; externalCancellation?: SharedArrayBuffer }
+interface PoolOptions extends SourcePreparationOptions { workers?: number; externalCancellation?: SharedArrayBuffer; checkpoints?: Map<string, SourceCheckpoint> }
 interface SourceWorkerMessage { id: number; result?: SourcePreparation; bytes: number }
 
 /** 완료 순서와 무관하게 호출자가 원래 논리 순서로 파일 준비 결과를 소비한다. */
@@ -51,11 +52,25 @@ export class SourceReaderPool {
     if (this.closed || this.options.cancelled()) return this.failure('interrupted');
     let job = this.jobs.get(file.id);
     // 파일 하나만 필요한 갱신에는 Worker 시작 비용을 추가하지 않는다.
-    if (!job && !this.slots.size) return prepareSource(file, this.options);
-    job ??= this.enqueue(file, true);
-    try { return await job.promise; }
+    try {
+      const result = !job && !this.slots.size
+        ? await prepareSource(file, { ...this.options, checkpoint: this.options.checkpoints?.get(this.key(file)) })
+        : await (job ??= this.enqueue(file, true)).promise;
+      const cache = this.options.checkpoints;
+      if (cache) {
+        if (result.ok && !file.path.toLowerCase().endsWith('.zst')) cache.set(this.key(file), {
+          id: file.id, sourceRoot: file.source_root, parserVersion: file.parser_version,
+          collectCapabilities: this.options.collectCapabilities, maxLineBytes: this.options.maxLineBytes ?? 4 * 1024 * 1024,
+          read: result.read, winners: result.winners,
+        });
+        else cache.delete(this.key(file));
+      }
+      return result;
+    }
     finally { this.jobs.delete(file.id); }
   }
+
+  private key(file: SourceFile): string { return JSON.stringify([file.provider, file.path]); }
 
   async dispose(): Promise<void> {
     this.closed = true;
@@ -80,7 +95,7 @@ export class SourceReaderPool {
       session_id: file.session_id, size_bytes: file.size_bytes, mtime_ms: file.mtime_ms,
       dev: file.dev, inode: file.inode, parser_version: file.parser_version,
       capabilities_collected: file.capabilities_collected };
-    const job = { file: metadata, promise, resolve };
+    const job: SourceJob = { file: metadata, promise, resolve, checkpoint: this.options.checkpoints?.get(this.key(file)) };
     this.jobs.set(file.id, job);
     if (priority) this.pending.unshift(job); else this.pending.push(job);
     this.dispatch();
@@ -125,7 +140,7 @@ export class SourceReaderPool {
     const job = this.pending.shift();
     if (!job) return;
     slot.job = job;
-    try { slot.worker.postMessage({ id: job.file.id, file: job.file }); }
+    try { slot.worker.postMessage({ id: job.file.id, file: job.file, checkpoint: job.checkpoint }); }
     catch { this.workerFailed(slot); }
   }
 

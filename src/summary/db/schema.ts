@@ -2,15 +2,15 @@
 import { SCHEMA_ROLLUP_SQL } from './rollup-state';
 
 export { SCHEMA_ROLLUP_SQL } from './rollup-state';
-export const SCHEMA_VERSION = 19;
+export const SCHEMA_VERSION = 20;
 
 /**
  * 책임: 파일 이동 판정에 필요한 플랫폼별 identity 인덱스를 구성한다.
  * 알고리즘: device·inode를 이동 판정에 쓰지 않는 Windows는 인덱스를 제거하고 다른 운영체제에서는 제공자·device·inode 인덱스를 생성한다.
  */
-export function manifestIdentityIndexSql(platform: NodeJS.Platform): string {
-  return platform === 'win32' ? 'DROP INDEX IF EXISTS idx_manifest_identity;'
-    : 'CREATE INDEX IF NOT EXISTS idx_manifest_identity ON manifest(provider, dev, inode);';
+export function sourceIdentityIndexSql(platform: NodeJS.Platform): string {
+  return platform === 'win32' ? 'DROP INDEX IF EXISTS idx_source_identity;'
+    : 'CREATE INDEX IF NOT EXISTS idx_source_identity ON source_file(provider, dev, inode);';
 }
 
 export const SCHEMA_CAPABILITY_SQL = `
@@ -83,7 +83,7 @@ CREATE TABLE IF NOT EXISTS turn_summary (
   total_tokens INTEGER NOT NULL CHECK(total_tokens = input_tokens + output_tokens),
   status TEXT NOT NULL CHECK(status IN ('completed','in_progress','failed')),
   quality_flags TEXT,
-  diagnostic_file_id INTEGER REFERENCES manifest(id) ON DELETE SET NULL,
+  diagnostic_file_id INTEGER REFERENCES source_file(id) ON DELETE SET NULL,
   diagnostic_offset INTEGER,
   last_error TEXT,
   updated_at TEXT NOT NULL,
@@ -98,7 +98,7 @@ CREATE INDEX IF NOT EXISTS idx_summary_project_period ON turn_summary(provider, 
 `;
 
 export const SCHEMA_SQL = `
-CREATE TABLE IF NOT EXISTS manifest (
+CREATE TABLE IF NOT EXISTS source_file (
   id INTEGER PRIMARY KEY,
   provider TEXT NOT NULL CHECK(provider IN ('claude', 'codex')),
   source_root TEXT NOT NULL,
@@ -111,6 +111,8 @@ CREATE TABLE IF NOT EXISTS manifest (
   parser_version INTEGER NOT NULL DEFAULT 0,
   source_identity TEXT,
   content_hash TEXT,
+  complete_position INTEGER NOT NULL DEFAULT 0 CHECK(complete_position >= 0),
+  prefix_hash TEXT,
   capabilities_collected INTEGER NOT NULL DEFAULT 0 CHECK(capabilities_collected IN (0,1)),
   source_missing INTEGER NOT NULL DEFAULT 0 CHECK(source_missing IN (0,1)),
   last_seen_scan_id TEXT,
@@ -121,10 +123,10 @@ CREATE TABLE IF NOT EXISTS manifest (
   last_error TEXT,
   UNIQUE(provider, path)
 );
-${manifestIdentityIndexSql(process.platform)}
-CREATE INDEX IF NOT EXISTS idx_manifest_root_id ON manifest(provider, source_root, id);
-CREATE INDEX IF NOT EXISTS idx_manifest_session ON manifest(provider, session_id, id);
-CREATE INDEX IF NOT EXISTS idx_manifest_source ON manifest(provider, source_identity, id);
+${sourceIdentityIndexSql(process.platform)}
+CREATE INDEX IF NOT EXISTS idx_source_root_id ON source_file(provider, source_root, id);
+CREATE INDEX IF NOT EXISTS idx_source_session ON source_file(provider, session_id, id);
+CREATE INDEX IF NOT EXISTS idx_source_source ON source_file(provider, source_identity, id);
 ${NAMES_SQL}
 ${TURN_SUMMARY_SQL}
 ${TURN_SUMMARY_INDEX_SQL}
