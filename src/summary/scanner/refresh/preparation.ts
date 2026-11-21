@@ -29,7 +29,7 @@ export async function inspectSource(context: RefreshContext, file: FileState): P
   if (!file.selected && !await refreshOutsideSource(context, file))
     return;
   try {
-    const preparation = await scan.measureAsync('readSources', () => sourcePool.read(file));
+    const preparation = await scan.measureAsync('readSources', () => sourcePool.read(file, file.selected));
     report();
     applyPreparation(context, file, preparation);
   }

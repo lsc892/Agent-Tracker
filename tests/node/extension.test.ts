@@ -64,7 +64,18 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
   let cancellations = 0;
   let clears = 0;
   let releaseScan: (() => void) | undefined;
+  const finishDeferredScan = (): void => {
+    const release = releaseScan;
+    releaseScan = undefined;
+    release?.();
+  };
   let deferScan = false;
+  let failScan = false;
+  let summaryProgress: ((value: import('../../src/summary/types').SummaryProgress) => void) | undefined;
+  const recentProgress: import('../../src/summary/types').SummaryProgress = {
+    phase: 'parsing', discovered: 0, parsed: 0, failed: 0, bodyBytes: 0,
+    recentUsage: { rows: [], total: 0, coverage: { files: 0, processing: 0, done: 0, error: 0, interrupted: 0, stale_summaries: 0 } },
+  };
   let lastRoots: import('../../src/summary/types').SourceRoot[] = [];
   let lastQuery: import('../../src/summary/types').UsageQuery = {};
   let lastNameQuery: import('../../src/summary/types').NameQuery | undefined;
@@ -167,14 +178,14 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     async refresh(options: {roots: typeof lastRoots}) {
       scans++; lastRoots = options.roots;
       if (deferScan) await new Promise<void>(resolve => { releaseScan = resolve; });
-      return { discovered: 0, parsed: 0, reused: 0, failed: 0, bodyBytes: 0 };
+      return { discovered: 0, parsed: 0, reused: 0, failed: Number(failScan), bodyBytes: 0 };
     }
     async query(query: typeof lastQuery) { queries++; lastQuery = query; return { rows: [], total: 0, coverage: {} }; }
     async queryNames(query: NonNullable<typeof lastNameQuery>) { lastNameQuery = query; return { rows: [], total: 0 }; }
     async setSessionBilling(provider: string, sessionId: string, mode: string) { billingChanges.push({provider,sessionId,mode}); }
     async diagnostics(page: NonNullable<typeof lastDiagnosticsPage>) { diagnostics++; lastDiagnosticsPage = page; return { files: [], summaries: [], counts: {} }; }
-    subscribe() { return () => {}; } cancel() {} async dispose() { summaryDisposals++; }
-    async cancelRefresh() { cancellations++; releaseScan?.(); releaseScan = undefined; }
+    subscribe(listener: typeof summaryProgress) { summaryProgress = listener; return () => {}; } cancel() {} async dispose() { summaryDisposals++; }
+    async cancelRefresh() { cancellations++; finishDeferredScan(); }
     async clearData() { clears++; await this.cancelRefresh(); }
   }
   Module._load = function(request, parent, isMain) {
@@ -310,9 +321,22 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     assert.equal(panels.length, 1);
     assert.equal(scans, 0, 'summary starts only when the usage webview is ready');
     const dashboard = panels[0].webview;
+    deferScan = true;
     dashboard.receive({ type: 'ready' }); await tick();
     assert.equal(scans, 1);
     assert.ok(dashboard.messages.some(message => message.type === 'state'));
+    const pending = queries;
+    dashboard.receive({ type: 'queryUsage', query: { groupBy: 'month', recentDays: 90 } });
+    dashboard.receive({ type: 'queryNames', requestId: 1, query: { kind: 'project' } });
+    summaryProgress?.(recentProgress);
+    await tick();
+    assert.equal(queries, pending, 'regular queries wait for the commit');
+    assert.equal(lastNameQuery, undefined);
+    assert.ok(dashboard.messages.some(message => message.type === 'previewUsage'));
+    assert.ok(!dashboard.messages.some(message => message.type === 'filtersReady'));
+    finishDeferredScan(); deferScan = false; await tick();
+    assert.ok(dashboard.messages.some(message => message.type === 'filtersReady'));
+    assert.equal(lastQuery.groupBy, 'month', 'the pending selection applies after the commit');
     assert.equal(diagnostics, 0, 'statistics alone does not load diagnostic logs');
     assert.ok(!dashboard.messages.some(message => message.type === 'diagnostics'));
     dashboard.receive({ type: 'ready' }); await tick();
@@ -436,12 +460,15 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     await click('agentTracker.openUsage');
     const closingPanel = panels.at(-1)!;
     closingPanel.webview.receive({type: 'ready'}); await tick();
+    summaryProgress?.(recentProgress);
     const scansBeforeReopen = scans;
     closingPanel.dispose();
     await click('agentTracker.openUsage');
     const reopened = panels.at(-1)!.webview;
     reopened.receive({type: 'ready'}); await tick();
-    releaseScan?.(); releaseScan = undefined; await tick();
+    assert.ok(reopened.messages.some(message => message.type === 'previewUsage'), 'reopening replays the running scan preview');
+    assert.ok(!reopened.messages.some(message => message.type === 'filtersReady'));
+    finishDeferredScan(); await tick();
     assert.equal(scans, scansBeforeReopen, 'reopening while a scan runs shares that scan');
     assert.ok(reopened.messages.some(message => message.type === 'usage'));
     assert.equal(reopened.messages.filter(message => message.type === 'busy').at(-1)?.busy, false);
@@ -454,6 +481,19 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     assert.equal(scans,beforeSkillSwitch+1,'turning Skill on backfills while the statistics page is open');
     assert.deepEqual(collectionSwitches,[false,true]);assert.equal(refreshes.length,quotaBeforeSkillSwitch);
     assert.deepEqual(errors, []);
+
+    failScan = true;
+    const queriesBeforeFailure = queries;
+    const unlocksBeforeFailure = reopened.messages.filter(message => message.type === 'filtersReady').length;
+    await click('agentTracker.openUsage');
+    reopened.receive({ type: 'queryUsage', query: { groupBy: 'project' } }); await tick();
+    assert.equal(queries, queriesBeforeFailure, 'failed refresh keeps the ordinary SQL view locked');
+    assert.equal(reopened.messages.filter(message => message.type === 'filtersReady').length, unlocksBeforeFailure);
+    failScan = false;
+    reopened.receive({ type: 'retryUsage' }); await tick();
+    assert.equal(reopened.messages.filter(message => message.type === 'filtersReady').length, unlocksBeforeFailure + 1);
+    assert.equal(lastQuery.groupBy, 'project');
+    const scansBeforeShutdown = scans;
 
     await extension.deactivate();
     for (const subscription of subscriptions) subscription.dispose();
@@ -470,7 +510,7 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     await extension.activate({ globalStorageUri: uri(storage), extensionUri: uri(process.cwd()), subscriptions } as unknown as import('vscode').ExtensionContext);
     assert.equal(initializations, 1, 'disabled statistics do not start the worker on activation');
     await click('agentTracker.openUsage');
-    assert.equal(scans, beforeSkillSwitch+1);
+    assert.equal(scans, scansBeforeShutdown);
     // VS Code may dispose the context before calling deactivate(). Both paths
     // must share the same asynchronous shutdown without disposing twice.
     for (const subscription of subscriptions) subscription.dispose();

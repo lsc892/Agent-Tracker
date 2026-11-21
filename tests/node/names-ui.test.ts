@@ -25,7 +25,7 @@ class Element {
   get textContent(): string { return this.text+this.children.map(child=>child.textContent).join(''); }
   set textContent(value: string) { this.text=value;this.children=[]; }
   append(...children: Element[]): void { this.children.push(...children); }
-  replaceChildren(): void { this.text='';this.children=[]; }
+  replaceChildren(...children: Element[]): void { this.text='';this.children=children; }
   setAttribute(key: string, value: string): void { this.attributes.set(key, value); }
   addEventListener(event: string, listener: (event?: Record<string, unknown>)=>void): void { this.listeners.set(event,listener); }
   focus(): void {}
@@ -41,7 +41,7 @@ function view(saved?: Record<string,unknown>) {
   let receive: ((event:{data:unknown})=>void) | undefined;
   let state: unknown;
   get('group').value='session';
-  get('date-range').value='7';
+  get('date-range').value='30';
   new Script(readFileSync(join(__dirname,'../../../media/dashboard.js'),'utf8')).runInNewContext({ agentTrackerI18n: createTranslator('ko'),
     acquireVsCodeApi:()=>({getState:()=>saved,setState:(value:unknown)=>{state=value;},postMessage:(message:typeof messages[number])=>messages.push(message)}),
     document:{getElementById:(id:string)=>id.startsWith('skill-chart') ? null : get(id),createElement:(tag:string)=>new Element(tag),createElementNS:(_namespace:string,tag:string)=>new Element(tag),querySelectorAll:()=>[]},
@@ -55,6 +55,30 @@ const sessions = [
   {provider:'codex',project_key:'/project',project_name:'Project',session_id:'two',session_name:'같은 이름',session_started_at_ms:1000},
   {provider:'claude',project_key:'/project',project_name:'Project',session_id:'three',session_name:null,session_started_at_ms:null},
 ];
+
+test('the recent preview keeps saved filters locked until SQLite refresh succeeds', () => {
+  const { get, receive, messages } = view({ section: 'skills', dateRange: '90', chartMetric: 'requests' });
+  const result = { rows: [], total: 0, coverage: {} };
+  receive({ type: 'busy', busy: true });
+  receive({ type: 'previewUsage', result });
+  assert.equal(get('usage-controls').disabled, true);
+  assert.equal(get('token-section').hidden, false);
+  assert.equal(get('skill-section').hidden, true);
+  assert.equal(get('preview-period').hidden, false);
+  assert.equal(get('date-range').value, '90');
+  assert.equal(get('chart-metric').value, 'requests');
+  assert.equal(messages[0].query?.recentDays, 90);
+  receive({ type: 'busy', busy: false });
+  assert.equal(get('usage-controls').disabled, true);
+  assert.equal(get('retry-usage').hidden, false);
+  get('retry-usage').listeners.get('click')!();
+  assert.equal(messages.at(-1)?.type, 'retryUsage');
+  receive({ type: 'filtersReady' });
+  receive({ type: 'usage', result: { ...result, capabilitiesEnabled: false } });
+  assert.equal(get('usage-controls').disabled, false);
+  assert.equal(get('preview-period').hidden, true);
+  assert.equal(get('skill-section').hidden, false);
+});
 
 test('Skill section shares project and period filters, renders four count/percentage tables and pages categories independently',()=>{
   const {get,messages,receive,respond,state}=view({dateRange:'custom'});
@@ -133,12 +157,12 @@ test('reset returns query controls and chart grouping to defaults while retainin
   assert.equal(query?.groupBy,'day');assert.equal(query?.chartMetric,'tokens');
   for (const name of ['provider','sessionId','projectKey','fromDay','toDay']) assert.equal(query?.[name],undefined);
   assert.equal(query?.offset,0);assert.equal(query?.chartBy,'provider');
-  assert.equal(query?.recentDays,7);
+  assert.equal(query?.recentDays,30);
   assert.equal(get('cost-note').hidden,false);assert.equal(get('project-options').hidden,true);
   assert.equal(get('billing-control').hidden,true);assert.equal(get('project-name').textContent,'전체 프로젝트');
   assert.equal(get('session-name').textContent,'전체 세션');
   assert.deepEqual(JSON.parse(JSON.stringify(state())),{section:'tokens',group:'day',chartMetric:'tokens',chartBy:'provider',pageSize:100,
-    capabilityPageSizes:{skill:100,subagent:100,plugin:100,model:100},dateRange:'7',fromDay:'',toDay:''});
+    capabilityPageSizes:{skill:100,subagent:100,plugin:100,model:100},dateRange:'30',fromDay:'',toDay:''});
 });
 
 test('typed token page sizes synchronize chart controls, reset the page and preserve filters and sorting',()=>{

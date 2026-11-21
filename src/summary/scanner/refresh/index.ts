@@ -2,7 +2,9 @@
 import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 import { performance } from 'node:perf_hooks';
-import type { SummaryDatabase } from '../../db';
+import { setImmediate as yieldToWorker } from 'node:timers/promises';
+import { SummaryDatabase } from '../../db';
+import { copyRecentUsage, type RecentWindow } from '../../db/recentSnapshot';
 import { SummaryError } from '../../jsonl';
 import { StageProfiler, type ScanStage, type StorageStage } from '../../profiling';
 import type { RefreshResult, SourceRoot, SummaryOptions, SummaryProgress } from '../../types';
@@ -15,7 +17,7 @@ import { discoverSources } from './discovery';
 import { commitComponents, finishScan, recordFailure } from './persistence';
 import { prepareChanged } from './preparation';
 import { expandRelatedSources, reconnectSources, resolveParentRequests } from './relations';
-import { PARSER_VERSION, ScanState } from './state';
+import { PARSER_VERSION, ScanState, sessionKey } from './state';
 
 export { PARSER_VERSION } from './state';
 
@@ -24,10 +26,15 @@ const WINDOWS_MTIME_OVERLAP_MS = 8;
 const PROGRESS_INTERVAL_MS = 100;
 type PublishProgress = (phase?: SummaryProgress['phase']) => void;
 
+interface RecentPreview extends RecentWindow {
+  /** Query the in-memory snapshot synchronously before the complete scan resumes. */
+  onReady(database: SummaryDatabase): void;
+}
+
 /** 갱신 잠금과 파일 Worker의 수명을 관리한다. */
 export async function refreshSummary(
   database: SummaryDatabase, options: SummaryOptions, signal?: AbortSignal,
-  progress?: (value: SummaryProgress) => void,
+  progress?: (value: SummaryProgress) => void, preview?: RecentPreview,
 ): Promise<RefreshResult> {
   const started = performance.now();
   const scan = new StageProfiler<ScanStage>();
@@ -58,7 +65,7 @@ export async function refreshSummary(
   try {
     check();
     release = await scan.measureAsync('lock', () => acquireRefreshLock(options.dbPath, signal, cancelled));
-    await scanUnderLock(context, scope, publish);
+    await scanUnderLock(context, scope, publish, preview);
   } catch (error) {
     recordInterruptedScan(context, error);
   } finally {
@@ -71,7 +78,7 @@ export async function refreshSummary(
   return result;
 }
 
-async function scanUnderLock(context: RefreshContext, scope: string, publish: PublishProgress): Promise<void> {
+async function scanUnderLock(context: RefreshContext, scope: string, publish: PublishProgress, preview?: RecentPreview): Promise<void> {
   const { database, scan, roots, check, cancelled } = context;
   const startedMs = Date.now();
   const cutoff = readRefreshCutoff(database, scope, startedMs);
@@ -81,6 +88,50 @@ async function scanUnderLock(context: RefreshContext, scope: string, publish: Pu
   const names = await scan.measureAsync('names', () => readNames(roots, cancelled));
 
   publish('parsing');
+  if (preview) {
+    await prepareRecentPreview(context, names, preview).catch(() => { check(); });
+    publish('parsing');
+    await yieldToWorker();
+  }
+  await prepareAndCommit(context, names, () => publish('committing'));
+  check();
+  scan.measure('finishScan', () => finishScan(context, names, scope, startedMs));
+  scan.measure('optimize', () => database.optimize());
+}
+
+async function prepareRecentPreview(
+  context: RefreshContext, names: Map<string, string>, preview: RecentPreview,
+): Promise<void> {
+  const database = new SummaryDatabase(':memory:');
+  const result = { ...context.result };
+  const state = new ScanState(result);
+  const recent = { ...context, database, state, result, report: () => {} };
+  context.sourcePool.capturePreparations(true);
+  try {
+    copyRecentUsage(context.database.connection, database, preview);
+    const sessions = new Set(Array.from(database.connection.prepare('SELECT DISTINCT provider, session_id FROM turn_summary').iterate(),
+      row => sessionKey(row.provider as 'claude' | 'codex', row.session_id as string)));
+    for (const file of context.state.files.values()) {
+      const inRecentSession = file.session_id !== null && sessions.has(sessionKey(file.provider, file.session_id));
+      const changed = file.changed && (inRecentSession || !file.removed && file.mtime_ms >= preview.fromMs);
+      state.trackFile({ ...file, changed });
+      if (!changed) continue;
+      state.indexRelatedSources();
+      if (file.removed) state.affect(file.provider, file.session_id);
+    }
+    await prepareAndCommit(recent, names);
+    context.check();
+    if (!result.failed) preview.onReady(database);
+  } finally {
+    context.sourcePool.capturePreparations(false);
+    database.close();
+  }
+}
+
+async function prepareAndCommit(
+  context: RefreshContext, names: Map<string, string>, committing?: () => void,
+): Promise<void> {
+  const { scan, check } = context;
   await scan.measureAsync('parseChanged', () => prepareChanged(context));
   await scan.measureAsync('expandRelated', () => expandRelatedSources(context));
   scan.measure('resolveParents', () => resolveParentRequests(context));
@@ -88,12 +139,9 @@ async function scanUnderLock(context: RefreshContext, scope: string, publish: Pu
   check();
   const aggregated = scan.measure('aggregate', () => collectWinners(context, names));
 
-  publish('committing');
+  committing?.();
   check();
   await scan.measureAsync('commitComponents', () => commitComponents(context, aggregated));
-  check();
-  scan.measure('finishScan', () => finishScan(context, names, scope, startedMs));
-  scan.measure('optimize', () => database.optimize());
 }
 
 function refreshScope(roots: readonly SourceRoot[], collect: boolean, maxLineBytes: number | undefined): string {

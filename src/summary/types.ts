@@ -23,6 +23,7 @@ export interface UsageQuery {
   timezone?: string;
   fromMs?: number;
   toMs?: number;
+  unknownTime?: 'exclude';
   provider?: Provider;
   providers?: Provider[];
   projectKey?: string;
@@ -66,6 +67,7 @@ export interface RefreshResult {
 }
 export interface SummaryProgress {
   phase: 'scanning' | 'parsing' | 'committing' | 'complete';
+  recentUsage?: UsageResult;
   discovered: number;
   parsed: number;
   failed: number;

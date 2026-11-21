@@ -40,6 +40,7 @@
   let latestProgress;
   let latestRefreshResult;
   let busy = false;
+  let showingPreview = false;
   let selectedProject;
   let selectedSession;
   let openNameKind;
@@ -104,8 +105,8 @@
     }
   }
   function updateSectionControls() {
-    $('token-section').hidden = section !== 'tokens';
-    $('skill-section').hidden = section !== 'skills';
+    $('token-section').hidden = !showingPreview && section !== 'tokens';
+    $('skill-section').hidden = showingPreview || section !== 'skills';
     $('group-control').hidden = section !== 'tokens';
     $('chart-by-control').hidden = section !== 'tokens';
     for (const name of ['tokens', 'skills']) $(`section-${name}`).setAttribute('aria-pressed', String(section === name));
@@ -242,11 +243,16 @@
   function toggleNames(kind) {
     if (openNameKind === kind) { closeNames(); return; }
     closeNames(); openNameKind = kind;
-    namePages[kind] = { loaded: 0, total: 0 };
     $(`${kind}-options`).hidden = false;
     $(`${kind}-options`).scrollTop = 0;
     $(`${kind}-name`).setAttribute('aria-expanded', 'true');
-    $(`${kind}-list`).append(nameOption(kind));
+    reloadNames();
+  }
+  function reloadNames() {
+    const kind = openNameKind;
+    if (!kind) return;
+    namePages[kind] = { loaded: 0, total: 0 };
+    $(`${kind}-list`).replaceChildren(nameOption(kind));
     loadNames(kind);
   }
   /**
@@ -278,7 +284,7 @@
     const tr = element('tr');
     for (const [index, header] of headers.entries()) {
       const label = typeof header === 'string' ? header : header.label;
-      const key = sortKeys[index];
+      const key = showingPreview ? undefined : sortKeys[index];
       const cell = tableHeader(header, label, key);
       tr.append(cell);
     }
@@ -449,15 +455,18 @@
     if (!chart) return;
     const turn = chart.mode === 'turn';
     const metric = chart.metric;
-    $('chart-metric').value = metric;
-    for (const option of $('chart-metric').options) {
-      option.disabled = turn && ['requests', 'averageTokens'].includes(option.value);
-      if (option.value === 'averageDuration') option.textContent = turn ? t('dashboard.duration') : t('dashboard.averageTime');
+    if (!showingPreview) {
+      $('chart-metric').value = metric;
+      for (const option of $('chart-metric').options) {
+        option.disabled = turn && ['requests', 'averageTokens'].includes(option.value);
+        if (option.value === 'averageDuration') option.textContent = turn ? t('dashboard.duration') : t('dashboard.averageTime');
+      }
     }
     const title = turn && metric === 'averageDuration' ? t('dashboard.requestDuration') : chartMetrics[metric];
     $('chart-title').textContent = title;
     const rows = [...chart.rows].sort((a, b) => unknownPriority(a, chart.mode) - unknownPriority(b, chart.mode));
-    const pageRange = result.rows.length ? t('dashboard.pageRange', { value0: number(offset + 1), value1: number(offset + result.rows.length), value2: number(result.total) }) : t('dashboard.zeroItems');
+    const pageOffset = showingPreview ? 0 : offset;
+    const pageRange = result.rows.length ? t('dashboard.pageRange', { value0: number(pageOffset + 1), value1: number(pageOffset + result.rows.length), value2: number(result.total) }) : t('dashboard.zeroItems');
     $('chart-scope').textContent = t('dashboard.chartScope', { value0: pageRange });
     if (rows.length < result.rows.length) $('chart-scope').textContent += t('dashboard.emptyExcludedSuffix', { value0: number(result.rows.length - rows.length) });
     if (chart.by === 'model') $('chart-scope').textContent += t('dashboard.modelScopeSuffix');
@@ -648,7 +657,7 @@
   function updateUsage(result) {
     latestUsage = result;
     if (result.capabilitiesEnabled !== undefined) setCapabilitiesEnabled(result.capabilitiesEnabled);
-    if (section === 'skills' && !capabilitiesEnabled) return;
+    if (!showingPreview && section === 'skills' && !capabilitiesEnabled) return;
     if (result.capabilities) {
       renderCapabilityTables(result.capabilities);
       return;
@@ -787,6 +796,7 @@
   $('open-diagnostics').addEventListener('click', event => { event.preventDefault(); send({ type: 'openDiagnostics' }); });
   $('settings').addEventListener('click', () => send({ type: 'settings' }));
   $('cancel-usage').addEventListener('click', () => send({ type: 'cancelUsage' }));
+  $('retry-usage').addEventListener('click', () => send({ type: 'retryUsage' }));
   $('usage-filters').addEventListener('submit', event => { event.preventDefault(); offset = 0; query(); });
   $('date-range').addEventListener('change', () => {
     updateDateControls();
@@ -804,7 +814,7 @@
   $('reset-filters').addEventListener('click', () => {
     closeNames(); selectedProject = undefined; selectedSession = undefined;
     for (const id of ['provider', 'from-day', 'to-day', 'from-day-picker', 'to-day-picker']) $(id).value = '';
-    $('date-range').value = '7';
+    $('date-range').value = '30';
     updateDateControls();
     $('group').value = 'day'; $('chart-metric').value = 'tokens';
     pageSize = 100;
@@ -894,20 +904,46 @@
     offset = 0;
     query();
   }
+  function showUsage(result, preview) {
+    showingPreview = preview;
+    $('preview-period').hidden = !preview;
+    $('usage-controls').setAttribute('data-stage', preview ? 'preview' : 'ready');
+    $('error').hidden = true;
+    updateSectionControls();
+    renderUsage(result);
+  }
+  function updateBusy(value) {
+    busy = value;
+    $('cancel-usage').hidden = !busy;
+    const controls = $('usage-controls');
+    if (busy) {
+      latestProgress = undefined;
+      latestRefreshResult = undefined;
+      latestUsage = undefined;
+      controls.disabled = true;
+      controls.setAttribute('data-stage', 'loading');
+      $('preview-period').hidden = true;
+      closeNames();
+    }
+    $('retry-usage').hidden = busy || !controls.disabled;
+    renderProgress();
+  }
   window.addEventListener('message', event => {
     const message = event.data;
     if (!message || typeof message !== 'object') return;
     switch (message.type) {
       case 'state': applyState(message); break;
-      case 'usage': $('error').hidden = true; renderUsage(message.result); break;
+      case 'usage': showUsage(message.result, false); break;
+      case 'previewUsage': showUsage(message.result, true); break;
+      case 'filtersReady': $('usage-controls').disabled = false; $('retry-usage').hidden = true; break;
       case 'names': renderNames(message); break;
-      case 'busy': busy = message.busy; $('cancel-usage').hidden = !busy; if (busy) { latestProgress = undefined; latestRefreshResult = undefined; } renderProgress(); break;
+      case 'busy': updateBusy(message.busy); break;
       case 'progress': latestProgress = message.progress; latestRefreshResult = undefined; renderProgress(); break;
-      case 'refreshResult': closeNames(); latestRefreshResult = message.result; renderProgress(); break;
+      case 'refreshResult': latestRefreshResult = message.result; renderProgress(); break;
       case 'error': $('error').textContent = message.message; $('error').hidden = false; $('billing-mode').disabled = !selectedSession; break;
     }
   });
-  // Restore the query before ready so the initial scan returns the selected group.
+  // Restore the query for the first read after the complete SQLite refresh.
   query();
   send({ type: 'ready' });
 })();

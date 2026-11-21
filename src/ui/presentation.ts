@@ -18,6 +18,7 @@ export type DashboardMessage =
   | { type: 'openDiagnostics' }
   | { type: 'settings' }
   | { type: 'cancelUsage' }
+  | { type: 'retryUsage' }
   | { type: 'setSessionBilling'; provider: 'claude' | 'codex'; sessionId: string; mode: BillingMode }
   | { type: 'queryUsage'; query: UsageQuery; fromDay?: string; toDay?: string; recentDays?: 7 | 30 | 90 }
   | { type: 'queryNames'; query: NameQuery; requestId: number }
@@ -31,7 +32,7 @@ export function parseDashboardMessage(input: unknown): DashboardMessage | null {
   if (!input || typeof input !== 'object') return null;
   const value = input as Record<string, unknown>;
   switch (value.type) {
-    case 'ready': case 'cancelUsage': case 'openDiagnostics': return { type: value.type };
+    case 'ready': case 'cancelUsage': case 'retryUsage': case 'openDiagnostics': return { type: value.type };
     case 'settings': return value.provider === undefined ? { type: 'settings' } : null;
     case 'setSessionBilling': return parseSessionBillingMessage(value);
     case 'diagnostics': return { type: 'diagnostics', offset: boundedOffset(value.offset) };

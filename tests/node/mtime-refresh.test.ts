@@ -1,19 +1,26 @@
 // 갱신 기준 시각과 재파싱 범위, SQLite 실패 뒤 재시도를 검증한다.
 import assert from 'node:assert/strict';
-import { mkdtemp, writeFile, utimes, rm } from 'node:fs/promises';
+import { appendFile, mkdtemp, writeFile, utimes, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
+import { setTimeout as delay } from 'node:timers/promises';
+import { SummaryClient } from '../../src/summary/client';
 import { SummaryDatabase } from '../../src/summary/db';
 import { refreshSummary } from '../../src/summary/scanner';
+import { acquireRefreshLock } from '../../src/summary/scanner/lock';
 
 const old = new Date('2020-01-01T00:00:00Z');
-const source = (session: string, input: number) => [
+const usage = (input: number, id = 'response') => ({ type: 'token_usage_record', payload: {
+  root_turn_id: 'turn', turn_id: 'turn', response_id: id, usage: { input_tokens: input, output_tokens: 7 },
+} });
+const source = (session: string, input: number, timestamp?: Date) => [
   { type: 'session_meta', payload: { id: session, cwd: '/fixture' } },
   { type: 'turn_context', payload: { root_turn_id: 'turn', turn_id: 'turn' } },
-  { type: 'token_usage_record', payload: { root_turn_id: 'turn', turn_id: 'turn', response_id: 'response',
-    usage: { input_tokens: input, output_tokens: 7 } } },
+  ...(timestamp ? [{ type: 'event_msg', timestamp, payload: { type: 'task_started', root_turn_id: 'turn', turn_id: 'turn' } }] : []),
+  usage(input),
 ].map(row => JSON.stringify(row)).join('\n') + '\n';
+const recentWindow = () => ({ fromMs: Date.now() - 30 * 86_400_000, toMs: Date.now() + 86_400_000 });
 
 async function fixture<T>(action: (path: string, options: { dbPath: string; roots: { provider: 'codex'; path: string }[] }) => Promise<T>): Promise<T> {
   const path = await mkdtemp(join(tmpdir(), 'tracker-mtime-'));
@@ -24,6 +31,90 @@ async function fixture<T>(action: (path: string, options: { dbPath: string; root
 function cutoff(db: SummaryDatabase): number | undefined {
   return db.connection.prepare('SELECT started_ms FROM summary_refresh WHERE id=1').get()?.started_ms as number | undefined;
 }
+
+test('cold dashboard scan previews recent sources and reuses their reads for the complete snapshot', async () => fixture(async (path, options) => {
+  const recentPath = join(path, 'recent.jsonl'), olderPath = join(path, 'older.jsonl');
+  const recentSource = source('recent', 120), olderSource = source('older', 240);
+  await writeFile(recentPath, recentSource);
+  await writeFile(olderPath, olderSource);
+  await utimes(olderPath, old, old);
+  const baseline = new SummaryDatabase(':memory:');
+  const database = new SummaryDatabase(options.dbPath);
+  let previewSessions: string[] | undefined;
+  let checkpointAtPreview: number | undefined;
+  try {
+    const result = await refreshSummary(database, options, undefined, undefined, {
+      ...recentWindow(),
+      onReady: db => {
+        previewSessions = db.queryTurns().map(row => row.session_id);
+        checkpointAtPreview = cutoff(database);
+      },
+    });
+    assert.equal(checkpointAtPreview, undefined);
+    assert.deepEqual(previewSessions, ['recent']);
+    assert.equal(result.bodyBytes, Buffer.byteLength(recentSource + olderSource));
+    assert.equal(result.parsed, 2);
+    assert.ok(cutoff(database) !== undefined);
+    assert.equal((await refreshSummary(baseline, options)).failed, 0);
+    const facts = (db: SummaryDatabase) => db.queryTurns().map(({ updated_at: _updatedAt, ...row }) => row);
+    assert.deepEqual(facts(database), facts(baseline));
+  } finally {
+    database.close();
+    baseline.close();
+  }
+}));
+
+test('warm refresh previews a new response from memory before releasing SQLite queries', async () => fixture(async (path, options) => {
+  const file = join(path, 'existing.jsonl'), unchanged = join(path, 'unchanged.jsonl');
+  const now = new Date();
+  await writeFile(file, source('existing', 120, now));
+  await writeFile(unchanged, source('unchanged', 30, now));
+  await utimes(file, old, old);
+  await utimes(unchanged, old, old);
+  const client = new SummaryClient(options);
+  const database = new SummaryDatabase(options.dbPath);
+  const recentUsage = recentWindow();
+  let release: (() => void) | undefined;
+  let previewTotal: number | undefined;
+  let firstBytes: number | undefined;
+  let refreshed = false;
+  try {
+    await client.refresh();
+    const previous = cutoff(database)!;
+    await appendFile(file, `${JSON.stringify(usage(100, 'added'))}\n`);
+    const changedAt = new Date(previous + 10);
+    await utimes(file, changedAt, changedAt);
+    release = await acquireRefreshLock(options.dbPath);
+    client.subscribe(progress => {
+      if (!progress.recentUsage) return;
+      previewTotal = progress.recentUsage.rows.reduce((sum, row) => sum + (row.total_tokens ?? 0), 0);
+      firstBytes = progress.bodyBytes;
+    });
+    const refreshing = client.refresh({ recentUsage }).then(result => { refreshed = true; return result; });
+    const current = Promise.all([
+      client.query({ groupBy: 'all' }),
+      client.queryNames({ kind: 'session' }),
+    ]).then(page => ({ page, afterRefresh: refreshed }));
+    assert.equal(await Promise.race([current, delay(70, undefined, { ref: false })]), undefined);
+    assert.equal(database.queryUsage()[0].total_tokens, 164);
+    release();
+    release = undefined;
+    const result = await refreshing;
+    assert.equal(result.interrupted, false);
+    assert.equal(result.failed, 0);
+    assert.equal(previewTotal, 271);
+    assert.equal(firstBytes, result.bodyBytes);
+    assert.equal(result.parsed, 1);
+    const { page, afterRefresh } = await current;
+    assert.equal(afterRefresh, true);
+    assert.equal(page[0].rows[0].total_tokens, 271);
+    assert.equal(page[1].total, 2);
+  } finally {
+    release?.();
+    await client.dispose();
+    database.close();
+  }
+}));
 
 test('reopen skips old mtimes and reparses only the newer independent file from byte zero', async () => fixture(async (path, options) => {
   const one = join(path, 'one.jsonl'), two = join(path, 'two.jsonl');

@@ -100,7 +100,7 @@ export function resolveParentRequests(context: RefreshContext): void {
     if (!identity.rootlessSubagent || winners.evidence.eventCount === 0) continue;
     const root = resolve(file);
     if (root === null || state.missingParents.has(file.id)) state.fail(file, new SummaryError('missing-root-turn'));
-    else identity.parentRootId = root;
+    else file.prepared.identity = { ...identity, parentRootId: root };
   }
 }
 

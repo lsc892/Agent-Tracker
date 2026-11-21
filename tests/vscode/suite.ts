@@ -174,9 +174,14 @@ export async function run(): Promise<void> {
               check(!document.getElementById('diagnostics') && !document.getElementById('diagnostic-files'),'diagnostic logs are absent from the statistics page');
               check(!document.getElementById('quota') && !document.querySelector('[data-tab="quota"]') && !document.getElementById('refresh-usage'),'quota and summary refresh controls are absent from statistics');
               check(document.getElementById('configuration-warning').hidden === ${JSON.stringify(!expectTimezoneWarning)},'invalid timezone warning is visible and clears after correction');
+            } else if (message.type === 'previewUsage') {
+              check(document.getElementById('usage-controls').disabled,'recent preview locks statistics controls');
+              check(!document.getElementById('preview-period').hidden && document.getElementById('token-section').hidden === false,'recent preview shows the default token view');
+              check(message.result.rows.length === 1 && message.result.rows[0].total_tokens === 150,'recent preview shows the fixture request');
             } else if (phase === 'usage' && message.type === 'usage') {
-              check(message.result.rows.length === 1 && message.result.rows[0].total_tokens === 150,'recent seven days include the fixture request');
-              check(document.getElementById('date-range').value === '7','statistics defaults to recent seven days');
+              check(!document.getElementById('usage-controls').disabled,'the committed view enables statistics controls');
+              check(message.result.rows.length === 1 && message.result.rows[0].total_tokens === 150,'recent thirty days include the fixture request');
+              check(document.getElementById('date-range').value === '30','statistics defaults to recent thirty days');
               check(document.getElementById('from-date-control').hidden && document.getElementById('to-date-control').hidden,'preset periods hide custom date inputs');
               check(document.getElementById('usage-table').textContent.includes('150'),'usage table renders total');
               check(document.getElementById('usage').hidden === false,'usage stays visible in the statistics page');
@@ -344,7 +349,7 @@ export async function run(): Promise<void> {
               phase = 'reset'; document.getElementById('reset-filters').click();
             } else if (phase === 'reset' && message.type === 'usage') {
               check(message.result.groupBy === 'day' && message.result.total === 1,'reset restores daily query results');
-              check(document.getElementById('date-range').value === '7' && document.getElementById('from-date-control').hidden,'reset restores recent seven days and hides custom dates');
+              check(document.getElementById('date-range').value === '30' && document.getElementById('from-date-control').hidden,'reset restores recent thirty days and hides custom dates');
               for (const id of ['provider','from-day','to-day']) check(document.getElementById(id).value === '','reset clears '+id);
               check(document.getElementById('project-name').textContent === '전체 프로젝트' && document.getElementById('session-name').textContent === '전체 세션','reset clears selected identities');
               check(document.getElementById('chart-metric').value === 'tokens' && document.getElementById('chart-provider').getAttribute('aria-pressed')==='true','reset restores metric and provider chart');

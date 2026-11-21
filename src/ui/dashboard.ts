@@ -4,10 +4,12 @@ import { randomBytes } from 'node:crypto';
 import * as vscode from 'vscode';
 import type { TrackerConfiguration } from '../configuration';
 import type { SummaryClient } from '../summary/client';
-import type { UsageQuery } from '../summary/types';
+import type { UsageQuery, UsageResult } from '../summary/types';
 import { dashboardHtml, diagnosticsHtml } from './html';
 import { calendarPeriod, periodBounds } from '../summary/db/timezone';
 import { parseDashboardMessage, type DashboardMessage } from './presentation';
+
+const DEFAULT_RECENT_DAYS = 30;
 
 export interface DashboardDependencies {
   extensionUri: vscode.Uri;
@@ -26,12 +28,20 @@ export class Dashboard implements vscode.Disposable {
   private diagnosticsVersion = 0;
   private fromDay: string | undefined;
   private toDay: string | undefined;
-  private recentDays: 7 | 30 | 90 | undefined;
+  private recentDays: 7 | 30 | 90 | undefined = DEFAULT_RECENT_DAYS;
   private refreshPromise: Promise<void> | undefined;
+  private recentPreview: UsageResult | undefined;
+  private filtersReady = false;
   private readonly unsubscribe: () => void;
 
   constructor(private readonly dependencies: DashboardDependencies) {
-    this.unsubscribe = dependencies.summary.subscribe(progress => this.post({ type: 'progress', progress }));
+    this.unsubscribe = dependencies.summary.subscribe(({ recentUsage, ...progress }) => {
+      this.post({ type: 'progress', progress });
+      if (recentUsage && this.refreshPromise) {
+        this.recentPreview = recentUsage;
+        this.postPreview();
+      }
+    });
   }
 
   /**
@@ -46,7 +56,7 @@ export class Dashboard implements vscode.Disposable {
     }
     if (this.panel) {
       this.panel.reveal(vscode.ViewColumn.Active);
-      this.enter();
+      void this.enter().catch(error => this.error(error));
       return;
     }
     const media = vscode.Uri.joinPath(this.dependencies.extensionUri, 'media');
@@ -56,7 +66,7 @@ export class Dashboard implements vscode.Disposable {
     const webview = this.panel.webview;
     webview.html = dashboardHtml(webview.asWebviewUri(vscode.Uri.joinPath(media, 'dashboard.js')).toString(),
       webview.asWebviewUri(vscode.Uri.joinPath(media, 'dashboard.css')).toString(), webview.cspSource, randomBytes(18).toString('base64'));
-    this.panel.onDidDispose(() => { this.panel = undefined; this.ready = false; this.queryVersion++; });
+    this.panel.onDidDispose(() => { this.panel = undefined; this.ready = false; this.filtersReady = false; this.queryVersion++; });
     webview.onDidReceiveMessage((raw: unknown) => {
       if (this.panel?.webview !== webview) return;
       const message = parseDashboardMessage(raw);
@@ -104,11 +114,14 @@ export class Dashboard implements vscode.Disposable {
       case 'ready':
         if (this.ready) break;
         this.ready = true;
-        this.enter();
+        await this.enter(true);
         break;
       case 'openDiagnostics': this.openDiagnostics(); break;
       case 'settings': await vscode.commands.executeCommand('agentTracker.openSettings'); break;
       case 'cancelUsage': this.dependencies.summary.cancel(); break;
+      case 'retryUsage':
+        if (!this.filtersReady && !this.refreshPromise) await this.refreshUsage();
+        break;
       case 'setSessionBilling': await this.setSelectedSessionBilling(message); break;
       case 'queryUsage':
         this.query = message.query;
@@ -123,7 +136,7 @@ export class Dashboard implements vscode.Disposable {
 
   /** 화면에서 선택한 활성 제공자의 세션만 결제 방식을 변경할 수 있다. */
   private async setSelectedSessionBilling(message: Extract<DashboardMessage, { type: 'setSessionBilling' }>): Promise<void> {
-    if (!this.ready || !this.providers().includes(message.provider)
+    if (!this.filtersReady || !this.providers().includes(message.provider)
       || this.query.provider !== message.provider || this.query.sessionId !== message.sessionId) return;
     await this.dependencies.summary.setSessionBilling(message.provider, message.sessionId, message.mode);
     if (this.ready) await this.loadUsage();
@@ -131,11 +144,12 @@ export class Dashboard implements vscode.Disposable {
 
   /** 이름 검색의 성공·실패 응답은 요청을 보낸 패널에만 전달한다. */
   private async loadNames(message: Extract<DashboardMessage, { type: 'queryNames' }>): Promise<void> {
-    if (!this.ready) return;
+    if (!this.filtersReady) return;
     const panel = this.panel;
     try {
       const result = await this.dependencies.summary.queryNames({ ...message.query, providers: this.providers() });
-      if (this.panel === panel) this.post({ type: 'names', kind: message.query.kind, requestId: message.requestId, offset: message.query.offset, result });
+      if (this.panel === panel && this.filtersReady)
+        this.post({ type: 'names', kind: message.query.kind, requestId: message.requestId, offset: message.query.offset, result });
     } catch {
       if (this.panel === panel) this.post({ type: 'names', kind: message.query.kind, requestId: message.requestId, error: t('dashboard.namesFailed') });
     }
@@ -186,41 +200,56 @@ export class Dashboard implements vscode.Disposable {
     }
   }
 
-  private enter(): void {
+  private async enter(newWebview = false): Promise<void> {
     if (!this.ready) return;
     this.update();
-    void this.refreshUsage().catch(error => this.error(error));
+    await this.refreshUsage(newWebview);
   }
 
   /**
    * 책임: 통계 화면 진입 시 스캔을 합치고 완료 후 조회 결과를 갱신한다.
-   * 알고리즘: 진행 중 Promise가 있으면 공유하고 최초 요청만 refresh를 실행하며, 같은 패널이 살아 있을 때만 결과·busy 상태를 전달한다.
+   * 알고리즘: 진행 중 Promise를 공유하고 영속 갱신 성공 뒤에만 필터를 열고 현재 조회를 실행한다.
    */
-  private async refreshUsage(): Promise<void> {
-    if (!this.dependencies.settings().usage.enabled) return;
-    this.post({ type: 'busy', busy: true });
-    const panel = this.panel;
+  private async refreshUsage(newWebview = false): Promise<void> {
+    if (!this.ready || !this.dependencies.settings().usage.enabled) return;
     if (this.refreshPromise) {
-      try {
-        await this.refreshPromise;
-        if (this.panel === panel && this.ready) await this.loadDashboard();
-      } finally {
-        if (this.panel === panel) this.post({ type: 'busy', busy: false });
+      if (newWebview) {
+        this.post({ type: 'busy', busy: true });
+        this.postPreview();
       }
-      return;
+      return this.refreshPromise;
     }
+    this.filtersReady = false;
+    this.queryVersion++;
+    this.post({ type: 'busy', busy: true });
     this.refreshPromise = (async () => {
       const settings = this.dependencies.settings();
-      // The cached page remains visible during this operation.
-      const result = await this.dependencies.summary.refresh({ roots: settings.roots, timezone: settings.usage.timezone });
-      if (this.panel !== panel || !this.ready || !this.dependencies.settings().usage.enabled) return;
+      const timezone = settings.usage.timezone;
+      const { fromDay, toDay } = recentCalendarDays(DEFAULT_RECENT_DAYS, timezone);
+      const result = await this.dependencies.summary.refresh({
+        roots: settings.roots, timezone, recentUsage: {
+          fromMs: periodBounds(fromDay, timezone).fromMs, toMs: periodBounds(toDay, timezone).toMs,
+          providers: this.providers(), includeCosts: settings.usage.showApiCosts,
+          excludeEmptyUsage: settings.usage.excludeEmptyUsage,
+        },
+      });
+      if (!this.ready || !this.dependencies.settings().usage.enabled) return;
       this.post({ type: 'refreshResult', result });
-      await this.loadDashboard();
+      if (!result.interrupted && !result.failed) {
+        this.filtersReady = true;
+        this.post({ type: 'filtersReady' });
+      }
+      void this.loadDashboard().catch(error => this.error(error));
     })().finally(() => {
       this.refreshPromise = undefined;
-      if (this.panel === panel) this.post({ type: 'busy', busy: false });
+      this.recentPreview = undefined;
+      this.post({ type: 'busy', busy: false });
     });
     return this.refreshPromise;
+  }
+
+  private postPreview(): void {
+    if (this.recentPreview) this.post({ type: 'previewUsage', result: { ...this.recentPreview, groupBy: 'day' } });
   }
 
   private async loadDashboard(): Promise<void> {
@@ -232,25 +261,23 @@ export class Dashboard implements vscode.Disposable {
    * 알고리즘: 날짜를 현지 기간의 UTC 경계로 바꾸고 호스트 설정을 덧씌워 조회한 뒤 요청 버전이 최신일 때만 응답을 보낸다.
    */
   private async loadUsage(): Promise<void> {
-    if (!this.ready || !this.dependencies.settings().usage.enabled) return;
+    if (!this.filtersReady || !this.dependencies.settings().usage.enabled) return;
     const version = ++this.queryVersion;
     const settings = this.dependencies.settings();
     const timezone = settings.usage.timezone;
-    const query = { ...this.query, timezone, providers: this.providers(), includeCosts: settings.usage.showApiCosts,
+    const query: UsageQuery = { ...this.query, timezone, providers: this.providers(), includeCosts: settings.usage.showApiCosts,
       excludeEmptyUsage: settings.usage.excludeEmptyUsage };
     let fromDay = this.fromDay;
     let toDay = this.toDay;
     if (this.recentDays !== undefined) {
-      toDay = calendarPeriod(Date.now(), timezone, 'day');
-      const start = new Date(`${toDay}T00:00:00.000Z`);
-      start.setUTCDate(start.getUTCDate() - this.recentDays + 1);
-      fromDay = start.toISOString().slice(0, 10);
+      ({ fromDay, toDay } = recentCalendarDays(this.recentDays, timezone));
+      if (this.recentDays === DEFAULT_RECENT_DAYS) query.unknownTime = 'exclude';
     }
     if (fromDay) query.fromMs = periodBounds(fromDay, timezone).fromMs;
     if (toDay) query.toMs = periodBounds(toDay, timezone).toMs;
     if (query.fromMs !== undefined && query.toMs !== undefined && query.fromMs >= query.toMs) throw new Error(t('dashboard.invalidDateRange'));
     const result = await this.dependencies.summary.query(query);
-    if (version === this.queryVersion) this.post({ type: 'usage', result: { ...result, groupBy: this.query.groupBy } });
+    if (version === this.queryVersion) this.post({ type: 'usage', result: { ...result, groupBy: query.groupBy } });
   }
 
   private async loadDiagnostics(offset: number): Promise<void> {
@@ -277,4 +304,11 @@ export class Dashboard implements vscode.Disposable {
     if (diagnostics) this.postDiagnostics({ type: 'error', message });
     else this.post({ type: 'error', message });
   }
+}
+
+function recentCalendarDays(days: number, timezone: string): { fromDay: string; toDay: string } {
+  const toDay = calendarPeriod(Date.now(), timezone, 'day');
+  const start = new Date(`${toDay}T00:00:00.000Z`);
+  start.setUTCDate(start.getUTCDate() - days + 1);
+  return { fromDay: start.toISOString().slice(0, 10), toDay };
 }
