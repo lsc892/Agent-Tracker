@@ -322,7 +322,7 @@ Claude credential·로그 보존 설정은 `<dataHome>/.claude`, Codex App Serve
 **처리 절차**:
 
 1. 디렉터리를 순회하고 이번에 관측한 경로로 원본 소실을 판정한다. 파일별 관측 기록은 메모리에서 사용한다. 무변경 갱신의 마지막 트랜잭션은 이름과 전역 갱신 기준 시각을 반영한다.
-2. 관련 원본을 고정 byte 경계까지 한 번 읽는다. JSONL은 64 KiB 청크의 native LF 탐색·줄 예산·이미지 본문 생략·escape 검증을 적용하고 newline 없는 마지막 줄은 보류한다. 파싱 callback은 원본별 winner DTO를 갱신하고 패자 숫자 벡터를 버린다. 같은 읽기에서 파일 정체성·축소·동일 크기 재작성을 검사하고 내용 SHA-256을 계산한다. 읽기가 완료된 뒤 변경된 원본은 다음 갱신에서 수집한다.
+2. 관련 원본을 고정 byte 경계까지 한 번 읽는다. JSONL은 64 KiB 이하 단위로 파일을 읽고 native LF 탐색으로 한 줄씩 디코딩한다. 줄 예산·이미지 본문 생략·escape 검증을 적용하며 newline 없는 마지막 줄은 보류한다. 파싱 callback은 원본별 winner DTO를 갱신하고 패자 숫자 벡터를 버린다. 같은 읽기에서 파일 정체성·축소·동일 크기 재작성을 검사하고 내용 SHA-256을 계산한다. 읽기가 완료된 뒤 변경된 원본은 다음 갱신에서 수집한다.
 3. 세션·current 전환·복사 접두사·request 보정을 확정한 뒤 파일별 남은 winner를 부모 요청의 최종 winner Map에 비교한다. 더 큰 input+output과 동점의 늦은 순번을 선택한다. 교체 전 winner의 기여를 빼고 새 winner를 같은 부모 요청 DTO에 더해 토큰·캐시·모델·도구·결제 빈도를 유지한다. 종료 시 최종 winner 전체를 다시 합산하지 않는다.
 4. 다음 묶음은 현재 묶음의 처리가 진행된 만큼만 받아 대기열이 무제한으로 늘어나지 않도록 한다.
 5. 파일 읽기·파싱·집계가 끝난 뒤 결과 반영에만 write transaction을 사용한다. 한 session의 결과를 여러 묶음으로 읽어 쓰더라도 COMMIT은 그 반영 단위가 완성됐을 때 수행한다.
@@ -966,7 +966,9 @@ SQLite 자체보다 주의할 부분은 VS Code extension 배포 방식이다.
 
 SQLite 사용 자체가 고정 메모리를 보장하지 않는다. worker의 discovery 목록·중복 검증 작업량·DB page cache도 측정하고, corpus 전체를 host에 반환하지 않도록 batch/page 경계를 지킨다.
 
-JSONL reader는 64 KiB 이하 청크에서 완성된 줄 구간만 한 번 UTF-8로 디코딩하고 `split('\n')`해 일반 줄을 직접 파싱한다. 이전 청크에서 이어지는 첫 줄과 LF 뒤의 미완성 끝줄은 원본 바이트로 이어 붙이며, LF가 없는 청크는 문자열 분할 없이 현재 줄에만 추가한다. 이미지 후보는 기존 문자열·escape 검증과 본문 폐기를 적용한다. 원본 byte offset은 디코딩한 문자열 길이가 아닌 Buffer의 LF 위치로 계산한다. 읽은 원본 byte N에 대한 시간 O(N), chunk C와 보관 줄 한도 K에 대한 reader 보조 공간 O(C + min(L,K))는 유지한다. 청크 안의 디코딩 문자열·줄 배열과 이미지 검사의 임시 Latin-1 문자열에는 O(C) 공간이 들며, row 객체·adapter·DB 메모리는 별도다. 파일 전체 문자열·줄 배열은 만들지 않는다. 청크 분할의 시간·메모리와 실제 갱신 비교는 [A/B 보고서](benchmarks/2026-11-05/JsonlChunksAB-2026-11-05.md)에 둔다. 파싱의 규모는 JSONL 행 수·원본/보관 byte·최대 줄 크기로 비교한다. 동일한 RAM 입력으로 I/O·adapter·DB를 제외한 이전 브랜치 측정은 [파싱 전용 보고서](benchmarks/2026-10-09/JsonlParsingBranches-2026-10-09.md)에 둔다. 이전 reader+adapter 및 전체 갱신 측정은 [기존 트레이드오프 보고서](benchmarks/2026-10-09/JsonlReaderTradeoff.json)에 원본 그대로 보존한다. parser version과 집계 결과를 유지하므로 이 최적화만으로 정상 파일 전체를 강제 재파싱하지 않는다.
+JSONL reader는 64 KiB 이하 단위로 파일을 읽고 Buffer의 LF 위치에 맞춰 완성된 일반 줄 한 개를 UTF-8로 디코딩해 바로 파싱한다. 청크 경계를 넘는 줄은 원본 바이트를 `JsonlLine`에 이어 붙인다. 이미지 후보와 줄 예산을 초과한 원본 줄도 `JsonlLine`에서 처리해 이미지 본문을 폐기하면서 문자열·escape 문법과 보관 바이트 한도를 적용한다. 원본 byte offset은 Buffer에서 읽은 바이트 길이로 계산한다.
+
+일반 JSONL에서 원본 바이트 N에 대한 시간은 O(N)이다. 읽기 청크 C, 한 행에 보관할 내용의 최대 크기 L, 바이트 한도 K에 대한 reader 보조 공간은 O(C + min(L,K))다. 행별 디코딩은 입력 Buffer와 한 행의 임시 문자열을 사용하며 청크의 완성 줄 배열을 없앤다. 행 객체·adapter·DB 상태와 Zstd 디코더 공간은 별도다. parser version을 유지해 이 변경만으로 기존 정상 파일을 재파싱할 필요가 없다. [행별 디코딩 제품 A/B](../benchmarks/2026-11-21/JsonlLineProductAB-2026-11-21.md), [이전 청크 분할 A/B](../benchmarks/2026-11-05/JsonlChunksAB-2026-11-05.md), [파싱 전용 실험](../benchmarks/2026-10-09/JsonlParsingBranches-2026-10-09.md).
 
 ## 11. 검증 및 시뮬레이션
 

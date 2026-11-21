@@ -16,7 +16,8 @@ function parseJsonlObject(text: string, offset: number): Record<string, unknown>
 
 /**
  * 책임: 관측한 크기까지만 로그를 읽고 행과 원본 위치를 전달한다.
- * 알고리즘: 64KiB 이하 청크 안의 완성된 줄 구간만 한 번 디코딩·분할하고 경계 줄은 이어 붙인다. 이미지 제거·Zstd 해제와 미완성 마지막 행 유예를 유지한다.
+ * 64KiB 이하 단위로 파일을 읽고 LF마다 한 줄씩 디코딩한다.
+ * 청크 경계를 넘는 줄과 이미지가 있는 줄은 JsonlLine에서 처리한다.
  */
 export async function readJsonl(
   path: string,
@@ -52,22 +53,16 @@ export async function readJsonl(
   };
 
   function parseChunk(chunk: Buffer): boolean {
-    let completeLines: string[] | undefined;
-    let completeIndex = 0;
     let index = 0;
     while (index < chunk.length) {
       const newline = chunk.indexOf(10, index);
       const end = newline < 0 ? chunk.length : newline;
       let text: string | undefined;
       let sourceBytes = end - index;
-      if (!line && end < chunk.length) {
-        // Decode complete lines once per chunk. Keep split UTF-8 in JsonlLine
-        // and derive offsets from the Buffer, even for invalid UTF-8 bytes.
-        completeLines ??= chunk.toString('utf8', index, chunk.lastIndexOf(10)).split('\n');
-        const candidate = completeLines[completeIndex++].trim();
-        // Absence proves there is no image to sanitize. JSON.parse still checks
-        // every JSON string/escape; escaped image prefixes were never stripped.
-        if (sourceBytes <= maxLine && !/data:image\//i.test(candidate)) text = candidate;
+      if (!line && newline >= 0 && sourceBytes <= maxLine) {
+        const candidate = chunk.toString('utf8', index, end).trim();
+        // JsonlLine strips literal image bodies and validates their discarded bytes.
+        if (!/data:image\//i.test(candidate)) text = candidate;
       }
       if (text === undefined) {
         line ??= new JsonlLine(maxLine, lineOffset);

@@ -198,7 +198,7 @@ test('an image discovered after buffered ordinary chunks preserves the retained 
   }
 });
 
-test('chunk-wide decoding preserves source byte offsets even when UTF-8 replacement changes string length', async () => {
+test('per-line decoding preserves source byte offsets even when UTF-8 replacement changes string length', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'agent-tracker-jsonl-'));
   const path = join(directory, 'source.jsonl');
   const first = Buffer.concat([Buffer.from('{"text":"'), Buffer.from([0xff, 0xc3]), Buffer.from('"}\r\n')]);
