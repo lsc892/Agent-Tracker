@@ -2,6 +2,7 @@
 
 요약·JSONL·SQL·quota 처리의 정확성과 성능을 비교하는 도구를 모은다.
 
+- [dashboard-first-page-ab.cjs](dashboard-first-page-ab.cjs)는 격리된 VS Code에서 같은 30일 조건으로 창 표시, 첫 통계 표, SQLite 갱신 결과 표시를 비교한다. 빈 DB와 새 요청 1건이 추가된 DB 사본을 준비 3쌍·교대 10쌍으로 측정한다. [측정 보고서](../../docs/benchmarks/2026-11-21/DashboardFirstPageAB-2026-11-21.md).
 - [mtime-refresh-ab.cjs](mtime-refresh-ab.cjs)는 전수 prefix 검증 빌드와 전역 수정 시각 갱신 빌드를 준비 3쌍·교대 10쌍으로 비교한다. `--before=<A 빌드 루트> --after=<B 빌드 루트> --output=<새 JSON>`을 사용하며, 고정 원본 사본은 `--workspace=<이전 실행 폴더>`로 재사용한다. [결과와 재현 방법](../../docs/benchmarks/2026-11-21/MtimeRefreshAB-2026-11-21.md).
 
 - [prefix-hash-ab.cjs](prefix-hash-ab.cjs)는 수정 전 제품 사본과 P·원본 prefix 해시 증분을 실제 `refreshSummary`에서 비교한다. `--before=<이전 빌드> --after=<현재 빌드> --prepare-only`로 입력을 고정하고 출력된 `--workspace=<폴더> --output=<새 JSON>`으로 세 입력·세 해시·여섯 작업을 준비 3회·교대 10회 측정한다. 완전 무변경과 동일 내용의 mtime 변경을 구분한다. `--variants=sha256,threads4 --scenarios=append,unchanged,same-content-touch`는 SHA-256 파일 준비 풀 1/4개를 비교한다. 두 native 해시는 [실험 의존성](jsonl-algorithms/README.md)을 사용하고 제품은 Node 내장 SHA-256을 사용한다.
