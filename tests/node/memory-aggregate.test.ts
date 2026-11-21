@@ -51,10 +51,12 @@ function sqlOracle(files: readonly MemoryAggregateFile[]): MaterializedTurnSumma
       for (const item of file.flags ?? []) putFlag.run(file.id,item.rootId,item.flag);
       if (identity.standaloneSubagent) putFlag.run(file.id,'*','standalone-subagent');
       for (const e of file.events) {
-        const u=e.kind==='usage' || e.kind==='check' ? e : undefined,t=e.kind==='turn'?e:undefined,c=e.kind==='capability'?e:undefined;
+        const usage=e.kind==='usage'?e:undefined,check=e.kind==='check'?e:undefined;
+        const t=e.kind==='turn'?e:undefined,c=e.kind==='capability'?e:undefined;
         putEvent.run(++id,file.id,e.kind,e.rootId,e.kind==='usage'?e.responseId:null,e.kind==='usage'?e.requestId:null,
-          u?.threadId ?? c?.threadId ?? null,u?.turnId ?? null,u?.tokens.input ?? null,u?.tokens.output ?? null,
-          u?.tokens.cacheRead ?? null,u?.tokens.cacheWrite ?? null,t?Number(t.isMain || identity.standaloneSubagent):null,
+          usage?.threadId ?? check?.threadId ?? c?.threadId ?? null,usage?.turnId ?? check?.turnId ?? null,
+          usage?.tokens.input ?? check?.input ?? null,usage?.tokens.output ?? check?.output ?? null,
+          usage?.tokens.cacheRead ?? null,usage?.tokens.cacheWrite ?? null,t?Number(t.isMain || identity.standaloneSubagent):null,
           t?.startedAt ?? null,t?.completedAt ?? null,t?.lastAssistantAt ?? null,t?.duration ?? null,t?.durationQuality ?? null,
           Number(t?.completed ?? false),t?.status ?? null,t?.statusAt ?? null,e.offset,e.kind==='usage'?e.model ?? '':null,
           e.kind==='usage'?e.billingMode ?? 'unknown':null,c?.category ?? null,c?.name ?? null,c?.eventId ?? null,t?.title ?? null,
@@ -160,7 +162,7 @@ test('pure memory aggregation agrees with full raw SQL for seeded winner, lifecy
         if (i%7===0) events.push({kind:'capability',rootId:root,threadId:thread,eventId:'cap-'+next(4),
           category:'skill',name:'skill-'+next(2),offset:events.length});
         else if (i%11===0) events.push({kind:'check',rootId:root,threadId:thread,turnId:turn,
-          tokens:{input:next(300),output:next(20),cacheRead:0,cacheWrite:0,reasoning:0},offset:events.length});
+          input:next(300),output:next(20),offset:events.length});
         else events.push(usage(next(250),{rootId:root,responseId:'response-'+next(6),requestId:next(3)?'request-'+next(2):null,
           threadId:thread,turnId:turn,model:next(3)?'model-'+next(2):'',billingMode:next(3)?'api':'subscription',
           tokens:{input:100+next(200),output:next(10),cacheRead:next(40),cacheWrite:next(20),reasoning:0},

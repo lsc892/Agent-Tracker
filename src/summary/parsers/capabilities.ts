@@ -33,7 +33,7 @@ function stringEnd(code: string, start: number): number {
  * 책임: exec 래퍼에 포함된 정적인 tools 호출을 식별한다.
  * 알고리즘: 주석·문자열을 건너뛰며 tools.method와 괄호 깊이를 찾고 지원하는 인자 필드의 고정 문자열만 추출한다.
  */
-function *nestedCalls(code: string): Generator<{name:string;args:Record<string,unknown>}> {
+function *nestedCalls(code: string): Generator<{ name: string; input: string }> {
   for (let i=0;i<code.length;) {
     if ('\'"`'.includes(code[i])) { i=stringEnd(code,i); continue; }
     if (code.startsWith('//',i)) { const end=code.indexOf('\n',i);i=end<0 ? code.length : end+1;continue; }
@@ -47,25 +47,28 @@ function *nestedCalls(code: string): Generator<{name:string;args:Record<string,u
       if (code[end] === '(') depth++;
       if (code[end] === ')') depth--;
     }
-    const raw=code.slice(start,end-1);
-    const args=argumentsObject(raw);
-    // Object literals often have unquoted keys. Extract only supported scalar fields.
-    const fields=/(?:^|[,{]\s*)["']?(cmd|command|file_path|path|skill|subagent_type|agent_type)["']?\s*:\s*/g;
-    const seen=new Set<string>();
-    for (const field of raw.matchAll(fields)) {
-      const key=field[1];
-      if (seen.has(key)) continue;
-      seen.add(key);
-      const position=field.index+field[0].length;
-      if (!'\'"`'.includes(raw[position] ?? ' ')) continue;
-      const end=stringEnd(raw,position);
-      const value=raw.slice(position,end);
-      if (raw[position] === '`' && value.includes('${') || !/^\s*(?:[,}]|$)/.test(raw.slice(end))) continue;
-      args[key]=literal(value);
-    }
-    yield {name:match[1],args};
+    yield { name: match[1], input: code.slice(start,end-1) };
     i=end;
   }
+}
+
+function nestedArgumentsObject(raw: string): Record<string, unknown> {
+  const args = argumentsObject(raw);
+  // Object literals often have unquoted keys. Extract only supported scalar fields.
+  const fields = /(?:^|[,{]\s*)["']?(cmd|command|file_path|path|skill|subagent_type|agent_type)["']?\s*:\s*/g;
+  const seen = new Set<string>();
+  for (const field of raw.matchAll(fields)) {
+    const key = field[1];
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const position = field.index + field[0].length;
+    if (!'\'"`'.includes(raw[position] ?? ' ')) continue;
+    const end = stringEnd(raw, position);
+    const value = raw.slice(position, end);
+    if (raw[position] === '`' && value.includes('${') || !/^\s*(?:[,}]|$)/.test(raw.slice(end))) continue;
+    args[key] = literal(value);
+  }
+  return args;
 }
 
 /**
@@ -111,18 +114,36 @@ function addShellSkillUses(args: Record<string,unknown>, uses: Use[]): void {
  * 책임: 실제 도구 호출을 Skill·subagent·plugin 사용으로 분류한다.
  * 알고리즘: 호출명과 명시 인자를 기준으로 분류하고 파일 읽기 명령의 SKILL 경로를 추출한 뒤 같은 분류·이름을 중복 제거한다.
  */
-function directUses(name: string, args: Record<string,unknown>): Use[] {
-  name=name.split('.').at(-1)!;
-  const uses: Use[]=[];
-  const lower=name.toLowerCase();
-  if (lower === 'skill') addSkillUse(args,uses);
-  if (['spawn_agent','task','agent'].includes(lower)) {
-    uses.push({category:'subagent',name:displayName(args.subagent_type ?? args.agent_type) ?? 'default'});
+function directUses<Input>(name: string, input: Input, readArguments: (input: Input) => Record<string, unknown>): Use[] {
+  const uses: Use[] = [];
+  switch (name.toLowerCase()) {
+    case 'skill':
+      addSkillUse(readArguments(input), uses);
+      break;
+    case 'spawn_agent':
+    case 'task':
+    case 'agent': {
+      const args = readArguments(input);
+      uses.push({ category: 'subagent', name: displayName(args.subagent_type ?? args.agent_type) ?? 'default' });
+      break;
+    }
+    case 'read':
+    case 'read_file': {
+      const args = readArguments(input);
+      uses.push(...skillPaths(string(args.file_path ?? args.path) ?? ''));
+      break;
+    }
+    case 'exec_command':
+    case 'bash':
+    case 'powershell':
+    case 'shell_command':
+    case 'shell':
+      addShellSkillUses(readArguments(input), uses);
+      break;
   }
   const plugin=/^mcp__(.+?)__/.exec(name)?.[1];
   if (plugin) uses.push({category:'plugin',name:displayName(plugin)!});
-  if (['read','read_file'].includes(lower)) uses.push(...skillPaths(string(args.file_path ?? args.path) ?? ''));
-  if (['exec_command','bash','powershell','shell_command','shell'].includes(lower)) addShellSkillUses(args,uses);
+  if (!uses.length) return uses;
   const unique: Use[]=[];
   const seen=new Set<string>();
   for (const use of uses) {
@@ -141,11 +162,14 @@ function directUses(name: string, args: Record<string,unknown>): Use[] {
  * 알고리즘: exec 문자열은 정적으로 분해하고 나머지는 단일 호출로 취급해 분류 결과에 원래 호출 순번을 붙여 yield한다.
  */
 export function *toolCapabilities(name: string, input: unknown): Generator<Use & {index:number}> {
-  const calls=name.split('.').at(-1) === 'exec' && typeof input === 'string'
-    ? nestedCalls(input) : [{name,args:argumentsObject(input)}];
-  let index=0;
-  for (const call of calls) {
-    for (const use of directUses(call.name,call.args)) yield {...use,index};
+  const toolName = name.slice(name.lastIndexOf('.') + 1);
+  if (toolName !== 'exec' || typeof input !== 'string') {
+    for (const use of directUses(toolName, input, argumentsObject)) yield { ...use, index: 0 };
+    return;
+  }
+  let index = 0;
+  for (const call of nestedCalls(input)) {
+    for (const use of directUses(call.name, call.input, nestedArgumentsObject)) yield { ...use, index };
     index++;
   }
 }

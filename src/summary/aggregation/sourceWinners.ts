@@ -1,12 +1,13 @@
 // 읽는 동안 요청 상태·최신 검증·도구 중복·usage winner를 함께 누적한다.
-import type { ParseEvent, Provider, UsageEvent } from '../types';
+import type { CheckEvent, ParseEvent, Provider, UsageEvent } from '../types';
 import { key, normalizedEvent, SourceEvidence, type SourceEvidenceData } from './sourceEvidence';
 import { addTurn, createTurnState, max, type TurnState } from './turns';
 import { usageScore } from './winners';
 
 export interface Candidate { event: UsageEvent; index: number; score: number | bigint }
-interface Indexed<E> { event: E; index: number }
-type Check = Extract<ParseEvent, { kind: 'check' }>;
+export interface SourceCheck extends Omit<CheckEvent, 'kind' | 'rootId'> {
+  index: number;
+}
 type Capability = Extract<ParseEvent, { kind: 'capability' }>;
 export interface SourceRoot {
   rootId: string;
@@ -15,7 +16,7 @@ export interface SourceRoot {
   // Fork 접두사는 다른 파일을 확인한 뒤 정해지므로 legacy 위치만 경계별로 남긴다.
   legacy: { index: number; offset: number }[];
   turns: Map<boolean, TurnState>;
-  checks: Map<string, Indexed<Check>>;
+  checks: Map<string, SourceCheck>;
   capabilities: Map<string, { event: Capability; positions: { index: number; offset: number }[] }>;
 }
 export interface SourceWinnersSnapshot {
@@ -66,9 +67,16 @@ export class SourceWinners {
         return;
       }
       case 'check': {
-        root.checkOffset = root.checkOffset === null ? event.offset : Math.min(root.checkOffset, event.offset);
-        const id = key(event.threadId, event.turnId), previous = root.checks.get(id);
-        if (!previous || index > previous.index) root.checks.set(id, { event, index });
+        const { threadId, turnId, offset, input, output } = event;
+        root.checkOffset = root.checkOffset === null ? offset : Math.min(root.checkOffset, offset);
+        const id = key(threadId, turnId), previous = root.checks.get(id);
+        if (!previous) root.checks.set(id, { threadId, turnId, input, output, offset, index });
+        else if (index > previous.index) {
+          previous.input = input;
+          previous.output = output;
+          previous.offset = offset;
+          previous.index = index;
+        }
         return;
       }
       case 'capability': {

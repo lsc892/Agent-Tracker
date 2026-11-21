@@ -82,9 +82,13 @@ export function codexTokens(raw: Record<string, unknown>): TokenVector {
     reasoning: number(raw.reasoning_output_tokens ?? object(raw.output_tokens_details).reasoning_tokens) };
 }
 
-function validateTokens(raw: Record<string, unknown>): void {
-  for (const key of ['input_tokens','output_tokens','cache_read_input_tokens','cache_creation_input_tokens','cached_input_tokens','cache_write_input_tokens','reasoning_output_tokens']) {
-    if (raw[key] !== undefined && (typeof raw[key] !== 'number' || !Number.isSafeInteger(raw[key]) || Number(raw[key]) < 0)) throw new SummaryError('unsupported-token-schema');
+const tokenFields = ['input_tokens', 'output_tokens', 'cache_read_input_tokens', 'cache_creation_input_tokens',
+  'cached_input_tokens', 'cache_write_input_tokens', 'reasoning_output_tokens'];
+
+export function validateTokens(raw: Record<string, unknown>): void {
+  for (const key of tokenFields) {
+    const value = raw[key];
+    if (value !== undefined && (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0)) throw new SummaryError('unsupported-token-schema');
   }
   if (raw.input_tokens === undefined && raw.output_tokens === undefined) throw new SummaryError('unsupported-token-schema');
 }

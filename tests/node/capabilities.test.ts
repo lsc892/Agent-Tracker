@@ -30,7 +30,11 @@ test('capability parsers recognize explicit invocations and static wrappers with
     await Promise.all([tools.exec_command({cmd: "Get-Content -LiteralPath 'C:/my skills/commit/SKILL.md'"}),
       tools.exec_command({cmd: "rg --files -g SKILL.md"}),tools.mcp__docs__search({q:'x'})]);
     await tools.spawn_agent({agent_type:'explorer'});`;
-  assert.deepEqual(uses('exec',code),[{category:'skill',name:'commit'},{category:'plugin',name:'docs'},{category:'subagent',name:'explorer'}]);
+  assert.deepEqual([...toolCapabilities('exec', code)], [
+    { category: 'skill', name: 'commit', index: 0 },
+    { category: 'plugin', name: 'docs', index: 2 },
+    { category: 'subagent', name: 'explorer', index: 3 },
+  ]);
   assert.deepEqual(uses('apply_patch','Read /skills/commit/SKILL.md'),[]);
   assert.deepEqual(uses('exec_command',{cmd:"rg 'cat /skills/commit/SKILL.md' src"}),[]);
   assert.deepEqual(uses('exec_command',{cmd:"echo 'cat /skills/commit/SKILL.md'"}),[]);

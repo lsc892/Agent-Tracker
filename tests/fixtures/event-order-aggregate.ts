@@ -105,7 +105,7 @@ export class EventOrderAggregation {
       if (count > 0) addFlag(source.flags, rootId, 'missing-request-id');
     for (const [id, { source, event }] of this.checks) {
       const sum = this.totals.get(id);
-      if (event.tokens.input !== (sum?.input ?? 0) || event.tokens.output !== (sum?.output ?? 0)) addFlag(source.flags, event.rootId, 'token-total-mismatch');
+      if (event.input !== (sum?.input ?? 0) || event.output !== (sum?.output ?? 0)) addFlag(source.flags, event.rootId, 'token-total-mismatch');
     }
     return materialize(this.roots.values(), this.sessions, this.collectCapabilities);
   }

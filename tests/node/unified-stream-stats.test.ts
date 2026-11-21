@@ -32,7 +32,7 @@ test('thousands of lifecycle and check events become one request state and prese
       title: 'title-' + index, status: index % 2 ? 'in_progress' : 'completed', statusAt: 5000 - index,
       completed: index % 2 === 0, completedAt: 5000 - index, offset: index + 20 });
     events.push({ kind: 'check', rootId: 'root', threadId: 'thread', turnId: 'turn',
-      tokens: { input: 100, output: 2, cacheRead: 0, cacheWrite: 0, reasoning: 0 }, offset: index + 21 });
+      input: 100, output: 2, offset: index + 21 });
   }
   const file = source(1, events), selected = new SourceWinners('codex');
   events.forEach((event, index) => selected.add(event, index));

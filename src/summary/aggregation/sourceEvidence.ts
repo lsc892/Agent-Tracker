@@ -19,7 +19,10 @@ export const capabilityKey = (event: Extract<ParseEvent, { kind: 'capability' }>
 /** SQLite TEXT의 UTF-8 변환과 같은 문자열로 맞추되 정상 입력은 복사하지 않는다. */
 export function normalizedEvent(event: ParseEvent): ParseEvent {
   let result = event;
-  for (const [name, value] of Object.entries(event)) {
+  const fields = event as ParseEvent & Record<string, unknown>;
+  for (const name in fields) {
+    if (!Object.hasOwn(fields, name)) continue;
+    const value = fields[name];
     if (typeof value !== 'string') continue;
     const normalized = text(value);
     if (normalized === value) continue;

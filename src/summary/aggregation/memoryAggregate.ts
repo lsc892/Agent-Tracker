@@ -1,11 +1,11 @@
 // 단일 읽기에서 남은 원본별 winner를 최종 그룹·요청·모델·진단 값으로 병합한다.
-import type { ParseEvent } from '../types';
+import type { CapabilityEvent, TurnEvent, UsageEvent } from '../types';
 import { addFlag, eligible, key, prepareSources,
   type SourcePlan, type StreamingAggregateFile } from './sourceEvidence';
 import { addCapability, addWinner, createRoot, materialize, max, mergeTurn,
   type MemoryAggregateResult, type Outcome, type Root } from './turns';
 import { Winners, type Winner } from './winners';
-import type { SourceWinnersSnapshot } from './sourceWinners';
+import type { SourceCheck, SourceWinnersSnapshot } from './sourceWinners';
 
 export type { StreamingAggregateFile } from './sourceEvidence';
 export type { MaterializedTurnSummary, MemoryAggregateResult } from './turns';
@@ -19,7 +19,7 @@ export class StreamingAggregation {
   private readonly winners = new Winners((winner, direction) => this.applyWinner(winner, direction));
   private readonly totals = new Map<string, { input: number; output: number }>();
   private readonly missingRequests = new Map<string, { source: SourcePlan; rootId: string; count: number }>();
-  private readonly checks = new Map<string, { source: SourcePlan; event: Extract<ParseEvent, { kind: 'check' }>; ordinal: number }>();
+  private readonly checks = new Map<string, { source: SourcePlan; rootId: string; input: number; output: number; ordinal: number }>();
   private readonly capabilities = new Set<string>();
 
   constructor(files: readonly StreamingAggregateFile[], private readonly collectCapabilities = true) {
@@ -38,67 +38,73 @@ export class StreamingAggregation {
   /** 읽는 동안 접은 요청 상태를 한 번 병합하고 남은 winner만 바로 합계에 반영한다. */
   addSource(fileId: number, prepared: SourceWinnersSnapshot): void {
     const source = this.sources.get(fileId)!, file = source.file;
+    const parentRootId = file.identity.parentRootId;
     const outcomes = new Map<string, Outcome>();
     for (const state of prepared.roots.values()) {
       const inherited = source.inheritedRoots.has(state.rootId);
-      const rootId = file.identity.parentRootId ?? state.rootId;
-      const observe = (offset: number): Root => this.observeRequest(file, rootId, offset);
+      const rootId = parentRootId ?? state.rootId;
       if (!inherited) {
-        if (state.usageOffset !== null) observe(state.usageOffset);
+        if (state.usageOffset !== null) this.observeRequest(file, rootId, state.usageOffset);
         if (!file.evidence.current) for (const observed of state.legacy)
-          if (observed.index > source.legacyCutoff) observe(observed.offset);
-        if (state.checkOffset !== null) observe(state.checkOffset);
+          if (observed.index > source.legacyCutoff) this.observeRequest(file, rootId, observed.offset);
+        if (state.checkOffset !== null) this.observeRequest(file, rootId, state.checkOffset);
         for (const [isMain, turn] of state.turns) {
           if (!file.identity.isMain && !file.identity.standaloneSubagent) continue;
-          const target = observe(turn.offset);
+          const target = this.observeRequest(file, rootId, turn.offset);
           if (!isMain && !file.identity.standaloneSubagent) continue;
           mergeTurn(target, turn, source.base);
           if (turn.outcome) this.recordOutcome(outcomes, target, turn.outcome.event,
             source.base + turn.outcome.ordinal, turn.outcome.orderingAt);
         }
-        for (const { event, index } of state.checks.values()) this.addNormalized(source, event, index);
+        const checkRootId = parentRootId || state.rootId;
+        for (const check of state.checks.values()) {
+          // The folded offset already covers each check when both target the same root.
+          if (checkRootId !== rootId || state.checkOffset === null) this.observeRequest(file, checkRootId, check.offset);
+          this.recordCheck(source, checkRootId, check);
+        }
       }
       for (const { event, positions } of state.capabilities.values()) {
         for (const position of positions) {
           if (!eligible(source, event, position.index)) continue;
-          observe(position.offset);
-          this.addNormalized(source, { ...event, offset: position.offset }, position.index);
+          const observed = this.observeRequest(file, rootId, position.offset);
+          // An empty parent ID preserves the original event's target.
+          const capabilityRootId = parentRootId || event.rootId;
+          const root = capabilityRootId === rootId ? observed : this.observeRequest(file, capabilityRootId, position.offset);
+          this.recordCapability(root, event);
           break;
         }
       }
     }
-    for (const { event, index, score } of prepared.winners.values()) this.addNormalized(source, event, index, score);
+    for (const { event, index, score } of prepared.winners.values()) this.recordUsage(source, event, index, score);
   }
 
-  private addNormalized(source: SourcePlan, raw: Exclude<ParseEvent, { kind: 'turn' }>, index: number, score?: number | bigint): void {
-    let event = raw;
-    if (!eligible(source, event, index)) return;
-    if (source.file.identity.parentRootId) event = { ...event, rootId: source.file.identity.parentRootId };
+  private recordUsage(source: SourcePlan, raw: UsageEvent, index: number, score: number | bigint): void {
+    if (!eligible(source, raw, index)) return;
+    const parentRootId = source.file.identity.parentRootId;
+    const event = parentRootId && parentRootId !== raw.rootId ? { ...raw, rootId: parentRootId } : raw;
     const file = source.file, ordinal = source.base + index;
-    const root = this.observeRequest(file, event.rootId, event.offset);
-    switch (event.kind) {
-      case 'usage': {
-        const request = file.provider === 'claude' && event.requestId === null
-          ? this.requests.get(key(file.session_id, event.responseId)) ?? null : event.requestId;
-        const id = key(file.provider, file.session_id, event.responseId,
-          file.provider === 'claude' ? request ?? 'no-req' : event.threadId, file.provider === 'claude' ? '' : event.turnId);
-        this.winners.add(id, source, event, ordinal, request, score);
-        return;
-      }
-      case 'check': {
-        const id = key(file.provider, file.session_id, event.threadId, event.turnId), previous = this.checks.get(id);
-        if (!previous || ordinal > previous.ordinal) this.checks.set(id, { source, event, ordinal });
-        return;
-      }
-      case 'capability': {
-        if (!this.collectCapabilities) return;
-        const id = key(file.provider, file.session_id, event.rootId, event.threadId, event.eventId, event.category, event.name);
-        if (!this.capabilities.has(id)) { this.capabilities.add(id); addCapability(root, event.category, event.name); }
-      }
-    }
+    this.observeRequest(file, event.rootId, event.offset);
+    const request = file.provider === 'claude' && event.requestId === null
+      ? this.requests.get(key(file.session_id, event.responseId)) ?? null : event.requestId;
+    const id = key(file.provider, file.session_id, event.responseId,
+      file.provider === 'claude' ? request ?? 'no-req' : event.threadId, file.provider === 'claude' ? '' : event.turnId);
+    this.winners.add(id, source, event, ordinal, request, score);
   }
 
-  private recordOutcome(outcomes: Map<string, Outcome>, root: Root, event: Extract<ParseEvent, { kind: 'turn' }>,
+  private recordCapability(root: Root, event: CapabilityEvent): void {
+    if (!this.collectCapabilities) return;
+    const id = key(root.provider, root.session, root.rootId, event.threadId, event.eventId, event.category, event.name);
+    if (!this.capabilities.has(id)) { this.capabilities.add(id); addCapability(root, event.category, event.name); }
+  }
+
+  private recordCheck(source: SourcePlan, rootId: string, check: SourceCheck): void {
+    const { file } = source, ordinal = source.base + check.index;
+    const id = key(file.provider, file.session_id, check.threadId, check.turnId), previous = this.checks.get(id);
+    if (!previous || ordinal > previous.ordinal)
+      this.checks.set(id, { source, rootId, input: check.input, output: check.output, ordinal });
+  }
+
+  private recordOutcome(outcomes: Map<string, Outcome>, root: Root, event: TurnEvent,
     ordinal: number, orderingAt: number | null): void {
     let outcome = outcomes.get(root.rootId);
     if (!outcome) {
@@ -125,9 +131,9 @@ export class StreamingAggregation {
   finish(): MemoryAggregateResult {
     for (const { source, rootId, count } of this.missingRequests.values())
       if (count > 0) addFlag(source.flags, rootId, 'missing-request-id');
-    for (const [id, { source, event }] of this.checks) {
+    for (const [id, { source, rootId, input, output }] of this.checks) {
       const sum = this.totals.get(id);
-      if (event.tokens.input !== (sum?.input ?? 0) || event.tokens.output !== (sum?.output ?? 0)) addFlag(source.flags, event.rootId, 'token-total-mismatch');
+      if (input !== (sum?.input ?? 0) || output !== (sum?.output ?? 0)) addFlag(source.flags, rootId, 'token-total-mismatch');
     }
     return materialize(this.roots.values(), this.sessions, this.collectCapabilities);
   }

@@ -145,7 +145,7 @@ export interface UsageEvent {
 }
 export interface CheckEvent {
   kind: 'check'; rootId: string; threadId: string; turnId: string;
-  tokens: TokenVector; offset: number;
+  input: number; output: number; offset: number;
 }
 export interface CapabilityEvent {
   kind: 'capability'; rootId: string; threadId: string; eventId: string;

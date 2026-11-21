@@ -26,6 +26,23 @@ test('Claude tool results retain the current external prompt without inventing a
   assert.equal(events.find(event=>event.kind==='usage')!.rootId,'p');assert.equal(identity!.sessionId,'s');
 });
 
+test('Claude rows without emitted events can set metadata and the next response root', () => {
+  const events: ParseEvent[] = [];
+  let identity: ParsedIdentity | undefined;
+  const parser = new ClaudeParserAdapter({ provider: 'claude', path: '/projects/session.jsonl', sourceRoot: '/projects', fileId: 1 },
+    { identity: value => { identity = value; }, event: event => events.push(event) });
+  parser.row({ auth_mode: 'api_key', promptId: 'ignored-without-type' }, 0);
+  parser.row({ type: 'future-event', promptId: 'r', sessionId: 's', cwd: '/workspace/project' }, 1);
+  parser.row({ type: 'assistant', message: { id: 'response', usage: { input_tokens: 3 } } }, 2);
+  parser.finish();
+
+  assert.equal(identity!.sessionId, 's');
+  assert.equal(identity!.projectName, 'project');
+  const usage = events.find(event => event.kind === 'usage');
+  assert.equal(usage?.rootId, 'r');
+  assert.equal(usage?.billingMode, 'api');
+});
+
 test('Claude ignores zero-token local notices but retains unexpected positive synthetic usage as an unknown model', () => {
   const events: ParseEvent[] = [];
   const parser = new ClaudeParserAdapter({provider:'claude',path:'/projects/session.jsonl',sourceRoot:'/projects',fileId:1},
@@ -47,7 +64,30 @@ test('current Codex uses response usage and treats cumulative snapshots as valid
     {type:'token_usage_record',payload:{session_id:'thread-one',thread_id:'thread-one',turn_id:'t',root_turn_id:'t',response_id:'r',usage:{input_tokens:100,output_tokens:10},turn_token_usage:{input_tokens:100,output_tokens:10},thread_token_usage:{input_tokens:900,output_tokens:90}}},
     {type:'event_msg',payload:{type:'task_complete',turn_id:'t',duration_ms:400},timestamp:'2026-10-01T00:00:01Z'}]);
   assert.equal(events.filter(event=>event.kind==='usage').length,1);assert.equal((events.find(event=>event.kind==='usage') as UsageEvent).tokens.input,100);
+  assert.deepEqual(events.find(event => event.kind === 'check'), {
+    kind: 'check', rootId: 't', threadId: 'thread-one', turnId: 't', input: 100, output: 10, offset: 1,
+  });
   assert.ok(events.some(event=>event.kind==='turn' && event.duration===400));
+});
+
+test('Codex event messages without a handler can still set the next response root and turn', () => {
+  const events = codex([
+    { type: 'event_msg', payload: { type: 'future-event', root_turn_id: 'r', turn_id: 't' } },
+    { type: 'token_usage_record', payload: { response_id: 'response', usage: { input_tokens: 3 } } },
+  ]);
+  assert.equal(events.length, 1);
+  const usage = events.find(event => event.kind === 'usage');
+  assert.equal(usage?.rootId, 'r');
+  assert.equal(usage?.turnId, 't');
+});
+
+test('Codex validates optional token fields on turn totals before aggregation', () => {
+  assert.throws(() => codex([
+    { type: 'token_usage_record', payload: {
+      root_turn_id: 'r', turn_id: 't', response_id: 'response', usage: { input_tokens: 3 },
+      turn_token_usage: { input_tokens: 3, cached_input_tokens: 'invalid' },
+    } },
+  ]), /unsupported-token-schema/);
 });
 
 test('Codex lifecycle timestamps convert Unix seconds while preserving explicit millisecond durations', () => {
