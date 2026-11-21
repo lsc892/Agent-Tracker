@@ -1,0 +1,40 @@
+/*agent-tracker:statusbar-toggle:v6*/if(e.extensionId==="AgentTracker.agent-tracker"&&e.command?.id==="agentTracker.toggleQuotaTooltip"){(function configureQuotaCardToggle(item, toggle) {
+  if (item._agentTrackerCardToggleConfigured) return;
+  item._agentTrackerCardToggleConfigured = true;
+  const { container, labelContainer, hoverService, executeCommand } = item;
+  const handlesQuota = () => item.entry?.command === toggle;
+  const isCardVisible = () => hoverService._hoverStack.some(({ hover, options: { target } }) =>
+    !hover.isDisposed && (target === container || target.targetElements?.includes(container)));
+
+  // Keep the visible card alive until the click runs, before VS Code's mousedown dismissal.
+  const holdUntilClick = event => {
+    if (event.button === 0 && handlesQuota() && labelContainer.contains(event.target) && isCardVisible()) {
+      event.stopImmediatePropagation();
+    }
+  };
+  const ignoreInternalMouseOver = event => {
+    if (handlesQuota() && (event.relatedTarget?.nodeType && container.contains(event.relatedTarget) || hoverService.getStickyHover(container))) {
+      event.stopImmediatePropagation();
+    }
+  };
+  const capture = { capture: true };
+  container.addEventListener('mousedown', holdUntilClick, capture);
+  container.addEventListener('mouseover', ignoreInternalMouseOver, capture);
+  item._register({ dispose() {
+    container.removeEventListener('mousedown', holdUntilClick, capture);
+    container.removeEventListener('mouseover', ignoreInternalMouseOver, capture);
+  } });
+
+  item.executeCommand = function (command, wasPinned) {
+    const wasOpen = command === toggle && handlesQuota() ? wasPinned || isCardVisible() : wasPinned;
+    return executeCommand.call(this, command, wasOpen);
+  };
+})(this,nativeToggle);e={...e,command:nativeToggle};(function configureQuotaDividers(item) {
+  const document = item.container.ownerDocument;
+  const id = 'agent-tracker-quota-divider-style';
+  if (document.getElementById(id)) return;
+  const style = document.createElement('style');
+  style.id = id;
+  style.textContent = '.monaco-hover:has(a[data-href="command:agentTracker.openSettings"]) hr{border-top:2px solid #888888;border-bottom:0;height:2px;margin:8px -8px;}';
+  document.head.appendChild(style);
+})(this);}/*agent-tracker:statusbar-toggle:end*/

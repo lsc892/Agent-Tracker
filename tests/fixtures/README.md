@@ -7,6 +7,7 @@
 - [quota-benchmark-app-server.cjs](quota-benchmark-app-server.cjs) — 고정 메모리와 응답 지연을 가진 quota 벤치마크용 RPC 서버를 모사한다.
 - [quotaCardFixture.ts](quotaCardFixture.ts) — 실제 VS Code 팝업 검증에 사용할 합성 quota 상태와 상태바를 준비한다.
 - [statusbar-toggle-v4.txt](statusbar-toggle-v4.txt) — 이전 v4 상태바 패치를 재현하는 문자열 입력으로 호환·복원 검증에 사용한다.
+- [statusbar-toggle-v5.txt](statusbar-toggle-v5.txt)와 [statusbar-toggle-v6.txt](statusbar-toggle-v6.txt) — 이전 패치에서 갱신하고 원본을 복원하는 경로를 검증한다.
 - [storage-ab](storage-ab/README.md) — 날짜·월 배치와 SQL 묶음 비교에 사용할 롤백 전 증분 저장·집계 클래스를 보존한다.
 - [summary-lock.cjs](summary-lock.cjs) — 스레드·자식 프로세스에서 요약 갱신 잠금의 획득과 해제를 제어한다.
 - [streaming-aggregate.ts](streaming-aggregate.ts) — 독립 SQL oracle 입력을 제품과 같은 단일 읽기·원본별 winner 선택·최종 그룹 병합 순서로 전달한다.

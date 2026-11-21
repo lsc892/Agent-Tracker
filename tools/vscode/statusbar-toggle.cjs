@@ -3,115 +3,17 @@ const { existsSync, readFileSync, writeFileSync, renameSync, unlinkSync, statSyn
 const { dirname, join, resolve } = require('node:path');
 const { createHash } = require('node:crypto');
 const { spawnSync } = require('node:child_process');
+const { configureQuotaCardToggle } = require('./statusbar-toggle-behavior.cjs');
+const { configureQuotaDividers } = require('./statusbar-toggle-view.cjs');
+const { getHistoricalInjections } = require('./statusbar-toggle-history.cjs');
 
 const command = 'agentTracker.toggleQuotaTooltip';
 const extensionId = 'AgentTracker.agent-tracker';
 const checksumKey = 'vs/workbench/workbench.desktop.main.js';
-const begin = '/*agent-tracker:statusbar-toggle:v6*/';
-const fullCardBegin = '/*agent-tracker:statusbar-toggle:v5*/';
-const dividedPreviewBegin = '/*agent-tracker:statusbar-toggle:v4*/';
-const previewBegin = '/*agent-tracker:statusbar-toggle:v3*/';
-const clickOnlyBegin = '/*agent-tracker:statusbar-toggle:v2*/';
-const legacyBegin = '/*agent-tracker:statusbar-toggle:v1*/';
+const begin = '/*agent-tracker:statusbar-toggle:v7*/';
 const end = '/*agent-tracker:statusbar-toggle:end*/';
 const hash = value => createHash('sha256').update(value).digest('hex');
 const checksum = value => createHash('sha256').update(value).digest('base64').replace(/=+$/, '');
-
-// Preserve the historical v3/v4 function verbatim to verify upgrades safely.
-function configureQuotaHover(item, summary) {
-  item._agentTrackerSummary = summary;
-  if (item._agentTrackerHoverConfigured) return;
-  item._agentTrackerHoverConfigured = true;
-  const delegate = item.hoverDelegate;
-  item.hoverDelegate = {
-    get delay() { return delegate.delay; },
-    get placement() { return delegate.placement; },
-    get showNativeHover() { return delegate.showNativeHover; },
-    showHover(options, focus) {
-      if (item._agentTrackerSummary !== undefined && !focus) {
-        if (item.hoverService.getStickyHover(item.container)) return undefined;
-        options = { ...options, content: item._agentTrackerSummary };
-      }
-      return delegate.showHover(options, focus);
-    },
-    onDidHideHover() { delegate.onDidHideHover?.(); },
-  };
-  const stop = event => {
-    if (item._agentTrackerSummary !== undefined && item.hoverService.getStickyHover(item.container)) event.stopImmediatePropagation();
-  };
-  for (const type of ['mouseover', 'focus']) item.container.addEventListener(type, stop, { capture: true });
-  item._register({ dispose() {
-    for (const type of ['mouseover', 'focus']) item.container.removeEventListener(type, stop, { capture: true });
-  } });
-}
-
-// Preserve the historical v5 function verbatim to verify upgrades safely.
-function configureQuotaCardHover(item) {
-  item._agentTrackerQuotaHover = true;
-  if (item._agentTrackerCardHoverConfigured) return;
-  item._agentTrackerCardHoverConfigured = true;
-  const delegate = item.hoverDelegate;
-  item.hoverDelegate = {
-    get delay() { return delegate.delay; },
-    get placement() { return delegate.placement; },
-    get showNativeHover() { return delegate.showNativeHover; },
-    showHover(options, focus) {
-      if (item._agentTrackerQuotaHover && !focus && item.hoverService.getStickyHover(item.container)) return undefined;
-      return delegate.showHover(options, focus);
-    },
-    onDidHideHover() { delegate.onDidHideHover?.(); },
-  };
-  const stop = event => {
-    if (item._agentTrackerQuotaHover && item.hoverService.getStickyHover(item.container)) event.stopImmediatePropagation();
-  };
-  for (const type of ['mouseover', 'focus']) item.container.addEventListener(type, stop, { capture: true });
-  item._register({ dispose() {
-    for (const type of ['mouseover', 'focus']) item.container.removeEventListener(type, stop, { capture: true });
-  } });
-}
-
-function configureQuotaCardToggle(item, toggle) {
-  if (item._agentTrackerCardToggleConfigured) return;
-  item._agentTrackerCardToggleConfigured = true;
-  const { container, labelContainer, hoverService, executeCommand } = item;
-  const handlesQuota = () => item.entry?.command === toggle;
-  const isCardVisible = () => hoverService._hoverStack.some(({ hover, options: { target } }) =>
-    !hover.isDisposed && (target === container || target.targetElements?.includes(container)));
-
-  // Keep the visible card alive until the click runs, before VS Code's mousedown dismissal.
-  const holdUntilClick = event => {
-    if (event.button === 0 && handlesQuota() && labelContainer.contains(event.target) && isCardVisible()) {
-      event.stopImmediatePropagation();
-    }
-  };
-  const ignoreInternalMouseOver = event => {
-    if (handlesQuota() && (event.relatedTarget?.nodeType && container.contains(event.relatedTarget) || hoverService.getStickyHover(container))) {
-      event.stopImmediatePropagation();
-    }
-  };
-  const capture = { capture: true };
-  container.addEventListener('mousedown', holdUntilClick, capture);
-  container.addEventListener('mouseover', ignoreInternalMouseOver, capture);
-  item._register({ dispose() {
-    container.removeEventListener('mousedown', holdUntilClick, capture);
-    container.removeEventListener('mouseover', ignoreInternalMouseOver, capture);
-  } });
-
-  item.executeCommand = function (command, wasPinned) {
-    const wasOpen = command === toggle && handlesQuota() ? wasPinned || isCardVisible() : wasPinned;
-    return executeCommand.call(this, command, wasOpen);
-  };
-}
-
-function configureQuotaDividers(item) {
-  const document = item.container.ownerDocument;
-  const id = 'agent-tracker-quota-divider-style';
-  if (document.getElementById(id)) return;
-  const style = document.createElement('style');
-  style.id = id;
-  style.textContent = '.monaco-hover:has(a[data-href="command:agentTracker.openSettings"]) hr{border-top:2px solid #888888;border-bottom:0;height:2px;margin:8px -8px;}';
-  document.head.appendChild(style);
-}
 
 /**
  * 책임: 지원하는 workbench 코드에 quota 클릭 토글 패치만 생성한다.
@@ -121,12 +23,15 @@ function patchSource(source) {
   const symbols = [...source.matchAll(/\b([\w$]+)\s*=\s*\{\s*id:\s*["']statusBar\.entry\.toggleTooltip["'],\s*title:\s*["']["']\s*\}/g)];
   if (symbols.length !== 1) throw new Error('내장 ToggleTooltipCommand를 유일하게 찾을 수 없습니다. 지원하지 않는 VS Code 빌드입니다.');
   let original = source;
+  let existingPatch;
   const markers = [...source.matchAll(/\/\*agent-tracker:statusbar-toggle:v\d+\*\//g)];
   if (markers.length || source.includes(end)) {
-    if (markers.length !== 1 || source.split(end).length !== 2 || ![begin, fullCardBegin, dividedPreviewBegin, previewBegin, clickOnlyBegin, legacyBegin].includes(markers[0][0])) throw new Error('토글 패치 표식이 손상되었습니다.');
+    if (markers.length !== 1 || source.split(end).length !== 2 || !/v[1-7]\*\/$/.test(markers[0][0])) throw new Error('토글 패치 표식이 손상되었습니다.');
     const start = markers[0].index, finish = source.indexOf(end);
     if (finish < start) throw new Error('토글 패치 표식 순서가 잘못되었습니다.');
-    original = source.slice(0, start) + source.slice(finish + end.length);
+    const afterPatch = finish + end.length;
+    existingPatch = { start, injection: source.slice(start, afterPatch) };
+    original = source.slice(0, start) + source.slice(afterPatch);
   }
   const targets = [...original.matchAll(/update\(([\w$]+)\)\{(?=if\(this\.label\.showProgress=\1\.showProgress)/g)];
   if (targets.length !== 1) throw new Error('StatusbarEntryItem.update 연결 지점을 유일하게 찾을 수 없습니다.');
@@ -134,29 +39,25 @@ function patchSource(source) {
   const context = original.slice(target.index, target.index + 6000);
   if (!context.includes('getStickyHover(this.container)') || !context.includes('commandPointerListener') ||
       !/getStickyHover\([\w$]+\)\s*\{\s*return this\._hoverStack\.find\(/.test(original)) throw new Error('내장 클릭 토글 구현이 예상과 다릅니다.');
+  const symbol = symbols[0][1];
   const condition = `${argument}.extensionId===${JSON.stringify(extensionId)}&&${argument}.command?.id===${JSON.stringify(command)}`;
-  const mapping = `${argument}={...${argument},command:${symbols[0][1]}};`;
-  // Keep the exact v2 injection to safely recognize upgrades and restore backups.
-  const clickOnly = `if(!this._agentTrackerClickOnly){this._agentTrackerClickOnly=true;const stop=event=>{if(this.entry?.extensionId===${JSON.stringify(extensionId)}&&this.entry?.command===${symbols[0][1]})event.stopImmediatePropagation();};for(const type of ["mouseover","focus"])this.container.addEventListener(type,stop,{capture:true});this._register({dispose:()=>{for(const type of ["mouseover","focus"])this.container.removeEventListener(type,stop,{capture:true});}});}`;
-  const configureSource = configureQuotaHover.toString().replace(/\r\n/g, '\n');
-  const cardSource = configureQuotaCardHover.toString().replace(/\r\n/g, '\n');
+  const mapping = `${argument}={...${argument},command:${symbol}};`;
   const toggleSource = configureQuotaCardToggle.toString().replace(/\r\n/g, '\n');
   const dividerSource = configureQuotaDividers.toString().replace(/\r\n/g, '\n');
-  const previewInjection = `if(${condition}){(${configureSource})(this,${argument}.ariaLabel??${argument}.name??"");${mapping}}else{this._agentTrackerSummary=undefined;}`;
-  const injection = `${begin}if(${condition}){(${toggleSource})(this,${symbols[0][1]});${mapping}(${dividerSource})(this);}${end}`;
+  const injection = `${begin}if(${condition}){(${toggleSource})(this,${symbol});${mapping}(${dividerSource})(this);}${end}`;
   const position = target.index + target[0].length;
   const patched = original.slice(0, position) + injection + original.slice(position);
-  const legacy = original.slice(0, position) + `${legacyBegin}if(${condition}){${mapping}}${end}` + original.slice(position);
-  const clickOnlySource = original.slice(0, position) + `${clickOnlyBegin}if(${condition}){${mapping}${clickOnly}}${end}` + original.slice(position);
-  const preview = original.slice(0, position) + `${previewBegin}${previewInjection}${end}` + original.slice(position);
-  const dividedPreview = original.slice(0, position) + `${dividedPreviewBegin}if(${condition}){(${configureSource})(this,${argument}.ariaLabel??${argument}.name??"");${mapping}(${dividerSource})(this);}else{this._agentTrackerSummary=undefined;}${end}` + original.slice(position);
-  const fullCard = original.slice(0, position) + `${fullCardBegin}if(${condition}){(${cardSource})(this);${mapping}(${dividerSource})(this);}else{this._agentTrackerQuotaHover=false;}${end}` + original.slice(position);
-  // Recognize exact historical payloads so a publisher change retains restore backups.
-  const historical = [legacy, clickOnlySource, preview, dividedPreview, fullCard];
-  const previousPublisher = historical.map(value =>
-    value.replaceAll(JSON.stringify(extensionId), JSON.stringify('agent-tracker.agent-tracker')));
-  if (![original, patched, ...historical, ...previousPublisher].includes(source)) throw new Error('기존 토글 패치가 예상 코드와 다릅니다. 자동으로 덮어쓰지 않습니다.');
-  return { original, patched, alreadyPatched: source === patched, upgradeRequired: source !== original && source !== patched };
+  const alreadyPatched = source === patched;
+  const upgradeRequired = !!existingPatch && !alreadyPatched;
+  if (upgradeRequired) {
+    const historical = getHistoricalInjections({ argument, symbol, condition, mapping, extensionId, end });
+    const previousPublisher = historical.map(value =>
+      value.replaceAll(JSON.stringify(extensionId), JSON.stringify('agent-tracker.agent-tracker')));
+    if (existingPatch.start !== position || ![...historical, ...previousPublisher].includes(existingPatch.injection)) {
+      throw new Error('기존 토글 패치가 예상 코드와 다릅니다. 자동으로 덮어쓰지 않습니다.');
+    }
+  }
+  return { original, patched, alreadyPatched, upgradeRequired };
 }
 
 function appRootFromInstallation(root, launcher = join(root, 'bin', 'code.cmd')) {

@@ -67,11 +67,12 @@ test('native toggle mapping preserves object identity and is limited to the Agen
   assert.throws(() => patcher.patchSource(source + source), /유일하게/);
 });
 
-test('the quota toggle uses the visible card and prevents premature mousedown dismissal', () => {
+test('quota mousedown keeps the visible card for the native click to pin or close', () => {
   const context = rendererContext();
   runInNewContext(patcher.patchSource(source).patched, context);
   const target = new context.EventTarget();
   const item = new context.Item(target);
+  const nativeExecuteCommand = item.executeCommand;
   const { nativeToggle } = context;
   const entry = { extensionId: 'AgentTracker.agent-tracker', command: { id: patcher.command } };
   item.update(entry); item.update(entry);
@@ -91,8 +92,8 @@ test('the quota toggle uses the visible card and prevents premature mousedown di
   options.target.targetElements = [target];
   pointerDown(0);
   assert.equal(passedThrough, 1, 'primary mousedown leaves the visible quota card for the click');
-  assert.equal(item.executeCommand(nativeToggle, false).close, true, 'click closes a temporary hover');
-  assert.equal(item.executeCommand(nativeToggle).close, true, 'keyboard activation also closes an open card');
+  assert.equal(item.executeCommand, nativeExecuteCommand, 'the built-in command keeps control of pinning and focus');
+  assert.equal(item.executeCommand(nativeToggle, false).close, false, 'a temporary hover does not count as pinned');
   pointerDown(2);
   assert.equal(passedThrough, 2, 'right-click keeps ordinary handling');
 
@@ -117,18 +118,18 @@ test('the quota toggle uses the visible card and prevents premature mousedown di
 });
 
 const historicalPatches = ['AgentTracker.agent-tracker', 'agent-tracker.agent-tracker']
-  .flatMap(publisher => [1, 2, 3, 4, 5].map(version => ({ publisher, version })));
+  .flatMap(publisher => [1, 2, 3, 4, 5, 6].map(version => ({ publisher, version })));
 for (const { publisher, version } of historicalPatches) test(`${publisher} v${version} upgrades while retaining the original restore backups`, () => {
   const files = fixture();
   try {
     const anchor = 'update(e){';
     // Exact historical v2 payload: automatic activation was always suppressed.
     const clickOnly = version === 1 ? '' : `if(!this._agentTrackerClickOnly){this._agentTrackerClickOnly=true;const stop=event=>{if(this.entry?.extensionId===${JSON.stringify(publisher)}&&this.entry?.command===nativeToggle)event.stopImmediatePropagation();};for(const type of ["mouseover","focus"])this.container.addEventListener(type,stop,{capture:true});this._register({dispose:()=>{for(const type of ["mouseover","focus"])this.container.removeEventListener(type,stop,{capture:true});}});}`;
-    const historical = readFileSync(join(__dirname, `../../../tests/fixtures/statusbar-toggle-v${version === 5 ? 5 : 4}.txt`), 'utf8')
+    const historical = readFileSync(join(__dirname, `../../../tests/fixtures/statusbar-toggle-v${Math.max(4, version)}.txt`), 'utf8')
       .replace(/\r\n/g, '\n')
       .replaceAll('"AgentTracker.agent-tracker"', JSON.stringify(publisher));
     const preview = historical.match(/\/\*agent-tracker:statusbar-toggle:v4\*\/[\s\S]*?\/\*agent-tracker:statusbar-toggle:end\*\//)?.[0];
-    const injection = version === 5 ? historical : version === 4 ? preview! : version === 3
+    const injection = version >= 5 ? historical : version === 4 ? preview! : version === 3
       ? preview!.replace(':statusbar-toggle:v4*/', ':statusbar-toggle:v3*/')
         .replace(/\(function configureQuotaDividers\(item\) \{[\s\S]*?\}\)\(this\);/, '')
       : `/*agent-tracker:statusbar-toggle:v${version}*/if(e.extensionId===${JSON.stringify(publisher)}&&e.command?.id==="${patcher.command}"){e={...e,command:nativeToggle};${clickOnly}}/*agent-tracker:statusbar-toggle:end*/`;
