@@ -208,7 +208,6 @@ export class MemoryStore {
   /** 요청의 진단 참조가 가리킬 수 있도록 source_file를 요청 저장보다 먼저 반영한다. */
   private saveFiles(replacement: MemoryReplacement, sessions: ReplacementSessions, now: string): void {
     for (const file of replacement.files) {
-      const scanId = replacement.scanId;
       nonnegative(file.size_bytes, 'size_bytes');
       const previous = this.database.statement('SELECT provider,session_id FROM source_file WHERE id=?').get(file.id);
       if (previous) {
@@ -217,17 +216,16 @@ export class MemoryStore {
       }
       this.requireSession(file.provider, file.session_id, sessions);
       this.database.statement(`INSERT INTO source_file(id,provider,source_root,path,session_id,size_bytes,mtime_ms,dev,inode,parser_version,
-          source_identity,content_hash,complete_position,prefix_hash,capabilities_collected,source_missing,last_seen_scan_id,processing_status,processing_position,recorded_at,last_error)
-        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0,?,'done','committed',?,NULL)
+          source_identity,content_hash,capabilities_collected,source_missing,processing_status,processing_position,recorded_at,last_error)
+        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,0,'done','committed',?,NULL)
         ON CONFLICT(id) DO UPDATE SET source_root=excluded.source_root,path=excluded.path,session_id=excluded.session_id,
           size_bytes=excluded.size_bytes,mtime_ms=excluded.mtime_ms,dev=excluded.dev,inode=excluded.inode,
           parser_version=excluded.parser_version,source_identity=excluded.source_identity,content_hash=excluded.content_hash,
-          complete_position=excluded.complete_position,prefix_hash=excluded.prefix_hash,
-          capabilities_collected=excluded.capabilities_collected,source_missing=0,last_seen_scan_id=excluded.last_seen_scan_id,
+          capabilities_collected=excluded.capabilities_collected,source_missing=0,
           processing_status='done',processing_position='committed',recorded_at=excluded.recorded_at,last_error=NULL`)
         .run(file.id, file.provider, file.source_root, file.path, file.session_id, file.size_bytes, file.mtime_ms, file.dev, file.inode,
-          file.parser_version, file.source_identity ?? null, file.content_hash ?? null, file.complete_position ?? 0, file.prefix_hash ?? null,
-          file.capabilities_collected ?? 1, scanId, now);
+          file.parser_version, file.source_identity ?? null, file.content_hash ?? null,
+          file.capabilities_collected ?? 1, now);
     }
   }
 

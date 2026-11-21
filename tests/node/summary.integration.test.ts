@@ -5,6 +5,7 @@ import { mkdtemp, mkdir, writeFile, readFile, appendFile, unlink, rm } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SummaryDatabase } from '../../src/summary/db';
+import { ageLogFixtures } from '../fixtures/summary-mtime';
 import { PARSER_VERSION, refreshSummary } from '../../src/summary/scanner';
 import { SummaryClient } from '../../src/summary/client';
 import type { SummaryOptions } from '../../src/summary/types';
@@ -130,8 +131,10 @@ test('a Claude API failure without a timestamp still supersedes earlier completi
 test('Claude parser version repairs cached durations and API error averages without source changes',async () => fixture(async (database,options,root) => {
   const main = join(root,'session-one.jsonl');
   await writeFile(main,jsonl([user(),response(),stopHook(),user('error'),apiError('2026-10-01T00:00:05Z','error')]));
+  ageLogFixtures(main);
   await refreshSummary(database,options);
   database.connection.exec(`UPDATE source_file SET parser_version=3;
+    UPDATE summary_refresh SET scope='v3';
     UPDATE turn_summary SET status='completed',duration_ms=3000,duration_quality='approximate'`);
   assert.equal(database.queryUsage()[0].completed_turns,2);
   const refreshed = await refreshSummary(database,options);
@@ -140,7 +143,7 @@ test('Claude parser version repairs cached durations and API error averages with
   assert.equal(usage.completed_turns,1);assert.equal(usage.avg_duration_ms,16000);
   assert.equal(database.findSourceFile('claude',main)!.parser_version,PARSER_VERSION);
   const unchanged = await refreshSummary(database,options);
-  assert.equal(unchanged.reused,1);assert.ok(unchanged.bodyBytes > 0);
+  assert.equal(unchanged.reused,1);assert.equal(unchanged.bodyBytes,0);
 }));
 
 test('session rebuild deduplicates full vectors, includes subagent tokens, and reuses unchanged bodies',async () => fixture(async (database,options,root) => {
@@ -149,12 +152,13 @@ test('session rebuild deduplicates full vectors, includes subagent tokens, and r
     {type:'system',subtype:'turn_duration',promptId:'prompt-one',durationMs:1000,timestamp:'2026-10-01T00:00:03Z'}]));
   await writeFile(join(root,'session-one','subagents','agent-a.jsonl'),jsonl([response(30,'prompt-one','sub-response','sub-request'),
     {type:'system',subtype:'turn_duration',promptId:'prompt-one',durationMs:8000}]));
+  ageLogFixtures(join(root,'session-one.jsonl'),join(root,'session-one','subagents','agent-a.jsonl'));
   const first = await refreshSummary(database,options);
   assert.equal(first.failed,0);assert.equal(first.parsed,2);
   const rows = database.queryTurns();assert.equal(rows.length,1);
   assert.equal(rows[0].total_tokens,330);assert.equal(rows[0].duration_ms,1000);
   const unchanged = await refreshSummary(database,options);
-  assert.ok(unchanged.bodyBytes > 0);assert.equal(unchanged.reused,2);
+  assert.equal(unchanged.bodyBytes,0);assert.equal(unchanged.reused,2);
 }));
 
 test('append, truncated rewrite, winner deletion and fresh rebuild agree',async () => fixture(async (database,options,root,base) => {
@@ -274,8 +278,9 @@ test('Codex compression transitions and simultaneous copies preserve totals and 
   assert.equal(database.queryTurns()[0].total_tokens,100);
   assert.equal(database.findSourceFile('codex',plain),undefined);
   assert.equal(database.findSourceFile('codex',compressed)?.size_bytes,encoded.length);
+  ageLogFixtures(compressed);
   const warm=await refreshSummary(database,codexOptions);
-  assert.equal(warm.parsed,1);assert.equal(warm.reused,0);assert.ok(warm.bodyBytes > 0);
+  assert.equal(warm.parsed,0);assert.equal(warm.reused,1);assert.equal(warm.bodyBytes,0);
   assert.deepEqual(await readFile(compressed),encoded);
 }));
 
@@ -391,6 +396,7 @@ test('Codex parser version rebuilds cached seconds timestamps without changes to
   await refreshSummary(database,codexOptions);
   // Recreate the accepted v2 cache; source size, mtime and identity stay unchanged.
   database.connection.exec(`UPDATE source_file SET parser_version=2;
+    UPDATE summary_refresh SET scope='v2';
     UPDATE turn_summary SET started_at_ms=1786858107,completed_at_ms=1786859354`);
   assert.equal(database.queryUsage({},'month','Asia/Seoul')[0].period,'1970-01');
   const refreshed=await refreshSummary(database,codexOptions);
@@ -400,8 +406,9 @@ test('Codex parser version rebuilds cached seconds timestamps without changes to
   assert.equal(turns[0].total_tokens,100);assert.equal(turns[0].duration_ms,1247169);
   assert.equal(database.queryUsage({},'month','Asia/Seoul')[0].period,'2026-08');
   assert.equal(database.findSourceFile('codex',main)!.parser_version,PARSER_VERSION);
+  ageLogFixtures(main);
   const unchanged=await refreshSummary(database,codexOptions);
-  assert.equal(unchanged.failed,0);assert.equal(unchanged.reused,1);assert.ok(unchanged.bodyBytes > 0);
+  assert.equal(unchanged.failed,0);assert.equal(unchanged.reused,1);assert.equal(unchanged.bodyBytes,0);
 }));
 
 test('rootless legacy subagents merge into the spawn request without counting verified inherited usage twice',async () => fixture(async (database,options,root) => {
@@ -421,8 +428,9 @@ test('rootless legacy subagents merge into the spawn request without counting ve
   assert.equal(parentTurn.total_tokens,140);assert.equal(parentTurn.duration_ms,500);
   assert.ok(!parentTurn.quality_flags?.includes('standalone-subagent'));assert.equal(parentTurn.last_error,null);
   assert.equal(database.findSourceFile('codex',child)!.session_id,'main');
+  ageLogFixtures(main,child);
   const unchanged=await refreshSummary(database,codexOptions);
-  assert.equal(unchanged.failed,0);assert.equal(unchanged.reused,2);assert.ok(unchanged.bodyBytes > 0);
+  assert.equal(unchanged.failed,0);assert.equal(unchanged.reused,2);assert.equal(unchanged.bodyBytes,0);
   await appendFile(child,jsonl([rootlessStart('next-child-turn'),
     {type:'event_msg',payload:{type:'token_count',info:{total_token_usage:{input_tokens:160,output_tokens:0},last_token_usage:{input_tokens:20,output_tokens:0}}}}]));
   assert.equal((await refreshSummary(database,codexOptions)).failed,0);
@@ -592,8 +600,9 @@ test('two workers sharing a DB serialize refreshes and preserve unchanged reads'
   const first=new SummaryClient(options);const second=new SummaryClient(options);
   try {
     await first.initialize();await second.initialize();
+    ageLogFixtures(join(root,'main.jsonl'));
     const [a,b]=await Promise.all([first.refresh(),second.refresh()]);
-    assert.equal(a.failed+b.failed,0);assert.equal(a.parsed+b.parsed,2);assert.equal(a.reused+b.reused,0);
+    assert.equal(a.failed+b.failed,0);assert.equal(a.parsed+b.parsed,1);assert.equal(a.reused+b.reused,1);
     assert.equal((await first.query({groupBy:'all'})).rows[0].total_tokens,200);
   } finally {await Promise.all([first.dispose(),second.dispose()]);await rm(base,{recursive:true,force:true});}
 });

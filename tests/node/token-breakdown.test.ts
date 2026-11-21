@@ -8,6 +8,7 @@ import { test, type TestContext } from 'node:test';
 import { readFileSync } from 'node:fs';
 import { Script } from 'node:vm';
 import { SummaryDatabase, type TurnSummaryInput } from '../../src/summary/db';
+import { ageLogFixtures } from '../fixtures/summary-mtime';
 import { SCHEMA_VERSION } from '../../src/summary/db/schema';
 import { refreshSummary, PARSER_VERSION } from '../../src/summary/scanner';
 import { codexTokens } from '../../src/summary/parsers';
@@ -50,6 +51,7 @@ test('Claude cache components survive response deduplication, subagents and ever
   await writeFile(join(root, 'session.jsonl'), jsonl([claudeUser, response, response]));
   await mkdir(join(root, 'session', 'subagents'), { recursive: true });
   await writeFile(join(root, 'session', 'subagents', 'child.jsonl'), jsonl([claudeUsage('child', 20, 10, 40, 5)]));
+  ageLogFixtures(join(root, 'session.jsonl'), join(root, 'session', 'subagents', 'child.jsonl'));
   assert.equal((await refreshSummary(database, options)).failed, 0);
   const turn = database.queryTurns()[0];
   assert.deepEqual(breakdown(turn), [120, 15, 40, 100]);
@@ -59,7 +61,7 @@ test('Claude cache components survive response deduplication, subagents and ever
     assert.deepEqual(breakdown(usage), [120, 15, 40, 100], grouping);
     assert.equal(usage.total_tokens, 275);
   }
-  assert.ok((await refreshSummary(database, options)).bodyBytes > 0, 'unchanged summaries verify the original prefix');
+  assert.equal((await refreshSummary(database, options)).bodyBytes, 0, 'unchanged summaries skip the source body');
 });
 
 test('Codex reads its official flat and API detail cache fields without adding them to total input twice', async t => {
@@ -134,12 +136,12 @@ test('aggregate cache counts stay unknown when any included turn has not been re
   database.connection.exec('UPDATE turn_summary SET cache_write_input_tokens=NULL,cache_read_input_tokens=NULL');
   const old = database.queryTurns()[0];
   const next: TurnSummaryInput = { ...old, root_turn_id: 'next', cache_write_input_tokens: 30, cache_read_input_tokens: 60 };
-  database.replaceMemory({scanId: 'test', sessions: [{ provider: 'claude', session_id: 'session' }], files: [], summaries: [old, next] });
+  database.replaceMemory({sessions: [{ provider: 'claude', session_id: 'session' }], files: [], summaries: [old, next] });
   const usage = database.queryUsage()[0];
   assert.equal(usage.total_tokens, 400);
   assert.equal(usage.cache_write_input_tokens, null);
   assert.equal(usage.cache_read_input_tokens, null);
-  assert.throws(() => database.replaceMemory({scanId: 'test', sessions: [{ provider: 'claude', session_id: 'session' }], files: [],
+  assert.throws(() => database.replaceMemory({sessions: [{ provider: 'claude', session_id: 'session' }], files: [],
     summaries: [{ ...next, cache_read_input_tokens: 200 }] }), /Cache components cannot exceed input tokens/);
   assert.equal(database.queryUsage()[0].total_tokens, 400, 'invalid components roll back replacement');
 });

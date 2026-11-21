@@ -2,16 +2,15 @@
 import { SCHEMA_ROLLUP_SQL } from './rollup-state';
 
 export { SCHEMA_ROLLUP_SQL } from './rollup-state';
-export const SCHEMA_VERSION = 20;
+export const SCHEMA_VERSION = 21;
 
-/**
- * 책임: 파일 이동 판정에 필요한 플랫폼별 identity 인덱스를 구성한다.
- * 알고리즘: device·inode를 이동 판정에 쓰지 않는 Windows는 인덱스를 제거하고 다른 운영체제에서는 제공자·device·inode 인덱스를 생성한다.
- */
-export function sourceIdentityIndexSql(platform: NodeJS.Platform): string {
-  return platform === 'win32' ? 'DROP INDEX IF EXISTS idx_source_identity;'
-    : 'CREATE INDEX IF NOT EXISTS idx_source_identity ON source_file(provider, dev, inode);';
-}
+export const SCHEMA_REFRESH_SQL = `
+CREATE TABLE IF NOT EXISTS summary_refresh (
+  id INTEGER PRIMARY KEY CHECK(id = 1),
+  scope TEXT NOT NULL,
+  started_ms INTEGER NOT NULL
+);
+`;
 
 export const SCHEMA_CAPABILITY_SQL = `
 CREATE TABLE IF NOT EXISTS turn_capability_usage (
@@ -111,11 +110,9 @@ CREATE TABLE IF NOT EXISTS source_file (
   parser_version INTEGER NOT NULL DEFAULT 0,
   source_identity TEXT,
   content_hash TEXT,
-  complete_position INTEGER NOT NULL DEFAULT 0 CHECK(complete_position >= 0),
-  prefix_hash TEXT,
   capabilities_collected INTEGER NOT NULL DEFAULT 0 CHECK(capabilities_collected IN (0,1)),
   source_missing INTEGER NOT NULL DEFAULT 0 CHECK(source_missing IN (0,1)),
-  last_seen_scan_id TEXT,
+  last_seen_scan_id TEXT, -- compatibility with earlier v21 databases
   processing_status TEXT NOT NULL DEFAULT 'processing'
     CHECK(processing_status IN ('processing','done','error','interrupted')),
   processing_position TEXT,
@@ -123,7 +120,6 @@ CREATE TABLE IF NOT EXISTS source_file (
   last_error TEXT,
   UNIQUE(provider, path)
 );
-${sourceIdentityIndexSql(process.platform)}
 CREATE INDEX IF NOT EXISTS idx_source_root_id ON source_file(provider, source_root, id);
 CREATE INDEX IF NOT EXISTS idx_source_session ON source_file(provider, session_id, id);
 CREATE INDEX IF NOT EXISTS idx_source_source ON source_file(provider, source_identity, id);
@@ -133,6 +129,7 @@ ${TURN_SUMMARY_INDEX_SQL}
 ${SCHEMA_MODEL_SQL}
 ${SCHEMA_CAPABILITY_SQL}
 ${SCHEMA_ROLLUP_SQL}
+${SCHEMA_REFRESH_SQL}
 `;
 
 /** Both v1 and v2 stored project names on every turn. Preserve ids, statistics and diagnostics. */

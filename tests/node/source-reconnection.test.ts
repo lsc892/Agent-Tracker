@@ -1,11 +1,12 @@
 // 원본 로그의 이동 검증·이전 source_file 정리·통계 재집계와 실패 시 보존을 검증한다.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { appendFile, copyFile, lstat, mkdir, mkdtemp, rename, rm, unlink, writeFile } from 'node:fs/promises';
+import { appendFile, copyFile, lstat, mkdir, mkdtemp, rename, rm, unlink, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { zstdCompressSync } from 'node:zlib';
 import { SummaryDatabase } from '../../src/summary/db';
+import { ageLogFixtures } from '../fixtures/summary-mtime';
 import { refreshSummary } from '../../src/summary/scanner';
 import type { SummaryOptions } from '../../src/summary/types';
 
@@ -30,11 +31,17 @@ async function fixture(run: (db: SummaryDatabase, options: SummaryOptions, root:
   }
 }
 
+async function copyWithNewMtime(source: string, target: string): Promise<void> {
+  await copyFile(source,target);
+  const now = new Date();
+  await utimes(target,now,now);
+}
+
 /** Exercise the content proof on every OS, including when a move changes filesystem identity. */
 async function relocate(db: SummaryDatabase, oldPath: string, newPath: string): Promise<void> {
   db.connection.exec("UPDATE source_file SET dev='previous-filesystem'");
   await mkdir(dirname(newPath),{recursive:true});
-  await copyFile(oldPath,newPath);await unlink(oldPath);
+  await copyWithNewMtime(oldPath,newPath);await unlink(oldPath);
 }
 
 test('repeated moves remove previous paths and rebuild existing requests after appended usage',async()=>fixture(async(db,options,root)=>{
@@ -58,8 +65,9 @@ test('repeated moves remove previous paths and rebuild existing requests after a
     assert.equal(db.sessionBilling('claude','session'),'api');
     current=next;
   }
+  ageLogFixtures(current);
   const warm=await refreshSummary(db,options);
-  assert.equal(warm.parsed,0);assert.ok(warm.bodyBytes>0);
+  assert.equal(warm.parsed,0);assert.equal(warm.bodyBytes,0);
   assert.deepEqual(db.connection.prepare('PRAGMA foreign_key_check').all(),[]);
 }));
 
@@ -139,12 +147,12 @@ test('reconnecting one source preserves other missing contributions and remaps r
 test('existing sources without fingerprints are backfilled once without discarding usage',async()=>fixture(async(db,options,root)=>{
   const path=join(root,'session.jsonl');await writeFile(path,jsonl([user(),response()]));
   await refreshSummary(db,options);
-  db.connection.exec('UPDATE source_file SET source_identity=NULL,content_hash=NULL');
-  assert.equal((await refreshSummary(db,options)).parsed,0);
+  db.connection.exec('UPDATE source_file SET source_identity=NULL,content_hash=NULL; DELETE FROM summary_refresh');
+  assert.equal((await refreshSummary(db,options)).parsed,1);
   assert.ok(db.findSourceFile('claude',path)?.source_identity);
   assert.ok(db.findSourceFile('claude',path)?.content_hash);
   assert.equal(db.queryTurns()[0].total_tokens,12);
-  assert.ok((await refreshSummary(db,options)).bodyBytes>0);
+  assert.equal((await refreshSummary(db,options)).bodyBytes,0);
 }));
 
 test('an empty replacement clears the previous fingerprint and stays reusable',async()=>fixture(async(db,options,root)=>{
@@ -154,13 +162,14 @@ test('an empty replacement clears the previous fingerprint and stays reusable',a
   assert.equal(db.findSourceFile('claude',path)?.content_hash,null);
   assert.equal(db.findSourceFile('claude',path)?.source_identity,null);
   assert.equal(db.queryTurnsCount(),0);
+  ageLogFixtures(path);
   const warm=await refreshSummary(db,options);
   assert.equal(warm.parsed,0);assert.equal(warm.bodyBytes,0);
 }));
 
 test('live copies stay distinct and reconnect only after the former source disappears',async()=>fixture(async(db,options,root)=>{
   const oldPath=join(root,'old.jsonl'),copy=join(root,'copy.jsonl');
-  await writeFile(oldPath,jsonl([user(),response()]));await refreshSummary(db,options);await copyFile(oldPath,copy);
+  await writeFile(oldPath,jsonl([user(),response()]));await refreshSummary(db,options);await copyWithNewMtime(oldPath,copy);
   await refreshSummary(db,options);
   assert.equal(db.diagnostics().counts.files,2);assert.equal(db.findSourceFile('claude',oldPath)?.source_missing,0);
   await unlink(oldPath);assert.equal((await refreshSummary(db,options)).failed,0);
@@ -171,7 +180,7 @@ test('live copies stay distinct and reconnect only after the former source disap
 test('ambiguous live replacements and legacy missing sources without a fingerprint stay retained',async()=>fixture(async(db,options,root)=>{
   const oldPath=join(root,'old.jsonl'),first=join(root,'first.jsonl'),second=join(root,'second.jsonl');
   await writeFile(oldPath,jsonl([user(),response()]));await refreshSummary(db,options);
-  await copyFile(oldPath,first);await copyFile(oldPath,second);await unlink(oldPath);
+  await copyWithNewMtime(oldPath,first);await copyWithNewMtime(oldPath,second);await unlink(oldPath);
   await refreshSummary(db,options);
   assert.equal(db.findSourceFile('claude',oldPath)?.source_missing,1);assert.equal(db.diagnostics().counts.files,3);
   db.connection.exec('UPDATE source_file SET source_identity=NULL,content_hash=NULL WHERE source_missing=1');

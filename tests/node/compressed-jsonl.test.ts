@@ -36,7 +36,7 @@ test('Zstd streams preserve UTF-8, decoded offsets and image budgets without cre
       { row: { image: 'data:image/png;base64,', value: 123 }, offset: Buffer.byteLength(first) },
       { row: JSON.parse(last), offset: Buffer.byteLength(first + image) },
     ]);
-    assert.deepEqual(result, { rows: 3, partialLine: false, bytes: source.length, completeOffset: Buffer.byteLength(first + image + last) });
+    assert.deepEqual(result, { rows: 3, partialLine: false, bytes: source.length });
     assert.equal(bytes, source.length);
     assert.ok(batches > 1);
     assert.deepEqual(await readFile(path), source);
@@ -50,10 +50,10 @@ test('concatenated Zstd frames obey the compressed snapshot boundary and retain 
   await fixture(Buffer.concat([first, second]), async path => {
     const rows: unknown[] = [];
     assert.deepEqual(await readJsonl(path, first.length, row => { rows.push(row); }),
-      { rows: 1, partialLine: false, bytes: first.length, completeOffset: Buffer.byteLength('{"first":true}\n') });
+      { rows: 1, partialLine: false, bytes: first.length });
     assert.deepEqual(rows, [{ first: true }]);
     assert.deepEqual(await readJsonl(path, first.length + second.length, () => undefined),
-      { rows: 2, partialLine: true, bytes: first.length + second.length, completeOffset: Buffer.byteLength('{"first":true}\n{"second":true}\n') });
+      { rows: 2, partialLine: true, bytes: first.length + second.length });
   });
   await fixture(compress(''), async path => {
     assert.equal((await readJsonl(path, compress('').length, () => assert.fail('empty frame'))).rows, 0);

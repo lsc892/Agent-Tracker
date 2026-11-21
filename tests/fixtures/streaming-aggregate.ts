@@ -9,7 +9,7 @@ export function aggregateMemory(files: readonly MemoryAggregateFile[], collectCa
   const selected = files.map(({ events, ...file }) => {
     const winners = new SourceWinners(file.provider);
     events.forEach((event, index) => winners.add(event, index));
-    return { ...file, evidence: winners.evidence, winners };
+    return { ...file, evidence: winners.evidence, winners: winners.snapshot() };
   });
   const aggregation = new StreamingAggregation(selected, collectCapabilities);
   for (const file of selected) aggregation.addSource(file.id, file.winners);

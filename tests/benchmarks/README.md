@@ -2,6 +2,8 @@
 
 요약·JSONL·SQL·quota 처리의 정확성과 성능을 비교하는 도구를 모은다.
 
+- [mtime-refresh-ab.cjs](mtime-refresh-ab.cjs)는 전수 prefix 검증 빌드와 전역 수정 시각 갱신 빌드를 준비 3쌍·교대 10쌍으로 비교한다. `--before=<A 빌드 루트> --after=<B 빌드 루트> --output=<새 JSON>`을 사용하며, 고정 원본 사본은 `--workspace=<이전 실행 폴더>`로 재사용한다. [결과와 재현 방법](../../docs/benchmarks/2026-11-21/MtimeRefreshAB-2026-11-21.md).
+
 - [prefix-hash-ab.cjs](prefix-hash-ab.cjs)는 수정 전 제품 사본과 P·원본 prefix 해시 증분을 실제 `refreshSummary`에서 비교한다. `--before=<이전 빌드> --after=<현재 빌드> --prepare-only`로 입력을 고정하고 출력된 `--workspace=<폴더> --output=<새 JSON>`으로 세 입력·세 해시·여섯 작업을 준비 3회·교대 10회 측정한다. 완전 무변경과 동일 내용의 mtime 변경을 구분한다. `--variants=sha256,threads4 --scenarios=append,unchanged,same-content-touch`는 SHA-256 파일 준비 풀 1/4개를 비교한다. 두 native 해시는 [실험 의존성](jsonl-algorithms/README.md)을 사용하고 제품은 Node 내장 SHA-256을 사용한다.
 - [prefix-hash-report.cjs](prefix-hash-report.cjs)는 `<결과 JSON> <순수 해시 JSON> <Worker 비교 JSON> <긴 세션 JSON>`에서 복잡도·갱신·평균 조회·메모리·정합성 보고서를 재생성한다. [측정 보고서](../../docs/benchmarks/2026-11-19/PrefixHashAB-2026-11-19.md).
 - [jsonl-algorithms](jsonl-algorithms/README.md)는 고정 제품·원본 사본에서 SHA-256·XXH3-128·BLAKE3 전체 파싱과 검증 후 재개, 부분 fingerprint, 고정 블록·rolling·Merkle 조합을 준비 3회·교대 10회 비교한다. 새 요청 추가와 기존 요청의 사용량 갱신을 알고리즘별 두 행으로 놓고 구간 시간·공간복잡도·최종 시간·개선율·피크 RAM을 함께 표시한다. 순수 해시 CPU·평균 조회·캐시·변경 반례와 USN 접근 가능성도 기록한다. [측정 보고서](../../docs/benchmarks/2026-11-16/JsonlAlgorithmsAB-2026-11-16.md)

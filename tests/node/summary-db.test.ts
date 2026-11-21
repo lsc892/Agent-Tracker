@@ -7,12 +7,12 @@ import { test, type TestContext } from 'node:test';
 import { DatabaseSync } from 'node:sqlite';
 import { SummaryDatabase, periodBounds, type FileMetadata, type TurnSummaryInput } from '../../src/summary/db';
 import { SqliteSession } from '../../src/summary/db/connection';
-import { SCHEMA_SQL, SCHEMA_VERSION, SCHEMA_MODEL_SQL, SCHEMA_CAPABILITY_SQL, SCHEMA_ROLLUP_SQL, sourceIdentityIndexSql } from '../../src/summary/db/schema';
+import { SCHEMA_SQL, SCHEMA_VERSION, SCHEMA_MODEL_SQL, SCHEMA_CAPABILITY_SQL, SCHEMA_ROLLUP_SQL } from '../../src/summary/db/schema';
 
 const v9Schema = `${SCHEMA_SQL.replace(SCHEMA_ROLLUP_SQL, '')}
 CREATE INDEX idx_summary_session ON turn_summary(provider, session_id);
 CREATE INDEX IF NOT EXISTS idx_source_identity ON source_file(provider, dev, inode);`;
-const summaryTables = ['source_file', 'projects', 'session_billing', 'sessions', 'turn_capability_usage',
+const summaryTables = ['source_file', 'summary_refresh', 'projects', 'session_billing', 'sessions', 'turn_capability_usage',
   'turn_costs', 'turn_model_usage', 'turn_summary',
   'usage_model_daily', 'usage_request_daily', 'usage_rollup_meta'].sort();
 const v8Schema = v9Schema
@@ -53,8 +53,8 @@ function turn(root = 'turn-a', override: Partial<Omit<TurnSummaryInput, 'model_u
 
 function seed(db: SummaryDatabase, rows: TurnSummaryInput[] = [turn()]): number {
   const file = metadata();
-  const source_file = db.observeFile(file, 'scan-initial');
-  db.replaceMemory({scanId: 'test',
+  const source_file = db.observeFile(file);
+  db.replaceMemory({
     sessions: [{ provider: 'claude', session_id: 'session-a' }],
     files: [{ ...file, id: source_file.id }], summaries: rows,
   });
@@ -65,8 +65,8 @@ test('tracking selection filters usage, pagination counts and diagnostics withou
   const db = database(t);
   seed(db);
   const meta = {...metadata(), provider: 'codex' as const};
-  const file = db.observeFile(meta, 'scan-codex');
-  db.replaceMemory({scanId: 'test',sessions: [{provider: 'codex', session_id: 'session-a'}], files: [{...meta, id: file.id}], summaries: [turn('codex-turn', {provider: 'codex', quality_flags: '["derived"]'})]});
+  const file = db.observeFile(meta);
+  db.replaceMemory({sessions: [{provider: 'codex', session_id: 'session-a'}], files: [{...meta, id: file.id}], summaries: [turn('codex-turn', {provider: 'codex', quality_flags: '["derived"]'})]});
   for (const provider of ['claude', 'codex'] as const) {
     const filter = {providers: [provider]};
     assert.deepEqual(db.queryTurns(filter).map(row => row.provider), [provider]);
@@ -105,7 +105,9 @@ test('schema normalizes names and bounds SQLite caches', t => {
   assert.equal(first.connection.prepare('PRAGMA cache_size').get()?.cache_size, -4096);
   assert.equal(first.connection.prepare('PRAGMA temp.cache_size').get()?.cache_size, -4096);
   assert.equal(first.connection.prepare('PRAGMA journal_mode').get()?.journal_mode, 'wal');
-  first.connection.exec(sourceIdentityIndexSql(process.platform === 'win32' ? 'linux' : 'win32'));
+  const acceptedSource = first.findSourceFile('claude', metadata().path);
+  first.connection.exec('CREATE INDEX idx_source_identity ON source_file(provider, dev, inode)');
+  assert.equal(first.connection.prepare('PRAGMA index_info(idx_source_identity)').all().length, 3);
   first.close();
   const second = new SummaryDatabase(dbPath);
   t.after(() => second.close());
@@ -114,20 +116,9 @@ test('schema normalizes names and bounds SQLite caches', t => {
   assert.equal(second.queryUsage()[0].total_tokens, 110);
   assert.ok(second.connection.prepare('PRAGMA table_info(turn_summary)').all().every(column => column.name !== 'turn_index'));
   assert.deepEqual(second.connection.prepare('PRAGMA index_info(idx_summary_session)').all(), []);
-  assert.equal(second.connection.prepare('PRAGMA index_info(idx_source_identity)').all().length, process.platform === 'win32' ? 0 : 3);
+  assert.deepEqual(second.connection.prepare('PRAGMA index_info(idx_source_identity)').all(), []);
+  assert.deepEqual(second.findSourceFile('claude', metadata().path), acceptedSource);
   second.close();
-});
-
-test('identity indexes follow the discovery platform without changing stored metadata', t => {
-  const db = database(t);
-  const id = seed(db);
-  const before = db.findSourceFile('claude', metadata().path);
-  for (const platform of ['linux', 'win32', 'darwin', 'win32'] as const) {
-    db.connection.exec(sourceIdentityIndexSql(platform));
-    assert.equal(db.connection.prepare('PRAGMA index_info(idx_source_identity)').all().length, platform === 'win32' ? 0 : 3);
-    assert.equal(db.findIdentity('claude', '10', '1')[0].id, id);
-    assert.deepEqual(db.findSourceFile('claude', metadata().path), before);
-  }
 });
 
 test('session lookup and replacement retain the UNIQUE index and id pagination', t => {
@@ -253,10 +244,10 @@ test('v11 migration adds source presence without changing stored usage or markin
     assert.deepEqual(db.connection.prepare('SELECT * FROM turn_summary').all(),before);
     assert.equal(db.findSourceFile('claude',metadata().path)?.source_missing,0);
     const snapshot=db.queryTurns();
-    assert.throws(()=>db.replaceMemory({scanId: 'test',retainDeletedSourceUsage:true,sessions:[{provider:'claude',session_id:'session-a'}],
+    assert.throws(()=>db.replaceMemory({retainDeletedSourceUsage:true,sessions:[{provider:'claude',session_id:'session-a'}],
       files:[],removedFileIds:[42],summaries:[turn('invalid',{input_tokens:-1})]}),/nonnegative/);
     assert.deepEqual(db.queryTurns(),snapshot);assert.equal(db.findSourceFile('claude',metadata().path)?.source_missing,0);
-    db.replaceMemory({scanId: 'test',retainDeletedSourceUsage:true,sessions:[{provider:'claude',session_id:'session-a'}],files:[],summaries:[],removedFileIds:[42]});
+    db.replaceMemory({retainDeletedSourceUsage:true,sessions:[{provider:'claude',session_id:'session-a'}],files:[],summaries:[],removedFileIds:[42]});
     assert.deepEqual(db.queryTurns(),snapshot);assert.equal(db.findSourceFile('claude',metadata().path)?.source_missing,1);
     assert.deepEqual(db.connection.prepare('PRAGMA foreign_key_check').all(),[]);
   } finally { db.close(); }
@@ -420,7 +411,7 @@ for (const version of [8,9]) test(`v${version} migration removes redundant index
   assert.equal(db.connection.prepare('PRAGMA user_version').get()?.user_version, SCHEMA_VERSION);
   assert.ok(db.connection.prepare('PRAGMA table_info(turn_summary)').all().every(column => column.name !== 'turn_index'));
   assert.deepEqual(db.connection.prepare('PRAGMA index_info(idx_summary_session)').all(), []);
-  assert.equal(db.connection.prepare('PRAGMA index_info(idx_source_identity)').all().length, process.platform === 'win32' ? 0 : 3);
+  assert.deepEqual(db.connection.prepare('PRAGMA index_info(idx_source_identity)').all(), []);
   assert.deepEqual(db.connection.prepare('PRAGMA foreign_key_check').all(), []);
   assert.equal(db.queryTurns({ includeCosts: true }, { limit: 1, offset: 0 }, 'model')[0].id, 99);
   assert.equal(db.queryUsage({ includeCosts: true })[0].cost_usd, 0.0002475);
@@ -477,11 +468,11 @@ test('discovery and failure preserve accepted metadata and previous successful v
   const db = database(t);
   const id = seed(db);
   const changed = { ...metadata(), size_bytes: 900, mtime_ms: 654321, session_id: 'session-b', parser_version: 2 };
-  const observed = db.observeFile(changed, 'scan-next');
+  const observed = db.observeFile(changed);
   assert.equal(observed.size_bytes, 512);
   assert.equal(observed.mtime_ms, 123456);
   assert.equal(observed.session_id, 'session-a');
-  assert.equal(observed.last_seen_scan_id, 'scan-next');
+  assert.equal(observed.id, id);
   db.setSourceDiagnostic(id, 'error', 'parse: byte=128', 'parse-error', 128);
   const summary = db.queryTurns()[0];
   assert.equal(summary.total_tokens, 110);
@@ -497,7 +488,7 @@ test('discovery and failure preserve accepted metadata and previous successful v
 
 test('new files keep null normal session and zero metadata until committed', t => {
   const db = database(t);
-  const file = db.observeFile(metadata(), 'scan');
+  const file = db.observeFile(metadata());
   assert.equal(file.session_id, null);
   assert.equal(file.parser_version, 0);
   assert.equal(file.size_bytes, 0);
@@ -513,7 +504,7 @@ test('replacement rolls back summary, metadata, and deletion on a streaming row 
     yield turn('replacement', { total_tokens: 220, input_tokens: 200, output_tokens: 20 });
     throw new Error('synthetic staging failure');
   }
-  assert.throws(() => db.replaceMemory({scanId: 'test',
+  assert.throws(() => db.replaceMemory({
     sessions: [{ provider: 'claude', session_id: 'session-a' }],
     files: [{ ...metadata(), size_bytes: 1024, id }], summaries: failingRows(), removedFileIds: [id],
   }), /synthetic staging failure/);
@@ -523,7 +514,7 @@ test('replacement rolls back summary, metadata, and deletion on a streaming row 
     yield id;
     throw new Error('synthetic deletion failure');
   }
-  assert.throws(() => db.replaceMemory({scanId: 'test',
+  assert.throws(() => db.replaceMemory({
     sessions: [{ provider: 'claude', session_id: 'session-a' }], files: [], summaries: [],
     removedFileIds: failingDeletion(),
   }), /synthetic deletion failure/);
@@ -534,13 +525,13 @@ test('replacement rolls back summary, metadata, and deletion on a streaming row 
 test('a failed first replacement can retry without publishing partial state', t => {
   const db = database(t);
   const file = metadata();
-  const source_file = db.observeFile(file, 'scan');
-  assert.throws(() => db.replaceMemory({scanId: 'test',
+  const source_file = db.observeFile(file);
+  assert.throws(() => db.replaceMemory({
     sessions: [{ provider: 'claude', session_id: 'session-a' }],
     files: [{ ...file, id: source_file.id }], summaries: [turn('invalid', { total_tokens: 0 })],
   }));
   assert.equal(db.findSourceFile('claude', file.path)?.session_id, null);
-  db.replaceMemory({scanId: 'test',
+  db.replaceMemory({
     sessions: [{ provider: 'claude', session_id: 'session-a' }],
     files: [{ ...file, id: source_file.id }], summaries: [turn()],
   });
@@ -550,13 +541,13 @@ test('a failed first replacement can retry without publishing partial state', t 
 test('session replacement keeps identically named sessions from the other provider untouched', t => {
   const db = database(t);
   seed(db);
-  db.replaceMemory({scanId: 'test',
+  db.replaceMemory({
     sessions: [{ provider: 'codex', session_id: 'session-a' }, { provider: 'claude', session_id: 'session-b' }],
     files: [], summaries: [turn('codex-turn', { provider: 'codex' }), turn('other-session', { session_id: 'session-b' })],
   });
   const otherProvider = db.queryTurns({ provider: 'codex' });
   const otherSession = db.queryTurns({ provider: 'claude', sessionId: 'session-b' });
-  db.replaceMemory({scanId: 'test',
+  db.replaceMemory({
     sessions: [{ provider: 'claude', session_id: 'session-a' }], files: [],
     summaries: [turn('replacement', { input_tokens: 200, total_tokens: 210 })],
   });
@@ -570,12 +561,12 @@ test('session reassignment changes both sessions atomically and preserves source
   const id = seed(db);
   const sessions = [{ provider: 'claude' as const, session_id: 'session-a' }, { provider: 'claude' as const, session_id: 'session-b' }];
   const moved = { ...metadata(), path: '/synthetic/archive/moved.jsonl', source_root: '/synthetic/archive', session_id: 'session-b', id };
-  assert.throws(() => db.replaceMemory({scanId: 'test',
+  assert.throws(() => db.replaceMemory({
     sessions, files: [moved], summaries: [turn('new', { session_id: 'session-b', total_tokens: 999 })],
   }));
   assert.equal(db.findSourceFile('claude', metadata().path)?.id, id);
   assert.equal(db.queryTurns()[0].session_id, 'session-a');
-  db.replaceMemory({scanId: 'test', sessions, files: [moved], summaries: [turn('new', { session_id: 'session-b' })] });
+  db.replaceMemory({sessions, files: [moved], summaries: [turn('new', { session_id: 'session-b' })] });
   assert.equal(db.findSourceFile('claude', metadata().path), undefined);
   assert.equal(db.findSourceFile('claude', moved.path)?.id, id);
   assert.equal(db.queryTurns({ sessionId: 'session-a' }).length, 0);
@@ -588,28 +579,28 @@ test('replacement rejects file reassignment and deletion outside its atomic sess
   const before = db.queryTurns();
   const toSessionB = { ...metadata(), session_id: 'session-b', id };
   for (const included of ['session-a', 'session-b']) {
-    assert.throws(() => db.replaceMemory({scanId: 'test',
+    assert.throws(() => db.replaceMemory({
       sessions: [{ provider: 'claude', session_id: included }], files: [toSessionB], summaries: [],
     }), /outside the replacement session group/);
     assert.deepEqual(db.queryTurns(), before);
     assert.equal(db.findSourceFile('claude', metadata().path)?.session_id, 'session-a');
   }
-  assert.throws(() => db.replaceMemory({scanId: 'test',
+  assert.throws(() => db.replaceMemory({
     sessions: [{ provider: 'claude', session_id: 'session-b' }], files: [], summaries: [], removedFileIds: [id],
   }), /outside the replacement session group/);
   assert.ok(db.findSourceFile('claude', metadata().path));
   assert.deepEqual(db.queryTurns(), before);
   // An unprocessed file has no accepted session contribution to replace.
-  const newFile = db.observeFile(metadata(2), 'scan');
-  db.replaceMemory({scanId: 'test', sessions: [], files: [], summaries: [], removedFileIds: [newFile.id] });
+  const newFile = db.observeFile(metadata(2));
+  db.replaceMemory({sessions: [], files: [], summaries: [], removedFileIds: [newFile.id] });
   assert.equal(db.findSourceFile('claude', metadata(2).path), undefined);
 });
 
 test('diagnostic cursors and offsets preserve stable ordering for both file and summary pages', t => {
   const db = database(t);
   seed(db, [turn('clean'), turn('flagged', { quality_flags: 'duration-approximate' }), turn('failed', { last_error: 'parse-error' })]);
-  db.observeFile(metadata(2), 'scan');
-  db.observeFile(metadata(3), 'scan');
+  db.observeFile(metadata(2));
+  db.observeFile(metadata(3));
   const first = db.diagnostics({ limit: 1 });
   assert.equal(first.files[0].id, 1);
   assert.equal(first.summaries[0].root_turn_id, 'flagged');
@@ -631,47 +622,25 @@ test('diagnostic cursors and offsets preserve stable ordering for both file and 
   assert.throws(() => db.diagnostics({ offset: -1 }), RangeError);
 });
 
-test('keyset discovery includes null visits, limits deleted roots, and streams beyond 256 files', t => {
+test('session file lookup streams beyond 256 files in ID order', t => {
   const db = database(t);
-  for (let index = 1; index <= 300; index++) db.observeFile(metadata(index), index % 2 ? 'old' : 'current');
-  db.observeFile(metadata(301, 'session-a', '/excluded'), 'old');
-  db.connection.exec("UPDATE source_file SET last_seen_scan_id = NULL WHERE path = '/synthetic/claude/1.jsonl'");
-  let count = 0;
-  for (const row of db.unseenFiles('claude', '/synthetic/claude', 'current', 17)) {
-    count++;
-    db.markSeen(row.id, 'current');
-  }
-  assert.equal(count, 150);
-  assert.equal([...db.unseenFiles('claude', '/synthetic/claude', 'current', 17)].length, 0);
-  assert.equal([...db.unseenFiles('claude', '/excluded', 'current')].length, 1);
+  for (let index = 1; index <= 300; index++) db.observeFile(metadata(index));
+  db.observeFile(metadata(301, 'session-a', '/excluded'));
   function* files() {
     for (let index = 1; index <= 300; index++) {
       const file = metadata(index);
       yield { ...file, id: db.findSourceFile('claude', file.path)!.id };
     }
   }
-  db.replaceMemory({scanId: 'test', sessions: [{ provider: 'claude', session_id: 'session-a' }], files: [...files()], summaries: [] });
-  count = 0;
+  db.replaceMemory({sessions: [{ provider: 'claude', session_id: 'session-a' }], files: [...files()], summaries: [] });
+  let count = 0;
   for (const row of db.sessionFiles('claude', 'session-a', 23)) {
     assert.equal(row.processing_status, 'done');
     count++;
+    assert.equal(row.id, count);
   }
   assert.equal(count, 300);
   assert.equal(db.diagnostics({ limit: 25, offset: 300 }).files.length, 1);
-});
-
-test('ambiguous, zero, and missing identities never become a unique move match', t => {
-  const db = database(t);
-  const first = db.observeFile(metadata(), 'scan');
-  const secondMetadata = { ...metadata(2), inode: '1' };
-  const second = db.observeFile(secondMetadata, 'scan');
-  db.replaceMemory({scanId: 'test',
-    sessions: [{ provider: 'claude', session_id: 'session-a' }], summaries: [],
-    files: [{ ...metadata(), id: first.id }, { ...secondMetadata, id: second.id }],
-  });
-  assert.equal(db.findIdentity('claude', '10', '1').length, 2);
-  assert.deepEqual(db.findIdentity('claude', '0', '1'), []);
-  assert.deepEqual(db.findIdentity('claude', '10', null), []);
 });
 
 test('aggregates include in-progress tokens but average completed turns and known durations only', t => {

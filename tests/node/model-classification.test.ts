@@ -44,6 +44,7 @@ test('Claude error notices retain request outcomes without model responses and v
   assert.equal(db.queryUsage({}, 'total', 'UTC', {}, 'model').some(row => row.model === '<synthetic>'), false);
 
   db.connection.exec(`UPDATE source_file SET parser_version=11;
+    UPDATE summary_refresh SET scope='v11';
     INSERT INTO turn_model_usage SELECT id,'<synthetic>',0,0,0,0,NULL,'old' FROM turn_summary WHERE root_turn_id='notice-only';
     INSERT INTO turn_capability_usage SELECT id,'model','<synthetic>',1 FROM turn_summary WHERE root_turn_id='notice-only';`);
   assert.equal(db.queryCapabilities({}, 'model').totalUses, 3);

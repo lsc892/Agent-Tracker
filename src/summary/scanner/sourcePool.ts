@@ -2,32 +2,32 @@
 import { availableParallelism } from 'node:os';
 import { join } from 'node:path';
 import { Worker } from 'node:worker_threads';
-import { prepareSource, type SourceCheckpoint, type SourceFile, type SourcePreparation, type SourcePreparationOptions } from './sourcePreparation';
+import { prepareSource, type SourcePreparation, type SourcePreparationOptions } from './sourcePreparation';
+import type { SourceReadFile } from './sourceReader';
 
 const MAX_SOURCE_WORKERS = 4;
 const PREFETCH_PER_WORKER = 2;
 const MIN_PREFETCH_BYTES = 1024 * 1024;
 
 interface SourceJob {
-  file: SourceFile;
+  file: SourceReadFile;
   promise: Promise<SourcePreparation>;
   resolve: (value: SourcePreparation) => void;
-  checkpoint?: SourceCheckpoint;
 }
 interface WorkerSlot { worker: Worker; job?: SourceJob }
-interface PoolOptions extends SourcePreparationOptions { workers?: number; externalCancellation?: SharedArrayBuffer; checkpoints?: Map<string, SourceCheckpoint> }
+interface PoolOptions extends SourcePreparationOptions { workers?: number; externalCancellation?: SharedArrayBuffer }
 interface SourceWorkerMessage { id: number; result?: SourcePreparation; bytes: number }
 
 /** 완료 순서와 무관하게 호출자가 원래 논리 순서로 파일 준비 결과를 소비한다. */
 export class SourceReaderPool {
-  readonly concurrency: number;
   readonly lookahead: number;
-  private readonly cancellation = new SharedArrayBuffer(4);
+  private readonly concurrency: number;
+  private readonly cancellation = new Int32Array(new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT));
   private readonly jobs = new Map<number, SourceJob>();
   private readonly pending: SourceJob[] = [];
   private readonly slots = new Set<WorkerSlot>();
   private closed = false;
-  private readonly abort = (): void => { Atomics.store(new Int32Array(this.cancellation), 0, 1); };
+  private readonly abort = (): void => { Atomics.store(this.cancellation, 0, 1); };
 
   constructor(private readonly options: PoolOptions) {
     const requestedWorkers = Math.trunc(options.workers ?? availableParallelism() - 1) || 1;
@@ -37,7 +37,7 @@ export class SourceReaderPool {
   }
 
   /** 준비 결과까지 무제한 쌓지 않도록 최대 2×Worker 수의 파일만 선행한다. */
-  prefetch(files: readonly SourceFile[]): void {
+  prefetch(files: readonly SourceReadFile[]): void {
     if (this.closed || this.options.cancelled() || this.concurrency === 1) return;
     if (files.length < 2 && !this.slots.size) return;
     // 작은 파일들만 남은 경우에는 시작·메시지 비용보다 순차 준비가 저렴하다.
@@ -48,29 +48,16 @@ export class SourceReaderPool {
     }
   }
 
-  async read(file: SourceFile): Promise<SourcePreparation> {
+  async read(file: SourceReadFile): Promise<SourcePreparation> {
     if (this.closed || this.options.cancelled()) return this.failure('interrupted');
-    let job = this.jobs.get(file.id);
+    const job = this.jobs.get(file.id);
     // 파일 하나만 필요한 갱신에는 Worker 시작 비용을 추가하지 않는다.
+    if (!job && !this.slots.size) return prepareSource(file, this.options);
     try {
-      const result = !job && !this.slots.size
-        ? await prepareSource(file, { ...this.options, checkpoint: this.options.checkpoints?.get(this.key(file)) })
-        : await (job ??= this.enqueue(file, true)).promise;
-      const cache = this.options.checkpoints;
-      if (cache) {
-        if (result.ok && !file.path.toLowerCase().endsWith('.zst')) cache.set(this.key(file), {
-          id: file.id, sourceRoot: file.source_root, parserVersion: file.parser_version,
-          collectCapabilities: this.options.collectCapabilities, maxLineBytes: this.options.maxLineBytes ?? 4 * 1024 * 1024,
-          read: result.read, winners: result.winners,
-        });
-        else cache.delete(this.key(file));
-      }
-      return result;
+      return await (job ?? this.enqueue(file, true)).promise;
     }
     finally { this.jobs.delete(file.id); }
   }
-
-  private key(file: SourceFile): string { return JSON.stringify([file.provider, file.path]); }
 
   async dispose(): Promise<void> {
     this.closed = true;
@@ -84,18 +71,16 @@ export class SourceReaderPool {
   }
 
   private failure(code: string): SourcePreparation {
-    return { ok: false, error: { code, offset: 0 }, bytes: 0, elapsedMs: 0 };
+    return { ok: false, error: { code, offset: 0 } };
   }
 
-  private enqueue(file: SourceFile, priority = false): SourceJob {
+  private enqueue(file: SourceReadFile, priority = false): SourceJob {
     let resolve!: SourceJob['resolve'];
     const promise = new Promise<SourcePreparation>(done => { resolve = done; });
-    // FileState의 prepared/previous를 Worker로 복사하지 않는다.
-    const metadata: SourceFile = { id: file.id, provider: file.provider, path: file.path, source_root: file.source_root,
-      session_id: file.session_id, size_bytes: file.size_bytes, mtime_ms: file.mtime_ms,
-      dev: file.dev, inode: file.inode, parser_version: file.parser_version,
-      capabilities_collected: file.capabilities_collected };
-    const job: SourceJob = { file: metadata, promise, resolve, checkpoint: this.options.checkpoints?.get(this.key(file)) };
+    // Worker에는 읽기 경계와 원본을 확인할 필드만 보낸다.
+    const metadata: SourceReadFile = { id: file.id, provider: file.provider, path: file.path, source_root: file.source_root,
+      size_bytes: file.size_bytes, mtime_ms: file.mtime_ms, dev: file.dev, inode: file.inode };
+    const job: SourceJob = { file: metadata, promise, resolve };
     this.jobs.set(file.id, job);
     if (priority) this.pending.unshift(job); else this.pending.push(job);
     this.dispatch();
@@ -117,7 +102,7 @@ export class SourceReaderPool {
   private startWorker(): void {
     const worker = new Worker(join(__dirname, 'sourceWorker.js'), { workerData: {
       collectCapabilities: this.options.collectCapabilities, maxLineBytes: this.options.maxLineBytes,
-      cancellation: this.cancellation, externalCancellation: this.options.externalCancellation,
+      cancellation: this.cancellation.buffer, externalCancellation: this.options.externalCancellation,
     } });
     const slot: WorkerSlot = { worker };
     this.slots.add(slot);
@@ -140,7 +125,7 @@ export class SourceReaderPool {
     const job = this.pending.shift();
     if (!job) return;
     slot.job = job;
-    try { slot.worker.postMessage({ id: job.file.id, file: job.file, checkpoint: job.checkpoint }); }
+    try { slot.worker.postMessage(job.file); }
     catch { this.workerFailed(slot); }
   }
 

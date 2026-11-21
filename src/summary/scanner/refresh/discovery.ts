@@ -1,55 +1,97 @@
-// 디렉터리를 탐색하고 source_file와 비교하여 관측·변경·소실 파일을 등록한다.
+// JSONL 수정 시각으로 읽을 파일을 고르고 원본 소실과 관계 해소에 필요한 파일을 등록한다.
 import { lstat, opendir } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
-import type { FileMetadata, SourceFileRow } from '../../db/types';
+import { join } from 'node:path';
+import type { SummaryDatabase } from '../../db';
 import { SummaryError } from '../../jsonl';
 import type { RefreshContext } from './context';
-import { PARSER_VERSION, sessionKey } from './state';
-import type { FileState } from './state';
+import { PARSER_VERSION, sessionKey, type FileState, type StoredSource } from './state';
 
-export async function discoverSources(context: RefreshContext): Promise<void> {
-  const { database, state, roots, collect, retain, result, check, report } = context;
-  const source_file = database.connection.prepare('SELECT * FROM source_file ORDER BY id').all() as unknown as SourceFileRow[];
-  const paths = new Map(source_file.map(file => [sessionKey(file.provider, file.path), file]));
-  let nextId = source_file.reduce((max, file) => Math.max(max, file.id), 0) + 1;
-  const observed = new Set<number>();
+interface SourcePath {
+  previous?: StoredSource;
+  observed?: FileState;
+}
+
+interface DiscoveryPaths {
+  byPath: Map<string, SourcePath>;
+  storedRoots: Set<string>;
+  nextId: number;
+}
+
+type Observation = Pick<FileState, 'provider' | 'source_root' | 'path' | 'size_bytes' | 'mtime_ms' | 'dev' | 'inode' | 'changed'>;
+
+export async function discoverSources(context: RefreshContext, previousRefreshMs: number | undefined): Promise<void> {
+  const { database, roots, check } = context;
+  const paths = loadStoredPaths(database);
   for (const root of roots) {
     try {
       for await (const path of walk(root.path, check, root.provider === 'codex')) {
         const stat = await lstat(path);
-        if (!stat.isFile())
-          continue;
-        // Deleted inodes can be reused. Cross-path matches need the parsed content proof in reconnectSources.
-        const previous = paths.get(sessionKey(root.provider, resolve(path)));
-        if (previous && previous.parser_version !== PARSER_VERSION)
-          database.sourceCheckpoints.delete(sessionKey(root.provider, resolve(path)));
-        const metadata: FileMetadata = { provider: root.provider, source_root: root.path, path: resolve(path), session_id: previous?.session_id ?? null,
-          size_bytes: stat.size, mtime_ms: stat.mtimeMs, dev: String(stat.dev), inode: String(stat.ino), parser_version: PARSER_VERSION,
-          capabilities_collected: collect ? 1 : 0, source_identity: previous?.source_identity, content_hash: previous?.content_hash };
-        const file: FileState = { ...metadata, id: previous?.id ?? nextId++, previous, changed: true, removed: false, selected: true, session: metadata.session_id };
-        state.trackFile(file);
-        observed.add(file.id);
-        result.discovered++;
-        report();
+        if (!stat.isFile()) continue;
+        const changed = previousRefreshMs === undefined || stat.mtimeMs >= previousRefreshMs;
+        recordObservation(context, paths, { provider: root.provider, source_root: root.path, path,
+          size_bytes: stat.size, mtime_ms: stat.mtimeMs, dev: String(stat.dev), inode: String(stat.ino), changed });
       }
     }
     catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT'
-        || source_file.some(file => file.provider === root.provider && file.source_root === root.path))
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT' || paths.storedRoots.has(sessionKey(root.provider, root.path)))
         throw error;
     }
   }
-  for (const previous of source_file)
-    if (!observed.has(previous.id)) {
-      const selected = roots.some(root => root.provider === previous.provider && root.path === previous.source_root);
-      const file: FileState = { ...previous, id: previous.id, previous, changed: selected && (!previous.source_missing || !retain),
-        removed: selected, selected, session: previous.session_id };
-      state.trackFile(file);
-      if (file.changed)
-        state.affect(file.provider, file.session);
+  registerUnseenSources(context, paths.byPath.values());
+}
+
+function loadStoredPaths(database: SummaryDatabase): DiscoveryPaths {
+  const paths: DiscoveryPaths = { byPath: new Map(), storedRoots: new Set(), nextId: 1 };
+  const stored = database.connection.prepare(`SELECT id, provider, source_root, path, session_id,
+    size_bytes, mtime_ms, dev, inode, parser_version, source_identity, content_hash, capabilities_collected,
+    source_missing, processing_status FROM source_file ORDER BY id`).iterate() as unknown as Iterable<StoredSource>;
+  for (const previous of stored) {
+    paths.byPath.set(sessionKey(previous.provider, previous.path), { previous });
+    paths.storedRoots.add(sessionKey(previous.provider, previous.source_root));
+    paths.nextId = Math.max(paths.nextId, previous.id + 1);
+  }
+  return paths;
+}
+
+function recordObservation(context: RefreshContext, paths: DiscoveryPaths, observation: Observation): void {
+  const { state, result, collect, report } = context;
+  const { provider, path, changed } = observation;
+  const key = sessionKey(provider, path);
+  const entry = paths.byPath.get(key) ?? {};
+  const { observed, previous } = entry;
+  if (observed) {
+    // Overlapping roots share one file ID and the last root supplies its metadata.
+    result.reused += Number(observed.changed) - Number(changed);
+    Object.assign(observed, observation);
+  } else {
+    const file: FileState = { ...observation, id: previous?.id ?? paths.nextId++, discoveryOrder: state.files.size, previous,
+      session_id: previous?.session_id ?? null, selected: true, removed: false, parser_version: PARSER_VERSION,
+      capabilities_collected: collect ? 1 : 0, source_identity: previous?.source_identity, content_hash: previous?.content_hash };
+    entry.observed = file;
+    paths.byPath.set(key, entry);
+    state.trackFile(file);
+    if (!changed) result.reused++;
+  }
+  if (changed) state.indexRelatedSources();
+  result.discovered++;
+  report();
+}
+
+function registerUnseenSources(context: RefreshContext, stored: Iterable<SourcePath>): void {
+  const { state, roots, retain } = context;
+  const selectedRoots = new Set(roots.map(root => sessionKey(root.provider, root.path)));
+  for (const { previous, observed } of stored) {
+    if (observed || !previous) continue;
+    const selected = selectedRoots.has(sessionKey(previous.provider, previous.source_root));
+    const changed = selected && (!previous.source_missing || !retain);
+    const file: FileState = { ...previous, discoveryOrder: state.files.size, previous, changed,
+      removed: selected, selected };
+    state.trackFile(file);
+    if (changed && file.session_id) {
+      state.indexRelatedSources();
+      state.affect(file.provider, file.session_id);
     }
-  for (const [key, checkpoint] of database.sourceCheckpoints)
-    if (!observed.has(checkpoint.id)) database.sourceCheckpoints.delete(key);
+  }
 }
 
 async function* walk(directory: string, check: () => void, compressed: boolean): AsyncGenerator<string> {
@@ -63,8 +105,9 @@ async function* walk(directory: string, check: () => void, compressed: boolean):
     const path = join(directory, entry.name);
     if (entry.isDirectory())
       yield* walk(path, check, compressed);
-    else if (entry.isFile() && (entry.name.toLowerCase().endsWith('.jsonl')
-      || compressed && entry.name.toLowerCase().endsWith('.jsonl.zst')))
-      yield path;
+    else if (entry.isFile()) {
+      const name = entry.name.toLowerCase();
+      if (name.endsWith('.jsonl') || compressed && name.endsWith('.jsonl.zst')) yield path;
+    }
   }
 }

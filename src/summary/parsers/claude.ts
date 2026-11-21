@@ -222,13 +222,6 @@ export class ClaudeParserAdapter {
     this.sink.identity(this.identityValue);
   }
 
-  snapshot(): Record<string, unknown> {
-    const { context: _context, sink: _sink, ...state } = this;
-    return state;
-  }
-
-  restore(state: Record<string, unknown>): void { Object.assign(this, state); }
-
   /** Preserve the known parent/session even when a later line makes the file fail. */
   getIdentity(): ParsedIdentity { return this.identityValue; }
 }

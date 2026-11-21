@@ -5,7 +5,7 @@ import { addFlag, eligible, key, prepareSources,
 import { addCapability, addWinner, createRoot, materialize, max, mergeTurn,
   type MemoryAggregateResult, type Outcome, type Root } from './turns';
 import { Winners, type Winner } from './winners';
-import type { SourceWinners } from './sourceWinners';
+import type { SourceWinnersSnapshot } from './sourceWinners';
 
 export type { StreamingAggregateFile } from './sourceEvidence';
 export type { MaterializedTurnSummary, MemoryAggregateResult } from './turns';
@@ -36,7 +36,7 @@ export class StreamingAggregation {
   }
 
   /** 읽는 동안 접은 요청 상태를 한 번 병합하고 남은 winner만 바로 합계에 반영한다. */
-  addSource(fileId: number, prepared: SourceWinners): void {
+  addSource(fileId: number, prepared: SourceWinnersSnapshot): void {
     const source = this.sources.get(fileId)!, file = source.file;
     const outcomes = new Map<string, Outcome>();
     for (const state of prepared.roots.values()) {
@@ -67,7 +67,7 @@ export class StreamingAggregation {
         }
       }
     }
-    for (const { event, index, score } of prepared.values()) this.addNormalized(source, event, index, score);
+    for (const { event, index, score } of prepared.winners.values()) this.addNormalized(source, event, index, score);
   }
 
   private addNormalized(source: SourcePlan, raw: Exclude<ParseEvent, { kind: 'turn' }>, index: number, score?: number | bigint): void {

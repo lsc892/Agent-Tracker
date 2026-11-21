@@ -1,6 +1,7 @@
 // DB에 접근하지 않고 전달받은 파일 하나의 읽기·파싱·winner 선택을 실행한다.
 import { parentPort, workerData } from 'node:worker_threads';
-import { prepareSource, type SourceCheckpoint, type SourceFile } from './sourcePreparation';
+import { prepareSource } from './sourcePreparation';
+import type { SourceReadFile } from './sourceReader';
 
 const PROGRESS_INTERVAL_MS = 100;
 
@@ -10,19 +11,18 @@ const options = workerData as { collectCapabilities: boolean; maxLineBytes?: num
   cancellation: SharedArrayBuffer; externalCancellation?: SharedArrayBuffer };
 const cancellation = new Int32Array(options.cancellation);
 const externalCancellation = options.externalCancellation ? new Int32Array(options.externalCancellation) : undefined;
+const cancelled = (): boolean => Boolean(Atomics.load(cancellation, 0)
+  || externalCancellation && Atomics.load(externalCancellation, 0));
 
-port.on('message', (message: { id: number; file: SourceFile; checkpoint?: SourceCheckpoint }) => {
-  let readBytes = 0, reportedBytes = 0, lastReportAtMs = performance.now();
-  void prepareSource(message.file, { ...options,
-    checkpoint: message.checkpoint,
-    cancelled: () => Boolean(Atomics.load(cancellation, 0)
-      || externalCancellation && Atomics.load(externalCancellation, 0)),
+port.on('message', (file: SourceReadFile) => {
+  let pendingBytes = 0, lastReportAtMs = performance.now();
+  void prepareSource(file, { collectCapabilities: options.collectCapabilities, maxLineBytes: options.maxLineBytes, cancelled,
     onBytes: count => {
-      readBytes += count;
+      pendingBytes += count;
       if (performance.now() - lastReportAtMs < PROGRESS_INTERVAL_MS) return;
-      port.postMessage({ id: message.id, bytes: readBytes - reportedBytes });
-      reportedBytes = readBytes;
+      port.postMessage({ id: file.id, bytes: pendingBytes });
+      pendingBytes = 0;
       lastReportAtMs = performance.now();
     },
-  }).then(result => port.postMessage({ id: message.id, result, bytes: readBytes - reportedBytes }));
+  }).then(result => port.postMessage({ id: file.id, result, bytes: pendingBytes }));
 });

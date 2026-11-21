@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { zstdCompressSync } from 'node:zlib';
 import { SummaryDatabase } from '../../src/summary/db';
+import { ageLogFixtures } from '../fixtures/summary-mtime';
 import { SummaryClient } from '../../src/summary/client';
 import { refreshSummary } from '../../src/summary/scanner';
 import type { SummaryOptions } from '../../src/summary/types';
@@ -67,7 +68,8 @@ test('partial source loss freezes existing requests, collects new requests and a
   await unlink(child);assert.equal((await refreshSummary(db,{...options,collectCapabilities:false})).failed,0);
   assert.deepEqual(db.queryTurns()[0],before);assert.equal(db.queryCapabilities({},'skill').totalUses,2);
   assert.equal(db.findSourceFile('claude',child)?.source_missing,1);
-  const warm=await refreshSummary(db,{...options,collectCapabilities:false});assert.equal(warm.parsed,0);assert.ok(warm.bodyBytes>0);
+  ageLogFixtures(main);
+  const warm=await refreshSummary(db,{...options,collectCapabilities:false});assert.equal(warm.parsed,0);assert.equal(warm.bodyBytes,0);
   await appendFile(main,jsonl([response('one',5,'claude-sonnet-4-6','extra'),user('two'),response('two',30)]));
   assert.equal((await refreshSummary(db,options)).failed,0);
   assert.equal(db.queryTurns().find(row=>row.root_turn_id==='one')?.total_tokens,34);

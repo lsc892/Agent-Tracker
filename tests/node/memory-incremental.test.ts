@@ -1,11 +1,12 @@
 // 스트리밍 winner 집계·관련 원본 재읽기·최종 저장의 원자성을 검증한다.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { appendFile, mkdir, mkdtemp, rm, stat, unlink, writeFile } from 'node:fs/promises';
+import { appendFile, mkdir, mkdtemp, rm, stat, unlink, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { SummaryDatabase, type TurnSummaryInput } from '../../src/summary/db';
+import { ageLogFixtures } from '../fixtures/summary-mtime';
 import { refreshSummary } from '../../src/summary/scanner';
 import type { SummaryOptions } from '../../src/summary/types';
 
@@ -34,7 +35,7 @@ const finalRow=(input=100):TurnSummaryInput=>({provider:'codex',session_id:'sess
 test('final memory replacement creates no TEMP tables, keeps identical facts untouched and rolls back failed writes',()=>{
   const db=new SummaryDatabase(':memory:');
   try{
-    const replacement={scanId:'first',sessions:[{provider:'codex' as const,session_id:'session'}],files:[],summaries:[finalRow()]};
+    const replacement={sessions:[{provider:'codex' as const,session_id:'session'}],files:[],summaries:[finalRow()]};
     db.replaceMemory(replacement);
     const before=db.queryTurns();assert.equal(before.length,1);
     assert.deepEqual(db.connection.prepare("SELECT name FROM sqlite_temp_master WHERE type='table'").all(),[]);
@@ -42,11 +43,11 @@ test('final memory replacement creates no TEMP tables, keeps identical facts unt
       CREATE TRIGGER memory_update AFTER UPDATE ON turn_summary BEGIN INSERT INTO memory_writes VALUES('update'); END;
       CREATE TRIGGER memory_insert AFTER INSERT ON turn_summary BEGIN INSERT INTO memory_writes VALUES('insert'); END;
       CREATE TRIGGER memory_delete AFTER DELETE ON turn_summary BEGIN INSERT INTO memory_writes VALUES('delete'); END;`);
-    db.replaceMemory({...replacement,scanId:'same',summaries:[finalRow()]});
+    db.replaceMemory({...replacement,summaries:[finalRow()]});
     assert.deepEqual(db.queryTurns(),before);
     assert.equal(db.connection.prepare('SELECT count(*) n FROM memory_writes').get()?.n,0);
     db.connection.exec(`CREATE TRIGGER fail_memory_write BEFORE UPDATE ON turn_summary BEGIN SELECT RAISE(ABORT,'blocked final write'); END;`);
-    assert.throws(()=>db.replaceMemory({...replacement,scanId:'failure',summaries:[finalRow(200)]}),/blocked final write/);
+    assert.throws(()=>db.replaceMemory({...replacement,summaries:[finalRow(200)]}),/blocked final write/);
     assert.deepEqual(db.queryTurns(),before);assert.equal(db.connection.prepare('SELECT count(*) n FROM memory_writes').get()?.n,0);
     assert.deepEqual(db.connection.prepare('PRAGMA foreign_key_check').all(),[]);
     assert.deepEqual(db.connection.prepare("SELECT name FROM sqlite_temp_master WHERE type='table'").all(),[]);
@@ -56,13 +57,14 @@ test('final memory replacement creates no TEMP tables, keeps identical facts unt
 test('refresh streams winners without TEMP staging and rereads related sources after a change',async()=>fixture(async(db,options,root)=>{
   const main=join(root,'main.jsonl'),sibling=join(root,'copy.jsonl');
   await writeFile(main,jsonl([user(),response()]));await writeFile(sibling,jsonl([user(),response(50)]));
+  ageLogFixtures(main,sibling);
   const initial=await refreshSummary(db,options);assert.equal(initial.failed,0);assert.equal(initial.parsed,2);
   assert.deepEqual(db.connection.prepare("SELECT name FROM sqlite_temp_master WHERE type='table'").all(),[],
     'the refresh path must not leave event, winner, prepared or replacement staging tables');
-  const unchanged=await refreshSummary(db,options);assert.equal(unchanged.failed,0);assert.equal(unchanged.parsed,0);assert.ok(unchanged.bodyBytes > 0);
+  const unchanged=await refreshSummary(db,options);assert.equal(unchanged.failed,0);assert.equal(unchanged.parsed,0);assert.equal(unchanged.bodyBytes,0);
   await appendFile(main,jsonl([user('extra'),response(20,'extra','extra-response')]));
   const changed=await refreshSummary(db,options);assert.equal(changed.failed,0);
-  assert.equal(changed.parsed,1,'only appended rows are parsed; sibling winners are reused after hashing');
+  assert.equal(changed.parsed,2,'the modified file and its sibling are fully parsed');
   assert.equal(changed.bodyBytes,(await stat(main)).size+(await stat(sibling)).size,
     'every related source is read only once while its winner DTOs are selected');
   assert.equal(db.queryTurns().reduce((sum,row)=>sum+row.total_tokens,0),124);
@@ -89,7 +91,7 @@ test('a failed final transaction preserves facts and retry rereads the same sour
   assert.ok((await refreshSummary(db,options)).failed>0);assert.equal(db.queryTurns().length,1);
   assert.equal(db.queryTurns()[0].total_tokens,original.total_tokens);
   db.connection.exec('DROP TRIGGER reject_new_memory_request');
-  const retried=await refreshSummary(db,options);assert.equal(retried.failed,0);assert.equal(retried.parsed,0);
+  const retried=await refreshSummary(db,options);assert.equal(retried.failed,0);assert.equal(retried.parsed,1);
   assert.equal(db.queryTurns().length,2);assert.equal(db.queryTurns().reduce((n,row)=>n+row.total_tokens,0),124);
 }));
 
@@ -110,12 +112,15 @@ test('state DB titles keep higher priority than a later data home index for the 
   try{names.exec("CREATE TABLE threads(id TEXT PRIMARY KEY,title TEXT,name TEXT); INSERT INTO threads VALUES('session','automatic title','preferred state title')");}
   finally{names.close();}
   await writeFile(join(secondHome,'session_index.jsonl'),jsonl([{id:'session',thread_name:'lower priority later index'}]));
-  await writeFile(join(root,'session.jsonl'),jsonl([
+  const transcript=join(root,'session.jsonl');
+  await writeFile(transcript,jsonl([
     {type:'session_meta',payload:{id:'session',cwd:'/synthetic/project'}},
     {type:'event_msg',timestamp:'2026-11-01T00:00:00Z',payload:{type:'task_started',turn_id:'root',root_turn_id:'root'}},
     {type:'token_usage_record',payload:{turn_id:'root',root_turn_id:'root',response_id:'response',model:'gpt-5.6-sol',
       usage:{input_tokens:100,output_tokens:2}}},
   ]));
+  const old = new Date('2020-01-01T00:00:00Z');
+  await utimes(transcript,old,old);
   const codexOptions:SummaryOptions={...options,roots:[{provider:'codex',path:root,dataHome:firstHome},
     {provider:'codex',path:secondRoot,dataHome:secondHome}]};
   assert.equal((await refreshSummary(db,codexOptions)).failed,0);

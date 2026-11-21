@@ -26,9 +26,6 @@ export interface FileMetadata {
   /** Parsed source thread/role and SHA-256 of the accepted raw file snapshot. */
   source_identity?: string | null;
   content_hash?: string | null;
-  /** Incremental validation: complete raw JSONL line boundary and hash of [0, P). */
-  complete_position?: number;
-  prefix_hash?: string | null;
   /** 0 when Skill counts were skipped; re-enable rebuilds these sources. */
   capabilities_collected?: 0 | 1;
 }
@@ -38,7 +35,6 @@ export interface SourceFileRow extends FileMetadata {
   source_identity: string | null;
   content_hash: string | null;
   source_missing: 0 | 1;
-  last_seen_scan_id: string | null;
   processing_status: ProcessingStatus;
   processing_position: string | null;
   recorded_at: string;

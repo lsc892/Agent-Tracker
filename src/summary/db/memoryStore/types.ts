@@ -9,7 +9,6 @@ export interface MemoryReplacement {
   reconnectedFiles?: readonly { old_id: number; new_id: number }[];
   preserveCapabilities?: boolean;
   retainDeletedSourceUsage?: boolean;
-  scanId: string;
 }
 
 /** COMMIT한 이름만 스캔 마무리의 중복 이름 갱신 생략에 사용한다. */

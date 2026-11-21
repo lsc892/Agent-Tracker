@@ -12,7 +12,6 @@ import { SessionBillingStore } from './billing';
 import { SummaryReader } from './reader';
 import { MemoryStore, type MemoryReplacement, type SavedSessionNames } from './memoryStore';
 import type { StageProfiler, StorageStage } from '../profiling';
-import type { SourceCheckpoint } from '../scanner/sourcePreparation';
 
 export * from './types';
 export { usageChartFromPage } from './chart';
@@ -20,7 +19,6 @@ export { periodBounds } from './timezone';
 
 /** 하나의 DB 연결을 공유하는 저장소들을 구성하고 통계 작업을 위임한다. */
 export class SummaryDatabase {
-  readonly sourceCheckpoints = new Map<string, SourceCheckpoint>();
   readonly connection: DatabaseSync;
   private readonly sqlite: SqliteSession;
   private readonly sources: SourceFileStore;
@@ -36,7 +34,6 @@ export class SummaryDatabase {
   }
 
   close(): void {
-    this.sourceCheckpoints.clear();
     return this.sqlite.close();
   }
 
@@ -51,25 +48,16 @@ export class SummaryDatabase {
   clearData(): void {
     this.sqlite.transaction(() => {
       this.sqlite.rollups.clear();
-      this.connection.exec('DELETE FROM turn_summary; DELETE FROM source_file; DELETE FROM sessions; DELETE FROM projects;');
+      this.connection.exec('DELETE FROM summary_refresh; DELETE FROM turn_summary; DELETE FROM source_file; DELETE FROM sessions; DELETE FROM projects;');
     });
-    this.sourceCheckpoints.clear();
   }
 
   findSourceFile(provider: Provider, path: string): SourceFileRow | undefined {
     return this.sources.findSourceFile(provider, path);
   }
 
-  findIdentity(provider: Provider, dev: string | null, inode: string | null): SourceFileRow[] {
-    return this.sources.findIdentity(provider, dev, inode);
-  }
-
-  observeFile(metadata: FileMetadata, scanId: string): SourceFileRow {
-    return this.sources.observeFile(metadata, scanId);
-  }
-
-  markSeen(id: number, scanId: string): void {
-    return this.sources.markSeen(id, scanId);
+  observeFile(metadata: FileMetadata): SourceFileRow {
+    return this.sources.observeFile(metadata);
   }
 
   setSourceDiagnostic(id: number, status: ProcessingStatus, position: string | null, error: string | null, offset: number | null = null): void {
@@ -78,10 +66,6 @@ export class SummaryDatabase {
 
   sessionFiles(provider: Provider, sessionId: string, limit = 100): IterableIterator<SourceFileRow> {
     return this.sources.sessionFiles(provider, sessionId, limit);
-  }
-
-  unseenFiles(provider: Provider, sourceRoot: string, scanId: string, limit = 100): IterableIterator<SourceFileRow> {
-    return this.sources.unseenFiles(provider, sourceRoot, scanId, limit);
   }
 
   replaceMemory(replacement: MemoryReplacement, profile?: StageProfiler<StorageStage>): SavedSessionNames {

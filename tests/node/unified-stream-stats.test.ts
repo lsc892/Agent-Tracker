@@ -41,9 +41,9 @@ test('thousands of lifecycle and check events become one request state and prese
   assert.equal(selected.roots.get('root')!.checks.size, 1);
   assert.equal([...selected.values()].length, 1);
   assert.deepEqual(aggregateMemory([file]), eventOrder([file]));
-  const restored = new SourceWinners('codex', structuredClone(selected.snapshot()));
-  const aggregation = new StreamingAggregation([{ ...file, evidence: restored.evidence }]);
-  aggregation.addSource(file.id, restored);
+  const prepared = structuredClone(selected.snapshot());
+  const aggregation = new StreamingAggregation([{ ...file, evidence: prepared.evidence }]);
+  aggregation.addSource(file.id, prepared);
   assert.deepEqual(aggregation.finish(), aggregateMemory([file]));
 });
 
@@ -94,8 +94,9 @@ test('snapshot keeps exact winner scores and normalized text without modifying t
   const event = usage('root', Number.MAX_SAFE_INTEGER, { model: 'model\ud800' });
   event.tokens.output = 4;
   const selected = new SourceWinners('codex'); selected.add(event, 0);
-  const restored = new SourceWinners('codex', structuredClone(selected.snapshot()));
-  assert.equal([...restored.values()][0].score, BigInt(Number.MAX_SAFE_INTEGER) + 4n);
-  assert.equal([...restored.values()][0].event.model, 'model�');
+  const prepared = structuredClone(selected.snapshot());
+  const [winner] = prepared.winners.values();
+  assert.equal(winner.score, BigInt(Number.MAX_SAFE_INTEGER) + 4n);
+  assert.equal(winner.event.model, 'model�');
   assert.equal(event.model, 'model\ud800');
 });

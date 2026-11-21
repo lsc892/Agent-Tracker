@@ -8,7 +8,7 @@ import type { SourceRoot } from '../types';
 import { sqlText } from './sourceReader';
 const key = (provider: string, session: string): string => JSON.stringify([provider, sqlText(session)]);
 /** 제공자 제목의 우선순위를 메모리에 병합하며 통계 DB는 여기서 쓰지 않는다. */
-export async function readNames(roots: SourceRoot[], cancelled: () => boolean): Promise<Map<string, string>> {
+export async function readNames(roots: readonly SourceRoot[], cancelled: () => boolean): Promise<Map<string, string>> {
   const names = new Map<string, string>(), stateNames = new Set<string>();
   const homes = new Set(roots.filter(root => root.provider === 'codex').map(root => resolve(root.dataHome ?? dirname(root.path))));
   for (const home of homes) {

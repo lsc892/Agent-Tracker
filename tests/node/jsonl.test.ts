@@ -181,7 +181,7 @@ test('unfinished ordinary lines keep UTF-8 bytes across reused chunks and emit o
       },
     });
     assert.deepEqual(rows, [{ row: JSON.parse(first), offset: 0 }, { row: { next: true }, offset: Buffer.byteLength(first) }]);
-    assert.deepEqual(result, { rows: 2, bytes: size, partialLine: true, completeOffset: Buffer.byteLength(first + '{"next":true}\n') });
+    assert.deepEqual(result, { rows: 2, bytes: size, partialLine: true });
     assert.deepEqual(await observed(readJsonl, path, size), await observed(readByteJsonl, path, size));
   });
 });

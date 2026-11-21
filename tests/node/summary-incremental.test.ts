@@ -14,7 +14,7 @@ function row(id: string, date: string | null, tokens = 10): TurnSummaryInput {
 
 const sessions = [{ provider: 'codex' as const, session_id: 's' }];
 function replace(db: SummaryDatabase, summaries: Iterable<TurnSummaryInput>): void {
-  db.replaceMemory({scanId: 'test', sessions, files: [], summaries });
+  db.replaceMemory({sessions, files: [], summaries });
 }
 
 function audit(db: SummaryDatabase): void {
@@ -164,7 +164,7 @@ test('model replacement, preserved Skill counts and invalid one-shot snapshots r
   db.queryUsage({}, 'total', 'Asia/Seoul');
   const changed = { ...original, capability_usage: undefined,
     model_usage: [{ model: 'new-model', input_tokens: 10, output_tokens: 0, cache_write_input_tokens: 0, cache_read_input_tokens: 0 }] };
-  db.replaceMemory({scanId: 'test', sessions, files: [], summaries: [changed], preserveCapabilities: true });
+  db.replaceMemory({sessions, files: [], summaries: [changed], preserveCapabilities: true });
   assert.equal(db.queryTurns()[0].root_turn_id, original.root_turn_id);
   assert.equal(db.queryCapabilities({}, 'skill').totalUses, 1);
   exact(db);

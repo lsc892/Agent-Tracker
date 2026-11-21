@@ -17,5 +17,6 @@ export interface RefreshContext {
   readonly retain: boolean;
   readonly cancelled: () => boolean;
   readonly check: () => void;
-  readonly report: (force?: boolean) => void;
+  readonly report: () => void;
+  readonly onBytes: (bytes: number) => void;
 }

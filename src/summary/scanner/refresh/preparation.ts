@@ -1,16 +1,13 @@
 // Worker의 파일 준비 결과를 기존 순서로 반영하고 부분 파일·원본 소실을 처리한다.
 import { lstat } from 'node:fs/promises';
-import { SourceWinners } from '../../aggregation/sourceWinners';
 import { SummaryError } from '../../jsonl';
+import type { SourcePreparation } from '../sourcePreparation';
 import type { RefreshContext } from './context';
-import type { FileState } from './state';
+import type { FileState, ScanState } from './state';
 
 export async function prepareChanged(context: RefreshContext): Promise<void> {
   const changed = [...context.state.files.values()].filter(file => file.changed && !file.removed).sort((a, b) => a.id - b.id);
   await inspectBatch(context, changed);
-  // Hash validation visits every file; preserve the previous changed-first tie order.
-  for (const file of changed)
-    if (!file.changed && file.prepared) file.sequence = ++context.state.sequence;
 }
 
 export async function inspectBatch(context: RefreshContext, batch: readonly FileState[]): Promise<void> {
@@ -23,12 +20,10 @@ export async function inspectBatch(context: RefreshContext, batch: readonly File
 }
 
 export async function inspectSource(context: RefreshContext, file: FileState): Promise<void> {
-  const { state, result, scan, sourcePool, check, report, cancelled } = context;
-  check();
-  if (file.attempted || file.prepared || file.error || file.removed)
-    return;
+  const { state, result, scan, sourcePool, report, cancelled } = context;
+  context.check();
+  if (!state.ready(file)) return;
   file.attempted = true;
-  file.sequence = ++state.sequence;
   if (!file.changed && file.selected)
     result.reused = Math.max(0, result.reused - 1);
   if (!file.selected && !await refreshOutsideSource(context, file))
@@ -36,50 +31,60 @@ export async function inspectSource(context: RefreshContext, file: FileState): P
   try {
     const preparation = await scan.measureAsync('readSources', () => sourcePool.read(file));
     report();
-    if (!preparation.ok) {
-      if (preparation.identity) {
-        state.setSession(file, preparation.identity.sessionId);
-        state.connect(file.provider, file.previous?.session_id, file.session);
-      }
-      throw new SummaryError(preparation.error.code, preparation.error.offset);
-    }
-    check();
-    const read = preparation.read, winners = new SourceWinners(file.provider, preparation.winners), evidence = winners.evidence;
-    file.complete_position = read.position;
-    file.prefix_hash = read.prefixHash;
-    if (read.parsedRows || !read.resumed) result.parsed++;
-    else result.reused++;
-    if (!read.rows) {
-      state.affect(file.provider, file.previous?.session_id);
-      if (read.partialLine && file.previous?.session_id) {
-        file.deferred = true;
-        return;
-      }
-      file.content_hash = null;
-      state.setSourceIdentity(file, null);
-      state.setSession(file, file.previous?.session_id ?? null);
-      return;
-    }
-    state.setSession(file, read.identity!.sessionId);
-    file.prepared = { identity: read.identity!, evidence, winners, partialLine: read.partialLine, sourceIdentity: read.sourceIdentity!,
-      contentHash: read.contentHash, position: read.position, prefixHash: read.prefixHash };
-    state.setSourceIdentity(file, read.sourceIdentity);
-    file.content_hash = read.contentHash;
-    state.registerPrepared(file);
-    const previous = file.previous;
-    file.changed = !previous || previous.source_missing === 1 || previous.processing_status !== 'done'
-      || previous.content_hash !== read.contentHash || previous.source_root !== file.source_root
-      || previous.parser_version !== file.parser_version || context.collect && previous.capabilities_collected !== 1;
-    if (file.changed) {
-      state.affect(file.provider, file.session);
-      state.connect(file.provider, previous?.session_id, file.session);
-    }
+    applyPreparation(context, file, preparation);
   }
   catch (error) {
     state.fail(file, error);
     if (cancelled())
       throw error;
   }
+}
+
+function applyPreparation(context: RefreshContext, file: FileState, preparation: SourcePreparation): void {
+  const { state, result, check, collect } = context;
+  const previousSession = file.previous?.session_id;
+  if (!preparation.ok) {
+    if (preparation.identity) {
+      state.setSession(file, preparation.identity.sessionId);
+      state.connect(file.provider, previousSession, file.session_id);
+    }
+    throw new SummaryError(preparation.error.code, preparation.error.offset);
+  }
+  check();
+  result.parsed++;
+  const { read, winners } = preparation;
+  if (!read.rows) {
+    applyEmptySource(state, file, read.partialLine);
+    return;
+  }
+  const identity = read.identity!;
+  state.setSession(file, identity.sessionId);
+  state.setSourceIdentity(file, read.sourceIdentity);
+  file.content_hash = read.contentHash;
+  state.registerPrepared(file, { identity, winners, partialLine: read.partialLine });
+  file.changed = needsReplacement(file, collect);
+  if (!file.changed) return;
+  state.affect(file.provider, file.session_id);
+  state.connect(file.provider, previousSession, file.session_id);
+}
+
+function applyEmptySource(state: ScanState, file: FileState, partialLine: boolean): void {
+  const previousSession = file.previous?.session_id;
+  state.affect(file.provider, previousSession);
+  if (partialLine && previousSession) {
+    file.deferred = true;
+    return;
+  }
+  file.content_hash = null;
+  state.setSourceIdentity(file, null);
+  state.setSession(file, previousSession ?? null);
+}
+
+function needsReplacement(file: FileState, collect: boolean): boolean {
+  const previous = file.previous;
+  return !previous || previous.source_missing === 1 || previous.processing_status !== 'done'
+    || previous.content_hash !== file.content_hash || previous.source_root !== file.source_root
+    || previous.parser_version !== file.parser_version || collect && previous.capabilities_collected !== 1;
 }
 
 async function refreshOutsideSource(context: RefreshContext, file: FileState): Promise<boolean> {
@@ -93,15 +98,20 @@ async function refreshOutsideSource(context: RefreshContext, file: FileState): P
     return true;
   }
   catch (error) {
-    const replacement = [...state.identityFiles.get(JSON.stringify([file.provider, file.source_identity])) ?? []]
-      .some(candidate => candidate.prepared && !candidate.error && !candidate.removed);
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT' && (replacement || retain && file.previous?.source_missing)) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT'
+      && (retain && file.previous?.source_missing || hasPreparedReplacement(state, file))) {
       file.removed = true;
       file.changed = true;
-      state.affect(file.provider, file.session);
+      state.affect(file.provider, file.session_id);
       return false;
     }
     state.fail(file, new SummaryError('source-unavailable-outside-scan'));
     return false;
   }
+}
+
+function hasPreparedReplacement(state: ScanState, file: FileState): boolean {
+  for (const candidate of state.matchingSources(file))
+    if (candidate.prepared && !candidate.error && !candidate.removed) return true;
+  return false;
 }

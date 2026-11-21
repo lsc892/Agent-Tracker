@@ -1,6 +1,6 @@
 // 읽는 동안 요청 상태·최신 검증·도구 중복·usage winner를 함께 누적한다.
 import type { ParseEvent, Provider, UsageEvent } from '../types';
-import { key, normalizedEvent, SourceEvidence } from './sourceEvidence';
+import { key, normalizedEvent, SourceEvidence, type SourceEvidenceData } from './sourceEvidence';
 import { addTurn, createTurnState, max, type TurnState } from './turns';
 import { usageScore } from './winners';
 
@@ -19,22 +19,18 @@ export interface SourceRoot {
   capabilities: Map<string, { event: Capability; positions: { index: number; offset: number }[] }>;
 }
 export interface SourceWinnersSnapshot {
-  evidence: Omit<SourceEvidence, 'add' | 'child'>;
+  evidence: SourceEvidenceData;
   roots: Map<string, SourceRoot>;
   winners: Map<string, Candidate>;
 }
 
 /** 원문과 metadata 이벤트 목록을 보관하지 않고 요청별 상태와 winner만 전달한다. */
 export class SourceWinners {
-  readonly evidence: SourceEvidence;
-  readonly roots: Map<string, SourceRoot>;
-  private readonly winners: Map<string, Candidate>;
+  readonly evidence = new SourceEvidence();
+  readonly roots = new Map<string, SourceRoot>();
+  private readonly winners = new Map<string, Candidate>();
 
-  constructor(private readonly provider: Provider, snapshot?: SourceWinnersSnapshot) {
-    this.evidence = snapshot ? Object.assign(new SourceEvidence(), snapshot.evidence) : new SourceEvidence();
-    this.roots = snapshot?.roots ?? new Map();
-    this.winners = snapshot?.winners ?? new Map();
-  }
+  constructor(private readonly provider: Provider) {}
 
   snapshot(): SourceWinnersSnapshot { return { evidence: this.evidence, roots: this.roots, winners: this.winners }; }
 

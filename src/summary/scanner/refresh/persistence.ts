@@ -1,4 +1,4 @@
-// 연결 묶음의 최종 변경분을 저장하고 소실 보존·관측·실패 진단을 마무리한다.
+// 연결 묶음의 최종 변경분을 저장하고 진단과 전역 갱신 기준을 확정한다.
 import { setImmediate as yieldToWorker } from 'node:timers/promises';
 import type { MemoryAggregateResult } from '../../aggregation/memoryAggregate';
 import type { MemoryReplacement } from '../../db/memoryStore';
@@ -18,85 +18,78 @@ interface ComponentCommit {
 }
 
 export async function commitComponents(context: RefreshContext, aggregated: MemoryAggregateResult): Promise<void> {
-  const { state, check, report } = context;
-  const { files, affected, links } = state;
+  const { files, affected, links, reconnections } = context.state;
   if (!affected.size) return;
-  const memberGroups = new OrderedGroups(files.values(), file => [sessionKey(file.provider, file.session ?? ''),
+  const memberGroups = new OrderedGroups(files.values(), file => [sessionKey(file.provider, file.session_id ?? ''),
     sessionKey(file.provider, file.previous?.session_id ?? '')]);
   const summaryGroups = new OrderedGroups(aggregated.summaries, row => [sessionKey(row.provider, row.session_id)]);
   const orphanGroups = new OrderedGroups(aggregated.orphans, row => [sessionKey(row.provider, row.session_id)]);
-  const reconnectedIds = new Set(state.reconnections.flatMap(link => [link.old_id, link.new_id]));
-  const queued = new Set<string>();
-  let batch: ComponentCommit[] = [], batchSummaries = 0;
-  const finish = ({ component }: ComponentCommit): void => {
-    for (const value of component) affected.delete(value);
-    report();
-  };
+  const reconnectedIds = new Set(reconnections.flatMap(link => [link.old_id, link.new_id]));
+  const remaining = new Set([...affected].sort());
+  let batch: ComponentCommit[] = [];
+  let batchSummaries = 0;
   const flush = async (): Promise<void> => {
     if (!batch.length) return;
-    const pendingBatch = batch;
+    await commitBatch(context, batch);
     batch = [];
     batchSummaries = 0;
-    queued.clear();
-    await yieldToWorker();
-    check();
-    if (pendingBatch.length === 1) {
-      const entry = pendingBatch[0];
-      commitComponent(context, entry.component, entry.members, entry.aggregated);
-      finish(entry);
-      return;
-    }
-    try {
-      const names = context.database.replaceMemoryBatch(pendingBatch.map(entry =>
-        componentReplacement(context, entry.component, entry.members, entry.aggregated)), context.storage);
-      for (const [key, name] of names) state.savedSessionNames.set(key, name);
-    } catch {
-      // Scanner summaries contain arrays, so rollback can safely retry each original component.
-      for (const entry of pendingBatch) {
-        await yieldToWorker();
-        check();
-        commitComponent(context, entry.component, entry.members, entry.aggregated);
-        finish(entry);
-      }
-      return;
-    }
-    // A failed COMMIT must leave every member unsettled for the individual retry path.
-    for (const entry of pendingBatch)
-      for (const file of entry.members) file.settled = true;
-    for (const entry of pendingBatch) finish(entry);
   };
-  for (const seed of [...affected].sort()) {
-    if (!affected.has(seed) || queued.has(seed)) continue;
+  for (const seed of remaining) {
     const component = linkedComponent(seed, links);
-    const members = memberGroups.members(component);
-    const grouped = { summaries: summaryGroups.members(component), orphans: orphanGroups.members(component) };
-    const entry = { component, members, aggregated: grouped };
+    for (const session of component) remaining.delete(session);
+    const entry = { component, members: memberGroups.members(component),
+      aggregated: { summaries: summaryGroups.members(component), orphans: orphanGroups.members(component) } };
     if (requiresIndividualCommit(entry, reconnectedIds)) {
       await flush();
-      await yieldToWorker();
-      check();
-      commitComponent(context, component, members, grouped);
-      finish(entry);
+      await commitIndividual(context, entry);
       continue;
     }
-    if (batchSummaries + grouped.summaries.length > MAX_COMMIT_BATCH_SUMMARIES) await flush();
+    const summaries = entry.aggregated.summaries.length;
+    if (batchSummaries + summaries > MAX_COMMIT_BATCH_SUMMARIES) await flush();
     batch.push(entry);
-    batchSummaries += grouped.summaries.length;
-    for (const value of component) queued.add(value);
+    batchSummaries += summaries;
     if (batch.length === MAX_COMMIT_BATCH_COMPONENTS || batchSummaries === MAX_COMMIT_BATCH_SUMMARIES) await flush();
   }
   await flush();
 }
 
+async function commitBatch(context: RefreshContext, batch: readonly ComponentCommit[]): Promise<void> {
+  if (batch.length === 1) {
+    await commitIndividual(context, batch[0]);
+    return;
+  }
+  await yieldToWorker();
+  context.check();
+  try {
+    const names = context.database.replaceMemoryBatch(batch.map(entry => componentReplacement(context, entry)), context.storage);
+    for (const [key, name] of names) context.state.savedSessionNames.set(key, name);
+  } catch {
+    // Materialized summaries can be replayed after the batch transaction rolls back.
+    for (const entry of batch) await commitIndividual(context, entry);
+    return;
+  }
+  for (const entry of batch) settleFiles(entry.members);
+  for (const _ of batch) context.report();
+}
+
+async function commitIndividual(context: RefreshContext, entry: ComponentCommit): Promise<void> {
+  await yieldToWorker();
+  context.check();
+  commitComponent(context, entry);
+  context.report();
+}
+
+function settleFiles(files: readonly FileState[]): void {
+  for (const file of files) file.settled = true;
+}
+
 /** 연결된 세션을 기존 너비 우선 탐색 순서로 모아 하나의 원자적 저장 범위를 만든다. */
 function linkedComponent(seed: string, links: ReadonlyMap<string, ReadonlySet<string>>): Set<string> {
-  const component = new Set([seed]), pending = [seed];
-  for (let index = 0; index < pending.length; index++) {
-    for (const linked of links.get(pending[index]) ?? []) {
-      if (component.has(linked)) continue;
+  const component = new Set([seed]);
+  // Set iteration also visits newly discovered sessions in insertion order.
+  for (const session of component) {
+    for (const linked of links.get(session) ?? [])
       component.add(linked);
-      pending.push(linked);
-    }
   }
   return component;
 }
@@ -108,8 +101,9 @@ function requiresIndividualCommit(entry: ComponentCommit, reconnectedIds: Readon
 }
 
 /** 보류 → 원본 오류 → 고아 요청 → 실제 쓰기 순으로 검사해 앞선 보존·복구 정책을 우선한다. */
-function commitComponent(context: RefreshContext, component: Set<string>, members: FileState[], aggregated: MemoryAggregateResult): void {
+function commitComponent(context: RefreshContext, entry: ComponentCommit): void {
   const { database, storage, state, retain } = context;
+  const { members, aggregated } = entry;
   if (members.some(file => file.deferred)) {
     settleDeferredComponent(context, members);
     return;
@@ -134,10 +128,9 @@ function commitComponent(context: RefreshContext, component: Set<string>, member
     return;
   }
   try {
-    const names = database.replaceMemory(componentReplacement(context, component, members, aggregated), storage);
+    const names = database.replaceMemory(componentReplacement(context, entry), storage);
     for (const [key, name] of names) state.savedSessionNames.set(key, name);
-    for (const file of members)
-      file.settled = true;
+    settleFiles(members);
   }
   catch (error) {
     for (const file of members)
@@ -147,86 +140,95 @@ function commitComponent(context: RefreshContext, component: Set<string>, member
 }
 
 /** 성분별 보존·이동 범위를 합치지 않고 기존 snapshot 계약을 그대로 만든다. */
-function componentReplacement(
-  context: RefreshContext, component: Set<string>, members: FileState[], aggregated: MemoryAggregateResult,
-): MemoryReplacement {
-  const { state, result, collect, retain } = context;
-  const missing = members.some(file => file.removed);
-  const memberIds = new Set(members.map(file => file.id));
+function componentReplacement(context: RefreshContext, { component, members, aggregated }: ComponentCommit): MemoryReplacement {
+  const { state, collect, retain } = context;
   const sessions = [...component].map(value => {
     const [provider, session_id] = JSON.parse(value) as [Provider, string];
     return { provider, session_id };
   });
-  return { sessions, summaries: aggregated.summaries.filter(row => !retain || !missing || row.hasMain),
-    files: members.filter(file => !file.removed).map(finalFile),
-    removedFileIds: members.filter(file => file.removed).map(file => file.id),
-    reconnectedFiles: state.reconnections.filter(link => memberIds.has(link.old_id)),
-    preserveCapabilities: !collect, retainDeletedSourceUsage: retain, scanId: result.scanId };
+  const files = [], removedFileIds = new Set<number>();
+  for (const file of members) {
+    if (file.removed) removedFileIds.add(file.id);
+    else files.push(finalFile(file));
+  }
+  const summaries = retain && removedFileIds.size ? aggregated.summaries.filter(row => row.hasMain) : aggregated.summaries;
+  return { sessions, summaries, files, removedFileIds,
+    reconnectedFiles: state.reconnections.filter(link => removedFileIds.has(link.old_id)),
+    preserveCapabilities: !collect, retainDeletedSourceUsage: retain };
 }
 
 function settleDeferredComponent(context: RefreshContext, members: FileState[]): void {
   const { database } = context;
   database.transaction(() => {
-    for (const file of members) {
-      file.settled = true;
-      if (file.deferred)
-        database.connection.prepare(`UPDATE source_file SET processing_status='done',
-            processing_position='partial-line: waiting for newline',recorded_at=?,last_error=NULL WHERE id=?`)
-          .run(new Date().toISOString(), file.id);
-    }
+    const markDeferred = database.connection.prepare(`UPDATE source_file SET processing_status='done',
+      processing_position='partial-line: waiting for newline',recorded_at=?,last_error=NULL WHERE id=?`);
+    for (const file of members)
+      if (file.deferred) markDeferred.run(new Date().toISOString(), file.id);
+  });
+  settleFiles(members);
+}
+
+export function finishScan(context: RefreshContext, names: Map<string, string>, scope: string, startedMs: number): void {
+  const hasDeferredFiles = finishSourceRows(context);
+  context.check();
+  context.database.transaction(() => {
+    persistNames(context, names);
+    // Commit the scan's starting time so writes after discovery remain eligible next time.
+    if (!context.result.failed && !hasDeferredFiles)
+      context.database.connection.prepare(`INSERT INTO summary_refresh(id,scope,started_ms) VALUES(1,?,?)
+        ON CONFLICT(id) DO UPDATE SET scope=excluded.scope,started_ms=excluded.started_ms`).run(scope, startedMs);
   });
 }
 
-export function finishScan(context: RefreshContext, names: Map<string, string>): void {
-  const { database, result, storage, retain } = context;
-  const { files } = context.state;
-  const unsettled = [...files.values()].filter(file => file.selected && file.attempted
-    && !file.settled && !file.error && !file.removed && file.session === null);
-  if (unsettled.length)
-    database.replaceMemory({ sessions: [], summaries: [], files: unsettled.map(finalFile), scanId: result.scanId }, storage);
-  const removedEmpty = [...files.values()].filter(file => file.removed && file.previous?.session_id === null);
-  if (removedEmpty.length)
-    database.replaceMemory({ sessions: [], summaries: [], files: [], removedFileIds: removedEmpty.map(file => file.id),
-      retainDeletedSourceUsage: retain, scanId: result.scanId }, storage);
-  database.transaction(() => {
-    const update = database.connection.prepare('UPDATE sessions SET session_name=? WHERE provider=? AND session_id=? AND session_name IS NOT ?');
-    for (const [value, name] of names) {
-      if (context.state.savedSessionNames.get(value) === name) continue;
-      const [provider, session] = JSON.parse(value) as [Provider, string];
-      update.run(name, provider, session, name);
+/** 세션이 담당하지 않는 원본 행과 실패를 반영하고 보류 원본을 확인한다. */
+function finishSourceRows(context: RefreshContext): boolean {
+  const { database, state, storage, retain } = context;
+  const files = [], removedFileIds = [], failures: FileState[] = [];
+  let hasDeferredFiles = false;
+  for (const file of state.files.values()) {
+    if (file.removed) {
+      if (file.previous?.session_id === null) removedFileIds.push(file.id);
+    } else if (file.selected && file.attempted && !file.settled && !file.error && file.session_id === null) {
+      files.push(finalFile(file));
     }
-    const seen = database.connection.prepare('UPDATE source_file SET last_seen_scan_id=? WHERE id=?');
-    for (const file of files.values())
-      if (file.selected && file.previous)
-        seen.run(result.scanId, file.id);
-  });
-  for (const file of files.values())
-    if (file.error)
-      recordFailure(context, file);
+    if (file.error) failures.push(file);
+    if (file.deferred) hasDeferredFiles = true;
+  }
+  // Persist allocated IDs before recording new failures through SQLite-assigned IDs.
+  if (files.length) database.replaceMemory({ sessions: [], summaries: [], files }, storage);
+  if (removedFileIds.length)
+    database.replaceMemory({ sessions: [], summaries: [], files: [], removedFileIds, retainDeletedSourceUsage: retain }, storage);
+  for (const file of failures) recordFailure(context, file);
+  return hasDeferredFiles;
+}
+
+function persistNames(context: RefreshContext, names: ReadonlyMap<string, string>): void {
+  const update = context.database.connection.prepare('UPDATE sessions SET session_name=? WHERE provider=? AND session_id=? AND session_name IS NOT ?');
+  for (const [key, name] of names) {
+    if (context.state.savedSessionNames.get(key) === name) continue;
+    const [provider, session] = JSON.parse(key) as [Provider, string];
+    update.run(name, provider, session, name);
+  }
 }
 
 function finalFile(file: FileState): FileMetadata & { id: number } {
   return { id: file.id, provider: file.provider, source_root: file.source_root, path: file.path,
-    session_id: file.session, size_bytes: file.size_bytes, mtime_ms: file.mtime_ms, dev: file.dev, inode: file.inode,
+    session_id: file.session_id, size_bytes: file.size_bytes, mtime_ms: file.mtime_ms, dev: file.dev, inode: file.inode,
     parser_version: file.parser_version, capabilities_collected: file.capabilities_collected,
-    source_identity: file.prepared?.sourceIdentity ?? file.source_identity, content_hash: file.prepared?.contentHash ?? file.content_hash,
-    complete_position: file.prepared?.position ?? file.complete_position ?? 0, prefix_hash: file.prepared?.prefixHash ?? file.prefix_hash ?? null };
+    source_identity: file.source_identity, content_hash: file.content_hash };
 }
 
 export function recordFailure(context: RefreshContext, file: FileState): void {
-  const { database, result } = context;
-  let previous = database.findSourceFile(file.provider, file.path);
-  if (!previous) {
-    previous = database.observeFile(file, result.scanId);
-    file.id = previous.id;
-  }
-  database.setSourceDiagnostic(previous.id, file.error!.code === 'interrupted' ? 'interrupted' : 'error', `parse: byte=${file.error!.offset}`, file.error!.code, file.error!.offset);
+  const { database } = context;
+  const { code, offset } = file.error!;
+  const source = database.findSourceFile(file.provider, file.path) ?? database.observeFile(file);
+  database.setSourceDiagnostic(source.id, code === 'interrupted' ? 'interrupted' : 'error', `parse: byte=${offset}`, code, offset);
 }
 
 function preserveMissingSources(context: RefreshContext, members: FileState[]): void {
-  const { database, result, storage, retain } = context;
+  const { database, storage, retain } = context;
   const removed = members.filter(file => file.removed);
   if (removed.length && retain)
-    database.replaceMemory({ sessions: removed.filter(file => file.session).map(file => ({ provider: file.provider, session_id: file.session! })),
-      summaries: [], files: [], removedFileIds: removed.map(file => file.id), retainDeletedSourceUsage: true, scanId: result.scanId }, storage);
+    database.replaceMemory({ sessions: removed.filter(file => file.session_id).map(file => ({ provider: file.provider, session_id: file.session_id! })),
+      summaries: [], files: [], removedFileIds: removed.map(file => file.id), retainDeletedSourceUsage: true }, storage);
 }

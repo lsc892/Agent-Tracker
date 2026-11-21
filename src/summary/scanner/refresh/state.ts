@@ -1,6 +1,5 @@
 // 한 갱신의 파일 상태·관계 색인·큐를 소유하고 상태 변경 시 색인 일관성을 유지한다.
-import type { SourceEvidence } from '../../aggregation/sourceEvidence';
-import type { SourceWinners } from '../../aggregation/sourceWinners';
+import type { SourceWinnersSnapshot } from '../../aggregation/sourceWinners';
 import type { FileMetadata, SourceFileRow, Provider } from '../../db/types';
 import { SummaryError } from '../../jsonl';
 import type { ParsedIdentity, RefreshResult } from '../../types';
@@ -12,28 +11,30 @@ export const sessionKey = (provider: Provider, session: string): string => JSON.
 
 export interface PreparedSource {
   identity: ParsedIdentity;
-  evidence: SourceEvidence;
-  winners: SourceWinners;
+  winners: SourceWinnersSnapshot;
   partialLine: boolean;
-  sourceIdentity: string;
-  contentHash: string;
-  position: number;
-  prefixHash: string;
 }
+
+export type StoredSource = FileMetadata & Pick<SourceFileRow, 'id' | 'source_missing' | 'processing_status'>;
 
 export interface FileState extends FileMetadata {
   id: number;
-  previous?: SourceFileRow;
+  readonly discoveryOrder: number;
+  previous?: StoredSource;
   changed: boolean;
   removed: boolean;
   selected: boolean;
   prepared?: PreparedSource;
-  session: string | null;
   error?: SummaryError;
   settled?: boolean;
   attempted?: boolean;
-  sequence?: number;
   deferred?: boolean;
+}
+
+export type PreparedFile = FileState & { prepared: PreparedSource };
+
+export function isPreparedFile(file: FileState): file is PreparedFile {
+  return file.prepared !== undefined && !file.error && !file.removed;
 }
 
 /** Map·Set은 갱신당 한 번 만들고 책임별 모듈은 같은 상태를 사용한다. */
@@ -41,30 +42,27 @@ export class ScanState {
   readonly files = new Map<number, FileState>();
   readonly affected = new Set<string>();
   readonly links = new Map<string, Set<string>>();
-  readonly sessionFiles = new Map<string, Set<FileState>>();
-  readonly identityFiles = new Map<string, Set<FileState>>();
-  readonly codexFiles = new Set<FileState>();
-  readonly preparedCodex = new Set<FileState>();
-  readonly fileOrder = new Map<FileState, number>();
-  readonly knownThreads = new Set<string>();
-  readonly missingReferences = new Set<string>();
-  readonly unsearchedReferences = new Set<string>();
-  readonly parentReasons = new Map<FileState, Set<string>>();
+  private readonly sessionFiles = new Map<string, Set<FileState>>();
+  private readonly identityFiles = new Map<string, Set<FileState>>();
+  readonly codexFiles: FileState[] = [];
+  private readonly preparedCodex: FileState[] = [];
+  readonly preparedFiles: FileState[] = [];
+  private readonly seenReferences = new Set<string>();
+  readonly pendingReferences = new Set<string>();
   readonly relatedQueue = new SourceQueue<FileState>();
-  readonly parentQueue = new SourceQueue<FileState>();
   readonly missingParents = new Set<number>();
   readonly reconnections: { old_id: number; new_id: number }[] = [];
   readonly savedSessionNames = new Map<string, string>();
   lineageDirty = false;
-  sequence = 0;
+  private indexesEnabled = false;
 
   constructor(private readonly result: RefreshResult) {}
 
   ready(file: FileState): boolean {
-    return this.files.get(file.id) === file && !file.attempted && !file.prepared && !file.error && !file.removed;
+    return !file.attempted && !file.error && !file.removed;
   }
 
-  enqueueRelated(file: FileState): void {
+  private enqueueRelated(file: FileState): void {
     if (this.ready(file)) this.relatedQueue.add(file);
   }
 
@@ -92,55 +90,71 @@ export class ScanState {
     if (!file.error) this.result.failed++;
     file.error = error instanceof SummaryError ? error : new SummaryError('source-read-error');
     this.affect(file.provider, file.previous?.session_id);
-    this.affect(file.provider, file.session);
+    this.affect(file.provider, file.session_id);
   }
 
   trackFile(file: FileState): void {
-    const previous = this.files.get(file.id);
-    const order = previous ? this.fileOrder.get(previous)! : this.fileOrder.size;
-    if (previous) {
-      removeMember(this.sessionFiles, sessionKey(previous.provider, previous.session ?? ''), previous);
-      if (previous.source_identity)
-        removeMember(this.identityFiles, JSON.stringify([previous.provider, previous.source_identity]), previous);
-      this.codexFiles.delete(previous);
-      this.fileOrder.delete(previous);
-    }
     this.files.set(file.id, file);
-    this.fileOrder.set(file, order);
-    addMember(this.sessionFiles, sessionKey(file.provider, file.session ?? ''), file);
+    if (this.indexesEnabled) this.indexFile(file);
+  }
+
+  /** 무변경 스캔은 관계 색인을 만들지 않는다. 이후에 등록한 파일은 바로 색인한다. */
+  indexRelatedSources(): void {
+    if (this.indexesEnabled) return;
+    this.indexesEnabled = true;
+    for (const file of this.files.values()) this.indexFile(file);
+  }
+
+  private indexFile(file: FileState): void {
+    this.indexSession(file);
     if (file.source_identity)
-      addMember(this.identityFiles, JSON.stringify([file.provider, file.source_identity]), file);
-    if (file.provider === 'codex') this.codexFiles.add(file);
-    if (this.affected.has(sessionKey(file.provider, file.session ?? ''))) this.enqueueRelated(file);
+      addMember(this.identityFiles, sessionKey(file.provider, file.source_identity), file);
+    if (file.provider === 'codex') this.codexFiles.push(file);
+  }
+
+  private indexSession(file: FileState): void {
+    if (!file.session_id) return;
+    const key = sessionKey(file.provider, file.session_id);
+    addMember(this.sessionFiles, key, file);
+    if (this.affected.has(key)) this.enqueueRelated(file);
   }
 
   setSession(file: FileState, session: string | null): void {
-    if (file.session === session) return;
-    removeMember(this.sessionFiles, sessionKey(file.provider, file.session ?? ''), file);
-    file.session = session;
-    addMember(this.sessionFiles, sessionKey(file.provider, session ?? ''), file);
-    if (this.affected.has(sessionKey(file.provider, session ?? ''))) this.enqueueRelated(file);
+    if (file.session_id === session) return;
+    if (file.session_id) removeMember(this.sessionFiles, sessionKey(file.provider, file.session_id), file);
+    file.session_id = session;
+    this.indexSession(file);
   }
 
   setSourceIdentity(file: FileState, identity: string | null | undefined): void {
     if (file.source_identity === identity) return;
     if (file.source_identity)
-      removeMember(this.identityFiles, JSON.stringify([file.provider, file.source_identity]), file);
+      removeMember(this.identityFiles, sessionKey(file.provider, file.source_identity), file);
     file.source_identity = identity;
-    if (identity) addMember(this.identityFiles, JSON.stringify([file.provider, identity]), file);
+    if (identity) addMember(this.identityFiles, sessionKey(file.provider, identity), file);
   }
 
-  registerPrepared(file: FileState): void {
-    const identity = file.prepared!.identity;
-    this.knownThreads.add(identity.threadId);
-    this.missingReferences.delete(identity.threadId);
+  matchingSources(file: FileState): Iterable<FileState> {
+    return file.source_identity ? this.identityFiles.get(sessionKey(file.provider, file.source_identity)) ?? [] : [];
+  }
+
+  registerPrepared(file: FileState, prepared: PreparedSource): void {
+    file.prepared = prepared;
+    this.preparedFiles.push(file);
+    const { identity } = prepared;
+    this.seenReferences.add(identity.threadId);
+    this.pendingReferences.delete(identity.threadId);
     if (file.provider !== 'codex') return;
-    this.preparedCodex.add(file);
+    this.preparedCodex.push(file);
     this.lineageDirty = true;
     for (const reference of [identity.parentThreadId, identity.forkedFromId]) {
-      if (!reference || this.knownThreads.has(reference) || this.missingReferences.has(reference)) continue;
-      this.missingReferences.add(reference);
-      this.unsearchedReferences.add(reference);
+      if (!reference || this.seenReferences.has(reference)) continue;
+      this.seenReferences.add(reference);
+      this.pendingReferences.add(reference);
     }
+  }
+
+  preparedCodexFiles(): PreparedFile[] {
+    return this.preparedCodex.filter(isPreparedFile).sort((a, b) => a.discoveryOrder - b.discoveryOrder);
   }
 }

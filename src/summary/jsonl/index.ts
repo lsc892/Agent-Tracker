@@ -25,78 +25,82 @@ export async function readJsonl(
   options: { maxLineBytes?: number; signal?: AbortSignal; isCancelled?: () => boolean; onBytes?: (bytes: number) => void;
     /** Raw file bytes, before image filtering or decompression; valid only during the callback. */
     onChunk?: (chunk: Buffer) => void;
-    /** Uncompressed JSONL only; an already verified complete-line boundary. */
-    startOffset?: number;
     /** Synchronous processing of at most one chunk; file reads stay outside the callback. */
     processBatch?: (parseRows: () => void) => void } = {},
-): Promise<{ partialLine: boolean; bytes: number; rows: number; completeOffset: number }> {
+): Promise<{ partialLine: boolean; bytes: number; rows: number }> {
   const maxLine = options.maxLineBytes ?? 4 * 1024 * 1024;
   if (!Number.isSafeInteger(maxLine) || maxLine < 1) throw new RangeError('maxLineBytes must be a positive integer');
-  const start = options.startOffset ?? 0;
   const compressed = path.toLowerCase().endsWith('.jsonl.zst');
-  if (!Number.isSafeInteger(start) || start < 0 || start > size || compressed && start !== 0) throw new RangeError('Invalid JSONL startOffset');
   const file = await open(path, 'r');
-  const chunk = Buffer.allocUnsafe(Math.min(64 * 1024, Math.max(1, size)));
+  const buffer = Buffer.allocUnsafe(Math.min(64 * 1024, Math.max(1, size)));
   let line: JsonlLine | undefined;
-  let read = start;
-  let lineOffset = start;
+  let read = 0;
+  let lineOffset = 0;
   let rows = 0;
   const chunks = async function* (): AsyncGenerator<Buffer> {
     while (read < size) {
       if (options.signal?.aborted || options.isCancelled?.()) throw new SummaryError('interrupted', read);
-      const { bytesRead } = await file.read(chunk, 0, Math.min(chunk.length, size - read), read);
+      const { bytesRead } = await file.read(buffer, 0, Math.min(buffer.length, size - read), read);
       if (!bytesRead) throw new SummaryError('file-truncated-during-read', read);
       read += bytesRead;
-      options.onChunk?.(chunk.subarray(0, bytesRead));
+      const bytes = buffer.subarray(0, bytesRead);
+      options.onChunk?.(bytes);
       options.onBytes?.(bytesRead);
       // The decoder can prefetch; it must not see a buffer overwritten by the next file read.
-      yield compressed ? Buffer.from(chunk.subarray(0, bytesRead)) : chunk.subarray(0, bytesRead);
+      yield compressed ? Buffer.from(bytes) : bytes;
     }
   };
+
+  function parseChunk(chunk: Buffer): boolean {
+    let completeLines: string[] | undefined;
+    let completeIndex = 0;
+    let index = 0;
+    while (index < chunk.length) {
+      const newline = chunk.indexOf(10, index);
+      const end = newline < 0 ? chunk.length : newline;
+      let text: string | undefined;
+      let sourceBytes = end - index;
+      if (!line && end < chunk.length) {
+        // Decode complete lines once per chunk. Keep split UTF-8 in JsonlLine
+        // and derive offsets from the Buffer, even for invalid UTF-8 bytes.
+        completeLines ??= chunk.toString('utf8', index, chunk.lastIndexOf(10)).split('\n');
+        const candidate = completeLines[completeIndex++].trim();
+        // Absence proves there is no image to sanitize. JSON.parse still checks
+        // every JSON string/escape; escaped image prefixes were never stripped.
+        if (sourceBytes <= maxLine && !/data:image\//i.test(candidate)) text = candidate;
+      }
+      if (text === undefined) {
+        line ??= new JsonlLine(maxLine, lineOffset);
+        line.append(chunk, index, end);
+        if (end === chunk.length) break;
+        text = line.text();
+        sourceBytes = line.bytes;
+      }
+      if (text) {
+        const row = parseJsonlObject(text, lineOffset);
+        rows++;
+        if (onRow(row, lineOffset) === false) return true;
+      }
+      lineOffset += sourceBytes + 1;
+      line = undefined;
+      index = end + 1;
+    }
+    return false;
+  }
+
   try {
     for await (const chunk of compressed ? zstdChunks(chunks()) : chunks()) {
       if (options.signal?.aborted || options.isCancelled?.()) throw new SummaryError('interrupted', read);
-      const bytesRead = chunk.length;
-      let stopped = false;
-      const parseRows = (): void => {
-        let completeLines: string[] | undefined;
-        let completeIndex = 0;
-        let index = 0;
-        while (index < bytesRead) {
-          const newline = chunk.indexOf(10, index);
-          const end = newline < 0 ? bytesRead : newline;
-          let text: string | undefined;
-          let sourceBytes = end - index;
-          if (!line && end < bytesRead) {
-            // Decode complete lines once per chunk. Keep split UTF-8 in JsonlLine
-            // and derive offsets from the Buffer, even for invalid UTF-8 bytes.
-            completeLines ??= chunk.toString('utf8', index, chunk.lastIndexOf(10)).split('\n');
-            const candidate = completeLines[completeIndex++].trim();
-            // Absence proves there is no image to sanitize. JSON.parse still checks
-            // every JSON string/escape; escaped image prefixes were never stripped.
-            if (sourceBytes <= maxLine && !/data:image\//i.test(candidate)) text = candidate;
-          }
-          if (text === undefined) {
-            line ??= new JsonlLine(maxLine, lineOffset);
-            line.append(chunk, index, end);
-            if (end === bytesRead) break;
-            text = line.text();
-            sourceBytes = line.bytes;
-          }
-          if (text) {
-            const row = parseJsonlObject(text, lineOffset);
-            rows++;
-            if (onRow(row, lineOffset) === false) { stopped = true; return; }
-          }
-          lineOffset += sourceBytes + 1;
-          line = undefined;
-          index = end + 1;
-        }
-      };
-      if (options.processBatch) options.processBatch(parseRows); else parseRows();
-      if (stopped) return { partialLine: false, bytes: read - start, rows, completeOffset: lineOffset };
+      let stopped: boolean;
+      if (options.processBatch) {
+        stopped = false;
+        options.processBatch(() => { stopped = parseChunk(chunk) || stopped; });
+      } else {
+        stopped = parseChunk(chunk);
+      }
+      if (stopped) return { partialLine: false, bytes: read, rows };
     }
-    return { partialLine: (line?.bytes ?? 0) > 0, bytes: read - start, rows, completeOffset: lineOffset };
+    return { partialLine: (line?.bytes ?? 0) > 0, bytes: read, rows };
   } catch (error) {
     if (error instanceof ZstdError) throw new SummaryError('decompression-error', lineOffset);
     throw error;

@@ -54,7 +54,6 @@ export interface NameOption {
 }
 export interface NameResult { rows: NameOption[]; total: number }
 export interface RefreshResult {
-  scanId: string;
   discovered: number;
   parsed: number;
   reused: number;

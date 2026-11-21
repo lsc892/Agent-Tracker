@@ -1,9 +1,9 @@
-// 원본 로그 파일의 관측 정보·승인된 메타데이터·처리 진단을 저장한다.
+// 원본 로그의 등록·메타데이터 조회·처리 진단을 맡는다.
 import type { SqliteSession } from './connection';
 import type { FileMetadata, SourceFileRow, ProcessingStatus, Provider } from './types';
 import { pageLimit } from './validation';
 
-/** 파일 식별·관측·진단과 세션별·미관측 파일 조회를 관리한다. */
+/** 파일 식별·진단과 세션별 파일 조회를 관리한다. */
 export class SourceFileStore {
   constructor(private readonly database: SqliteSession) {}
 
@@ -12,28 +12,18 @@ export class SourceFileStore {
       .get(provider, path) as unknown as SourceFileRow | undefined;
   }
 
-  /**
-   * 책임: 이동한 파일의 기존 identity를 모호하지 않을 때만 재사용하게 한다.
-   * 알고리즘: 유효한 device·inode로 최대 두 행만 조회해 후보가 하나인지 또는 중복인지 판별할 정보를 제공한다.
-   */
-  findIdentity(provider: Provider, dev: string | null, inode: string | null): SourceFileRow[] {
-    if (!dev || !inode || dev === '0' || inode === '0') return [];
-    return this.database.statement('SELECT * FROM source_file WHERE provider = ? AND dev = ? AND inode = ? LIMIT 2')
-      .all(provider, dev, inode) as unknown as SourceFileRow[];
-  }
-
-  /** Discovery updates presence only; accepted metadata is replaced with the session. */
-  observeFile(metadata: FileMetadata, scanId: string): SourceFileRow {
-    return this.database.statement(`INSERT INTO source_file (
-      provider, source_root, path, last_seen_scan_id, processing_status, processing_position, recorded_at
-    ) VALUES (?, ?, ?, ?, 'processing', 'discovery', ?)
-    ON CONFLICT(provider, path) DO UPDATE SET last_seen_scan_id = excluded.last_seen_scan_id
+  /** 실패를 기록할 신규 원본 행을 준비하고, 이미 저장한 원본의 메타데이터를 보존한다. */
+  observeFile(metadata: FileMetadata): SourceFileRow {
+    const { provider, source_root, path } = metadata;
+    const inserted = this.database.statement(`INSERT INTO source_file (
+      provider, source_root, path, processing_status, processing_position, recorded_at
+    ) VALUES (?, ?, ?, 'processing', 'discovery', ?)
+    ON CONFLICT(provider, path) DO NOTHING
     RETURNING *`)
-      .get(metadata.provider, metadata.source_root, metadata.path, scanId, new Date().toISOString()) as unknown as SourceFileRow;
-  }
-
-  markSeen(id: number, scanId: string): void {
-    this.database.statement('UPDATE source_file SET last_seen_scan_id = ? WHERE id = ?').run(scanId, id);
+      .get(provider, source_root, path, new Date().toISOString()) as unknown as SourceFileRow | undefined;
+    const file = inserted ?? this.findSourceFile(provider, path);
+    if (!file) throw new Error('Source file observation did not return a row');
+    return file;
   }
 
   setSourceDiagnostic(id: number, status: ProcessingStatus, position: string | null, error: string | null, offset: number | null = null): void {
@@ -55,23 +45,6 @@ export class SourceFileStore {
     const query = this.database.connection.prepare('SELECT * FROM source_file WHERE provider = ? AND session_id = ? AND id > ? ORDER BY id LIMIT ?');
     while (true) {
       const rows = query.all(provider, sessionId, after, limit) as unknown as SourceFileRow[];
-      for (const row of rows) yield row;
-      if (rows.length < limit) return;
-      after = rows[rows.length - 1].id;
-    }
-  }
-
-  /**
-   * 책임: 선택 루트의 전체 순회 성공 후 원본 부재 후보를 찾는다.
-   * 알고리즘: 같은 제공자·루트에서 이번 scan ID로 관측하지 못한 행만 ID keyset 페이지로 반환해 다른 루트의 삭제 오판을 막는다.
-   */
-  *unseenFiles(provider: Provider, sourceRoot: string, scanId: string, limit = 100): IterableIterator<SourceFileRow> {
-    pageLimit(limit);
-    let after = 0;
-    const query = this.database.connection.prepare(`SELECT * FROM source_file WHERE provider = ? AND source_root = ?
-      AND (last_seen_scan_id IS NULL OR last_seen_scan_id <> ?) AND id > ? ORDER BY id LIMIT ?`);
-    while (true) {
-      const rows = query.all(provider, sourceRoot, scanId, after, limit) as unknown as SourceFileRow[];
       for (const row of rows) yield row;
       if (rows.length < limit) return;
       after = rows[rows.length - 1].id;

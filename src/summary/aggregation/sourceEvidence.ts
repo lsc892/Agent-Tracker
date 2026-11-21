@@ -7,7 +7,7 @@ export interface StreamingAggregateFile {
   provider: Provider;
   session_id: string;
   identity: ParsedIdentity;
-  evidence: SourceEvidence;
+  evidence: SourceEvidenceData;
   flags?: readonly { rootId: string; flag: string }[];
 }
 
@@ -81,6 +81,8 @@ export class SourceEvidence {
     else if (requests.get(event.responseId) !== event.requestId) requests.set(event.responseId, null);
   }
 }
+
+export type SourceEvidenceData = Omit<SourceEvidence, 'add' | 'child'>;
 
 export interface SourcePlan {
   file: StreamingAggregateFile;

@@ -5,6 +5,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SummaryDatabase } from '../../src/summary/db';
+import { ageLogFixtures } from '../fixtures/summary-mtime';
 import { refreshSummary } from '../../src/summary/scanner';
 import type { SummaryOptions } from '../../src/summary/types';
 
@@ -65,7 +66,7 @@ test('duplicate parent identities must agree on their resolved session before a 
   assert.equal((await refreshSummary(db,options)).failed,0);
   assert.equal(db.findSourceFile('codex',child)?.session_id,'child-session');
   assert.equal(db.queryTurns().find(row=>row.session_id==='child-session')?.total_tokens,2);
-  // 같은 시각 단위 안의 재작성도 크기 변경으로 확실하게 발견한다.
+  // 같은 부모를 가리키는 두 파일을 다시 쓰면서 자식의 귀속을 다시 확인한다.
   await writeFile(join(root,'b-parent.jsonl'),source('duplicate',null,'session-a')+'\n');
   await writeFile(child,source('child','duplicate','child-session')+'\n');
   assert.equal((await refreshSummary(db,options)).failed,0);
@@ -81,18 +82,20 @@ test('changed sources expand their stored session when filenames contain no thre
   await writeFile(main,source('hidden-main-thread',null,'shared-session'));
   await writeFile(child,source('hidden-child-thread','hidden-main-thread','shared-session'));
   await writeFile(other,source('independent-thread'));
+  ageLogFixtures(main,child,other);
   assert.equal((await refreshSummary(db,options)).failed,0);
   const independent=db.queryTurns().find(row=>row.session_id==='independent-thread')!;
 
   await writeFile(child,source('hidden-child-thread','hidden-main-thread','shared-session',17));
   const updated=await refreshSummary(db,options);
-  assert.equal(updated.failed,0);assert.equal(updated.parsed,1);assert.equal(updated.reused,2);
+  assert.equal(updated.failed,0);assert.equal(updated.parsed,2);assert.equal(updated.reused,1);
   assert.equal(db.queryTurns().find(row=>row.session_id==='shared-session')?.total_tokens,18);
   assert.deepEqual(db.queryTurns().find(row=>row.session_id==='independent-thread'),independent);
   assert.doesNotMatch(db.queryTurns().find(row=>row.session_id==='shared-session')?.quality_flags??'',/missing-parent/);
 
+  ageLogFixtures(child);
   const unchanged=await refreshSummary(db,options);
-  assert.equal(unchanged.parsed,0);assert.ok(unchanged.bodyBytes > 0);assert.equal(unchanged.reused,3);
+  assert.equal(unchanged.parsed,0);assert.equal(unchanged.bodyBytes,0);assert.equal(unchanged.reused,3);
 }));
 
 test('moving a parent between sessions updates unchanged descendants and both previous and next totals',async()=>fixture(async(db,options,root)=>{
@@ -107,7 +110,7 @@ test('moving a parent between sessions updates unchanged descendants and both pr
 
   await writeFile(child,source('thread-child','thread-main-b','thread-main-b',11));
   const updated=await refreshSummary(db,options);
-  assert.equal(updated.failed,0);assert.equal(updated.parsed,1);
+  assert.equal(updated.failed,0);assert.equal(updated.parsed,4);
   assert.equal(db.findSourceFile('codex',child)?.session_id,'thread-main-b');
   assert.equal(db.findSourceFile('codex',grandchild)?.session_id,'thread-main-b');
   const rows=db.queryTurns();assert.equal(rows.length,2);
@@ -115,8 +118,9 @@ test('moving a parent between sessions updates unchanged descendants and both pr
   assert.equal(rows.find(row=>row.session_id==='thread-main-b')?.total_tokens,13);
   assert.deepEqual(db.connection.prepare('PRAGMA foreign_key_check').all(),[]);
 
+  ageLogFixtures(mainA,mainB,child,grandchild);
   const unchanged=await refreshSummary(db,options);
-  assert.equal(unchanged.parsed,0);assert.ok(unchanged.bodyBytes > 0);
+  assert.equal(unchanged.parsed,0);assert.equal(unchanged.bodyBytes,0);
   assert.deepEqual(db.queryTurns(),rows);
 }));
 
@@ -133,7 +137,7 @@ test('new descendants preserve the later-id winner among multiple unchanged pare
 
   await writeFile(join(root,'new-grandchild.jsonl'),source('new-grandchild','thread-parent','session-main',3,'grandchild-model'));
   const updated=await refreshSummary(db,options);
-  assert.equal(updated.failed,0);assert.equal(updated.parsed,1);
+  assert.equal(updated.failed,0);assert.equal(updated.parsed,4);
   const rows=db.queryTurns();assert.equal(rows.length,1);assert.equal(rows[0].total_tokens,14);
   assert.equal(rows[0].session_id,'session-main');
   assert.deepEqual(models().map(row=>({...row})),[
@@ -142,7 +146,7 @@ test('new descendants preserve the later-id winner among multiple unchanged pare
   assert.doesNotMatch(rows[0].quality_flags??'',/missing-parent/);
 }));
 
-test('overlapping scan roots prepare each source_file file once after discovery replaces its queued state',async()=>fixture(async(db,options,root)=>{
+test('an overlapping root keeps the existing file ID and prepares each file once',async()=>fixture(async(db,options,root)=>{
   const nested=join(root,'nested');await mkdir(nested);
   const main=join(root,'00.jsonl'),child=join(nested,'01.jsonl');
   const mainSource=source('opaque-main-thread',null,'shared-session');
@@ -155,10 +159,34 @@ test('overlapping scan roots prepare each source_file file once after discovery 
   await writeFile(child,changedSource);
   const overlapping:SummaryOptions={...options,roots:[...options.roots,{provider:'codex',path:nested}]};
   const updated=await refreshSummary(db,overlapping);
-  assert.equal(updated.failed,0);assert.equal(updated.discovered,3);assert.equal(updated.parsed,1);
+  assert.equal(updated.failed,0);assert.equal(updated.discovered,3);assert.equal(updated.parsed,2);
   assert.equal(updated.bodyBytes,Buffer.byteLength(mainSource)+Buffer.byteLength(changedSource));
   assert.equal(db.connection.prepare('SELECT count(*) AS n FROM source_file').get()?.n,2);
   assert.equal(db.findSourceFile('codex',child)?.id,previousId);
   assert.equal(db.findSourceFile('codex',child)?.source_root,nested);
   const rows=db.queryTurns();assert.equal(rows.length,1);assert.equal(rows[0].total_tokens,18);
+}));
+
+test('overlapping roots register a previously unknown path once', async () => fixture(async (db, options, root) => {
+  const nested = join(root, 'nested');
+  await mkdir(nested);
+  const path = join(nested, 'new.jsonl');
+  const body = source('new-thread', null, 'new-session', 7);
+  await writeFile(path, body);
+  ageLogFixtures(path);
+  const overlapping: SummaryOptions = { ...options, roots: [...options.roots, { provider: 'codex', path: nested }] };
+
+  const initial = await refreshSummary(db, overlapping);
+  assert.equal(initial.discovered, 2);
+  assert.equal(initial.parsed, 1);
+  assert.equal(initial.failed, 0);
+  assert.equal(initial.bodyBytes, Buffer.byteLength(body));
+  assert.equal(db.connection.prepare('SELECT count(*) AS n FROM source_file').get()?.n, 1);
+  assert.equal(db.findSourceFile('codex', path)?.source_root, nested);
+  assert.equal(db.queryTurns()[0].total_tokens, 7);
+
+  const next = await refreshSummary(db, overlapping);
+  assert.equal(next.parsed, 0);
+  assert.equal(next.reused, 1);
+  assert.equal(next.bodyBytes, 0);
 }));
