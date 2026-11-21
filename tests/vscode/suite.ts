@@ -374,7 +374,7 @@ export async function run(): Promise<void> {
               check(document.getElementById('refresh-diagnostics').title.includes('원본을 재검증하지 않고'),'diagnostics explains that reload only reads stored results');
               check(document.getElementById('configuration-warning').hidden === ${JSON.stringify(!expectTimezoneWarning)},'diagnostic timezone warning follows settings');
             } else if (phase === 'initial' && message.type === 'diagnostics') {
-              check(message.result.counts.files === 1,'diagnostics returns fixture manifest');
+              check(message.result.counts.files === 1,'diagnostics returns the fixture source');
               check(document.getElementById('diagnostic-files').textContent.includes('session.jsonl'),'separate webview renders the source log');
               check(document.getElementById('diagnostic-summaries'),'separate webview retains the request warnings table');
               phase = 'reload'; document.getElementById('refresh-diagnostics').click();
@@ -447,8 +447,8 @@ export async function run(): Promise<void> {
     database = new DatabaseSync(databasePath, { readOnly: true });
     // The file exists before the worker finishes its initial WAL/schema transaction.
     database.exec('PRAGMA busy_timeout=5000');
-    const countFiles = (): number => (database!.prepare('SELECT count(*) n FROM manifest').get() as { n: number }).n;
-    await until(() => Boolean(database!.prepare("SELECT 1 FROM sqlite_master WHERE name='manifest'").get()), 'schema creation');
+    const countFiles = (): number => (database!.prepare('SELECT count(*) n FROM source_file').get() as { n: number }).n;
+    await until(() => Boolean(database!.prepare("SELECT 1 FROM sqlite_master WHERE name='source_file'").get()), 'schema creation');
     assert.equal(countFiles(), 0, 'activation does not scan');
     assert.equal(scanCount, 0);
     await vscode.commands.executeCommand('agentTracker.refreshQuota');
@@ -481,7 +481,7 @@ export async function run(): Promise<void> {
       }
       await vscode.commands.executeCommand('agentTracker.refreshQuota');
       assert.equal(scanCount, scansBefore, 'quota refresh and display changes never scan summaries');
-      assert.equal(countFiles(), filesBefore, 'quota controls leave the summary manifest unchanged');
+      assert.equal(countFiles(), filesBefore, 'quota controls leave summary sources unchanged');
       const usageLink = currentTooltip!.value.match(/\]\(command:(agentTracker\.openUsage)\)/);
       assert.ok(usageLink, 'hover exposes a statistics command link');
       assert.ok(typeof currentTooltip!.isTrusted === 'object' && currentTooltip!.isTrusted.enabledCommands.includes(usageLink[1]));
@@ -525,7 +525,7 @@ export async function run(): Promise<void> {
     assert.ok(settingsLink, 'settings remains available with statistics off');
     await vscode.commands.executeCommand(settingsLink[1]);
     await vscode.commands.executeCommand('agentTracker.clearUsageData');
-    assert.equal(countFiles(), 0, 'the command deletes manifest records');
+    assert.equal(countFiles(), 0, 'the command deletes source records');
     assert.equal((database.prepare('SELECT count(*) n FROM turn_summary').get() as {n: number}).n, 0);
     assert.equal(readFileSync(sourcePath, 'utf8'), originalSource, 'original transcript survives deletion');
     assert.equal(scanCount, scansBeforeSettings, 'deletion does not trigger a rebuild');
@@ -557,7 +557,7 @@ export async function run(): Promise<void> {
     await config.update('claude.enabled', true, vscode.ConfigurationTarget.Global);
     await config.update('usage.enabled', true, vscode.ConfigurationTarget.Global);
     await vscode.commands.executeCommand('agentTracker.openUsage');
-    await until(() => Boolean(database!.prepare("SELECT 1 FROM manifest WHERE path=? AND processing_status='done'").get(alternateSource)), 'statistics collect only the new data home');
+    await until(() => Boolean(database!.prepare("SELECT 1 FROM source_file WHERE path=? AND processing_status='done'").get(alternateSource)), 'statistics collect only the new data home');
     assert.equal(countFiles(), 1);
     outcomes.push('one global data home supplies both providers, statistics and Claude retention; duplicate path settings are removed');
     // A fresh driver observes the production scripts during live language changes.
