@@ -51,7 +51,7 @@ async function worker(configPath, variant) {
   const dbPath = join(config.directory, `mtime-${variant}.sqlite`);
   const db = new SummaryDatabase(dbPath);
   const options = { dbPath, roots: config.snapshot.roots, sourceWorkers };
-  async function refresh() {
+  async function refresh(database = db, refreshOptions = options) {
     global.gc();
     const before = memory(), peak = { ...before };
     const sample = () => {
@@ -60,7 +60,7 @@ async function worker(configPath, variant) {
     };
     const timer = setInterval(sample, intervalMs), start = performance.now();
     let result;
-    try { result = await refreshSummary(db, options, undefined, sample); }
+    try { result = await refreshSummary(database, refreshOptions, undefined, sample); }
     finally { clearInterval(timer); }
     const ms = performance.now() - start;
     sample();
@@ -69,9 +69,9 @@ async function worker(configPath, variant) {
     assert.equal(result.interrupted, false);
     assert.equal(result.failed, 0);
     return { ms, scan: result.timings.scan, storage: result.timings.storage, parsed: result.parsed,
-      reused: result.reused, bodyBytes: result.bodyBytes, before, peak, retained, checkpointEntries: db.sourceCheckpoints?.size ?? 0 };
+      reused: result.reused, bodyBytes: result.bodyBytes, before, peak, retained, checkpointEntries: database.sourceCheckpoints?.size ?? 0 };
   }
-  const total = () => db.connection.prepare('SELECT count(*) AS requests,coalesce(sum(total_tokens),0) AS tokens FROM turn_summary').get();
+  const total = (database = db) => database.connection.prepare('SELECT count(*) AS requests,coalesce(sum(total_tokens),0) AS tokens FROM turn_summary').get();
   const initial = await refresh();
   const base = total();
   if (config.snapshot.expected) {
@@ -97,6 +97,21 @@ async function worker(configPath, variant) {
       break;
     }
     try {
+      if (scenario === 'rebuild') {
+        const freshPath = join(config.directory, `rebuild-${variant}.sqlite`);
+        const fresh = new SummaryDatabase(freshPath);
+        let value;
+        try {
+          const sample = await refresh(fresh, { ...options, dbPath: freshPath });
+          value = { ...sample, totals: total(fresh), facts: facts(fresh) };
+        } finally {
+          fresh.close();
+          await fs.unlink(freshPath);
+        }
+        assert.deepEqual(value.totals, base);
+        process.send(value);
+        continue;
+      }
       if (scenario === 'append') await fs.appendFile(target.path, extra);
       const sample = await refresh();
       if (scenario === 'unchanged' && variant === 'B') assert.equal(sample.bodyBytes, 0);
@@ -155,6 +170,9 @@ function launch(path, variant) {
 async function main() {
   const args = Object.fromEntries(process.argv.slice(2).map(arg => arg.slice(2).split(/=(.*)/).slice(0, 2)));
   const A = resolve(args.before), B = resolve(args.after ?? root), output = resolve(args.output);
+  const measuredPairs = Number(args.repetitions ?? repetitions);
+  assert.ok(Number.isSafeInteger(measuredPairs) && measuredPairs > 0);
+  const scenarios = args.rebuild === 'true' ? ['unchanged', 'append', 'rebuild'] : ['unchanged', 'append'];
   if (!args.workspace) await fs.mkdir(join(root, 'tests/.cache'), { recursive: true });
   const workspace = args.workspace ? resolve(args.workspace) : await fs.mkdtemp(join(root, 'tests/.cache/mtime-refresh-'));
   const setup = args.workspace ? JSON.parse(await fs.readFile(join(workspace, 'setup.json'), 'utf8')) : { configs: [] };
@@ -172,7 +190,7 @@ async function main() {
   console.log(JSON.stringify({ workspace }));
   const report = { environment: { node: process.version, v8: process.versions.v8, sqlite: process.versions.sqlite,
     cpu: cpus()[0].model, platform: process.platform, arch: process.arch },
-  protocol: { warmups, repetitions, sourceWorkers, intervalMs, order: 'AB/BA', timezone: 'Asia/Seoul', filter },
+    protocol: { warmups, repetitions: measuredPairs, scenarios, sourceWorkers, intervalMs, order: 'AB/BA', timezone: 'Asia/Seoul', filter },
   builds: {}, datasets: [] };
   for (const [key, product] of Object.entries({ A, B }))
     report.builds[key] = { source: await fingerprint(join(product, 'src')), build: await fingerprint(join(product, 'dist/src')) };
@@ -192,17 +210,18 @@ async function main() {
       }
       for (const key of ['base', 'targetBytes', 'addedBytes', 'facts']) assert.deepEqual(dataset.initial.A[key], dataset.initial.B[key]);
       console.log(JSON.stringify({ dataset: config.name, initial: dataset.initial.A.base, targetBytes: dataset.initial.A.targetBytes }));
-      for (const scenario of ['unchanged', 'append']) {
-        for (let iteration = -warmups; iteration < repetitions; iteration++) {
+      for (const scenario of scenarios) {
+        for (let iteration = -warmups; iteration < measuredPairs; iteration++) {
           const pair = { scenario, iteration };
           for (const variant of iteration % 2 === 0 ? ['A', 'B'] : ['B', 'A'])
             pair[variant] = await workers[variant].measure(scenario);
           assert.deepEqual(pair.A.totals, pair.B.totals);
           assert.equal(pair.A.facts, pair.B.facts);
-          for (const group of groups) assert.equal(pair.A.queries[group].sha256, pair.B.queries[group].sha256);
+          if (scenario === 'rebuild') assert.equal(pair.A.facts, dataset.initial.A.facts);
+          else for (const group of groups) assert.equal(pair.A.queries[group].sha256, pair.B.queries[group].sha256);
           dataset.samples.push(pair);
         }
-        console.log(JSON.stringify({ dataset: config.name, scenario, pairs: warmups + repetitions }));
+        console.log(JSON.stringify({ dataset: config.name, scenario, pairs: warmups + measuredPairs }));
       }
     } finally {
       for (const worker of Object.values(workers)) worker.close();
