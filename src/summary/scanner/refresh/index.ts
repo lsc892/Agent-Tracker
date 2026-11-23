@@ -176,8 +176,9 @@ function recordInterruptedScan(context: RefreshContext, error: unknown): void {
   result.interrupted = true;
   result.error = errorCode;
   if (!wasCancelled) result.failed++;
+  const prepared = new Set(state.preparedFiles);
   for (const file of state.files.values()) {
-    if (file.settled || file.removed || !file.changed && !file.prepared) continue;
+    if (file.settled || file.removed || !file.changed && !prepared.has(file)) continue;
     file.error = new SummaryError(errorCode);
     recordFailure(context, file);
   }

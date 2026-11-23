@@ -5,10 +5,15 @@ import { addFlag, eligible, key, prepareSources,
 import { addCapability, addWinner, createRoot, materialize, max, mergeTurn,
   type MemoryAggregateResult, type Outcome, type Root } from './turns';
 import { Winners, type Winner } from './winners';
-import type { SourceCheck, SourceWinnersSnapshot } from './sourceWinners';
+import type { Candidate, SourceCheck, SourceWinnersSnapshot } from './sourceWinners';
 
 export type { StreamingAggregateFile } from './sourceEvidence';
 export type { MaterializedTurnSummary, MemoryAggregateResult } from './turns';
+
+interface SessionWinners {
+  remaining: number;
+  winners?: Winners;
+}
 
 /** 같은 읽기에서 모은 귀속 근거와 원본별 winner를 최종 세션·요청 그룹으로 병합한다. */
 export class StreamingAggregation {
@@ -16,7 +21,7 @@ export class StreamingAggregation {
   private readonly requests: Map<string, string | null>;
   private readonly sessions = new Map<string, SourcePlan[]>();
   private readonly roots = new Map<string, Root>();
-  private readonly winners = new Winners((winner, direction) => this.applyWinner(winner, direction));
+  private readonly sharedWinners = new Map<string, SessionWinners>();
   private readonly totals = new Map<string, { input: number; output: number }>();
   private readonly missingRequests = new Map<string, { source: SourcePlan; rootId: string; count: number }>();
   private readonly checks = new Map<string, { source: SourcePlan; rootId: string; input: number; output: number; ordinal: number }>();
@@ -32,7 +37,10 @@ export class StreamingAggregation {
       if (!files) this.sessions.set(id, files = []);
       files.push(source);
     }
-    for (const files of this.sessions.values()) files.sort((a, b) => a.file.id - b.file.id);
+    for (const [id, files] of this.sessions) {
+      if (files.length > 1) this.sharedWinners.set(id, { remaining: files.length });
+      files.sort((a, b) => a.file.id - b.file.id);
+    }
   }
 
   /** 읽는 동안 접은 요청 상태를 한 번 병합하고 남은 winner만 바로 합계에 반영한다. */
@@ -75,10 +83,19 @@ export class StreamingAggregation {
         }
       }
     }
-    for (const { event, index, score } of prepared.winners.values()) this.recordUsage(source, event, index, score);
+    const session = key(file.provider, file.session_id);
+    const shared = this.sharedWinners.get(session);
+    let scope = shared;
+    for (const candidate of prepared.winners) {
+      // A file already contains one winner per source key. Only a shared session, a schema
+      // change in the key, or a Claude request alias can bring those keys together again.
+      const compare = shared || prepared.mixedSchemas || prepared.requestAliases?.has(candidate.event.responseId);
+      this.recordUsage(source, candidate, compare ? (scope ??= { remaining: 1 }) : undefined);
+    }
+    if (shared && --shared.remaining === 0) this.sharedWinners.delete(session);
   }
 
-  private recordUsage(source: SourcePlan, raw: UsageEvent, index: number, score: number | bigint): void {
+  private recordUsage(source: SourcePlan, { event: raw, index, score }: Candidate, scope?: SessionWinners): void {
     if (!eligible(source, raw, index)) return;
     const parentRootId = source.file.identity.parentRootId;
     const event = parentRootId && parentRootId !== raw.rootId ? { ...raw, rootId: parentRootId } : raw;
@@ -86,9 +103,14 @@ export class StreamingAggregation {
     this.observeRequest(file, event.rootId, event.offset);
     const request = file.provider === 'claude' && event.requestId === null
       ? this.requests.get(key(file.session_id, event.responseId)) ?? null : event.requestId;
-    const id = key(file.provider, file.session_id, event.responseId,
-      file.provider === 'claude' ? request ?? 'no-req' : event.threadId, file.provider === 'claude' ? '' : event.turnId);
-    this.winners.add(id, source, event, ordinal, request, score);
+    if (!scope) {
+      this.applyWinner({ source, event, ordinal, request, score }, 1);
+      return;
+    }
+    const id = file.provider === 'claude' ? key(event.responseId, request ?? 'no-req')
+      : key(event.responseId, event.threadId, event.turnId);
+    scope.winners ??= new Winners((winner, direction) => this.applyWinner(winner, direction));
+    scope.winners.add(id, source, event, ordinal, request, score);
   }
 
   private recordCapability(root: Root, event: CapabilityEvent): void {

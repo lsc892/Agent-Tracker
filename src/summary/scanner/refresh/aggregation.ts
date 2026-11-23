@@ -7,9 +7,13 @@ type AggregateSource = PreparedFile & { session_id: string };
 
 export function collectWinners(context: RefreshContext, names: Map<string, string>): MemoryAggregateResult {
   const { state, collect, check } = context;
-  if (!state.affected.size) return { summaries: [], orphans: [] };
-  const sources = state.preparedFiles.filter((file): file is AggregateSource => isAffectedSource(state, file))
-    .sort(compareSourceOrder);
+  const sources: AggregateSource[] = [];
+  for (const file of state.preparedFiles) {
+    if (isAffectedSource(state, file)) sources.push(file);
+    else file.prepared = undefined;
+  }
+  if (!sources.length) return { summaries: [], orphans: [] };
+  sources.sort(compareSourceOrder);
   const inputs: StreamingAggregateFile[] = sources.map(file => {
     const { identity, winners } = file.prepared;
     const sessionName = names.get(sessionKey(file.provider, file.session_id)) ?? identity.sessionName;
@@ -20,6 +24,9 @@ export function collectWinners(context: RefreshContext, names: Map<string, strin
   for (const file of sources) {
     check();
     aggregation.addSource(file.id, file.prepared.winners);
+    // The recent preview and the main scan can share the snapshot itself.
+    const consumed: FileState = file;
+    consumed.prepared = undefined;
   }
   return aggregation.finish();
 }

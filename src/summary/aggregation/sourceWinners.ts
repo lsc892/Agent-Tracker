@@ -22,7 +22,9 @@ export interface SourceRoot {
 export interface SourceWinnersSnapshot {
   evidence: SourceEvidenceData;
   roots: Map<string, SourceRoot>;
-  winners: Map<string, Candidate>;
+  winners: readonly Candidate[];
+  mixedSchemas: boolean;
+  requestAliases?: ReadonlySet<string>;
 }
 
 /** 원문과 metadata 이벤트 목록을 보관하지 않고 요청별 상태와 winner만 전달한다. */
@@ -33,7 +35,26 @@ export class SourceWinners {
 
   constructor(private readonly provider: Provider) {}
 
-  snapshot(): SourceWinnersSnapshot { return { evidence: this.evidence, roots: this.roots, winners: this.winners }; }
+  snapshot(): SourceWinnersSnapshot {
+    const winners: Candidate[] = [];
+    let firstSchema: UsageEvent['schema'];
+    let mixedSchemas = false;
+    let requestAliases: Set<string> | undefined;
+    for (const candidate of this.winners.values()) {
+      const { event } = candidate;
+      if (this.evidence.current && event.schema === 'legacy') continue;
+      if (!winners.length) firstSchema = event.schema;
+      else mixedSchemas ||= event.schema !== firstSchema;
+      winners.push(candidate);
+
+      if (this.provider === 'claude' && event.requestId === null
+        && (this.evidence.requests.has(event.responseId)
+          || !this.evidence.current && this.evidence.legacyRequests.has(event.responseId))) {
+        (requestAliases ??= new Set()).add(event.responseId);
+      }
+    }
+    return { evidence: this.evidence, roots: this.roots, winners, mixedSchemas, requestAliases };
+  }
 
   add(raw: ParseEvent, index: number): void {
     const event = normalizedEvent(raw);
