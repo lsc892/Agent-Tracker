@@ -98,6 +98,24 @@ test('changed sources expand their stored session when filenames contain no thre
   assert.equal(unchanged.parsed,0);assert.equal(unchanged.bodyBytes,0);assert.equal(unchanged.reused,3);
 }));
 
+test('stored thread metadata locates a parent with an opaque filename and different declared session', async () => fixture(async (db, options, root) => {
+  const main = join(root, '00.jsonl');
+  const child = join(root, '01.jsonl');
+  await writeFile(main, source('parent-thread', null, 'parent-session', 60));
+  ageLogFixtures(main);
+  const first = await refreshSummary(db, options);
+  assert.equal(first.failed, 0);
+  await writeFile(child, source('child-thread', 'parent-thread', 'declared-child-session', 40));
+  const updated = await refreshSummary(db, options);
+  assert.equal(updated.failed, 0);
+  const rows = db.queryTurns();
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].session_id, 'parent-session');
+  assert.equal(rows[0].total_tokens, 100);
+  assert.equal(db.findSourceFile('codex', child)?.session_id, 'parent-session');
+  assert.doesNotMatch(rows[0].quality_flags ?? '', /missing-parent/);
+}));
+
 test('moving a parent between sessions updates unchanged descendants and both previous and next totals',async()=>fixture(async(db,options,root)=>{
   const mainA=join(root,'thread-main-a.jsonl'),mainB=join(root,'thread-main-b.jsonl');
   const child=join(root,'thread-child.jsonl'),grandchild=join(root,'opaque-descendant.jsonl');
@@ -105,6 +123,7 @@ test('moving a parent between sessions updates unchanged descendants and both pr
   await writeFile(mainB,source('thread-main-b'));
   await writeFile(child,source('thread-child','thread-main-a','thread-main-a'));
   await writeFile(grandchild,source('thread-grandchild','thread-child','thread-main-a'));
+  ageLogFixtures(mainA,mainB,child,grandchild);
   assert.equal((await refreshSummary(db,options)).failed,0);
   assert.equal(db.queryTurns().find(row=>row.session_id==='thread-main-a')?.total_tokens,3);
 
@@ -130,6 +149,7 @@ test('new descendants preserve the later-id winner among multiple unchanged pare
   await writeFile(main,source('thread-main',null,'session-main',1,'main-model'));
   await writeFile(first,source('thread-parent','thread-main','session-main',10,'parent-a'));
   await writeFile(second,source('thread-parent','thread-main','session-main',10,'parent-b'));
+  ageLogFixtures(main,first,second);
   assert.equal((await refreshSummary(db,options)).failed,0);
   const winner=db.findSourceFile('codex',first)!.id>db.findSourceFile('codex',second)!.id?'parent-a':'parent-b';
   const models=()=>db.connection.prepare('SELECT model,input_tokens FROM turn_model_usage ORDER BY model').all();

@@ -3,6 +3,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import {
   SCHEMA_SQL, SCHEMA_VERSION, SCHEMA_LEGACY_MIGRATION_SQL, SCHEMA_CACHE_MIGRATION_SQL,
   SCHEMA_MODEL_SQL, SCHEMA_CAPABILITY_SQL, SCHEMA_REFRESH_SQL, SCHEMA_ROLLUP_SQL, SCHEMA_TURN_INDEX_MIGRATION_SQL,
+  SCHEMA_APPLIED_RESPONSES_SQL,
 } from './schema';
 
 function initialMigrationSql(version: number): string {
@@ -48,6 +49,8 @@ export function migrateSchema(connection: DatabaseSync, transaction: (action: ()
         if (sourceColumns.some(existing => existing.name === column))
           connection.exec(`ALTER TABLE source_file DROP COLUMN ${column}`);
       }
+      if (!sourceColumns.some(column => column.name === 'relation_meta'))
+        connection.exec('ALTER TABLE source_file ADD COLUMN relation_meta BLOB');
       connection.exec(SCHEMA_REFRESH_SQL);
       connection.exec('DELETE FROM summary_refresh');
       connection.exec(SCHEMA_MODEL_SQL);
@@ -73,6 +76,9 @@ export function migrateSchema(connection: DatabaseSync, transaction: (action: ()
       if (connection.prepare('PRAGMA table_info(turn_summary)').all().some(column => column.name === 'turn_index')) {
         connection.exec(SCHEMA_TURN_INDEX_MIGRATION_SQL);
       }
+      connection.exec(`DROP TABLE IF EXISTS source_winner_candidate;
+        DROP TABLE IF EXISTS source_winner_snapshot;
+        ${SCHEMA_APPLIED_RESPONSES_SQL}`);
       connection.exec('DROP INDEX IF EXISTS idx_summary_session;');
       connection.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
     });

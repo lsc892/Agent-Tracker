@@ -1,34 +1,35 @@
 // 준비된 원본 winner를 기존 순서로 최종 집계기에 전달한다.
 import { StreamingAggregation, type StreamingAggregateFile, type MemoryAggregateResult } from '../../aggregation/memoryAggregate';
+import type { AppliedResponse } from '../../db/appliedResponses';
 import type { RefreshContext } from './context';
 import { isPreparedFile, sessionKey, type FileState, type PreparedFile, type ScanState } from './state';
 
 type AggregateSource = PreparedFile & { session_id: string };
 
-export function collectWinners(context: RefreshContext, names: Map<string, string>): MemoryAggregateResult {
-  const { state, collect, check } = context;
-  const sources: AggregateSource[] = [];
-  for (const file of state.preparedFiles) {
-    if (isAffectedSource(state, file)) sources.push(file);
-    else file.prepared = undefined;
-  }
-  if (!sources.length) return { summaries: [], orphans: [] };
+export interface ScanAggregation extends MemoryAggregateResult {
+  appliedResponses: AppliedResponse[];
+}
+
+export function collectWinners(context: RefreshContext, names: Map<string, string>): ScanAggregation {
+  const { state, collect, check, persistAppliedResponses } = context;
+  const sources = state.preparedFiles.filter(file => isAffectedSource(state, file));
+  const appliedResponses: AppliedResponse[] = [];
+  if (!sources.length) return { summaries: [], orphans: [], appliedResponses };
   sources.sort(compareSourceOrder);
   const inputs: StreamingAggregateFile[] = sources.map(file => {
     const { identity, winners } = file.prepared;
     const sessionName = names.get(sessionKey(file.provider, file.session_id)) ?? identity.sessionName;
-    return { id: file.id, provider: file.provider, session_id: file.session_id, identity: { ...identity, sessionName },
+    return { id: file.id, provider: file.provider, session_id: file.session_id,
+      identity: { ...identity, sessionName, parentRootId: file.prepared.parentRootId },
       evidence: winners.evidence, flags: sourceFlags(state, file) };
   });
-  const aggregation = new StreamingAggregation(inputs, collect);
+  const aggregation = new StreamingAggregation(inputs, collect,
+    persistAppliedResponses ? response => { appliedResponses.push(response); } : undefined);
   for (const file of sources) {
     check();
     aggregation.addSource(file.id, file.prepared.winners);
-    // The recent preview and the main scan can share the snapshot itself.
-    const consumed: FileState = file;
-    consumed.prepared = undefined;
   }
-  return aggregation.finish();
+  return { ...aggregation.finish(), appliedResponses };
 }
 
 function isAffectedSource(state: ScanState, file: FileState): file is AggregateSource {

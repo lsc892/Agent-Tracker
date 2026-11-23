@@ -2,9 +2,9 @@
 import type { ParseEvent } from '../../src/summary/types';
 import { addFlag, eligible, key, normalizedEvent, prepareSources,
   type SourcePlan, type StreamingAggregateFile } from '../../src/summary/aggregation/sourceEvidence';
-import { addCapability, addTurn, addWinner, createRoot, materialize, max,
+import { addCapability, addTurn, addUsage, createRoot, materialize, max,
   type MemoryAggregateResult, type Outcome, type Root } from '../../src/summary/aggregation/turns';
-import { Winners, type Winner } from '../../src/summary/aggregation/winners';
+import { Winners, type Winner } from './event-order-winners';
 interface ObservedRoot { rootId: string; offset: number; index: number; schema?: 'current' | 'legacy' }
 
 export { SourceEvidence } from '../../src/summary/aggregation/sourceEvidence';
@@ -112,7 +112,7 @@ export class EventOrderAggregation {
 
   private applyWinner(winner: Winner, direction: 1 | -1): void {
     const { source, event, request } = winner, file = source.file;
-    addWinner(this.roots.get(key(file.provider, file.session_id, event.rootId))!, winner, this.collectCapabilities, direction);
+    addUsage(this.roots.get(key(file.provider, file.session_id, event.rootId))!, event, this.collectCapabilities, direction);
     const id = key(file.provider, file.session_id, event.threadId, event.turnId);
     let sum = this.totals.get(id);
     if (!sum) this.totals.set(id, sum = { input: 0, output: 0 });

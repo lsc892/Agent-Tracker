@@ -9,7 +9,7 @@ import { isPreparedFile, sessionKey, type FileState, type PreparedFile, type Sca
 export async function expandRelatedSources(context: RefreshContext): Promise<void> {
   while (true) {
     resolveLineage(context.state);
-    const parents = takeParentSources(context.state);
+    const parents = takeParentSources(context);
     if (parents.length) {
       await inspectBatch(context, parents);
       continue;
@@ -57,13 +57,18 @@ function resolveLineage(state: ScanState): void {
   }
 }
 
-function takeParentSources(state: ScanState): FileState[] {
+function takeParentSources({ state, database }: RefreshContext): FileState[] {
   if (!state.pendingReferences.size) return [];
   const references = [...state.pendingReferences];
   state.pendingReferences.clear();
-  // 파싱된 thread를 얻기 전에는 경로에서만 부모 후보를 좁힐 수 있다.
-  return state.codexFiles.filter(file => state.ready(file) && references.some(reference => file.path.includes(reference)))
-    .sort((a, b) => a.id - b.id);
+  const identities = new Set(references.flatMap(id => [JSON.stringify([id, true]), JSON.stringify([id, false])]));
+  return state.codexFiles.filter(file => {
+    if (!state.ready(file)) return false;
+    if (references.some(reference => file.path.includes(reference))) return true;
+    if (!file.source_identity || !identities.has(file.source_identity)) return false;
+    const relations = database.sourceRelations(file.id);
+    return !!relations && references.includes(relations.identity.threadId);
+  }).sort((a, b) => a.id - b.id);
 }
 
 /** 자식 자체 요청 행 대신 검증된 생성 호출의 부모 요청에 사용량을 붙인다. */
@@ -100,7 +105,7 @@ export function resolveParentRequests(context: RefreshContext): void {
     if (!identity.rootlessSubagent || winners.evidence.eventCount === 0) continue;
     const root = resolve(file);
     if (root === null || state.missingParents.has(file.id)) state.fail(file, new SummaryError('missing-root-turn'));
-    else file.prepared.identity = { ...identity, parentRootId: root };
+    else file.prepared.parentRootId = root;
   }
 }
 

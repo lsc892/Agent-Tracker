@@ -59,6 +59,7 @@ export async function refreshSummary(
   const roots = options.roots.map(root => ({ ...root, path: resolve(root.path) }));
   const scope = refreshScope(roots, collect, options.maxLineBytes);
   const context: RefreshContext = { database, result, scan, storage, state, sourcePool,
+    persistAppliedResponses: true,
     roots, collect, retain, cancelled, check, report: publish, onBytes };
 
   let release: (() => void) | undefined;
@@ -69,8 +70,11 @@ export async function refreshSummary(
   } catch (error) {
     recordInterruptedScan(context, error);
   } finally {
-    await scan.measureAsync('sourcePoolClose', () => sourcePool.dispose());
-    release?.();
+    try {
+      await scan.measureAsync('sourcePoolClose', () => sourcePool.dispose());
+    } finally {
+      release?.();
+    }
     result.completedAt = new Date().toISOString();
     publish('complete');
     timings.totalMs = performance.now() - started;
@@ -105,7 +109,7 @@ async function prepareRecentPreview(
   const database = new SummaryDatabase(':memory:');
   const result = { ...context.result };
   const state = new ScanState(result);
-  const recent = { ...context, database, state, result, report: () => {} };
+  const recent = { ...context, database, state, result, persistAppliedResponses: false, report: () => {} };
   context.sourcePool.capturePreparations(true);
   try {
     copyRecentUsage(context.database.connection, database, preview);

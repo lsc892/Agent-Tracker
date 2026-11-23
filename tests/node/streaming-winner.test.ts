@@ -6,7 +6,7 @@ import { EventOrderAggregation } from '../fixtures/event-order-aggregate';
 import { SourceWinners } from '../../src/summary/aggregation/sourceWinners';
 import { aggregateMemory, type MemoryAggregateFile } from '../fixtures/streaming-aggregate';
 import { prepareSources } from '../../src/summary/aggregation/sourceEvidence';
-import { Winners } from '../../src/summary/aggregation/winners';
+import { Winners } from '../fixtures/event-order-winners';
 import type { ParseEvent, UsageEvent } from '../../src/summary/types';
 
 const usage = (input: number, extra: Partial<UsageEvent> = {}): UsageEvent => ({

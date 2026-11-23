@@ -1,4 +1,6 @@
 // 통계 DB의 저장 입력·조회 필터·페이지·집계·진단 타입을 정의한다.
+import type { ParsedIdentity } from '../types';
+
 export type Provider = 'claude' | 'codex';
 export type ProcessingStatus = 'processing' | 'done' | 'error' | 'interrupted';
 export type DurationQuality = 'exact' | 'derived' | 'approximate' | 'missing';
@@ -11,6 +13,12 @@ export interface CostFields {
   cost_usd?: number | null;
   unknown_costs?: number;
   billing_mode?: BillingMode;
+}
+
+export interface SourceRelationMetadata {
+  identity: Pick<ParsedIdentity, 'sessionId' | 'threadId' | 'parentThreadId' | 'isMain' | 'agentPath'
+    | 'rootlessSubagent' | 'forkedFromId'>;
+  childRequests: ReadonlyMap<string, string | null>;
 }
 
 export interface FileMetadata {
@@ -26,6 +34,8 @@ export interface FileMetadata {
   /** Parsed source thread/role and SHA-256 of the accepted raw file snapshot. */
   source_identity?: string | null;
   content_hash?: string | null;
+  /** The parsed identity and spawn bindings used to reconnect unchanged relatives. */
+  relations?: SourceRelationMetadata | null;
   /** 0 when Skill counts were skipped; re-enable rebuilds these sources. */
   capabilities_collected?: 0 | 1;
 }

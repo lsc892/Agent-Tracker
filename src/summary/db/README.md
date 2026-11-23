@@ -7,6 +7,7 @@
 - [connection.ts](connection.ts) — `SqliteSession`: SQLite 연결·쿼리 캐시·트랜잭션·유지보수를 관리한다.
 - [index.ts](index.ts) — `SummaryDatabase`: 공유 연결의 저장소들을 구성하고 통계 DB API를 제공한다.
 - [sourceFiles.ts](sourceFiles.ts) — `SourceFileStore`는 원본 출처·소실 보존·진단 조회를 관리한다. 갱신은 파일시스템 수정 시각과 `summary_refresh`의 전역 기준 시각을 비교한다.
+- [appliedResponses.ts](appliedResponses.ts) — 응답 그룹별 최종 반영값과 차분 합산에 사용할 기존 요청 합계를 읽고 저장한다.
 - [memoryStore.ts](memoryStore.ts) — `MemoryStore`와 저장 입력·결과 타입의 기존 공개 경로를 유지한다.
 - [memoryStore/](memoryStore/README.md) — 메모리 집계의 영속 반영·SQL 값 검증/변환·입출력 타입을 나눠 관리한다.
 - [migrations.ts](migrations.ts) — 기존 통계와 식별자를 보존하며 DB 스키마를 갱신한다.

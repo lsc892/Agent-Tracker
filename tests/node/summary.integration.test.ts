@@ -284,15 +284,19 @@ test('Codex compression transitions and simultaneous copies preserve totals and 
   assert.deepEqual(await readFile(compressed),encoded);
 }));
 
-test('compressed Codex parents are reread for new descendants and corrupt refreshes preserve accepted usage',async () => fixture(async (database,options,root) => {
+test('compressed Codex parents rebuild with new descendants and corrupt refreshes preserve accepted usage',async () => fixture(async (database,options,root) => {
   const codexOptions={...options,roots:[{provider:'codex' as const,path:root}]};
   const parent=join(root,'main.jsonl.zst');
   const encoded=zstdCompressSync(Buffer.from(jsonl([codexMeta('main'),codexStart('root'),currentUsage('main','root','root',100)])),
     {params:{[constants.ZSTD_c_checksumFlag]:1}});
-  await writeFile(parent,encoded);await refreshSummary(database,codexOptions);
-  await writeFile(join(root,'child.jsonl'),jsonl([codexMeta('child','main'),codexStart('child-turn','root'),currentUsage('child','child-turn','root',40)]));
+  await writeFile(parent,encoded);
+  ageLogFixtures(parent);
+  await refreshSummary(database,codexOptions);
+  const childSource=jsonl([codexMeta('child','main'),codexStart('child-turn','root'),currentUsage('child','child-turn','root',40)]);
+  await writeFile(join(root,'child.jsonl'),childSource);
   const expanded=await refreshSummary(database,codexOptions);
   assert.equal(expanded.failed,0);assert.equal(database.queryTurns()[0].total_tokens,140);
+  assert.equal(expanded.parsed,2);assert.equal(expanded.bodyBytes,encoded.length+Buffer.byteLength(childSource));
   await writeFile(parent,encoded.subarray(0,encoded.length-1));
   const broken=await refreshSummary(database,codexOptions);
   assert.ok(broken.failed>0);assert.equal(database.queryTurns()[0].total_tokens,140);
@@ -692,12 +696,13 @@ test('a malformed new Codex descendant keeps the accepted root-session summary',
   assert.equal(database.queryTurns()[0].last_error,'parse-error');
 }));
 
-test('cancelling an affected session also marks its reread unchanged source interrupted',async () => fixture(async(database,options,root)=>{
+test('cancelling an affected session also marks its unchanged source interrupted',async () => fixture(async(database,options,root)=>{
   const main=join(root,'session-one.jsonl');
   const agents=join(root,'session-one','subagents');await mkdir(agents,{recursive:true});
   const child=join(agents,'agent-child.jsonl');
   await writeFile(main,jsonl([user(),response()]));
   await writeFile(child,jsonl([response(30,'prompt-one','child','child-request')]));
+  ageLogFixtures(main,child);
   await refreshSummary(database,options);
   // 30→60의 같은 길이 재작성도 변경 감지가 확실하도록 크기를 바꾼다.
   await writeFile(child,jsonl([response(60,'prompt-one','child','child-request')])+'\n');

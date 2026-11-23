@@ -42,15 +42,18 @@ test('cold dashboard scan previews recent sources and reuses their reads for the
   const database = new SummaryDatabase(options.dbPath);
   let previewSessions: string[] | undefined;
   let checkpointAtPreview: number | undefined;
+  let committedAtPreview: number | undefined;
   try {
     const result = await refreshSummary(database, options, undefined, undefined, {
       ...recentWindow(),
       onReady: db => {
         previewSessions = db.queryTurns().map(row => row.session_id);
         checkpointAtPreview = cutoff(database);
+        committedAtPreview = database.queryTurnsCount();
       },
     });
     assert.equal(checkpointAtPreview, undefined);
+    assert.equal(committedAtPreview, 0);
     assert.deepEqual(previewSessions, ['recent']);
     assert.equal(result.bodyBytes, Buffer.byteLength(recentSource + olderSource));
     assert.equal(result.parsed, 2);
@@ -64,13 +67,16 @@ test('cold dashboard scan previews recent sources and reuses their reads for the
   }
 }));
 
-test('warm refresh previews a new response from memory before releasing SQLite queries', async () => fixture(async (path, options) => {
-  const file = join(path, 'existing.jsonl'), unchanged = join(path, 'unchanged.jsonl');
+test('warm refresh previews a new response and the unchanged winner before releasing SQLite queries', async () => fixture(async (path, options) => {
+  const file = join(path, 'existing.jsonl'), companion = join(path, 'copy-of-existing.jsonl'), unchanged = join(path, 'unchanged.jsonl');
   const now = new Date();
-  await writeFile(file, source('existing', 120, now));
+  const existing = source('existing', 120, now);
+  const companionSource = source('existing', 130, now);
+  const added = `${JSON.stringify(usage(100, 'added'))}\n`;
+  await writeFile(file, existing);
+  await writeFile(companion, companionSource);
   await writeFile(unchanged, source('unchanged', 30, now));
-  await utimes(file, old, old);
-  await utimes(unchanged, old, old);
+  for (const log of [file, companion, unchanged]) await utimes(log, old, old);
   const client = new SummaryClient(options);
   const database = new SummaryDatabase(options.dbPath);
   const recentUsage = recentWindow();
@@ -81,7 +87,7 @@ test('warm refresh previews a new response from memory before releasing SQLite q
   try {
     await client.refresh();
     const previous = cutoff(database)!;
-    await appendFile(file, `${JSON.stringify(usage(100, 'added'))}\n`);
+    await appendFile(file, added);
     const changedAt = new Date(previous + 10);
     await utimes(file, changedAt, changedAt);
     release = await acquireRefreshLock(options.dbPath);
@@ -96,18 +102,19 @@ test('warm refresh previews a new response from memory before releasing SQLite q
       client.queryNames({ kind: 'session' }),
     ]).then(page => ({ page, afterRefresh: refreshed }));
     assert.equal(await Promise.race([current, delay(70, undefined, { ref: false })]), undefined);
-    assert.equal(database.queryUsage()[0].total_tokens, 164);
+    assert.equal(database.queryUsage()[0].total_tokens, 174);
     release();
     release = undefined;
     const result = await refreshing;
     assert.equal(result.interrupted, false);
     assert.equal(result.failed, 0);
-    assert.equal(previewTotal, 271);
+    assert.equal(previewTotal, 281);
     assert.equal(firstBytes, result.bodyBytes);
-    assert.equal(result.parsed, 1);
+    assert.equal(result.bodyBytes, Buffer.byteLength(existing + added + companionSource));
+    assert.equal(result.parsed, 2);
     const { page, afterRefresh } = await current;
     assert.equal(afterRefresh, true);
-    assert.equal(page[0].rows[0].total_tokens, 271);
+    assert.equal(page[0].rows[0].total_tokens, 281);
     assert.equal(page[1].total, 2);
   } finally {
     release?.();
@@ -163,9 +170,12 @@ test('a migration discards per-file offsets and retains previously committed fac
   const previous = new SummaryDatabase(options.dbPath);
   try {
     assert.equal((await refreshSummary(previous, options)).failed, 0);
-    previous.connection.exec(`DROP TABLE summary_refresh;
+    previous.connection.exec(`DROP TABLE applied_response;
+      DROP TABLE summary_refresh;
+      ALTER TABLE source_file DROP COLUMN relation_meta;
       ALTER TABLE source_file ADD COLUMN complete_position INTEGER NOT NULL DEFAULT 100;
       ALTER TABLE source_file ADD COLUMN prefix_hash TEXT;
+      UPDATE source_file SET parser_version=18;
       PRAGMA user_version=20;`);
   } finally { previous.close(); }
 
@@ -176,9 +186,46 @@ test('a migration discards per-file offsets and retains previously committed fac
     assert.ok(!columns.includes('complete_position') && !columns.includes('prefix_hash'));
     assert.equal((await refreshSummary(db, options)).parsed, 1);
     assert.equal(db.queryTurns()[0].total_tokens, 130);
+    assert.equal(db.connection.prepare('SELECT COUNT(*) AS count FROM applied_response').get()?.count, 1);
     assert.deepEqual(db.connection.prepare('PRAGMA foreign_key_check').all(), []);
     db.clearData();
     assert.equal(cutoff(db), undefined);
+    assert.equal(db.connection.prepare('SELECT COUNT(*) AS count FROM applied_response').get()?.count, 0);
+  } finally { db.close(); }
+}));
+
+test('v22 migration preserves existing summaries and replaces the source cache with applied responses', async () => fixture(async (path, options) => {
+  const file = join(path, 'one.jsonl');
+  await writeFile(file, source('one', 123));
+  const previous = new SummaryDatabase(options.dbPath);
+  let summaryId: number;
+  try {
+    assert.equal((await refreshSummary(previous, options)).failed, 0);
+    summaryId = previous.queryTurns()[0].id;
+    previous.connection.exec(`DROP TABLE applied_response;
+      ALTER TABLE source_file DROP COLUMN relation_meta;
+      CREATE TABLE source_winner_snapshot (file_id INTEGER PRIMARY KEY REFERENCES source_file(id), state BLOB NOT NULL);
+      CREATE TABLE source_winner_candidate (file_id INTEGER REFERENCES source_winner_snapshot(file_id), position INTEGER NOT NULL);
+      INSERT INTO source_winner_snapshot SELECT id, x'01' FROM source_file;
+      INSERT INTO source_winner_candidate SELECT file_id, 0 FROM source_winner_snapshot;
+      UPDATE source_file SET parser_version=19;
+      PRAGMA user_version=22;`);
+  } finally { previous.close(); }
+
+  const db = new SummaryDatabase(options.dbPath);
+  try {
+    assert.equal(db.queryTurns()[0].total_tokens, 130);
+    assert.equal(db.queryTurns()[0].id, summaryId);
+    assert.equal(db.connection.prepare("SELECT count(*) AS n FROM sqlite_schema WHERE name LIKE 'source_winner_%'").get()?.n, 0);
+    assert.equal((await refreshSummary(db, options)).failed, 0);
+    assert.equal(db.queryTurns()[0].total_tokens, 130);
+    assert.equal(db.queryTurns()[0].id, summaryId);
+    assert.equal(db.connection.prepare('SELECT count(*) AS n FROM applied_response').get()?.n, 1);
+    await appendFile(file, `${JSON.stringify(usage(140))}\n`);
+    assert.equal((await refreshSummary(db, options)).failed, 0);
+    assert.equal(db.queryTurns()[0].total_tokens, 147);
+    assert.equal(db.connection.prepare('SELECT count(*) AS n FROM applied_response').get()?.n, 1);
+    assert.deepEqual(db.connection.prepare('PRAGMA foreign_key_check').all(), []);
   } finally { db.close(); }
 }));
 

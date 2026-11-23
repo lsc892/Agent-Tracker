@@ -1,6 +1,6 @@
 # summary
 
-Claude·Codex 로그를 읽으면서 그룹별 winner DTO를 갱신하고 패자를 버린 뒤 최종 요청·모델·도구 결과만 저장한다. 원본 이벤트 DTO 캐시와 SQL staging·turn metadata 집계 경로는 제거했다.
+Claude·Codex 로그를 읽으면서 원본별 winner를 고른다. 부모 요청별로 최종 승자를 확정하고, SQLite의 응답별 마지막 반영값과 비교해 토큰 차이를 더한다. 원본에는 계보와 자식 요청 연결 근거를 저장한다.
 
 - [client/](client/README.md): 통계 클라이언트, Worker 통신·명령 실행, 갱신·취소·삭제 직렬화.
 - [scanner/](scanner/README.md): 파일 탐색·유효성 근거 수집·스트리밍 집계·성분별 저장, 잠금과 원본 이동 검증.

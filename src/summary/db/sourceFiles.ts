@@ -1,11 +1,17 @@
 // 원본 로그의 등록·메타데이터 조회·처리 진단을 맡는다.
+import { deserialize } from 'node:v8';
 import type { SqliteSession } from './connection';
-import type { FileMetadata, SourceFileRow, ProcessingStatus, Provider } from './types';
+import type { FileMetadata, SourceFileRow, ProcessingStatus, Provider, SourceRelationMetadata } from './types';
 import { pageLimit } from './validation';
 
 /** 파일 식별·진단과 세션별 파일 조회를 관리한다. */
 export class SourceFileStore {
   constructor(private readonly database: SqliteSession) {}
+
+  loadRelations(fileId: number): SourceRelationMetadata | undefined {
+    const row = this.database.statement('SELECT relation_meta FROM source_file WHERE id=?').get(fileId);
+    if (row?.relation_meta instanceof Uint8Array) return deserialize(row.relation_meta) as SourceRelationMetadata;
+  }
 
   findSourceFile(provider: Provider, path: string): SourceFileRow | undefined {
     return this.database.statement('SELECT * FROM source_file WHERE provider = ? AND path = ?')

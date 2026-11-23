@@ -2,7 +2,7 @@
 import type { CheckEvent, ParseEvent, Provider, UsageEvent } from '../types';
 import { key, normalizedEvent, SourceEvidence, type SourceEvidenceData } from './sourceEvidence';
 import { addTurn, createTurnState, max, type TurnState } from './turns';
-import { usageScore } from './winners';
+import { isBetterUsage, usageScore } from './winners';
 
 export interface Candidate { event: UsageEvent; index: number; score: number | bigint }
 export interface SourceCheck extends Omit<CheckEvent, 'kind' | 'rootId'> {
@@ -19,12 +19,14 @@ export interface SourceRoot {
   checks: Map<string, SourceCheck>;
   capabilities: Map<string, { event: Capability; positions: { index: number; offset: number }[] }>;
 }
-export interface SourceWinnersSnapshot {
+export interface SourceWinnerState {
   evidence: SourceEvidenceData;
   roots: Map<string, SourceRoot>;
-  winners: readonly Candidate[];
   mixedSchemas: boolean;
   requestAliases?: ReadonlySet<string>;
+}
+export interface SourceWinnersSnapshot extends SourceWinnerState {
+  winners: readonly Candidate[];
 }
 
 /** 원문과 metadata 이벤트 목록을 보관하지 않고 요청별 상태와 winner만 전달한다. */
@@ -72,7 +74,7 @@ export class SourceWinners {
         this.provider === 'claude' ? '' : event.turnId, event.schema);
       const score = usageScore(event), previous = this.winners.get(id);
       if (!previous) { this.winners.set(id, { event: { ...event }, index, score }); return; }
-      if (score < previous.score || score === previous.score && index <= previous.index) return;
+      if (!isBetterUsage(score, index, previous.score, previous.index)) return;
       for (const field of Object.keys(previous.event)) if (!Object.hasOwn(event, field)) Reflect.deleteProperty(previous.event, field);
       Object.assign(previous.event, event);
       previous.index = index; previous.score = score;

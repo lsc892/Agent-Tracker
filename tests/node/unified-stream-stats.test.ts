@@ -100,3 +100,28 @@ test('snapshot keeps exact winner scores and normalized text without modifying t
   assert.equal(winner.event.model, 'model�');
   assert.equal(event.model, 'model\ud800');
 });
+
+test('only applied winners enter the response ledger while losing roots retain their offsets', () => {
+  const fresh = source(1, [usage('fresh-root', 200, { responseId: 'shared', model: 'fresh-model' })]);
+  const stored = source(2, [
+    usage('stored-loser', 50, { responseId: 'shared', offset: 4, model: 'losing-model' }),
+    usage('stored-winner', 80, { model: 'stored-model' }),
+  ]);
+  const prepared = [fresh, stored].map(file => {
+    const selected = new SourceWinners(file.provider);
+    file.events.forEach((event, index) => selected.add(event, index));
+    return { ...file, evidence: selected.evidence, snapshot: selected.snapshot() };
+  });
+  const applied: { rootId: string; input: number }[] = [];
+  const aggregation = new StreamingAggregation(prepared, true, ({ rootId, tokens }) => {
+    applied.push({ rootId, input: tokens.input });
+  });
+  for (const file of prepared) aggregation.addSource(file.id, file.snapshot);
+  const actual = aggregation.finish();
+  assert.deepEqual(actual, eventOrder([fresh, stored]));
+  assert.equal(actual.summaries.find(row => row.root_turn_id === 'stored-loser')!.diagnostic_offset, 4);
+  assert.deepEqual(applied, [
+    { rootId: 'fresh-root', input: 200 },
+    { rootId: 'stored-winner', input: 80 },
+  ]);
+});

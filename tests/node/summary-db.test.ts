@@ -7,12 +7,12 @@ import { test, type TestContext } from 'node:test';
 import { DatabaseSync } from 'node:sqlite';
 import { SummaryDatabase, periodBounds, type FileMetadata, type TurnSummaryInput } from '../../src/summary/db';
 import { SqliteSession } from '../../src/summary/db/connection';
-import { SCHEMA_SQL, SCHEMA_VERSION, SCHEMA_MODEL_SQL, SCHEMA_CAPABILITY_SQL, SCHEMA_ROLLUP_SQL } from '../../src/summary/db/schema';
+import { SCHEMA_SQL, SCHEMA_VERSION, SCHEMA_MODEL_SQL, SCHEMA_CAPABILITY_SQL, SCHEMA_ROLLUP_SQL, SCHEMA_APPLIED_RESPONSES_SQL } from '../../src/summary/db/schema';
 
-const v9Schema = `${SCHEMA_SQL.replace(SCHEMA_ROLLUP_SQL, '')}
+const v9Schema = `${SCHEMA_SQL.replace(SCHEMA_ROLLUP_SQL, '').replace(SCHEMA_APPLIED_RESPONSES_SQL, '').replace('  relation_meta BLOB,', '')}
 CREATE INDEX idx_summary_session ON turn_summary(provider, session_id);
 CREATE INDEX IF NOT EXISTS idx_source_identity ON source_file(provider, dev, inode);`;
-const summaryTables = ['source_file', 'summary_refresh', 'projects', 'session_billing', 'sessions', 'turn_capability_usage',
+const summaryTables = ['source_file', 'applied_response', 'summary_refresh', 'projects', 'session_billing', 'sessions', 'turn_capability_usage',
   'turn_costs', 'turn_model_usage', 'turn_summary',
   'usage_model_daily', 'usage_request_daily', 'usage_rollup_meta'].sort();
 const v8Schema = v9Schema
@@ -34,7 +34,7 @@ function database(t: TestContext): SummaryDatabase {
   return db;
 }
 
-function metadata(index = 1, session = 'session-a', sourceRoot = '/synthetic/claude'): FileMetadata {
+function metadata(index = 1, session = 'session-a', sourceRoot = '/synthetic/claude'): Omit<FileMetadata, 'relations'> {
   return {
     provider: 'claude', source_root: sourceRoot, path: `${sourceRoot}/${index}.jsonl`,
     session_id: session, size_bytes: 512, mtime_ms: 123456, dev: '10', inode: String(index), parser_version: 1,
@@ -60,6 +60,32 @@ function seed(db: SummaryDatabase, rows: TurnSummaryInput[] = [turn()]): number 
   });
   return source_file.id;
 }
+
+test('applied responses are scoped to a session and source relations survive separately', t => {
+  const db = database(t);
+  const file = metadata();
+  const sourceId = db.observeFile(file).id;
+  const relations = { identity: { sessionId: 'session-a', threadId: 'thread', parentThreadId: 'parent', isMain: false,
+    agentPath: 'parent/thread', rootlessSubagent: true, forkedFromId: null },
+    childRequests: new Map([['child\0id', 'root\0id']]) };
+  const response = { provider: 'claude' as const, sessionId: 'session-a', responseKey: '["response","request"]', rootId: 'root\0id',
+    tokens: { input: 100, output: 10, cacheRead: 2, cacheWrite: 3 } };
+  db.replaceMemory({
+    sessions: [{ provider: 'claude', session_id: 'session-a' }],
+    files: [{ ...file, id: sourceId, relations }], summaries: [turn('root\0id')], appliedResponses: [response],
+  });
+  const [stored] = [...db.appliedResponses.loadSessions([{ provider: 'claude', session_id: 'session-a' }])];
+  assert.equal(stored?.responseKey, response.responseKey);
+  assert.equal(stored?.rootId, response.rootId);
+  assert.deepEqual(stored?.tokens, response.tokens);
+  assert.equal(db.connection.prepare('SELECT turn_id FROM applied_response').get()?.turn_id, db.queryTurns()[0].id);
+  assert.deepEqual(db.connection.prepare('PRAGMA table_info(applied_response)').all().map(row => row.name),
+    ['turn_id', 'response_key', 'input_tokens', 'output_tokens', 'cache_read', 'cache_write']);
+  assert.deepEqual([...db.appliedResponses.loadSessions([{ provider: 'claude', session_id: 'other-session' }])], []);
+  assert.deepEqual(db.sourceRelations(sourceId), relations);
+  db.clearData();
+  assert.equal(db.connection.prepare('SELECT count(*) AS n FROM applied_response').get()?.n, 0);
+});
 
 test('tracking selection filters usage, pagination counts and diagnostics without discarding cached data', t => {
   const db = database(t);
@@ -193,7 +219,7 @@ for (const version of [1,2]) test(`v${version} migration preserves summaries, so
       const keys = Object.keys(row);
       legacy.prepare(`INSERT INTO ${table} (${keys.join(',')}) VALUES (${keys.map(()=>'?').join(',')})`).run(...Object.values(row));
     }
-    beforeFiles = legacy.prepare('SELECT * FROM source_file').all();
+    beforeFiles = legacy.prepare('SELECT *, NULL AS relation_meta FROM source_file').all();
     beforeTurns = legacy.prepare('SELECT * FROM turn_summary').all();
     if (version===1) assert.throws(()=>legacy.exec("UPDATE turn_summary SET status='failed'"),/CHECK constraint/);
     legacy.exec('ALTER TABLE source_file RENAME TO manifest');
@@ -381,7 +407,7 @@ for (const version of [8,9]) test(`v${version} migration removes redundant index
   const tables = ['source_file', 'projects', 'sessions', 'turn_summary', 'turn_model_usage', 'turn_costs', 'session_billing', 'turn_capability_usage'];
   const snapshot = (connection: DatabaseSync) => tables.map(table => ({
     table, rows: connection.prepare(`SELECT * FROM ${table} ORDER BY 1,2`).all().map(row =>
-      Object.fromEntries(Object.entries(row).filter(([name]) => name !== 'turn_index'))),
+      Object.fromEntries(Object.entries(row).filter(([name]) => name !== 'turn_index' && name !== 'relation_meta'))),
   }));
   const legacy = new DatabaseSync(dbPath);
   let before: ReturnType<typeof snapshot>;

@@ -1,8 +1,10 @@
 // 메모리에서 완성한 요청 snapshot을 비교해 달라진 영속 행만 원자적으로 반영한다.
 import type { SQLInputValue } from 'node:sqlite';
+import { serialize } from 'node:v8';
 import type { SqliteSession } from '../connection';
 import type { SessionBillingStore } from '../billing';
-import type { BillingMode, SessionRef, TurnSummaryInput } from '../types';
+import type { AppliedResponseStore } from '../appliedResponses';
+import type { BillingMode, Provider, SessionRef, SourceRelationMetadata, TurnSummaryInput } from '../types';
 import { nonnegative } from '../validation';
 import { PRICING_VERSION } from '../../models/pricing';
 import { performance } from 'node:perf_hooks';
@@ -20,7 +22,7 @@ interface BatchReplacement extends MemoryReplacement {
 }
 
 type ReplacementSessions = Map<string, SessionRef>;
-type SourceSession = { provider: string; session_id: string | null };
+type SourceSession = { provider: Provider; session_id: string | null };
 type RemovedSources = Map<number, SourceSession>;
 
 interface RetainedUsage {
@@ -49,13 +51,24 @@ interface ReplacementMetadata {
 /** 제공자와 세션을 JSON 튜플로 묶어 충돌 없는 세션 키를 만든다. */
 const sessionKey = (provider: unknown, session: unknown): string => JSON.stringify([provider, session]);
 
-/** 제공자와 요청 root를 JSON 튜플로 묶어 삭제 보존 여부를 구분한다. */
-const rootKey = (provider: unknown, root: unknown): string => JSON.stringify([provider, root]);
+/** 제공자·세션·요청을 JSON 튜플로 묶어 삭제 보존 여부를 구분한다. */
+const rootKey = (provider: Provider, session: string, root: string): string => JSON.stringify([provider, session, root]);
+
+function relationBlob(relations: SourceRelationMetadata | null | undefined): Buffer | null {
+  if (!relations) return null;
+  const { sessionId, threadId, parentThreadId, isMain, agentPath, rootlessSubagent, forkedFromId } = relations.identity;
+  const identity: SourceRelationMetadata['identity'] = { sessionId, threadId, parentThreadId, isMain };
+  if (agentPath !== undefined) identity.agentPath = agentPath;
+  if (rootlessSubagent !== undefined) identity.rootlessSubagent = rootlessSubagent;
+  if (forkedFromId !== undefined) identity.forkedFromId = forkedFromId;
+  return serialize({ identity, childRequests: relations.childRequests });
+}
 
 /** DTO를 SQL 임시 표에 재적재하지 않고 최종 facts·모델·도구·원본 상태를 저장한다. */
 export class MemoryStore {
   constructor(
     private readonly database: SqliteSession, private readonly billing: SessionBillingStore,
+    private readonly appliedResponses: AppliedResponseStore,
     private readonly profile = new StageProfiler<StorageStage>(),
   ) {}
 
@@ -133,6 +146,11 @@ export class MemoryStore {
       this.profile.measure('deleteMissing', () => this.deleteMissingSummaries(sessions, next, retained.turnIds, changedSessions, affectedProjects));
       this.profile.measure('summaries', () => this.saveSummaries(next, retained.roots, replacement.preserveCapabilities,
         now, changedSessions, affectedProjects, metadata.billing));
+      if (replacement.appliedResponses || replacement.replaceAppliedSessions) {
+        this.appliedResponses.replace(replacement.appliedResponses ?? [],
+          replacement.replaceAppliedSessions ? [...sessions.values()] : [],
+          response => retained.roots.has(rootKey(response.provider, response.sessionId, response.rootId)));
+      }
       this.profile.measure('reconnectDiagnostics', () => this.reconnectDiagnostics(reconnected));
       this.profile.measure('removeSources', () => this.removeSources(removed, reconnected, retained.sessions, now));
       for (const [key, session] of sessions)
@@ -198,7 +216,7 @@ export class MemoryStore {
         .all(file.provider, file.session_id) as { id: number; root_turn_id: string }[];
       for (const row of requests) {
         retained.turnIds.add(row.id);
-        retained.roots.add(rootKey(file.provider, row.root_turn_id));
+        retained.roots.add(rootKey(file.provider, file.session_id, row.root_turn_id));
         retained.sessions.add(sessionKey(file.provider, file.session_id));
       }
     }
@@ -215,17 +233,19 @@ export class MemoryStore {
         this.requireSession(previous.provider, previous.session_id, sessions);
       }
       this.requireSession(file.provider, file.session_id, sessions);
+      const relations = file.relations;
       this.database.statement(`INSERT INTO source_file(id,provider,source_root,path,session_id,size_bytes,mtime_ms,dev,inode,parser_version,
-          source_identity,content_hash,capabilities_collected,source_missing,processing_status,processing_position,recorded_at,last_error)
-        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,0,'done','committed',?,NULL)
+          source_identity,content_hash,capabilities_collected,relation_meta,source_missing,processing_status,processing_position,recorded_at,last_error)
+        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,0,'done','committed',?,NULL)
         ON CONFLICT(id) DO UPDATE SET source_root=excluded.source_root,path=excluded.path,session_id=excluded.session_id,
           size_bytes=excluded.size_bytes,mtime_ms=excluded.mtime_ms,dev=excluded.dev,inode=excluded.inode,
           parser_version=excluded.parser_version,source_identity=excluded.source_identity,content_hash=excluded.content_hash,
+          relation_meta=CASE WHEN ? THEN excluded.relation_meta ELSE source_file.relation_meta END,
           capabilities_collected=excluded.capabilities_collected,source_missing=0,
           processing_status='done',processing_position='committed',recorded_at=excluded.recorded_at,last_error=NULL`)
         .run(file.id, file.provider, file.source_root, file.path, file.session_id, file.size_bytes, file.mtime_ms, file.dev, file.inode,
           file.parser_version, file.source_identity ?? null, file.content_hash ?? null,
-          file.capabilities_collected ?? 1, now);
+          file.capabilities_collected ?? 1, relationBlob(relations), now, Number(relations !== undefined));
     }
   }
 
@@ -265,7 +285,7 @@ export class MemoryStore {
     now: string, changedSessions: Set<string>, affectedProjects: Set<string>, billing: Map<string, BillingMode | undefined>,
   ): void {
     for (const summary of next.values()) {
-      if (retainedRoots.has(rootKey(summary.provider, summary.root_turn_id))) continue;
+      if (retainedRoots.has(rootKey(summary.provider, summary.session_id, summary.root_turn_id))) continue;
       this.saveSummary(summary, preserveCapabilities, now, changedSessions, affectedProjects, billing);
     }
   }
@@ -340,7 +360,7 @@ export class MemoryStore {
   private collectMetadata(plans: readonly PreparedReplacement[]): ReplacementMetadata {
     const projects = new Map<string, string>(), sessions = new Map<string, SessionMetadata>();
     for (const { next, retained } of plans) for (const summary of next.values()) {
-      if (retained.roots.has(rootKey(summary.provider, summary.root_turn_id))) continue;
+      if (retained.roots.has(rootKey(summary.provider, summary.session_id, summary.root_turn_id))) continue;
       projects.set(summary.project_key, summary.project_name);
       const key = sessionKey(summary.provider, summary.session_id), name = summary.session_name?.trim() || null;
       if (!sessions.has(key) || name !== null) sessions.set(key, { provider: summary.provider, session_id: summary.session_id, name });

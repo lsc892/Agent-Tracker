@@ -1,8 +1,7 @@
 // 유효한 원본의 요청 상태와 최종 winner를 조회용 요청·모델·도구 값으로 만든다.
 import type { BillingMode, CapabilityUsageInput, ModelUsageInput, TurnSummaryInput } from '../db/types';
-import type { TurnEvent } from '../types';
+import type { TokenVector, TurnEvent, UsageEvent } from '../types';
 import { key, type SourcePlan, type StreamingAggregateFile } from './sourceEvidence';
-import type { Winner } from './winners';
 
 export interface MaterializedTurnSummary extends TurnSummaryInput {
   model_usage: ModelUsageInput[];
@@ -73,11 +72,23 @@ export function addCapability(root: Root, category: CapabilityUsageInput['catego
   else root.capabilities.set(id, { category, name, usage_count: count });
 }
 
-/** 교체 전 기여를 빼고 새 기여를 더해 winner 전체를 다시 합산하지 않는다. */
-export function addWinner(root: Root, winner: Winner, collectCapabilities: boolean, direction: 1 | -1 = 1): void {
-  const event = winner.event, tokens = event.tokens;
+export interface UsageContribution extends Pick<UsageEvent, 'billingMode' | 'model'> {
+  tokens: Pick<TokenVector, 'input' | 'output' | 'cacheRead' | 'cacheWrite'>;
+}
+
+export function accountedCacheRead(tokens: UsageContribution['tokens']): number {
+  return Math.min(tokens.input, tokens.cacheRead);
+}
+
+export function accountedCacheWrite(tokens: UsageContribution['tokens']): number {
+  return Math.min(Math.max(0, tokens.input - tokens.cacheRead), tokens.cacheWrite);
+}
+
+/** 확정한 후보의 토큰, 모델, 결제 정보를 요청에 합친다. */
+export function addUsage(root: Root, event: UsageContribution, collectCapabilities: boolean, direction: 1 | -1 = 1): void {
+  const { tokens } = event;
   root.input += direction * tokens.input; root.output += direction * tokens.output;
-  const cacheRead = Math.min(tokens.input, tokens.cacheRead), cacheWrite = Math.min(Math.max(0, tokens.input - tokens.cacheRead), tokens.cacheWrite);
+  const cacheRead = accountedCacheRead(tokens), cacheWrite = accountedCacheWrite(tokens);
   root.cacheRead += direction * cacheRead; root.cacheWrite += direction * cacheWrite;
   const billing = event.billingMode ?? 'unknown', billingCount = (root.billing.get(billing) ?? 0) + direction;
   if (billingCount === 0) root.billing.delete(billing); else root.billing.set(billing, billingCount);

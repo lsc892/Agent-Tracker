@@ -1,6 +1,7 @@
 // 연결 묶음의 최종 변경분을 저장하고 진단과 전역 갱신 기준을 확정한다.
 import { setImmediate as yieldToWorker } from 'node:timers/promises';
-import type { MemoryAggregateResult } from '../../aggregation/memoryAggregate';
+import type { ScanAggregation } from './aggregation';
+import { planAppliedUsage } from '../../aggregation/appliedUsage';
 import type { MemoryReplacement } from '../../db/memoryStore';
 import type { FileMetadata, Provider } from '../../db/types';
 import { SummaryError } from '../../jsonl';
@@ -14,16 +15,17 @@ const MAX_COMMIT_BATCH_SUMMARIES = 1000;
 interface ComponentCommit {
   component: Set<string>;
   members: FileState[];
-  aggregated: MemoryAggregateResult;
+  aggregated: ScanAggregation;
 }
 
-export async function commitComponents(context: RefreshContext, aggregated: MemoryAggregateResult): Promise<void> {
+export async function commitComponents(context: RefreshContext, aggregated: ScanAggregation): Promise<void> {
   const { files, affected, links, reconnections } = context.state;
   if (!affected.size) return;
   const memberGroups = new OrderedGroups(files.values(), file => [sessionKey(file.provider, file.session_id ?? ''),
     sessionKey(file.provider, file.previous?.session_id ?? '')]);
   const summaryGroups = new OrderedGroups(aggregated.summaries, row => [sessionKey(row.provider, row.session_id)]);
   const orphanGroups = new OrderedGroups(aggregated.orphans, row => [sessionKey(row.provider, row.session_id)]);
+  const responseGroups = new OrderedGroups(aggregated.appliedResponses, row => [sessionKey(row.provider, row.sessionId)]);
   const reconnectedIds = new Set(reconnections.flatMap(link => [link.old_id, link.new_id]));
   const remaining = new Set([...affected].sort());
   let batch: ComponentCommit[] = [];
@@ -38,7 +40,8 @@ export async function commitComponents(context: RefreshContext, aggregated: Memo
     const component = linkedComponent(seed, links);
     for (const session of component) remaining.delete(session);
     const entry = { component, members: memberGroups.members(component),
-      aggregated: { summaries: summaryGroups.members(component), orphans: orphanGroups.members(component) } };
+      aggregated: { summaries: summaryGroups.members(component), orphans: orphanGroups.members(component),
+        appliedResponses: responseGroups.members(component) } };
     if (requiresIndividualCommit(entry, reconnectedIds)) {
       await flush();
       await commitIndividual(context, entry);
@@ -80,7 +83,10 @@ async function commitIndividual(context: RefreshContext, entry: ComponentCommit)
 }
 
 function settleFiles(files: readonly FileState[]): void {
-  for (const file of files) file.settled = true;
+  for (const file of files) {
+    file.settled = true;
+    file.prepared = undefined;
+  }
 }
 
 /** 연결된 세션을 기존 너비 우선 탐색 순서로 모아 하나의 원자적 저장 범위를 만든다. */
@@ -141,18 +147,27 @@ function commitComponent(context: RefreshContext, entry: ComponentCommit): void 
 
 /** 성분별 보존·이동 범위를 합치지 않고 기존 snapshot 계약을 그대로 만든다. */
 function componentReplacement(context: RefreshContext, { component, members, aggregated }: ComponentCommit): MemoryReplacement {
-  const { state, collect, retain } = context;
+  const { database, state, collect, retain, persistAppliedResponses } = context;
   const sessions = [...component].map(value => {
     const [provider, session_id] = JSON.parse(value) as [Provider, string];
     return { provider, session_id };
   });
   const files = [], removedFileIds = new Set<number>();
   for (const file of members) {
-    if (file.removed) removedFileIds.add(file.id);
-    else files.push(finalFile(file));
+    if (file.removed) {
+      removedFileIds.add(file.id);
+      continue;
+    }
+    files.push(finalFile(file));
   }
   const summaries = retain && removedFileIds.size ? aggregated.summaries.filter(row => row.hasMain) : aggregated.summaries;
-  return { sessions, summaries, files, removedFileIds,
+  const ledger = persistAppliedResponses
+    ? (members.some(file => file.previous?.parser_version === file.parser_version) && !removedFileIds.size
+      ? planAppliedUsage(summaries, aggregated.appliedResponses, database.appliedResponses.loadSessions(sessions),
+        database.appliedResponses.loadTotals(sessions))
+      : { summaries, appliedResponses: aggregated.appliedResponses, replaceAppliedSessions: true })
+    : { summaries };
+  return { sessions, ...ledger, files, removedFileIds,
     reconnectedFiles: state.reconnections.filter(link => removedFileIds.has(link.old_id)),
     preserveCapabilities: !collect, retainDeletedSourceUsage: retain };
 }
@@ -215,7 +230,7 @@ function finalFile(file: FileState): FileMetadata & { id: number } {
   return { id: file.id, provider: file.provider, source_root: file.source_root, path: file.path,
     session_id: file.session_id, size_bytes: file.size_bytes, mtime_ms: file.mtime_ms, dev: file.dev, inode: file.inode,
     parser_version: file.parser_version, capabilities_collected: file.capabilities_collected,
-    source_identity: file.source_identity, content_hash: file.content_hash };
+    source_identity: file.source_identity, content_hash: file.content_hash, relations: file.relations };
 }
 
 export function recordFailure(context: RefreshContext, file: FileState): void {

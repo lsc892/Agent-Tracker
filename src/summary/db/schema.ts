@@ -2,7 +2,7 @@
 import { SCHEMA_ROLLUP_SQL } from './rollup-state';
 
 export { SCHEMA_ROLLUP_SQL } from './rollup-state';
-export const SCHEMA_VERSION = 21;
+export const SCHEMA_VERSION = 23;
 
 export const SCHEMA_REFRESH_SQL = `
 CREATE TABLE IF NOT EXISTS summary_refresh (
@@ -10,6 +10,18 @@ CREATE TABLE IF NOT EXISTS summary_refresh (
   scope TEXT NOT NULL,
   started_ms INTEGER NOT NULL
 );
+`;
+
+export const SCHEMA_APPLIED_RESPONSES_SQL = `
+CREATE TABLE IF NOT EXISTS applied_response (
+  turn_id INTEGER NOT NULL REFERENCES turn_summary(id) ON DELETE CASCADE,
+  response_key TEXT NOT NULL,
+  input_tokens INTEGER NOT NULL,
+  output_tokens INTEGER NOT NULL,
+  cache_read INTEGER NOT NULL,
+  cache_write INTEGER NOT NULL,
+  PRIMARY KEY (turn_id, response_key)
+) WITHOUT ROWID;
 `;
 
 export const SCHEMA_CAPABILITY_SQL = `
@@ -110,6 +122,7 @@ CREATE TABLE IF NOT EXISTS source_file (
   parser_version INTEGER NOT NULL DEFAULT 0,
   source_identity TEXT,
   content_hash TEXT,
+  relation_meta BLOB,
   capabilities_collected INTEGER NOT NULL DEFAULT 0 CHECK(capabilities_collected IN (0,1)),
   source_missing INTEGER NOT NULL DEFAULT 0 CHECK(source_missing IN (0,1)),
   last_seen_scan_id TEXT, -- compatibility with earlier v21 databases
@@ -130,6 +143,7 @@ ${SCHEMA_MODEL_SQL}
 ${SCHEMA_CAPABILITY_SQL}
 ${SCHEMA_ROLLUP_SQL}
 ${SCHEMA_REFRESH_SQL}
+${SCHEMA_APPLIED_RESPONSES_SQL}
 `;
 
 /** Both v1 and v2 stored project names on every turn. Preserve ids, statistics and diagnostics. */

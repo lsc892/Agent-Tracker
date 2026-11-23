@@ -4,22 +4,25 @@ import type { NameQuery, NameResult } from '../types';
 import type {
   BillingMode, CapabilityCategory, CapabilityPage, ChartMetric, DiagnosticsPage, FileMetadata,
   KeysetPage, SourceFileRow, OffsetPage, ProcessingStatus, Provider, SummaryFilter,
-  TurnSummaryRow, UsagePage, UsageGrouping, UsageRow, UsageSort,
+  TurnSummaryRow, UsagePage, UsageGrouping, UsageRow, UsageSort, SourceRelationMetadata,
 } from './types';
 import { SqliteSession, type SqliteSessionOptions } from './connection';
 import { SourceFileStore } from './sourceFiles';
 import { SessionBillingStore } from './billing';
 import { SummaryReader } from './reader';
 import { MemoryStore, type MemoryReplacement, type SavedSessionNames } from './memoryStore';
+import { AppliedResponseStore } from './appliedResponses';
 import type { StageProfiler, StorageStage } from '../profiling';
 
 export * from './types';
+export type { AppliedRequestTotals, AppliedResponse } from './appliedResponses';
 export { usageChartFromPage } from './chart';
 export { periodBounds } from './timezone';
 
 /** 하나의 DB 연결을 공유하는 저장소들을 구성하고 통계 작업을 위임한다. */
 export class SummaryDatabase {
   readonly connection: DatabaseSync;
+  readonly appliedResponses: AppliedResponseStore;
   private readonly sqlite: SqliteSession;
   private readonly sources: SourceFileStore;
   private readonly billing: SessionBillingStore;
@@ -28,6 +31,7 @@ export class SummaryDatabase {
   constructor(options: SqliteSessionOptions) {
     this.sqlite = new SqliteSession(options);
     this.connection = this.sqlite.connection;
+    this.appliedResponses = new AppliedResponseStore(this.sqlite);
     this.sources = new SourceFileStore(this.sqlite);
     this.billing = new SessionBillingStore(this.sqlite);
     this.reader = new SummaryReader(this.sqlite);
@@ -56,6 +60,10 @@ export class SummaryDatabase {
     return this.sources.findSourceFile(provider, path);
   }
 
+  sourceRelations(fileId: number): SourceRelationMetadata | undefined {
+    return this.sources.loadRelations(fileId);
+  }
+
   observeFile(metadata: FileMetadata): SourceFileRow {
     return this.sources.observeFile(metadata);
   }
@@ -69,11 +77,11 @@ export class SummaryDatabase {
   }
 
   replaceMemory(replacement: MemoryReplacement, profile?: StageProfiler<StorageStage>): SavedSessionNames {
-    return new MemoryStore(this.sqlite, this.billing, profile).replace(replacement);
+    return new MemoryStore(this.sqlite, this.billing, this.appliedResponses, profile).replace(replacement);
   }
 
   replaceMemoryBatch(replacements: readonly MemoryReplacement[], profile?: StageProfiler<StorageStage>): SavedSessionNames {
-    return new MemoryStore(this.sqlite, this.billing, profile).replaceBatch(replacements);
+    return new MemoryStore(this.sqlite, this.billing, this.appliedResponses, profile).replaceBatch(replacements);
   }
 
   queryNames(query: NameQuery): NameResult {

@@ -161,9 +161,13 @@ export function prepareSources(files: readonly StreamingAggregateFile[]): {
   return { sources, requests };
 }
 
+export function eligibleUsage(source: SourcePlan, event: Pick<UsageEvent, 'schema' | 'rootId'>, index: number): boolean {
+  return !source.inheritedRoots.has(event.rootId)
+    && (event.schema !== 'legacy' || !source.file.evidence.current && index > source.legacyCutoff);
+}
+
 export function eligible(source: SourcePlan, event: ParseEvent, index: number): boolean {
-  if (event.kind === 'usage' && event.schema === 'legacy'
-    && (source.file.evidence.current || index <= source.legacyCutoff)) return false;
+  if (event.kind === 'usage') return eligibleUsage(source, event, index);
   if (event.kind === 'capability' && index <= source.legacyCutoff && source.copiedCapabilities.has(capabilityKey(event))) return false;
   return !(event.kind !== 'capability' && source.inheritedRoots.has(event.rootId));
 }

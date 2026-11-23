@@ -3,7 +3,7 @@ import { lstat } from 'node:fs/promises';
 import { SummaryError } from '../../jsonl';
 import type { SourcePreparation } from '../sourcePreparation';
 import type { RefreshContext } from './context';
-import type { FileState, ScanState } from './state';
+import { PARSER_VERSION, type FileState, type ScanState } from './state';
 
 export async function prepareChanged(context: RefreshContext): Promise<void> {
   const changed = [...context.state.files.values()].filter(file => file.changed && !file.removed).sort((a, b) => a.id - b.id);
@@ -24,11 +24,11 @@ export async function inspectSource(context: RefreshContext, file: FileState): P
   context.check();
   if (!state.ready(file)) return;
   file.attempted = true;
-  if (!file.changed && file.selected)
-    result.reused = Math.max(0, result.reused - 1);
   if (!file.selected && !await refreshOutsideSource(context, file))
     return;
   try {
+    if (!file.changed && file.selected)
+      result.reused = Math.max(0, result.reused - 1);
     const preparation = await scan.measureAsync('readSources', () => sourcePool.read(file, file.selected));
     report();
     applyPreparation(context, file, preparation);
@@ -58,8 +58,11 @@ function applyPreparation(context: RefreshContext, file: FileState, preparation:
     return;
   }
   const identity = read.identity!;
+  file.parser_version = PARSER_VERSION;
+  file.capabilities_collected = collect ? 1 : 0;
   state.setSession(file, identity.sessionId);
   state.setSourceIdentity(file, read.sourceIdentity);
+  file.relations = { identity, childRequests: winners.evidence.childRequests };
   file.content_hash = read.contentHash;
   state.registerPrepared(file, { identity, winners, partialLine: read.partialLine });
   file.changed = needsReplacement(file, collect);
@@ -76,6 +79,7 @@ function applyEmptySource(state: ScanState, file: FileState, partialLine: boolea
     return;
   }
   file.content_hash = null;
+  file.relations = null;
   state.setSourceIdentity(file, null);
   state.setSession(file, previousSession ?? null);
 }
