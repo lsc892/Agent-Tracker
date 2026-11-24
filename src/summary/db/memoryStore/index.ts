@@ -6,6 +6,7 @@ import type { SessionBillingStore } from '../billing';
 import type { AppliedResponseStore } from '../appliedResponses';
 import type { BillingMode, Provider, SessionRef, SourceRelationMetadata, TurnSummaryInput } from '../types';
 import { nonnegative } from '../validation';
+import { planAppliedUsage } from '../../aggregation/appliedUsage';
 import { PRICING_VERSION } from '../../models/pricing';
 import { performance } from 'node:perf_hooks';
 import { StageProfiler, type StorageStage } from '../../profiling';
@@ -53,6 +54,13 @@ const sessionKey = (provider: unknown, session: unknown): string => JSON.stringi
 
 /** 제공자·세션·요청을 JSON 튜플로 묶어 삭제 보존 여부를 구분한다. */
 const rootKey = (provider: Provider, session: string, root: string): string => JSON.stringify([provider, session, root]);
+
+const SUMMARY_KEY_COLUMNS: readonly string[] = ['provider', 'session_id', 'root_turn_id'];
+const UPSERT_SUMMARY = `INSERT INTO turn_summary(${SUMMARY_COLUMNS.join(',')})
+  VALUES(${SUMMARY_COLUMNS.map(() => '?').join(',')})
+  ON CONFLICT(${SUMMARY_KEY_COLUMNS.join(',')}) DO UPDATE SET
+  ${SUMMARY_COLUMNS.filter(name => !SUMMARY_KEY_COLUMNS.includes(name)).map(name => `${name}=excluded.${name}`).join(',')}
+  RETURNING id`;
 
 function relationBlob(relations: SourceRelationMetadata | null | undefined): Buffer | null {
   if (!relations) return null;
@@ -127,6 +135,12 @@ export class MemoryStore {
     const removed = this.collectRemovedSources(replacement.removedFileIds ?? [], sessions);
     const reconnected = this.collectReconnectedSources(replacement, removed, sessions);
     const retained = this.collectRetainedUsage(replacement.retainDeletedSourceUsage, removed, reconnected);
+    if (replacement.reconcileAppliedResponses) {
+      const scope = [...sessions.values()];
+      const usage = planAppliedUsage([...replacement.summaries], replacement.appliedResponses ?? [],
+        this.appliedResponses.loadSessions(scope), this.appliedResponses.loadTotals(scope));
+      replacement = { ...replacement, ...usage };
+    }
     this.profile.record('prepare', prepareStarted);
     const next = this.profile.measure('indexSummaries', () => this.indexSummaries(replacement.summaries, sessions));
     return { replacement, sessions, next, removed, reconnected, retained, now };
@@ -328,15 +342,8 @@ export class MemoryStore {
 
     const writeStarted = performance.now();
     try {
-      const id = this.profile.measure('facts', () => {
-        if (!previous) {
-          return this.database.statement(`INSERT INTO turn_summary(${SUMMARY_COLUMNS.join(',')}) VALUES(${SUMMARY_COLUMNS.map(() => '?').join(',')})`)
-            .run(...incoming).lastInsertRowid;
-        }
-        const id = previous.id as number;
-        this.database.statement(`UPDATE turn_summary SET ${SUMMARY_COLUMNS.map(name => `${name}=?`).join(',')} WHERE id=?`).run(...incoming, id);
-        return id;
-      });
+      const id = this.profile.measure('facts', () =>
+        (this.database.statement(UPSERT_SUMMARY).get(...incoming) as { id: number }).id);
       if (!previous || modelsChanged) {
         this.profile.measure('models', () => {
           if (previous !== undefined) this.database.statement('DELETE FROM turn_model_usage WHERE turn_id=?').run(id);

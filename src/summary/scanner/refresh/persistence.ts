@@ -1,7 +1,6 @@
 // 연결 묶음의 최종 변경분을 저장하고 진단과 전역 갱신 기준을 확정한다.
 import { setImmediate as yieldToWorker } from 'node:timers/promises';
 import type { ScanAggregation } from './aggregation';
-import { planAppliedUsage } from '../../aggregation/appliedUsage';
 import type { MemoryReplacement } from '../../db/memoryStore';
 import type { FileMetadata, Provider } from '../../db/types';
 import { SummaryError } from '../../jsonl';
@@ -147,7 +146,7 @@ function commitComponent(context: RefreshContext, entry: ComponentCommit): void 
 
 /** 성분별 보존·이동 범위를 합치지 않고 기존 snapshot 계약을 그대로 만든다. */
 function componentReplacement(context: RefreshContext, { component, members, aggregated }: ComponentCommit): MemoryReplacement {
-  const { database, state, collect, retain, persistAppliedResponses } = context;
+  const { state, collect, retain, persistAppliedResponses } = context;
   const sessions = [...component].map(value => {
     const [provider, session_id] = JSON.parse(value) as [Provider, string];
     return { provider, session_id };
@@ -161,13 +160,12 @@ function componentReplacement(context: RefreshContext, { component, members, agg
     files.push(finalFile(file));
   }
   const summaries = retain && removedFileIds.size ? aggregated.summaries.filter(row => row.hasMain) : aggregated.summaries;
-  const ledger = persistAppliedResponses
-    ? (members.some(file => file.previous?.parser_version === file.parser_version) && !removedFileIds.size
-      ? planAppliedUsage(summaries, aggregated.appliedResponses, database.appliedResponses.loadSessions(sessions),
-        database.appliedResponses.loadTotals(sessions))
-      : { summaries, appliedResponses: aggregated.appliedResponses, replaceAppliedSessions: true })
-    : { summaries };
-  return { sessions, ...ledger, files, removedFileIds,
+  const ledger = persistAppliedResponses ? {
+    appliedResponses: aggregated.appliedResponses,
+    replaceAppliedSessions: true,
+    reconcileAppliedResponses: !removedFileIds.size && members.some(file => file.previous?.parser_version === file.parser_version),
+  } : {};
+  return { sessions, summaries, ...ledger, files, removedFileIds,
     reconnectedFiles: state.reconnections.filter(link => removedFileIds.has(link.old_id)),
     preserveCapabilities: !collect, retainDeletedSourceUsage: retain };
 }

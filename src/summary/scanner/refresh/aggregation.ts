@@ -1,4 +1,4 @@
-// 준비된 원본 winner를 기존 순서로 최종 집계기에 전달한다.
+// 준비된 파일별 winner를 기존 순서로 최종 집계기에 전달한다.
 import { StreamingAggregation, type StreamingAggregateFile, type MemoryAggregateResult } from '../../aggregation/memoryAggregate';
 import type { AppliedResponse } from '../../db/appliedResponses';
 import type { RefreshContext } from './context';
@@ -28,8 +28,10 @@ export function collectWinners(context: RefreshContext, names: Map<string, strin
   for (const file of sources) {
     check();
     aggregation.addSource(file.id, file.prepared.winners);
+    const stateFile: FileState = file;
+    stateFile.prepared = undefined;
   }
-  return { ...aggregation.finish(), appliedResponses };
+  return { ...aggregation.finish(check), appliedResponses };
 }
 
 function isAffectedSource(state: ScanState, file: FileState): file is AggregateSource {

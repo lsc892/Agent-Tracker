@@ -1,11 +1,12 @@
 // 새로 고른 응답과 이미 반영한 응답을 비교해 부모 요청의 추가 사용량을 계산한다.
 import type { AppliedRequestTotals, AppliedResponse } from '../db/appliedResponses';
+import type { TurnSummaryInput } from '../db/types';
 import { key } from './sourceEvidence';
-import { accountedCacheRead, accountedCacheWrite, type MaterializedTurnSummary } from './turns';
+import { accountedCacheRead, accountedCacheWrite } from './turns';
 import { usageScore } from './winners';
 
 export interface AppliedUsagePlan {
-  summaries: readonly MaterializedTurnSummary[];
+  summaries: readonly TurnSummaryInput[];
   appliedResponses: readonly AppliedResponse[];
   replaceAppliedSessions: boolean;
 }
@@ -15,7 +16,7 @@ const responseId = (usage: AppliedResponse): string => key(usage.provider, usage
 const requestId = (usage: AppliedResponse | AppliedRequestTotals): string => key(usage.provider, usage.sessionId, usage.rootId);
 
 /** 이전 값에 차분을 더하고 같은 입력을 다시 처리해도 이중 반영하지 않는다. */
-export function planAppliedUsage(summaries: readonly MaterializedTurnSummary[], selected: readonly AppliedResponse[],
+export function planAppliedUsage(summaries: readonly TurnSummaryInput[], selected: readonly AppliedResponse[],
   previous: Iterable<AppliedResponse>, previousTotals: Iterable<AppliedRequestTotals>): AppliedUsagePlan {
   const replacement = { summaries, appliedResponses: selected, replaceAppliedSessions: true };
   const remaining = new Map(Array.from(previous, usage => [responseId(usage), usage]));
@@ -57,7 +58,7 @@ export function planAppliedUsage(summaries: readonly MaterializedTurnSummary[], 
   }
   if (remaining.size) return replacement;
 
-  const updated: MaterializedTurnSummary[] = [];
+  const updated: TurnSummaryInput[] = [];
   for (const row of summaries) {
     const root = key(row.provider, row.session_id, row.root_turn_id);
     const sum = totals.get(root) ?? emptyTokens;

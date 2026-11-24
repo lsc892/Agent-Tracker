@@ -51,7 +51,7 @@ export class SourceEvidence {
   eventCount = 0;
   current = false;
   readonly flags = new Map<string, Set<string>>();
-  readonly legacy: { index: number; rootId: string; signature: string }[] = [];
+  readonly legacy: { index: number; rootId: string; signature: string; offset: number }[] = [];
   readonly nonLegacyRoots = new Set<string>();
   readonly capabilities = new Map<string, number>();
   readonly requests = new Map<string, string | null>();
@@ -76,7 +76,7 @@ export class SourceEvidence {
     }
     if (event.kind !== 'usage') return;
     if (event.schema === 'current') this.current = true;
-    if (event.schema === 'legacy') this.legacy.push({ index, rootId: event.rootId, signature: legacySignature(event) });
+    if (event.schema === 'legacy') this.legacy.push({ index, rootId: event.rootId, signature: legacySignature(event), offset: event.offset });
     else this.nonLegacyRoots.add(event.rootId);
     if (event.requestId === null) return;
     const requests = event.schema === 'legacy' ? this.legacyRequests : this.requests;

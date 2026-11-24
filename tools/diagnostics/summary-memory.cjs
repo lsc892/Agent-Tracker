@@ -41,7 +41,6 @@ function transientCounts() {
     SourceWinners: require('../../dist/src/summary/aggregation/sourceWinners').SourceWinners,
     SourceEvidence: require('../../dist/src/summary/aggregation/sourceEvidence').SourceEvidence,
     StreamingAggregation: require('../../dist/src/summary/aggregation/memoryAggregate').StreamingAggregation,
-    Winners: require('../../dist/src/summary/aggregation/winners').Winners,
     MemoryStore: require('../../dist/src/summary/db/memoryStore').MemoryStore,
     Worker: require('node:worker_threads').Worker,
   };
@@ -229,7 +228,7 @@ async function summarizeSnapshot(path) {
   const typeAt = fields.indexOf('type'), nameAt = fields.indexOf('name'), sizeAt = fields.indexOf('self_size');
   const types = snapshot.snapshot.meta.node_types[typeAt];
   const selected = new Set(['Map', 'Set', 'Array', 'Promise', 'ScanState', 'SourceReaderPool', 'SourceWinners',
-    'SourceEvidence', 'StreamingAggregation', 'Winners', 'MemoryStore', 'Worker', 'StatementSync', 'DatabaseSync',
+    'SourceEvidence', 'StreamingAggregation', 'MemoryStore', 'Worker', 'StatementSync', 'DatabaseSync',
     'SqliteSession', 'FileHandle', 'AbortController', 'AbortSignal']);
   const byType = {}, objects = {};
   for (let index = 0; index < snapshot.nodes.length; index += width) {

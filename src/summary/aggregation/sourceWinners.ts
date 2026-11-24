@@ -1,86 +1,88 @@
-// 읽는 동안 요청 상태·최신 검증·도구 중복·usage winner를 함께 누적한다.
+// 원본을 읽으면서 응답 키별 winner와 요청·누계·도구의 상태를 접는다.
 import type { CheckEvent, ParseEvent, Provider, UsageEvent } from '../types';
 import { key, normalizedEvent, SourceEvidence, type SourceEvidenceData } from './sourceEvidence';
 import { addTurn, createTurnState, max, type TurnState } from './turns';
 import { isBetterUsage, usageScore } from './winners';
 
-export interface Candidate { event: UsageEvent; index: number; score: number | bigint }
-export interface SourceCheck extends Omit<CheckEvent, 'kind' | 'rootId'> {
+export interface UsageWinner {
+  event: UsageEvent;
   index: number;
+  score: number | bigint;
+  // 복사 접두사 뒤에서만 살아남을 수 있는 legacy 후보를 점수 내림차순으로 보존한다.
+  later?: UsageWinner[];
 }
+
+export interface SourceCheck extends Omit<CheckEvent, 'kind' | 'rootId'> { index: number }
 type Capability = Extract<ParseEvent, { kind: 'capability' }>;
-export interface SourceRoot {
+interface SourceRoot {
   rootId: string;
-  checkOffset: number | null;
   usageOffset: number | null;
-  // Fork 접두사는 다른 파일을 확인한 뒤 정해지므로 legacy 위치만 경계별로 남긴다.
-  legacy: { index: number; offset: number }[];
+  checkOffset: number | null;
   turns: Map<boolean, TurnState>;
   checks: Map<string, SourceCheck>;
   capabilities: Map<string, { event: Capability; positions: { index: number; offset: number }[] }>;
 }
-export interface SourceWinnerState {
+
+export interface SourceWinnersSnapshot {
   evidence: SourceEvidenceData;
   roots: Map<string, SourceRoot>;
-  mixedSchemas: boolean;
-  requestAliases?: ReadonlySet<string>;
-}
-export interface SourceWinnersSnapshot extends SourceWinnerState {
-  winners: readonly Candidate[];
+  winners: readonly UsageWinner[];
 }
 
-/** 원문과 metadata 이벤트 목록을 보관하지 않고 요청별 상태와 winner만 전달한다. */
 export class SourceWinners {
   readonly evidence = new SourceEvidence();
   readonly roots = new Map<string, SourceRoot>();
-  private readonly winners = new Map<string, Candidate>();
+  private readonly winners = new Map<string, UsageWinner>();
 
   constructor(private readonly provider: Provider) {}
 
   snapshot(): SourceWinnersSnapshot {
-    const winners: Candidate[] = [];
-    let firstSchema: UsageEvent['schema'];
-    let mixedSchemas = false;
-    let requestAliases: Set<string> | undefined;
-    for (const candidate of this.winners.values()) {
-      const { event } = candidate;
-      if (this.evidence.current && event.schema === 'legacy') continue;
-      if (!winners.length) firstSchema = event.schema;
-      else mixedSchemas ||= event.schema !== firstSchema;
-      winners.push(candidate);
-
-      if (this.provider === 'claude' && event.requestId === null
-        && (this.evidence.requests.has(event.responseId)
-          || !this.evidence.current && this.evidence.legacyRequests.has(event.responseId))) {
-        (requestAliases ??= new Set()).add(event.responseId);
-      }
+    const winners: UsageWinner[] = [];
+    for (const winner of this.values()) {
+      if (!this.evidence.current || winner.event.schema !== 'legacy') winners.push(winner);
     }
-    return { evidence: this.evidence, roots: this.roots, winners, mixedSchemas, requestAliases };
+    return { evidence: this.evidence, roots: this.roots, winners };
+  }
+
+  values(): IterableIterator<UsageWinner> { return this.winners.values(); }
+
+  private addUsage(event: UsageEvent, index: number): void {
+    const legacy = event.schema === 'legacy';
+    const id = key(event.responseId, this.provider === 'claude' ? event.requestId : event.threadId,
+      this.provider === 'claude' ? '' : event.turnId, event.schema, legacy ? event.rootId : undefined);
+    const score = usageScore(event), previous = this.winners.get(id);
+    if (!previous) { this.winners.set(id, { event: { ...event }, index, score }); return; }
+    if (isBetterUsage(score, index, previous.score, previous.index)) {
+      for (const field of Object.keys(previous.event)) if (!Object.hasOwn(event, field)) Reflect.deleteProperty(previous.event, field);
+      Object.assign(previous.event, event);
+      previous.index = index;
+      previous.score = score;
+      delete previous.later;
+    } else if (legacy) {
+      const later = previous.later ??= [];
+      while (later.length && isBetterUsage(score, index, later.at(-1)!.score, later.at(-1)!.index)) later.pop();
+      later.push({ event, index, score });
+    }
   }
 
   add(raw: ParseEvent, index: number): void {
     const event = normalizedEvent(raw);
     this.evidence.add(event, index);
+    if (event.kind === 'usage' && event.schema === 'legacy') {
+      this.addUsage(event, index);
+      return;
+    }
     let root = this.roots.get(event.rootId);
     if (!root) {
-      root = { rootId: event.rootId, checkOffset: null, usageOffset: null, legacy: [],
+      root = { rootId: event.rootId, usageOffset: null, checkOffset: null,
         turns: new Map(), checks: new Map(), capabilities: new Map() };
       this.roots.set(event.rootId, root);
     }
-    if (event.kind === 'usage') {
-      if (event.schema === 'legacy') root.legacy.push({ index, offset: event.offset });
-      else root.usageOffset = root.usageOffset === null ? event.offset : Math.min(root.usageOffset, event.offset);
-      const id = key(event.responseId, this.provider === 'claude' ? event.requestId : event.threadId,
-        this.provider === 'claude' ? '' : event.turnId, event.schema);
-      const score = usageScore(event), previous = this.winners.get(id);
-      if (!previous) { this.winners.set(id, { event: { ...event }, index, score }); return; }
-      if (!isBetterUsage(score, index, previous.score, previous.index)) return;
-      for (const field of Object.keys(previous.event)) if (!Object.hasOwn(event, field)) Reflect.deleteProperty(previous.event, field);
-      Object.assign(previous.event, event);
-      previous.index = index; previous.score = score;
-      return;
-    }
     switch (event.kind) {
+      case 'usage':
+        root.usageOffset = root.usageOffset === null ? event.offset : Math.min(root.usageOffset, event.offset);
+        this.addUsage(event, index);
+        return;
       case 'turn': {
         let state = root.turns.get(event.isMain);
         if (!state) root.turns.set(event.isMain, state = createTurnState());
@@ -112,6 +114,4 @@ export class SourceWinners {
       }
     }
   }
-
-  values(): IterableIterator<Candidate> { return this.winners.values(); }
 }

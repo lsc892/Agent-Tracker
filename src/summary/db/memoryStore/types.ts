@@ -8,6 +8,7 @@ export interface MemoryReplacement {
   files: readonly (FileMetadata & { id: number })[];
   appliedResponses?: readonly AppliedResponse[];
   replaceAppliedSessions?: boolean;
+  reconcileAppliedResponses?: boolean;
   removedFileIds?: Iterable<number>;
   reconnectedFiles?: readonly { old_id: number; new_id: number }[];
   preserveCapabilities?: boolean;

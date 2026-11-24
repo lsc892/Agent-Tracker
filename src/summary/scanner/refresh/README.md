@@ -8,7 +8,7 @@
 - [discovery.ts](discovery.ts) — 경로별로 관측을 모아 수정 시각으로 재파싱 후보를 고르고 원본 소실을 판단한다.
 - [preparation.ts](preparation.ts) — 변경·관련 원본의 파싱 결과를 반영하고 부모 관계 메타를 준비한다.
 - [relations.ts](relations.ts) — 관계 큐·계보·부모 요청 귀속·원본 이동 검증을 담당한다.
-- [aggregation.ts](aggregation.ts) — 파싱한 후보를 병합해 최종 요청과 반영할 응답을 반환한다.
+- [aggregation.ts](aggregation.ts) — 파일별 winner를 병합해 최종 요청과 반영할 응답을 반환한다.
 - [persistence.ts](persistence.ts) — 응답별 차이와 요청 합계를 저장하고 성공한 갱신의 시작 시각을 확정한다.
 
 의존 방향은 갱신 조율 → 책임별 함수 → 공유 상태·기존 reader/집계/DB 모듈이다. 관계 확장은 준비 함수를 호출하고 준비 함수는 상태만 갱신하므로 관계 모듈을 역참조하지 않는다. 전체 context를 Worker 메시지로 보내거나 단계마다 복제하지 않는다.
