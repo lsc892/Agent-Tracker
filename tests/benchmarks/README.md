@@ -2,6 +2,8 @@
 
 요약·JSONL·SQL·quota 처리의 정확성과 성능을 비교하는 도구를 모은다.
 
+- [historical-summary-ab.cjs](historical-summary-ab.cjs)는 최근 30일 첫 화면 기록 커밋·v0.3.1·현재 빌드를 고정 입력에 적용한다. 수집·증분 갱신·평균 조회·최근 30일 백엔드 응답, 힙·RSS와 SQLite 파일 크기를 비교한다. [보고서와 실행 명령](../../docs/benchmarks/2026-11-24/HistoricalSummaryAB-2026-11-24.md).
+
 - [thread-usage-ab.cjs](thread-usage-ab.cjs)는 같은 실로그를 빈 SQLite DB에 빌드별 한 번 수집하고 [원본 검산](thread-usage-oracle.cjs)과 토큰 합계를 대조한다. `--same-stats`를 주면 스레드·모델·비용·원본 상태와 조회 결과도 비교한다. [즉시 병합 결과와 재실행 방법](../../docs/benchmarks/2026-11-24/StreamingThreadResponseAB-2026-11-24.md).
 
 - [jsonl-line-product-ab.cjs](jsonl-line-product-ab.cjs)는 고정 입력에서 JSONL 청크 디코딩과 행별 디코딩의 실제 빌드를 실행한다. [결과와 재실행 방법](../../docs/benchmarks/2026-11-21/JsonlLineProductAB-2026-11-21.md).
