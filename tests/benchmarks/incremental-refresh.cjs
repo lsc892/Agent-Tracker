@@ -204,7 +204,8 @@ async function makeSnapshot(directory, options) {
       const original = resolve(source.dataHome ?? dirname(source.path));
       if (!homes.has(original)) {
         const target = join(directory, 'snapshot', `home-${ordinal}`);
-        homes.set(original, { dataHome: target, metadata: await freezeNames(original, target) });
+        const names = options.jsonlOnly ? undefined : await freezeNames(original, target);
+        homes.set(original, { dataHome: target, metadata: names });
       }
       ({ dataHome, metadata } = homes.get(original));
     }

@@ -1,5 +1,6 @@
 # 2026-11-24 벤치마크
 
+- [파일 준비 결과의 winner 경량화 A/B](CompactWinnerAB-2026-11-24.md) — 현재 JSONL 698파일의 최초 수집을 1쌍 비교해 시간·피크 메모리·SQLite 결과를 확인했다.
 - [최종 winner Map 하나로 통합한 A/B](SingleWinnerMapAB-2026-11-24.md) — 현재 로컬 1,473요청에서 전체 재수집·1건 추가·무변경 갱신을 3쌍 비교했다.
 - [파일별 winner와 요청당 한 번의 UPSERT A/B](FileWinnerUpsertAB-2026-11-24.md) — 같은 입력을 3쌍 비교해 전역 winner Map 대비 최종 집계 시간과 관측 힙을 확인했다.
 - [파일별 수정 시각과 원본 해시 제거 A/B](PerFileMtimeAB-2026-11-24.md) — 같은 입력으로 3쌍 비교해 재수집·파일 파싱·DB 공간 변화와 이전 DB 이관을 확인했다.

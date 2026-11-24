@@ -44,25 +44,63 @@ function memory() {
   return { heapUsed, rss };
 }
 
+function measureQueries(db) {
+  const queries = {};
+  for (const group of groups) {
+    const start = performance.now();
+    const rows = allUsage(db, group, filter);
+    queries[group] = { ms: performance.now() - start, ...independentCheck(db, filter, group, rows) };
+  }
+  assert.deepEqual(db.connection.prepare('PRAGMA foreign_key_check').all(), []);
+  return queries;
+}
+
+function appliedResponses(db) {
+  const hash = createHash('sha256');
+  let rows = 0;
+  for (const row of db.connection.prepare(`SELECT t.provider,t.session_id,t.root_turn_id,
+    r.response_key,r.input_tokens,r.output_tokens,r.cache_read,r.cache_write
+    FROM applied_response r JOIN turn_summary t ON t.id=r.turn_id ORDER BY 1,2,3,4`).iterate()) {
+    hash.update(JSON.stringify(row));
+    rows++;
+  }
+  return { rows, sha256: hash.digest('hex') };
+}
+
 async function existingResponseUpdate(db, product, sources) {
   const { prepareSource } = require(join(product, 'dist/src/summary/scanner/sourcePreparation'));
+  const readOptions = { collectCapabilities: true, cancelled: () => false };
   const completed = db.connection.prepare(`SELECT root_turn_id FROM turn_summary
     WHERE provider='codex' AND session_id=? AND status='completed'`);
   for (const source of sources) {
     const roots = new Set(completed.all(source.session_id).map(row => row.root_turn_id));
-    const prepared = await prepareSource(source, { collectCapabilities: true, cancelled: () => false });
+    const prepared = await prepareSource(source, readOptions);
     assert.ok(prepared.ok);
-    const newest = [...prepared.winners.winners.values()].reduce((latest, candidate) => {
-      const { event, index } = candidate;
-      return event.schema === 'current' && event.model && roots.has(event.rootId) && (!latest || index > latest.index) ? candidate : latest;
-    }, undefined);
+    const { winners, references } = prepared.winners;
+    let newest;
+    for (const candidate of winners.values()) {
+      const reference = references instanceof Map ? references.get(candidate.referenceId) : references?.[candidate.referenceId];
+      const event = reference ?? candidate.event;
+      const index = reference?.index ?? candidate.index ?? candidate.referenceId;
+      const schema = event.schema ?? (prepared.winners.evidence.current ? 'current' : undefined);
+      if (schema === 'current' && event.model && roots.has(event.rootId) && (!newest || index > newest.index))
+        newest = { event, index, tokens: candidate.tokens ?? event.tokens };
+    }
     if (!newest) continue;
-    const { event } = newest;
-    const { rootId, threadId, turnId, responseId, model, billingMode, tokens } = event;
+    const { event, tokens } = newest;
+    const { rootId, threadId, turnId, responseId, model, billingMode } = event;
+    let reasoning = tokens.reasoning;
+    if (reasoning === undefined) {
+      const { readSource } = require(join(product, 'dist/src/summary/scanner/sourceReader'));
+      await readSource(source, (parsed, index) => {
+        if (index === newest.index && parsed.kind === 'usage') reasoning = parsed.tokens.reasoning;
+      }, readOptions);
+      assert.notEqual(reasoning, undefined);
+    }
     const payload = { root_turn_id: rootId, thread_id: threadId, turn_id: turnId, response_id: responseId,
       model, billing_mode: billingMode, usage: { input_tokens: tokens.input + 123, output_tokens: tokens.output + 7,
         cached_input_tokens: tokens.cacheRead, cache_write_input_tokens: tokens.cacheWrite,
-        reasoning_output_tokens: tokens.reasoning } };
+        reasoning_output_tokens: reasoning } };
     const check = prepared.winners.roots.get(rootId)?.checks.get(JSON.stringify([threadId, turnId]));
     if (check) payload.turn_token_usage = { input_tokens: check.input + 123, output_tokens: check.output + 7 };
     return { source, change: JSON.stringify({ type: 'token_usage_record', payload }) + '\n' };
@@ -104,6 +142,16 @@ async function worker(configPath, variant) {
   if (config.snapshot.expected) {
     assert.equal(base.requests, config.snapshot.expected.requests);
     assert.equal(base.tokens, config.snapshot.expected.tokens);
+  }
+  if (config.initialOnly) {
+    const queries = measureQueries(db);
+    const applied = appliedResponses(db);
+    assert.equal(db.connection.prepare('PRAGMA integrity_check').get().integrity_check, 'ok');
+    process.send({ initial, base, queries, facts: facts(db), applied });
+    await require('node:events').once(process, 'message');
+    db.close();
+    process.disconnect();
+    return;
   }
   const plainSources = `SELECT * FROM source_file WHERE provider='codex' AND processing_status='done'
     AND path NOT LIKE '%.zst' AND EXISTS(SELECT 1 FROM turn_summary t
@@ -168,14 +216,7 @@ async function worker(configPath, variant) {
       const totals = total();
       assert.equal(totals.requests, base.requests + Number(append));
       assert.equal(totals.tokens, base.tokens + (modifiesBody ? 130 : 0));
-      const queries = {};
-      for (const group of groups) {
-        const queryStart = performance.now();
-        const rows = allUsage(db, group, filter);
-        const ms = performance.now() - queryStart;
-        queries[group] = { ms, ...independentCheck(db, filter, group, rows) };
-      }
-      assert.deepEqual(db.connection.prepare('PRAGMA foreign_key_check').all(), []);
+      const queries = measureQueries(db);
       const value = { ...sample, totals, facts: facts(db), queries };
       if (touch) assert.equal(value.facts, baseFacts);
       if (modifiesBody) {
@@ -225,17 +266,22 @@ async function main() {
   assert.ok(Number.isSafeInteger(warmups) && warmups >= 0);
   const selectedDatasets = args.datasets?.split(',');
   const stampAppendMtime = args['stamp-append-mtime'] === 'true';
-  const scenarios = args.scenarios?.split(',') ?? (args.rebuild === 'true' ? ['unchanged', 'append', 'rebuild'] : ['unchanged', 'append']);
+  const initialOnly = args.scenarios === 'initial';
+  const jsonlOnly = args['jsonl-only'] === 'true';
+  const scenarios = initialOnly ? []
+    : args.scenarios?.split(',') ?? (args.rebuild === 'true' ? ['unchanged', 'append', 'rebuild'] : ['unchanged', 'append']);
   assert.ok(scenarios.every(scenario => scenarioNames.includes(scenario)));
+  if (initialOnly) assert.ok(measuredPairs === 1 && warmups === 0, 'Initial-only runs require --repetitions=1 --warmups=0');
   if (!args.workspace) await fs.mkdir(join(root, 'tests/.cache'), { recursive: true });
   const workspace = args.workspace ? resolve(args.workspace) : await fs.mkdtemp(join(root, 'tests/.cache/mtime-refresh-'));
-  const setup = args.workspace ? JSON.parse(await fs.readFile(join(workspace, 'setup.json'), 'utf8')) : { configs: [] };
+  const setup = args.workspace ? JSON.parse(await fs.readFile(join(workspace, 'setup.json'), 'utf8')) : { configs: [], jsonlOnly };
+  if (jsonlOnly) assert.ok(setup.jsonlOnly, 'The workspace must have a JSONL-only snapshot');
   if (!args.workspace) {
     for (const [name, requests, turns] of datasets) {
       if (selectedDatasets && !selectedDatasets.includes(name)) continue;
       const directory = join(workspace, name);
       await fs.mkdir(directory);
-      const snapshot = await makeSnapshot(directory, { after: B, real: !requests, requests, 'turns-per-session': turns });
+      const snapshot = await makeSnapshot(directory, { after: B, real: !requests, requests, 'turns-per-session': turns, jsonlOnly });
       const path = join(directory, 'config.private.json');
       await fs.writeFile(path, JSON.stringify({ name, directory, snapshot }));
       setup.configs.push(path);
@@ -245,8 +291,9 @@ async function main() {
   console.log(JSON.stringify({ workspace }));
   const report = { environment: { node: process.version, v8: process.versions.v8, sqlite: process.versions.sqlite,
     cpu: cpus()[0].model, platform: process.platform, arch: process.arch },
-    protocol: { warmups, repetitions: measuredPairs, scenarios, sourceWorkers, intervalMs, order: 'AB/BA', timezone: 'Asia/Seoul',
-      filter, ...(stampAppendMtime ? { stampAppendMtime } : {}) },
+    protocol: { warmups, repetitions: measuredPairs, scenarios: initialOnly ? ['initial'] : scenarios, sourceWorkers, intervalMs,
+      order: initialOnly ? 'AB' : 'AB/BA', timezone: 'Asia/Seoul', filter,
+      ...(setup.jsonlOnly ? { jsonlOnly: true } : {}), ...(stampAppendMtime ? { stampAppendMtime } : {}) },
   builds: {}, datasets: [] };
   for (const [key, product] of Object.entries({ A, B }))
     report.builds[key] = { source: await fingerprint(join(product, 'src')), build: await fingerprint(join(product, 'dist/src')) };
@@ -255,7 +302,7 @@ async function main() {
     if (selectedDatasets && !selectedDatasets.includes(config.name)) continue;
     const runPath = join(await fs.mkdtemp(join(workspace, `${config.name}-run-`)), 'config.private.json');
     config.directory = resolve(runPath, '..');
-    await fs.writeFile(runPath, JSON.stringify({ ...config, A, B, stampAppendMtime, scenarios }));
+    await fs.writeFile(runPath, JSON.stringify({ ...config, A, B, initialOnly, stampAppendMtime, scenarios }));
     const dataset = { name: config.name, inputSha256: config.snapshot.sha256, expected: config.snapshot.expected,
       inventory: config.snapshot.inventory, initial: {}, samples: [] };
     const workers = {};
@@ -264,8 +311,10 @@ async function main() {
         workers[variant] = launch(runPath, variant);
         dataset.initial[variant] = await workers[variant].ready;
       }
-      for (const key of ['base', 'targetBytes', 'addedBytes', 'targetSha256', 'changedBytes', 'changeSha256', 'facts'])
+      for (const key of ['base', 'targetBytes', 'addedBytes', 'targetSha256', 'changedBytes', 'changeSha256', 'facts', 'applied'])
         assert.deepEqual(dataset.initial.A[key], dataset.initial.B[key]);
+      if (initialOnly) for (const group of groups)
+        assert.equal(dataset.initial.A.queries[group].sha256, dataset.initial.B.queries[group].sha256);
       console.log(JSON.stringify({ dataset: config.name, initial: dataset.initial.A.base, targetBytes: dataset.initial.A.targetBytes }));
       for (const scenario of scenarios) {
         for (let iteration = -warmups; iteration < measuredPairs; iteration++) {
