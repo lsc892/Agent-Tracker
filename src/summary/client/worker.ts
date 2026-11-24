@@ -15,13 +15,15 @@ let cancellation: AbortController | undefined;
 let queue = Promise.resolve();
 let lastRefresh: RefreshResult | undefined;
 type WorkerMessage = {id?:number;method:string;payload?:unknown};
+type RefreshPayload = RefreshOptions & { cancellation?: SharedArrayBuffer };
 
 function queryUsage(query: UsageQuery, db: SummaryDatabase): UsageResult {
   if (query.section === 'skills') return queryCapabilities(query, db);
   const by = query.chartBy ?? 'provider';
+  const groupBy = query.groupBy === 'turn' ? 'day' : query.groupBy ?? 'all';
   const page = { ...query, tableSort: query.tableSort ?? { key: 'period' as const, direction: 'desc' as const } };
-  const {rows,total} = db.queryUsagePage(query,query.groupBy ?? 'all',query.timezone ?? options.timezone ?? 'UTC',page,by);
-  const chart = query.chartMetric ? usageChartFromPage(rows, total, query.groupBy ?? 'all', query.chartMetric, by, query.excludeEmptyUsage) : undefined;
+  const {rows,total} = db.queryUsagePage(query,groupBy,query.timezone ?? options.timezone ?? 'UTC',page,by);
+  const chart = query.chartMetric ? usageChartFromPage(rows, total, groupBy, query.chartMetric, by, query.excludeEmptyUsage) : undefined;
   const billing = query.includeCosts && query.provider && query.sessionId ? db.sessionBilling(query.provider,query.sessionId) : undefined;
   return {rows,total,by,chart,billing,coverage:db.diagnosticCounts(query.providers)};
 }
@@ -46,7 +48,10 @@ port.on('message',(message: WorkerMessage) => {
 
 async function run(message: WorkerMessage): Promise<void> {
   try {
-    database ??= new SummaryDatabase(options.dbPath);
+    const refresh = message.method === 'refresh' ? (message.payload ?? {}) as RefreshPayload : undefined;
+    if (refresh?.roots) options.roots = refresh.roots;
+    if (refresh?.timezone) options.timezone = refresh.timezone;
+    database ??= new SummaryDatabase({ databasePath: options.dbPath, timezone: options.timezone });
     let result: unknown;
     switch (message.method) {
       case 'initialize': break;
@@ -63,9 +68,7 @@ async function run(message: WorkerMessage): Promise<void> {
         break;
       }
       case 'refresh': {
-        const config = (message.payload ?? {}) as RefreshOptions & {cancellation?:SharedArrayBuffer};
-        if (config.roots) options.roots = config.roots;
-        if (config.timezone) options.timezone = config.timezone;
+        const config = refresh ?? {};
         cancellation = new AbortController();
         let recentUsage: UsageResult | undefined;
         const preview = config.recentUsage && {

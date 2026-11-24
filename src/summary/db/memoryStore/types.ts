@@ -6,13 +6,12 @@ export interface MemoryReplacement {
   sessions: Iterable<SessionRef>;
   summaries: Iterable<TurnSummaryInput>;
   files: readonly (FileMetadata & { id: number })[];
-  appliedResponses?: readonly AppliedResponse[];
-  replaceAppliedSessions?: boolean;
-  reconcileAppliedResponses?: boolean;
   removedFileIds?: Iterable<number>;
-  preserveCapabilities?: boolean;
   retainDeletedSourceUsage?: boolean;
-  threadUsage?: boolean;
+  /** @deprecated Response records are no longer persisted. */
+  appliedResponses?: readonly AppliedResponse[];
+  /** @deprecated Skill history is managed at the daily level. */
+  preserveCapabilities?: boolean;
 }
 
 /** COMMIT한 이름만 스캔 마무리의 중복 이름 갱신 생략에 사용한다. */

@@ -8,7 +8,7 @@ import { UsageRollupStore } from './rollups';
 import { modelOrderKey, modelRelease } from '../models/modelOrder';
 import type { StageProfiler, StorageStage } from '../profiling';
 
-export type SqliteSessionOptions = string | { databasePath: string; cacheKiB?: number };
+export type SqliteSessionOptions = string | { databasePath: string; cacheKiB?: number; timezone?: string };
 
 /** 공유 SQLite 연결·고정 쿼리 캐시·트랜잭션과 유지보수를 관리한다. */
 export class SqliteSession {
@@ -22,6 +22,7 @@ export class SqliteSession {
   constructor(options: SqliteSessionOptions) {
     const path = typeof options === 'string' ? options : options.databasePath;
     const cacheKiB = typeof options === 'string' ? 4096 : options.cacheKiB ?? 4096;
+    const timezone = typeof options === 'string' ? 'UTC' : options.timezone ?? 'UTC';
     if (!Number.isSafeInteger(cacheKiB) || cacheKiB < 256 || cacheKiB > 65536) {
       throw new RangeError('Database cache must be between 256 and 65536 KiB');
     }
@@ -35,12 +36,12 @@ export class SqliteSession {
         PRAGMA cache_size = -${cacheKiB};
         PRAGMA temp.cache_size = -${cacheKiB};
         PRAGMA mmap_size = 0;`);
-      migrateSchema(this.connection, action => this.transaction(action));
-      this.optimizeConnection(true);
       this.connection.function('agent_tracker_period', { deterministic: true }, (timestamp, timezone, unit) => {
         if (timestamp === null) return null;
         return calendarPeriod(Number(timestamp), String(timezone), unit === 'month' ? 'month' : 'day');
       });
+      migrateSchema(this.connection, timezone, action => this.transaction(action));
+      this.optimizeConnection(true);
       this.rollups = new UsageRollupStore(this);
       this.connection.function('agent_tracker_model_release', { deterministic: true }, model => modelRelease(String(model ?? '')));
       this.connection.function('agent_tracker_model_key', { deterministic: true }, model => modelOrderKey(String(model ?? '')));

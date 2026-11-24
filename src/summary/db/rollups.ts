@@ -1,138 +1,96 @@
-// 원본 요청과 일치하도록 활성 시간대의 일별 사전 집계를 구축·갱신한다.
+// 메모리 집계에서 날짜별 사용량을 계산해 해당 세션의 일별 행을 교체한다.
 import type { SqliteSession } from './connection';
-import type { Provider, SessionRef } from './types';
-import { aggregateUsageSource } from './rollup-queries';
-import { ROLLUP_FORMAT_VERSION, ROLLUP_TABLES } from './rollup-state';
-import { performance } from 'node:perf_hooks';
+import type { Provider, SessionRef, TurnSummaryInput } from './types';
+import { aggregateUsageSource, dailyKeySource } from './queries/rollup/source';
+import { DAILY_COST_STATES, dailyKeyColumns, rollupStates, ROLLUP_TABLES } from './rollup-state';
 import type { StageProfiler, StorageStage } from '../profiling';
+import { DAILY_FACTS_SOURCE, dailyFacts } from './dailyFacts';
+import { calendarPeriod } from './timezone';
 
-interface RollupMetadata { timezone: string; format_version: number }
-// Keep local days in the four-digit AD range, with room for timezone offsets.
-const MIN_CALENDAR_TIME = Date.parse('0002-01-03T00:00:00Z');
-const MAX_CALENDAR_TIME = Date.parse('9998-12-29T00:00:00Z');
-// Fixed SQL keeps the statement cache independent of the number of changed sessions.
 const SESSION_SET_FILTER = `(provider, session_id) IN (
   SELECT json_extract(value, '$[0]'), json_extract(value, '$[1]') FROM json_each(?)
 )`;
-// Visit the existing session index for each tuple before fetching only its matching facts.
-const SESSION_FACTS_FILTER = `id IN (
-  SELECT selected.id
-  FROM json_each(?) AS changed
-  CROSS JOIN turn_summary AS selected
-  WHERE selected.provider = json_extract(changed.value, '$[0]')
-    AND selected.session_id = json_extract(changed.value, '$[1]')
-)`;
+const MISSING_SESSIONS = `SELECT DISTINCT f.provider, f.session_id FROM json_each(?) AS s
+  CROSS JOIN source_file f ON f.provider=json_extract(s.value, '$[0]') AND f.session_id=json_extract(s.value, '$[1]')
+  WHERE f.source_missing=1`;
+const REPLACE_MISSING_DAYS = `AND (NOT (${SESSION_SET_FILTER}) OR (provider, session_id, local_day) IN (
+  SELECT json_extract(value, '$[0]'), json_extract(value, '$[1]'), json_extract(value, '$[2]') FROM json_each(?)
+))`;
 
-/** DB에서 활성 시간대 하나의 일별 사전 집계를 구축하고 세션 변경을 반영한다. */
+function dailyUpsert(by: keyof typeof ROLLUP_TABLES): string {
+  const table = ROLLUP_TABLES[by];
+  const states = [...rollupStates(by), ...DAILY_COST_STATES].map(state => state.name);
+  const fields = by === 'model' ? ['model', ...states] : states;
+  const incoming = fields.map(field => `excluded.${field}`);
+  return `INSERT INTO ${table}
+    SELECT * FROM (${aggregateUsageSource(by, DAILY_FACTS_SOURCE)}) WHERE true
+    ON CONFLICT(${dailyKeyColumns(by).join(', ')}) DO UPDATE SET
+      (${fields.join(', ')}) = (${incoming.join(', ')})
+    WHERE (${fields.map(field => `${table}.${field}`).join(', ')}) IS NOT (${incoming.join(', ')})`;
+}
+
+const DAILY_UPSERTS = { provider: dailyUpsert('provider'), model: dailyUpsert('model') };
+
 export class UsageRollupStore {
   constructor(private readonly database: SqliteSession) {}
 
-  private metadata(): RollupMetadata | undefined {
-    return this.database.statement('SELECT timezone, format_version FROM usage_rollup_meta WHERE singleton = 1')
-      .get() as unknown as RollupMetadata | undefined;
+  dailyTimezone(): string {
+    const row = this.database.statement('SELECT timezone FROM usage_rollup_meta WHERE singleton=1').get();
+    if (typeof row?.timezone !== 'string') throw new Error('Missing daily usage timezone');
+    return row.timezone;
   }
 
-  private calendarSupported(): boolean {
-    // Separate scalar MIN/MAX queries each seek the date index; combined MIN/MAX would scan it.
-    const range = this.database.statement(`SELECT
-      (SELECT MIN(started_at_ms) FROM turn_summary) AS first,
-      (SELECT MAX(started_at_ms) FROM turn_summary) AS last`).get() as { first: number | null; last: number | null };
-    return range.first === null || range.first >= MIN_CALENDAR_TIME && range.last! < MAX_CALENDAR_TIME;
-  }
-
-  /**
-   * 책임: 사전 집계의 준비 상태 확인과 실제 조회에 같은 snapshot을 보장한다.
-   * 알고리즘: DEFERRED 읽기로 시간대·형식을 확인하고 재구축이 필요할 때만 쓰기 트랜잭션으로 재확인하며, 기존 트랜잭션·미지원 환경은 raw로 대체한다.
-   */
-  read<T>(timezone: string, action: (ready: boolean) => T): T {
-    const connection = this.database.connection;
-    // DatabaseSync.isTransaction arrived in Node 22.16; retain raw reads on 22.15.
-    if (typeof connection.isTransaction !== 'boolean') return action(false);
-    const current = (): { ready: boolean; supported: boolean } => {
-      const metadata = this.metadata();
-      return { ready: metadata?.format_version === ROLLUP_FORMAT_VERSION && metadata.timezone === timezone,
-        supported: this.calendarSupported() };
-    };
-    if (connection.isTransaction) {
-      const state = current();
-      return action(state.ready && state.supported);
-    }
-    connection.exec('BEGIN');
-    try {
-      const state = current();
-      if (state.ready || !state.supported) {
-        const result = action(state.ready && state.supported);
-        connection.exec('COMMIT');
-        return result;
-      }
-      connection.exec('ROLLBACK');
-    } catch (error) {
-      if (connection.isTransaction) connection.exec('ROLLBACK');
-      throw error;
-    }
-    return this.database.transaction(() => {
-      // A different window may have rebuilt while we waited for BEGIN IMMEDIATE.
-      const metadata = this.metadata();
-      if (!this.calendarSupported()) return action(false);
-      if (metadata?.format_version !== ROLLUP_FORMAT_VERSION || metadata.timezone !== timezone) {
-        this.rebuild(timezone);
-      }
-      return action(true);
+  /** 시간대가 바뀌면 읽을 수 있는 원본을 다시 집계하고 미반영 파일의 재시도를 보장한다. */
+  setDailyTimezone(timezone: string): void {
+    if (this.dailyTimezone() === timezone) return;
+    calendarPeriod(0, timezone, 'day');
+    this.database.transaction(() => {
+      if (this.dailyTimezone() === timezone) return;
+      this.database.statement('UPDATE usage_rollup_meta SET timezone=? WHERE singleton=1').run(timezone);
+      this.database.connection.exec('UPDATE source_file SET parser_version=0 WHERE source_missing=0');
     });
   }
 
-  private rebuild(timezone: string): void {
-    this.clear();
-    for (const by of ['provider', 'model'] as const) {
-      this.database.statement(`INSERT INTO ${ROLLUP_TABLES[by]} ${aggregateUsageSource(by)}`).run(timezone);
-    }
-    this.database.statement('INSERT INTO usage_rollup_meta(singleton, timezone, format_version) VALUES (1, ?, ?)')
-      .run(timezone, ROLLUP_FORMAT_VERSION);
-  }
-
-  /** Reuses the installer session set before it is cleared; old dates/projects are deleted too. */
-  refreshChangedSessions(): void {
-    this.refresh('(provider, session_id) IN (SELECT provider, session_id FROM db_replacement_sessions)', []);
-  }
-
-  refreshSession(provider: Provider, sessionId: string, profile?: StageProfiler<StorageStage>): void {
-    this.refresh('provider = ? AND session_id = ?', [provider, sessionId], profile);
-  }
-
-  /** 묶음 저장에서 모은 변경 세션을 최종 facts로 한 번에 재집계한다. */
-  refreshSessions(sessions: readonly SessionRef[], profile?: StageProfiler<StorageStage>): void {
+  replaceDaily(sessions: readonly SessionRef[], summaries: readonly TurnSummaryInput[], retain: boolean,
+    profile: StageProfiler<StorageStage>): void {
     if (!sessions.length) return;
-    if (sessions.length === 1) {
-      this.refreshSession(sessions[0].provider, sessions[0].session_id, profile);
-      return;
-    }
-    const tuples = JSON.stringify(sessions.map(session => [session.provider, session.session_id]));
-    this.refresh(SESSION_SET_FILTER, [tuples], profile, SESSION_FACTS_FILTER);
-  }
-
-  /**
-   * 책임: 변경된 세션의 이전 날짜·프로젝트 기여분까지 교체한다.
-   * 알고리즘: 활성 시간대·형식을 검증한 뒤 대상 세션의 provider·model 일별 행을 지우고 현재 facts로 다시 집계한다.
-   */
-  private refresh(where: string, values: string[], profile?: StageProfiler<StorageStage>, sourceWhere = where): void {
-    const metadata = this.metadata();
-    if (!metadata || metadata.format_version !== ROLLUP_FORMAT_VERSION) return;
-    if (!this.calendarSupported()) { this.clear(); return; }
-    for (const by of ['provider', 'model'] as const) {
-      const deleteStarted = performance.now();
-      try { this.database.statement(`DELETE FROM ${ROLLUP_TABLES[by]} WHERE ${where}`).run(...values); }
-      finally { profile?.record(by === 'provider' ? 'rollupRequestDelete' : 'rollupModelDelete', deleteStarted); }
-      const insertStarted = performance.now();
-      try {
-        this.database.statement(`INSERT INTO ${ROLLUP_TABLES[by]} ${aggregateUsageSource(by, sourceWhere)}`)
-          .run(metadata.timezone, ...values);
+    const timezone = this.dailyTimezone();
+    const scope = JSON.stringify(sessions.map(row => [row.provider, row.session_id]));
+    const missing = retain ? this.database.statement(MISSING_SESSIONS).all(scope).map(row => [row.provider, row.session_id]) : [];
+    const where = `WHERE ${SESSION_SET_FILTER} ${missing.length ? REPLACE_MISSING_DAYS : ''}`;
+    const params = [scope];
+    if (missing.length) {
+      const missingSessions = new Set(missing.map(session => JSON.stringify(session)));
+      const dates = new Map<string, [Provider, string, string]>();
+      for (const row of summaries) {
+        if (!missingSessions.has(JSON.stringify([row.provider, row.session_id]))) continue;
+        const day = row.started_at_ms == null ? '' : calendarPeriod(row.started_at_ms, timezone, 'day');
+        const date: [Provider, string, string] = [row.provider, row.session_id, day];
+        dates.set(JSON.stringify(date), date);
       }
-      finally { profile?.record(by === 'provider' ? 'rollupRequestInsert' : 'rollupModelInsert', insertStarted); }
+      // Missing sessions keep old dates for which this scan could produce no new result.
+      params.push(JSON.stringify(missing), JSON.stringify([...dates.values()]));
     }
+
+    const facts = dailyFacts(summaries);
+    for (const by of ['provider', 'model'] as const) {
+      const table = ROLLUP_TABLES[by];
+      profile.measure(by === 'provider' ? 'rollupRequestInsert' : 'rollupModelInsert', () => {
+        this.database.statement(DAILY_UPSERTS[by]).run(timezone, facts[by]);
+      });
+      const keys = dailyKeyColumns(by).join(', ');
+      profile.measure(by === 'provider' ? 'rollupRequestDelete' : 'rollupModelDelete', () => {
+        this.database.statement(`DELETE FROM ${table} WHERE (${keys}) IN (
+          SELECT ${keys} FROM ${table} ${where}
+          EXCEPT
+          ${dailyKeySource(by, DAILY_FACTS_SOURCE)}
+        )`).run(...params, timezone, facts[by]);
+      });
+    }
+    this.database.statement(`DELETE FROM usage_capability_daily ${where}`).run(...params);
   }
 
-  /** Call within the facts clear/rebuild transaction. */
   clear(): void {
-    this.database.connection.exec('DELETE FROM usage_request_daily; DELETE FROM usage_model_daily; DELETE FROM usage_rollup_meta;');
+    this.database.connection.exec('DELETE FROM usage_request_daily; DELETE FROM usage_model_daily; DELETE FROM usage_capability_daily;');
   }
 }

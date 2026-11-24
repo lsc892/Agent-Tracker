@@ -127,7 +127,7 @@ v0.2.0에도 rollup 조회는 있었지만 행·전체 개수·도표를 따로 
 
 일반 화면의 coverage는 진단 목록 없이 개수만 읽는다. 비용 포함 조회는 여전히 raw facts를 사용하고, 모든 필터·정렬이 인덱스만으로 해결되거나 모든 조회가 빨라진 것은 아니다.
 
-현재 코드: [통합 페이지·fallback](../src/summary/db/reader.ts), [rollup 페이지 SQL](../src/summary/db/queries/rollup/usage.ts), [도구 window 지표](../src/summary/db/queries/raw/capabilities.ts), [페이지 도표 변환](../src/summary/db/chart.ts).
+관련 코드 — [일별 조회](../src/summary/db/reader.ts), [rollup 페이지 SQL](../src/summary/db/queries/rollup/usage.ts), [도구 window 지표](../src/summary/db/queries/rollup/capabilities.ts), [페이지 도표 변환](../src/summary/db/chart.ts).
 
 ## 5. 개별 최적화에서 확인한 절감량
 

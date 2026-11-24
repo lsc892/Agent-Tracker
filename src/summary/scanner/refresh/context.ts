@@ -12,7 +12,6 @@ export interface RefreshContext {
   readonly storage: StageProfiler<StorageStage>;
   readonly state: ScanState;
   readonly sourcePool: SourceReaderPool;
-  readonly persistAppliedResponses: boolean;
   readonly roots: readonly SourceRoot[];
   readonly retain: boolean;
   readonly cancelled: () => boolean;

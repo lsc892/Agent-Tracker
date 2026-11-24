@@ -32,17 +32,11 @@ export class SourceFileStore {
     return file;
   }
 
-  setSourceDiagnostic(id: number, status: ProcessingStatus, position: string | null, error: string | null, offset: number | null = null): void {
-    this.database.transaction(() => {
-      const file = this.database.statement('SELECT provider, session_id FROM source_file WHERE id = ?').get(id);
-      if (!file) throw new Error('Unknown source_file file');
-      this.database.statement(`UPDATE source_file SET processing_status = ?, processing_position = ?, recorded_at = ?, last_error = ? WHERE id = ?`)
-        .run(status, position, new Date().toISOString(), error, id);
-      if (status !== 'error' && status !== 'interrupted') return;
-      this.database.statement(`UPDATE turn_summary SET diagnostic_file_id = ?, diagnostic_offset = ?, last_error = ?
-          WHERE provider = ? AND session_id = ?`)
-        .run(id, offset, error ?? status, file.provider, file.session_id);
-    });
+  setSourceDiagnostic(id: number, status: ProcessingStatus, position: string | null, error: string | null): void {
+    const updated = this.database.statement(`UPDATE source_file
+      SET processing_status=?, processing_position=?, recorded_at=?, last_error=? WHERE id=?`)
+      .run(status, position, new Date().toISOString(), error, id);
+    if (!updated.changes) throw new Error('Unknown source_file file');
   }
 
   *sessionFiles(provider: Provider, sessionId: string, limit = 100): IterableIterator<SourceFileRow> {

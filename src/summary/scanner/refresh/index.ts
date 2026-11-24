@@ -54,14 +54,13 @@ export async function refreshSummary(
   const state = new ScanState(result);
   const roots = options.roots.map(root => ({ ...root, path: resolve(root.path) }));
   const context: RefreshContext = { database, result, scan, storage, state, sourcePool,
-    persistAppliedResponses: true,
     roots, retain, cancelled, check, report: publish };
 
   let release: (() => void) | undefined;
   try {
     check();
     release = await scan.measureAsync('lock', () => acquireRefreshLock(options.dbPath, signal, cancelled));
-    await scanUnderLock(context, publish, preview);
+    await scanUnderLock(context, publish, options.timezone ?? 'UTC', preview);
   } catch (error) {
     recordInterruptedScan(context, error);
   } finally {
@@ -77,16 +76,17 @@ export async function refreshSummary(
   return result;
 }
 
-async function scanUnderLock(context: RefreshContext, publish: PublishProgress, preview?: RecentPreview): Promise<void> {
+async function scanUnderLock(context: RefreshContext, publish: PublishProgress, timezone: string, preview?: RecentPreview): Promise<void> {
   const { database, scan, roots, check, cancelled } = context;
   publish('scanning');
+  database.setDailyTimezone(timezone);
   await scan.measureAsync('discover', () => discoverSources(context));
   check();
   const names = await scan.measureAsync('names', () => readNames(roots, cancelled));
 
   publish('parsing');
   if (preview) {
-    await prepareRecentPreview(context, names, preview).catch(() => { check(); });
+    await prepareRecentPreview(context, names, preview, timezone).catch(() => { check(); });
     publish('parsing');
     await yieldToWorker();
   }
@@ -97,16 +97,16 @@ async function scanUnderLock(context: RefreshContext, publish: PublishProgress, 
 }
 
 async function prepareRecentPreview(
-  context: RefreshContext, names: Map<string, string>, preview: RecentPreview,
+  context: RefreshContext, names: Map<string, string>, preview: RecentPreview, timezone: string,
 ): Promise<void> {
-  const database = new SummaryDatabase(':memory:');
+  const database = new SummaryDatabase({ databasePath: ':memory:', timezone });
   const result = { ...context.result };
   const state = new ScanState(result);
-  const recent = { ...context, database, state, result, persistAppliedResponses: false, report: () => {} };
+  const recent = { ...context, database, state, result, report: () => {} };
   context.sourcePool.capturePreparations(true);
   try {
-    copyRecentUsage(context.database.connection, database, preview);
-    const sessions = new Set(Array.from(database.connection.prepare('SELECT DISTINCT provider, session_id FROM turn_summary').iterate(),
+    copyRecentUsage(context.database.connection, database, preview, timezone);
+    const sessions = new Set(Array.from(database.connection.prepare('SELECT DISTINCT provider, session_id FROM usage_request_daily').iterate(),
       row => sessionKey(row.provider as 'claude' | 'codex', row.session_id as string)));
     for (const file of context.state.files.values()) {
       const inRecentSession = file.session_id !== null && sessions.has(sessionKey(file.provider, file.session_id));

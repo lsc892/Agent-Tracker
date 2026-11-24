@@ -1,6 +1,5 @@
 // 일별 소스와 병합 지표를 조합해 통계 행·개수 조회 SQL을 생성한다.
 import type { ChartMetric, SummaryFilter, UsageGrouping, UsageSort } from '../../types';
-import { buildQueryFilter } from '../common/filters';
 import type { QuerySql, UsageBasis } from '../common/types';
 import { unknownOrder, usageTableOrder } from '../common/sorting';
 import { mergeRollupMetrics } from './metrics';
@@ -9,7 +8,6 @@ import { ROLLUP_TABLES } from '../../rollup-state';
 import { calendarPeriod } from '../../timezone';
 
 export interface RollupUsageQueries {
-  mode: 'rollup' | 'rollup-plus-raw-boundaries';
   rows: QuerySql;
   count: QuerySql;
 }
@@ -28,31 +26,26 @@ const METRIC_COLUMNS: Record<ChartMetric, string> = {
   averageDuration: 'avg_duration_ms',
 };
 
+const DAILY_COSTS = `,
+  SUM(CASE billing_override WHEN 'subscription' THEN 0 WHEN 'api' THEN api_cost_usd
+    WHEN 'unknown' THEN NULL ELSE recorded_cost_usd END) AS cost_usd,
+  SUM(CASE billing_override WHEN 'subscription' THEN 0 WHEN 'api' THEN api_unknown_costs
+    WHEN 'unknown' THEN cost_components ELSE recorded_unknown_costs END) AS unknown_costs,
+  CASE WHEN MIN(coalesce(billing_override, default_billing_mode)) = MAX(coalesce(billing_override, default_billing_mode))
+    THEN MIN(coalesce(billing_override, default_billing_mode)) ELSE 'unknown' END AS billing_mode`;
+
 // #region 최종 행·개수 조회
 
 /**
- * 책임: 사용 가능한 조건에서 일별 사전 집계 기반의 행·개수 SQL을 만든다.
- * 알고리즘: 입력 검증 후 일별 소스·차원·병합 지표를 조합하고 미지원 조건은 원본 조회에 돌린다.
+ * 일별 합계의 조회 차원·지표·정렬을 조합해 행·개수 SQL을 만든다.
  */
 export function buildRollupUsageQueries(
   filter: SummaryFilter, grouping: UsageGrouping, timezone: string,
   by: UsageBasis, sortBy?: ChartMetric, tableSort?: UsageSort, withTotal = false,
-): RollupUsageQueries | undefined {
+): RollupUsageQueries {
   if (!['total', 'project', 'session', 'day', 'month'].includes(grouping)) throw new RangeError('Unknown usage grouping');
   if (by !== 'provider' && by !== 'model') throw new RangeError('Unknown usage grouping basis');
-  buildQueryFilter(filter); // 원본 대체 경로에서도 epoch 정수 검증을 먼저 수행한다.
-
-  const calendar = grouping === 'day' || grouping === 'month';
-  try {
-    calendarPeriod(0, timezone, 'day');
-  } catch (error) {
-    if (calendar) throw error;
-    return undefined;
-  }
-
-  const emptyRange = filter.fromMs !== undefined && filter.toMs !== undefined && filter.fromMs >= filter.toMs;
-  if (filter.includeCosts || emptyRange) return undefined;
-  if (!supportsCalendarBounds(filter, timezone)) return undefined;
+  calendarPeriod(0, timezone, 'day');
 
   const source = buildDailyUsageSource(filter, grouping, timezone, by);
   const dimensions = rollupDimensions(grouping, by);
@@ -60,10 +53,10 @@ export function buildRollupUsageQueries(
   const includeComponentAverages = filter.chartMetric === undefined || filter.chartMetric === 'averageTokens';
   const groupedRows = `SELECT
       ${dimensions.columns.join(',\n      ')},
-      ${mergeRollupMetrics(filter.excludeEmptyUsage, includeComponentAverages)}${withTotal ? ', COUNT(*) OVER() AS _total' : ''}
+      ${mergeRollupMetrics(filter.excludeEmptyUsage, includeComponentAverages)}${filter.includeCosts ? DAILY_COSTS : ''}${withTotal ? ', COUNT(*) OVER() AS _total' : ''}
     FROM (
       ${source.sql}
-    ) AS turn_summary
+    ) AS usage
     GROUP BY ${groupColumns}`;
 
   const metricOrder = sortBy ? `${METRIC_COLUMNS[sortBy]} DESC, ${groupColumns}` : groupColumns;
@@ -73,7 +66,7 @@ export function buildRollupUsageQueries(
       )`
     : groupedRows;
   const order = tableSort
-    ? usageTableOrder(tableSort, grouping, by === 'model')
+    ? usageTableOrder(tableSort, grouping, by === 'model', filter.includeCosts)
     : unknownOrder(by, dimensions.calendar ? 'period IS NULL' : undefined) + metricOrder;
   const rowsSql = `${orderedSource}
     ORDER BY ${order}
@@ -81,7 +74,6 @@ export function buildRollupUsageQueries(
     OFFSET ?`;
 
   return {
-    mode: source.boundary ? 'rollup-plus-raw-boundaries' : 'rollup',
     rows: { sql: rowsSql, values: source.values },
     count: {
       sql: `SELECT COUNT(*) AS count
@@ -89,7 +81,7 @@ export function buildRollupUsageQueries(
           SELECT ${dimensions.period} AS period
           FROM (
             ${source.sql}
-          ) AS turn_summary
+          ) AS usage
           GROUP BY ${groupColumns}
         )`,
       values: source.values,
@@ -98,7 +90,6 @@ export function buildRollupUsageQueries(
 }
 
 // #endregion
-
 // #region 조회 차원·기간·정렬
 
 function rollupDimensions(grouping: UsageGrouping, by: UsageBasis): RollupDimensions {
@@ -115,17 +106,17 @@ function rollupDimensions(grouping: UsageGrouping, by: UsageBasis): RollupDimens
   const projectName = project
     ? `(SELECT project_name
         FROM projects p
-        WHERE p.project_key = turn_summary.project_key) AS project_name`
+        WHERE p.project_key = usage.project_key) AS project_name`
     : 'NULL AS project_name';
   const sessionName = session
     ? `(SELECT session_name
         FROM sessions s
-        WHERE s.provider = turn_summary.provider AND s.session_id = turn_summary.session_id) AS session_name`
+        WHERE s.provider = usage.provider AND s.session_id = usage.session_id) AS session_name`
     : 'NULL AS session_name';
   const sessionStartedAt = session
     ? `(SELECT MIN(d.min_started_at_ms)
         FROM ${ROLLUP_TABLES.provider} d
-        WHERE d.provider = turn_summary.provider AND d.session_id = turn_summary.session_id) AS session_started_at_ms`
+        WHERE d.provider = usage.provider AND d.session_id = usage.session_id) AS session_started_at_ms`
     : 'NULL AS session_started_at_ms';
 
   return {
@@ -154,24 +145,6 @@ function rollupPeriod(grouping: UsageGrouping): string {
     default:
       return 'NULL';
   }
-}
-
-// #endregion
-
-// #region 원본 조회로 대체할 달력 범위
-
-function supportsCalendarBounds(filter: SummaryFilter, timezone: string): boolean {
-  // periodBounds는 네 자리 서기 연도만 지원한다. 그 밖의 범위는 원본 조회의 의미를 유지한다.
-  for (const timestampMs of [filter.fromMs, filter.toMs]) {
-    if (timestampMs === undefined) continue;
-    if (!Number.isFinite(new Date(timestampMs).getTime())) return false;
-
-    const date = calendarPeriod(timestampMs, timezone, 'day');
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
-    const year = Number(date.slice(0, 4));
-    if (year < 2 || year > 9998) return false;
-  }
-  return true;
 }
 
 // #endregion

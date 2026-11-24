@@ -4,25 +4,28 @@ import type { NameQuery, NameResult } from '../types';
 import type {
   BillingMode, CapabilityCategory, CapabilityPage, ChartMetric, DiagnosticsPage, FileMetadata,
   KeysetPage, SourceFileRow, OffsetPage, ProcessingStatus, Provider, SummaryFilter,
-  TurnSummaryRow, UsagePage, UsageGrouping, UsageRow, UsageSort, SourceRelationMetadata,
+  TurnSummaryRow, UsagePage, UsageGrouping, UsageRow, UsageSort, SourceRelationMetadata, SessionRef,
 } from './types';
 import { SqliteSession, type SqliteSessionOptions } from './connection';
 import { SourceFileStore } from './sourceFiles';
 import { SessionBillingStore } from './billing';
 import { SummaryReader } from './reader';
 import { MemoryStore, type MemoryReplacement, type SavedSessionNames } from './memoryStore';
-import { AppliedResponseStore } from './appliedResponses';
+import type { AppliedResponse } from './appliedResponses';
 import type { StageProfiler, StorageStage } from '../profiling';
+import { buildDailyUsageFilter } from './queries/rollup/source';
+import { ROLLUP_TABLES } from './rollup-state';
 
 export * from './types';
-export type { AppliedRequestTotals, AppliedResponse } from './appliedResponses';
+export type { AppliedResponse } from './appliedResponses';
 export { usageChartFromPage } from './chart';
 export { periodBounds } from './timezone';
 
 /** 하나의 DB 연결을 공유하는 저장소들을 구성하고 통계 작업을 위임한다. */
 export class SummaryDatabase {
   readonly connection: DatabaseSync;
-  readonly appliedResponses: AppliedResponseStore;
+  /** @deprecated 일별 스키마에는 개별 응답 행이 없다. */
+  readonly appliedResponses = { loadSessions: (_sessions: readonly SessionRef[]): Iterable<AppliedResponse> => [] };
   private readonly sqlite: SqliteSession;
   private readonly sources: SourceFileStore;
   private readonly billing: SessionBillingStore;
@@ -31,7 +34,6 @@ export class SummaryDatabase {
   constructor(options: SqliteSessionOptions) {
     this.sqlite = new SqliteSession(options);
     this.connection = this.sqlite.connection;
-    this.appliedResponses = new AppliedResponseStore(this.sqlite);
     this.sources = new SourceFileStore(this.sqlite);
     this.billing = new SessionBillingStore(this.sqlite);
     this.reader = new SummaryReader(this.sqlite);
@@ -49,10 +51,14 @@ export class SummaryDatabase {
     return this.sqlite.transaction(action);
   }
 
+  setDailyTimezone(timezone: string): void {
+    this.sqlite.rollups.setDailyTimezone(timezone);
+  }
+
   clearData(): void {
     this.sqlite.transaction(() => {
       this.sqlite.rollups.clear();
-      this.connection.exec('DELETE FROM turn_summary; DELETE FROM source_file; DELETE FROM sessions; DELETE FROM projects;');
+      this.connection.exec('DELETE FROM source_file; DELETE FROM sessions; DELETE FROM projects;');
     });
   }
 
@@ -68,8 +74,8 @@ export class SummaryDatabase {
     return this.sources.observeFile(metadata);
   }
 
-  setSourceDiagnostic(id: number, status: ProcessingStatus, position: string | null, error: string | null, offset: number | null = null): void {
-    return this.sources.setSourceDiagnostic(id, status, position, error, offset);
+  setSourceDiagnostic(id: number, status: ProcessingStatus, position: string | null, error: string | null, _offset?: number | null): void {
+    this.sources.setSourceDiagnostic(id, status, position, error);
   }
 
   sessionFiles(provider: Provider, sessionId: string, limit = 100): IterableIterator<SourceFileRow> {
@@ -77,19 +83,20 @@ export class SummaryDatabase {
   }
 
   replaceMemory(replacement: MemoryReplacement, profile?: StageProfiler<StorageStage>): SavedSessionNames {
-    return new MemoryStore(this.sqlite, this.billing, this.appliedResponses, profile).replace(replacement);
+    return new MemoryStore(this.sqlite, profile).replace(replacement);
   }
 
   replaceMemoryBatch(replacements: readonly MemoryReplacement[], profile?: StageProfiler<StorageStage>): SavedSessionNames {
-    return new MemoryStore(this.sqlite, this.billing, this.appliedResponses, profile).replaceBatch(replacements);
+    return new MemoryStore(this.sqlite, profile).replaceBatch(replacements);
   }
 
   queryNames(query: NameQuery): NameResult {
     return this.reader.queryNames(query);
   }
 
-  queryTurns(filter: SummaryFilter = {}, page: KeysetPage & { offset?: number; unknownLast?: boolean; tableSort?: UsageSort } = {}, by: 'provider' | 'model' = 'provider'): TurnSummaryRow[] {
-    return this.reader.queryTurns(filter, page, by);
+  /** @deprecated 일별 스키마에는 개별 스레드 행이 없다. */
+  queryTurns(_filter?: SummaryFilter, _page?: KeysetPage & { offset?: number; unknownLast?: boolean; tableSort?: UsageSort }, _by?: 'provider' | 'model'): TurnSummaryRow[] {
+    return [];
   }
 
   setSessionBilling(provider: Provider, sessionId: string, mode: BillingMode): void {
@@ -100,8 +107,12 @@ export class SummaryDatabase {
     return this.billing.sessionBilling(provider, sessionId);
   }
 
+  /** @deprecated 일별 집계에 저장된 표본 수를 반환한다. */
   queryTurnsCount(filter: SummaryFilter = {}, by: 'provider' | 'model' = 'provider'): number {
-    return this.reader.queryTurnsCount(filter, by);
+    const where = buildDailyUsageFilter(filter, this.sqlite.rollups.dailyTimezone());
+    const row = this.connection.prepare(`SELECT COALESCE(SUM(turn_count), 0) AS count
+      FROM ${ROLLUP_TABLES[by]} AS usage WHERE ${where.sql}`).get(...where.values);
+    return Number(row?.count);
   }
 
   queryCapabilities(filter: SummaryFilter, category: CapabilityCategory, offset = 0, limit = 100): CapabilityPage {

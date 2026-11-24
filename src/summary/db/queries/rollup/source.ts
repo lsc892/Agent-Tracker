@@ -1,169 +1,92 @@
-// 완전한 현지 일의 사전 집계와 양끝의 원본 요청을 중복 없이 결합한다.
-import type { SQLInputValue } from 'node:sqlite';
+// 일별 결과의 조회 조건과 메모리 입력의 일별 집계 SQL을 만든다.
 import type { SummaryFilter, UsageGrouping } from '../../types';
 import { buildQueryFilter } from '../common/filters';
 import type { QuerySql, UsageBasis } from '../common/types';
-import { usageTurns } from '../raw/source';
-import { rollupStates, ROLLUP_TABLES } from '../../rollup-state';
+import { DAILY_COST_STATES, dailyKeyColumns, rollupStates, ROLLUP_TABLES } from '../../rollup-state';
 import { calendarPeriod, periodBounds } from '../../timezone';
 
-interface FullDayBounds {
-  startMs?: number;
-  endMs?: number;
-}
+const LOCAL_DAY = "coalesce(agent_tracker_period(started_at_ms, ?, 'day'), '')";
+const MODEL_KEY = "CASE WHEN model IS NULL THEN 'N' ELSE 'V' || model END";
 
-// #region 조회 소스: 완전한 날짜 + 원본 경계
-
-/**
- * 책임: 기간 필터의 완전한 현지 일과 부분 경계를 중복 없이 결합한다.
- * 알고리즘: 일별 집계에 날짜·미상 정책을 적용하고 필요한 원본 경계만 UNION ALL한다.
- */
 export function buildDailyUsageSource(
   filter: SummaryFilter, grouping: UsageGrouping, timezone: string, by: UsageBasis,
-): QuerySql & { boundary: boolean } {
+): QuerySql {
   const calendar = grouping === 'day' || grouping === 'month';
   const usageFilter = calendar && filter.unknownTime === undefined
     ? { ...filter, unknownTime: 'include' as const }
     : filter;
-  const dimensions = buildQueryFilter({
-    ...usageFilter, fromMs: undefined, toMs: undefined, unknownTime: undefined,
-  });
-  const knownAllowed = usageFilter.unknownTime !== 'only';
-  const unknownAllowed = usageFilter.unknownTime === 'only'
-    || usageFilter.unknownTime === 'include'
-    || usageFilter.unknownTime !== 'exclude' && usageFilter.fromMs === undefined && usageFilter.toMs === undefined;
-
-  const bounds = fullDayBounds(usageFilter, timezone);
-  const fullDays = fullDayFilter(bounds, knownAllowed, timezone);
+  const { sql: where, values } = buildDailyUsageFilter(usageFilter, timezone);
   const columns = [
     'provider', 'project_key', 'session_id', 'local_day',
     ...(by === 'model' ? ['model', 'model_key'] : []),
     ...rollupStates(by).map(state => state.name),
   ];
-  const unknownDay = unknownAllowed ? " OR local_day = ''" : '';
-  const sql = `SELECT
+  if (filter.includeCosts) columns.push(...DAILY_COST_STATES.map(state => state.name),
+    `(SELECT billing_mode FROM session_billing b
+      WHERE b.provider=usage.provider AND b.session_id=usage.session_id) AS billing_override`);
+  return {
+    sql: `SELECT
       ${columns.join(',\n      ')}
-    FROM ${ROLLUP_TABLES[by]} AS turn_summary
-    WHERE ${dimensions.sql}
-      AND ((${fullDays.sql})${unknownDay})`;
-  const values = [...dimensions.values, ...fullDays.values];
-
-  // 완전한 날짜와 양끝의 부분 날짜는 겹치지 않으며, 미상 시각은 일별 집계에서만 읽는다.
-  const partialStart = usageFilter.fromMs !== undefined && bounds.startMs !== usageFilter.fromMs;
-  const partialEnd = usageFilter.toMs !== undefined && bounds.endMs !== usageFilter.toMs;
-  const boundary = knownAllowed && (partialStart || partialEnd);
-  if (!boundary) return { sql, values, boundary };
-
-  const raw = rawBoundarySource(usageFilter, bounds, timezone, by);
-  return {
-    sql: `${sql}
-      UNION ALL
-      ${raw.sql}`,
-    values: [...values, ...raw.values],
-    boundary,
+    FROM ${ROLLUP_TABLES[by]} AS usage
+    WHERE ${where}`,
+    values,
   };
 }
 
-function fullDayBounds(filter: SummaryFilter, timezone: string): FullDayBounds {
-  let startMs: number | undefined;
-  if (filter.fromMs !== undefined) {
-    const day = calendarPeriod(filter.fromMs, timezone, 'day');
-    const bounds = periodBounds(day, timezone);
-    startMs = filter.fromMs === bounds.fromMs ? bounds.fromMs : bounds.toMs;
+/** 날짜 범위는 통계 시간대에서 각 날짜가 시작되는 시각으로 받는다. */
+export function buildDailyUsageFilter(filter: SummaryFilter, timezone: string): QuerySql {
+  const { fromMs, toMs, unknownTime, ...dimensions } = filter;
+  const { sql, values } = buildQueryFilter(dimensions, 'usage');
+  const dateConditions = ["local_day <> ''"];
+  for (const [bound, operator, timestamp] of [['fromMs', '>=', fromMs], ['toMs', '<', toMs]] as const) {
+    if (timestamp === undefined) continue;
+    if (!Number.isSafeInteger(timestamp)) throw new RangeError(`${bound} must be an epoch millisecond integer`);
+    const day = calendarPeriod(timestamp, timezone, 'day');
+    const year = Number(day.slice(0, 4));
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || year < 2 || year > 9998) throw new RangeError('Unsupported usage date');
+    if (unknownTime === 'only') continue;
+    if (periodBounds(day, timezone).fromMs !== timestamp) throw new RangeError('Daily usage requires local midnight bounds');
+    dateConditions.push(`local_day ${operator} ?`);
+    values.push(day);
   }
-
-  let endMs: number | undefined;
-  if (filter.toMs !== undefined) {
-    const day = calendarPeriod(filter.toMs, timezone, 'day');
-    endMs = periodBounds(day, timezone).fromMs;
-  }
-  return { startMs, endMs };
+  if (unknownTime === 'only') return { sql: `${sql} AND local_day = ''`, values };
+  if (dateConditions.length === 1 && unknownTime !== 'exclude') return { sql, values };
+  const dates = dateConditions.join(' AND ');
+  return { sql: `${sql} AND ((${dates})${unknownTime === 'include' ? " OR local_day = ''" : ''})`, values };
 }
 
-function fullDayFilter(bounds: FullDayBounds, knownAllowed: boolean, timezone: string): QuerySql {
-  const { startMs, endMs } = bounds;
-  const clauses = ["local_day <> ''"];
-  const values: SQLInputValue[] = [];
-  const emptyRange = startMs !== undefined && endMs !== undefined && startMs >= endMs;
-  if (!knownAllowed || emptyRange) {
-    clauses.push('0 = 1');
-    return { sql: clauses.join(' AND '), values };
-  }
-
-  if (startMs !== undefined) {
-    clauses.push('local_day >= ?');
-    values.push(calendarPeriod(startMs, timezone, 'day'));
-  }
-  if (endMs !== undefined) {
-    clauses.push('local_day < ?');
-    values.push(calendarPeriod(endMs, timezone, 'day'));
-  }
-  return { sql: clauses.join(' AND '), values };
+/** 소실된 행을 정리할 때 새 집계와 같은 날짜·모델 키를 사용한다. */
+export function dailyKeySource(by: UsageBasis, source: string): string {
+  const keys = dailyKeyColumns(by).map(key => key === 'local_day' ? LOCAL_DAY : key === 'model_key' ? MODEL_KEY : key);
+  return `SELECT ${keys.join(', ')} FROM ${source} AS usage`;
 }
 
-function rawBoundarySource(filter: SummaryFilter, bounds: FullDayBounds, timezone: string, by: UsageBasis): QuerySql {
-  const raw = buildQueryFilter({ ...filter, unknownTime: 'exclude' });
-  const outsideDays: string[] = [];
-  const values: SQLInputValue[] = [];
-  if (bounds.startMs !== undefined) {
-    outsideDays.push('started_at_ms < ?');
-    values.push(bounds.startMs);
-  }
-  if (bounds.endMs !== undefined) {
-    outsideDays.push('started_at_ms >= ?');
-    values.push(bounds.endMs);
-  }
-  const where = `${raw.sql} AND (${outsideDays.join(' OR ')})`;
-  return {
-    sql: aggregateUsageSource(by, where),
-    values: [timezone, ...raw.values, ...values],
-  };
-}
-
-// #endregion
-
-// #region 원본 요청의 일별 집계: 저장과 경계 조회가 공유
-
-/**
- * 책임: 원본 요청을 다시 병합할 수 있는 일별 상태로 변환한다.
- * 알고리즘: 대상 범위를 먼저 좁혀 집계 입력·모델 기록 여부·현지 일을 한 번 계산하고 공통 합계·표본 수를 집계한다.
- */
-export function aggregateUsageSource(by: UsageBasis, where = '1 = 1'): string {
+/** 스레드 합계를 현지 날짜와 모델별로 묶어 합계와 평균 표본 수를 계산한다. */
+export function aggregateUsageSource(by: UsageBasis, source: string): string {
   const input = [
     'provider', 'project_key', 'session_id',
-    "coalesce(agent_tracker_period(started_at_ms, ?, 'day'), '') AS local_day",
+    `${LOCAL_DAY} AS local_day`,
     ...(by === 'model' ? ['model'] : ['started_at_ms']),
     'input_tokens', 'output_tokens', 'total_tokens',
     'cache_write_input_tokens', 'cache_read_input_tokens',
     'status', 'duration_ms', 'duration_quality',
     // Positive tokens already qualify; only zero-token requests need the model lookup.
     'CASE WHEN total_tokens > 0 THEN 1 ELSE has_model END AS has_recorded_usage',
+    'api_cost_usd', 'api_unknown_costs', 'cost_components', 'default_billing_mode',
   ];
   const columns = ['provider', 'project_key', 'session_id', 'local_day'];
-  const groups = ['provider', 'project_key', 'session_id', 'local_day'];
   if (by === 'model') {
-    columns.push('model', `CASE
-        WHEN model IS NULL THEN 'N'
-        ELSE 'V' || model
-      END AS model_key`);
-    groups.push('model_key');
+    columns.push('model', `${MODEL_KEY} AS model_key`);
   }
-  columns.push(...rollupStates(by).map(state => `${state.expression} AS ${state.name}`));
+  columns.push(...[...rollupStates(by), ...DAILY_COST_STATES].map(state => `${state.expression} AS ${state.name}`));
 
-  // A SELECT wrapper keeps this source valid after UNION ALL and in INSERT SELECT.
-  // The timezone placeholder stays before every source filter placeholder.
-  return `SELECT * FROM (
-    WITH scoped AS MATERIALIZED (
+  return `WITH scoped AS MATERIALIZED (
       SELECT
         ${input.join(',\n        ')}
-      FROM ${usageTurns(false, by)} AS turn_summary
-      WHERE ${where}
+      FROM ${source} AS usage
     )
     SELECT
       ${columns.join(',\n      ')}
     FROM scoped
-    GROUP BY ${groups.join(', ')}
-  )`;
+    GROUP BY ${dailyKeyColumns(by).join(', ')}`;
 }
-
-// #endregion

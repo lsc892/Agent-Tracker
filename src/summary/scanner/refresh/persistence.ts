@@ -5,7 +5,7 @@ import type { FileMetadata, Provider, TurnSummaryInput } from '../../db/types';
 import { SummaryError } from '../../jsonl';
 import { OrderedGroups } from '../worklist';
 import type { RefreshContext } from './context';
-import { PARSER_VERSION, sessionKey, type FileState } from './state';
+import { sessionKey, type FileState } from './state';
 
 const MAX_COMMIT_BATCH_COMPONENTS = 16;
 const MAX_COMMIT_BATCH_SUMMARIES = 1000;
@@ -129,7 +129,7 @@ function commitComponent(context: RefreshContext, entry: ComponentCommit): void 
 
 /** 연결 성분의 스레드 합계와 정상 반영할 파일 버전을 묶는다. */
 function componentReplacement(context: RefreshContext, { component, members, summaries }: ComponentCommit): MemoryReplacement {
-  const { retain, persistAppliedResponses } = context;
+  const { retain } = context;
   const sessions = [...component].map(value => {
     const [provider, session_id] = JSON.parse(value) as [Provider, string];
     return { provider, session_id };
@@ -142,9 +142,7 @@ function componentReplacement(context: RefreshContext, { component, members, sum
     }
     files.push(finalFile(file));
   }
-  const replaceAppliedSessions = persistAppliedResponses && members.some(file => file.previous && file.previous.parser_version < PARSER_VERSION);
-  return { sessions, summaries, files, removedFileIds, replaceAppliedSessions,
-    retainDeletedSourceUsage: retain, threadUsage: true };
+  return { sessions, summaries, files, removedFileIds, retainDeletedSourceUsage: retain };
 }
 
 function settleDeferredComponent(context: RefreshContext, members: FileState[]): void {
@@ -206,9 +204,12 @@ export function recordFailure(context: RefreshContext, file: FileState): void {
 }
 
 function preserveMissingSources(context: RefreshContext, members: FileState[]): void {
-  const { database, storage, retain } = context;
+  const { database, retain } = context;
   const removed = members.filter(file => file.removed);
-  if (removed.length && retain)
-    database.replaceMemory({ sessions: removed.filter(file => file.session_id).map(file => ({ provider: file.provider, session_id: file.session_id! })),
-      summaries: [], files: [], removedFileIds: removed.map(file => file.id), retainDeletedSourceUsage: true }, storage);
+  if (!removed.length || !retain) return;
+  database.transaction(() => {
+    const markMissing = database.connection.prepare('UPDATE source_file SET source_missing=1,recorded_at=? WHERE id=? AND source_missing=0');
+    const now = new Date().toISOString();
+    for (const file of removed) markMissing.run(now, file.id);
+  });
 }

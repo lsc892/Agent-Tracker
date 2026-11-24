@@ -7,7 +7,7 @@ import type { QuerySql } from './types';
  * 책임: 행 조회와 개수 조회에 동일한 필터 의미를 제공한다.
  * 알고리즘: 허용된 열의 조건과 바인딩을 순서대로 만들고 이름 검색 문자를 escape하며 날짜를 검증해 미상 시간 포함 정책을 적용한다.
  */
-export function buildQueryFilter(filter: SummaryFilter): QuerySql {
+export function buildQueryFilter(filter: SummaryFilter, source: 'turn_summary' | 'usage' = 'turn_summary'): QuerySql {
   const clauses: string[] = [];
   const values: SQLInputValue[] = [];
   if (filter.providers) {
@@ -25,8 +25,8 @@ export function buildQueryFilter(filter: SummaryFilter): QuerySql {
     values.push(filter[name]!);
   }
   for (const [name, table, condition, column] of [
-    ['projectName', 'projects', 'projects.project_key = turn_summary.project_key', 'project_name'],
-    ['sessionName', 'sessions', 'sessions.provider = turn_summary.provider AND sessions.session_id = turn_summary.session_id', 'session_name'],
+    ['projectName', 'projects', `projects.project_key = ${source}.project_key`, 'project_name'],
+    ['sessionName', 'sessions', `sessions.provider = ${source}.provider AND sessions.session_id = ${source}.session_id`, 'session_name'],
   ] as const) {
     if (!filter[name]) continue;
     clauses.push(`EXISTS(

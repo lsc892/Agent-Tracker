@@ -2,18 +2,17 @@
 import type { NameQuery, NameResult } from '../types';
 import type {
   CapabilityCategory, CapabilityPage, CapabilityRow, ChartMetric, DiagnosticsPage,
-  KeysetPage, SourceFileRow, OffsetPage, Provider, SummaryFilter, TurnSummaryRow, UsagePage, UsageGrouping, UsageRow, UsageSort,
+  KeysetPage, SourceFileRow, OffsetPage, Provider, SummaryFilter, UsagePage, UsageGrouping, UsageRow, UsageSort,
 } from './types';
-import { SqliteSession } from './connection';
-import {
-  buildCapabilityQueries, buildDiagnosticCountsQuery, buildDiagnosticQueries, buildNameQueries, buildQueryFilter,
-  buildTurnsCountQuery, buildTurnsQuery, buildUsageCountQuery, buildUsageQuery,
-} from './queries';
+import type { SqliteSession } from './connection';
+import type { QuerySql, UsageBasis } from './queries/common/types';
+import { buildCapabilityQueries } from './queries/rollup/capabilities';
+import { buildDiagnosticCountsQuery, buildDiagnosticQueries } from './queries/rollup/diagnostics';
+import { buildNameQueries } from './queries/rollup/names';
+import { buildRollupUsageQueries } from './queries/rollup/usage';
 import { nonnegative, pageLimit } from './validation';
-import { buildRollupUsageQueries } from './rollup-queries';
-import type { QuerySql, UsageBasis } from './queries';
 
-/** 조회 조건을 검증하고 원본·사전 집계 SQL로 통계 페이지를 읽는다. */
+/** 일별 합계에서 통계 페이지를 읽는다. */
 export class SummaryReader {
   constructor(private readonly database: SqliteSession) {}
 
@@ -30,22 +29,6 @@ export class SummaryReader {
       connection.exec('ROLLBACK TO usage_page; RELEASE usage_page');
       throw error;
     }
-  }
-
-  /**
-   * 책임: 조회 조건에 맞는 raw 또는 사전 집계 SQL을 선택한다.
-   * 알고리즘: 비용·미지원 기간은 raw로 보내고 그 외에는 rollup의 시간대·형식 준비 여부를 확인한 같은 트랜잭션에서 쿼리를 실행한다.
-   */
-  private usageQueries<T>(filter: SummaryFilter, groupBy: UsageGrouping, timezone: string,
-    by: UsageBasis, sortBy: ChartMetric | undefined, action: (queries: { rows: QuerySql; count: QuerySql }) => T,
-    tableSort?: UsageSort, withTotal = false): T {
-    const raw = (): { rows: QuerySql; count: QuerySql } => ({
-      rows: buildUsageQuery(filter, groupBy, timezone, by, sortBy, tableSort, withTotal),
-      count: buildUsageCountQuery(filter, groupBy, timezone, by),
-    });
-    const candidate = buildRollupUsageQueries(filter, groupBy, timezone, by, sortBy, tableSort, withTotal);
-    if (!candidate) return action(raw());
-    return this.database.rollups.read(timezone, ready => action(ready ? candidate : raw()));
   }
 
   /** Name choices cover all stored usage, independently of dates and the table page. */
@@ -67,30 +50,13 @@ export class SummaryReader {
     return { rows, total };
   }
 
-  queryTurns(filter: SummaryFilter = {}, page: KeysetPage & { offset?: number; unknownLast?: boolean; tableSort?: UsageSort } = {}, by: 'provider' | 'model' = 'provider'): TurnSummaryRow[] {
-    if ((page.unknownLast || page.tableSort) && page.afterId !== undefined) throw new RangeError('Sorted request pages require offsets');
-    const where = buildQueryFilter(filter);
-    const after = nonnegative(page.afterId ?? 0, 'afterId');
-    const offset = nonnegative(page.offset ?? 0, 'offset');
-    const query = buildTurnsQuery(where, filter.includeCosts, by, page.unknownLast, page.tableSort);
-    const rows = this.database.connection.prepare(query.sql)
-      .all(...query.values, after, pageLimit(page.limit), offset);
-    for (const row of rows) delete row.has_model;
-    return rows as unknown as TurnSummaryRow[];
-  }
-
-  queryTurnsCount(filter: SummaryFilter = {}, by: 'provider' | 'model' = 'provider'): number {
-    const query = buildTurnsCountQuery(filter, by);
-    return (this.database.connection.prepare(query.sql).get(...query.values) as { count: number }).count;
-  }
-
   /**
    * 책임: 분류별 사용 횟수와 페이지에 독립적인 비율을 반환한다.
    * 알고리즘: 순위의 window 지표로 전체 합계·최댓값을 함께 읽고 빈 후속 페이지만 별도 집계하며 전체 합계를 비율 분모로 사용한다.
    */
   queryCapabilities(filter: SummaryFilter, category: CapabilityCategory, offset = 0, limit = 100): CapabilityPage {
     pageLimit(limit);
-    const queries = buildCapabilityQueries(filter, category, true);
+    const queries = buildCapabilityQueries(filter, category, true, this.database.rollups.dailyTimezone());
     const ranking = this.database.connection.prepare(queries.ranking.sql);
     const pageOffset = nonnegative(offset, 'offset');
     const rows = ranking.all(...queries.ranking.values, limit, pageOffset) as unknown as
@@ -106,29 +72,24 @@ export class SummaryReader {
     })) };
   }
 
-  queryUsageCount(filter: SummaryFilter = {}, groupBy: UsageGrouping = 'total', timezone = 'UTC', by: 'provider' | 'model' = 'provider'): number {
-    return this.usageQueries(filter, groupBy, timezone, by, undefined, ({ count }) =>
-      (this.database.connection.prepare(count.sql).get(...count.values) as { count: number }).count);
+  queryUsageCount(filter: SummaryFilter = {}, groupBy: UsageGrouping = 'total', timezone = 'UTC', by: UsageBasis = 'provider'): number {
+    const { count } = buildRollupUsageQueries(filter, groupBy, timezone, by);
+    return (this.database.connection.prepare(count.sql).get(...count.values) as { count: number }).count;
   }
 
-  queryUsage(filter: SummaryFilter = {}, groupBy: UsageGrouping = 'total', timezone = 'UTC', page: OffsetPage & { sortBy?: ChartMetric; tableSort?: UsageSort } = {}, by: 'provider' | 'model' = 'provider'): UsageRow[] {
-    return this.usageQueries(filter, groupBy, timezone, by, page.sortBy, ({ rows }) => this.database.connection.prepare(rows.sql)
-      .all(...rows.values, pageLimit(page.limit), nonnegative(page.offset ?? 0, 'offset')) as unknown as UsageRow[], page.tableSort);
+  queryUsage(filter: SummaryFilter = {}, groupBy: UsageGrouping = 'total', timezone = 'UTC', page: OffsetPage & { sortBy?: ChartMetric; tableSort?: UsageSort } = {}, by: UsageBasis = 'provider'): UsageRow[] {
+    const { rows } = buildRollupUsageQueries(filter, groupBy, timezone, by, page.sortBy, page.tableSort);
+    return this.database.connection.prepare(rows.sql)
+      .all(...rows.values, pageLimit(page.limit), nonnegative(page.offset ?? 0, 'offset')) as unknown as UsageRow[];
   }
 
   /** Read table rows and their total from one snapshot; charts reuse these rows. */
   queryUsagePage(filter: SummaryFilter = {}, groupBy: UsageGrouping | 'all' | 'turn' = 'total', timezone = 'UTC',
     page: OffsetPage & { afterId?: number; sortBy?: ChartMetric; tableSort?: UsageSort } = {},
-    by: 'provider' | 'model' = 'provider'): UsagePage {
-    const grouping = groupBy === 'all' ? 'total' : groupBy;
-    if (grouping === 'turn') {
-      return this.readPage(() => ({
-        rows: this.queryTurns(filter, { ...page, unknownLast: page.afterId === undefined }, by),
-        total: this.queryTurnsCount(filter, by),
-      }));
-    }
-    return this.usageQueries(filter, grouping, timezone, by, page.sortBy,
-      queries => this.readPage(() => this.countedPage<UsageRow>(queries, page)), page.tableSort, true);
+    by: UsageBasis = 'provider'): UsagePage {
+    const grouping = groupBy === 'all' ? 'total' : groupBy === 'turn' ? 'day' : groupBy;
+    const queries = buildRollupUsageQueries(filter, grouping, timezone, by, page.sortBy, page.tableSort, true);
+    return this.readPage(() => this.countedPage<UsageRow>(queries, page));
   }
 
   diagnosticCounts(providers?: Provider[]): DiagnosticsPage['counts'] {
@@ -137,8 +98,7 @@ export class SummaryReader {
   }
 
   /**
-   * 책임: 진단 파일·요약과 처리 개수를 제한된 페이지로 반환한다.
-   * 알고리즘: limit·offset·cursor를 검증해 각각 조회하고 페이지가 가득 찼을 때 마지막 ID를 다음 cursor로 제공한다.
+   * 파일 진단과 상태별 개수를 조회하고 페이지의 마지막 파일 ID를 반환한다.
    */
   diagnostics(page: KeysetPage & { afterSummaryId?: number; offset?: number; providers?: Provider[] } = {}): DiagnosticsPage {
     const limit = pageLimit(page.limit);
@@ -146,14 +106,12 @@ export class SummaryReader {
     const queries = buildDiagnosticQueries({ providers: page.providers });
     const files = this.database.connection.prepare(queries.files.sql)
       .all(...queries.files.values, nonnegative(page.afterId ?? 0, 'afterId'), limit, offset) as unknown as SourceFileRow[];
-    const summaries = this.database.connection.prepare(queries.summaries.sql)
-      .all(...queries.summaries.values, nonnegative(page.afterSummaryId ?? 0, 'afterSummaryId'), limit, offset) as unknown as TurnSummaryRow[];
     const counts = this.database.connection.prepare(queries.counts.sql)
       .get(...queries.counts.values) as unknown as DiagnosticsPage['counts'];
     return {
-      files, summaries, counts,
+      files, summaries: [], counts,
       nextFileId: files.length === limit ? files[files.length - 1].id : null,
-      nextSummaryId: summaries.length === limit ? summaries[summaries.length - 1].id : null,
+      nextSummaryId: null,
     };
   }
 }

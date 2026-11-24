@@ -86,8 +86,8 @@ function parseUsageMessage(value: Record<string, unknown>): DashboardMessage | n
 }
 
 function parseUsageControls(raw: Record<string, unknown>): UsageQuery | null {
-  const groupBy = raw.groupBy;
-  if (!['day', 'month', 'project', 'session', 'all', 'turn'].includes(String(groupBy))) return null;
+  const groupBy = raw.groupBy === 'turn' ? 'day' : raw.groupBy;
+  if (!['day', 'month', 'project', 'session', 'all'].includes(String(groupBy))) return null;
   const limit = raw.limit === undefined ? DEFAULT_PAGE_LIMIT : raw.limit;
   if (!validPageLimit(limit)) return null;
   const query: UsageQuery = { groupBy: groupBy as UsageQuery['groupBy'], limit, offset: boundedOffset(raw.offset) };

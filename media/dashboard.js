@@ -47,7 +47,7 @@
   let nameRequestId = 0;
   const namePages = { project: { loaded: 0, total: 0 }, session: { loaded: 0, total: 0 } };
   const saved = vscode.getState();
-  if (saved && ['day', 'month', 'project', 'session', 'turn', 'all'].includes(saved.group)) $('group').value = saved.group;
+  if (saved && ['day', 'month', 'project', 'session', 'all'].includes(saved.group)) $('group').value = saved.group;
   if (saved && Object.hasOwn(chartMetrics, saved.chartMetric)) $('chart-metric').value = saved.chartMetric;
   if (saved?.chartBy === 'model') chartBy = 'model';
   if (saved?.section === 'skills') section = 'skills';
@@ -117,9 +117,7 @@
       request.capabilityOffsets = { ...capabilityOffsets };
       request.capabilityLimits = { ...capabilityPageSizes };
     }
-    const metric = $('chart-metric').value || 'tokens';
-    request.chartMetric = request.groupBy === 'turn' && metric !== 'averageDuration' ? 'tokens' : metric;
-    $('chart-metric').value = request.chartMetric;
+    request.chartMetric = $('chart-metric').value || 'tokens';
     if ($('provider').value) request.provider = $('provider').value;
     if (selectedProject) request.projectKey = selectedProject;
     if (selectedSession) request.sessionId = selectedSession;
@@ -339,7 +337,6 @@
     node.title = String(text);
     return node;
   }
-  const requestLabel = row => row.request_title || row.root_turn_id || row.session_name || t('dashboard.untitled');
   function projectLabel(row) {
     const name = row.project_name || t('dashboard.unnamedProject');
     const node = element('button', undefined, 'name-filter');
@@ -349,12 +346,12 @@
     node.addEventListener('click', () => chooseProject(row));
     return node;
   }
-  function sessionLabel(row, request = false) {
-    const label = tableLabel(request ? requestLabel(row) : `${row.project_name || t('dashboard.unnamedProject')} / ${row.session_name || t('dashboard.unnamedSession')}`);
+  function sessionLabel(row) {
+    const label = tableLabel(`${row.project_name || t('dashboard.unnamedProject')} / ${row.session_name || t('dashboard.unnamedSession')}`);
     const node = element('button', undefined, 'name-filter');
     node.type = 'button';
-    node.title = t('dashboard.sessionDetails', { value0: label.textContent, value1: row.session_name || '', value2: row.project_key || '', value3: row.session_id, value4: request ? t('dashboard.requestIdLine', { value0: row.root_turn_id }) : '' });
-    label.append(element('span', request ? row.session_name || t('dashboard.unnamedSession') : date(row.session_started_at_ms), 'muted session-start'));
+    node.title = t('dashboard.sessionDetails', { value0: label.textContent, value1: row.session_name || '', value2: row.project_key || '', value3: row.session_id, value4: '' });
+    label.append(element('span', date(row.session_started_at_ms), 'muted session-start'));
     node.append(label);
     node.addEventListener('click', () => chooseSession(row));
     return node;
@@ -367,35 +364,32 @@
   }
   const providerLabel = provider => provider === 'claude' ? 'Claude' : 'Codex';
   const providerClass = provider => `chart-provider-${provider}`;
-  const modelLabel = row => row.other_models ? t('dashboard.otherModels', { value0: providerLabel(row.provider) })
-    : (row.model || t('dashboard.unknownModel')).replace(/^claude-(opus|sonnet|haiku)-(\d+)-(\d+)(?:-\d{8})?$/, '$1$2.$3');
+  const modelLabel = row => (row.model || t('dashboard.unknownModel')).replace(/^claude-(opus|sonnet|haiku)-(\d+)-(\d+)(?:-\d{8})?$/, '$1$2.$3');
   const seriesLabel = row => row.model !== undefined ? modelLabel(row) : providerLabel(row.provider);
   function providerMarker(provider, attributes = {}) {
     return svgElement('rect', { width: 8, height: 8, class: `provider-marker ${providerClass(provider)}`, 'aria-hidden': 'true', ...attributes });
   }
-  function seriesName(row, model, suffix = '') {
+  function seriesName(row, model) {
     const node = element('span', undefined, 'series-name');
     const label = model ? modelLabel(row) : providerLabel(row.provider);
     node.title = providerLabel(row.provider);
     const marker = svgElement('svg', { width: 8, height: 8, role: 'img', 'aria-label': providerLabel(row.provider) });
     marker.append(providerMarker(row.provider));
-    node.append(marker, suffix ? tableLabel(`${label}${suffix}`) : element('span', label));
+    node.append(marker, element('span', label));
     return node;
   }
   const compact = value => value == null ? '—' : new Intl.NumberFormat(globalThis.agentTrackerI18n.language, { notation: 'compact', maximumFractionDigits: 1 }).format(value);
   const compactDuration = value => value == null || value < 1000 ? duration(value) : t('dashboard.seconds', { value0: compact(value / 1000) });
-  function chartValue(row, metric, turn) {
-    if (turn) return metric === 'averageDuration' ? row.duration_ms : row.total_tokens;
+  function chartValue(row, metric) {
     return row[({ tokens: 'total_tokens', requests: 'turn_count', averageTokens: 'avg_tokens_per_turn', averageDuration: 'avg_duration_ms' })[metric]];
   }
   function unknownPriority(row, mode) {
     const model = row.model !== undefined && !row.model;
-    const time = mode === 'calendar' ? row.period == null : mode === 'turn' && row.started_at_ms == null;
+    const time = mode === 'calendar' && row.period == null;
     return Number(model) + 2 * Number(time);
   }
   function chartLabel(row, mode) {
     const provider = seriesLabel(row);
-    if (mode === 'turn') return `${provider} · ${date(row.started_at_ms)} · ${row.session_name || t('dashboard.unnamedSession')} · ${requestLabel(row)} (${row.root_turn_id})`;
     if (mode === 'calendar') return `${row.period || t('dashboard.unknownTime')} · ${provider}`;
     if (mode === 'total') return provider;
     return `${provider} · ${row.project_name || t('dashboard.unnamedProject')}${row.session_id ? ` / ${row.session_name || t('dashboard.unnamedSession')}` : ''}`;
@@ -420,17 +414,15 @@
    * 알고리즘: 도표 모드와 지표에 맞는 값·구성을 선택하고 완료 횟수·시간 표본·모델 시간 중복 안내를 필요한 경우 덧붙인다.
    */
   function chartDescription(row, chart) {
-    const turn = chart.mode === 'turn';
-    const value = chartValue(row, chart.metric, turn);
+    const value = chartValue(row, chart.metric);
     let detail = `${chartLabel(row, chart.mode)} · ${chartMetricValue(value, chart)}`;
     if (['tokens', 'averageTokens'].includes(chart.metric) && value != null) {
       const segments = chartSegments(row, chart.metric);
       detail += segments[0].className === 'chart-unknown' ? t('dashboard.unknownBreakdownSuffix')
         : ` · ${segments.map(segment => `${segment.label} ${number(segment.value)}`).join(' / ')}`;
     }
-    if (chart.metric === 'averageDuration' && !turn) detail += t('dashboard.timeSampleSuffix', { value0: number(row.turns_with_duration) });
+    if (chart.metric === 'averageDuration') detail += t('dashboard.timeSampleSuffix', { value0: number(row.turns_with_duration) });
     if (chart.mode === 'ranking' && row.session_id) detail += t('dashboard.sessionIdSuffix', { value0: row.session_id });
-    if (turn) detail += ` · ${row.duration_quality}`;
     if (chart.by === 'model' && chart.metric === 'averageDuration') detail += t('dashboard.modelTimeSuffix');
     return detail;
   }
@@ -439,7 +431,7 @@
     return `${number(value)} ${chart.metric === 'requests' ? t('dashboard.items') : t('common.tokens')}`;
   }
   /**
-   * 책임: 현재 표 페이지의 통계를 기간·요청·비교 도표로 그린다.
+   * 책임: 현재 표 페이지의 통계를 기간·순위·비교 도표로 그린다.
    * 알고리즘: 분류별 peer와 축 최댓값으로 SVG 좌표를 계산하고 토큰 성분을 누적 배치하며, 각 구간에 키보드 접근과 상세 설명을 연결한다.
    */
   function renderChart(result) {
@@ -451,16 +443,9 @@
     legend.hidden = true;
     $('chart-detail').textContent = '';
     if (!chart) return;
-    const turn = chart.mode === 'turn';
     const metric = chart.metric;
-    if (!showingPreview) {
-      $('chart-metric').value = metric;
-      for (const option of $('chart-metric').options) {
-        option.disabled = turn && ['requests', 'averageTokens'].includes(option.value);
-        if (option.value === 'averageDuration') option.textContent = turn ? t('dashboard.duration') : t('dashboard.averageTime');
-      }
-    }
-    const title = turn && metric === 'averageDuration' ? t('dashboard.requestDuration') : chartMetrics[metric];
+    if (!showingPreview) $('chart-metric').value = metric;
+    const title = chartMetrics[metric];
     $('chart-title').textContent = title;
     const rows = [...chart.rows].sort((a, b) => unknownPriority(a, chart.mode) - unknownPriority(b, chart.mode));
     const pageOffset = showingPreview ? 0 : offset;
@@ -469,7 +454,7 @@
     if (rows.length < result.rows.length) $('chart-scope').textContent += t('dashboard.emptyExcludedSuffix', { value0: number(result.rows.length - rows.length) });
     if (chart.by === 'model') $('chart-scope').textContent += t('dashboard.modelScopeSuffix');
     if (!rows.length) { plot.append(element('p', t('common.noRecords'), 'empty')); return; }
-    renderChartLegend(legend, rows, metric, turn);
+    renderChartLegend(legend, rows, metric);
     const layout = calculateChartLayout(chart, rows, result.groupBy, plot);
     const { width, height } = layout;
     const svg = svgElement('svg', { viewBox: `0 0 ${width} ${height}`, width, height, class: 'chart-svg', role: 'group', 'aria-label': `${title} · ${$('chart-scope').textContent}` });
@@ -481,10 +466,10 @@
     $('chart-detail').textContent = chartDescription(rows[0], chart);
   }
 
-  function renderChartLegend(legend, rows, metric, turn) {
+  function renderChartLegend(legend, rows, metric) {
     if (!['tokens', 'averageTokens'].includes(metric)) return;
     const entries = tokenHeaders.map((header, index) => ({ ...header, className: `chart-series-${index}` }));
-    if (rows.some(row => chartValue(row, metric, turn) != null && chartSegments(row, metric)[0].className === 'chart-unknown')) {
+    if (rows.some(row => chartValue(row, metric) != null && chartSegments(row, metric)[0].className === 'chart-unknown')) {
       entries.push({ label: t('dashboard.unknownBreakdown'), get title() { return t('dashboard.unknownBreakdownHelp'); }, className: 'chart-unknown' });
     }
     for (const entry of entries) {
@@ -499,25 +484,24 @@
   }
 
   function calculateChartLayout(chart, rows, groupBy, plot) {
-    const turn = chart.mode === 'turn';
     const metric = chart.metric;
     const sessions = chart.mode === 'ranking' && groupBy === 'session';
     const projects = chart.mode === 'ranking' && groupBy === 'project';
-    const vertical = chart.mode === 'calendar' || turn || sessions || projects;
-    const categoryKey = (row, index) => turn ? String(index) : sessions ? `${row.provider}/${row.project_key}/${row.session_id}` : projects ? `${row.provider}/${row.project_key}` : row.period;
+    const vertical = chart.mode === 'calendar' || sessions || projects;
+    const categoryKey = row => sessions ? `${row.provider}/${row.project_key}/${row.session_id}` : projects ? `${row.provider}/${row.project_key}` : row.period;
     const categories = vertical ? [...new Set(rows.map(categoryKey))] : [];
     if (chart.mode === 'calendar') categories.sort((a, b) => Number(a == null) - Number(b == null));
-    const maxPeers = vertical && !turn ? Math.max(1, ...categories.map(category => rows.filter((row, index) => categoryKey(row, index) === category).length)) : 1;
+    const maxPeers = vertical ? Math.max(1, ...categories.map(category => rows.filter(row => categoryKey(row) === category).length)) : 1;
     const peerWidth = chart.by === 'model' ? 46 : 60;
-    const categoryWidth = Math.max(turn || sessions || projects ? 164 : 128, maxPeers * peerWidth + 36);
+    const categoryWidth = Math.max(sessions || projects ? 164 : 128, maxPeers * peerWidth + 36);
     const width = Math.max(plot.clientWidth || 736, 736, vertical ? 86 + categories.length * categoryWidth : 0);
     const height = vertical ? chart.by === 'model' ? 414 : 372 : 62 + rows.length * 62;
-    const max = Math.max(1, ...rows.map(row => chartValue(row, metric, turn) ?? 0));
+    const max = Math.max(1, ...rows.map(row => chartValue(row, metric) ?? 0));
     const maximum = max === 1 ? 1 : Math.ceil(max / (10 ** Math.floor(Math.log10(max)))) * (10 ** Math.floor(Math.log10(max)));
     const left = vertical ? 70 : 0;
     const top = vertical ? 28 : 26;
     const length = vertical ? 224 : width - 96;
-    return { turn, sessions, projects, vertical, categoryKey, categories, peerWidth, width, height, maximum, left, top, length };
+    return { sessions, projects, vertical, categoryKey, categories, peerWidth, width, height, maximum, left, top, length };
   }
 
   function appendChartAxes(svg, metric, layout) {
@@ -539,38 +523,32 @@
   }
 
   function appendChartCategories(svg, chart, rows, layout) {
-    const { turn, sessions, projects, vertical, categoryKey, categories, left, width } = layout;
+    const { sessions, projects, vertical, categoryKey, categories, left, width } = layout;
     if (!vertical) return;
     categories.forEach((category, index) => {
       const x = left + (width - left - 16) * (index + .5) / categories.length;
-      const row = rows.find((row, rowIndex) => categoryKey(row, rowIndex) === category);
+      const row = rows.find(row => categoryKey(row) === category);
       const shortened = text => text.length > 16 ? `${text.slice(0, 15)}…` : text;
-      const label = turn ? shortened(requestLabel(row)) : sessions ? shortened(row.session_name || t('dashboard.unnamedSession')) : projects ? shortened(row.project_name || t('dashboard.unnamedProject')) : category || t('dashboard.unknownTime');
-      const parts = turn ? [label] : label.split(' ~ ');
+      const label = sessions ? shortened(row.session_name || t('dashboard.unnamedSession')) : projects ? shortened(row.project_name || t('dashboard.unnamedProject')) : category || t('dashboard.unknownTime');
+      const parts = label.split(' ~ ');
       const labelY = chart.by === 'model' ? 352 : 292;
-      const caption = svgElement('text', { x, y: labelY, 'text-anchor': 'middle', class: 'chart-axis-label' }, parts[0]);
-      if (turn) caption.append(svgElement('title', {}, requestLabel(row)));
-      svg.append(caption);
+      svg.append(svgElement('text', { x, y: labelY, 'text-anchor': 'middle', class: 'chart-axis-label' }, parts[0]));
       if (parts[1]) svg.append(svgElement('text', { x, y: labelY + 16, 'text-anchor': 'middle', class: 'chart-axis-label' }, `~ ${parts[1]}`));
-      if (turn) {
-        svg.append(svgElement('text', { x, y: labelY + 16, 'text-anchor': 'middle', class: 'chart-axis-label' }, row.started_at_ms == null ? t('dashboard.unknownTime')
-          : new Intl.DateTimeFormat(globalThis.agentTrackerI18n.language, { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: timezone }).format(new Date(row.started_at_ms))));
-      }
       if (sessions) svg.append(svgElement('text', { x, y: labelY + 16, 'text-anchor': 'middle', class: 'chart-axis-label' }, shortened(row.project_name || t('dashboard.unnamedProject'))));
     });
   }
 
   function appendChartBars(svg, chart, rows, layout) {
-    const { turn, vertical, categoryKey, categories, peerWidth, width, maximum, left, top, length } = layout;
+    const { vertical, categoryKey, categories, peerWidth, width, maximum, left, top, length } = layout;
     const metric = chart.metric;
     const tokenMetric = ['tokens', 'averageTokens'].includes(metric);
     rows.forEach((row, index) => {
-      const value = chartValue(row, metric, turn);
+      const value = chartValue(row, metric);
       const description = chartDescription(row, chart);
       const group = svgElement('g', { class: 'chart-bar', tabindex: 0, role: 'img', 'aria-label': row.model === undefined ? description : `${providerLabel(row.provider)} · ${description}` });
       group.append(svgElement('title', {}, description));
-      const peers = vertical && !turn ? rows.filter((peer, peerIndex) => categoryKey(peer, peerIndex) === categoryKey(row, index)) : [row];
-      const categoryIndex = categories.indexOf(categoryKey(row, index));
+      const peers = vertical ? rows.filter(peer => categoryKey(peer) === categoryKey(row)) : [row];
+      const categoryIndex = categories.indexOf(categoryKey(row));
       const center = left + (width - left - 16) * (categoryIndex + .5) / Math.max(1, categories.length);
       const x = vertical ? center + (peers.indexOf(row) - (peers.length - 1) / 2) * peerWidth - 18 : left;
       const y = vertical ? top + length : 58 + index * 62;
@@ -665,14 +643,12 @@
       $('billing-mode').value = result.billing;
       $('billing-mode').disabled = false;
     }
-    const turn = result.groupBy === 'turn';
     const model = result.by === 'model';
     $('model-note').hidden = !model;
     const rows = result.rows;
-    if (turn) renderTurnTable(rows, model);
-    else renderAggregateTable(rows, model, result.groupBy);
+    renderAggregateTable(rows, model, result.groupBy);
     updateUsagePagination(rows, result.total);
-    updateUsageCoverage(result.coverage, rows, turn);
+    updateUsageCoverage(result.coverage, rows);
   }
 
   function renderCapabilityTables(pages) {
@@ -686,14 +662,6 @@
       $(`${category}-next`).disabled = capabilityOffsets[category] + page.rows.length >= page.total;
       $(`${category}-page`).textContent = page.total ? `${number(capabilityOffsets[category] + 1)}–${number(capabilityOffsets[category] + page.rows.length)} / ${number(page.total)}` : t('dashboard.zeroItems');
     }
-  }
-
-  function renderTurnTable(rows, model) {
-    const costHeaders = showCosts ? [t('dashboard.estimatedApiCost')] : [];
-    const costSortKeys = showCosts ? ['cost'] : [];
-    table($('usage-table'), [t('dashboard.projectHeader', { value0: model ? t('common.model') : t('common.provider') }), t('dashboard.requestSessionHeader'), t('dashboard.startTime'), ...tokenHeaders, t('dashboard.totalTokens'), t('dashboard.duration'), t('dashboard.statusQuality'), ...costHeaders], rows.map(row => [
-      seriesName(row, model, ` / ${row.project_name}`), sessionLabel(row, true), date(row.started_at_ms), ...tokenValues(row), number(row.total_tokens), duration(row.duration_ms), requestStatusQuality(row), ...costValues(row),
-    ]), ['model', undefined, 'period', ...tokenSortKeys, 'averageDuration', undefined, ...costSortKeys]);
   }
 
   function renderAggregateTable(rows, model, groupBy) {
@@ -716,13 +684,6 @@
     return new Intl.NumberFormat(globalThis.agentTrackerI18n.language, { style: 'currency', currency: 'USD', minimumFractionDigits: 4, maximumFractionDigits: 6 }).format(row.cost_usd);
   }
 
-  function requestStatusQuality(row) {
-    let quality = row.duration_quality;
-    if (row.quality_flags) quality += ` · ${row.quality_flags}`;
-    if (row.last_error) quality += t('dashboard.previousValueSuffix', { value0: row.last_error });
-    return quality;
-  }
-
   function usageScopeLabel(row, groupBy) {
     if (row.period != null) return tableLabel(row.period);
     if (row.session_id) return sessionLabel(row);
@@ -738,8 +699,8 @@
     }
   }
 
-  function updateUsageCoverage(coverage, rows, turn) {
-    const durationCoverage = turn ? '' : t('dashboard.timeQualitySuffix', { value0: number(rows.reduce((n, r) => n + (r.exact_duration_turns ?? 0), 0)), value1: number(rows.reduce((n, r) => n + (r.derived_duration_turns ?? 0), 0)), value2: number(rows.reduce((n, r) => n + (r.approximate_duration_turns ?? 0), 0)), value3: number(rows.reduce((n, r) => n + (r.missing_duration_turns ?? 0), 0)) });
+  function updateUsageCoverage(coverage, rows) {
+    const durationCoverage = t('dashboard.timeQualitySuffix', { value0: number(rows.reduce((n, r) => n + (r.exact_duration_turns ?? 0), 0)), value1: number(rows.reduce((n, r) => n + (r.derived_duration_turns ?? 0), 0)), value2: number(rows.reduce((n, r) => n + (r.approximate_duration_turns ?? 0), 0)), value3: number(rows.reduce((n, r) => n + (r.missing_duration_turns ?? 0), 0)) });
     $('coverage').textContent = t('dashboard.coverage', { value0: number(coverage.files), value1: number(coverage.done), value2: number(coverage.error), value3: number(coverage.interrupted), value4: number(coverage.stale_summaries), value5: durationCoverage });
   }
   function setCapabilitiesEnabled(enabled) {

@@ -62,6 +62,14 @@ for (const { prefix, condition } of COMPLETED_SAMPLES) {
 }
 
 addState('min_started_at_ms', 'MIN(started_at_ms)', 'INTEGER', 'MIN');
+export const DAILY_COST_STATES = [
+  { name: 'api_cost_usd', expression: 'SUM(api_cost_usd)', type: 'REAL' },
+  { name: 'api_unknown_costs', expression: 'SUM(api_unknown_costs)', type: 'INTEGER' },
+  { name: 'cost_components', expression: 'SUM(cost_components)', type: 'INTEGER' },
+  { name: 'default_billing_mode', expression: "CASE WHEN MIN(default_billing_mode) = MAX(default_billing_mode) THEN MIN(default_billing_mode) ELSE 'unknown' END", type: 'TEXT' },
+  { name: 'recorded_cost_usd', expression: "SUM(CASE default_billing_mode WHEN 'subscription' THEN 0 WHEN 'api' THEN api_cost_usd END)", type: 'REAL' },
+  { name: 'recorded_unknown_costs', expression: "SUM(CASE default_billing_mode WHEN 'subscription' THEN 0 WHEN 'api' THEN api_unknown_costs ELSE cost_components END)", type: 'INTEGER' },
+] as const;
 
 export const ROLLUP_STATES: readonly RollupState[] = states;
 const MODEL_ROLLUP_STATES = states.filter(state => state.name !== 'min_started_at_ms');
@@ -71,11 +79,16 @@ export function rollupStates(by: 'provider' | 'model'): readonly RollupState[] {
   return by === 'model' ? MODEL_ROLLUP_STATES : ROLLUP_STATES;
 }
 
-export const ROLLUP_FORMAT_VERSION = 2;
+export const ROLLUP_FORMAT_VERSION = 3;
 export const ROLLUP_TABLES = {
   provider: 'usage_request_daily',
   model: 'usage_model_daily',
 } as const;
+
+export function dailyKeyColumns(by: keyof typeof ROLLUP_TABLES): readonly string[] {
+  const keys = ['provider', 'session_id', 'project_key', 'local_day'];
+  return by === 'model' ? [...keys, 'model_key'] : keys;
+}
 
 // #endregion
 
@@ -84,8 +97,7 @@ export const ROLLUP_TABLES = {
 const dailyTablesSql = (['provider', 'model'] as const).map(by => {
   const table = ROLLUP_TABLES[by];
   const modelColumns = by === 'model' ? 'model TEXT,\n  model_key TEXT NOT NULL,' : '';
-  const stateColumns = rollupStates(by).map(state => `${state.name} ${state.type}`).join(',\n  ');
-  const modelKey = by === 'model' ? ', model_key' : '';
+  const stateColumns = [...rollupStates(by), ...DAILY_COST_STATES].map(state => `${state.name} ${state.type}`).join(',\n  ');
 
   return `
 CREATE TABLE IF NOT EXISTS ${table} (
@@ -95,7 +107,7 @@ CREATE TABLE IF NOT EXISTS ${table} (
   local_day TEXT NOT NULL,
   ${modelColumns}
   ${stateColumns},
-  PRIMARY KEY(provider, session_id, project_key, local_day${modelKey})
+  PRIMARY KEY(${dailyKeyColumns(by).join(', ')})
 ) WITHOUT ROWID;
 
 CREATE INDEX IF NOT EXISTS idx_${table}_day
@@ -105,7 +117,7 @@ CREATE INDEX IF NOT EXISTS idx_${table}_project_day
 `;
 }).join('');
 
-/** Empty derived tables are migrated immediately; facts are materialized only on first use. */
+/** 영속 일별 합계와 해당 합계를 계산한 시간대. */
 export const SCHEMA_ROLLUP_SQL = `
 CREATE TABLE IF NOT EXISTS usage_rollup_meta (
   singleton INTEGER PRIMARY KEY CHECK(singleton = 1),
@@ -113,5 +125,17 @@ CREATE TABLE IF NOT EXISTS usage_rollup_meta (
   format_version INTEGER NOT NULL
 );
 ${dailyTablesSql}`;
+
+export const SCHEMA_DAILY_CAPABILITY_SQL = `
+CREATE TABLE IF NOT EXISTS usage_capability_daily (
+  provider TEXT NOT NULL,
+  session_id TEXT NOT NULL,
+  project_key TEXT NOT NULL,
+  local_day TEXT NOT NULL,
+  category TEXT NOT NULL,
+  name TEXT NOT NULL,
+  usage_count INTEGER NOT NULL,
+  PRIMARY KEY(provider, session_id, project_key, local_day, category, name)
+) WITHOUT ROWID;`;
 
 // #endregion

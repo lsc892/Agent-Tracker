@@ -1,7 +1,13 @@
-// 제공자·모델 기준의 요청 원본과 이름·비용 projection을 구성한다.
+// 이전 DB의 일별 이관과 기존 SQL 검증에 필요한 스레드 열을 구성한다.
 import type { UsageBasis } from '../common/types';
 
 export const RECORDED_USAGE = '(total_tokens > 0 OR has_model = 1)';
+
+const TURN_DIMENSIONS = 't.provider, t.project_key, t.session_id, t.started_at_ms, t.duration_ms, t.duration_quality, t.status';
+
+const HAS_MODEL = `EXISTS(
+        SELECT 1 FROM turn_model_usage m WHERE m.turn_id = t.id AND m.model <> ''
+      ) AS has_model`;
 
 // #region 모델별 원본 열
 
@@ -25,6 +31,12 @@ const MODEL_TOKENS = `
     ELSE m.cache_read_input_tokens
   END AS cache_read_input_tokens`;
 
+const MODEL_USAGE = `
+      coalesce(m.model, '') <> '' AS has_model,
+      ${MODEL_NAME},
+      ${MODEL_TOKENS},
+      coalesce(m.input_tokens + m.output_tokens, t.total_tokens) AS total_tokens`;
+
 const MODEL_COSTS = `
   coalesce(c.billing_mode, 'unknown') AS billing_mode,
   CASE
@@ -39,33 +51,13 @@ const MODEL_COSTS = `
   END AS unknown_costs`;
 
 function modelTurns(costs: boolean): string {
-  const costColumns = costs ? `, ${MODEL_COSTS}` : '';
-  const costJoin = costs ? 'LEFT JOIN turn_costs c ON c.turn_id = t.id' : '';
   return `(
     SELECT
-      t.id,
-      t.provider,
-      t.project_key,
-      t.session_id,
-      t.root_turn_id,
-      t.request_title,
-      coalesce(m.model, '') <> '' AS has_model,
-      t.started_at_ms,
-      t.completed_at_ms,
-      t.duration_ms,
-      t.duration_quality,
-      t.status,
-      t.quality_flags,
-      t.diagnostic_file_id,
-      t.diagnostic_offset,
-      t.last_error,
-      t.updated_at,
-      ${MODEL_NAME},
-      ${MODEL_TOKENS},
-      coalesce(m.input_tokens + m.output_tokens, t.total_tokens) AS total_tokens${costColumns}
+      ${TURN_DIMENSIONS},
+      ${MODEL_USAGE}${costs ? `, ${MODEL_COSTS}` : ''}
     FROM turn_summary t
     LEFT JOIN turn_model_usage m ON m.turn_id = t.id
-    ${costJoin}
+    ${costs ? 'LEFT JOIN turn_costs c ON c.turn_id = t.id' : ''}
   )`;
 }
 
@@ -93,24 +85,42 @@ export function usageTurns(costs = false, by: UsageBasis = 'provider'): string {
   return `(
     SELECT
       t.*,
-      EXISTS(
-        SELECT 1
-        FROM turn_model_usage m
-        WHERE m.turn_id = t.id AND m.model <> ''
-      ) AS has_model
+      ${HAS_MODEL}
     FROM ${source} t
   )`;
 }
 
-export function namedTurns(costs = false, by: UsageBasis = 'provider'): string {
+/** 일별 이관은 사용량 열과 결제 방식에 독립적인 API 추정치만 읽는다. */
+export function rollupUsageTurns(by: UsageBasis): string {
+  if (by === 'model') return `(
+    SELECT
+      ${TURN_DIMENSIONS},
+      ${MODEL_USAGE},
+      m.estimated_cost_usd AS api_cost_usd,
+      m.estimated_cost_usd IS NULL AS api_unknown_costs,
+      1 AS cost_components,
+      coalesce(c.billing_mode, 'unknown') AS default_billing_mode
+    FROM turn_summary t
+    LEFT JOIN turn_model_usage m ON m.turn_id = t.id
+    LEFT JOIN turn_costs c ON c.turn_id = t.id
+  )`;
   return `(
     SELECT
-      t.*,
-      p.project_name,
-      s.session_name
-    FROM ${usageTurns(costs, by)} t
-    JOIN projects p ON p.project_key = t.project_key
-    JOIN sessions s ON s.provider = t.provider AND s.session_id = t.session_id
+      ${TURN_DIMENSIONS},
+      t.input_tokens, t.output_tokens, t.total_tokens, t.cache_write_input_tokens, t.cache_read_input_tokens,
+      coalesce(m.has_model, 0) AS has_model,
+      m.api_cost_usd,
+      coalesce(m.api_unknown_costs, 1) AS api_unknown_costs,
+      coalesce(m.cost_components, 1) AS cost_components,
+      coalesce(c.billing_mode, 'unknown') AS default_billing_mode
+    FROM turn_summary t
+    LEFT JOIN (
+      SELECT turn_id, MAX(model <> '') AS has_model, SUM(estimated_cost_usd) AS api_cost_usd,
+        COUNT(*) - COUNT(estimated_cost_usd) AS api_unknown_costs, COUNT(*) AS cost_components
+      FROM turn_model_usage
+      GROUP BY turn_id
+    ) m ON m.turn_id = t.id
+    LEFT JOIN turn_costs c ON c.turn_id = t.id
   )`;
 }
 

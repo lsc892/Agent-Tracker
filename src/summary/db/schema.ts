@@ -1,8 +1,8 @@
 // 통계 DB의 테이블·인덱스·버전과 기존 스키마 변환 SQL을 정의한다.
-import { SCHEMA_ROLLUP_SQL } from './rollup-state';
+import { SCHEMA_DAILY_CAPABILITY_SQL, SCHEMA_ROLLUP_SQL } from './rollup-state';
 
 export { SCHEMA_ROLLUP_SQL } from './rollup-state';
-export const SCHEMA_VERSION = 24;
+export const SCHEMA_VERSION = 26;
 
 export const SCHEMA_APPLIED_RESPONSES_SQL = `
 CREATE TABLE IF NOT EXISTS applied_response (
@@ -26,6 +26,16 @@ CREATE TABLE IF NOT EXISTS turn_capability_usage (
 ) WITHOUT ROWID;
 `;
 
+const SESSION_BILLING_SQL = `
+CREATE TABLE IF NOT EXISTS session_billing (
+  provider TEXT NOT NULL,
+  session_id TEXT NOT NULL,
+  billing_mode TEXT NOT NULL CHECK(billing_mode IN ('subscription','api','unknown')),
+  PRIMARY KEY(provider,session_id),
+  FOREIGN KEY(provider,session_id) REFERENCES sessions(provider,session_id) ON DELETE CASCADE
+) WITHOUT ROWID;
+`;
+
 export const SCHEMA_MODEL_SQL = `
 CREATE TABLE IF NOT EXISTS turn_model_usage (
   turn_id INTEGER NOT NULL REFERENCES turn_summary(id) ON DELETE CASCADE,
@@ -38,13 +48,7 @@ CREATE TABLE IF NOT EXISTS turn_model_usage (
   pricing_version TEXT NOT NULL,
   PRIMARY KEY(turn_id, model)
 ) WITHOUT ROWID;
-CREATE TABLE IF NOT EXISTS session_billing (
-  provider TEXT NOT NULL,
-  session_id TEXT NOT NULL,
-  billing_mode TEXT NOT NULL CHECK(billing_mode IN ('subscription','api','unknown')),
-  PRIMARY KEY(provider,session_id),
-  FOREIGN KEY(provider,session_id) REFERENCES sessions(provider,session_id) ON DELETE CASCADE
-) WITHOUT ROWID;
+${SESSION_BILLING_SQL}
 CREATE TABLE IF NOT EXISTS turn_costs (
   turn_id INTEGER PRIMARY KEY REFERENCES turn_summary(id) ON DELETE CASCADE,
   billing_mode TEXT NOT NULL CHECK(billing_mode IN ('subscription','api','unknown')),
@@ -100,7 +104,7 @@ CREATE INDEX IF NOT EXISTS idx_summary_period ON turn_summary(started_at_ms, pro
 CREATE INDEX IF NOT EXISTS idx_summary_project_period ON turn_summary(provider, project_key, started_at_ms);
 `;
 
-export const SCHEMA_SQL = `
+const SOURCE_SQL = `
 CREATE TABLE IF NOT EXISTS source_file (
   id INTEGER PRIMARY KEY,
   provider TEXT NOT NULL CHECK(provider IN ('claude', 'codex')),
@@ -122,6 +126,19 @@ CREATE TABLE IF NOT EXISTS source_file (
 );
 CREATE INDEX IF NOT EXISTS idx_source_root_id ON source_file(provider, source_root, id);
 CREATE INDEX IF NOT EXISTS idx_source_session ON source_file(provider, session_id, id);
+`;
+
+export const DAILY_SCHEMA_SQL = `
+${SOURCE_SQL}
+${NAMES_SQL}
+${SESSION_BILLING_SQL}
+${SCHEMA_ROLLUP_SQL}
+${SCHEMA_DAILY_CAPABILITY_SQL}
+`;
+
+/** Legacy DDL used to describe the on-disk format before daily-only storage. */
+export const SCHEMA_SQL = `
+${SOURCE_SQL}
 ${NAMES_SQL}
 ${TURN_SUMMARY_SQL}
 ${TURN_SUMMARY_INDEX_SQL}
@@ -129,35 +146,4 @@ ${SCHEMA_MODEL_SQL}
 ${SCHEMA_CAPABILITY_SQL}
 ${SCHEMA_ROLLUP_SQL}
 ${SCHEMA_APPLIED_RESPONSES_SQL}
-`;
-
-/** Both v1 and v2 stored project names on every turn. Preserve ids, statistics and diagnostics. */
-export const SCHEMA_LEGACY_MIGRATION_SQL = `
-${NAMES_SQL}
-INSERT INTO projects SELECT project_key, MIN(project_name) FROM turn_summary GROUP BY project_key;
-INSERT INTO sessions SELECT DISTINCT provider, session_id, NULL FROM turn_summary;
-ALTER TABLE turn_summary RENAME TO turn_summary_legacy;
-${TURN_SUMMARY_SQL}
-INSERT INTO turn_summary (id, provider, project_key, session_id, root_turn_id,
-  started_at_ms, completed_at_ms, duration_ms, duration_quality,
-  input_tokens, output_tokens, total_tokens, status, quality_flags,
-  diagnostic_file_id, diagnostic_offset, last_error, updated_at)
-SELECT id, provider, project_key, session_id, root_turn_id,
-  started_at_ms, completed_at_ms, duration_ms, duration_quality,
-  input_tokens, output_tokens, total_tokens, status, quality_flags,
-  diagnostic_file_id, diagnostic_offset, last_error, updated_at FROM turn_summary_legacy;
-DROP TABLE turn_summary_legacy;
-${TURN_SUMMARY_INDEX_SQL}
-`;
-
-/** Keep totals available until the next scan reconstructs previously discarded cache components. */
-export const SCHEMA_CACHE_MIGRATION_SQL = `
-ALTER TABLE turn_summary ADD COLUMN cache_write_input_tokens INTEGER CHECK(cache_write_input_tokens >= 0);
-ALTER TABLE turn_summary ADD COLUMN cache_read_input_tokens INTEGER CHECK(cache_read_input_tokens >= 0);
-`;
-
-/** Drop only the unused ordinal; keep request ids and all referencing rows intact. */
-export const SCHEMA_TURN_INDEX_MIGRATION_SQL = `
-DROP INDEX IF EXISTS idx_summary_session;
-ALTER TABLE turn_summary DROP COLUMN turn_index;
 `;
