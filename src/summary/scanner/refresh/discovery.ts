@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import type { SummaryDatabase } from '../../db';
 import { SummaryError } from '../../jsonl';
 import type { RefreshContext } from './context';
-import { PARSER_VERSION, sessionKey, type FileState, type StoredSource } from './state';
+import { needsSourceRead, PARSER_VERSION, sessionKey, type FileState, type StoredSource } from './state';
 
 interface SourcePath {
   previous?: StoredSource;
@@ -17,9 +17,9 @@ interface DiscoveryPaths {
   nextId: number;
 }
 
-type Observation = Pick<FileState, 'provider' | 'source_root' | 'path' | 'size_bytes' | 'mtime_ms' | 'dev' | 'inode' | 'changed'>;
+type Observation = Pick<FileState, 'provider' | 'source_root' | 'path' | 'size_bytes' | 'mtime_ms'>;
 
-export async function discoverSources(context: RefreshContext, previousRefreshMs: number | undefined): Promise<void> {
+export async function discoverSources(context: RefreshContext): Promise<void> {
   const { database, roots, check } = context;
   const paths = loadStoredPaths(database);
   for (const root of roots) {
@@ -27,9 +27,8 @@ export async function discoverSources(context: RefreshContext, previousRefreshMs
       for await (const path of walk(root.path, check, root.provider === 'codex')) {
         const stat = await lstat(path);
         if (!stat.isFile()) continue;
-        const changed = previousRefreshMs === undefined || stat.mtimeMs >= previousRefreshMs;
         recordObservation(context, paths, { provider: root.provider, source_root: root.path, path,
-          size_bytes: stat.size, mtime_ms: stat.mtimeMs, dev: String(stat.dev), inode: String(stat.ino), changed });
+          size_bytes: stat.size, mtime_ms: stat.mtimeMs });
       }
     }
     catch (error) {
@@ -43,7 +42,7 @@ export async function discoverSources(context: RefreshContext, previousRefreshMs
 function loadStoredPaths(database: SummaryDatabase): DiscoveryPaths {
   const paths: DiscoveryPaths = { byPath: new Map(), storedRoots: new Set(), nextId: 1 };
   const stored = database.connection.prepare(`SELECT id, provider, source_root, path, session_id,
-    size_bytes, mtime_ms, dev, inode, parser_version, source_identity, content_hash, capabilities_collected,
+    size_bytes, mtime_ms, parser_version, capabilities_collected,
     source_missing, processing_status FROM source_file ORDER BY id`).iterate() as unknown as Iterable<StoredSource>;
   for (const previous of stored) {
     paths.byPath.set(sessionKey(previous.provider, previous.path), { previous });
@@ -55,18 +54,20 @@ function loadStoredPaths(database: SummaryDatabase): DiscoveryPaths {
 
 function recordObservation(context: RefreshContext, paths: DiscoveryPaths, observation: Observation): void {
   const { state, result, collect, report } = context;
-  const { provider, path, changed } = observation;
+  const { provider, path } = observation;
   const key = sessionKey(provider, path);
   const entry = paths.byPath.get(key) ?? {};
   const { observed, previous } = entry;
+  const changed = needsSourceRead(observation, previous, collect);
   if (observed) {
     // Overlapping roots share one file ID and the last root supplies its metadata.
     result.reused += Number(observed.changed) - Number(changed);
     Object.assign(observed, observation);
+    observed.changed = changed;
   } else {
-    const file: FileState = { ...observation, id: previous?.id ?? paths.nextId++, discoveryOrder: state.files.size, previous,
+    const file: FileState = { ...observation, changed, id: previous?.id ?? paths.nextId++, discoveryOrder: state.files.size, previous,
       session_id: previous?.session_id ?? null, selected: true, removed: false, parser_version: PARSER_VERSION,
-      capabilities_collected: collect ? 1 : 0, source_identity: previous?.source_identity, content_hash: previous?.content_hash };
+      capabilities_collected: collect ? 1 : 0 };
     entry.observed = file;
     paths.byPath.set(key, entry);
     state.trackFile(file);

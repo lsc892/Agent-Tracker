@@ -37,7 +37,6 @@ interface PreparedReplacement {
   sessions: ReplacementSessions;
   next: Map<string, TurnSummaryInput>;
   removed: RemovedSources;
-  reconnected: Map<number, number>;
   retained: RetainedUsage;
   now: string;
 }
@@ -117,7 +116,7 @@ export class MemoryStore {
   private canShareMetadata(replacements: readonly BatchReplacement[]): boolean {
     const seen = new Set<string>();
     for (const replacement of replacements) {
-      if (replacement.removedFileIds.length || replacement.reconnectedFiles?.length) return false;
+      if (replacement.removedFileIds.length) return false;
       for (const session of replacement.sessions) {
         const key = sessionKey(session.provider, session.session_id);
         if (seen.has(key)) return false;
@@ -133,8 +132,7 @@ export class MemoryStore {
     const now = new Date().toISOString();
     const sessions = new Map(Array.from(replacement.sessions, session => [sessionKey(session.provider, session.session_id), session]));
     const removed = this.collectRemovedSources(replacement.removedFileIds ?? [], sessions);
-    const reconnected = this.collectReconnectedSources(replacement, removed, sessions);
-    const retained = this.collectRetainedUsage(replacement.retainDeletedSourceUsage, removed, reconnected);
+    const retained = this.collectRetainedUsage(replacement.retainDeletedSourceUsage, removed);
     if (replacement.reconcileAppliedResponses) {
       const scope = [...sessions.values()];
       const usage = planAppliedUsage([...replacement.summaries], replacement.appliedResponses ?? [],
@@ -143,7 +141,7 @@ export class MemoryStore {
     }
     this.profile.record('prepare', prepareStarted);
     const next = this.profile.measure('indexSummaries', () => this.indexSummaries(replacement.summaries, sessions));
-    return { replacement, sessions, next, removed, reconnected, retained, now };
+    return { replacement, sessions, next, removed, retained, now };
   }
 
   /** 최종 이름·설정을 먼저 저장한 뒤 facts를 순차 반영하고 사용하지 않는 이름을 한 번 정리한다. */
@@ -154,7 +152,7 @@ export class MemoryStore {
       return metadata;
     });
     const affectedSessions: ReplacementSessions = new Map(), affectedProjects = new Set<string>();
-    for (const { replacement, sessions, next, removed, reconnected, retained, now } of plans) {
+    for (const { replacement, sessions, next, removed, retained, now } of plans) {
       const changedSessions = new Set<string>();
       this.profile.measure('source_file', () => this.saveFiles(replacement, sessions, now));
       this.profile.measure('deleteMissing', () => this.deleteMissingSummaries(sessions, next, retained.turnIds, changedSessions, affectedProjects));
@@ -165,8 +163,7 @@ export class MemoryStore {
           replacement.replaceAppliedSessions ? [...sessions.values()] : [],
           response => retained.roots.has(rootKey(response.provider, response.sessionId, response.rootId)));
       }
-      this.profile.measure('reconnectDiagnostics', () => this.reconnectDiagnostics(reconnected));
-      this.profile.measure('removeSources', () => this.removeSources(removed, reconnected, retained.sessions, now));
+      this.profile.measure('removeSources', () => this.removeSources(removed, retained.sessions, now));
       for (const [key, session] of sessions)
         if (changedSessions.has(key)) batchSessions.set(key, session);
       for (const [key, session] of sessions) affectedSessions.set(key, session);
@@ -194,33 +191,13 @@ export class MemoryStore {
     return removed;
   }
 
-  /** 이동 전·후 원본의 존재·제공자·교체 범위를 확인해 진단 참조의 새 ID를 기록한다. */
-  private collectReconnectedSources(
-    replacement: MemoryReplacement, removed: RemovedSources, sessions: ReplacementSessions,
-  ): Map<number, number> {
-    const reconnected = new Map<number, number>();
-    for (const link of replacement.reconnectedFiles ?? []) {
-      const previous = removed.get(link.old_id);
-      const current = replacement.files.find(file => file.id === link.new_id)
-        ?? this.database.statement('SELECT provider,session_id FROM source_file WHERE id=?').get(link.new_id);
-      if (!previous || !current || link.old_id === link.new_id || previous.provider !== current.provider) {
-        throw new Error('Invalid reconnected source');
-      }
-      this.requireSession(current.provider, current.session_id, sessions);
-      reconnected.set(link.old_id, link.new_id);
-    }
-    return reconnected;
-  }
-
   /** 삭제 보존이 켜진 누락 원본에서 유효 사용량이 있는 요청·root·세션 키를 수집한다. */
-  private collectRetainedUsage(
-    enabled: boolean | undefined, removed: RemovedSources, reconnected: Map<number, number>,
-  ): RetainedUsage {
+  private collectRetainedUsage(enabled: boolean | undefined, removed: RemovedSources): RetainedUsage {
     const retained: RetainedUsage = { turnIds: new Set(), roots: new Set(), sessions: new Set() };
     if (!enabled) return retained;
     const checkedSessions = new Set<string>();
-    for (const [id, file] of removed) {
-      if (reconnected.has(id) || file.session_id === null) continue;
+    for (const file of removed.values()) {
+      if (file.session_id === null) continue;
       const key = sessionKey(file.provider, file.session_id);
       if (checkedSessions.has(key)) continue;
       checkedSessions.add(key);
@@ -248,17 +225,15 @@ export class MemoryStore {
       }
       this.requireSession(file.provider, file.session_id, sessions);
       const relations = file.relations;
-      this.database.statement(`INSERT INTO source_file(id,provider,source_root,path,session_id,size_bytes,mtime_ms,dev,inode,parser_version,
-          source_identity,content_hash,capabilities_collected,relation_meta,source_missing,processing_status,processing_position,recorded_at,last_error)
-        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,0,'done','committed',?,NULL)
+      this.database.statement(`INSERT INTO source_file(id,provider,source_root,path,session_id,size_bytes,mtime_ms,parser_version,
+          capabilities_collected,relation_meta,source_missing,processing_status,processing_position,recorded_at,last_error)
+        VALUES(?,?,?,?,?,?,?,?,?,?,0,'done','committed',?,NULL)
         ON CONFLICT(id) DO UPDATE SET source_root=excluded.source_root,path=excluded.path,session_id=excluded.session_id,
-          size_bytes=excluded.size_bytes,mtime_ms=excluded.mtime_ms,dev=excluded.dev,inode=excluded.inode,
-          parser_version=excluded.parser_version,source_identity=excluded.source_identity,content_hash=excluded.content_hash,
+          size_bytes=excluded.size_bytes,mtime_ms=excluded.mtime_ms,parser_version=excluded.parser_version,
           relation_meta=CASE WHEN ? THEN excluded.relation_meta ELSE source_file.relation_meta END,
           capabilities_collected=excluded.capabilities_collected,source_missing=0,
           processing_status='done',processing_position='committed',recorded_at=excluded.recorded_at,last_error=NULL`)
-        .run(file.id, file.provider, file.source_root, file.path, file.session_id, file.size_bytes, file.mtime_ms, file.dev, file.inode,
-          file.parser_version, file.source_identity ?? null, file.content_hash ?? null,
+        .run(file.id, file.provider, file.source_root, file.path, file.session_id, file.size_bytes, file.mtime_ms, file.parser_version,
           file.capabilities_collected ?? 1, relationBlob(relations), now, Number(relations !== undefined));
     }
   }
@@ -390,19 +365,10 @@ export class MemoryStore {
     }
   }
 
-  /** 검증된 이동 쌍의 이전 진단 원본 ID를 새 source_file ID로 바꾼다. */
-  private reconnectDiagnostics(reconnected: Map<number, number>): void {
-    for (const [oldId, newId] of reconnected) {
-      this.database.statement('UPDATE turn_summary SET diagnostic_file_id=? WHERE diagnostic_file_id=?').run(newId, oldId);
-    }
-  }
-
-  /** 이동·보존 여부에 따라 삭제 후보 source_file를 제거하거나 source_missing으로 남긴다. */
-  private removeSources(
-    removed: RemovedSources, reconnected: Map<number, number>, retainedSessions: Set<string>, now: string,
-  ): void {
+  /** 삭제 후보 source_file를 제거하거나 통계 보존을 위해 source_missing으로 남긴다. */
+  private removeSources(removed: RemovedSources, retainedSessions: Set<string>, now: string): void {
     for (const [id, file] of removed) {
-      if (!reconnected.has(id) && retainedSessions.has(sessionKey(file.provider, file.session_id))) {
+      if (retainedSessions.has(sessionKey(file.provider, file.session_id))) {
         this.database.statement('UPDATE source_file SET source_missing=1,recorded_at=? WHERE id=? AND source_missing=0').run(now, id);
         continue;
       }

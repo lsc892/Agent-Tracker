@@ -2,7 +2,7 @@
 import type { DatabaseSync } from 'node:sqlite';
 import {
   SCHEMA_SQL, SCHEMA_VERSION, SCHEMA_LEGACY_MIGRATION_SQL, SCHEMA_CACHE_MIGRATION_SQL,
-  SCHEMA_MODEL_SQL, SCHEMA_CAPABILITY_SQL, SCHEMA_REFRESH_SQL, SCHEMA_ROLLUP_SQL, SCHEMA_TURN_INDEX_MIGRATION_SQL,
+  SCHEMA_MODEL_SQL, SCHEMA_CAPABILITY_SQL, SCHEMA_ROLLUP_SQL, SCHEMA_TURN_INDEX_MIGRATION_SQL,
   SCHEMA_APPLIED_RESPONSES_SQL,
 } from './schema';
 
@@ -34,25 +34,19 @@ export function migrateSchema(connection: DatabaseSync, transaction: (action: ()
           DROP INDEX IF EXISTS idx_manifest_root_id; DROP INDEX IF EXISTS idx_manifest_session;
           DROP INDEX IF EXISTS idx_manifest_source; DROP INDEX IF EXISTS idx_manifest_identity;`);
       }
-      const existingSourceColumns = connection.prepare('PRAGMA table_info(source_file)').all();
-      for (const column of ['source_identity', 'content_hash']) {
-        if (existingSourceColumns.length && !existingSourceColumns.some(existing => existing.name === column)) {
-          connection.exec(`ALTER TABLE source_file ADD COLUMN ${column} TEXT`);
-        }
-      }
       connection.exec(initialMigrationSql(current.user_version));
       // v1/v2/v3 use targeted migrations instead of SCHEMA_SQL; restore renamed indexes too.
       connection.exec(`CREATE INDEX IF NOT EXISTS idx_source_root_id ON source_file(provider, source_root, id);
-        CREATE INDEX IF NOT EXISTS idx_source_session ON source_file(provider, session_id, id);`);
+        CREATE INDEX IF NOT EXISTS idx_source_session ON source_file(provider, session_id, id);
+        DROP INDEX IF EXISTS idx_source_source; DROP INDEX IF EXISTS idx_source_identity;
+        DROP TABLE IF EXISTS summary_refresh;`);
       const sourceColumns = connection.prepare('PRAGMA table_info(source_file)').all();
-      for (const column of ['complete_position', 'prefix_hash']) {
+      for (const column of ['complete_position', 'prefix_hash', 'source_identity', 'content_hash', 'dev', 'inode', 'last_seen_scan_id']) {
         if (sourceColumns.some(existing => existing.name === column))
           connection.exec(`ALTER TABLE source_file DROP COLUMN ${column}`);
       }
       if (!sourceColumns.some(column => column.name === 'relation_meta'))
         connection.exec('ALTER TABLE source_file ADD COLUMN relation_meta BLOB');
-      connection.exec(SCHEMA_REFRESH_SQL);
-      connection.exec('DELETE FROM summary_refresh');
       connection.exec(SCHEMA_MODEL_SQL);
       connection.exec(SCHEMA_CAPABILITY_SQL);
       // Removed aggregate columns change the derived layout; source facts and IDs stay intact.
@@ -69,7 +63,6 @@ export function migrateSchema(connection: DatabaseSync, transaction: (action: ()
       if (!connection.prepare('PRAGMA table_info(source_file)').all().some(column => column.name === 'source_missing')) {
         connection.exec('ALTER TABLE source_file ADD COLUMN source_missing INTEGER NOT NULL DEFAULT 0 CHECK(source_missing IN (0,1))');
       }
-      connection.exec('CREATE INDEX IF NOT EXISTS idx_source_source ON source_file(provider, source_identity, id)');
       if (!connection.prepare('PRAGMA table_info(turn_summary)').all().some(column => column.name === 'request_title')) {
         connection.exec('ALTER TABLE turn_summary ADD COLUMN request_title TEXT');
       }
@@ -83,6 +76,4 @@ export function migrateSchema(connection: DatabaseSync, transaction: (action: ()
       connection.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
     });
   }
-  // Older databases can contain the device/inode move lookup index.
-  connection.exec('DROP INDEX IF EXISTS idx_source_identity;');
 }

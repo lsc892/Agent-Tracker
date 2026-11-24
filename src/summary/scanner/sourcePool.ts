@@ -94,7 +94,7 @@ export class SourceReaderPool {
     const promise = new Promise<SourcePreparation>(done => { resolve = done; });
     // Worker에는 읽기 경계와 원본을 확인할 필드만 보낸다.
     const metadata: SourceReadFile = { id: file.id, provider: file.provider, path: file.path, source_root: file.source_root,
-      size_bytes: file.size_bytes, mtime_ms: file.mtime_ms, dev: file.dev, inode: file.inode };
+      size_bytes: file.size_bytes, mtime_ms: file.mtime_ms };
     const job: SourceJob = { file: metadata, promise, resolve };
     this.jobs.set(file.id, job);
     if (priority) this.pending.unshift(job); else this.pending.push(job);

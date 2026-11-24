@@ -2,15 +2,7 @@
 import { SCHEMA_ROLLUP_SQL } from './rollup-state';
 
 export { SCHEMA_ROLLUP_SQL } from './rollup-state';
-export const SCHEMA_VERSION = 23;
-
-export const SCHEMA_REFRESH_SQL = `
-CREATE TABLE IF NOT EXISTS summary_refresh (
-  id INTEGER PRIMARY KEY CHECK(id = 1),
-  scope TEXT NOT NULL,
-  started_ms INTEGER NOT NULL
-);
-`;
+export const SCHEMA_VERSION = 24;
 
 export const SCHEMA_APPLIED_RESPONSES_SQL = `
 CREATE TABLE IF NOT EXISTS applied_response (
@@ -117,15 +109,10 @@ CREATE TABLE IF NOT EXISTS source_file (
   session_id TEXT,
   size_bytes INTEGER NOT NULL DEFAULT 0 CHECK(size_bytes >= 0),
   mtime_ms REAL NOT NULL DEFAULT 0,
-  dev TEXT,
-  inode TEXT,
   parser_version INTEGER NOT NULL DEFAULT 0,
-  source_identity TEXT,
-  content_hash TEXT,
   relation_meta BLOB,
   capabilities_collected INTEGER NOT NULL DEFAULT 0 CHECK(capabilities_collected IN (0,1)),
   source_missing INTEGER NOT NULL DEFAULT 0 CHECK(source_missing IN (0,1)),
-  last_seen_scan_id TEXT, -- compatibility with earlier v21 databases
   processing_status TEXT NOT NULL DEFAULT 'processing'
     CHECK(processing_status IN ('processing','done','error','interrupted')),
   processing_position TEXT,
@@ -135,14 +122,12 @@ CREATE TABLE IF NOT EXISTS source_file (
 );
 CREATE INDEX IF NOT EXISTS idx_source_root_id ON source_file(provider, source_root, id);
 CREATE INDEX IF NOT EXISTS idx_source_session ON source_file(provider, session_id, id);
-CREATE INDEX IF NOT EXISTS idx_source_source ON source_file(provider, source_identity, id);
 ${NAMES_SQL}
 ${TURN_SUMMARY_SQL}
 ${TURN_SUMMARY_INDEX_SQL}
 ${SCHEMA_MODEL_SQL}
 ${SCHEMA_CAPABILITY_SQL}
 ${SCHEMA_ROLLUP_SQL}
-${SCHEMA_REFRESH_SQL}
 ${SCHEMA_APPLIED_RESPONSES_SQL}
 `;
 

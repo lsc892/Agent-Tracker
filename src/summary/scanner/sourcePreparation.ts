@@ -1,4 +1,4 @@
-// 단일 파일을 읽어 원본별 winner·관계 근거 또는 부분 식별 정보가 있는 오류를 만든다.
+// 단일 파일에서 응답 winner·관계 근거 또는 부분 식별 정보가 있는 오류를 만든다.
 import { SourceWinners, type SourceWinnersSnapshot } from '../aggregation/sourceWinners';
 import { SummaryError } from '../jsonl';
 import type { ParsedIdentity } from '../types';
@@ -15,7 +15,7 @@ export type SourcePreparation =
   | { ok: true; read: SourceRead; winners: SourceWinnersSnapshot }
   | { ok: false; error: { code: string; offset: number }; identity?: ParsedIdentity };
 
-/** 읽기·파싱·해시·winner 선택은 파일 안에서 끝내고 오류도 값으로 반환한다. */
+/** 파일을 처음부터 파싱하고 오류도 값으로 반환한다. */
 export async function prepareSource(file: SourceReadFile, options: SourcePreparationOptions): Promise<SourcePreparation> {
   const winners = new SourceWinners(file.provider);
   let identity: ParsedIdentity | undefined;

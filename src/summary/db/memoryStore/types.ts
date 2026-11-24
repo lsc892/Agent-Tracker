@@ -10,7 +10,6 @@ export interface MemoryReplacement {
   replaceAppliedSessions?: boolean;
   reconcileAppliedResponses?: boolean;
   removedFileIds?: Iterable<number>;
-  reconnectedFiles?: readonly { old_id: number; new_id: number }[];
   preserveCapabilities?: boolean;
   retainDeletedSourceUsage?: boolean;
 }

@@ -3,7 +3,7 @@ import { lstat } from 'node:fs/promises';
 import { SummaryError } from '../../jsonl';
 import type { SourcePreparation } from '../sourcePreparation';
 import type { RefreshContext } from './context';
-import { PARSER_VERSION, type FileState, type ScanState } from './state';
+import { needsSourceRead, PARSER_VERSION, type FileState, type ScanState } from './state';
 
 export async function prepareChanged(context: RefreshContext): Promise<void> {
   const changed = [...context.state.files.values()].filter(file => file.changed && !file.removed).sort((a, b) => a.id - b.id);
@@ -53,19 +53,17 @@ function applyPreparation(context: RefreshContext, file: FileState, preparation:
   check();
   result.parsed++;
   const { read, winners } = preparation;
+  file.parser_version = PARSER_VERSION;
+  file.capabilities_collected = collect ? 1 : 0;
   if (!read.rows) {
     applyEmptySource(state, file, read.partialLine);
     return;
   }
   const identity = read.identity!;
-  file.parser_version = PARSER_VERSION;
-  file.capabilities_collected = collect ? 1 : 0;
   state.setSession(file, identity.sessionId);
-  state.setSourceIdentity(file, read.sourceIdentity);
   file.relations = { identity, childRequests: winners.evidence.childRequests };
-  file.content_hash = read.contentHash;
   state.registerPrepared(file, { identity, winners, partialLine: read.partialLine });
-  file.changed = needsReplacement(file, collect);
+  file.changed = needsSourceRead(file, file.previous, collect);
   if (!file.changed) return;
   state.affect(file.provider, file.session_id);
   state.connect(file.provider, previousSession, file.session_id);
@@ -78,17 +76,8 @@ function applyEmptySource(state: ScanState, file: FileState, partialLine: boolea
     file.deferred = true;
     return;
   }
-  file.content_hash = null;
   file.relations = null;
-  state.setSourceIdentity(file, null);
   state.setSession(file, previousSession ?? null);
-}
-
-function needsReplacement(file: FileState, collect: boolean): boolean {
-  const previous = file.previous;
-  return !previous || previous.source_missing === 1 || previous.processing_status !== 'done'
-    || previous.content_hash !== file.content_hash || previous.source_root !== file.source_root
-    || previous.parser_version !== file.parser_version || collect && previous.capabilities_collected !== 1;
 }
 
 async function refreshOutsideSource(context: RefreshContext, file: FileState): Promise<boolean> {
@@ -97,13 +86,10 @@ async function refreshOutsideSource(context: RefreshContext, file: FileState): P
     const stat = await lstat(file.path);
     file.size_bytes = stat.size;
     file.mtime_ms = stat.mtimeMs;
-    file.dev = String(stat.dev);
-    file.inode = String(stat.ino);
     return true;
   }
   catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT'
-      && (retain && file.previous?.source_missing || hasPreparedReplacement(state, file))) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT' && retain && file.previous?.source_missing) {
       file.removed = true;
       file.changed = true;
       state.affect(file.provider, file.session_id);
@@ -112,10 +98,4 @@ async function refreshOutsideSource(context: RefreshContext, file: FileState): P
     state.fail(file, new SummaryError('source-unavailable-outside-scan'));
     return false;
   }
-}
-
-function hasPreparedReplacement(state: ScanState, file: FileState): boolean {
-  for (const candidate of state.matchingSources(file))
-    if (candidate.prepared && !candidate.error && !candidate.removed) return true;
-  return false;
 }

@@ -1,5 +1,4 @@
 // 갱신 단계의 실행 순서와 잠금·진행·취소·Worker 종료 수명을 조율한다.
-import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { setImmediate as yieldToWorker } from 'node:timers/promises';
@@ -7,7 +6,7 @@ import { SummaryDatabase } from '../../db';
 import { copyRecentUsage, type RecentWindow } from '../../db/recentSnapshot';
 import { SummaryError } from '../../jsonl';
 import { StageProfiler, type ScanStage, type StorageStage } from '../../profiling';
-import type { RefreshResult, SourceRoot, SummaryOptions, SummaryProgress } from '../../types';
+import type { RefreshResult, SummaryOptions, SummaryProgress } from '../../types';
 import { acquireRefreshLock } from '../lock';
 import { readNames } from '../names';
 import { SourceReaderPool } from '../sourcePool';
@@ -16,13 +15,11 @@ import type { RefreshContext } from './context';
 import { discoverSources } from './discovery';
 import { commitComponents, finishScan, recordFailure } from './persistence';
 import { prepareChanged } from './preparation';
-import { expandRelatedSources, reconnectSources, resolveParentRequests } from './relations';
-import { PARSER_VERSION, ScanState, sessionKey } from './state';
+import { expandRelatedSources, resolveParentRequests } from './relations';
+import { ScanState, sessionKey } from './state';
 
 export { PARSER_VERSION } from './state';
 
-// NTFS write timestamps can lag Date.now() by a few milliseconds.
-const WINDOWS_MTIME_OVERLAP_MS = 8;
 const PROGRESS_INTERVAL_MS = 100;
 type PublishProgress = (phase?: SummaryProgress['phase']) => void;
 
@@ -57,16 +54,15 @@ export async function refreshSummary(
     maxLineBytes: options.maxLineBytes, signal, cancelled, externalCancellation: options.cancellation, onBytes });
   const state = new ScanState(result);
   const roots = options.roots.map(root => ({ ...root, path: resolve(root.path) }));
-  const scope = refreshScope(roots, collect, options.maxLineBytes);
   const context: RefreshContext = { database, result, scan, storage, state, sourcePool,
     persistAppliedResponses: true,
-    roots, collect, retain, cancelled, check, report: publish, onBytes };
+    roots, collect, retain, cancelled, check, report: publish };
 
   let release: (() => void) | undefined;
   try {
     check();
     release = await scan.measureAsync('lock', () => acquireRefreshLock(options.dbPath, signal, cancelled));
-    await scanUnderLock(context, scope, publish, preview);
+    await scanUnderLock(context, publish, preview);
   } catch (error) {
     recordInterruptedScan(context, error);
   } finally {
@@ -82,12 +78,10 @@ export async function refreshSummary(
   return result;
 }
 
-async function scanUnderLock(context: RefreshContext, scope: string, publish: PublishProgress, preview?: RecentPreview): Promise<void> {
+async function scanUnderLock(context: RefreshContext, publish: PublishProgress, preview?: RecentPreview): Promise<void> {
   const { database, scan, roots, check, cancelled } = context;
-  const startedMs = Date.now();
-  const cutoff = readRefreshCutoff(database, scope, startedMs);
   publish('scanning');
-  await scan.measureAsync('discover', () => discoverSources(context, cutoff));
+  await scan.measureAsync('discover', () => discoverSources(context));
   check();
   const names = await scan.measureAsync('names', () => readNames(roots, cancelled));
 
@@ -99,7 +93,7 @@ async function scanUnderLock(context: RefreshContext, scope: string, publish: Pu
   }
   await prepareAndCommit(context, names, () => publish('committing'));
   check();
-  scan.measure('finishScan', () => finishScan(context, names, scope, startedMs));
+  scan.measure('finishScan', () => finishScan(context, names));
   scan.measure('optimize', () => database.optimize());
 }
 
@@ -139,25 +133,12 @@ async function prepareAndCommit(
   await scan.measureAsync('parseChanged', () => prepareChanged(context));
   await scan.measureAsync('expandRelated', () => expandRelatedSources(context));
   scan.measure('resolveParents', () => resolveParentRequests(context));
-  await scan.measureAsync('reconnect', () => reconnectSources(context));
   check();
   const aggregated = scan.measure('aggregate', () => collectWinners(context, names));
 
   committing?.();
   check();
   await scan.measureAsync('commitComponents', () => commitComponents(context, aggregated));
-}
-
-function refreshScope(roots: readonly SourceRoot[], collect: boolean, maxLineBytes: number | undefined): string {
-  const rootKeys = roots.map(root => [root.provider, root.path, root.dataHome]);
-  return createHash('sha256').update(JSON.stringify([PARSER_VERSION, collect, maxLineBytes, rootKeys])).digest('hex');
-}
-
-function readRefreshCutoff(database: SummaryDatabase, scope: string, startedMs: number): number | undefined {
-  const previous = database.connection.prepare('SELECT started_ms FROM summary_refresh WHERE id=1 AND scope=? AND started_ms<=?')
-    .get(scope, startedMs)?.started_ms;
-  if (typeof previous !== 'number') return undefined;
-  return process.platform === 'win32' ? previous - WINDOWS_MTIME_OVERLAP_MS : previous;
 }
 
 function progressReporter(result: RefreshResult, progress?: (value: SummaryProgress) => void): PublishProgress {

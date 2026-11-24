@@ -52,7 +52,7 @@ export class SummaryDatabase {
   clearData(): void {
     this.sqlite.transaction(() => {
       this.sqlite.rollups.clear();
-      this.connection.exec('DELETE FROM summary_refresh; DELETE FROM turn_summary; DELETE FROM source_file; DELETE FROM sessions; DELETE FROM projects;');
+      this.connection.exec('DELETE FROM turn_summary; DELETE FROM source_file; DELETE FROM sessions; DELETE FROM projects;');
     });
   }
 

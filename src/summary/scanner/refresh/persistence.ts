@@ -1,4 +1,4 @@
-// 연결 묶음의 최종 변경분을 저장하고 진단과 전역 갱신 기준을 확정한다.
+// 연결 묶음의 통계·원본 수정 시각을 저장하고 진단과 이름을 마무리한다.
 import { setImmediate as yieldToWorker } from 'node:timers/promises';
 import type { ScanAggregation } from './aggregation';
 import type { MemoryReplacement } from '../../db/memoryStore';
@@ -18,14 +18,13 @@ interface ComponentCommit {
 }
 
 export async function commitComponents(context: RefreshContext, aggregated: ScanAggregation): Promise<void> {
-  const { files, affected, links, reconnections } = context.state;
+  const { files, affected, links } = context.state;
   if (!affected.size) return;
   const memberGroups = new OrderedGroups(files.values(), file => [sessionKey(file.provider, file.session_id ?? ''),
     sessionKey(file.provider, file.previous?.session_id ?? '')]);
   const summaryGroups = new OrderedGroups(aggregated.summaries, row => [sessionKey(row.provider, row.session_id)]);
   const orphanGroups = new OrderedGroups(aggregated.orphans, row => [sessionKey(row.provider, row.session_id)]);
   const responseGroups = new OrderedGroups(aggregated.appliedResponses, row => [sessionKey(row.provider, row.sessionId)]);
-  const reconnectedIds = new Set(reconnections.flatMap(link => [link.old_id, link.new_id]));
   const remaining = new Set([...affected].sort());
   let batch: ComponentCommit[] = [];
   let batchSummaries = 0;
@@ -41,7 +40,7 @@ export async function commitComponents(context: RefreshContext, aggregated: Scan
     const entry = { component, members: memberGroups.members(component),
       aggregated: { summaries: summaryGroups.members(component), orphans: orphanGroups.members(component),
         appliedResponses: responseGroups.members(component) } };
-    if (requiresIndividualCommit(entry, reconnectedIds)) {
+    if (requiresIndividualCommit(entry)) {
       await flush();
       await commitIndividual(context, entry);
       continue;
@@ -99,10 +98,10 @@ function linkedComponent(seed: string, links: ReadonlyMap<string, ReadonlySet<st
   return component;
 }
 
-/** 큰 성분과 보류·오류·삭제·재연결은 기존 개별 복구 경로로 처리한다. */
-function requiresIndividualCommit(entry: ComponentCommit, reconnectedIds: ReadonlySet<number>): boolean {
+/** 큰 성분과 보류·오류·삭제는 개별 복구 경로로 처리한다. */
+function requiresIndividualCommit(entry: ComponentCommit): boolean {
   return entry.aggregated.summaries.length > MAX_COMMIT_BATCH_SUMMARIES || entry.aggregated.orphans.length > 0
-    || entry.members.some(file => file.deferred || file.error || file.removed || reconnectedIds.has(file.id));
+    || entry.members.some(file => file.deferred || file.error || file.removed);
 }
 
 /** 보류 → 원본 오류 → 고아 요청 → 실제 쓰기 순으로 검사해 앞선 보존·복구 정책을 우선한다. */
@@ -144,9 +143,9 @@ function commitComponent(context: RefreshContext, entry: ComponentCommit): void 
   }
 }
 
-/** 성분별 보존·이동 범위를 합치지 않고 기존 snapshot 계약을 그대로 만든다. */
+/** 연결 성분의 요청·응답과 정상 반영할 파일 버전을 묶는다. */
 function componentReplacement(context: RefreshContext, { component, members, aggregated }: ComponentCommit): MemoryReplacement {
-  const { state, collect, retain, persistAppliedResponses } = context;
+  const { collect, retain, persistAppliedResponses } = context;
   const sessions = [...component].map(value => {
     const [provider, session_id] = JSON.parse(value) as [Provider, string];
     return { provider, session_id };
@@ -165,9 +164,8 @@ function componentReplacement(context: RefreshContext, { component, members, agg
     replaceAppliedSessions: true,
     reconcileAppliedResponses: !removedFileIds.size && members.some(file => file.previous?.parser_version === file.parser_version),
   } : {};
-  return { sessions, summaries, ...ledger, files, removedFileIds,
-    reconnectedFiles: state.reconnections.filter(link => removedFileIds.has(link.old_id)),
-    preserveCapabilities: !collect, retainDeletedSourceUsage: retain };
+  return { sessions, summaries, ...ledger, files, removedFileIds, preserveCapabilities: !collect,
+    retainDeletedSourceUsage: retain };
 }
 
 function settleDeferredComponent(context: RefreshContext, members: FileState[]): void {
@@ -181,23 +179,16 @@ function settleDeferredComponent(context: RefreshContext, members: FileState[]):
   settleFiles(members);
 }
 
-export function finishScan(context: RefreshContext, names: Map<string, string>, scope: string, startedMs: number): void {
-  const hasDeferredFiles = finishSourceRows(context);
+export function finishScan(context: RefreshContext, names: Map<string, string>): void {
+  finishSourceRows(context);
   context.check();
-  context.database.transaction(() => {
-    persistNames(context, names);
-    // Commit the scan's starting time so writes after discovery remain eligible next time.
-    if (!context.result.failed && !hasDeferredFiles)
-      context.database.connection.prepare(`INSERT INTO summary_refresh(id,scope,started_ms) VALUES(1,?,?)
-        ON CONFLICT(id) DO UPDATE SET scope=excluded.scope,started_ms=excluded.started_ms`).run(scope, startedMs);
-  });
+  context.database.transaction(() => persistNames(context, names));
 }
 
-/** 세션이 담당하지 않는 원본 행과 실패를 반영하고 보류 원본을 확인한다. */
-function finishSourceRows(context: RefreshContext): boolean {
+/** 세션이 담당하지 않는 원본 행과 실패를 반영한다. */
+function finishSourceRows(context: RefreshContext): void {
   const { database, state, storage, retain } = context;
   const files = [], removedFileIds = [], failures: FileState[] = [];
-  let hasDeferredFiles = false;
   for (const file of state.files.values()) {
     if (file.removed) {
       if (file.previous?.session_id === null) removedFileIds.push(file.id);
@@ -205,14 +196,12 @@ function finishSourceRows(context: RefreshContext): boolean {
       files.push(finalFile(file));
     }
     if (file.error) failures.push(file);
-    if (file.deferred) hasDeferredFiles = true;
   }
   // Persist allocated IDs before recording new failures through SQLite-assigned IDs.
   if (files.length) database.replaceMemory({ sessions: [], summaries: [], files }, storage);
   if (removedFileIds.length)
     database.replaceMemory({ sessions: [], summaries: [], files: [], removedFileIds, retainDeletedSourceUsage: retain }, storage);
   for (const file of failures) recordFailure(context, file);
-  return hasDeferredFiles;
 }
 
 function persistNames(context: RefreshContext, names: ReadonlyMap<string, string>): void {
@@ -226,9 +215,8 @@ function persistNames(context: RefreshContext, names: ReadonlyMap<string, string
 
 function finalFile(file: FileState): FileMetadata & { id: number } {
   return { id: file.id, provider: file.provider, source_root: file.source_root, path: file.path,
-    session_id: file.session_id, size_bytes: file.size_bytes, mtime_ms: file.mtime_ms, dev: file.dev, inode: file.inode,
-    parser_version: file.parser_version, capabilities_collected: file.capabilities_collected,
-    source_identity: file.source_identity, content_hash: file.content_hash, relations: file.relations };
+    session_id: file.session_id, size_bytes: file.size_bytes, mtime_ms: file.mtime_ms,
+    parser_version: file.parser_version, capabilities_collected: file.capabilities_collected, relations: file.relations };
 }
 
 export function recordFailure(context: RefreshContext, file: FileState): void {

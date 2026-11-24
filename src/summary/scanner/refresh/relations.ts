@@ -1,10 +1,9 @@
-// 부모·세션 관계를 해소하고 관련 원본의 준비 범위와 이동 연결을 확정한다.
+// 관련 원본을 읽고 부모 세션·요청의 귀속을 확정한다.
 import { groupParents } from '../../aggregation/parentGroups';
 import { SummaryError } from '../../jsonl';
-import { includesSourceSnapshot } from '../sourceFingerprint';
 import type { RefreshContext } from './context';
 import { inspectBatch, inspectSource } from './preparation';
-import { isPreparedFile, sessionKey, type FileState, type PreparedFile, type ScanState } from './state';
+import { sessionKey, type FileState, type PreparedFile, type ScanState } from './state';
 
 export async function expandRelatedSources(context: RefreshContext): Promise<void> {
   while (true) {
@@ -61,13 +60,12 @@ function takeParentSources({ state, database }: RefreshContext): FileState[] {
   if (!state.pendingReferences.size) return [];
   const references = [...state.pendingReferences];
   state.pendingReferences.clear();
-  const identities = new Set(references.flatMap(id => [JSON.stringify([id, true]), JSON.stringify([id, false])]));
   return state.codexFiles.filter(file => {
     if (!state.ready(file)) return false;
     if (references.some(reference => file.path.includes(reference))) return true;
-    if (!file.source_identity || !identities.has(file.source_identity)) return false;
-    const relations = database.sourceRelations(file.id);
-    return !!relations && references.includes(relations.identity.threadId);
+    if (!file.previous) return false;
+    if (file.storedThreadId === undefined) file.storedThreadId = database.sourceRelations(file.id)?.identity.threadId ?? null;
+    return file.storedThreadId !== null && references.includes(file.storedThreadId);
   }).sort((a, b) => a.id - b.id);
 }
 
@@ -107,37 +105,4 @@ export function resolveParentRequests(context: RefreshContext): void {
     if (root === null || state.missingParents.has(file.id)) state.fail(file, new SummaryError('missing-root-turn'));
     else file.prepared.parentRootId = root;
   }
-}
-
-export async function reconnectSources(context: RefreshContext): Promise<void> {
-  const { state, check, onBytes, cancelled } = context;
-  if (!state.preparedFiles.length) return;
-  for (const file of state.files.values()) {
-    if (!isPreparedFile(file)) continue;
-    for (const old of removedPredecessors(state, file)) {
-      try {
-        if (await includesSourceSnapshot(file, old, { check, onBytes }))
-          state.reconnections.push({ old_id: old.id, new_id: file.id });
-      }
-      catch (error) {
-        state.fail(file, error);
-        if (cancelled())
-          throw error;
-        break;
-      }
-    }
-  }
-}
-
-function removedPredecessors(state: ScanState, file: FileState): FileState[] {
-  const removed: FileState[] = [];
-  for (const candidate of state.matchingSources(file)) {
-    if (candidate === file) continue;
-    if (!candidate.removed) {
-      if (!candidate.error) return [];
-    } else if (candidate.session_id === file.session_id && candidate.content_hash && candidate.size_bytes > 0) {
-      removed.push(candidate);
-    }
-  }
-  return removed.sort((a, b) => a.discoveryOrder - b.discoveryOrder);
 }

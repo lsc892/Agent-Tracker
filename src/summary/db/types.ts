@@ -28,22 +28,23 @@ export interface FileMetadata {
   session_id: string | null;
   size_bytes: number;
   mtime_ms: number;
-  dev: string | null;
-  inode: string | null;
   parser_version: number;
-  /** Parsed source thread/role and SHA-256 of the accepted raw file snapshot. */
-  source_identity?: string | null;
-  content_hash?: string | null;
-  /** The parsed identity and spawn bindings used to reconnect unchanged relatives. */
+  /** Parsed thread identity and spawn bindings for finding related files. */
   relations?: SourceRelationMetadata | null;
   /** 0 when Skill counts were skipped; re-enable rebuilds these sources. */
   capabilities_collected?: 0 | 1;
+  /** @deprecated Accepted in old callers' input. Schema v24 does not store it. */
+  dev?: string | null;
+  /** @deprecated Accepted in old callers' input. Schema v24 does not store it. */
+  inode?: string | null;
 }
 
 export interface SourceFileRow extends FileMetadata {
   id: number;
-  source_identity: string | null;
-  content_hash: string | null;
+  /** @deprecated Present in v23 rows of historical callers only. */
+  source_identity?: string | null;
+  /** @deprecated Present in v23 rows of historical callers only. */
+  content_hash?: string | null;
   source_missing: 0 | 1;
   processing_status: ProcessingStatus;
   processing_position: string | null;

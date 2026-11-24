@@ -18,10 +18,19 @@ export interface PreparedSource {
 
 export type StoredSource = FileMetadata & Pick<SourceFileRow, 'id' | 'source_missing' | 'processing_status'>;
 
+/** 경로의 마지막 반영 시각과 재수집이 필요한 상태를 비교한다. */
+export function needsSourceRead(file: Pick<FileMetadata, 'mtime_ms' | 'source_root'>,
+  previous: StoredSource | undefined, collect: boolean): boolean {
+  return !previous || previous.mtime_ms !== file.mtime_ms || previous.source_root !== file.source_root
+    || previous.source_missing === 1 || previous.processing_status !== 'done'
+    || previous.parser_version !== PARSER_VERSION || collect && previous.capabilities_collected !== 1;
+}
+
 export interface FileState extends FileMetadata {
   id: number;
   readonly discoveryOrder: number;
   previous?: StoredSource;
+  storedThreadId?: string | null;
   changed: boolean;
   removed: boolean;
   selected: boolean;
@@ -44,7 +53,6 @@ export class ScanState {
   readonly affected = new Set<string>();
   readonly links = new Map<string, Set<string>>();
   private readonly sessionFiles = new Map<string, Set<FileState>>();
-  private readonly identityFiles = new Map<string, Set<FileState>>();
   readonly codexFiles: FileState[] = [];
   private readonly preparedCodex: FileState[] = [];
   readonly preparedFiles: FileState[] = [];
@@ -52,7 +60,6 @@ export class ScanState {
   readonly pendingReferences = new Set<string>();
   readonly relatedQueue = new SourceQueue<FileState>();
   readonly missingParents = new Set<number>();
-  readonly reconnections: { old_id: number; new_id: number }[] = [];
   readonly savedSessionNames = new Map<string, string>();
   lineageDirty = false;
   private indexesEnabled = false;
@@ -108,8 +115,6 @@ export class ScanState {
 
   private indexFile(file: FileState): void {
     this.indexSession(file);
-    if (file.source_identity)
-      addMember(this.identityFiles, sessionKey(file.provider, file.source_identity), file);
     if (file.provider === 'codex') this.codexFiles.push(file);
   }
 
@@ -125,18 +130,6 @@ export class ScanState {
     if (file.session_id) removeMember(this.sessionFiles, sessionKey(file.provider, file.session_id), file);
     file.session_id = session;
     this.indexSession(file);
-  }
-
-  setSourceIdentity(file: FileState, identity: string | null | undefined): void {
-    if (file.source_identity === identity) return;
-    if (file.source_identity)
-      removeMember(this.identityFiles, sessionKey(file.provider, file.source_identity), file);
-    file.source_identity = identity;
-    if (identity) addMember(this.identityFiles, sessionKey(file.provider, identity), file);
-  }
-
-  matchingSources(file: FileState): Iterable<FileState> {
-    return file.source_identity ? this.identityFiles.get(sessionKey(file.provider, file.source_identity)) ?? [] : [];
   }
 
   registerPrepared(file: FileState, prepared: PreparedSource): void {

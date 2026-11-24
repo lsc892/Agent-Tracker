@@ -7,10 +7,10 @@
 - [state.ts](state.ts) — 파일과 세션 상태를 관리하고 재파싱·소실 처리에 필요한 시점에 관계 색인을 구성한다.
 - [discovery.ts](discovery.ts) — 경로별로 관측을 모아 수정 시각으로 재파싱 후보를 고르고 원본 소실을 판단한다.
 - [preparation.ts](preparation.ts) — 변경·관련 원본의 파싱 결과를 반영하고 부모 관계 메타를 준비한다.
-- [relations.ts](relations.ts) — 관계 큐·계보·부모 요청 귀속·원본 이동 검증을 담당한다.
+- [relations.ts](relations.ts) — 관계 큐·스레드 계보·부모 요청 귀속을 담당한다.
 - [aggregation.ts](aggregation.ts) — 파일별 winner를 병합해 최종 요청과 반영할 응답을 반환한다.
-- [persistence.ts](persistence.ts) — 응답별 차이와 요청 합계를 저장하고 성공한 갱신의 시작 시각을 확정한다.
+- [persistence.ts](persistence.ts) — 쓰기 트랜잭션에 전달할 요청·응답 snapshot과 파일별 정상 반영 수정 시각을 구성한다.
 
 의존 방향은 갱신 조율 → 책임별 함수 → 공유 상태·기존 reader/집계/DB 모듈이다. 관계 확장은 준비 함수를 호출하고 준비 함수는 상태만 갱신하므로 관계 모듈을 역참조하지 않는다. 전체 context를 Worker 메시지로 보내거나 단계마다 복제하지 않는다.
 
-알고리즘·최소 힙·선행 창·동점 winner·오류/취소·삭제 보존·트랜잭션 경계와 Worker 종료 시점은 유지한다. 파일별 준비 풀·reader·이름·잠금·작업 큐 구현은 상위 scanner 폴더에서 재사용한다.
+파일 준비 풀·reader·이름·잠금·작업 큐 구현은 상위 scanner 폴더에서 재사용한다.

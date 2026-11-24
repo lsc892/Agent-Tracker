@@ -1,14 +1,11 @@
-// 원본을 고정 byte 경계까지 읽어 이벤트를 전달하고 파일 정체성과 내용 해시를 확인한다.
-import { createHash } from 'node:crypto';
-import type { Stats } from 'node:fs';
+// 원본을 관측한 byte 경계까지 읽어 파싱 이벤트를 전달한다.
 import { lstat } from 'node:fs/promises';
 import type { FileMetadata } from '../db/types';
 import { readJsonl, SummaryError } from '../jsonl';
 import { ClaudeParserAdapter, CodexCurrentParserAdapter } from '../parsers';
 import type { ParseEvent, ParsedIdentity, SummaryOptions } from '../types';
-import { sourceIdentity } from './sourceFingerprint';
 
-export type SourceReadFile = Pick<FileMetadata, 'provider' | 'path' | 'source_root' | 'size_bytes' | 'mtime_ms' | 'dev' | 'inode'> & { id: number };
+export type SourceReadFile = Pick<FileMetadata, 'provider' | 'path' | 'source_root' | 'size_bytes' | 'mtime_ms'> & { id: number };
 
 export const sqlText = (value: string): string => /[\ud800-\udfff]/.test(value) ? Buffer.from(value).toString('utf8') : value;
 
@@ -20,8 +17,6 @@ export function normalizedIdentity(identity: ParsedIdentity): ParsedIdentity {
 
 export interface SourceRead {
   identity?: ParsedIdentity;
-  sourceIdentity?: string;
-  contentHash: string;
   partialLine: boolean;
   rows: number;
 }
@@ -36,12 +31,7 @@ interface ReadOptions {
   onChild?: (reference: string, rootId: string) => void;
 }
 
-function isObservedSource(file: SourceReadFile, stat: Stats): boolean {
-  const truncated = stat.size < file.size_bytes;
-  return String(stat.dev) === file.dev && String(stat.ino) === file.inode && !truncated;
-}
-
-/** 고정 byte 경계의 단일 읽기로 winner 선택과 귀속·진단 근거 수집을 함께 수행한다. */
+/** 고정 byte 경계의 단일 읽기로 파싱 이벤트를 전달한다. */
 export async function readSource(
   file: SourceReadFile,
   event: (value: ParseEvent, index: number) => void,
@@ -55,20 +45,17 @@ export async function readSource(
     child: (reference: string, rootId: string) => options.onChild?.(sqlText(reference), sqlText(rootId)) };
   const parser = file.provider === 'claude' ? new ClaudeParserAdapter(context, sink) : new CodexCurrentParserAdapter(context, sink);
   try {
-    const before = await lstat(file.path);
-    if (!before.isFile() || !isObservedSource(file, before)) throw new SummaryError('file-replaced-during-read');
-    const digest = createHash('sha256');
     const read = await readJsonl(file.path, file.size_bytes, (row, offset) => parser.row(row, offset), {
       signal: options.signal, isCancelled: options.cancelled, maxLineBytes: options.maxLineBytes,
-      onBytes: options.onBytes, onChunk: chunk => { digest.update(chunk); },
+      onBytes: options.onBytes,
     });
     const after = await lstat(file.path);
-    if (!isObservedSource(file, after)
+    if (!after.isFile() || after.size < file.size_bytes
       || after.size === file.size_bytes && after.mtimeMs !== file.mtime_ms) throw new SummaryError('file-rewritten-during-read');
-    const result: SourceRead = { rows: read.rows, partialLine: read.partialLine, contentHash: digest.digest('hex') };
+    const result: SourceRead = { rows: read.rows, partialLine: read.partialLine };
     if (!read.rows) return result;
     parser.finish();
-    return { ...result, identity: normalizedIdentity(identity), sourceIdentity: sourceIdentity(identity) };
+    return { ...result, identity: normalizedIdentity(identity) };
   } catch (error) {
     const partialIdentity = parser.getIdentity();
     if (partialIdentity) options.onIdentity?.(normalizedIdentity(partialIdentity));
