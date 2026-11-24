@@ -3,13 +3,15 @@ import { open } from 'node:fs/promises';
 import { zstdChunks, ZstdError } from './zstd';
 import { SummaryError } from './errors';
 import { JsonlLine } from './line';
+import { projectFixedJson, projectJson, type JsonShape } from './projection';
 
 export { SummaryError } from './errors';
 
 /** JSON 문법 오류와 지원하지 않는 최상위 형식을 원본 행 위치로 구분한다. */
-function parseJsonlObject(text: string, offset: number): Record<string, unknown> {
+function parseJsonlObject(text: string, offset: number, shape: JsonShape | undefined, fixedShape: JsonShape | undefined): Record<string, unknown> {
   let row: unknown;
-  try { row = JSON.parse(text); } catch { throw new SummaryError('parse-error', offset); }
+  try { row = fixedShape ? projectFixedJson(text, fixedShape) : shape ? projectJson(text, shape) : JSON.parse(text); }
+  catch { throw new SummaryError('parse-error', offset); }
   if (!row || typeof row !== 'object' || Array.isArray(row)) throw new SummaryError('unsupported-schema', offset);
   return row as Record<string, unknown>;
 }
@@ -24,6 +26,7 @@ export async function readJsonl(
   size: number,
   onRow: (row: Record<string, unknown>, offset: number) => void | boolean,
   options: { maxLineBytes?: number; signal?: AbortSignal; isCancelled?: () => boolean; onBytes?: (bytes: number) => void;
+    shape?: JsonShape; fixedShape?: JsonShape;
     /** Raw file bytes, before image filtering or decompression; valid only during the callback. */
     onChunk?: (chunk: Buffer) => void;
     /** Synchronous processing of at most one chunk; file reads stay outside the callback. */
@@ -72,7 +75,7 @@ export async function readJsonl(
         sourceBytes = line.bytes;
       }
       if (text) {
-        const row = parseJsonlObject(text, lineOffset);
+        const row = parseJsonlObject(text, lineOffset, options.shape, options.fixedShape);
         rows++;
         if (onRow(row, lineOffset) === false) return true;
       }

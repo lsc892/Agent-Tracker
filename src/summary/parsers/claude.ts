@@ -1,10 +1,11 @@
 // Claude 대화 로그의 식별 정보·요청·사용량·도구 호출을 공통 이벤트로 변환한다.
 import { basename, dirname, sep } from 'node:path';
 import { SummaryError } from '../jsonl';
+import { hasJsonFields } from '../jsonl/projection';
 import type { FileContext, ParsedIdentity, ParseSink } from '../types';
 import type { BillingMode } from '../db/types';
 import { billingMode, claudeTokens, displayName, number, object, project, requestTitle, string, timestamp } from './common';
-import { toolCapabilities } from './capabilities';
+import { readToolCapabilities } from './capabilities';
 
 const recognizedTypes = new Set(['user', 'assistant', 'system', 'progress', 'file-history-snapshot', 'queue-operation', 'summary']);
 
@@ -99,7 +100,7 @@ export class ClaudeParserAdapter {
       const eventId = string(call.id);
       const name = string(call.name);
       if (!eventId || !name) continue;
-      for (const use of toolCapabilities(name, call.input)) this.sink.event({ kind: 'capability', rootId,
+      for (const use of readToolCapabilities(name, () => call.input)) this.sink.event({ kind: 'capability', rootId,
         threadId: this.identityValue.threadId, eventId: `${eventId}:${use.index}`, category: use.category, name: use.name, offset });
     }
   }
@@ -127,7 +128,7 @@ export class ClaudeParserAdapter {
   private recordAssistantUsage(row: Record<string, unknown>, message: Record<string, unknown>, rootId: string | undefined, offset: number): void {
     if (!message.usage) return;
     const usage = object(message.usage);
-    if (Object.keys(usage).length === 0) return;
+    if (!hasJsonFields(usage)) return;
     const tokens = claudeTokens(usage);
     const model = displayName(message.model);
     const synthetic = model === '<synthetic>';

@@ -3,10 +3,10 @@ import { lstat, readdir } from 'node:fs/promises';
 import { join, dirname, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { readJsonl } from '../jsonl';
-import { displayName, string } from '../parsers/common';
+import { displayName, sqlText, string } from '../parsers/common';
 import type { SourceRoot } from '../types';
-import { sqlText } from './sourceReader';
 const key = (provider: string, session: string): string => JSON.stringify([provider, sqlText(session)]);
+const indexFields = { fields: { id: {}, thread_name: {} } };
 /** 제공자 제목의 우선순위를 메모리에 병합하며 통계 DB는 여기서 쓰지 않는다. */
 export async function readNames(roots: readonly SourceRoot[], cancelled: () => boolean): Promise<Map<string, string>> {
   const names = new Map<string, string>(), stateNames = new Set<string>();
@@ -21,7 +21,7 @@ export async function readNames(roots: readonly SourceRoot[], cancelled: () => b
           const id = string(row.id), name = displayName(row.thread_name);
           if (id && name && !stateNames.has(key('codex', id)))
             names.set(key('codex', id), name);
-        }, { isCancelled: cancelled });
+        }, { isCancelled: cancelled, fixedShape: indexFields });
     }
     catch { /* Optional metadata does not invalidate transcript facts. */ }
     let source: DatabaseSync | undefined;

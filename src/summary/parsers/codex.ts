@@ -1,8 +1,10 @@
 // 현재·이전 Codex 로그의 식별 정보·요청·사용량·도구 호출을 공통 이벤트로 변환한다.
 import { SummaryError } from '../jsonl';
+import { projectJson } from '../jsonl/projection';
 import type { FileContext, ParsedIdentity, ParseSink, TokenVector } from '../types';
 import { billingMode, codexTokens, displayName, number, object, project, requestTitle, string, timestamp, tokenFlags, validateTokens } from './common';
-import { toolCapabilities } from './capabilities';
+import { readToolCapabilities } from './capabilities';
+import { spawnOutput } from './logFields';
 
 const turnRowTypes = new Set(['turn_context', 'token_usage_record', 'event_msg']);
 const tokenFields = ['input', 'output', 'cacheRead', 'cacheWrite', 'reasoning'] as const satisfies readonly (keyof TokenVector)[];
@@ -63,7 +65,7 @@ export class CodexCurrentParserAdapter {
     switch (type) {
       case 'turn_context': this.turnContext(payload, identity.isMain, suppliedRoot, suppliedTurn); break;
       case 'token_usage_record': this.currentUsage(payload, identity, suppliedRoot, suppliedTurn, offset); break;
-      case 'event_msg': this.eventLifecycle(payload, identity, suppliedRoot, suppliedTurn, row.timestamp, offset); break;
+      case 'event_msg': this.eventLifecycle(payload, identity, suppliedRoot, suppliedTurn, row, offset); break;
     }
   }
 
@@ -166,14 +168,15 @@ export class CodexCurrentParserAdapter {
       const capabilityType = String(type);
       if (capabilityType !== 'function_call' && capabilityType !== 'custom_tool_call') return;
     }
-    const callId = string(payload.call_id) ?? string(payload.id);
     const name = string(payload.name);
-    if (!callId || !name) return;
-    if (type === 'function_call' && (name === 'spawn_agent' || name.endsWith('.spawn_agent'))) {
-      this.spawnRequests.set(callId, this.root);
-    }
+    if (!name) return;
+    const spawnsChild = type === 'function_call' && (name === 'spawn_agent' || name.endsWith('.spawn_agent'));
+    if (!spawnsChild && !collectCapabilities) return;
+    const callId = string(payload.call_id) ?? string(payload.id);
+    if (!callId) return;
+    if (spawnsChild) this.spawnRequests.set(callId, this.root);
     if (!collectCapabilities) return;
-    for (const use of toolCapabilities(name, payload.arguments ?? payload.input)) {
+    for (const use of readToolCapabilities(name, () => payload.arguments ?? payload.input)) {
       this.sink.event({ kind: 'capability', rootId: this.root, threadId,
         eventId: `${callId}:${use.index}`, category: use.category, name: use.name, offset });
     }
@@ -187,7 +190,10 @@ export class CodexCurrentParserAdapter {
     if (!root) return;
     this.spawnRequests.delete(callId);
     let output: Record<string, unknown>;
-    try { output = object(typeof payload.output === 'string' ? JSON.parse(payload.output) : payload.output); }
+    try {
+      const value = payload.output;
+      output = object(typeof value === 'string' ? projectJson(value, spawnOutput) : value);
+    }
     catch { return; }
     const agent = string(output.agent_id), task = string(output.task_name);
     if (agent) this.sink.child?.(agent, root);
@@ -199,7 +205,7 @@ export class CodexCurrentParserAdapter {
    * 알고리즘: 명시 root·turn을 우선하고 사용자 메시지·종료 상태로 대체 요청을 구분하며, 이벤트별 시각·duration·상태를 기록한다.
    */
   private eventLifecycle(payload: Record<string, unknown>, identity: ParsedIdentity, suppliedRoot: string | undefined,
-    suppliedTurn: string | undefined, rowTimestamp: unknown, offset: number): void {
+    suppliedTurn: string | undefined, row: Record<string, unknown>, offset: number): void {
     const ownTurns = identity.isMain || !this.hasExplicitRoot;
     if (suppliedTurn) this.turn = suppliedTurn;
     if (suppliedRoot) this.root = suppliedRoot;
@@ -208,25 +214,25 @@ export class CodexCurrentParserAdapter {
       case 'task_started': {
         this.currentClosed = false; this.hasUserInTurn = false; this.pendingLifecycle = true;
         if (!this.root) break;
-        const startedAt = lifecycleTimestamp(payload.started_at) ?? timestamp(rowTimestamp);
+        const startedAt = lifecycleTimestamp(payload.started_at) ?? timestamp(row.timestamp);
         this.sink.event({ kind: 'turn', rootId: this.root, isMain: identity.isMain,
           startedAt, status: 'in_progress', statusAt: startedAt, offset });
         break;
       }
       case 'user_message':
-        this.recordUserMessage(payload, timestamp(rowTimestamp), identity.isMain, ownTurns, offset);
+        this.recordUserMessage(payload, timestamp(row.timestamp), identity.isMain, ownTurns, offset);
         break;
       case 'task_complete':
       case 'task_completed':
-        this.recordCompletion(payload, rowTimestamp, identity.isMain, offset);
+        this.recordCompletion(payload, row, identity.isMain, offset);
         break;
       case 'turn_aborted':
         this.currentClosed = true; this.pendingLifecycle = false;
         if (this.root) this.sink.event({ kind: 'turn', rootId: this.root, isMain: identity.isMain,
-          status: 'aborted', statusAt: lifecycleTimestamp(payload.completed_at) ?? timestamp(rowTimestamp), offset });
+          status: 'aborted', statusAt: lifecycleTimestamp(payload.completed_at) ?? timestamp(row.timestamp), offset });
         break;
       case 'agent_message':
-        if (this.root) this.sink.event({ kind: 'turn', rootId: this.root, isMain: identity.isMain, lastAssistantAt: timestamp(rowTimestamp), offset });
+        if (this.root) this.sink.event({ kind: 'turn', rootId: this.root, isMain: identity.isMain, lastAssistantAt: timestamp(row.timestamp), offset });
         break;
       case 'token_count':
         if (!this.sawCurrent) this.legacyTokens(payload, identity, offset);
@@ -249,10 +255,10 @@ export class CodexCurrentParserAdapter {
   }
 
   /** 완료 시각과 duration의 출처를 보존하면서 요청을 종료 상태로 기록한다. */
-  private recordCompletion(payload: Record<string, unknown>, rowTimestamp: unknown, isMain: boolean, offset: number): void {
+  private recordCompletion(payload: Record<string, unknown>, row: Record<string, unknown>, isMain: boolean, offset: number): void {
     this.currentClosed = true;
     if (!this.root) return;
-    const completedAt = lifecycleTimestamp(payload.completed_at) ?? timestamp(rowTimestamp);
+    const completedAt = lifecycleTimestamp(payload.completed_at) ?? timestamp(row.timestamp);
     this.sink.event({ kind: 'turn', rootId: this.root, isMain, completed: true, completedAt,
       duration: typeof payload.duration_ms === 'number' ? number(payload.duration_ms) : null,
       durationQuality: typeof payload.duration_ms === 'number' ? 'exact' : 'derived',

@@ -15,6 +15,7 @@ export function object(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
 export function string(value: unknown): string | undefined { return typeof value === 'string' && value.length > 0 ? value : undefined; }
+export const sqlText = (value: string): string => /[\ud800-\udfff]/.test(value) ? Buffer.from(value).toString('utf8') : value;
 export function displayName(value: unknown): string | undefined {
   return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, 512) || undefined : undefined;
 }
@@ -82,8 +83,8 @@ export function codexTokens(raw: Record<string, unknown>): TokenVector {
     reasoning: number(raw.reasoning_output_tokens) };
 }
 
-const tokenFields = ['input_tokens', 'output_tokens', 'cache_read_input_tokens', 'cache_creation_input_tokens',
-  'cached_input_tokens', 'cache_write_input_tokens', 'reasoning_output_tokens'];
+export const tokenFields = ['input_tokens', 'output_tokens', 'cache_read_input_tokens', 'cache_creation_input_tokens',
+  'cached_input_tokens', 'cache_write_input_tokens', 'reasoning_output_tokens'] as const;
 
 export function validateTokens(raw: Record<string, unknown>): void {
   for (const key of tokenFields) {

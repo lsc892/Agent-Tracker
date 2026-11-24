@@ -2,12 +2,13 @@
 import { lstat } from 'node:fs/promises';
 import type { FileMetadata } from '../db/types';
 import { readJsonl, SummaryError } from '../jsonl';
-import { ClaudeParserAdapter, CodexCurrentParserAdapter } from '../parsers';
+import type { JsonShape } from '../jsonl/projection';
+import { sqlText } from '../parsers/common';
 import type { ParseEvent, ParsedIdentity, SummaryOptions } from '../types';
 
 export type SourceReadFile = Pick<FileMetadata, 'provider' | 'path' | 'source_root' | 'size_bytes' | 'mtime_ms'> & { id: number };
 
-export const sqlText = (value: string): string => /[\ud800-\udfff]/.test(value) ? Buffer.from(value).toString('utf8') : value;
+export { sqlText } from '../parsers/common';
 
 export function normalizedIdentity(identity: ParsedIdentity): ParsedIdentity {
   const result = { ...identity };
@@ -31,12 +32,28 @@ interface ReadOptions {
   onChild?: (reference: string, rootId: string) => void;
 }
 
+async function readSourceRows(file: SourceReadFile, onRow: (row: Record<string, unknown>, offset: number) => void,
+  fields: { shape: JsonShape }, options: Pick<ReadOptions, 'signal' | 'cancelled' | 'maxLineBytes' | 'onBytes'>):
+  Promise<Pick<SourceRead, 'rows' | 'partialLine'>> {
+  const { rows, partialLine } = await readJsonl(file.path, file.size_bytes, onRow, {
+    signal: options.signal, isCancelled: options.cancelled, maxLineBytes: options.maxLineBytes,
+    onBytes: options.onBytes, ...fields,
+  });
+  const after = await lstat(file.path);
+  if (!after.isFile() || after.size < file.size_bytes
+    || after.size === file.size_bytes && after.mtimeMs !== file.mtime_ms) throw new SummaryError('file-rewritten-during-read');
+  return { rows, partialLine };
+}
+
 /** 고정 byte 경계의 단일 읽기로 파싱 이벤트를 전달한다. */
 export async function readSource(
   file: SourceReadFile,
   event: (value: ParseEvent, index: number) => void,
   options: ReadOptions,
 ): Promise<SourceRead> {
+  const [{ ClaudeParserAdapter, CodexCurrentParserAdapter }, { sourceFields }] = await Promise.all([
+    import('../parsers'), import('../parsers/logFields'),
+  ]);
   const context = { provider: file.provider, path: file.path, sourceRoot: file.source_root,
     fileId: file.id, collectCapabilities: options.collectCapabilities };
   let index = 0;
@@ -45,15 +62,8 @@ export async function readSource(
     child: (reference: string, rootId: string) => options.onChild?.(sqlText(reference), sqlText(rootId)) };
   const parser = file.provider === 'claude' ? new ClaudeParserAdapter(context, sink) : new CodexCurrentParserAdapter(context, sink);
   try {
-    const read = await readJsonl(file.path, file.size_bytes, (row, offset) => parser.row(row, offset), {
-      signal: options.signal, isCancelled: options.cancelled, maxLineBytes: options.maxLineBytes,
-      onBytes: options.onBytes,
-    });
-    const after = await lstat(file.path);
-    if (!after.isFile() || after.size < file.size_bytes
-      || after.size === file.size_bytes && after.mtimeMs !== file.mtime_ms) throw new SummaryError('file-rewritten-during-read');
-    const result: SourceRead = { rows: read.rows, partialLine: read.partialLine };
-    if (!read.rows) return result;
+    const result = await readSourceRows(file, (row, offset) => parser.row(row, offset), { shape: sourceFields(file.provider, options.collectCapabilities) }, options);
+    if (!result.rows) return result;
     parser.finish();
     return { ...result, identity: normalizedIdentity(identity) };
   } catch (error) {

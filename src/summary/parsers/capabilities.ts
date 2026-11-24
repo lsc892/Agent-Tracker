@@ -1,12 +1,14 @@
 // 도구 호출과 정적인 중첩 호출에서 스킬·서브에이전트·플러그인 사용을 추출한다.
 import type { CapabilityEvent } from '../types';
+import { projectJson } from '../jsonl/projection';
 import { displayName, object, string } from './common';
+import { capabilityArguments } from './logFields';
 
 type Use = Pick<CapabilityEvent, 'category' | 'name'>;
 
 function argumentsObject(value: unknown): Record<string, unknown> {
   if (typeof value !== 'string') return object(value);
-  try { return object(JSON.parse(value)); } catch { return {}; }
+  try { return object(projectJson(value, capabilityArguments)); } catch { return {}; }
 }
 
 /**
@@ -66,7 +68,7 @@ function nestedArgumentsObject(raw: string): Record<string, unknown> {
     const end = stringEnd(raw, position);
     const value = raw.slice(position, end);
     if (raw[position] === '`' && value.includes('${') || !/^\s*(?:[,}]|$)/.test(raw.slice(end))) continue;
-    args[key] = literal(value);
+    Object.defineProperty(args, key, { value: literal(value), enumerable: true, writable: true, configurable: true });
   }
   return args;
 }
@@ -157,16 +159,19 @@ function directUses<Input>(name: string, input: Input, readArguments: (input: In
   return unique;
 }
 
-/**
- * 책임: 직접 호출과 exec 내부 호출에 같은 사용 횟수 추출 규칙을 적용한다.
- * 알고리즘: exec 문자열은 정적으로 분해하고 나머지는 단일 호출로 취급해 분류 결과에 원래 호출 순번을 붙여 yield한다.
- */
-export function *toolCapabilities(name: string, input: unknown): Generator<Use & {index:number}> {
+export function toolCapabilities(name: string, input: unknown): Generator<Use & {index:number}> {
+  return readToolCapabilities(name, () => input);
+}
+
+/** Reads an argument value only when the tool's classification needs it. */
+export function *readToolCapabilities(name: string, readInput: () => unknown): Generator<Use & {index:number}> {
   const toolName = name.slice(name.lastIndexOf('.') + 1);
-  if (toolName !== 'exec' || typeof input !== 'string') {
-    for (const use of directUses(toolName, input, argumentsObject)) yield { ...use, index: 0 };
+  if (toolName !== 'exec') {
+    for (const use of directUses(toolName, readInput, read => argumentsObject(read()))) yield { ...use, index: 0 };
     return;
   }
+  const input = readInput();
+  if (typeof input !== 'string') return;
   let index = 0;
   for (const call of nestedCalls(input)) {
     for (const use of directUses(call.name, call.input, nestedArgumentsObject)) yield { ...use, index };
