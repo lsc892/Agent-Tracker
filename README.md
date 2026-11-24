@@ -148,3 +148,5 @@ Use **Agent Tracker: Delete Statistics Data** to clear aggregated statistics. Or
 [Usage and development reference (Korean)](docs/Development.ko.md)
 
 [Code responsibilities (Korean)](src/README.md) · [Tools](tools/README.md) · [Tests](tests/README.md) · [Webview](media/README.md) · [Localization](localization/README.md) · [Resources](resource/README.md) · [Documents](docs/README.md)
+
+[Claude and Codex JSONL parsing fields (Korean)](docs/refrences/LogParsingFields.md)

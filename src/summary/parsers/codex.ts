@@ -72,7 +72,7 @@ export class CodexCurrentParserAdapter {
    * 알고리즘: 첫 thread ID를 유지해 복사된 부모 metadata를 무시하고 명시 session·부모·thread 순으로 세션 ID를 정한다.
    */
   private sessionMetadata(payload: Record<string, unknown>, offset: number): void {
-    const id = string(payload.id) ?? string(payload.thread_id);
+    const id = string(payload.id);
     if (!id) throw new SummaryError('missing-session-id', offset);
     // Forked rollouts can contain copied parent session_meta rows. The first identity owns this file.
     if (this.identityValue && id !== this.identityValue.threadId) return;
@@ -81,7 +81,7 @@ export class CodexCurrentParserAdapter {
     const spawned = object(subagent.thread_spawn);
     const parent = string(payload.parent_thread_id) ?? string(spawned.parent_thread_id) ?? this.identityValue?.parentThreadId ?? null;
     const cwd = string(payload.cwd);
-    this.identityValue = { sessionId: string(payload.session_id) ?? string(payload.sessionId) ?? this.identityValue?.sessionId ?? parent ?? id,
+    this.identityValue = { sessionId: string(payload.session_id) ?? this.identityValue?.sessionId ?? parent ?? id,
       threadId: id, parentThreadId: parent, isMain: parent === null,
       forkedFromId: string(payload.forked_from_id) ?? this.identityValue?.forkedFromId ?? null,
       agentPath: string(payload.agent_path) ?? string(spawned.agent_path) ?? this.identityValue?.agentPath,

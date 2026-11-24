@@ -72,14 +72,14 @@ export function claudeTokens(raw: Record<string, unknown>): TokenVector {
 }
 /**
  * 책임: Codex의 평면·세부 토큰 필드를 공통 벡터로 정규화한다.
- * 알고리즘: 기존 입력·출력 총량은 유지하고 평면 필드를 우선해 캐시·reasoning 성분을 읽어 이중 가산을 막는다.
+ * 알고리즘: 입력·출력 총량을 유지하고 캐시는 평면·중첩 필드에서, reasoning은 평면 필드에서 읽는다.
  */
 export function codexTokens(raw: Record<string, unknown>): TokenVector {
   validateTokens(raw);
   const details = object(raw.input_tokens_details);
   return { input: number(raw.input_tokens), output: number(raw.output_tokens),
     cacheRead: number(raw.cached_input_tokens ?? details.cached_tokens), cacheWrite: number(raw.cache_write_input_tokens ?? details.cache_write_tokens),
-    reasoning: number(raw.reasoning_output_tokens ?? object(raw.output_tokens_details).reasoning_tokens) };
+    reasoning: number(raw.reasoning_output_tokens) };
 }
 
 const tokenFields = ['input_tokens', 'output_tokens', 'cache_read_input_tokens', 'cache_creation_input_tokens',

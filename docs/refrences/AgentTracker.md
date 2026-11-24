@@ -494,7 +494,7 @@ agent_role = parent_thread_id가 없으면 main, 있으면 subagent
 
 현재 JSONL의 `session_meta.parent_thread_id`, `forked_from_id`, `thread_source`와 turn의 `root_turn_id`를 우선 사용한다. 단순히 “내 turn id와 parent id가 다르다”는 조건으로 subagent를 판정하지 않는다.
 
-파일의 첫 `session_meta`가 소유 thread를 정한다. fork 로그 안에 복제된 다른 thread의 부모 `session_meta`는 소유 식별자·프로젝트·lineage를 덮어쓰지 않는다. 같은 thread의 반복 metadata는 기존 부모·fork·프로젝트 정보를 유지하면서 제공된 제목 등을 갱신한다.
+파일의 첫 `session_meta`에서 `payload.id`를 소유 thread로 읽는다. 세션은 `payload.session_id`, 직전 세션 ID, 부모 thread, 소유 thread 순으로 정한다. fork 로그 안에 복제된 다른 thread의 부모 `session_meta`는 소유 식별자·프로젝트·lineage를 덮어쓰지 않는다. 같은 thread의 반복 metadata는 기존 부모·fork·프로젝트 정보를 유지하면서 제공된 제목 등을 갱신한다.
 
 부모 세션 연결은 원본의 parent_thread_id로 계산한다. 직접 자식과 다단계 계보 모두 각 thread의 최상위 root를 비재귀 순회로 한 번 해소한 뒤 root별로 직접 묶는다. 경로의 확정 결과와 임시 null 방문 표시를 같은 Map에 저장하며 Union-Find 재병합과 별도 방문 Set은 두지 않는다. 같은 정상 계보는 같은 그룹 객체를 공유하고 root별 원본 배열의 순서를 유지한다. forked_from_id는 복사 이력 검증에만 사용한다. 부모 누락·충돌·순환과 그 의존 경로는 독립 그룹으로 남기고 missing-parent-agent를 표시한다. parser v17은 관련 원본을 한 번 읽으며 원본 전체 DTO 캐시는 사용하지 않는다.
 
@@ -556,6 +556,7 @@ Anthropic과 OpenAI는 cache token 의미가 다르다.
 
 - Anthropic: 총 input은 `input_tokens + cache_creation_input_tokens + cache_read_input_tokens`다.
 - 현재 Codex: `total_tokens = input_tokens + output_tokens`이고 `cached_input_tokens`, `cache_write_input_tokens`는 input의 세부 항목이다.
+- Codex reasoning은 `reasoning_output_tokens`에서 읽는다. 캐시 읽기·쓰기는 평면 필드가 없을 때 `input_tokens_details`의 값을 사용한다.
 - reasoning output은 output의 세부 항목이므로 총합에 다시 더하지 않는다.
 
 parser 내부 공통 field는 다음 의미로 고정한다.

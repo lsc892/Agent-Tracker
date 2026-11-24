@@ -6,7 +6,7 @@ import type { ParsedIdentity, RefreshResult } from '../../types';
 import { sqlText } from '../sourceReader';
 import { addMember, removeMember, SourceQueue } from '../worklist';
 
-export const PARSER_VERSION = 22;
+export const PARSER_VERSION = 23;
 export const sessionKey = (provider: Provider, session: string): string => JSON.stringify([provider, sqlText(session)]);
 
 export interface PreparedSource {
