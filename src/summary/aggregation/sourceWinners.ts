@@ -1,15 +1,64 @@
 // 원본을 읽으면서 응답 키별 winner와 요청·누계·도구의 상태를 접는다.
 import type { CheckEvent, ParseEvent, Provider, UsageEvent } from '../types';
 import { key, normalizedEvent, SourceEvidence, type SourceEvidenceData } from './sourceEvidence';
-import { addTurn, createTurnState, max, type TurnState } from './turns';
+import { addTurn, createTurnState, max, type TurnState, type UsageContribution } from './turns';
 import { isBetterUsage, usageScore } from './winners';
 
+type WinnerUsage = Pick<UsageEvent, 'responseId' | 'requestId' | 'threadId' | 'turnId' | 'rootId' | 'schema' | 'offset'>
+  & UsageContribution;
+
 export interface UsageWinner {
-  event: UsageEvent;
+  referenceId: number;
+  tokens: UsageContribution['tokens'];
+}
+
+export interface WinnerReference extends Omit<WinnerUsage, 'tokens' | 'schema' | 'offset'> {
+  later?: UsageWinner[];
+}
+
+interface DetailedUsageWinner {
+  event: WinnerUsage;
   index: number;
   score: number | bigint;
   // 복사 접두사 뒤에서만 살아남을 수 있는 legacy 후보를 점수 내림차순으로 보존한다.
-  later?: UsageWinner[];
+  later?: DetailedUsageWinner[];
+}
+
+interface ParsedUsageWinner extends DetailedUsageWinner {
+  event: UsageEvent;
+  later?: ParsedUsageWinner[];
+}
+
+function snapshotWinner({ event, index, score, later }: ParsedUsageWinner): DetailedUsageWinner {
+  const { responseId, requestId, threadId, turnId, rootId, schema, offset, model, billingMode } = event;
+  const { input, output, cacheRead, cacheWrite } = event.tokens;
+  const winner: DetailedUsageWinner = {
+    event: { responseId, requestId, threadId, turnId, rootId, schema, offset, model, billingMode,
+      tokens: { input, output, cacheRead, cacheWrite } },
+    index, score,
+  };
+  if (later) winner.later = later.map(snapshotWinner);
+  return winner;
+}
+
+function referenceWinner({ event, index, later }: DetailedUsageWinner, references: Map<number, WinnerReference>): UsageWinner {
+  const { responseId, requestId, threadId, turnId, rootId, model, billingMode } = event;
+  const reference: WinnerReference = { responseId, requestId, threadId, turnId, rootId, model, billingMode };
+  references.set(index, reference);
+  if (later) reference.later = later.map(winner => referenceWinner(winner, references));
+  const { input, output, cacheRead, cacheWrite } = event.tokens;
+  return { referenceId: index, tokens: { input, output, cacheRead, cacheWrite } };
+}
+
+export interface ReferencedWinners {
+  winners: readonly UsageWinner[];
+  references: ReadonlyMap<number, WinnerReference>;
+}
+
+export function referenceWinners(entries: Iterable<DetailedUsageWinner>): ReferencedWinners {
+  const references = new Map<number, WinnerReference>();
+  const winners = Array.from(entries, winner => referenceWinner(winner, references));
+  return { winners, references };
 }
 
 export interface SourceCheck extends Omit<CheckEvent, 'kind' | 'rootId'> { index: number }
@@ -23,28 +72,39 @@ interface SourceRoot {
   capabilities: Map<string, { event: Capability; positions: { index: number; offset: number }[] }>;
 }
 
-export interface SourceWinnersSnapshot {
+interface SourceState {
   evidence: SourceEvidenceData;
   roots: Map<string, SourceRoot>;
-  winners: readonly UsageWinner[];
+}
+
+export interface SourceWinnersSnapshot extends SourceState, ReferencedWinners {}
+
+export interface DetailedSourceWinnersSnapshot extends SourceState {
+  winners: readonly DetailedUsageWinner[];
 }
 
 export class SourceWinners {
   readonly evidence = new SourceEvidence();
   readonly roots = new Map<string, SourceRoot>();
-  private readonly winners = new Map<string, UsageWinner>();
+  private readonly winners = new Map<string, ParsedUsageWinner>();
 
   constructor(private readonly provider: Provider) {}
 
-  snapshot(): SourceWinnersSnapshot {
-    const winners: UsageWinner[] = [];
-    for (const winner of this.values()) {
-      if (!this.evidence.current || winner.event.schema !== 'legacy') winners.push(winner);
-    }
-    return { evidence: this.evidence, roots: this.roots, winners };
+  snapshot(): DetailedSourceWinnersSnapshot {
+    return { evidence: this.evidence, roots: this.roots, winners: Array.from(this.selected(), snapshotWinner) };
   }
 
-  values(): IterableIterator<UsageWinner> { return this.winners.values(); }
+  preparedSnapshot(): SourceWinnersSnapshot {
+    return { evidence: this.evidence, roots: this.roots, ...referenceWinners(this.selected()) };
+  }
+
+  private *selected(): IterableIterator<ParsedUsageWinner> {
+    for (const winner of this.winners.values()) {
+      if (!this.evidence.current || winner.event.schema !== 'legacy') yield winner;
+    }
+  }
+
+  values(): IterableIterator<ParsedUsageWinner> { return this.winners.values(); }
 
   private addUsage(event: UsageEvent, index: number): void {
     const legacy = event.schema === 'legacy';

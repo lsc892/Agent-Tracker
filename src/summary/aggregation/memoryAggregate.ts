@@ -1,22 +1,24 @@
 // 파일별 winner를 요청·모델·진단 값에 반영한다.
 import type { AppliedResponse } from '../db/appliedResponses';
-import type { CapabilityEvent, TurnEvent, UsageEvent } from '../types';
-import { addFlag, eligible, eligibleUsage, key, prepareSources,
+import type { CapabilityEvent, TurnEvent } from '../types';
+import { addFlag, eligible, eligibleWinner, key, prepareSources,
   type SourcePlan, type StreamingAggregateFile } from './sourceEvidence';
 import { addCapability, addUsage, createRoot, materialize, max, mergeTurn,
   type MemoryAggregateResult, type Outcome, type Root } from './turns';
-import type { SourceCheck, SourceWinnersSnapshot, UsageWinner } from './sourceWinners';
-import { isBetterUsage } from './winners';
+import { referenceWinners, type DetailedSourceWinnersSnapshot, type ReferencedWinners,
+  type SourceCheck, type SourceWinnersSnapshot, type UsageWinner, type WinnerReference } from './sourceWinners';
+import { isBetterUsage, usageScore } from './winners';
 
 export type { StreamingAggregateFile } from './sourceEvidence';
 export type { MaterializedTurnSummary, MemoryAggregateResult } from './turns';
 
-interface UsageSource extends SourcePlan { winners?: readonly UsageWinner[] }
+interface UsageSource extends SourcePlan { usage?: ReferencedWinners }
 
 interface SelectedWinner {
   source: SourcePlan;
   root: Root;
-  usage: UsageEvent;
+  reference: WinnerReference;
+  tokens: UsageWinner['tokens'];
   responseKey: string;
   request: string | null;
   score: number | bigint;
@@ -49,7 +51,7 @@ export class StreamingAggregation {
   }
 
   /** 파싱 중 접은 요청 상태와 파일별 winner를 등록한다. */
-  addSource(fileId: number, prepared: SourceWinnersSnapshot): void {
+  addSource(fileId: number, prepared: SourceWinnersSnapshot | DetailedSourceWinnersSnapshot): void {
     const source = this.sources.get(fileId)!, file = source.file;
     const parentRootId = file.identity.parentRootId;
     const outcomes = new Map<string, Outcome>();
@@ -92,28 +94,36 @@ export class StreamingAggregation {
           this.observeRequest(file, parentRootId || rootId, offset);
       }
     }
-    source.winners = prepared.winners;
+    const { winners, references } = 'references' in prepared ? prepared : referenceWinners(prepared.winners);
+    source.usage = { winners, references };
   }
 
-  private selectUsage(source: SourcePlan, { event: usage, index, score }: UsageWinner, position: number): SelectedWinner {
-    const file = source.file, ordinal = source.base + index;
-    const root = this.observeRequest(file, file.identity.parentRootId || usage.rootId, usage.offset);
-    const request = file.provider === 'claude' && usage.requestId === null
-      ? this.requests.get(key(file.session_id, usage.responseId)) ?? null : usage.requestId;
-    const responseKey = file.provider === 'claude' ? key(usage.responseId, request ?? 'no-req')
-      : key(usage.responseId, usage.threadId, usage.turnId);
-    return { source, root, usage, responseKey, request, score, ordinal, position };
+  private selectUsage(source: SourcePlan, winner: UsageWinner, reference: WinnerReference, position: number): SelectedWinner {
+    const { file } = source, { rootId, requestId, responseId, threadId, turnId } = reference;
+    // addSource already registered every eligible usage's request and diagnostic offset.
+    const root = this.roots.get(key(file.provider, file.session_id, file.identity.parentRootId || rootId))!;
+    const request = file.provider === 'claude' && requestId === null
+      ? this.requests.get(key(file.session_id, responseId)) ?? null : requestId;
+    const responseKey = file.provider === 'claude' ? key(responseId, request ?? 'no-req') : key(responseId, threadId, turnId);
+    return { source, root, reference, tokens: winner.tokens, responseKey, request,
+      score: usageScore(winner), ordinal: source.base + winner.referenceId, position };
   }
 
   private applySessionUsage(sources: readonly UsageSource[]): void {
     const candidates: SelectedWinner[] = [];
     for (const source of sources.slice().sort((a, b) => a.base - b.base)) {
-      for (const entry of source.winners ?? []) {
-        const winner = eligibleUsage(source, entry.event, entry.index) ? entry
-          : entry.later?.find(item => eligibleUsage(source, item.event, item.index));
-        if (winner) candidates.push(this.selectUsage(source, winner, candidates.length));
+      if (!source.usage) continue;
+      const { winners, references } = source.usage;
+      for (const entry of winners) {
+        const reference = references.get(entry.referenceId)!;
+        if (eligibleWinner(source, reference.rootId, entry.referenceId)) {
+          candidates.push(this.selectUsage(source, entry, reference, candidates.length));
+          continue;
+        }
+        const winner = reference.later?.find(item => eligibleWinner(source, references.get(item.referenceId)!.rootId, item.referenceId));
+        if (winner) candidates.push(this.selectUsage(source, winner, references.get(winner.referenceId)!, candidates.length));
       }
-      source.winners = undefined;
+      source.usage = undefined;
     }
     candidates.sort((a, b) => a.responseKey < b.responseKey ? -1 : Number(a.responseKey > b.responseKey));
     // 그룹에서 처음 본 위치를 보존해 요청별 반영과 진단 순서를 유지한다.
@@ -179,11 +189,11 @@ export class StreamingAggregation {
     return materialize(this.roots.values(), this.sessions, this.collectCapabilities);
   }
 
-  private applyUsage({ source, root, usage, responseKey, request }: SelectedWinner): void {
-    const { file } = source, { tokens } = usage;
-    addUsage(root, usage, this.collectCapabilities);
+  private applyUsage({ source, root, reference, tokens, responseKey, request }: SelectedWinner): void {
+    const { file } = source, { model, billingMode, threadId, turnId } = reference;
+    addUsage(root, { model, billingMode, tokens }, this.collectCapabilities);
     this.onApplied?.({ provider: file.provider, sessionId: file.session_id, rootId: root.rootId, responseKey, tokens });
-    const id = key(file.provider, file.session_id, usage.threadId, usage.turnId);
+    const id = key(file.provider, file.session_id, threadId, turnId);
     let sum = this.totals.get(id);
     if (!sum) this.totals.set(id, sum = { input: 0, output: 0 });
     sum.input += tokens.input; sum.output += tokens.output;

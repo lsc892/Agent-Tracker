@@ -25,7 +25,7 @@ export async function prepareSource(file: SourceReadFile, options: SourcePrepara
       onIdentity: value => { identity = value; },
       onChild: (reference, rootId) => winners.evidence.child(reference, rootId),
     });
-    return { ok: true, read, winners: winners.snapshot() };
+    return { ok: true, read, winners: winners.preparedSnapshot() };
   } catch (error) {
     const failure = error instanceof SummaryError
       ? { code: error.code, offset: error.offset }

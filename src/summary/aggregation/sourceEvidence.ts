@@ -92,6 +92,7 @@ export interface SourcePlan {
   base: number;
   flags: Map<string, Set<string>>;
   inheritedRoots: Set<string>;
+  copiedLegacyIndices?: ReadonlySet<number>;
   copiedCapabilities: Set<string>;
   legacyCutoff: number;
 }
@@ -139,7 +140,12 @@ export function prepareSources(files: readonly StreamingAggregateFile[]): {
       source.inheritedRoots.add(child.rootId);
     }
     if (source.legacyCutoff < 0) continue;
-    for (const event of childRows) if (event.index > source.legacyCutoff) source.inheritedRoots.delete(event.rootId);
+    const copiedLegacyIndices = new Set<number>();
+    for (const { index, rootId } of childRows) {
+      if (index > source.legacyCutoff) source.inheritedRoots.delete(rootId);
+      else copiedLegacyIndices.add(index);
+    }
+    source.copiedLegacyIndices = copiedLegacyIndices;
     for (const rootId of source.file.evidence.nonLegacyRoots) source.inheritedRoots.delete(rootId);
     for (const [id, index] of source.file.evidence.capabilities) {
       if (index > source.legacyCutoff) continue;
@@ -164,6 +170,10 @@ export function prepareSources(files: readonly StreamingAggregateFile[]): {
 export function eligibleUsage(source: SourcePlan, event: Pick<UsageEvent, 'schema' | 'rootId'>, index: number): boolean {
   return !source.inheritedRoots.has(event.rootId)
     && (event.schema !== 'legacy' || !source.file.evidence.current && index > source.legacyCutoff);
+}
+
+export function eligibleWinner(source: SourcePlan, rootId: string, referenceId: number): boolean {
+  return !source.inheritedRoots.has(rootId) && !source.copiedLegacyIndices?.has(referenceId);
 }
 
 export function eligible(source: SourcePlan, event: ParseEvent, index: number): boolean {
