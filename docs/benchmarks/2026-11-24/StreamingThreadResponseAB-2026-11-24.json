@@ -1,0 +1,538 @@
+{
+  "dateSeoul": "2026-11-24",
+  "baselineCommit": "21ff22b",
+  "environment": {
+    "node": "v24.14.1",
+    "sqlite": "3.51.2",
+    "platform": "win32",
+    "arch": "x64"
+  },
+  "protocol": {
+    "runsPerBuild": 1,
+    "order": "A/B",
+    "warmups": 0,
+    "sourceWorkers": 4,
+    "sampleIntervalMs": 5,
+    "timezone": "Asia/Seoul",
+    "emptyDatabases": true,
+    "reusedBaseline": false
+  },
+  "input": {
+    "sha256": "e89e63d4ffd88f071ecb64b37cca791fdf9a481958e794a1d568a33ca83bae5a",
+    "inventory": [
+      {
+        "provider": "claude",
+        "rootOrdinal": 0,
+        "files": 12,
+        "bytes": 11486533,
+        "compressed": 0
+      },
+      {
+        "provider": "codex",
+        "rootOrdinal": 1,
+        "files": 689,
+        "bytes": 415018914,
+        "compressed": 666,
+        "metadata": {
+          "indexBytes": 53453,
+          "threads": 690
+        }
+      },
+      {
+        "provider": "codex",
+        "rootOrdinal": 2,
+        "files": 2,
+        "bytes": 3075020,
+        "compressed": 2,
+        "metadata": {
+          "indexBytes": 53453,
+          "threads": 690
+        }
+      }
+    ]
+  },
+  "builds": {
+    "A": {
+      "source": "6dfeebd9d8a7917bca43ece7351fcaceeec1a56848407c79d1e4145d379cb0b5",
+      "compiled": "697ea13b564ea2f3ea17e45dcbacba271c2dc66992a670d9ca2793a7702aa667"
+    },
+    "B": {
+      "source": "c82bf2193a8d1f2b0705650ba2b25664762a0e74e7911d62c1cfd69ad065fb54",
+      "compiled": "6dc1616e75aa9d5c7d123a878c15951c81229e97657767232ea9f2053b70b48c"
+    }
+  },
+  "samples": {
+    "A": {
+      "ms": 4037.7715999999996,
+      "peak": {
+        "rss": 498130944,
+        "heapUsed": 44695112
+      },
+      "afterGc": {
+        "rss": 276791296,
+        "heapUsed": 7981216
+      },
+      "files": 703,
+      "bytes": 429580467,
+      "stages": {
+        "lock": {
+          "calls": 1,
+          "totalMs": 2.4976000000000056
+        },
+        "discover": {
+          "calls": 1,
+          "totalMs": 153.21549999999996
+        },
+        "names": {
+          "calls": 1,
+          "totalMs": 14.01679999999999
+        },
+        "readSources": {
+          "calls": 703,
+          "totalMs": 3689.7355000000043
+        },
+        "parseChanged": {
+          "calls": 1,
+          "totalMs": 3714.0478000000003
+        },
+        "expandRelated": {
+          "calls": 1,
+          "totalMs": 1.3591000000001259
+        },
+        "aggregate": {
+          "calls": 1,
+          "totalMs": 44.309999999999945
+        },
+        "commitComponents": {
+          "calls": 1,
+          "totalMs": 93.69780000000037
+        },
+        "finishScan": {
+          "calls": 1,
+          "totalMs": 2.4754000000002634
+        },
+        "optimize": {
+          "calls": 1,
+          "totalMs": 1.2052999999996246
+        },
+        "sourcePoolClose": {
+          "calls": 1,
+          "totalMs": 9.38630000000012
+        }
+      },
+      "totals": {
+        "claude": {
+          "threads": 12,
+          "input": 9994511,
+          "output": 247006,
+          "tokens": 10241517
+        },
+        "codex": {
+          "threads": 672,
+          "input": 3444826635,
+          "output": 16569656,
+          "tokens": 3461396291
+        }
+      },
+      "query": {
+        "day": {
+          "claude": {
+            "input": 9994511,
+            "output": 247006,
+            "tokens": 10241517,
+            "groups": 3,
+            "ms": 72.79370000000017
+          },
+          "codex": {
+            "input": 3444826635,
+            "output": 16569656,
+            "tokens": 3461396291,
+            "groups": 89,
+            "ms": 1.7001000000000204
+          }
+        },
+        "month": {
+          "claude": {
+            "input": 9994511,
+            "output": 247006,
+            "tokens": 10241517,
+            "groups": 1,
+            "ms": 0.579899999999725
+          },
+          "codex": {
+            "input": 3444826635,
+            "output": 16569656,
+            "tokens": 3461396291,
+            "groups": 6,
+            "ms": 0.8442999999997483
+          }
+        },
+        "session": {
+          "claude": {
+            "input": 9994511,
+            "output": 247006,
+            "tokens": 10241517,
+            "groups": 12,
+            "ms": 0.6000999999996566
+          },
+          "codex": {
+            "input": 3444826635,
+            "output": 16569656,
+            "tokens": 3461396291,
+            "groups": 386,
+            "ms": 3.2169000000003507
+          }
+        },
+        "project": {
+          "claude": {
+            "input": 9994511,
+            "output": 247006,
+            "tokens": 10241517,
+            "groups": 2,
+            "ms": 0.3838000000005195
+          },
+          "codex": {
+            "input": 3444826635,
+            "output": 16569656,
+            "tokens": 3461396291,
+            "groups": 1,
+            "ms": 0.581000000000131
+          }
+        }
+      },
+      "fingerprints": {
+        "rows": {
+          "threads": {
+            "rows": 684,
+            "sha256": "5356ddae1dba05fac4dcec2b71b6ae7a9ae36015d959bafc9d772f0bf3c718bc"
+          },
+          "models": {
+            "rows": 689,
+            "sha256": "6e3c71a6d325b47964b3e70ca46169a61f40d70b9416256e63abfde10379b212"
+          },
+          "costs": {
+            "rows": 684,
+            "sha256": "ea74ed18436ec38ca8fb56c6e9afce8e673eae6af108fad0fbde568c0b25237d"
+          },
+          "sources": {
+            "rows": 703,
+            "sha256": "41a4ac9d2d84dbc4cd0bd91bfe3627b8a1eed5cd3575b2f195b664ccdceaf0d1"
+          }
+        },
+        "groups": {
+          "provider/total": {
+            "rows": 2,
+            "sha256": "6388b5b4984953439b0b718dadcc2085e7bfdc82e1fc2169fabdfee49b1d8666"
+          },
+          "provider/day": {
+            "rows": 92,
+            "sha256": "6c931c9b39e34e304d75a5315f03ed81b9e66de3203d454c0114b0ec4712f9b0"
+          },
+          "provider/month": {
+            "rows": 7,
+            "sha256": "c7683f379140debd16ac3369343b8d2fbbe318026aa1eebace706d3f28122e7e"
+          },
+          "provider/session": {
+            "rows": 398,
+            "sha256": "a13154bd0f779e82d8d41f18a0fb2dfc0286acef0aa75485a17bafc2f429d405"
+          },
+          "provider/project": {
+            "rows": 3,
+            "sha256": "704002e13782ee1e250e9cfb6833afa8e17fc389bb6b416f1187f1693bd7246d"
+          },
+          "model/total": {
+            "rows": 9,
+            "sha256": "f462cef23a92aeb59be4ef8b96278e240560f389544d53f9e386c57db9379baf"
+          },
+          "model/day": {
+            "rows": 110,
+            "sha256": "52744ea90442b9fb71d8f68a043972b3aaf4ec988496d1fd94b4d3a698ce7552"
+          },
+          "model/month": {
+            "rows": 15,
+            "sha256": "4ea2dfce4c95329cee6c8362a9bf58db4ff971c2527b6053104c3b0d95c7d2a9"
+          },
+          "model/session": {
+            "rows": 402,
+            "sha256": "809d2688cf447ab9597ccde505199a0314d0cc2f8e73d3768aa955776ec1a4e8"
+          },
+          "model/project": {
+            "rows": 10,
+            "sha256": "0dfeddfca430f824104fb01dbc496b804a4d6963dc7464877727ff2169989df5"
+          }
+        }
+      },
+      "checks": {
+        "integrity": true,
+        "foreignKeys": true,
+        "rollupSums": true,
+        "modelSums": true
+      }
+    },
+    "B": {
+      "ms": 3673.9235,
+      "peak": {
+        "rss": 473944064,
+        "heapUsed": 47284888
+      },
+      "afterGc": {
+        "rss": 256495616,
+        "heapUsed": 7959432
+      },
+      "files": 703,
+      "bytes": 429580467,
+      "stages": {
+        "lock": {
+          "calls": 1,
+          "totalMs": 1.770700000000005
+        },
+        "discover": {
+          "calls": 1,
+          "totalMs": 131.35790000000003
+        },
+        "names": {
+          "calls": 1,
+          "totalMs": 11.908900000000017
+        },
+        "readSources": {
+          "calls": 703,
+          "totalMs": 3363.3565000000003
+        },
+        "parseChanged": {
+          "calls": 1,
+          "totalMs": 3399.6101
+        },
+        "expandRelated": {
+          "calls": 1,
+          "totalMs": 0.8006000000000313
+        },
+        "aggregate": {
+          "calls": 1,
+          "totalMs": 10.559200000000146
+        },
+        "commitComponents": {
+          "calls": 1,
+          "totalMs": 98.85429999999997
+        },
+        "finishScan": {
+          "calls": 1,
+          "totalMs": 2.4908000000000357
+        },
+        "optimize": {
+          "calls": 1,
+          "totalMs": 1.0091999999999643
+        },
+        "sourcePoolClose": {
+          "calls": 1,
+          "totalMs": 13.993399999999838
+        }
+      },
+      "totals": {
+        "claude": {
+          "threads": 12,
+          "input": 9994511,
+          "output": 247006,
+          "tokens": 10241517
+        },
+        "codex": {
+          "threads": 672,
+          "input": 3444826635,
+          "output": 16569656,
+          "tokens": 3461396291
+        }
+      },
+      "query": {
+        "day": {
+          "claude": {
+            "input": 9994511,
+            "output": 247006,
+            "tokens": 10241517,
+            "groups": 3,
+            "ms": 33.542799999999716
+          },
+          "codex": {
+            "input": 3444826635,
+            "output": 16569656,
+            "tokens": 3461396291,
+            "groups": 89,
+            "ms": 1.9517000000000735
+          }
+        },
+        "month": {
+          "claude": {
+            "input": 9994511,
+            "output": 247006,
+            "tokens": 10241517,
+            "groups": 1,
+            "ms": 0.6195999999999913
+          },
+          "codex": {
+            "input": 3444826635,
+            "output": 16569656,
+            "tokens": 3461396291,
+            "groups": 6,
+            "ms": 0.9342000000001462
+          }
+        },
+        "session": {
+          "claude": {
+            "input": 9994511,
+            "output": 247006,
+            "tokens": 10241517,
+            "groups": 12,
+            "ms": 0.47280000000000655
+          },
+          "codex": {
+            "input": 3444826635,
+            "output": 16569656,
+            "tokens": 3461396291,
+            "groups": 386,
+            "ms": 4.615600000000086
+          }
+        },
+        "project": {
+          "claude": {
+            "input": 9994511,
+            "output": 247006,
+            "tokens": 10241517,
+            "groups": 2,
+            "ms": 0.5231999999996333
+          },
+          "codex": {
+            "input": 3444826635,
+            "output": 16569656,
+            "tokens": 3461396291,
+            "groups": 1,
+            "ms": 1.008299999999963
+          }
+        }
+      },
+      "fingerprints": {
+        "rows": {
+          "threads": {
+            "rows": 684,
+            "sha256": "5356ddae1dba05fac4dcec2b71b6ae7a9ae36015d959bafc9d772f0bf3c718bc"
+          },
+          "models": {
+            "rows": 689,
+            "sha256": "6e3c71a6d325b47964b3e70ca46169a61f40d70b9416256e63abfde10379b212"
+          },
+          "costs": {
+            "rows": 684,
+            "sha256": "ea74ed18436ec38ca8fb56c6e9afce8e673eae6af108fad0fbde568c0b25237d"
+          },
+          "sources": {
+            "rows": 703,
+            "sha256": "41a4ac9d2d84dbc4cd0bd91bfe3627b8a1eed5cd3575b2f195b664ccdceaf0d1"
+          }
+        },
+        "groups": {
+          "provider/total": {
+            "rows": 2,
+            "sha256": "6388b5b4984953439b0b718dadcc2085e7bfdc82e1fc2169fabdfee49b1d8666"
+          },
+          "provider/day": {
+            "rows": 92,
+            "sha256": "6c931c9b39e34e304d75a5315f03ed81b9e66de3203d454c0114b0ec4712f9b0"
+          },
+          "provider/month": {
+            "rows": 7,
+            "sha256": "c7683f379140debd16ac3369343b8d2fbbe318026aa1eebace706d3f28122e7e"
+          },
+          "provider/session": {
+            "rows": 398,
+            "sha256": "a13154bd0f779e82d8d41f18a0fb2dfc0286acef0aa75485a17bafc2f429d405"
+          },
+          "provider/project": {
+            "rows": 3,
+            "sha256": "704002e13782ee1e250e9cfb6833afa8e17fc389bb6b416f1187f1693bd7246d"
+          },
+          "model/total": {
+            "rows": 9,
+            "sha256": "f462cef23a92aeb59be4ef8b96278e240560f389544d53f9e386c57db9379baf"
+          },
+          "model/day": {
+            "rows": 110,
+            "sha256": "52744ea90442b9fb71d8f68a043972b3aaf4ec988496d1fd94b4d3a698ce7552"
+          },
+          "model/month": {
+            "rows": 15,
+            "sha256": "4ea2dfce4c95329cee6c8362a9bf58db4ff971c2527b6053104c3b0d95c7d2a9"
+          },
+          "model/session": {
+            "rows": 402,
+            "sha256": "809d2688cf447ab9597ccde505199a0314d0cc2f8e73d3768aa955776ec1a4e8"
+          },
+          "model/project": {
+            "rows": 10,
+            "sha256": "0dfeddfca430f824104fb01dbc496b804a4d6963dc7464877727ff2169989df5"
+          }
+        }
+      },
+      "checks": {
+        "integrity": true,
+        "foreignKeys": true,
+        "rollupSums": true,
+        "modelSums": true
+      }
+    }
+  },
+  "oracle": {
+    "files": 703,
+    "totals": {
+      "claude": {
+        "input": 9994511,
+        "output": 247006,
+        "tokens": 10241517
+      },
+      "codex": {
+        "input": 3444826635,
+        "output": 16569656,
+        "tokens": 3461396291
+      }
+    },
+    "evidence": {
+      "claudeRawRows": 422,
+      "claudeResponses": 100,
+      "responses": 18101,
+      "copiedRows": 4557,
+      "legacyFiles": 180,
+      "mixedLeading": 10626023,
+      "corroboratedGaps": 384742,
+      "unresolvedGaps": 0
+    }
+  },
+  "differences": {
+    "claude": {
+      "input": {
+        "A": 0,
+        "B": 0
+      },
+      "output": {
+        "A": 0,
+        "B": 0
+      },
+      "tokens": {
+        "A": 0,
+        "B": 0
+      }
+    },
+    "codex": {
+      "input": {
+        "A": 0,
+        "B": 0
+      },
+      "output": {
+        "A": 0,
+        "B": 0
+      },
+      "tokens": {
+        "A": 0,
+        "B": 0
+      }
+    }
+  },
+  "matchesOracle": true,
+  "mismatched": [],
+  "matchesBaseline": true
+}

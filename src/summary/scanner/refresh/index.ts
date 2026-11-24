@@ -10,7 +10,6 @@ import type { RefreshResult, SummaryOptions, SummaryProgress } from '../../types
 import { acquireRefreshLock } from '../lock';
 import { readNames } from '../names';
 import { SourceReaderPool } from '../sourcePool';
-import { collectThreads } from './aggregation';
 import type { RefreshContext } from './context';
 import { discoverSources } from './discovery';
 import { commitComponents, finishScan, recordFailure } from './persistence';
@@ -129,11 +128,11 @@ async function prepareRecentPreview(
 async function prepareAndCommit(
   context: RefreshContext, names: Map<string, string>, committing?: () => void,
 ): Promise<void> {
-  const { scan, check } = context;
+  const { scan, check, state } = context;
   await scan.measureAsync('parseChanged', () => prepareChanged(context));
   await scan.measureAsync('expandRelated', () => expandRelatedSources(context));
   check();
-  const summaries = scan.measure('aggregate', () => collectThreads(context, names));
+  const summaries = scan.measure('aggregate', () => state.aggregation.summarize(state.affected, names, check));
 
   committing?.();
   check();
@@ -160,9 +159,8 @@ function recordInterruptedScan(context: RefreshContext, error: unknown): void {
   result.interrupted = true;
   result.error = errorCode;
   if (!wasCancelled) result.failed++;
-  const prepared = new Set(state.preparedFiles);
   for (const file of state.files.values()) {
-    if (file.settled || file.removed || !file.changed && !prepared.has(file)) continue;
+    if (file.settled || file.removed || !file.changed && !file.prepared) continue;
     file.error = new SummaryError(errorCode);
     recordFailure(context, file);
   }

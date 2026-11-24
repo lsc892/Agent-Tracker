@@ -5,14 +5,12 @@ import type { ThreadLog } from '../../parsers/threadUsage';
 import type { RefreshResult } from '../../types';
 import { sqlText } from '../sourceReader';
 import { addMember, removeMember, SourceQueue } from '../worklist';
+import { ThreadAggregation } from './aggregation';
 
 export const PARSER_VERSION = 25;
 export const sessionKey = (provider: Provider, session: string): string => JSON.stringify([provider, sqlText(session)]);
 
-export interface PreparedSource {
-  thread: ThreadLog;
-  partialLine: boolean;
-}
+type PreparedSource = Pick<ThreadLog, 'sessionId' | 'threadId' | 'parentThreadId'> & { hasLegacy: boolean };
 
 export type StoredSource = FileMetadata & Pick<SourceFileRow, 'id' | 'source_missing' | 'processing_status'>;
 
@@ -49,7 +47,8 @@ export class ScanState {
   readonly affected = new Set<string>();
   readonly links = new Map<string, Set<string>>();
   private readonly sessionFiles = new Map<string, Set<FileState>>();
-  readonly preparedFiles: FileState[] = [];
+  readonly preparedCodexFiles: FileState[] = [];
+  readonly aggregation = new ThreadAggregation();
   readonly relatedQueue = new SourceQueue<FileState>();
   readonly savedSessionNames = new Map<string, string>();
   private indexesEnabled = false;
@@ -117,8 +116,10 @@ export class ScanState {
     this.indexSession(file);
   }
 
-  registerPrepared(file: FileState, prepared: PreparedSource): void {
-    file.prepared = prepared;
-    this.preparedFiles.push(file);
+  registerPrepared(file: FileState, thread: ThreadLog, partialLine: boolean): void {
+    const { sessionId, threadId, parentThreadId, legacy } = thread;
+    this.aggregation.add(file, sessionKey(file.provider, sessionId), thread, partialLine);
+    file.prepared = { sessionId, threadId, parentThreadId, hasLegacy: legacy.length > 0 };
+    if (file.provider === 'codex') this.preparedCodexFiles.push(file);
   }
 }

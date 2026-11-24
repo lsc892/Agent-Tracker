@@ -1,116 +1,176 @@
-// Selects unique response usage and persists one summary per thread.
-import { consumeThread } from '../../aggregation/threadAccounting';
+// Merges prepared response winners and keeps the timeline needed to verify Codex usage.
+import { accumulateThreadUsage, consumeCodexThread, type CodexThreadEvidence, type ThreadUsage } from '../../aggregation/threadAccounting';
 import { usageScore } from '../../aggregation/winners';
 import type { TurnSummaryInput } from '../../db/types';
-import type { ThreadResponse } from '../../parsers/threadUsage';
-import type { RefreshContext } from './context';
-import { isPreparedFile, sessionKey, type PreparedFile } from './state';
+import { responseKey, type ThreadCheckpointInterval, type ThreadLog, type ThreadResponse } from '../../parsers/threadUsage';
+import type { FileState } from './state';
+
+interface SourceOrder {
+  copyOrder?: number;
+}
+
+interface SummarySource {
+  file: FileState;
+  thread: Omit<ThreadLog, 'responses' | 'checkpoints' | 'legacy' | 'leadingLegacyCount' | 'firstResponse'>;
+  partialLine: boolean;
+  hasResponses: boolean;
+  order: SourceOrder;
+  codex?: CodexThreadEvidence;
+}
+
+interface CodexResponses {
+  winners: Map<string, ThreadResponse>;
+  // Used only when copies can compete with the canonical file on an equal score.
+  canonicalKeys?: Set<string>;
+}
 
 interface ThreadCandidate {
-  source: PreparedFile;
-  copies?: PreparedFile[];
+  source: SummarySource;
+  session: string;
+  order: number;
+  codex?: CodexResponses;
 }
 
-export function collectThreads({ state, check }: RefreshContext, names: ReadonlyMap<string, string>): TurnSummaryInput[] {
-  const threads = new Map<string, ThreadCandidate>();
-  const parents = new Map<string, PreparedFile>();
-  for (const file of state.preparedFiles) {
-    check();
-    if (!isPreparedFile(file)) continue;
-    const { sessionId, threadId } = file.prepared.thread;
-    if (file.provider === 'codex') {
-      const parent = parents.get(threadId);
-      if (!parent || preferTimeline(file, parent)) parents.set(threadId, file);
-    }
-    if (!state.affected.has(sessionKey(file.provider, sessionId))) continue;
-    const key = JSON.stringify([file.provider, sessionId, threadId]);
-    const group = threads.get(key);
-    if (!group) threads.set(key, { source: file });
-    else if (preferTimeline(file, group.source)) {
-      (group.copies ??= []).push(group.source);
-      group.source = file;
-    } else {
-      (group.copies ??= []).push(file);
-    }
-  }
-  const claude = selectClaudeResponses(threads.values());
-  const summaries: TurnSummaryInput[] = [];
-  for (const group of threads.values()) {
-    check();
-    const file = group.source;
-    const { thread, partialLine } = file.prepared;
-    const { sessionId, threadId, projectKey, projectName, startedAt, lastAt, parentThreadId } = thread;
-    const parent = parentThreadId && parentThreadId !== threadId ? parents.get(parentThreadId)?.prepared.thread : undefined;
-    const responses = file.provider === 'claude' ? claude.get(group) ?? [] : allResponses(group);
-    const usage = consumeThread(file.provider, thread, responses, parent);
-    if (!usage) continue;
-    const duration = startedAt !== null && lastAt !== null && lastAt > startedAt ? lastAt - startedAt : null;
-    const flags = [partialLine ? 'partial-line' : '',
-      parentThreadId && !parent && thread.records.some(record => record.kind === 'legacy') ? 'missing-fork-parent' : ''].filter(Boolean);
-    summaries.push({
-      provider: file.provider, session_id: sessionId, session_name: names.get(sessionKey(file.provider, sessionId)),
-      root_turn_id: threadId, project_key: projectKey, project_name: projectName,
-      started_at_ms: startedAt, completed_at_ms: lastAt, duration_ms: duration,
-      duration_quality: duration === null ? 'missing' : 'approximate',
-      input_tokens: usage.input, output_tokens: usage.output, total_tokens: usage.input + usage.output,
-      cache_read_input_tokens: usage.cacheRead, cache_write_input_tokens: usage.cacheWrite,
-      // The aggregate storage uses the completed bucket as the denominator for its averages.
-      status: 'completed', quality_flags: flags.join(',') || null,
-      diagnostic_file_id: flags.length ? file.id : null,
-      model_usage: [...usage.models.values()].filter(row => row.model || row.input_tokens || row.output_tokens),
-    });
-  }
-  return summaries;
+interface ClaudeWinner {
+  group: ThreadCandidate;
+  source: SourceOrder;
+  response: ThreadResponse;
 }
 
-function preferTimeline(candidate: PreparedFile, previous: PreparedFile): boolean {
-  const next = candidate.prepared.thread.records, before = previous.prepared.thread.records;
-  const nextHasResponses = next.some(record => record.kind === 'response');
-  const previousHasResponses = before.some(record => record.kind === 'response');
-  if (nextHasResponses !== previousHasResponses) return nextHasResponses;
-  const length = next.length - before.length;
-  if (length) return length > 0;
-  if (candidate.mtime_ms !== previous.mtime_ms) return candidate.mtime_ms > previous.mtime_ms;
-  return candidate.path < previous.path;
-}
+export class ThreadAggregation {
+  private readonly threads = new Map<string, ThreadCandidate>();
+  private readonly parents = new Map<string, SummarySource>();
+  private readonly claude = new Map<string, Map<string | undefined, ClaudeWinner>>();
+  private sourceOrder = 0;
 
-function* allResponses(group: ThreadCandidate): IterableIterator<ThreadResponse> {
-  for (const file of group.copies ?? []) {
-    for (const record of file.prepared.thread.records)
-      if (record.kind === 'response') yield record;
-  }
-  for (const record of group.source.prepared.thread.records)
-    if (record.kind === 'response') yield record;
-}
+  add(file: FileState, session: string, log: ThreadLog, partialLine: boolean): void {
+    const { responses, checkpoints, legacy, leadingLegacyCount, firstResponse, ...thread } = log;
+    const source: SummarySource = { file, thread, partialLine, hasResponses: responses.length > 0, order: {} };
+    const key = JSON.stringify([session, thread.threadId]);
+    const previous = this.threads.get(key);
+    const preferred = !previous || preferTimeline(source, previous.source);
+    const group = previous ?? { source, session, order: this.threads.size,
+      codex: file.provider === 'codex' ? { winners: new Map<string, ThreadResponse>() } : undefined };
+    const order = this.sourceOrder++;
+    if (previous) {
+      if (preferred) {
+        group.source.order.copyOrder = order;
+        group.source = source;
+      } else source.order.copyOrder = order;
+    } else this.threads.set(key, group);
 
-/** Claude can write the same response into more than one transcript in a session. */
-function selectClaudeResponses(groups: IterableIterator<ThreadCandidate>): Map<ThreadCandidate, ThreadResponse[]> {
-  const sources = Array.from(groups).filter(({ source }) => source.provider === 'claude');
-  const requestIds = new Map<string, string | null>();
-  for (const group of sources) {
-    for (const response of allResponses(group)) {
-      if (!response.requestId) continue;
-      const key = JSON.stringify([group.source.prepared.thread.sessionId, response.responseId]);
-      const prior = requestIds.get(key);
-      if (prior === undefined) requestIds.set(key, response.requestId);
-      else if (prior !== response.requestId) requestIds.set(key, null);
+    if (!group.codex) {
+      this.addClaude(group, source.order, responses);
+      return;
+    }
+    const intervals = preferred ? checkpoints.map(interval => ({ ...interval, responseKeys: [] as string[] })) : [];
+    mergeCodexResponses(group.codex, responses, preferred, !!previous, intervals);
+    if (preferred) {
+      source.codex = { checkpoints: intervals, legacy, leadingLegacyCount, firstResponse, responseCount: responses.length };
+      const parent = this.parents.get(thread.threadId);
+      if (!parent || preferTimeline(source, parent)) this.parents.set(thread.threadId, source);
     }
   }
-  const best = new Map<string, { group: ThreadCandidate; response: ThreadResponse; score: number | bigint }>();
-  for (const group of sources) {
-    for (const response of allResponses(group)) {
-      const session = group.source.prepared.thread.sessionId;
-      const request = response.requestId ?? requestIds.get(JSON.stringify([session, response.responseId]));
-      const key = JSON.stringify([session, response.responseId, request ?? null]);
-      const score = usageScore(response), prior = best.get(key);
-      if (!prior || score >= prior.score) best.set(key, { group, response, score });
+
+  summarize(affected: ReadonlySet<string>, names: ReadonlyMap<string, string>, check: () => void): TurnSummaryInput[] {
+    const claude = this.summarizeClaude(affected);
+    const summaries: TurnSummaryInput[] = [];
+    for (const group of this.threads.values()) {
+      check();
+      if (!affected.has(group.session)) continue;
+      const { file, thread, partialLine, codex } = group.source;
+      const { sessionId, threadId, projectKey, projectName, startedAt, lastAt, parentThreadId } = thread;
+      const parent = parentThreadId && parentThreadId !== threadId ? this.parents.get(parentThreadId) : undefined;
+      const usage = codex && group.codex ? consumeCodexThread(codex, group.codex.winners, parent?.codex) : claude.get(group);
+      if (!usage) continue;
+      const duration = startedAt !== null && lastAt !== null && lastAt > startedAt ? lastAt - startedAt : null;
+      const flags = [partialLine ? 'partial-line' : '',
+        parentThreadId && !parent && codex?.legacy.length ? 'missing-fork-parent' : ''].filter(Boolean);
+      summaries.push({
+        provider: file.provider, session_id: sessionId, session_name: names.get(group.session),
+        root_turn_id: threadId, project_key: projectKey, project_name: projectName,
+        started_at_ms: startedAt, completed_at_ms: lastAt, duration_ms: duration,
+        duration_quality: duration === null ? 'missing' : 'approximate',
+        input_tokens: usage.input, output_tokens: usage.output, total_tokens: usage.input + usage.output,
+        cache_read_input_tokens: usage.cacheRead, cache_write_input_tokens: usage.cacheWrite,
+        // The aggregate storage uses the completed bucket as the denominator for its averages.
+        status: 'completed', quality_flags: flags.join(',') || null,
+        diagnostic_file_id: flags.length ? file.id : null,
+        model_usage: [...usage.models.values()].filter(row => row.model || row.input_tokens || row.output_tokens),
+      });
+    }
+    this.threads.clear();
+    this.parents.clear();
+    return summaries;
+  }
+
+  private addClaude(group: ThreadCandidate, source: SourceOrder, responses: readonly ThreadResponse[]): void {
+    for (const response of responses) {
+      const key = JSON.stringify([group.session, response.responseId]);
+      let requests = this.claude.get(key);
+      if (!requests) this.claude.set(key, requests = new Map());
+      const request = response.requestId || undefined;
+      const previous = requests.get(request);
+      const winner = { group, source, response };
+      if (!previous || betterClaude(winner, previous)) requests.set(request, winner);
     }
   }
-  const selected = new Map<ThreadCandidate, ThreadResponse[]>();
-  for (const { group, response } of best.values()) {
-    const records = selected.get(group);
-    if (records) records.push(response);
-    else selected.set(group, [response]);
+
+  private summarizeClaude(affected: ReadonlySet<string>): Map<ThreadCandidate, ThreadUsage> {
+    const usage = new Map<ThreadCandidate, ThreadUsage>();
+    for (const requests of this.claude.values()) {
+      // Resolve an unidentified request only when exactly one known request used this response ID.
+      const anonymous = requests.size === 2 ? requests.get(undefined) : undefined;
+      for (const entry of requests.values()) {
+        if (entry === anonymous) continue;
+        const { group, response } = anonymous && betterClaude(anonymous, entry) ? anonymous : entry;
+        if (affected.has(group.session)) usage.set(group, accumulateThreadUsage(usage.get(group), response.tokens, response.model));
+      }
+    }
+    this.claude.clear();
+    return usage;
   }
-  return selected;
+}
+
+function preferTimeline(candidate: SummarySource, previous: SummarySource): boolean {
+  if (candidate.hasResponses !== previous.hasResponses) return candidate.hasResponses;
+  if (candidate.thread.recordCount !== previous.thread.recordCount) return candidate.thread.recordCount > previous.thread.recordCount;
+  if (candidate.file.mtime_ms !== previous.file.mtime_ms) return candidate.file.mtime_ms > previous.file.mtime_ms;
+  return candidate.file.path < previous.file.path;
+}
+
+function betterClaude(candidate: ClaudeWinner, previous: ClaudeWinner): boolean {
+  const score = usageScore(candidate.response), previousScore = usageScore(previous.response);
+  if (score !== previousScore) return score > previousScore;
+  // Equal usage keeps the last transcript within the original group order. Canonical comes after all copies.
+  if (candidate.group !== previous.group) return candidate.group.order > previous.group.order;
+  if (candidate.source !== previous.source)
+    return (candidate.source.copyOrder ?? Infinity) > (previous.source.copyOrder ?? Infinity);
+  return candidate.response.order > previous.response.order;
+}
+
+function mergeCodexResponses(target: CodexResponses, responses: readonly ThreadResponse[], preferred: boolean,
+  hasPrevious: boolean, intervals: readonly (ThreadCheckpointInterval & { responseKeys: string[] })[]): void {
+  if (hasPrevious) {
+    if (preferred) target.canonicalKeys = new Set();
+    else target.canonicalKeys ??= new Set(target.winners.keys());
+  }
+  const { winners, canonicalKeys } = target;
+  let intervalIndex = 0;
+  for (let responseIndex = 0; responseIndex < responses.length; responseIndex++) {
+    const response = responses[responseIndex];
+    const key = responseKey(response), prior = winners.get(key);
+    for (let interval = intervals[intervalIndex]; interval && interval.start.responseIndex <= responseIndex; interval = intervals[++intervalIndex]) {
+      interval.responseKeys.push(key);
+      // Adjacent intervals share their boundary response.
+      if (interval.end.responseIndex > responseIndex) break;
+    }
+    if (prior) {
+      const score = usageScore(response), previousScore = usageScore(prior);
+      if (score < previousScore || score === previousScore && !preferred && canonicalKeys?.has(key)) continue;
+    }
+    winners.set(key, response);
+    if (preferred) canonicalKeys?.add(key);
+    else canonicalKeys?.delete(key);
+  }
 }

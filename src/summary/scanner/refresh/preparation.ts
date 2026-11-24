@@ -62,7 +62,7 @@ function applyPreparation(context: RefreshContext, file: FileState, preparation:
   const { sessionId, threadId } = thread;
   state.setSession(file, sessionId);
   file.relations = { identity: { sessionId, threadId }, threadUsage: true };
-  state.registerPrepared(file, { thread, partialLine });
+  state.registerPrepared(file, thread, partialLine);
   file.changed = needsSourceRead(file, file.previous);
   if (!file.changed) return;
   state.affect(file.provider, file.session_id);

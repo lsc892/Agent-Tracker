@@ -1,9 +1,13 @@
 // Counts recorded response usage and reconciles gaps supported by independent cumulative records.
-import type { ModelUsageInput, Provider } from '../db/types';
-import type { ThreadLegacy, ThreadLog, ThreadResponse, ThreadTokens } from '../parsers/threadUsage';
-import { usageScore } from './winners';
+import type { ModelUsageInput } from '../db/types';
+import type { ThreadCheckpointInterval, ThreadLegacy, ThreadLog, ThreadResponse, ThreadTokens } from '../parsers/threadUsage';
 
 type ModelUsage = ModelUsageInput & { cache_read_input_tokens: number; cache_write_input_tokens: number };
+
+export type CodexThreadEvidence = Pick<ThreadLog, 'legacy' | 'leadingLegacyCount' | 'firstResponse'> & {
+  responseCount: number;
+  checkpoints: readonly (ThreadCheckpointInterval & { responseKeys: readonly string[] })[];
+};
 
 export interface ThreadUsage extends ThreadTokens {
   models: Map<string, ModelUsage>;
@@ -20,7 +24,7 @@ function increase(total: ThreadTokens, previous: ThreadTokens): ThreadTokens {
     cacheRead: Math.max(0, total.cacheRead - previous.cacheRead), cacheWrite: Math.max(0, total.cacheWrite - previous.cacheWrite) };
 }
 
-function accumulate(usage: ThreadUsage | undefined, tokens: ThreadTokens, model: string): ThreadUsage {
+export function accumulateThreadUsage(usage: ThreadUsage | undefined, tokens: ThreadTokens, model: string): ThreadUsage {
   const result = usage ?? { ...emptyTokens(), models: new Map<string, ModelUsage>() };
   const read = Math.min(tokens.input, tokens.cacheRead);
   const write = Math.min(tokens.input - read, tokens.cacheWrite);
@@ -40,19 +44,12 @@ function accumulate(usage: ThreadUsage | undefined, tokens: ThreadTokens, model:
   return result;
 }
 
-function* legacyRows(source: ThreadLog | undefined): IterableIterator<ThreadLegacy> {
-  for (const row of source?.records ?? []) if (row.kind === 'legacy') yield row;
-}
-
 /** A fork can repeat the parent's records with new file timestamps. */
-function copiedPrefix(source: ThreadLog, parent: ThreadLog | undefined): number {
-  if (!parent || source === parent) return 0;
-  const ancestor = legacyRows(parent);
+function copiedPrefix(legacy: readonly ThreadLegacy[], parent: readonly ThreadLegacy[] | undefined): number {
+  if (!parent || legacy === parent) return 0;
+  const limit = Math.min(legacy.length, parent.length);
   let copied = 0;
-  for (const row of legacyRows(source)) {
-    if (row.signature !== ancestor.next().value?.signature) break;
-    copied++;
-  }
+  while (copied < limit && legacy[copied].signature === parent[copied].signature) copied++;
   return copied;
 }
 
@@ -86,23 +83,22 @@ function legacyIncrease(row: ThreadLegacy, state: LegacyPosition): ThreadTokens 
   return positive(delta) ? delta : undefined;
 }
 
-function leadingLegacyUsage(source: ThreadLog, historical: number): ThreadUsage | undefined {
-  const first = source.records.find((row): row is ThreadResponse => row.kind === 'response');
+function leadingLegacyUsage({ legacy, leadingLegacyCount, firstResponse }: CodexThreadEvidence, historical: number): ThreadUsage | undefined {
+  if (leadingLegacyCount <= historical) return;
   const state: LegacyPosition = { seen: new Set() };
-  let index = 0;
   let usage: ThreadUsage | undefined;
-  for (const row of source.records) {
-    if (row.kind === 'response') break;
+  for (let index = 0; index < leadingLegacyCount; index++) {
+    const row = legacy[index];
     const delta = legacyIncrease(row, state);
-    if (index++ < historical || !delta) continue;
+    if (index < historical || !delta) continue;
     // Some logs emit a legacy snapshot for the first response before its identified usage record.
-    if (row.total && first?.threadTotal && sameUsage(row.total, first.threadTotal) && sameUsage(delta, first.tokens)) continue;
-    usage = accumulate(usage, delta, row.model);
+    if (row.total && firstResponse?.threadTotal && sameUsage(row.total, firstResponse.threadTotal)
+      && sameUsage(delta, firstResponse.tokens)) continue;
+    usage = accumulateThreadUsage(usage, delta, row.model);
   }
   return usage;
 }
 
-const responseKey = (row: ThreadResponse): string => JSON.stringify([row.turnId, row.responseId]);
 const checkpointKey = (tokens: ThreadTokens): string => `${tokens.input}:${tokens.output}`;
 
 interface CheckpointGap {
@@ -113,41 +109,36 @@ interface CheckpointGap {
   verified: boolean;
 }
 
-/** Compare only intervals that begin with an observed checkpoint. */
-function findCheckpointGaps(source: ThreadLog, winners: ReadonlyMap<string, ThreadResponse>): CheckpointGap[] {
-  const seen = new Set<string>();
+/** Sum final winners in each disjoint interval between observed checkpoints. */
+function findCheckpointGaps({ checkpoints, responseCount }: CodexThreadEvidence,
+  winners: ReadonlyMap<string, ThreadResponse>): CheckpointGap[] {
+  // Responses supplied by another file can already account for a gap in this file.
+  if (!checkpoints.length || responseCount !== winners.size) return [];
   const gaps: CheckpointGap[] = [];
   const explicit = emptyTokens();
-  let previous: ThreadResponse | undefined;
-  let turnChanged = false;
-  for (const row of source.records) {
-    if (row.kind !== 'response') continue;
-    const key = responseKey(row), winner = winners.get(key);
-    if (!winner || seen.has(key)) continue;
-    seen.add(key);
-    for (const component of components) explicit[component] += winner.tokens[component];
-    turnChanged ||= previous?.turnId !== row.turnId;
-    if (!row.threadTotal) continue;
-    const before = previous?.threadTotal;
-    if (before && !regressed(row.threadTotal, before)) {
-      const delta = increase(row.threadTotal, before);
-      const tokens = increase(delta, explicit);
-      if (positive(tokens) && !regressed(delta, explicit)) {
-        const priorTurn = previous?.turnTotal;
-        const verified = !turnChanged && !!row.turnId && !!priorTurn && !!row.turnTotal
-          && !regressed(row.turnTotal, priorTurn) && sameUsage(delta, increase(row.turnTotal, priorTurn));
-        gaps.push({ model: previous?.model === row.model ? row.model : '', tokens, before, after: row.threadTotal, verified });
-      }
-    }
-    previous = row;
-    turnChanged = false;
+  for (const { start, end, responseKeys } of checkpoints) {
+    const before = start.threadTotal, after = end.threadTotal;
+    const startTurn = winners.get(responseKeys[0])?.turnId;
+    let sameTurn = !!startTurn;
     for (const component of components) explicit[component] = 0;
+    for (let position = 1; position < responseKeys.length; position++) {
+      const winner = winners.get(responseKeys[position]);
+      if (!winner) return [];
+      sameTurn &&= winner.turnId === startTurn;
+      for (const component of components) explicit[component] += winner.tokens[component];
+    }
+    const delta = increase(after, before);
+    if (regressed(delta, explicit)) continue;
+    const tokens = increase(delta, explicit);
+    if (!positive(tokens)) continue;
+    const verified = sameTurn && !!start.turnTotal && !!end.turnTotal && !regressed(end.turnTotal, start.turnTotal)
+      && sameUsage(delta, increase(end.turnTotal, start.turnTotal));
+    gaps.push({ model: start.model === end.model ? end.model : '', tokens, before, after, verified });
   }
-  // Responses supplied by another file can already account for a gap in this file.
-  return seen.size === winners.size ? gaps : [];
+  return gaps;
 }
 
-function corroborateGaps(source: ThreadLog, historical: number, gaps: readonly CheckpointGap[]): void {
+function corroborateGaps(legacy: readonly ThreadLegacy[], historical: number, gaps: readonly CheckpointGap[]): void {
   if (gaps.every(gap => gap.verified)) return;
   const openings = new Map<string, CheckpointGap>();
   const closings = new Map<string, CheckpointGap>();
@@ -157,13 +148,13 @@ function corroborateGaps(source: ThreadLog, historical: number, gaps: readonly C
     closings.set(checkpointKey(gap.after), gap);
   }
   const open = new Set<CheckpointGap>();
-  let index = 0;
   let previous: ThreadTokens | undefined;
-  for (const row of legacyRows(source)) {
-    if (index++ < historical || !row.total) continue;
-    if (previous && regressed(row.total, previous)) open.clear();
-    previous = row.total;
-    const key = checkpointKey(row.total);
+  for (let index = historical; index < legacy.length; index++) {
+    const total = legacy[index].total;
+    if (!total) continue;
+    if (previous && regressed(total, previous)) open.clear();
+    previous = total;
+    const key = checkpointKey(total);
     const closing = closings.get(key);
     if (closing && open.delete(closing)) closing.verified = true;
     const opening = openings.get(key);
@@ -171,23 +162,14 @@ function corroborateGaps(source: ThreadLog, historical: number, gaps: readonly C
   }
 }
 
-export function consumeThread(provider: Provider, source: ThreadLog, records: Iterable<ThreadResponse>, parent?: ThreadLog): ThreadUsage | undefined {
-  let usage: ThreadUsage | undefined;
-  if (provider === 'claude') {
-    for (const row of records) usage = accumulate(usage, row.tokens, row.model);
-    return usage;
-  }
-  const historical = copiedPrefix(source, parent);
-  usage = leadingLegacyUsage(source, historical);
-  const winners = new Map<string, ThreadResponse>();
-  for (const row of records) {
-    const key = responseKey(row), previous = winners.get(key);
-    if (!previous || usageScore(row) >= usageScore(previous)) winners.set(key, row);
-  }
+export function consumeCodexThread(source: CodexThreadEvidence, winners: ReadonlyMap<string, ThreadResponse>,
+  parent?: Pick<ThreadLog, 'legacy'>): ThreadUsage | undefined {
+  const historical = copiedPrefix(source.legacy, parent?.legacy);
+  let usage = leadingLegacyUsage(source, historical);
   if (!winners.size) return usage;
-  for (const row of winners.values()) usage = accumulate(usage, row.tokens, row.model);
+  for (const row of winners.values()) usage = accumulateThreadUsage(usage, row.tokens, row.model);
   const gaps = findCheckpointGaps(source, winners);
-  corroborateGaps(source, historical, gaps);
-  for (const gap of gaps) if (gap.verified) usage = accumulate(usage, gap.tokens, gap.model);
+  corroborateGaps(source.legacy, historical, gaps);
+  for (const gap of gaps) if (gap.verified) usage = accumulateThreadUsage(usage, gap.tokens, gap.model);
   return usage;
 }

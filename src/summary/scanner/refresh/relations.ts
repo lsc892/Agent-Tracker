@@ -34,12 +34,12 @@ function takeRelatedSource(context: RefreshContext): FileState | undefined {
 
 function pendingParents({ state }: RefreshContext, lookedUp: Set<string>): Set<string> {
   const alreadyRead = new Set<string>(), needed = new Set<string>();
-  for (const file of state.preparedFiles) {
-    if (file.provider !== 'codex' || !isPreparedFile(file)) continue;
-    const { threadId, parentThreadId, sessionId, records } = file.prepared.thread;
+  for (const file of state.preparedCodexFiles) {
+    if (!isPreparedFile(file)) continue;
+    const { threadId, parentThreadId, sessionId, hasLegacy } = file.prepared;
     alreadyRead.add(threadId);
     if (parentThreadId && parentThreadId !== threadId && !lookedUp.has(parentThreadId)
-      && state.affected.has(sessionKey(file.provider, sessionId)) && records.some(record => record.kind === 'legacy')) {
+      && hasLegacy && state.affected.has(sessionKey(file.provider, sessionId))) {
       needed.add(parentThreadId);
     }
   }

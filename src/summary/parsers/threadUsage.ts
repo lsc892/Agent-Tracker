@@ -1,5 +1,6 @@
-// A transcript contributes only usage records and the fields needed to identify its thread.
+// Selects file-local response winners while preserving ordered Codex accounting evidence.
 import { basename, dirname, sep } from 'node:path';
+import { usageScore } from '../aggregation/winners';
 import type { Provider } from '../db/types';
 import { SummaryError } from '../jsonl';
 import { hasJsonFields, type JsonFields, type JsonShape } from '../jsonl/projection';
@@ -31,18 +32,27 @@ export const threadFields: Record<Provider, JsonShape> = {
 export type ThreadTokens = Pick<TokenVector, 'input' | 'output' | 'cacheRead' | 'cacheWrite'>;
 
 export interface ThreadResponse {
-  kind: 'response';
   responseId: string;
   requestId?: string;
   turnId?: string;
   tokens: ThreadTokens;
   model: string;
-  threadTotal?: ThreadTokens;
+  order: number;
+}
+
+export interface ThreadCheckpoint {
+  responseIndex: number;
+  model: string;
+  threadTotal: ThreadTokens;
   turnTotal?: ThreadTokens;
 }
 
+export interface ThreadCheckpointInterval {
+  start: ThreadCheckpoint;
+  end: ThreadCheckpoint;
+}
+
 export interface ThreadLegacy {
-  kind: 'legacy';
   total?: ThreadTokens;
   last?: ThreadTokens;
   signature: string;
@@ -60,8 +70,15 @@ export interface ThreadLog extends ThreadIdentity {
   startedAt: number | null;
   lastAt: number | null;
   parentThreadId?: string;
-  records: (ThreadResponse | ThreadLegacy)[];
+  recordCount: number;
+  responses: ThreadResponse[];
+  checkpoints: ThreadCheckpointInterval[];
+  legacy: ThreadLegacy[];
+  leadingLegacyCount: number;
+  firstResponse?: { tokens: ThreadTokens; threadTotal?: ThreadTokens };
 }
+
+export const responseKey = (row: Pick<ThreadResponse, 'turnId' | 'responseId'>): string => JSON.stringify([row.turnId, row.responseId]);
 
 function identifier(value: unknown): string | undefined {
   const id = string(value);
@@ -98,7 +115,15 @@ export class ThreadLogParser {
   private startedAt: number | null = null;
   private lastAt: number | null = null;
   private model?: string;
-  private readonly records: (ThreadResponse | ThreadLegacy)[] = [];
+  private recordCount = 0;
+  private readonly responseIndices = new Map<string, number>();
+  private readonly responses: ThreadResponse[] = [];
+  private readonly checkpoints: ThreadCheckpointInterval[] = [];
+  private previousCheckpoint?: ThreadCheckpoint;
+  private intervalUsage = 0;
+  private readonly legacy: ThreadLegacy[] = [];
+  private leadingLegacyCount = 0;
+  private firstResponse?: ThreadLog['firstResponse'];
 
   constructor(private readonly provider: Provider, path: string, sourceRoot: string) {
     const parts = path.split(/[\\/]/);
@@ -125,7 +150,9 @@ export class ThreadLogParser {
     const identity = this.identity();
     if (!identity || !this.recognized) throw new SummaryError('unsupported-schema');
     return { ...identity, ...this.project, startedAt: this.startedAt, lastAt: this.lastAt,
-      parentThreadId: this.forkedFromId ?? this.parentThreadId, records: this.records };
+      parentThreadId: this.forkedFromId ?? this.parentThreadId, recordCount: this.recordCount,
+      responses: this.responses, checkpoints: this.checkpoints, legacy: this.legacy,
+      leadingLegacyCount: this.leadingLegacyCount, firstResponse: this.firstResponse };
   }
 
   private observeTime(value: number | null): void {
@@ -150,8 +177,9 @@ export class ThreadLogParser {
     if ((model === '<synthetic>' || row.isApiErrorMessage === true) && tokens.input + tokens.output === 0) return;
     const responseId = identifier(message.id);
     if (!responseId) throw new SummaryError('missing-response-id', offset);
-    this.records.push({ kind: 'response', responseId, requestId: identifier(row.requestId), tokens: tokenVector(tokens),
-      model: model === '<synthetic>' ? '' : sqlText(model ?? '') });
+    const requestId = identifier(row.requestId);
+    this.keepResponse(JSON.stringify([responseId, requestId]), { responseId, requestId, tokens: tokenVector(tokens),
+      model: model === '<synthetic>' ? '' : sqlText(model ?? ''), order: this.recordCount++ });
   }
 
   private codex(row: Record<string, unknown>, offset: number): void {
@@ -195,13 +223,48 @@ export class ThreadLogParser {
     return sqlText(displayName(payload.model) ?? this.model ?? '');
   }
 
+  /** Replacements keep their first appearance index and carry the winning row's order. */
+  private keepResponse(key: string, candidate: ThreadResponse): number | undefined {
+    const index = this.responseIndices.get(key);
+    if (index !== undefined) {
+      if (usageScore(candidate) >= usageScore(this.responses[index])) this.responses[index] = candidate;
+      return;
+    }
+    const next = this.responses.length;
+    this.responseIndices.set(key, next);
+    this.responses.push(candidate);
+    return next;
+  }
+
   private recordResponse(payload: Record<string, unknown>, offset: number): void {
     const responseId = identifier(payload.response_id);
     if (!responseId) throw new SummaryError('missing-response-id', offset);
     if (!this.turnId) throw new SummaryError('missing-root-turn', offset);
-    this.records.push({ kind: 'response', responseId, turnId: this.turnId, model: this.codexModel(payload),
-      tokens: tokenVector(codexTokens(object(payload.usage))), threadTotal: optionalCheckpoint(payload.thread_token_usage),
+    const candidate = { responseId, turnId: this.turnId, model: this.codexModel(payload),
+      tokens: tokenVector(codexTokens(object(payload.usage))), order: this.recordCount++ };
+    const responseIndex = this.keepResponse(responseKey(candidate), candidate);
+    if (responseIndex === undefined) return;
+    this.intervalUsage += candidate.tokens.input + candidate.tokens.output;
+    const threadTotal = optionalCheckpoint(payload.thread_token_usage);
+    if (!threadTotal) return;
+    if (responseIndex === 0 && this.leadingLegacyCount) this.firstResponse = { tokens: candidate.tokens, threadTotal };
+    this.recordCheckpoint({ responseIndex, model: candidate.model, threadTotal,
       turnTotal: optionalCheckpoint(payload.turn_token_usage) });
+  }
+
+  private recordCheckpoint(end: ThreadCheckpoint): void {
+    const start = this.previousCheckpoint;
+    const usage = this.intervalUsage;
+    this.previousCheckpoint = end;
+    this.intervalUsage = 0;
+    if (!start) return;
+    const input = end.threadTotal.input - start.threadTotal.input;
+    const output = end.threadTotal.output - start.threadTotal.output;
+    if (input < 0 || output < 0) return;
+    const increase = input + output;
+    // Final response winners can only raise the input-plus-output sum for the interval.
+    if (Number.isSafeInteger(increase) && Number.isSafeInteger(usage) && increase <= usage) return;
+    this.checkpoints.push({ start, end });
   }
 
   private recordLegacy(info: Record<string, unknown>, model: string): void {
@@ -211,6 +274,8 @@ export class ThreadLogParser {
     if (!total && !last) return;
     // Timestamps can change when the same legacy prefix is written to a fork's file.
     const signature = JSON.stringify([this.turnId ?? null, checkpointSignature(total, rawTotal), checkpointSignature(last, rawLast)]);
-    this.records.push({ kind: 'legacy', signature, model, total: total && tokenVector(total), last: last && tokenVector(last) });
+    this.recordCount++;
+    if (!this.responses.length) this.leadingLegacyCount++;
+    this.legacy.push({ signature, model, total: total && tokenVector(total), last: last && tokenVector(last) });
   }
 }
