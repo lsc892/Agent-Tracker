@@ -53,21 +53,21 @@ function loadStoredPaths(database: SummaryDatabase): DiscoveryPaths {
 }
 
 function recordObservation(context: RefreshContext, paths: DiscoveryPaths, observation: Observation): void {
-  const { state, result, collect, report } = context;
+  const { state, result, report } = context;
   const { provider, path } = observation;
   const key = sessionKey(provider, path);
   const entry = paths.byPath.get(key) ?? {};
   const { observed, previous } = entry;
-  const changed = needsSourceRead(observation, previous, collect);
+  const changed = needsSourceRead(observation, previous);
   if (observed) {
     // Overlapping roots share one file ID and the last root supplies its metadata.
     result.reused += Number(observed.changed) - Number(changed);
     Object.assign(observed, observation);
     observed.changed = changed;
   } else {
-    const file: FileState = { ...observation, changed, id: previous?.id ?? paths.nextId++, discoveryOrder: state.files.size, previous,
+    const file: FileState = { ...observation, changed, id: previous?.id ?? paths.nextId++, previous,
       session_id: previous?.session_id ?? null, selected: true, removed: false, parser_version: PARSER_VERSION,
-      capabilities_collected: collect ? 1 : 0 };
+      capabilities_collected: 0 };
     entry.observed = file;
     paths.byPath.set(key, entry);
     state.trackFile(file);
@@ -85,7 +85,7 @@ function registerUnseenSources(context: RefreshContext, stored: Iterable<SourceP
     if (observed || !previous) continue;
     const selected = selectedRoots.has(sessionKey(previous.provider, previous.source_root));
     const changed = selected && (!previous.source_missing || !retain);
-    const file: FileState = { ...previous, discoveryOrder: state.files.size, previous, changed,
+    const file: FileState = { ...previous, previous, changed,
       removed: selected, selected };
     state.trackFile(file);
     if (changed && file.session_id) {

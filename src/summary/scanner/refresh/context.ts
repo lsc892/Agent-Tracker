@@ -14,7 +14,6 @@ export interface RefreshContext {
   readonly sourcePool: SourceReaderPool;
   readonly persistAppliedResponses: boolean;
   readonly roots: readonly SourceRoot[];
-  readonly collect: boolean;
   readonly retain: boolean;
   readonly cancelled: () => boolean;
   readonly check: () => void;

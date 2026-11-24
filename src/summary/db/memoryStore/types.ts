@@ -12,6 +12,7 @@ export interface MemoryReplacement {
   removedFileIds?: Iterable<number>;
   preserveCapabilities?: boolean;
   retainDeletedSourceUsage?: boolean;
+  threadUsage?: boolean;
 }
 
 /** COMMIT한 이름만 스캔 마무리의 중복 이름 갱신 생략에 사용한다. */

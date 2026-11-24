@@ -4,6 +4,7 @@ import type { FileMetadata } from '../db/types';
 import { readJsonl, SummaryError } from '../jsonl';
 import type { JsonShape } from '../jsonl/projection';
 import { sqlText } from '../parsers/common';
+import { ThreadLogParser, threadFields, type ThreadIdentity, type ThreadLog } from '../parsers/threadUsage';
 import type { ParseEvent, ParsedIdentity, SummaryOptions } from '../types';
 
 export type SourceReadFile = Pick<FileMetadata, 'provider' | 'path' | 'source_root' | 'size_bytes' | 'mtime_ms'> & { id: number };
@@ -33,7 +34,7 @@ interface ReadOptions {
 }
 
 async function readSourceRows(file: SourceReadFile, onRow: (row: Record<string, unknown>, offset: number) => void,
-  fields: { shape: JsonShape }, options: Pick<ReadOptions, 'signal' | 'cancelled' | 'maxLineBytes' | 'onBytes'>):
+  fields: { shape: JsonShape } | { fixedShape: JsonShape }, options: Pick<ReadOptions, 'signal' | 'cancelled' | 'maxLineBytes' | 'onBytes'>):
   Promise<Pick<SourceRead, 'rows' | 'partialLine'>> {
   const { rows, partialLine } = await readJsonl(file.path, file.size_bytes, onRow, {
     signal: options.signal, isCancelled: options.cancelled, maxLineBytes: options.maxLineBytes,
@@ -45,7 +46,28 @@ async function readSourceRows(file: SourceReadFile, onRow: (row: Record<string, 
   return { rows, partialLine };
 }
 
-/** 고정 byte 경계의 단일 읽기로 파싱 이벤트를 전달한다. */
+export interface ThreadSourceRead {
+  partialLine: boolean;
+  thread?: ThreadLog;
+}
+
+export async function readThreadSource(file: SourceReadFile, options: Pick<ReadOptions,
+  'signal' | 'cancelled' | 'maxLineBytes' | 'onBytes'> & { onIdentity: (value: ThreadIdentity) => void }): Promise<ThreadSourceRead> {
+  const parser = new ThreadLogParser(file.provider, file.path, file.source_root);
+  try {
+    const { rows, partialLine } = await readSourceRows(file, (row, offset) => parser.row(row, offset), { fixedShape: threadFields[file.provider] }, options);
+    if (!rows) return { partialLine };
+    const { sessionId, threadId, projectKey, projectName, ...usage } = parser.finish();
+    return { partialLine, thread: { ...usage, sessionId: sqlText(sessionId), threadId: sqlText(threadId),
+      projectKey: sqlText(projectKey), projectName: sqlText(projectName) } };
+  } catch (error) {
+    const identity = parser.identity();
+    if (identity) options.onIdentity({ sessionId: sqlText(identity.sessionId), threadId: sqlText(identity.threadId) });
+    throw error;
+  }
+}
+
+/** 기존 응답별 파서를 쓰는 진단 도구에 파싱 이벤트를 전달한다. */
 export async function readSource(
   file: SourceReadFile,
   event: (value: ParseEvent, index: number) => void,

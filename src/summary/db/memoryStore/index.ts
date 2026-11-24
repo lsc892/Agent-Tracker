@@ -1,6 +1,6 @@
 // 메모리에서 완성한 요청 snapshot을 비교해 달라진 영속 행만 원자적으로 반영한다.
 import type { SQLInputValue } from 'node:sqlite';
-import { serialize } from 'node:v8';
+import { deserialize, serialize } from 'node:v8';
 import type { SqliteSession } from '../connection';
 import type { SessionBillingStore } from '../billing';
 import type { AppliedResponseStore } from '../appliedResponses';
@@ -23,7 +23,7 @@ interface BatchReplacement extends MemoryReplacement {
 }
 
 type ReplacementSessions = Map<string, SessionRef>;
-type SourceSession = { provider: Provider; session_id: string | null };
+type SourceSession = { provider: Provider; session_id: string | null; relation_meta?: Uint8Array | null };
 type RemovedSources = Map<number, SourceSession>;
 
 interface RetainedUsage {
@@ -63,8 +63,9 @@ const UPSERT_SUMMARY = `INSERT INTO turn_summary(${SUMMARY_COLUMNS.join(',')})
 
 function relationBlob(relations: SourceRelationMetadata | null | undefined): Buffer | null {
   if (!relations) return null;
+  if (relations.threadUsage) return serialize(relations);
   const { sessionId, threadId, parentThreadId, isMain, agentPath, rootlessSubagent, forkedFromId } = relations.identity;
-  const identity: SourceRelationMetadata['identity'] = { sessionId, threadId, parentThreadId, isMain };
+  const identity: typeof relations.identity = { sessionId, threadId, parentThreadId, isMain };
   if (agentPath !== undefined) identity.agentPath = agentPath;
   if (rootlessSubagent !== undefined) identity.rootlessSubagent = rootlessSubagent;
   if (forkedFromId !== undefined) identity.forkedFromId = forkedFromId;
@@ -132,7 +133,6 @@ export class MemoryStore {
     const now = new Date().toISOString();
     const sessions = new Map(Array.from(replacement.sessions, session => [sessionKey(session.provider, session.session_id), session]));
     const removed = this.collectRemovedSources(replacement.removedFileIds ?? [], sessions);
-    const retained = this.collectRetainedUsage(replacement.retainDeletedSourceUsage, removed);
     if (replacement.reconcileAppliedResponses) {
       const scope = [...sessions.values()];
       const usage = planAppliedUsage([...replacement.summaries], replacement.appliedResponses ?? [],
@@ -141,6 +141,7 @@ export class MemoryStore {
     }
     this.profile.record('prepare', prepareStarted);
     const next = this.profile.measure('indexSummaries', () => this.indexSummaries(replacement.summaries, sessions));
+    const retained = this.collectRetainedUsage(replacement.retainDeletedSourceUsage, removed, replacement.threadUsage ? next : undefined);
     return { replacement, sessions, next, removed, retained, now };
   }
 
@@ -182,7 +183,7 @@ export class MemoryStore {
   private collectRemovedSources(ids: Iterable<number>, sessions: ReplacementSessions): RemovedSources {
     const removed: RemovedSources = new Map();
     for (const id of ids) {
-      const file = this.database.statement('SELECT provider,session_id FROM source_file WHERE id=?')
+      const file = this.database.statement('SELECT provider,session_id,relation_meta FROM source_file WHERE id=?')
         .get(id) as SourceSession | undefined;
       if (!file) continue;
       this.requireSession(file.provider, file.session_id, sessions);
@@ -192,19 +193,25 @@ export class MemoryStore {
   }
 
   /** 삭제 보존이 켜진 누락 원본에서 유효 사용량이 있는 요청·root·세션 키를 수집한다. */
-  private collectRetainedUsage(enabled: boolean | undefined, removed: RemovedSources): RetainedUsage {
+  private collectRetainedUsage(enabled: boolean | undefined, removed: RemovedSources,
+    liveThreads?: ReadonlyMap<string, TurnSummaryInput>): RetainedUsage {
     const retained: RetainedUsage = { turnIds: new Set(), roots: new Set(), sessions: new Set() };
-    if (!enabled) return retained;
-    const checkedSessions = new Set<string>();
+    if (!enabled || !removed.size) return retained;
+    const checked = new Set<string>();
+    const liveSessions = liveThreads && new Set(Array.from(liveThreads.values(), row => sessionKey(row.provider, row.session_id)));
     for (const file of removed.values()) {
       if (file.session_id === null) continue;
       const key = sessionKey(file.provider, file.session_id);
-      if (checkedSessions.has(key)) continue;
-      checkedSessions.add(key);
+      const relation = liveThreads && file.relation_meta && deserialize(file.relation_meta) as SourceRelationMetadata;
+      const threadId = relation && relation.threadUsage ? relation.identity.threadId : null;
+      const retentionKey = threadId === null ? key : rootKey(file.provider, file.session_id, threadId);
+      if (checked.has(retentionKey) || liveThreads?.has(retentionKey) || threadId === null && liveSessions?.has(key)) continue;
+      checked.add(retentionKey);
       const requests = this.database.statement(`SELECT t.id,t.root_turn_id FROM turn_summary t WHERE t.provider=? AND t.session_id=?
+        AND (? IS NULL OR t.root_turn_id=?)
         AND trim(t.session_id)<>'' AND trim(t.root_turn_id)<>'' AND t.total_tokens>0
         AND EXISTS(SELECT 1 FROM turn_model_usage u WHERE u.turn_id=t.id AND trim(u.model)<>'' AND u.input_tokens+u.output_tokens>0)`)
-        .all(file.provider, file.session_id) as { id: number; root_turn_id: string }[];
+        .all(file.provider, file.session_id, threadId, threadId) as { id: number; root_turn_id: string }[];
       for (const row of requests) {
         retained.turnIds.add(row.id);
         retained.roots.add(rootKey(file.provider, file.session_id, row.root_turn_id));

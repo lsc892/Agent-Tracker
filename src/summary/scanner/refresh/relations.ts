@@ -1,21 +1,23 @@
-// 관련 원본을 읽고 부모 세션·요청의 귀속을 확정한다.
-import { groupParents } from '../../aggregation/parentGroups';
-import { SummaryError } from '../../jsonl';
+// Loads changed-session candidates and any parent timeline needed to verify copied history.
 import type { RefreshContext } from './context';
 import { inspectBatch, inspectSource } from './preparation';
-import { sessionKey, type FileState, type PreparedFile, type ScanState } from './state';
+import { isPreparedFile, sessionKey, type FileState } from './state';
 
 export async function expandRelatedSources(context: RefreshContext): Promise<void> {
-  while (true) {
-    resolveLineage(context.state);
-    const parents = takeParentSources(context);
-    if (parents.length) {
-      await inspectBatch(context, parents);
-      continue;
+  const lookedUp = new Set<string>();
+  let storedThreads: Map<string, FileState[]> | undefined;
+  for (;;) {
+    let next: FileState | undefined;
+    while ((next = takeRelatedSource(context))) await inspectSource(context, next);
+    const needed = pendingParents(context, lookedUp);
+    if (!needed.size) return;
+    storedThreads ??= indexAvailableCodexThreads(context);
+    const parents = new Set<FileState>();
+    for (const id of needed) {
+      for (const file of storedThreads.get(id) ?? []) if (context.state.ready(file)) parents.add(file);
     }
-    const next = takeRelatedSource(context);
-    if (!next) return;
-    await inspectSource(context, next);
+    if (!parents.size) return;
+    await inspectBatch(context, [...parents]);
   }
 }
 
@@ -30,79 +32,34 @@ function takeRelatedSource(context: RefreshContext): FileState | undefined {
   return undefined;
 }
 
-function resolveLineage(state: ScanState): void {
-  if (!state.lineageDirty) return;
-  state.lineageDirty = false;
-  state.missingParents.clear();
-  const candidates = state.preparedCodexFiles();
-  const { groups, unresolved } = groupParents(candidates.map(file => ({ id: file.prepared.identity.threadId,
-    parentId: file.prepared.identity.parentThreadId, value: file })));
-  const sessions = new Map<string, string | null>();
-  for (const file of candidates) {
-    const identity = file.prepared.identity, group = groups.get(identity.threadId)!;
-    if (!sessions.has(group.rootId)) {
-      const targets = new Set(group.members.get(group.rootId)!.map(parent => parent.prepared.identity.sessionId));
-      sessions.set(group.rootId, targets.size === 1 ? targets.values().next().value! : null);
-    }
-    const target = sessions.get(group.rootId)!;
-    const resolved = !unresolved.has(identity.threadId) && target !== null;
-    if (!resolved)
-      state.missingParents.add(file.id);
-    const session = resolved ? target : identity.sessionId;
-    if (file.session_id !== session) {
-      state.connect(file.provider, file.session_id, session);
-      state.setSession(file, session);
+function pendingParents({ state }: RefreshContext, lookedUp: Set<string>): Set<string> {
+  const alreadyRead = new Set<string>(), needed = new Set<string>();
+  for (const file of state.preparedFiles) {
+    if (file.provider !== 'codex' || !isPreparedFile(file)) continue;
+    const { threadId, parentThreadId, sessionId, records } = file.prepared.thread;
+    alreadyRead.add(threadId);
+    if (parentThreadId && parentThreadId !== threadId && !lookedUp.has(parentThreadId)
+      && state.affected.has(sessionKey(file.provider, sessionId)) && records.some(record => record.kind === 'legacy')) {
+      needed.add(parentThreadId);
     }
   }
+  for (const id of needed) {
+    lookedUp.add(id);
+    if (alreadyRead.has(id)) needed.delete(id);
+  }
+  return needed;
 }
 
-function takeParentSources({ state, database }: RefreshContext): FileState[] {
-  if (!state.pendingReferences.size) return [];
-  const references = [...state.pendingReferences];
-  state.pendingReferences.clear();
-  return state.codexFiles.filter(file => {
-    if (!state.ready(file)) return false;
-    if (references.some(reference => file.path.includes(reference))) return true;
-    if (!file.previous) return false;
-    if (file.storedThreadId === undefined) file.storedThreadId = database.sourceRelations(file.id)?.identity.threadId ?? null;
-    return file.storedThreadId !== null && references.includes(file.storedThreadId);
-  }).sort((a, b) => a.id - b.id);
-}
-
-/** 자식 자체 요청 행 대신 검증된 생성 호출의 부모 요청에 사용량을 붙인다. */
-export function resolveParentRequests(context: RefreshContext): void {
-  const state = context.state;
-  const sources = state.preparedCodexFiles();
-  const threads = new Map<string, PreparedFile[]>();
-  for (const file of sources) {
-    const id = file.prepared.identity.threadId, previous = threads.get(id);
-    if (previous) previous.push(file); else threads.set(id, [file]);
+function indexAvailableCodexThreads({ database, state, check }: RefreshContext): Map<string, FileState[]> {
+  const threads = new Map<string, FileState[]>();
+  for (const file of state.files.values()) {
+    check();
+    if (file.provider !== 'codex' || !state.ready(file) || !file.previous) continue;
+    const id = database.sourceRelations(file.id)?.identity.threadId;
+    if (!id) continue;
+    const candidates = threads.get(id);
+    if (candidates) candidates.push(file);
+    else threads.set(id, [file]);
   }
-  const memo = new Map<number, string | null>(), visiting = new Set<number>();
-  const resolve = (file: PreparedFile): string | null => {
-    if (memo.has(file.id)) return memo.get(file.id)!;
-    if (visiting.has(file.id)) return null;
-    visiting.add(file.id);
-    const identity = file.prepared.identity;
-    const parents = threads.get(identity.parentThreadId ?? '') ?? [];
-    const references = identity.agentPath ? [identity.threadId, identity.agentPath] : [identity.threadId];
-    const roots = new Set<string | null>();
-    for (const parent of parents) {
-      const prepared = parent.prepared;
-      if (prepared.identity.rootlessSubagent) { roots.add(resolve(parent)); continue; }
-      const requests = prepared.winners.evidence.childRequests;
-      for (const reference of references)
-        if (reference && requests.has(reference)) roots.add(requests.get(reference)!);
-    }
-    const target = roots.size === 1 ? roots.values().next().value! : null;
-    visiting.delete(file.id); memo.set(file.id, target);
-    return target;
-  };
-  for (const file of sources) {
-    const { identity, winners } = file.prepared;
-    if (!identity.rootlessSubagent || winners.evidence.eventCount === 0) continue;
-    const root = resolve(file);
-    if (root === null || state.missingParents.has(file.id)) state.fail(file, new SummaryError('missing-root-turn'));
-    else file.prepared.parentRootId = root;
-  }
+  return threads;
 }

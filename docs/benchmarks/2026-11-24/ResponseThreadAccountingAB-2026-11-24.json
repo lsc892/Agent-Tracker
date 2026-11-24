@@ -1,0 +1,412 @@
+{
+  "dateSeoul": "2026-11-24",
+  "baselineCommit": "21ff22b",
+  "environment": {
+    "node": "v24.14.1",
+    "sqlite": "3.51.2",
+    "platform": "win32",
+    "arch": "x64"
+  },
+  "protocol": {
+    "runsPerBuild": 1,
+    "order": "A/B",
+    "warmups": 0,
+    "sourceWorkers": 4,
+    "sampleIntervalMs": 5,
+    "timezone": "Asia/Seoul",
+    "emptyDatabases": true,
+    "reusedBaseline": true
+  },
+  "input": {
+    "sha256": "e89e63d4ffd88f071ecb64b37cca791fdf9a481958e794a1d568a33ca83bae5a",
+    "inventory": [
+      {
+        "provider": "claude",
+        "rootOrdinal": 0,
+        "files": 12,
+        "bytes": 11486533,
+        "compressed": 0
+      },
+      {
+        "provider": "codex",
+        "rootOrdinal": 1,
+        "files": 689,
+        "bytes": 415018914,
+        "compressed": 666,
+        "metadata": {
+          "indexBytes": 53453,
+          "threads": 690
+        }
+      },
+      {
+        "provider": "codex",
+        "rootOrdinal": 2,
+        "files": 2,
+        "bytes": 3075020,
+        "compressed": 2,
+        "metadata": {
+          "indexBytes": 53453,
+          "threads": 690
+        }
+      }
+    ]
+  },
+  "builds": {
+    "A": {
+      "source": "6833fc1f1c053c9068b30ad00c469c792e17169e3c9fbd37cca9249e837dc804",
+      "compiled": "4e1eeb1bc7e14ba8a843c6b19323abbd5c0731cc1fd8c5bb8dc6910bd0b4e4fb"
+    },
+    "B": {
+      "source": "6dfeebd9d8a7917bca43ece7351fcaceeec1a56848407c79d1e4145d379cb0b5",
+      "compiled": "697ea13b564ea2f3ea17e45dcbacba271c2dc66992a670d9ca2793a7702aa667"
+    }
+  },
+  "samples": {
+    "A": {
+      "ms": 4193.1787,
+      "peak": {
+        "rss": 395730944,
+        "heapUsed": 16753224
+      },
+      "afterGc": {
+        "rss": 158564352,
+        "heapUsed": 7674280
+      },
+      "files": 703,
+      "bytes": 429580467,
+      "stages": {
+        "lock": {
+          "calls": 1,
+          "totalMs": 1.053699999999992
+        },
+        "discover": {
+          "calls": 1,
+          "totalMs": 115.33910000000002
+        },
+        "names": {
+          "calls": 1,
+          "totalMs": 10.749200000000002
+        },
+        "readSources": {
+          "calls": 703,
+          "totalMs": 3887.3105999999984
+        },
+        "parseChanged": {
+          "calls": 1,
+          "totalMs": 3917.2397
+        },
+        "expandRelated": {
+          "calls": 1,
+          "totalMs": 0.23959999999988213
+        },
+        "aggregate": {
+          "calls": 1,
+          "totalMs": 3.2129000000004453
+        },
+        "commitComponents": {
+          "calls": 1,
+          "totalMs": 125.28119999999944
+        },
+        "finishScan": {
+          "calls": 1,
+          "totalMs": 2.4538000000002285
+        },
+        "optimize": {
+          "calls": 1,
+          "totalMs": 1.2486000000008062
+        },
+        "sourcePoolClose": {
+          "calls": 1,
+          "totalMs": 15.100300000000061
+        }
+      },
+      "totals": {
+        "claude": {
+          "threads": 12,
+          "input": 56887384,
+          "output": 2882677,
+          "tokens": 59770061
+        },
+        "codex": {
+          "threads": 673,
+          "input": 3676150543,
+          "output": 17894586,
+          "tokens": 3694045129
+        }
+      },
+      "query": {
+        "day": {
+          "claude": {
+            "input": 56887384,
+            "output": 2882677,
+            "tokens": 59770061,
+            "groups": 3,
+            "ms": 40.41690000000017
+          },
+          "codex": {
+            "input": 3676150543,
+            "output": 17894586,
+            "tokens": 3694045129,
+            "groups": 89,
+            "ms": 1.5786000000007334
+          }
+        },
+        "month": {
+          "claude": {
+            "input": 56887384,
+            "output": 2882677,
+            "tokens": 59770061,
+            "groups": 1,
+            "ms": 0.6954999999998108
+          },
+          "codex": {
+            "input": 3676150543,
+            "output": 17894586,
+            "tokens": 3694045129,
+            "groups": 6,
+            "ms": 0.9402000000000044
+          }
+        },
+        "session": {
+          "claude": {
+            "input": 56887384,
+            "output": 2882677,
+            "tokens": 59770061,
+            "groups": 12,
+            "ms": 0.7309000000004744
+          },
+          "codex": {
+            "input": 3676150543,
+            "output": 17894586,
+            "tokens": 3694045129,
+            "groups": 386,
+            "ms": 4.38379999999961
+          }
+        },
+        "project": {
+          "claude": {
+            "input": 56887384,
+            "output": 2882677,
+            "tokens": 59770061,
+            "groups": 2,
+            "ms": 0.6561000000001513
+          },
+          "codex": {
+            "input": 3676150543,
+            "output": 17894586,
+            "tokens": 3694045129,
+            "groups": 1,
+            "ms": 0.9670999999998457
+          }
+        }
+      },
+      "checks": {
+        "integrity": true,
+        "foreignKeys": true,
+        "rollupSums": true,
+        "modelSums": true
+      }
+    },
+    "B": {
+      "ms": 3672.8029,
+      "peak": {
+        "rss": 501989376,
+        "heapUsed": 45020016
+      },
+      "afterGc": {
+        "rss": 275243008,
+        "heapUsed": 7973024
+      },
+      "files": 703,
+      "bytes": 429580467,
+      "stages": {
+        "lock": {
+          "calls": 1,
+          "totalMs": 1.1535999999999973
+        },
+        "discover": {
+          "calls": 1,
+          "totalMs": 110.9551
+        },
+        "names": {
+          "calls": 1,
+          "totalMs": 10.989200000000011
+        },
+        "readSources": {
+          "calls": 703,
+          "totalMs": 3360.537399999999
+        },
+        "parseChanged": {
+          "calls": 1,
+          "totalMs": 3380.2733
+        },
+        "expandRelated": {
+          "calls": 1,
+          "totalMs": 1.5140999999998712
+        },
+        "aggregate": {
+          "calls": 1,
+          "totalMs": 50.32020000000011
+        },
+        "commitComponents": {
+          "calls": 1,
+          "totalMs": 100.11589999999978
+        },
+        "finishScan": {
+          "calls": 1,
+          "totalMs": 2.643000000000029
+        },
+        "optimize": {
+          "calls": 1,
+          "totalMs": 1.5506000000000313
+        },
+        "sourcePoolClose": {
+          "calls": 1,
+          "totalMs": 12.203899999999976
+        }
+      },
+      "totals": {
+        "claude": {
+          "threads": 12,
+          "input": 9994511,
+          "output": 247006,
+          "tokens": 10241517
+        },
+        "codex": {
+          "threads": 672,
+          "input": 3444826635,
+          "output": 16569656,
+          "tokens": 3461396291
+        }
+      },
+      "query": {
+        "day": {
+          "claude": {
+            "input": 9994511,
+            "output": 247006,
+            "tokens": 10241517,
+            "groups": 3,
+            "ms": 27.6862000000001
+          },
+          "codex": {
+            "input": 3444826635,
+            "output": 16569656,
+            "tokens": 3461396291,
+            "groups": 89,
+            "ms": 1.8618999999998778
+          }
+        },
+        "month": {
+          "claude": {
+            "input": 9994511,
+            "output": 247006,
+            "tokens": 10241517,
+            "groups": 1,
+            "ms": 0.6192999999998392
+          },
+          "codex": {
+            "input": 3444826635,
+            "output": 16569656,
+            "tokens": 3461396291,
+            "groups": 6,
+            "ms": 1.0634000000000015
+          }
+        },
+        "session": {
+          "claude": {
+            "input": 9994511,
+            "output": 247006,
+            "tokens": 10241517,
+            "groups": 12,
+            "ms": 0.4861000000000786
+          },
+          "codex": {
+            "input": 3444826635,
+            "output": 16569656,
+            "tokens": 3461396291,
+            "groups": 386,
+            "ms": 3.272100000000137
+          }
+        },
+        "project": {
+          "claude": {
+            "input": 9994511,
+            "output": 247006,
+            "tokens": 10241517,
+            "groups": 2,
+            "ms": 0.7514000000001033
+          },
+          "codex": {
+            "input": 3444826635,
+            "output": 16569656,
+            "tokens": 3461396291,
+            "groups": 1,
+            "ms": 0.8888000000001739
+          }
+        }
+      },
+      "checks": {
+        "integrity": true,
+        "foreignKeys": true,
+        "rollupSums": true,
+        "modelSums": true
+      }
+    }
+  },
+  "oracle": {
+    "files": 703,
+    "totals": {
+      "claude": {
+        "input": 9994511,
+        "output": 247006,
+        "tokens": 10241517
+      },
+      "codex": {
+        "input": 3444826635,
+        "output": 16569656,
+        "tokens": 3461396291
+      }
+    },
+    "evidence": {
+      "claudeRawRows": 422,
+      "claudeResponses": 100,
+      "responses": 18101,
+      "copiedRows": 4557,
+      "legacyFiles": 180,
+      "mixedLeading": 10626023,
+      "corroboratedGaps": 384742,
+      "unresolvedGaps": 0
+    }
+  },
+  "differences": {
+    "claude": {
+      "input": {
+        "A": 46892873,
+        "B": 0
+      },
+      "output": {
+        "A": 2635671,
+        "B": 0
+      },
+      "tokens": {
+        "A": 49528544,
+        "B": 0
+      }
+    },
+    "codex": {
+      "input": {
+        "A": 231323908,
+        "B": 0
+      },
+      "output": {
+        "A": 1324930,
+        "B": 0
+      },
+      "tokens": {
+        "A": 232648838,
+        "B": 0
+      }
+    }
+  },
+  "matchesOracle": true
+}

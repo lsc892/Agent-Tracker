@@ -339,7 +339,7 @@
     node.title = String(text);
     return node;
   }
-  const requestLabel = row => row.request_title || row.session_name || t('dashboard.untitled');
+  const requestLabel = row => row.request_title || row.root_turn_id || row.session_name || t('dashboard.untitled');
   function projectLabel(row) {
     const name = row.project_name || t('dashboard.unnamedProject');
     const node = element('button', undefined, 'name-filter');
@@ -428,11 +428,9 @@
       detail += segments[0].className === 'chart-unknown' ? t('dashboard.unknownBreakdownSuffix')
         : ` · ${segments.map(segment => `${segment.label} ${number(segment.value)}`).join(' / ')}`;
     }
-    if (chart.metric === 'requests') detail += t('dashboard.completedCountSuffix', { value0: number(row.completed_turns) });
     if (chart.metric === 'averageDuration' && !turn) detail += t('dashboard.timeSampleSuffix', { value0: number(row.turns_with_duration) });
-    if (chart.metric === 'averageTokens') detail += t('dashboard.completedRequestsSuffix', { value0: number(row.completed_turns) });
     if (chart.mode === 'ranking' && row.session_id) detail += t('dashboard.sessionIdSuffix', { value0: row.session_id });
-    if (turn) detail += ` · ${requestStatus(row)} · ${row.duration_quality}`;
+    if (turn) detail += ` · ${row.duration_quality}`;
     if (chart.by === 'model' && chart.metric === 'averageDuration') detail += t('dashboard.modelTimeSuffix');
     return detail;
   }
@@ -702,7 +700,7 @@
     const costHeaders = showCosts ? [t('dashboard.estimatedApiCost')] : [];
     const costSortKeys = showCosts ? ['cost'] : [];
     table($('usage-table'), [model ? t('common.model') : t('common.provider'), t('dashboard.periodProjectSession'), ...tokenHeaders, t('dashboard.totalTokens'), t('dashboard.completedTotal'), t('dashboard.averageTokens'), t('dashboard.averageTimeSamples'), ...costHeaders], rows.map(row => [
-      seriesName(row, model), usageScopeLabel(row, groupBy), ...tokenValues(row), number(row.total_tokens), `${number(row.completed_turns)} / ${number(row.turn_count)}`, number(row.avg_tokens_per_turn), t('dashboard.timeSamples', { value0: duration(row.avg_duration_ms), value1: number(row.turns_with_duration) }), ...costValues(row),
+      seriesName(row, model), usageScopeLabel(row, groupBy), ...tokenValues(row), number(row.total_tokens), number(row.turn_count), number(row.avg_tokens_per_turn), t('dashboard.timeSamples', { value0: duration(row.avg_duration_ms), value1: number(row.turns_with_duration) }), ...costValues(row),
     ]), ['model', 'period', ...tokenSortKeys, 'requests', 'averageTokens', 'averageDuration', ...costSortKeys]);
   }
 
@@ -718,15 +716,8 @@
     return new Intl.NumberFormat(globalThis.agentTrackerI18n.language, { style: 'currency', currency: 'USD', minimumFractionDigits: 4, maximumFractionDigits: 6 }).format(row.cost_usd);
   }
 
-  function requestStatus(row) {
-    if (row.status === 'completed') return t('common.completed');
-    if (row.status === 'failed') return t('common.failed');
-    return t('common.inProgress');
-  }
-
   function requestStatusQuality(row) {
-    const status = requestStatus(row);
-    let quality = `${status} · ${row.duration_quality}`;
+    let quality = row.duration_quality;
     if (row.quality_flags) quality += ` · ${row.quality_flags}`;
     if (row.last_error) quality += t('dashboard.previousValueSuffix', { value0: row.last_error });
     return quality;

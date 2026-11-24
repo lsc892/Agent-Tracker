@@ -116,7 +116,7 @@ export class SourceReaderPool {
 
   private startWorker(): void {
     const worker = new Worker(join(__dirname, 'sourceWorker.js'), { workerData: {
-      collectCapabilities: this.options.collectCapabilities, maxLineBytes: this.options.maxLineBytes,
+      maxLineBytes: this.options.maxLineBytes,
       cancellation: this.cancellation.buffer, externalCancellation: this.options.externalCancellation,
     } });
     const slot: WorkerSlot = { worker };

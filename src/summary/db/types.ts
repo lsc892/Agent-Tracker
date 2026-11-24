@@ -15,11 +15,17 @@ export interface CostFields {
   billing_mode?: BillingMode;
 }
 
-export interface SourceRelationMetadata {
+interface LegacySourceRelation {
+  threadUsage?: never;
   identity: Pick<ParsedIdentity, 'sessionId' | 'threadId' | 'parentThreadId' | 'isMain' | 'agentPath'
     | 'rootlessSubagent' | 'forkedFromId'>;
   childRequests: ReadonlyMap<string, string | null>;
 }
+
+export type SourceRelationMetadata = LegacySourceRelation | {
+  threadUsage: true;
+  identity: Pick<ParsedIdentity, 'sessionId' | 'threadId'>;
+};
 
 export interface FileMetadata {
   provider: Provider;
@@ -29,7 +35,7 @@ export interface FileMetadata {
   size_bytes: number;
   mtime_ms: number;
   parser_version: number;
-  /** Parsed thread identity and spawn bindings for finding related files. */
+  /** Parsed identity for retaining usage when the source disappears. */
   relations?: SourceRelationMetadata | null;
   /** 0 when Skill counts were skipped; re-enable rebuilds these sources. */
   capabilities_collected?: 0 | 1;

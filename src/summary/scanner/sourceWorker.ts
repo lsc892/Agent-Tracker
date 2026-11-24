@@ -1,4 +1,4 @@
-// DB에 접근하지 않고 전달받은 파일 하나의 읽기·파싱·winner 선택을 실행한다.
+// DB에 접근하지 않고 전달받은 스레드 로그 하나의 사용량을 집계한다.
 import { parentPort, workerData } from 'node:worker_threads';
 import { prepareSource } from './sourcePreparation';
 import type { SourceReadFile } from './sourceReader';
@@ -7,7 +7,7 @@ const PROGRESS_INTERVAL_MS = 100;
 
 if (!parentPort) throw new Error('Source worker requires a parent');
 const port = parentPort;
-const options = workerData as { collectCapabilities: boolean; maxLineBytes?: number;
+const options = workerData as { maxLineBytes?: number;
   cancellation: SharedArrayBuffer; externalCancellation?: SharedArrayBuffer };
 const cancellation = new Int32Array(options.cancellation);
 const externalCancellation = options.externalCancellation ? new Int32Array(options.externalCancellation) : undefined;
@@ -16,7 +16,7 @@ const cancelled = (): boolean => Boolean(Atomics.load(cancellation, 0)
 
 port.on('message', (file: SourceReadFile) => {
   let pendingBytes = 0, lastReportAtMs = performance.now();
-  void prepareSource(file, { collectCapabilities: options.collectCapabilities, maxLineBytes: options.maxLineBytes, cancelled,
+  void prepareSource(file, { maxLineBytes: options.maxLineBytes, cancelled,
     onBytes: count => {
       pendingBytes += count;
       if (performance.now() - lastReportAtMs < PROGRESS_INTERVAL_MS) return;

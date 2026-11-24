@@ -1,12 +1,11 @@
 // 연결 묶음의 통계·원본 수정 시각을 저장하고 진단과 이름을 마무리한다.
 import { setImmediate as yieldToWorker } from 'node:timers/promises';
-import type { ScanAggregation } from './aggregation';
 import type { MemoryReplacement } from '../../db/memoryStore';
-import type { FileMetadata, Provider } from '../../db/types';
+import type { FileMetadata, Provider, TurnSummaryInput } from '../../db/types';
 import { SummaryError } from '../../jsonl';
 import { OrderedGroups } from '../worklist';
 import type { RefreshContext } from './context';
-import { sessionKey, type FileState } from './state';
+import { PARSER_VERSION, sessionKey, type FileState } from './state';
 
 const MAX_COMMIT_BATCH_COMPONENTS = 16;
 const MAX_COMMIT_BATCH_SUMMARIES = 1000;
@@ -14,17 +13,15 @@ const MAX_COMMIT_BATCH_SUMMARIES = 1000;
 interface ComponentCommit {
   component: Set<string>;
   members: FileState[];
-  aggregated: ScanAggregation;
+  summaries: TurnSummaryInput[];
 }
 
-export async function commitComponents(context: RefreshContext, aggregated: ScanAggregation): Promise<void> {
+export async function commitComponents(context: RefreshContext, summaries: readonly TurnSummaryInput[]): Promise<void> {
   const { files, affected, links } = context.state;
   if (!affected.size) return;
   const memberGroups = new OrderedGroups(files.values(), file => [sessionKey(file.provider, file.session_id ?? ''),
     sessionKey(file.provider, file.previous?.session_id ?? '')]);
-  const summaryGroups = new OrderedGroups(aggregated.summaries, row => [sessionKey(row.provider, row.session_id)]);
-  const orphanGroups = new OrderedGroups(aggregated.orphans, row => [sessionKey(row.provider, row.session_id)]);
-  const responseGroups = new OrderedGroups(aggregated.appliedResponses, row => [sessionKey(row.provider, row.sessionId)]);
+  const summaryGroups = new OrderedGroups(summaries, row => [sessionKey(row.provider, row.session_id)]);
   const remaining = new Set([...affected].sort());
   let batch: ComponentCommit[] = [];
   let batchSummaries = 0;
@@ -37,18 +34,16 @@ export async function commitComponents(context: RefreshContext, aggregated: Scan
   for (const seed of remaining) {
     const component = linkedComponent(seed, links);
     for (const session of component) remaining.delete(session);
-    const entry = { component, members: memberGroups.members(component),
-      aggregated: { summaries: summaryGroups.members(component), orphans: orphanGroups.members(component),
-        appliedResponses: responseGroups.members(component) } };
+    const entry = { component, members: memberGroups.members(component), summaries: summaryGroups.members(component) };
     if (requiresIndividualCommit(entry)) {
       await flush();
       await commitIndividual(context, entry);
       continue;
     }
-    const summaries = entry.aggregated.summaries.length;
-    if (batchSummaries + summaries > MAX_COMMIT_BATCH_SUMMARIES) await flush();
+    const count = entry.summaries.length;
+    if (batchSummaries + count > MAX_COMMIT_BATCH_SUMMARIES) await flush();
     batch.push(entry);
-    batchSummaries += summaries;
+    batchSummaries += count;
     if (batch.length === MAX_COMMIT_BATCH_COMPONENTS || batchSummaries === MAX_COMMIT_BATCH_SUMMARIES) await flush();
   }
   await flush();
@@ -100,14 +95,14 @@ function linkedComponent(seed: string, links: ReadonlyMap<string, ReadonlySet<st
 
 /** 큰 성분과 보류·오류·삭제는 개별 복구 경로로 처리한다. */
 function requiresIndividualCommit(entry: ComponentCommit): boolean {
-  return entry.aggregated.summaries.length > MAX_COMMIT_BATCH_SUMMARIES || entry.aggregated.orphans.length > 0
+  return entry.summaries.length > MAX_COMMIT_BATCH_SUMMARIES
     || entry.members.some(file => file.deferred || file.error || file.removed);
 }
 
-/** 보류 → 원본 오류 → 고아 요청 → 실제 쓰기 순으로 검사해 앞선 보존·복구 정책을 우선한다. */
+/** 보류·원본 오류가 있을 때 마지막 정상 반영값을 유지한다. */
 function commitComponent(context: RefreshContext, entry: ComponentCommit): void {
-  const { database, storage, state, retain } = context;
-  const { members, aggregated } = entry;
+  const { database, storage, state } = context;
+  const { members } = entry;
   if (members.some(file => file.deferred)) {
     settleDeferredComponent(context, members);
     return;
@@ -117,17 +112,6 @@ function commitComponent(context: RefreshContext, entry: ComponentCommit): void 
     for (const file of members)
       if (!file.error)
         file.error = new SummaryError(sourceError.code);
-    preserveMissingSources(context, members);
-    return;
-  }
-  const missing = members.some(file => file.removed);
-  const orphan = !retain || !missing ? aggregated.orphans[0] : undefined;
-  if (orphan) {
-    const file = state.files.get(orphan.fileId)!;
-    state.fail(file, new SummaryError('missing-root-turn', orphan.offset));
-    for (const sibling of members)
-      if (!sibling.error)
-        sibling.error = file.error;
     preserveMissingSources(context, members);
     return;
   }
@@ -143,9 +127,9 @@ function commitComponent(context: RefreshContext, entry: ComponentCommit): void 
   }
 }
 
-/** 연결 성분의 요청·응답과 정상 반영할 파일 버전을 묶는다. */
-function componentReplacement(context: RefreshContext, { component, members, aggregated }: ComponentCommit): MemoryReplacement {
-  const { collect, retain, persistAppliedResponses } = context;
+/** 연결 성분의 스레드 합계와 정상 반영할 파일 버전을 묶는다. */
+function componentReplacement(context: RefreshContext, { component, members, summaries }: ComponentCommit): MemoryReplacement {
+  const { retain, persistAppliedResponses } = context;
   const sessions = [...component].map(value => {
     const [provider, session_id] = JSON.parse(value) as [Provider, string];
     return { provider, session_id };
@@ -158,14 +142,9 @@ function componentReplacement(context: RefreshContext, { component, members, agg
     }
     files.push(finalFile(file));
   }
-  const summaries = retain && removedFileIds.size ? aggregated.summaries.filter(row => row.hasMain) : aggregated.summaries;
-  const ledger = persistAppliedResponses ? {
-    appliedResponses: aggregated.appliedResponses,
-    replaceAppliedSessions: true,
-    reconcileAppliedResponses: !removedFileIds.size && members.some(file => file.previous?.parser_version === file.parser_version),
-  } : {};
-  return { sessions, summaries, ...ledger, files, removedFileIds, preserveCapabilities: !collect,
-    retainDeletedSourceUsage: retain };
+  const replaceAppliedSessions = persistAppliedResponses && members.some(file => file.previous && file.previous.parser_version < PARSER_VERSION);
+  return { sessions, summaries, files, removedFileIds, replaceAppliedSessions,
+    retainDeletedSourceUsage: retain, threadUsage: true };
 }
 
 function settleDeferredComponent(context: RefreshContext, members: FileState[]): void {

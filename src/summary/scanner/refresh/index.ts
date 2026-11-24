@@ -10,12 +10,12 @@ import type { RefreshResult, SummaryOptions, SummaryProgress } from '../../types
 import { acquireRefreshLock } from '../lock';
 import { readNames } from '../names';
 import { SourceReaderPool } from '../sourcePool';
-import { collectWinners } from './aggregation';
+import { collectThreads } from './aggregation';
 import type { RefreshContext } from './context';
 import { discoverSources } from './discovery';
 import { commitComponents, finishScan, recordFailure } from './persistence';
 import { prepareChanged } from './preparation';
-import { expandRelatedSources, resolveParentRequests } from './relations';
+import { expandRelatedSources } from './relations';
 import { ScanState, sessionKey } from './state';
 
 export { PARSER_VERSION } from './state';
@@ -49,14 +49,14 @@ export async function refreshSummary(
   const check = (): void => {
     if (cancelled()) throw new SummaryError('interrupted');
   };
-  const collect = options.collectCapabilities !== false, retain = options.retainDeletedSourceUsage !== false;
-  const sourcePool = new SourceReaderPool({ workers: options.sourceWorkers, collectCapabilities: collect,
+  const retain = options.retainDeletedSourceUsage !== false;
+  const sourcePool = new SourceReaderPool({ workers: options.sourceWorkers,
     maxLineBytes: options.maxLineBytes, signal, cancelled, externalCancellation: options.cancellation, onBytes });
   const state = new ScanState(result);
   const roots = options.roots.map(root => ({ ...root, path: resolve(root.path) }));
   const context: RefreshContext = { database, result, scan, storage, state, sourcePool,
     persistAppliedResponses: true,
-    roots, collect, retain, cancelled, check, report: publish };
+    roots, retain, cancelled, check, report: publish };
 
   let release: (() => void) | undefined;
   try {
@@ -132,13 +132,12 @@ async function prepareAndCommit(
   const { scan, check } = context;
   await scan.measureAsync('parseChanged', () => prepareChanged(context));
   await scan.measureAsync('expandRelated', () => expandRelatedSources(context));
-  scan.measure('resolveParents', () => resolveParentRequests(context));
   check();
-  const aggregated = scan.measure('aggregate', () => collectWinners(context, names));
+  const summaries = scan.measure('aggregate', () => collectThreads(context, names));
 
   committing?.();
   check();
-  await scan.measureAsync('commitComponents', () => commitComponents(context, aggregated));
+  await scan.measureAsync('commitComponents', () => commitComponents(context, summaries));
 }
 
 function progressReporter(result: RefreshResult, progress?: (value: SummaryProgress) => void): PublishProgress {

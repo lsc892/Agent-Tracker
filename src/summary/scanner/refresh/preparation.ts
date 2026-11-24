@@ -41,7 +41,7 @@ export async function inspectSource(context: RefreshContext, file: FileState): P
 }
 
 function applyPreparation(context: RefreshContext, file: FileState, preparation: SourcePreparation): void {
-  const { state, result, check, collect } = context;
+  const { state, result, check } = context;
   const previousSession = file.previous?.session_id;
   if (!preparation.ok) {
     if (preparation.identity) {
@@ -52,18 +52,18 @@ function applyPreparation(context: RefreshContext, file: FileState, preparation:
   }
   check();
   result.parsed++;
-  const { read, winners } = preparation;
+  const { partialLine, thread } = preparation.read;
   file.parser_version = PARSER_VERSION;
-  file.capabilities_collected = collect ? 1 : 0;
-  if (!read.rows) {
-    applyEmptySource(state, file, read.partialLine);
+  file.capabilities_collected = 0;
+  if (!thread) {
+    applyEmptySource(state, file, partialLine);
     return;
   }
-  const identity = read.identity!;
-  state.setSession(file, identity.sessionId);
-  file.relations = { identity, childRequests: winners.evidence.childRequests };
-  state.registerPrepared(file, { identity, winners, partialLine: read.partialLine });
-  file.changed = needsSourceRead(file, file.previous, collect);
+  const { sessionId, threadId } = thread;
+  state.setSession(file, sessionId);
+  file.relations = { identity: { sessionId, threadId }, threadUsage: true };
+  state.registerPrepared(file, { thread, partialLine });
+  file.changed = needsSourceRead(file, file.previous);
   if (!file.changed) return;
   state.affect(file.provider, file.session_id);
   state.connect(file.provider, previousSession, file.session_id);

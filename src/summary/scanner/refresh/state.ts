@@ -1,36 +1,32 @@
 // 한 갱신의 파일 상태·관계 색인·큐를 소유하고 상태 변경 시 색인 일관성을 유지한다.
-import type { SourceWinnersSnapshot } from '../../aggregation/sourceWinners';
 import type { FileMetadata, SourceFileRow, Provider } from '../../db/types';
 import { SummaryError } from '../../jsonl';
-import type { ParsedIdentity, RefreshResult } from '../../types';
+import type { ThreadLog } from '../../parsers/threadUsage';
+import type { RefreshResult } from '../../types';
 import { sqlText } from '../sourceReader';
 import { addMember, removeMember, SourceQueue } from '../worklist';
 
-export const PARSER_VERSION = 23;
+export const PARSER_VERSION = 25;
 export const sessionKey = (provider: Provider, session: string): string => JSON.stringify([provider, sqlText(session)]);
 
 export interface PreparedSource {
-  identity: ParsedIdentity;
-  winners: SourceWinnersSnapshot;
+  thread: ThreadLog;
   partialLine: boolean;
-  parentRootId?: string;
 }
 
 export type StoredSource = FileMetadata & Pick<SourceFileRow, 'id' | 'source_missing' | 'processing_status'>;
 
 /** 경로의 마지막 반영 시각과 재수집이 필요한 상태를 비교한다. */
 export function needsSourceRead(file: Pick<FileMetadata, 'mtime_ms' | 'source_root'>,
-  previous: StoredSource | undefined, collect: boolean): boolean {
+  previous: StoredSource | undefined): boolean {
   return !previous || previous.mtime_ms !== file.mtime_ms || previous.source_root !== file.source_root
     || previous.source_missing === 1 || previous.processing_status !== 'done'
-    || previous.parser_version !== PARSER_VERSION || collect && previous.capabilities_collected !== 1;
+    || previous.parser_version !== PARSER_VERSION;
 }
 
 export interface FileState extends FileMetadata {
   id: number;
-  readonly discoveryOrder: number;
   previous?: StoredSource;
-  storedThreadId?: string | null;
   changed: boolean;
   removed: boolean;
   selected: boolean;
@@ -53,15 +49,9 @@ export class ScanState {
   readonly affected = new Set<string>();
   readonly links = new Map<string, Set<string>>();
   private readonly sessionFiles = new Map<string, Set<FileState>>();
-  readonly codexFiles: FileState[] = [];
-  private readonly preparedCodex: FileState[] = [];
   readonly preparedFiles: FileState[] = [];
-  private readonly seenReferences = new Set<string>();
-  readonly pendingReferences = new Set<string>();
   readonly relatedQueue = new SourceQueue<FileState>();
-  readonly missingParents = new Set<number>();
   readonly savedSessionNames = new Map<string, string>();
-  lineageDirty = false;
   private indexesEnabled = false;
 
   constructor(private readonly result: RefreshResult) {}
@@ -103,19 +93,14 @@ export class ScanState {
 
   trackFile(file: FileState): void {
     this.files.set(file.id, file);
-    if (this.indexesEnabled) this.indexFile(file);
+    if (this.indexesEnabled) this.indexSession(file);
   }
 
   /** 무변경 스캔은 관계 색인을 만들지 않는다. 이후에 등록한 파일은 바로 색인한다. */
   indexRelatedSources(): void {
     if (this.indexesEnabled) return;
     this.indexesEnabled = true;
-    for (const file of this.files.values()) this.indexFile(file);
-  }
-
-  private indexFile(file: FileState): void {
-    this.indexSession(file);
-    if (file.provider === 'codex') this.codexFiles.push(file);
+    for (const file of this.files.values()) this.indexSession(file);
   }
 
   private indexSession(file: FileState): void {
@@ -135,20 +120,5 @@ export class ScanState {
   registerPrepared(file: FileState, prepared: PreparedSource): void {
     file.prepared = prepared;
     this.preparedFiles.push(file);
-    const { identity } = prepared;
-    this.seenReferences.add(identity.threadId);
-    this.pendingReferences.delete(identity.threadId);
-    if (file.provider !== 'codex') return;
-    this.preparedCodex.push(file);
-    this.lineageDirty = true;
-    for (const reference of [identity.parentThreadId, identity.forkedFromId]) {
-      if (!reference || this.seenReferences.has(reference)) continue;
-      this.seenReferences.add(reference);
-      this.pendingReferences.add(reference);
-    }
-  }
-
-  preparedCodexFiles(): PreparedFile[] {
-    return this.preparedCodex.filter(isPreparedFile).sort((a, b) => a.discoveryOrder - b.discoveryOrder);
   }
 }
