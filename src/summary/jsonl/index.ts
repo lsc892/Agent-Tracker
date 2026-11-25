@@ -4,6 +4,7 @@ import { zstdChunks, ZstdError } from './zstd';
 import { SummaryError } from './errors';
 import { JsonlLine } from './line';
 import { projectFixedJson, projectJson, type JsonShape } from './projection';
+import { StreamingFixedProjection } from './streamProjection';
 
 export { SummaryError } from './errors';
 
@@ -18,8 +19,8 @@ function parseJsonlObject(text: string, offset: number, shape: JsonShape | undef
 
 /**
  * 책임: 관측한 크기까지만 로그를 읽고 행과 원본 위치를 전달한다.
- * 64KiB 이하 단위로 파일을 읽고 LF마다 한 줄씩 디코딩한다.
- * 청크 경계를 넘는 줄과 이미지가 있는 줄은 JsonlLine에서 처리한다.
+ * 64KiB 이하 단위로 파일을 읽고 LF마다 한 행을 전달한다.
+ * 청크 경계를 넘거나 이미지가 있는 줄의 고정 필드는 읽는 중에 고른다.
  */
 export async function readJsonl(
   path: string,
@@ -38,6 +39,7 @@ export async function readJsonl(
   const file = await open(path, 'r');
   const buffer = Buffer.allocUnsafe(Math.min(64 * 1024, Math.max(1, size)));
   let line: JsonlLine | undefined;
+  let projection: StreamingFixedProjection | undefined;
   let read = 0;
   let lineOffset = 0;
   let rows = 0;
@@ -68,19 +70,23 @@ export async function readJsonl(
         if (!/data:image\//i.test(candidate)) text = candidate;
       }
       if (text === undefined) {
-        line ??= new JsonlLine(maxLine, lineOffset);
+        if (!line) {
+          projection = options.fixedShape && new StreamingFixedProjection(options.fixedShape, lineOffset);
+          line = new JsonlLine(maxLine, lineOffset, projection?.append.bind(projection));
+        }
         line.append(chunk, index, end);
-        if (end === chunk.length) break;
-        text = line.text();
+        if (newline < 0) break;
+        if (!projection) text = line.text();
         sourceBytes = line.bytes;
       }
-      if (text) {
-        const row = parseJsonlObject(text, lineOffset, options.shape, options.fixedShape);
+      const row = projection ? projection.finish() : text ? parseJsonlObject(text, lineOffset, options.shape, options.fixedShape) : undefined;
+      if (row) {
         rows++;
         if (onRow(row, lineOffset) === false) return true;
       }
       lineOffset += sourceBytes + 1;
       line = undefined;
+      projection = undefined;
       index = end + 1;
     }
     return false;

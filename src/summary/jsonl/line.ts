@@ -4,7 +4,7 @@ import { SummaryError } from './errors';
 /** 이미지 Base64 본문을 제외한 JSON 한 행을 메모리 상한 안에서 구성한다. */
 export class JsonlLine {
   private readonly blocks: Buffer[] = [];
-  private block: Buffer;
+  private block?: Buffer;
   private used = 0;
   private length = 0;
   private inString = false;
@@ -14,9 +14,8 @@ export class JsonlLine {
   private image = false;
   bytes = 0;
 
-  constructor(private readonly maxBytes: number, private readonly offset: number) {
-    this.block = Buffer.allocUnsafe(Math.min(1024, maxBytes));
-  }
+  constructor(private readonly maxBytes: number, private readonly offset: number,
+    private readonly consume?: (chunk: Buffer, start: number, end: number) => void) {}
 
   /**
    * 책임: 행의 일반 구간을 빠르게 복사하고 문자열 경계를 추적한다.
@@ -34,54 +33,56 @@ export class JsonlLine {
     let quote = find(34, start);
     let escape = find(92, start);
     let index = start;
+    let retainedStart = start;
+    const discard = (from: number, to: number): void => {
+      if (retainedStart < from) this.consume?.(chunk, retainedStart, from);
+      retainedStart = to;
+    };
     while (index < end) {
       if (this.probe !== undefined || this.escaped || this.unicode) {
-        this.appendByte(chunk[index++]);
+        if (this.trackStringByte(chunk[index])) this.retain(chunk, index, index + 1);
+        else discard(index, index + 1);
+        index++;
         continue;
       }
       if (quote < index) quote = find(34, index);
       if (escape < index) escape = find(92, index);
       const boundary = this.inString ? Math.min(quote, escape) : quote;
       if (boundary <= index) {
-        this.appendByte(chunk[index++]);
+        if (this.trackStringByte(chunk[index])) this.retain(chunk, index, index + 1);
+        else discard(index, index + 1);
+        index++;
         continue;
       }
       if (this.image) {
         // Discard without retaining Base64; JSON.parse cannot check these bytes.
         if (/[\x00-\x1f]/.test(chunk.toString('latin1', index, boundary))) throw new SummaryError('parse-error', this.offset);
+        discard(index, boundary);
       } else this.retain(chunk, index, boundary);
       index = boundary;
     }
+    if (retainedStart < end) this.consume?.(chunk, retainedStart, end);
   }
 
   private retain(chunk: Buffer, start: number, end: number): void {
     if (end - start > this.maxBytes - this.length) throw new SummaryError('line-byte-budget-exceeded', this.offset);
+    if (this.consume) {
+      this.length += end - start;
+      return;
+    }
     while (start < end) {
-      if (this.used === this.block.length) this.nextBlock();
-      const count = Math.min(end - start, this.block.length - this.used);
-      chunk.copy(this.block, this.used, start, start + count);
+      if (this.block && this.used === this.block.length) {
+        this.blocks.push(this.block);
+        this.block = undefined;
+        this.used = 0;
+      }
+      const block = this.block ??= Buffer.allocUnsafe(Math.min(this.blocks.length ? 64 * 1024 : 1024, this.maxBytes - this.length));
+      const count = Math.min(end - start, block.length - this.used);
+      chunk.copy(block, this.used, start, start + count);
       start += count;
       this.used += count;
       this.length += count;
     }
-  }
-
-  private nextBlock(): void {
-    this.blocks.push(this.block);
-    this.block = Buffer.allocUnsafe(Math.min(64 * 1024, this.maxBytes - this.length));
-    this.used = 0;
-  }
-
-  /**
-   * 책임: 버리는 이미지 문자열까지 JSON 문자열 문법을 검증한다.
-   * 알고리즘: 문자열·escape·유니코드 잔여 길이를 상태로 갱신하고, 이미지 본문은 제어 문자와 잘못된 escape를 거부하며 저장을 생략한다.
-   */
-  private appendByte(byte: number): void {
-    if (!this.trackStringByte(byte)) return;
-    if (this.length >= this.maxBytes) throw new SummaryError('line-byte-budget-exceeded', this.offset);
-    if (this.used === this.block.length) this.nextBlock();
-    this.block[this.used++] = byte;
-    this.length++;
   }
 
   /** Advance string state and report whether this byte belongs in the retained JSON. */
@@ -139,6 +140,7 @@ export class JsonlLine {
   }
 
   text(): string {
+    if (!this.block) return '';
     const tail = this.block.subarray(0, this.used);
     return (this.blocks.length ? Buffer.concat([...this.blocks, tail], this.length) : tail).toString('utf8').trim();
   }
