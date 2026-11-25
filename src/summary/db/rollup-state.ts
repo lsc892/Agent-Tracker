@@ -109,11 +109,6 @@ CREATE TABLE IF NOT EXISTS ${table} (
   ${stateColumns},
   PRIMARY KEY(${dailyKeyColumns(by).join(', ')})
 ) WITHOUT ROWID;
-
-CREATE INDEX IF NOT EXISTS idx_${table}_day
-  ON ${table}(local_day, provider);
-CREATE INDEX IF NOT EXISTS idx_${table}_project_day
-  ON ${table}(provider, project_key, local_day);
 `;
 }).join('');
 

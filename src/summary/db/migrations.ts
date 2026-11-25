@@ -23,7 +23,13 @@ export function migrateSchema(connection: DatabaseSync, timezone: string, transa
       connection.exec(DAILY_SCHEMA_SQL);
       saveTimezone(connection, timezone);
     } else {
-      migrateUsage(connection, version, timezone);
+      if (version < 26) migrateUsage(connection, version, timezone);
+      connection.exec(`DROP INDEX IF EXISTS idx_source_root_id;
+        DROP INDEX IF EXISTS idx_source_session;
+        DROP INDEX IF EXISTS idx_usage_request_daily_day;
+        DROP INDEX IF EXISTS idx_usage_request_daily_project_day;
+        DROP INDEX IF EXISTS idx_usage_model_daily_day;
+        DROP INDEX IF EXISTS idx_usage_model_daily_project_day;`);
     }
     connection.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
   });

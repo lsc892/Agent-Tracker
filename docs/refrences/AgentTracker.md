@@ -605,6 +605,8 @@ schema v4는 이전 summary의 cache component를 NULL로 유지해 미확인 �
 
 DB 위치는 `ExtensionContext.globalStorageUri` 아래로 한다. 현재 표는 파일 상태의 `source_file`, 이름의 `projects`·`sessions`, 세션 결제 선택의 `session_billing`, 일별 사용량의 `usage_request_daily`·`usage_model_daily`와 집계 설정의 `usage_rollup_meta`다. `usage_capability_daily`는 이전 도구 사용량을 일별로 보관한다. 아래의 상세 표 정의는 이전 DB의 형식을 설명하며, v26에서는 이관과 상세 테이블 삭제를 같은 트랜잭션에서 진행한다.
 
+스키마 v27은 `source_file`의 루트·세션 보조 인덱스 두 개와 일별 사용량 표 두 개의 날짜·프로젝트 보조 인덱스 네 개를 제거한다. 새 DB는 기본 키와 고유 제약에 필요한 구조로 시작한다. 기존 DB는 파일·사용량 행을 보존하고 같은 마이그레이션 트랜잭션에서 보조 인덱스만 삭제한다. 회수한 페이지는 이후 쓰기에 재사용한다.
+
 ```sql
 PRAGMA foreign_keys = ON;
 PRAGMA journal_mode = WAL;
@@ -630,12 +632,6 @@ CREATE TABLE source_file (
   last_error          TEXT,                                   -- 최근 오류 원인; 정상 처리하면 NULL
   UNIQUE(provider, path)                                      -- 묶음별 파일 조회용 유일 key
 );
-
-CREATE INDEX idx_source_root_id
-  ON source_file(provider, source_root, id);                    -- 루트별 출처 조회
-
-CREATE INDEX idx_source_session
-  ON source_file(provider, session_id, id);                    -- 재집계할 session의 원본 파일 page 조회
 
 CREATE TABLE projects (
   project_key        TEXT PRIMARY KEY,
@@ -723,9 +719,9 @@ DB 모듈은 변경 이유별로 책임을 나눈다. `src/summary/db/index.ts`�
 
 입력에 `updated_at`이 있으면 그 값을 사용하고 생략되면 실제 변경·일괄 재삽입 시각으로 기록한다. 부분 반영 경로의 변경 없는 요청은 이전 시각을 유지한다. 요청별 시각은 facts의 `updated_at`, 파일의 최근 반영·진단 시각은 `source_file.recorded_at`, 마지막으로 반영한 파일시스템 수정 시각은 `source_file.mtime_ms`에서 확인한다.
 
-`reader.ts`는 조회 실행·페이지·결과 변환과 rollup/raw 경로 선택, `validation.ts`는 공통 수치·페이지 검증을 맡는다. [queries/](../src/summary/db/queries/README.md)는 `common/`의 타입·필터·정렬, `raw/`의 원본·통계·요청·이름·도구·진단, `rollup/`의 최종 조회·일별 소스·병합 지표로 나눈다. 기존 `queries.ts`와 `rollup-queries.ts`는 공개 함수·타입만 재노출하며 내부 구현은 필요한 파일을 직접 참조한다. `rollup-state.ts`는 병합 가능한 상태와 schema, `rollups.ts`는 구축·세션별 갱신·조회 snapshot을 맡는다. SQL은 역할별 구역에서 절·목록·CASE·서브쿼리를 여러 줄로 표현한다. 실제 통계 worker는 `queryUsagePage()` 한 번으로 페이지 행과 전체 개수를 같은 snapshot에서 읽고, 반환된 행으로 도표를 만든다. 요청별·비용 포함·구버전 Node의 raw 조회도 같은 페이지 계약을 사용하며 별도의 도표 조회 메서드와 누계 요청·응답 계약은 두지 않는다. 목록과 개수는 같은 필터·그룹 정의를 사용하고 모델 해석은 공통 facts 표현식을 재사용한다. SQL 구조와 바인딩을 함께 반환하며 시간대·기간·ID는 SQL 문자열에 삽입하지 않는다. 집계 표본·NULL·미상 정렬과 기존 원본 인덱스를 보존한다.
+`reader.ts`는 조회 실행·페이지·결과 변환과 rollup/raw 경로 선택, `validation.ts`는 공통 수치·페이지 검증을 맡는다. [queries/](../src/summary/db/queries/README.md)는 `common/`의 타입·필터·정렬, `raw/`의 원본·통계·요청·이름·도구·진단, `rollup/`의 최종 조회·일별 소스·병합 지표로 나눈다. 기존 `queries.ts`와 `rollup-queries.ts`는 공개 함수·타입만 재노출하며 내부 구현은 필요한 파일을 직접 참조한다. `rollup-state.ts`는 병합 가능한 상태와 schema, `rollups.ts`는 구축·세션별 갱신·조회 snapshot을 맡는다. SQL은 역할별 구역에서 절·목록·CASE·서브쿼리를 여러 줄로 표현한다. 실제 통계 worker는 `queryUsagePage()` 한 번으로 페이지 행과 전체 개수를 같은 snapshot에서 읽고, 반환된 행으로 도표를 만든다. 요청별·비용 포함·구버전 Node의 raw 조회도 같은 페이지 계약을 사용하며 별도의 도표 조회 메서드와 누계 요청·응답 계약은 두지 않는다. 목록과 개수는 같은 필터·그룹 정의를 사용하고 모델 해석은 공통 facts 표현식을 재사용한다. SQL 구조와 바인딩을 함께 반환하며 시간대·기간·ID는 SQL 문자열에 삽입하지 않는다. 집계 표본·NULL·미상 정렬을 보존한다.
 
-SQLite 조회 계획용 통계는 DB 열기에서 `PRAGMA main.optimize=0x10002`, 첫 스캔 완료와 이후 24시간 이상 지난 스캔 완료 및 연결 종료에서 `PRAGMA main.optimize`로 수집한다. `main`만 지정하여 TEMP 파싱 테이블은 분석하지 않는다. 새 인덱스 생성·기존 인덱스 정리 뒤에도 열기 시 통계 수집이 적용되며, 다른 운영체제에서 복사한 같은 schema version의 DB도 열 때 identity 인덱스를 현재 플랫폼에 맞춘다. 통계 수집은 선택적 유지보수여서 실패가 스캔·연결 정리를 실패시키지 않고 다음 실행 시점에 다시 시도한다. `PRAGMA optimize`는 평균 결과 캐시가 아니라 필요한 `ANALYZE`를 선택하는 SQLite 기능이다. [SQLite 권고](https://www.sqlite.org/lang_analyze.html).
+SQLite 조회 계획용 통계는 DB 열기에서 `PRAGMA main.optimize=0x10002`, 첫 스캔 완료와 이후 24시간 이상 지난 스캔 완료 및 연결 종료에서 `PRAGMA main.optimize`로 수집한다. `main`만 지정하여 TEMP 파싱 테이블은 분석하지 않는다. 스키마 이관 뒤에도 열기 시 통계 수집이 적용된다. 통계 수집은 선택적 유지보수여서 실패가 스캔·연결 정리를 실패시키지 않고 다음 실행 시점에 다시 시도한다. `PRAGMA optimize`는 필요한 `ANALYZE`를 선택하는 SQLite 기능이다. [SQLite 권고](https://www.sqlite.org/lang_analyze.html).
 
 표시 이름은 projects·sessions에만 저장한다. 이름에는 UNIQUE 제약을 두지 않는다. 이름이 같은 프로젝트는 project_key로, 같은 프로젝트 안의 같은 세션명도 (provider, session_id)로 구분한다. 조회 시 이름을 연결하고 집계 기준은 기존 ID를 유지한다. 이름을 찾지 못하면 ‘이름 없는 세션’으로 표시한다. 원본 제목을 사용하며 첫 prompt를 제목으로 복사하지 않는다.
 

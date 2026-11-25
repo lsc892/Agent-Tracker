@@ -2,7 +2,7 @@
 import { SCHEMA_DAILY_CAPABILITY_SQL, SCHEMA_ROLLUP_SQL } from './rollup-state';
 
 export { SCHEMA_ROLLUP_SQL } from './rollup-state';
-export const SCHEMA_VERSION = 26;
+export const SCHEMA_VERSION = 27;
 
 export const SCHEMA_APPLIED_RESPONSES_SQL = `
 CREATE TABLE IF NOT EXISTS applied_response (
@@ -124,8 +124,6 @@ CREATE TABLE IF NOT EXISTS source_file (
   last_error TEXT,
   UNIQUE(provider, path)
 );
-CREATE INDEX IF NOT EXISTS idx_source_root_id ON source_file(provider, source_root, id);
-CREATE INDEX IF NOT EXISTS idx_source_session ON source_file(provider, session_id, id);
 `;
 
 export const DAILY_SCHEMA_SQL = `
