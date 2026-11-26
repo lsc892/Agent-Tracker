@@ -1,10 +1,12 @@
 // JSONL 리더의 이미지 생략·청크 경계·오류·취소를 기준 구현과 대조한다.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, writeFile, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readJsonl } from '../../src/summary/jsonl';
+import { ThreadLogParser, threadFields } from '../../src/summary/parsers/threadUsage';
+import { readThreadSource } from '../../src/summary/scanner/sourceReader';
 import { readJsonl as readByteJsonl } from '../fixtures/jsonl-byte-reader';
 import { truncateSync } from 'node:fs';
 import { createHash } from 'node:crypto';
@@ -15,6 +17,38 @@ async function fixture(text: string, run: (path: string, size: number) => Promis
   try { await writeFile(path, text); await run(path, Buffer.byteLength(text)); }
   finally { await rm(directory, { recursive: true, force: true }); }
 }
+
+test('Codex prefix dispatch preserves timestamps, duplicate-key fallback, and response winner order', async () => {
+  const meta = '{"type":"session_meta","payload":{"id":"thread"}}\n';
+  const response = (input: number, model: string) =>
+    JSON.stringify({ thread_id: 'thread', turn_id: 'turn', response_id: 'response', model, usage: { input_tokens: input } });
+  const prefix = '{"timestamp":"2026-11-25T00:00:00.123Z","ordinal":1,"type":"response_item","payload":';
+  const skipped = prefix + '{"timestamp":999,"content":[{"text":"ignored \\"quote\\""}]}}';
+  const duplicated = prefix + '{},"type":"token_usage_record","payload":' + response(20, 'first') + '}\n';
+  const later = (input: number, model: string) => '{"payload":' + response(input, model) + ',"type":"token_usage_record"}\n';
+  const crossChunk = prefix + JSON.stringify({ content: 'x'.repeat(64 * 1024) }) + '}\n';
+  const partial = prefix + '{"content":"waiting';
+  await fixture(meta + skipped + '\r\n' + duplicated + later(19, 'loser') + crossChunk + later(20, 'tie') + partial, async (path, size) => {
+    const parser = new ThreadLogParser('codex', path, path);
+    const bytes = Buffer.from(skipped);
+    assert.equal(parser.readCompleteLine(bytes, 0, bytes.length), true);
+    const baseline = new ThreadLogParser('codex', path, path);
+    const projected = await readJsonl(path, size, (row, offset) => baseline.row(row, offset), { fixedShape: threadFields.codex });
+    const actual = await readThreadSource({ id: 1, provider: 'codex', path, source_root: path, size_bytes: size,
+      mtime_ms: (await stat(path)).mtimeMs }, { cancelled: () => false, onFailedSession: () => assert.fail('unexpected failure') });
+    assert.deepEqual(actual, { partialLine: projected.partialLine, thread: baseline.finish() });
+    assert.equal(actual.partialLine, true);
+    assert.equal(actual.thread?.lastAt, Date.parse('2026-11-25T00:00:00.123Z'));
+    assert.equal(actual.thread?.responses.rows[0].model, 'tie');
+  });
+  await fixture(meta + prefix + '{"discard":[1,]}}\n', async (path, size) => {
+    const failed: string[] = [];
+    await assert.rejects(readThreadSource({ id: 1, provider: 'codex', path, source_root: path, size_bytes: size,
+      mtime_ms: (await stat(path)).mtimeMs }, { cancelled: () => false, onFailedSession: id => { failed.push(id); } }),
+    { code: 'parse-error', offset: Buffer.byteLength(meta) });
+    assert.deepEqual(failed, ['thread']);
+  });
+});
 
 test('inline image bodies crossing read chunks do not consume the retained line budget or change source offsets', async () => {
   // The next image header straddles the 64 KiB read boundary.

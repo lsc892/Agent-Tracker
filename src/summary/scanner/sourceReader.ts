@@ -35,7 +35,8 @@ interface ReadOptions {
 }
 
 async function readSourceRows(file: SourceReadFile, onRow: (row: Record<string, unknown>, offset: number) => void,
-  fields: { shape: JsonShape } | { fixedShape: FixedJsonShape }, options: Pick<ReadOptions, 'signal' | 'cancelled' | 'maxLineBytes' | 'onBytes'>):
+  fields: { shape: JsonShape } | { fixedShape: FixedJsonShape; onCompleteLine?: (chunk: Buffer, start: number, end: number) => boolean },
+  options: Pick<ReadOptions, 'signal' | 'cancelled' | 'maxLineBytes' | 'onBytes'>):
   Promise<Pick<SourceRead, 'rows' | 'partialLine'>> {
   const { rows, partialLine } = await readJsonl(file.path, file.size_bytes, onRow, {
     signal: options.signal, isCancelled: options.cancelled, maxLineBytes: options.maxLineBytes,
@@ -58,7 +59,10 @@ export async function readThreadSource(file: SourceReadFile, options: Pick<ReadO
   // [파싱 정책] 제공자별 고정 필드로 관측한 범위만 읽고 완성한 행이 있을 때 스레드를 확정한다.
   const parser = new ThreadLogParser(file.provider, file.path, file.source_root);
   try {
-    const { rows, partialLine } = await readSourceRows(file, (row, offset) => parser.row(row, offset), { fixedShape: threadFields[file.provider] }, options);
+    const { rows, partialLine } = await readSourceRows(file, (row, offset) => parser.row(row, offset), {
+      fixedShape: threadFields[file.provider],
+      onCompleteLine: file.provider === 'codex' ? parser.readCompleteLine.bind(parser) : undefined,
+    }, options);
     if (!rows) return { partialLine };
     return { partialLine, thread: parser.finish() };
   } catch (error) {

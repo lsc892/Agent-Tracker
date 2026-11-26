@@ -41,6 +41,8 @@ export async function readJsonl(
   onRow: (row: Record<string, unknown>, offset: number) => void | boolean,
   options: { maxLineBytes?: number; signal?: AbortSignal; isCancelled?: () => boolean; onBytes?: (bytes: number) => void;
     shape?: JsonShape; fixedShape?: FixedJsonShape;
+    /** Consume a complete, image-free row directly from the current buffer. */
+    onCompleteLine?: (chunk: Buffer, start: number, end: number) => boolean;
     /** Raw file bytes, before image filtering or decompression; valid only during the callback. */
     onChunk?: (chunk: Buffer) => void;
     /** Synchronous processing of at most one chunk; file reads stay outside the callback. */
@@ -88,7 +90,15 @@ export async function readJsonl(
         if (projection) {
           if (image < index) image = nextImageMarker(chunk, index);
           needsLine = image < end;
-          if (!needsLine) projection.append(chunk, index, end);
+          if (!needsLine) {
+            if (options.onCompleteLine?.(chunk, index, end)) {
+              rows++;
+              lineOffset += end - index + 1;
+              index = end + 1;
+              continue;
+            }
+            projection.append(chunk, index, end);
+          }
         } else {
           const candidate = chunk.toString('utf8', index, end).trim();
           needsLine = /data:image\//i.test(candidate);

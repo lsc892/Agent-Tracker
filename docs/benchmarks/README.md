@@ -11,6 +11,7 @@
 
 ## 제품 반영
 
+- [2026-11-27 Codex 행 접두사와 응답 winner A/B](success/2026-11-27/PrefixWinnerAB-2026-11-27.md) — 시각만 필요한 줄과 응답 객체 생성을 줄인 뒤 할당, 최초 수집, 증분 갱신과 평균 조회를 비교했다.
 - [2026-11-26 원본 탐색과 Codex 응답 키 색인의 힙 A/B](success/2026-11-26/RefreshHeapAB-2026-11-26.md) — 디렉터리 순회와 Codex 응답 키 색인 변경이 갱신에서 사용하는 힙에 미치는 영향을 비교했다.
 - [2026-11-26 구형 Codex 누계 비교 서명 ArrayBuffer A/B](success/2026-11-26/LegacySignaturesBufferAB-2026-11-26.md) — 집계 직전 힙과 전체 피크 힙, 프로세스 RSS 및 저장 결과를 비교했다.
 - [2026-11-26 JSONL 고정 필드 바이트 선택 A/B](success/2026-11-26/ByteProjectionAB-2026-11-26.md) — 필요한 값만 디코딩하는 경로의 파일 Worker 힙·할당과 전체 갱신 시간·RSS를 비교했다.

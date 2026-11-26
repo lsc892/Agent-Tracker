@@ -4,6 +4,7 @@ import { tokenUsageScore } from '../aggregation/winners';
 import type { Provider } from '../db/types';
 import { SummaryError } from '../jsonl';
 import { hasJsonFields, type FixedJsonShape } from '../jsonl/projection';
+import { StreamingFixedProjection } from '../jsonl/streamProjection';
 import type { TokenVector } from '../types';
 import { claudeTokens, codexTokens, displayName, object, project, sqlText, string, timestamp } from './common';
 import { packLegacySignatures, type LegacySignatures } from './legacySignatures';
@@ -18,6 +19,14 @@ const usage: FixedJsonShape = { fields: { ...fields('input_tokens', 'output_toke
 const legacyUsage: FixedJsonShape = { fields: { ...usage.fields, ...fields('reasoning_output_tokens', 'total_tokens') } };
 const lineage: FixedJsonShape = { fields: { subagent: { fields: { thread_spawn: { fields: fields('parent_thread_id') } } } } };
 const claudeTypes = new Set(['user', 'assistant', 'system', 'progress', 'file-history-snapshot', 'queue-operation', 'summary']);
+const timestampPrefix = Buffer.from('{"timestamp":"');
+const ordinalPrefix = Buffer.from(',"ordinal":');
+const responseItemPrefix = Buffer.from(',"type":"response_item","payload":{');
+const isoTimestamp = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?Z$/;
+
+function matches(bytes: Buffer, start: number, end: number, prefix: Buffer): boolean {
+  return start + prefix.length <= end && bytes.compare(prefix, 0, prefix.length, start, start + prefix.length) === 0;
+}
 
 // Fixed field paths make selection independent of the order of type and payload in a row.
 export const threadFields: Record<Provider, FixedJsonShape> = {
@@ -134,6 +143,7 @@ export class ThreadLogParser {
   private previousCheckpoint?: ThreadCheckpoint;
   private intervalUsage = 0;
   private legacy?: PendingLegacy;
+  private responseItemValidator?: StreamingFixedProjection;
 
   constructor(private readonly provider: Provider, path: string, sourceRoot: string) {
     // [귀속 정책] Claude는 경로로 스레드와 프로젝트를, Codex는 원본 루트의 상위 경로로 프로젝트를 정한다.
@@ -155,6 +165,34 @@ export class ThreadLogParser {
   row(row: Record<string, unknown>, offset: number): void {
     if (this.provider === 'claude') this.claude(row, offset);
     else this.codex(row, offset);
+  }
+
+  readCompleteLine(bytes: Buffer, start: number, end: number): boolean {
+    // Compact Codex response items contribute only their top-level timestamp.
+    if (!matches(bytes, start, end, timestampPrefix)) return false;
+    const timeStart = start + timestampPrefix.length;
+    const timeEnd = bytes.indexOf(34, timeStart);
+    if (timeEnd < 0 || !matches(bytes, timeEnd + 1, end, ordinalPrefix)) return false;
+    const ordinalStart = timeEnd + 1 + ordinalPrefix.length;
+    let next = ordinalStart;
+    while (next < end && bytes[next] >= 48 && bytes[next] <= 57) next++;
+    if (next === ordinalStart || next > ordinalStart + 1 && bytes[ordinalStart] === 48
+      || !matches(bytes, next, end, responseItemPrefix)) return false;
+    const time = bytes.toString('utf8', timeStart, timeEnd);
+    if (!isoTimestamp.test(time)) return false;
+    const observed = timestamp(time);
+    if (observed === null) return false;
+
+    // Require exactly the four root members above. The payload must be one valid JSON object.
+    while (end > next && (bytes[end - 1] === 32 || bytes[end - 1] === 9 || bytes[end - 1] === 13)) end--;
+    const payloadStart = next + responseItemPrefix.length - 1;
+    if (bytes[end - 1] !== 125 || bytes[end - 2] !== 125) return false;
+    const validator = this.responseItemValidator ??= new StreamingFixedProjection();
+    validator.reset(0);
+    validator.append(bytes, payloadStart, end - 1);
+    if (!validator.isCompleteObject()) return false;
+    this.observeTime(observed);
+    return true;
   }
 
   finish(): ThreadLog {
@@ -198,8 +236,11 @@ export class ThreadLogParser {
     const responseId = identifier(message.id);
     if (!responseId) throw new SummaryError('missing-response-id', offset);
     const requestId = identifier(row.requestId);
-    this.keepResponse(JSON.stringify([responseId, requestId]), { responseId, requestId,
-      model: model === '<synthetic>' ? '' : sqlText(model ?? ''), order: this.recordCount++ }, tokens);
+    const order = this.recordCount++;
+    const index = this.winnerIndex(JSON.stringify([responseId, requestId]), tokens);
+    if (index === undefined) return;
+    this.responses[index] = { responseId, requestId, model: model === '<synthetic>' ? '' : sqlText(model ?? ''), order };
+    this.responseTokens.write(index, tokens);
   }
 
   private codex(row: Record<string, unknown>, offset: number): void {
@@ -246,20 +287,13 @@ export class ThreadLogParser {
     return sqlText(displayName(payload.model) ?? this.model ?? '');
   }
 
-  private keepResponse(key: string, candidate: ThreadResponse, tokens: ThreadTokens): number | undefined {
+  private winnerIndex(key: string, tokens: ThreadTokens): number | undefined {
     // [Winner 정책] 입력+출력 토큰이 많은 후보를 택하고 동점이면 나중 행으로 교체하되 첫 등장 인덱스를 유지한다.
     const index = this.responseIndices.get(key);
-    if (index !== undefined) {
-      if (tokenUsageScore(tokens.input, tokens.output) >= scoreThreadTokens(this.responseTokens.values, index)) {
-        this.responses[index] = candidate;
-        this.responseTokens.write(index, tokens);
-      }
-      return;
-    }
+    if (index !== undefined)
+      return tokenUsageScore(tokens.input, tokens.output) >= scoreThreadTokens(this.responseTokens.values, index) ? index : undefined;
     const next = this.responses.length;
     this.responseIndices.set(key, next);
-    this.responses.push(candidate);
-    this.responseTokens.write(next, tokens);
     return next;
   }
 
@@ -268,20 +302,25 @@ export class ThreadLogParser {
     const responseId = identifier(payload.response_id);
     if (!responseId) throw new SummaryError('missing-response-id', offset);
     if (!this.turnId) throw new SummaryError('missing-root-turn', offset);
-    const candidate = { responseId, turnId: this.turnId, model: this.codexModel(payload) };
+    const turnId = this.turnId;
     const tokens = codexTokens(object(payload.usage));
     this.recordCount++;
 
     // [Winner 정책] 턴 ID와 응답 ID가 같은 후보를 파일 내 winner 하나로 합친다.
-    const responseIndex = this.keepResponse(responseKey(candidate), candidate, tokens);
+    const responseIndex = this.winnerIndex(JSON.stringify([turnId, responseId]), tokens);
     if (responseIndex === undefined) return;
+    const first = responseIndex === this.responses.length;
+    const model = this.codexModel(payload);
+    this.responses[responseIndex] = { responseId, turnId, model };
+    this.responseTokens.write(responseIndex, tokens);
+    if (!first) return;
 
     // [집계 정책] 첫 등장 행의 사용량으로 구간 합계를 늘리고 누계가 있으면 체크포인트를 기록한다.
     this.intervalUsage += tokens.input + tokens.output;
     const threadTotal = optionalCheckpoint(payload.thread_token_usage);
     if (!threadTotal) return;
     if (responseIndex === 0 && this.legacy?.leadingCount) this.legacy.firstResponse = { tokens, threadTotal };
-    this.recordCheckpoint({ responseIndex, model: candidate.model, threadTotal,
+    this.recordCheckpoint({ responseIndex, model, threadTotal,
       turnTotal: optionalCheckpoint(payload.turn_token_usage) });
   }
 

@@ -132,7 +132,9 @@ class CompactRow {
 
 export class StreamingFixedProjection {
   private readonly containers: Container[] = [];
+  private readonly spareContainers: Container[] = [];
   private readonly compact = new CompactRow();
+  private readonly stringState: JsonString = { target: 'discard', prefix: '', keyLimit: 0, escape: 0 };
   private string?: JsonString;
   private number?: NumberState;
   private literal = '';
@@ -142,12 +144,17 @@ export class StreamingFixedProjection {
   private edgeSpace = 0;
   private offset = 0;
 
-  constructor(private readonly shape: FixedJsonShape) {}
+  constructor(private readonly shape?: FixedJsonShape) {}
 
   reset(offset: number): void {
-    // A new row starts only after a successful finish has emptied the grammar state.
     this.offset = offset;
     this.rootByte = undefined;
+    this.invalid = false;
+    this.edgeSpace = 0;
+    this.string = undefined;
+    this.number = undefined;
+    this.literal = '';
+    while (this.containers.length) this.releaseContainer();
     this.compact.reset();
   }
 
@@ -168,12 +175,21 @@ export class StreamingFixedProjection {
   }
 
   finish(): Record<string, unknown> | undefined {
-    if (this.invalid || this.string || this.literal || this.containers.length || this.edgeSpace
-      || this.number !== undefined && !endsNumber(this.number)) throw new SummaryError('parse-error', this.offset);
+    if (!this.isComplete()) throw new SummaryError('parse-error', this.offset);
     if (this.rootByte === undefined) return undefined;
     if (this.rootByte !== Byte.OpenObject) throw new SummaryError('unsupported-schema', this.offset);
     try { return JSON.parse(this.compact.text()) as Record<string, unknown>; }
     catch { throw new SummaryError('parse-error', this.offset); }
+  }
+
+  /** Validate a complete object without decoding it into a JavaScript value. */
+  isCompleteObject(): boolean {
+    return this.rootByte === Byte.OpenObject && this.isComplete();
+  }
+
+  private isComplete(): boolean {
+    return !this.invalid && !this.string && !this.literal && !this.containers.length && !this.edgeSpace
+      && (this.number === undefined || endsNumber(this.number));
   }
 
   private readStructure(byte: number): void {
@@ -244,7 +260,14 @@ export class StreamingFixedProjection {
         this.compact.appendByte(byte);
         if (!project) this.compact.appendByte(end);
       }
-      this.containers.push({ end, position: 'first', shape: project, selected: false, nonempty: false });
+      const frame = this.spareContainers.pop() ?? { end, position: 'first', selected: false, nonempty: false };
+      frame.end = end;
+      frame.position = 'first';
+      frame.shape = project;
+      frame.member = undefined;
+      frame.selected = false;
+      frame.nonempty = false;
+      this.containers.push(frame);
       return;
     }
     if (byte === Byte.Quote) {
@@ -260,10 +283,16 @@ export class StreamingFixedProjection {
   }
 
   private endContainer(frame: Container): void {
-    this.containers.pop();
-    if (!frame.shape) return;
-    if (frame.shape.keepNonempty && frame.nonempty && !frame.selected) this.compact.appendLatin1('"":true');
-    this.compact.appendByte(frame.end);
+    if (frame.shape) {
+      if (frame.shape.keepNonempty && frame.nonempty && !frame.selected) this.compact.appendLatin1('"":true');
+      this.compact.appendByte(frame.end);
+    }
+    this.releaseContainer();
+  }
+
+  private releaseContainer(): void {
+    const frame = this.containers.pop()!;
+    if (this.spareContainers.length < 32) this.spareContainers.push(frame);
   }
 
   private readScalar(bytes: Buffer, index: number, end: number): number {
@@ -293,7 +322,12 @@ export class StreamingFixedProjection {
   }
 
   private startString(target: JsonString['target'], limit = 0): void {
-    this.string = { target, prefix: '', keyLimit: limit, escape: 0 };
+    const state = this.stringState;
+    state.target = target;
+    state.prefix = '';
+    state.keyLimit = limit;
+    state.escape = 0;
+    this.string = state;
     if (target === 'output') this.compact.appendByte(Byte.Quote);
   }
 
