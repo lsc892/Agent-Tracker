@@ -21,7 +21,6 @@ const plainString = /[^"\\\x00-\x1f]*"/y;
 const escapedString = /[^"\\\x00-\x1f]*(?:\\(?:["\\/bfnrt]|u[0-9a-fA-F]{4})[^"\\\x00-\x1f]*)*"/y;
 const stringPart = /[^"\\\x00-\x1f]+|\\(?:["\\/bfnrt]|u[0-9a-fA-F]{4})/y;
 const numberToken = /-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?/y;
-const keyEscapes: Record<string, string> = { b: '\b', f: '\f', n: '\n', r: '\r', t: '\t' };
 
 export function hasJsonFields(value: Record<string, unknown>): boolean {
   return Object.hasOwn(value, nonempty) || Object.keys(value).length > 0;
@@ -29,10 +28,6 @@ export function hasJsonFields(value: Record<string, unknown>): boolean {
 
 export function projectJson(text: string, shape: JsonShape): unknown {
   return new JsonProjection(text).parse(shape);
-}
-
-export function projectFixedJson(text: string, shape: FixedJsonShape): unknown {
-  return new JsonProjection(text).parseFixed(shape);
 }
 
 function field<T>(fields: Readonly<Record<string, T>> | undefined, name: string): T | undefined {
@@ -51,58 +46,6 @@ class JsonProjection {
     this.space();
     if (this.offset !== this.text.length) invalidJson();
     return result;
-  }
-
-  /** Validate the input once and decode the compact row in one native JSON.parse call. */
-  parseFixed(shape: FixedJsonShape): unknown {
-    // [파싱 정책] 입력 문법은 모두 확인하고 선택한 조각을 합쳐 한 번만 JSON.parse에 넘긴다.
-    const pieces: string[] = [];
-    this.space();
-    if (this.text[this.offset] === '{') this.fixedObject(shape, pieces);
-    else this.skipValue();
-    this.space();
-    if (this.offset !== this.text.length) invalidJson();
-    return pieces.length ? JSON.parse(pieces.join('')) : null;
-  }
-
-  private fixedObject(shape: FixedJsonShape, pieces: string[]): void {
-    // [필드 선택 정책] 키 이스케이프를 해석해 선택표에서 찾고 선택 밖의 값은 문법만 검사한다.
-    this.offset++;
-    if (this.take('}')) { pieces.push('{}'); return; }
-    pieces.push('{');
-    let selected = false;
-    do {
-      this.space();
-      const keyStart = this.offset;
-      const escaped = this.skipString(), keyEnd = this.offset;
-      const literal = this.text.slice(keyStart + 1, keyEnd - 1);
-      const name = escaped ? literal.replace(/\\(u[0-9a-fA-F]{4}|.)/g, (_match, code: string) =>
-        code.length === 5 ? String.fromCharCode(Number.parseInt(code.slice(1), 16)) : keyEscapes[code] ?? code) : literal;
-      this.expect(':');
-      const member = field(shape.fields, name);
-      if (!member) { this.skipValue(); continue; }
-      if (selected) pieces.push(',');
-      selected = true;
-      pieces.push(this.text.slice(keyStart, keyEnd), ':');
-      this.fixedValue(member, pieces);
-    } while (this.next('}'));
-    // Distinguish an empty usage object from a malformed, populated one after selection.
-    if (!selected && shape.keepNonempty) pieces.push('"":true');
-    pieces.push('}');
-  }
-
-  private fixedValue(shape: FixedJsonShape, pieces: string[]): void {
-    // [필드 선택 정책] 하위 필드 정의가 있는 객체만 펼치고 나머지 컨테이너는 형태만 보존한다.
-    this.space();
-    const start = this.offset, char = this.text[start];
-    if (char === '{' && shape.fields) {
-      this.fixedObject(shape, pieces);
-      return;
-    }
-    this.skipValue();
-    if (char === '{') pieces.push('{}');
-    else if (char === '[') pieces.push('[]');
-    else pieces.push(this.text.slice(start, this.offset));
   }
 
   private space(): void {

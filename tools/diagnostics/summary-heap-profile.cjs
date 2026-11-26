@@ -117,10 +117,11 @@ function aggregationShape(aggregation) {
   const uuid = /^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/i;
   for (const { source, codex } of aggregation.threads.values()) {
     if (!codex) continue;
-    responseRows += codex.rows.length;
-    responseBufferBytes += codex.tokens.values.byteLength;
-    for (const key of codex.indices.keys()) responseKeyCodeUnits += key.length;
-    for (const row of codex.rows) {
+    const responseIndex = codex.indices ?? codex.winners;
+    responseRows += responseIndex.size;
+    responseBufferBytes += codex.tokens?.values.byteLength ?? 0;
+    for (const key of responseIndex.keys()) responseKeyCodeUnits += key.length;
+    for (const row of codex.rows ?? codex.winners.values()) {
       turnIds.add(row.turnId);
       responseIds.add(row.responseId);
       models.add(row.model);
@@ -134,9 +135,11 @@ function aggregationShape(aggregation) {
     }
     const legacy = source.codex?.legacy;
     if (!legacy) continue;
-    legacyRows += legacy.signatures.length;
-    legacyBufferBytes += legacy.tokens.byteLength;
-    for (const key of legacy.signatures) {
+    const signatures = legacy.signatures ?? legacy;
+    legacyRows += signatures.length;
+    legacyBufferBytes += legacy.tokens?.byteLength ?? 0;
+    for (const entry of signatures) {
+      const key = typeof entry === 'string' ? entry : entry.signature;
       legacySignatureCodeUnits += key.length;
       if (legacySignatures.has(key)) continue;
       legacySignatures.add(key);
@@ -352,62 +355,82 @@ async function runQuota() {
 async function main() {
   const args = Object.fromEntries(process.argv.slice(2).map(arg => arg.replace(/^--/, '').split(/=(.*)/s).slice(0, 2)));
   assert.ok(args.workspace && args.reference && args.output, 'Pass --workspace, --reference and --output');
-  const workspace = resolve(args.workspace), product = join(workspace, 'B');
+  const variant = args.variant ?? 'B';
+  assert.ok(['A', 'B', 'both'].includes(variant), 'Use --variant=A, --variant=B or --variant=both');
+  assert.ok(!args.mode || ['timeline', 'allocations', 'retained'].includes(args.mode), 'Unknown profile mode');
+  const timelineRuns = Number(args['timeline-runs'] ?? (args.mode === 'timeline' ? 1 : 3));
+  assert.ok(Number.isSafeInteger(timelineRuns) && timelineRuns > 0, '--timeline-runs must be a positive integer');
+  const variants = variant === 'both' ? ['A', 'B'] : [variant];
+  const modes = args.mode && args.mode !== 'timeline' ? [args.mode] : Array(timelineRuns).fill('timeline');
+  if (!args.mode) modes.push('allocations', 'retained');
+  const workspace = resolve(args.workspace);
   const reference = JSON.parse(await fs.readFile(args.reference, 'utf8'));
-  assert.equal(await treeHash(join(product, 'dist/src')), reference.builds.B.build);
-  assert.equal(await treeHash(join(product, 'src')), reference.builds.B.source);
+  const products = {};
+  for (const id of variants) {
+    const product = products[id] = join(workspace, id);
+    assert.equal(await treeHash(join(product, 'dist/src')), reference.builds[id].build);
+    assert.equal(await treeHash(join(product, 'src')), reference.builds[id].source);
+  }
   const folder = await fs.mkdtemp(join(repo, 'tests/.cache/summary-heap-profile-'));
   const inputs = {};
   const startedAt = new Date().toISOString();
   for (const name of args.dataset ? [args.dataset] : ['real', '10000']) {
     const manifest = join(workspace, name, 'snapshot.json');
     const input = reference.inputs[name];
-    const original = input.samples.cold[0].B;
     const snapshot = JSON.parse(await fs.readFile(manifest, 'utf8'));
     assert.equal(snapshot.sha256, input.sha256);
     for (const file of snapshot.files) assert.equal(await fileHash(file.path), file.sha256);
     const rows = inputs[name] = { sha256: input.sha256, runs: [] };
-    const modes = args.mode ? [args.mode] : ['timeline', 'timeline', 'timeline', 'allocations', 'retained'];
     for (const [index, mode] of modes.entries()) {
-      const run = join(folder, `${name}-${mode}-${index + 1}`);
-      await fs.mkdir(run);
-      const expected = { parsed: original.parsed, bytes: original.bytes,
-        tokens: original.totals.reduce((sum, row) => sum + row.tokens, 0) };
-      await new Promise((done, reject) => {
-        const child = fork(__filename, ['--child'], {
-          execArgv: ['--no-warnings', '--expose-gc', '--require', __filename], stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
-          env: { ...process.env, [configKey]: JSON.stringify({ product, manifest, mode, run, expected }) },
-          windowsHide: true,
-        });
-        child.once('error', reject);
-        child.once('exit', code => code === 0 ? done() : reject(new Error(`Profile child exited with code ${code}`)));
-      });
-      const files = (await fs.readdir(run)).filter(file => file.startsWith('isolate-')).sort();
-      const isolates = files.map(file => JSON.parse(readFileSync(join(run, file), 'utf8')));
-      assert.equal(isolates.filter(row => row.role === 'summary').length, 1);
-      assert.equal(isolates.filter(row => row.role === 'client').length, 1);
-      if (name === 'real') assert.equal(isolates.filter(row => row.role === 'source').length, 4);
-      rows.runs.push({ mode, workload: JSON.parse(readFileSync(join(run, 'workload.json'), 'utf8')), isolates });
-      console.log(`${name} ${mode} ${index + 1}/${modes.length}`);
+      const order = index % 2 === 0 ? variants : variants.toReversed();
+      for (const id of order) {
+        const run = join(folder, `${name}-${mode}-${index + 1}-${id}`);
+        await fs.mkdir(run);
+        const original = input.samples.cold[0][id];
+        const expected = { parsed: original.parsed, bytes: original.bytes,
+          tokens: original.totals.reduce((sum, row) => sum + row.tokens, 0) };
+        await profileChild('--child', { product: products[id], manifest, mode, run, expected });
+        const files = (await fs.readdir(run)).filter(file => file.startsWith('isolate-')).sort();
+        const isolates = files.map(file => JSON.parse(readFileSync(join(run, file), 'utf8')));
+        assert.equal(isolates.filter(row => row.role === 'summary').length, 1);
+        assert.equal(isolates.filter(row => row.role === 'client').length, 1);
+        if (name === 'real') assert.equal(isolates.filter(row => row.role === 'source').length, 4);
+        rows.runs.push({ variant: id, mode, workload: JSON.parse(readFileSync(join(run, 'workload.json'), 'utf8')), isolates });
+        console.log(`${name} ${mode} ${id} ${index + 1}/${modes.length}`);
+      }
     }
   }
   const offlineQuota = [];
-  for (let index = 0; index < 3; index++) {
-    const run = join(folder, `quota-${index + 1}`);
-    await fs.mkdir(run);
-    await new Promise((done, reject) => {
-      const child = fork(__filename, ['--quota'], { execArgv: ['--no-warnings', '--expose-gc'], stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
-        env: { ...process.env, [configKey]: JSON.stringify({ product, mode: 'timeline', run }) }, windowsHide: true });
-      child.once('error', reject);
-      child.once('exit', code => code === 0 ? done() : reject(new Error(`Quota profile exited with code ${code}`)));
-    });
-    offlineQuota.push(JSON.parse(readFileSync(join(run, 'isolate-0.json'), 'utf8')));
+  if (args['skip-quota'] !== 'true') {
+    for (const id of variants) {
+      for (let index = 0; index < 3; index++) {
+        const run = join(folder, `quota-${index + 1}-${id}`);
+        await fs.mkdir(run);
+        await profileChild('--quota', { product: products[id], mode: 'timeline', run });
+        offlineQuota.push({ variant: id, ...JSON.parse(readFileSync(join(run, 'isolate-0.json'), 'utf8')) });
+      }
+    }
   }
   const output = resolve(args.output);
   await fs.mkdir(dirname(output), { recursive: true });
-  await fs.writeFile(output, JSON.stringify({ startedAt, completedAt: new Date().toISOString(), build: reference.builds.B,
+  const builds = Object.fromEntries(variants.map(id => [id, reference.builds[id]]));
+  await fs.writeFile(output, JSON.stringify({ startedAt, completedAt: new Date().toISOString(),
+    ...(variants.length === 1 ? { build: builds[variant] } : {}), builds,
     environment: { node: process.version, v8: process.versions.v8, sqlite: process.versions.sqlite, platform: process.platform },
     intervalMs, samplingInterval, inputs, offlineQuota }, null, 2) + '\n', { flag: 'wx' });
+}
+
+function profileChild(action, config) {
+  const execArgv = ['--no-warnings', '--expose-gc'];
+  if (action === '--child') execArgv.push('--require', __filename);
+  return new Promise((done, reject) => {
+    const child = fork(__filename, [action], {
+      execArgv, stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
+      env: { ...process.env, [configKey]: JSON.stringify(config) }, windowsHide: true,
+    });
+    child.once('error', reject);
+    child.once('exit', code => code === 0 ? done() : reject(new Error(`${action} profile exited with code ${code}`)));
+  });
 }
 
 if (!isMainThread && process.env[configKey]) instrumentWorker();

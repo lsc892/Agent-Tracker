@@ -3,16 +3,28 @@ import { open } from 'node:fs/promises';
 import { zstdChunks, ZstdError } from './zstd';
 import { SummaryError } from './errors';
 import { JsonlLine } from './line';
-import { projectFixedJson, projectJson, type FixedJsonShape, type JsonShape } from './projection';
+import { projectJson, type FixedJsonShape, type JsonShape } from './projection';
 import { StreamingFixedProjection } from './streamProjection';
 
 export { SummaryError } from './errors';
 
+const imagePrefix = Buffer.from('data:image');
+
+/** Find the next literal marker so each chunk is searched once, including mixed ASCII case. */
+function nextImageMarker(chunk: Buffer, start: number): number {
+  for (let slash = chunk.indexOf(47, start + imagePrefix.length); slash >= 0; slash = chunk.indexOf(47, slash + 1)) {
+    const candidate = slash - imagePrefix.length;
+    let index = 0;
+    while (index < imagePrefix.length && (chunk[candidate + index] | 32) === imagePrefix[index]) index++;
+    if (index === imagePrefix.length) return candidate;
+  }
+  return chunk.length;
+}
+
 /** JSON 문법 오류와 지원하지 않는 최상위 형식을 원본 행 위치로 구분한다. */
-function parseJsonlObject(text: string, offset: number, shape: JsonShape | undefined, fixedShape: FixedJsonShape | undefined): Record<string, unknown> {
-  // [파싱 정책] 고정 필드, 유형별 필드, 전체 JSON 순으로 적용하고 문법 오류와 객체 형식 오류를 구분한다.
+function parseJsonlObject(text: string, offset: number, shape: JsonShape | undefined): Record<string, unknown> {
   let row: unknown;
-  try { row = fixedShape ? projectFixedJson(text, fixedShape) : shape ? projectJson(text, shape) : JSON.parse(text); }
+  try { row = shape ? projectJson(text, shape) : JSON.parse(text); }
   catch { throw new SummaryError('parse-error', offset); }
   if (!row || typeof row !== 'object' || Array.isArray(row)) throw new SummaryError('unsupported-schema', offset);
   return row as Record<string, unknown>;
@@ -21,7 +33,7 @@ function parseJsonlObject(text: string, offset: number, shape: JsonShape | undef
 /**
  * 책임: 관측한 크기까지만 로그를 읽고 행과 원본 위치를 전달한다.
  * 64KiB 이하 단위로 파일을 읽고 LF마다 한 행을 전달한다.
- * 청크 경계를 넘거나 이미지가 있는 줄의 고정 필드는 읽는 중에 고른다.
+ * 고정 필드는 원본 바이트에서 고른 뒤 선택 결과만 UTF-8로 디코딩한다.
  */
 export async function readJsonl(
   path: string,
@@ -40,8 +52,9 @@ export async function readJsonl(
   const compressed = path.toLowerCase().endsWith('.jsonl.zst');
   const file = await open(path, 'r');
   const buffer = Buffer.allocUnsafe(Math.min(64 * 1024, Math.max(1, size)));
+  const projection = options.fixedShape && new StreamingFixedProjection(options.fixedShape);
+  const appendProjected = projection?.append.bind(projection);
   let line: JsonlLine | undefined;
-  let projection: StreamingFixedProjection | undefined;
   let read = 0;
   let lineOffset = 0;
   let rows = 0;
@@ -61,41 +74,44 @@ export async function readJsonl(
     }
   };
 
-  // [파싱 정책] LF로 행을 나누고 이미지가 없는 짧은 한 청크 행은 바로 UTF-8로 읽는다.
+  // [파싱 정책] LF로 행을 나누고 이미지가 없는 고정 필드 행은 원본 바이트에서 바로 선택한다.
   function parseChunk(chunk: Buffer): boolean {
     let index = 0;
+    let image = -1;
     while (index < chunk.length) {
       const newline = chunk.indexOf(10, index);
       const end = newline < 0 ? chunk.length : newline;
       let text: string | undefined;
-      let sourceBytes = end - index;
-      if (!line && newline >= 0 && sourceBytes <= maxLine) {
-        const candidate = chunk.toString('utf8', index, end).trim();
-        // JsonlLine strips literal image bodies and validates their discarded bytes.
-        if (!/data:image\//i.test(candidate)) text = candidate;
+      let needsLine = !!line || newline < 0 || end - index > maxLine;
+      if (!line) projection?.reset(lineOffset);
+      if (!needsLine) {
+        if (projection) {
+          if (image < index) image = nextImageMarker(chunk, index);
+          needsLine = image < end;
+          if (!needsLine) projection.append(chunk, index, end);
+        } else {
+          const candidate = chunk.toString('utf8', index, end).trim();
+          needsLine = /data:image\//i.test(candidate);
+          if (!needsLine) text = candidate;
+        }
       }
 
       // [파싱 정책] 청크를 넘기거나 이미지가 든 행은 상태를 이어받아 읽고, 고정 스키마가 있으면 필요한 필드만 누적한다.
-      if (text === undefined) {
-        if (!line) {
-          projection = options.fixedShape && new StreamingFixedProjection(options.fixedShape, lineOffset);
-          line = new JsonlLine(maxLine, lineOffset, projection?.append.bind(projection));
-        }
+      if (needsLine) {
+        line ??= new JsonlLine(maxLine, lineOffset, appendProjected);
         line.append(chunk, index, end);
         if (newline < 0) break;
         if (!projection) text = line.text();
-        sourceBytes = line.bytes;
       }
 
       // [파싱 정책] LF에서 완성된 객체를 행 시작 오프셋과 함께 전달하고 다음 행의 상태를 초기화한다.
-      const row = projection ? projection.finish() : text ? parseJsonlObject(text, lineOffset, options.shape, options.fixedShape) : undefined;
+      const row = projection ? projection.finish() : text ? parseJsonlObject(text, lineOffset, options.shape) : undefined;
       if (row) {
         rows++;
         if (onRow(row, lineOffset) === false) return true;
       }
-      lineOffset += sourceBytes + 1;
+      lineOffset += (line?.bytes ?? end - index) + 1;
       line = undefined;
-      projection = undefined;
       index = end + 1;
     }
     return false;

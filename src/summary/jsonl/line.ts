@@ -55,7 +55,9 @@ export class JsonlLine {
       }
       // [메모리 정책] 이미지 본문은 버리고 버려지는 구간의 제어 문자는 직접 검증한다.
       if (this.image) {
-        if (/[\x00-\x1f]/.test(chunk.toString('latin1', index, boundary))) throw new SummaryError('parse-error', this.offset);
+        for (let position = index; position < boundary; position++) {
+          if (chunk[position] < 32) throw new SummaryError('parse-error', this.offset);
+        }
         discard(index, boundary);
       } else this.retain(chunk, index, boundary);
       index = boundary;

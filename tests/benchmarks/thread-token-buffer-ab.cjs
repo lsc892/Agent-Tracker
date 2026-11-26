@@ -1,4 +1,4 @@
-// Measures the token buffer change in isolated runs of the real refresh and query APIs.
+// Compares two builds in isolated runs of the real refresh and query APIs.
 'use strict';
 
 const assert = require('node:assert/strict');
@@ -215,9 +215,50 @@ function compare(A, B) {
     assert.equal(A.query[dimension].sha256, B.query[dimension].sha256, `Query equality for ${dimension}`);
 }
 
-async function measureInput(folder, snapshot, products, pairs, warmups, name) {
+async function fixedRowsFingerprint(product, snapshot) {
+  const { readJsonl } = require(join(product, 'dist/src/summary/jsonl'));
+  const { threadFields } = require(join(product, 'dist/src/summary/parsers/threadUsage'));
+  const hash = createHash('sha256');
+  let rows = 0, partialFiles = 0;
+  for (const file of snapshot.files) {
+    const root = snapshot.roots.find(value => file.path.startsWith(value.path + sep));
+    assert.ok(root, 'Source must be inside a frozen root');
+    const result = await readJsonl(file.path, file.bytes, (row, offset) => {
+      hash.update(JSON.stringify([offset, row])).update('\n');
+    }, { fixedShape: threadFields[root.provider] });
+    rows += result.rows;
+    partialFiles += Number(result.partialLine);
+    hash.update(JSON.stringify(result)).update('\n');
+  }
+  return { rows, partialFiles, sha256: hash.digest('hex') };
+}
+
+async function copySnapshot(inputWorkspace, name, folder) {
+  const source = resolve(inputWorkspace, name);
+  const from = join(source, 'snapshot'), to = join(folder, 'snapshot');
+  const snapshot = JSON.parse(await fs.readFile(join(source, 'snapshot.json'), 'utf8'));
+  const relocate = path => {
+    assert.ok(resolve(path).startsWith(from + sep), 'Frozen path must stay inside the input snapshot');
+    return join(to, relative(from, path));
+  };
+  await fs.cp(from, to, { recursive: true, preserveTimestamps: true });
+  return {
+    ...snapshot,
+    files: snapshot.files.map(file => ({ ...file, path: relocate(file.path) })),
+    roots: snapshot.roots.map(root => ({ ...root, path: relocate(root.path),
+      ...(root.dataHome ? { dataHome: relocate(root.dataHome) } : {}) })),
+  };
+}
+
+async function measureInput(folder, snapshot, products, pairs, warmups, name, verifyFixedRows) {
   const manifest = join(folder, 'snapshot.json');
   await fs.writeFile(manifest, JSON.stringify(snapshot));
+  let fixedRows;
+  if (verifyFixedRows) {
+    fixedRows = await fixedRowsFingerprint(products.A, snapshot);
+    assert.deepEqual(await fixedRowsFingerprint(products.B, snapshot), fixedRows, 'Projected rows and offsets must match');
+    console.log(`${name} fixed rows verified: ${fixedRows.rows}`);
+  }
   const append = await selectAppend(snapshot, products.A);
   const baseline = await auditThreadUsage(snapshot, products.A);
   if (snapshot.expected) {
@@ -270,7 +311,8 @@ async function measureInput(folder, snapshot, products, pairs, warmups, name) {
   }
   for (const file of snapshot.files) assert.equal(await fileHash(file.path), file.sha256, 'Frozen source hash changed');
   return {
-    inventory: snapshot.inventory, sha256: snapshot.sha256, fixture: snapshot.expected, independentTotals: { cold: baseline, append: after },
+    inventory: snapshot.inventory, sha256: snapshot.sha256, fixture: snapshot.expected, fixedRows,
+    independentTotals: { cold: baseline, append: after },
     appendTarget: { beforeBytes: append.file.bytes, appendedBytes: append.append.length,
       existingModernRows: append.modern, compressed: append.compressed, sha256: appendSha256 },
     samples: { cold, append: appended },
@@ -295,9 +337,10 @@ async function main() {
     assert.ok(['real', '10000', '100'].includes(name));
     const folder = join(workspace, name);
     await fs.mkdir(folder);
-    const snapshot = await makeSnapshot(folder, { after: products.A, real: name === 'real',
-      requests: name === 'real' ? 0 : Number(name), 'turns-per-session': name === '100' ? 5 : 50 });
-    inputs[name] = await measureInput(folder, snapshot, products, pairs, warmups, name);
+    const snapshot = args['input-workspace'] ? await copySnapshot(args['input-workspace'], name, folder)
+      : await makeSnapshot(folder, { after: products.A, real: name === 'real',
+        requests: name === 'real' ? 0 : Number(name), 'turns-per-session': name === '100' ? 5 : 50 });
+    inputs[name] = await measureInput(folder, snapshot, products, pairs, warmups, name, args['verify-fixed-rows'] === 'true');
   }
   const environment = { platform: process.platform, release: release(), arch: process.arch, node: process.version,
     v8: process.versions.v8, sqlite: process.versions.sqlite, cpu: cpus()[0].model, logicalCpus: cpus().length };

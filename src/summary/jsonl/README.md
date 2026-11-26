@@ -4,7 +4,7 @@
 
 - [index.ts](index.ts) — 관측한 크기까지 일반·압축 JSONL을 읽는다. LF를 기준으로 한 행씩 디코딩하고 바이트 위치·취소·파일 핸들 수명을 관리한다.
 - [line.ts](line.ts) — `JsonlLine`: 이미지 본문을 제거하고 행의 문자열 문법·바이트 예산·청크 경계 상태를 관리한다.
-- [streamProjection.ts](streamProjection.ts) — 청크 경계를 넘거나 이미지가 있는 행에서 필요한 필드의 바이트만 보관하고 JSON 문법을 검사한다.
+- [streamProjection.ts](streamProjection.ts) — 고정 필드 행의 원본 바이트를 검사하고 선택한 값을 모아 축소 행으로 디코딩한다.
 - [errors.ts](errors.ts) — `SummaryError`: JSONL 처리에서 공유하는 오류 코드와 원본 바이트 위치를 전달한다.
 - [zstd.ts](zstd.ts) — `zstdChunks`·`ZstdError`·`ZstdFrames`: 압축 스트림 해제와 frame 경계·checksum·window를 검증한다.
 
