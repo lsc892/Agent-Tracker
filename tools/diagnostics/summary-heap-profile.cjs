@@ -110,7 +110,8 @@ function sampleHeap(config, role) {
 }
 
 function aggregationShape(aggregation) {
-  let checkpointIntervals = 0, checkpointKeys = 0, responseRows = 0, indexedResponseRows = 0, responseKeyCodeUnits = 0;
+  let checkpointIntervals = 0, checkpointKeys = 0, checkpointIndexBytes = 0;
+  let responseRows = 0, indexedResponseRows = 0, responseKeyCodeUnits = 0;
   let legacyRows = 0, legacySignatureCodeUnits = 0, responseBufferBytes = 0, legacyBufferBytes = 0;
   let legacySignatureBufferBytes = 0;
   let turnIdCodeUnits = 0, responseIdCodeUnits = 0, uniqueLegacyCodeUnits = 0, uuidTurnRows = 0;
@@ -131,9 +132,10 @@ function aggregationShape(aggregation) {
       responseIdCodeUnits += row.responseId.length;
       if (uuid.test(row.turnId)) uuidTurnRows++;
     }
+    checkpointIndexBytes += source.codex?.checkpointWinnerRows?.byteLength ?? 0;
     for (const interval of source.codex?.checkpoints ?? []) {
       checkpointIntervals++;
-      checkpointKeys += interval.responseKeys.length;
+      checkpointKeys += interval.responseKeys?.length ?? 0;
     }
     const legacy = source.codex?.legacy;
     if (!legacy) continue;
@@ -158,7 +160,8 @@ function aggregationShape(aggregation) {
     }
   }
   return { groups: aggregation.threads.size, claudeMessageGroups: aggregation.claude.size, parentIndex: aggregation.parents.size,
-    responseRows, indexedResponseRows, responseKeyCodeUnits, checkpointIntervals, checkpointKeys, legacyRows, legacySignatureCodeUnits,
+    responseRows, indexedResponseRows, responseKeyCodeUnits, checkpointIntervals, checkpointKeys, checkpointIndexBytes,
+    legacyRows, legacySignatureCodeUnits,
     responseBufferBytes, legacyBufferBytes, legacySignatureBufferBytes, turnIds: turnIds.size, responseIds: responseIds.size, models: models.size,
     turnIdCodeUnits, responseIdCodeUnits, uuidTurnRows, uniqueLegacySignatures: legacySignatures.size, uniqueLegacyCodeUnits };
 }

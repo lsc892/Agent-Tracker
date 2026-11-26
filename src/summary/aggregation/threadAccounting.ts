@@ -9,11 +9,11 @@ type ModelUsage = ModelUsageInput & { cache_read_input_tokens: number; cache_wri
 export interface CodexThreadEvidence {
   legacy?: ThreadLegacy;
   responseCount: number;
-  checkpoints: readonly (ThreadCheckpointInterval & { responseKeys: readonly string[] })[];
+  checkpoints: readonly ThreadCheckpointInterval[];
+  checkpointWinnerRows?: Uint32Array;
 }
 
 interface CodexWinners {
-  indices?: ReadonlyMap<string, number>;
   rows: readonly ThreadResponse[];
   tokens: Float64Array;
 }
@@ -135,23 +135,22 @@ interface CheckpointGap {
 }
 
 /** Sum final winners in each disjoint interval between observed checkpoints. */
-function findCheckpointGaps({ checkpoints, responseCount }: CodexThreadEvidence,
-  { indices, rows, tokens: winnerTokens }: CodexWinners): CheckpointGap[] {
+function findCheckpointGaps({ checkpoints, checkpointWinnerRows, responseCount }: CodexThreadEvidence,
+  { rows, tokens: winnerTokens }: CodexWinners): CheckpointGap[] {
   // [집계 정책] 파일의 응답 수와 최종 winner 수가 다르면 파일 간 병합으로 차이가 설명될 수 있어 보정을 생략한다.
-  if (!checkpoints.length || !indices || responseCount !== indices.size) return [];
+  if (!checkpoints.length || responseCount !== rows.length) return [];
   const gaps: CheckpointGap[] = [];
   const explicit = emptyTokens();
   const winner = emptyTokens();
-  for (const { start, end, responseKeys } of checkpoints) {
+  for (const { start, end } of checkpoints) {
     // [집계 정책] 시작 경계 응답을 빼고 구간의 최종 winner 토큰을 더하며 같은 턴인지 추적한다.
     const before = start.threadTotal, after = end.threadTotal;
-    const startIndex = indices.get(responseKeys[0]);
-    const startTurn = startIndex === undefined ? undefined : rows[startIndex].turnId;
+    const startIndex = checkpointWinnerRows?.[start.responseIndex] ?? start.responseIndex;
+    const startTurn = rows[startIndex].turnId;
     let sameTurn = !!startTurn;
     for (const component of components) explicit[component] = 0;
-    for (let position = 1; position < responseKeys.length; position++) {
-      const winnerIndex = indices.get(responseKeys[position]);
-      if (winnerIndex === undefined) return [];
+    for (let position = start.responseIndex + 1; position <= end.responseIndex; position++) {
+      const winnerIndex = checkpointWinnerRows?.[position] ?? position;
       sameTurn &&= rows[winnerIndex].turnId === startTurn;
       readThreadTokens(winnerTokens, winnerIndex, winner);
       for (const component of components) explicit[component] += winner[component];
