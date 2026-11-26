@@ -11,7 +11,10 @@ export type { SettingsReader } from './configuration/reader';
 export type TrackerConfiguration = ReturnType<typeof readConfiguration>;
 
 export function expandPath(value: string): string {
-  return resolve(homedir(), value === '~' ? homedir() : /^~[/\\]/.test(value) ? join(homedir(), value.slice(2)) : value);
+  // [설정 정책] 물결표와 상대 경로를 사용자 홈을 기준으로 절대 경로로 해석한다.
+  const home = homedir();
+  const path = value === '~' ? home : /^~[/\\]/.test(value) ? join(home, value.slice(2)) : value;
+  return resolve(home, path);
 }
 
 function readDisplaySettings(display: ConfigurationValues['display']) {

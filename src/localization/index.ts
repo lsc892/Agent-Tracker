@@ -20,9 +20,11 @@ export interface LocalizationBundle { locale: string; messages: Record<string, s
 export function resolveLocale(setting: unknown, editorLanguage: string): string {
   const candidate = typeof setting === 'string' && setting !== 'auto' ? setting : editorLanguage;
   const normalized = candidate.trim().toLowerCase().replaceAll('_', '-');
-  // Regional variants share a catalog. Chinese UI is the simplified catalog.
-  return languages.find(language => language.locale === normalized)?.locale
-    ?? languages.find(language => language.locale === normalized.split('-')[0])?.locale ?? 'en';
+  const exact = languages.find(language => language.locale === normalized);
+  if (exact) return exact.locale;
+  // [언어 정책] 지역별 사전이 없으면 언어 코드로 찾고 영어를 최종 대체 언어로 쓴다.
+  const [languageCode] = normalized.split('-', 1);
+  return languages.find(language => language.locale === languageCode)?.locale ?? 'en';
 }
 
 /**
