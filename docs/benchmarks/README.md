@@ -11,6 +11,7 @@
 
 ## 제품 반영
 
+- [2026-11-26 임시 DB 없이 최근 30일 통계 열기 A/B](failure/2026-11-26/DirectDashboardRefreshAB-2026-11-26.md) — 같은 빌드에서 메모리 미리보기 생략이 첫 표, 최종 표, 메모리와 SQLite 크기에 미치는 영향을 비교했다. 이후 직접 갱신을 적용했다. [기능 결정 일지](../AgentTracker-일지.md)
 - [2026-11-26 원본 관계 저장 형식 A/B](success/2026-11-26/SourceRelationStorageAB-2026-11-26.md) — 원본 관계를 BLOB에 저장하던 방식과 스레드 ID·보존 플래그로 저장하는 방식의 공간, 부모 조회, 갱신 비용을 비교했다. [날짜별 자료](success/2026-11-26/README.md)
 - [2026-11-25 SQLite 보조 인덱스 제거 A/B](success/2026-11-25/SQLiteIndexRemovalAB-2026-11-25.md) — 일별 집계 스키마에서 보조 인덱스 6개를 제거하기 전후의 DB 크기, 갱신 및 조회를 비교했다. [날짜별 자료](success/2026-11-25/README.md)
 - [2026-11-25 청크별 JSONL 필드 선택 A/B](success/2026-11-25/StreamingJsonlProjectionAB-2026-11-25.md) — 행을 조립한 뒤 필드를 고르던 방식과 읽는 중에 필요한 조각을 고르는 방식의 파싱 시간과 메모리를 비교했다.

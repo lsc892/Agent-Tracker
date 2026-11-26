@@ -8,6 +8,7 @@ const { existsSync } = require('node:fs');
 const { cpus, tmpdir } = require('node:os');
 const { basename, dirname, join, resolve } = require('node:path');
 const { makeSnapshot } = require('./incremental-refresh.cjs');
+const { diskSizes, measureAverages } = require('./dashboard-direct-refresh.cjs');
 
 const repo = resolve(__dirname, '../..');
 const timezone = 'Asia/Seoul';
@@ -16,6 +17,7 @@ const recentFixture = 'dashboard-ab-recent';
 const warmups = 3;
 const trials = 10;
 const dayMs = 86_400_000;
+const previewRevision = '7b02b2c';
 
 async function fingerprint(directory) {
   const entries = await fs.readdir(directory, { recursive: true, withFileTypes: true });
@@ -23,17 +25,19 @@ async function fingerprint(directory) {
   return sha(JSON.stringify(await Promise.all(files.map(async file => [file.slice(directory.length + 1), sha(await fs.readFile(file))]))));
 }
 
-async function buildVariants(workspace, revision) {
+async function buildVariants(workspace, revision, direct) {
   const before = join(workspace, 'before'), after = join(workspace, 'after');
   const paths = ['src', 'media', 'localization', 'package.json', 'tsconfig.json'];
-  await fs.mkdir(before);
   await fs.mkdir(after);
   const archive = join(workspace, 'baseline.tar');
   execFileSync('git', ['archive', '--format=tar', '-o', archive, revision, ...paths], { cwd: repo });
-  execFileSync('tar', ['-xf', archive, '-C', before]);
-  for (const path of paths) await fs.cp(join(repo, path), join(after, path), { recursive: true });
+  if (!direct) {
+    await fs.mkdir(before);
+    for (const path of paths) await fs.cp(join(repo, path), join(after, path), { recursive: true });
+  }
+  execFileSync('tar', ['-xf', archive, '-C', direct ? after : before]);
   const source = {};
-  for (const product of [before, after]) {
+  for (const product of direct ? [after] : [before, after]) {
     await fs.symlink(join(repo, 'node_modules'), join(product, 'node_modules'), 'junction');
     execFileSync(process.execPath, [join(repo, 'node_modules/typescript/bin/tsc'), '-p', join(product, 'tsconfig.json')], { stdio: 'inherit' });
     await fs.copyFile(join(repo, 'node_modules/i18next/dist/umd/i18next.min.js'), join(product, 'media/i18next.js'));
@@ -44,7 +48,7 @@ async function buildVariants(workspace, revision) {
       build: await fingerprint(join(product, 'dist/src')),
     };
   }
-  return { products: { before, after }, source };
+  return { products: { before: direct ? after : before, after }, source };
 }
 
 function request(sessionId, promptId, timestamp) {
@@ -133,23 +137,28 @@ function instrumentDashboard(product, onMessage) {
   return () => { html.dashboardHtml = originalHtml; protocol.parseDashboardMessage = originalParse; };
 }
 
-async function measure(vscode, product, variant, input, dbPath, seed) {
+async function measure(vscode, product, variant, input, dbPath, seed, direct, bounds) {
   const { SummaryClient } = require(join(product, 'dist/src/summary/client'));
   const { Dashboard } = require(join(product, 'dist/src/ui/dashboard'));
   const { readConfiguration } = require(join(product, 'dist/src/configuration'));
   if (seed) await fs.copyFile(seed, dbPath);
-  const summary = new SummaryClient({ dbPath, roots: input.roots, timezone });
+  const summary = new SummaryClient({ dbPath, roots: input.roots, timezone,
+    ...(direct && { workerPath: join(__dirname, 'dashboard-direct-refresh.cjs'), benchmarkProduct: product, collectCapabilities: false }) });
   const settings = readConfiguration({ get: (_key, fallback) => fallback });
   settings.roots = input.roots;
   settings.usage.timezone = timezone;
   const dashboard = new Dashboard({ summary, extensionUri: vscode.Uri.file(product), settings: () => settings });
   const query = summary.query.bind(summary);
   summary.query = filter => query({ ...filter, unknownTime: 'exclude' });
+  if (direct && variant === 'after') {
+    const refresh = summary.refresh.bind(summary);
+    summary.refresh = ({ recentUsage: _recentUsage, ...options }) => refresh(options);
+  }
   if (variant === 'cached') {
     const enter = dashboard.enter.bind(dashboard);
     dashboard.enter = async () => { dashboard.update(); await dashboard.loadUsage(); enter(); };
   }
-  let started, shellMs, first;
+  let started, shellMs, first, trace, measurement;
   const sample = new Promise((accept, reject) => {
     const timeout = setTimeout(() => reject(Error('No dashboard result before timeout')), 60_000);
     dashboard.benchmarkMessage = message => {
@@ -166,23 +175,49 @@ async function measure(vscode, product, variant, input, dbPath, seed) {
   const restore = instrumentDashboard(product, dashboard.benchmarkMessage);
   try {
     await summary.initialize();
+    if (direct) summary.transport.worker.on('message', message => { trace ??= message.dashboardBenchmark; });
     started = performance.timeOrigin + performance.now();
     dashboard.open();
-    return await sample;
+    measurement = await sample;
   } finally {
     dashboard.dispose();
     restore();
     await summary.dispose();
   }
+  if (direct) {
+    assert.ok(trace, 'Missing backend timings');
+    measurement.trace = trace;
+    measurement.trace.openEpochMs = started;
+    measurement.diskAfterClose = diskSizes(dbPath);
+    measurement.averages = measureAverages(product, dbPath, timezone, bounds);
+    await fs.unlink(dbPath);
+  }
+  return measurement;
 }
 
-async function prepareBaseline(product, input, bounds) {
+async function prepareBaseline(product, input, bounds, direct) {
   const { SummaryDatabase } = require(join(product, 'dist/src/summary/db'));
   const { refreshSummary } = require(join(product, 'dist/src/summary/scanner'));
   const dbPath = join(input.folder, 'seed.sqlite');
-  const db = new SummaryDatabase(dbPath);
+  const db = new SummaryDatabase(direct ? { databasePath: dbPath, timezone } : dbPath);
   try {
-    const refresh = await refreshSummary(db, { dbPath, roots: input.roots, timezone });
+    const refresh = await refreshSummary(db, { dbPath, roots: input.roots, timezone, ...(direct && { collectCapabilities: false }) });
+    if (direct) {
+      assert.equal(refresh.interrupted, false, refresh.error);
+      assert.equal(refresh.failed, 0, 'Fixture preparation failed');
+      const count = (where, args) => db.connection.prepare(`SELECT sum(turn_count) AS threads, sum(total_tokens) AS tokens
+        FROM usage_request_daily ${where}`).get(...args);
+      const all = count('', []);
+      const recent = count('WHERE local_day BETWEEN ? AND ?', [bounds.fromDay, bounds.toDay]);
+      const counts = { threads: all.threads, recentThreads: recent.threads, tokens: all.tokens, recentTokens: recent.tokens };
+      if (input.expected) {
+        assert.equal(counts.tokens, input.expected.tokens);
+        assert.equal(counts.recentTokens, input.expected.recentTokens);
+        assert.equal(counts.threads, input.inventory[0].files);
+        assert.equal(counts.recentThreads, input.inventory[0].recentFiles);
+      }
+      return { dbPath, counts, parserFailures: refresh.failed };
+    }
     const rows = db.connection.prepare('SELECT started_at_ms, total_tokens FROM turn_summary').all();
     const recent = rows.filter(row => row.started_at_ms !== null && row.started_at_ms >= bounds.fromMs && row.started_at_ms < bounds.toMs);
     const tokens = values => values.reduce((sum, row) => sum + row.total_tokens, 0);
@@ -197,12 +232,14 @@ async function prepareBaseline(product, input, bounds) {
 async function run() {
   const vscode = require('vscode');
   const config = JSON.parse(await fs.readFile(process.env.AGENT_TRACKER_DASHBOARD_AB_CONFIG, 'utf8'));
-  const { products, inputs, bounds, scenarios, warmups: warm, trials: pairs } = config;
+  const { products, inputs, bounds, scenarios, warmups: warm, trials: pairs, direct } = config;
   const results = [];
   for (const input of inputs) {
-    const { dbPath, counts, parserFailures } = await prepareBaseline(products.after, input, bounds);
-    const datasetResult = { name: input.name, inputSha256: input.inputSha256, inventory: input.inventory, counts, parserFailures, cold: [], warm: [] };
+    const { dbPath, counts, parserFailures } = await prepareBaseline(products.after, input, bounds, direct);
+    const datasetResult = { name: input.name, inputSha256: input.inputSha256,
+      inventory: input.inventory, counts, expectedSynthetic: input.expected, parserFailures };
     for (const scenario of scenarios) {
+      datasetResult[scenario] = [];
       if (scenario === 'warm') {
         await fs.appendFile(input.marker, input.append);
         const written = new Date(Date.now() + 100);
@@ -210,12 +247,20 @@ async function run() {
       }
       for (let index = -warm; index < pairs; index++) {
         const variants = index % 2 === 0 ? ['before', 'after'] : ['after', 'before'];
-        if (scenario === 'warm') variants.push('cached');
+        if (scenario === 'warm' && !direct) variants.push('cached');
         const pair = { order: variants };
         for (const variant of variants) {
           const file = join(input.folder, `${scenario}-${index}-${variant}.sqlite`);
-          const result = await measure(vscode, products[variant === 'after' ? 'after' : 'before'], variant, input, file, scenario === 'warm' ? dbPath : undefined);
-          if (result.final) {
+          const result = await measure(vscode, products[variant === 'after' ? 'after' : 'before'], variant, input, file,
+            scenario === 'cold' ? undefined : dbPath, direct, bounds);
+          if (direct) {
+            assert.ok(result.final, 'No committed frame');
+            assert.equal(result.final.requests, counts.recentThreads);
+            assert.equal(result.final.tokens, counts.recentTokens + (scenario === 'warm' ? 110 : 0));
+            assert.equal(result.averages.tokens, counts.tokens + (scenario === 'warm' ? 110 : 0));
+            assert.equal(result.averages.threads, counts.threads);
+            assert.equal(result.first.source, variant === 'before' ? 'memory' : 'committed');
+          } else if (result.final) {
             const expected = scenario === 'cold' ? counts.recentRequests : counts.recentRequests + 1;
             const tokens = scenario === 'cold' ? counts.recentTokens : counts.recentTokens + 110;
             assert.equal(result.final.requests, expected);
@@ -228,6 +273,7 @@ async function run() {
           }
           pair[variant] = result;
         }
+        if (direct) assert.deepEqual(pair.before.averages.groups, pair.after.averages.groups, 'A/B final aggregate mismatch');
         if (index >= 0) datasetResult[scenario].push(pair);
         process.stdout.write(`Dashboard A/B ${input.name} ${scenario} ${index + 1}/${pairs}\n`);
       }
@@ -244,24 +290,26 @@ async function main() {
   assert.ok(output, '--output=<new JSON> is required');
   const outputPath = resolve(output);
   assert.ok(!existsSync(outputPath), 'Output already exists');
-  const revision = execFileSync('git', ['rev-parse', option('before') ?? 'HEAD'], { cwd: repo, encoding: 'utf8' }).trim();
+  const direct = process.argv.includes('--direct');
+  const revision = execFileSync('git', ['rev-parse', option('before') ?? (direct ? previewRevision : 'HEAD')], { cwd: repo, encoding: 'utf8' }).trim();
   const workspace = await fs.mkdtemp(join(tmpdir(), 'agent-tracker-dashboard-ab-'));
   try {
-    const { products, source } = await buildVariants(workspace, revision);
+    const { products, source } = await buildVariants(workspace, revision, direct);
     const now = new Date();
     const { calendarPeriod, periodBounds } = require(join(products.after, 'dist/src/summary/db/timezone'));
     const today = calendarPeriod(now.getTime(), timezone, 'day');
     const start = new Date(`${today}T00:00:00Z`);
     start.setUTCDate(start.getUTCDate() - 29);
-    const bounds = { fromMs: periodBounds(start.toISOString().slice(0, 10), timezone).fromMs, toMs: periodBounds(today, timezone).toMs };
+    const fromDay = start.toISOString().slice(0, 10);
+    const bounds = { fromDay, toDay: today, fromMs: periodBounds(fromDay, timezone).fromMs, toMs: periodBounds(today, timezone).toMs };
     const inputs = [];
     for (const [name, count] of [['synthetic-100', 100], ['synthetic-10000', 10_000], ['current', 0]]) {
       if (option('dataset') && option('dataset') !== name) continue;
       inputs.push(await dataset(workspace, products.after, name, count, now));
     }
     assert.ok(inputs.length);
-    const scenarios = option('scenario') ? [option('scenario')] : ['cold', 'warm'];
-    assert.ok(scenarios.every(scenario => scenario === 'cold' || scenario === 'warm'));
+    const scenarios = option('scenario') ? [option('scenario')] : direct ? ['cold', 'unchanged', 'warm'] : ['cold', 'warm'];
+    assert.ok(scenarios.every(scenario => ['cold', 'warm', ...(direct ? ['unchanged'] : [])].includes(scenario)));
     const warm = Number(option('warmups') ?? warmups), pairs = Number(option('pairs') ?? trials);
     const shell = join(workspace, 'test-extension');
     await fs.mkdir(shell);
@@ -273,7 +321,7 @@ async function main() {
       'update.mode': 'none', 'extensions.autoCheckUpdates': false, 'chat.disableAIFeatures': true,
     }));
     const profile = join(workspace, 'config.json'), result = join(workspace, 'result.json');
-    await fs.writeFile(profile, JSON.stringify({ products, inputs, bounds, scenarios, warmups: warm, trials: pairs, result }));
+    await fs.writeFile(profile, JSON.stringify({ products, inputs, bounds, scenarios, warmups: warm, trials: pairs, result, direct }));
     const { runTests } = require('@vscode/test-electron');
     const installed = join(process.env.LOCALAPPDATA ?? '', 'Programs/Microsoft VS Code/Code.exe');
     await runTests({ vscodeExecutablePath: process.env.VSCODE_EXECUTABLE || (existsSync(installed) ? installed : undefined),
@@ -284,7 +332,7 @@ async function main() {
     });
     const measured = JSON.parse(await fs.readFile(result, 'utf8'));
     await fs.mkdir(dirname(outputPath), { recursive: true });
-    await fs.writeFile(outputPath, JSON.stringify({ revision, source, timezone, today, bounds, scenarios, warmRollupPrepared: true, warmups: warm, pairs,
+    await fs.writeFile(outputPath, JSON.stringify({ revision, source, timezone, today, bounds, scenarios, direct, warmRollupPrepared: true, warmups: warm, pairs,
       platform: process.platform, cpu: cpus()[0]?.model, cores: cpus().length, ...measured }, null, 2) + '\n', { flag: 'wx' });
   } finally {
     assert.equal(dirname(resolve(workspace)), resolve(tmpdir()));
