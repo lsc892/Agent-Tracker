@@ -110,7 +110,7 @@ function sampleHeap(config, role) {
 }
 
 function aggregationShape(aggregation) {
-  let checkpointIntervals = 0, checkpointKeys = 0, responseRows = 0, responseKeyCodeUnits = 0;
+  let checkpointIntervals = 0, checkpointKeys = 0, responseRows = 0, indexedResponseRows = 0, responseKeyCodeUnits = 0;
   let legacyRows = 0, legacySignatureCodeUnits = 0, responseBufferBytes = 0, legacyBufferBytes = 0;
   let legacySignatureBufferBytes = 0;
   let turnIdCodeUnits = 0, responseIdCodeUnits = 0, uniqueLegacyCodeUnits = 0, uuidTurnRows = 0;
@@ -119,9 +119,10 @@ function aggregationShape(aggregation) {
   for (const { source, codex } of aggregation.threads.values()) {
     if (!codex) continue;
     const responseIndex = codex.indices ?? codex.winners;
-    responseRows += responseIndex.size;
+    responseRows += codex.rows?.length ?? responseIndex.size;
+    indexedResponseRows += responseIndex?.size ?? 0;
     responseBufferBytes += codex.tokens?.values.byteLength ?? 0;
-    for (const key of responseIndex.keys()) responseKeyCodeUnits += key.length;
+    for (const key of responseIndex?.keys() ?? []) responseKeyCodeUnits += key.length;
     for (const row of codex.rows ?? codex.winners.values()) {
       turnIds.add(row.turnId);
       responseIds.add(row.responseId);
@@ -157,7 +158,7 @@ function aggregationShape(aggregation) {
     }
   }
   return { groups: aggregation.threads.size, claudeMessageGroups: aggregation.claude.size, parentIndex: aggregation.parents.size,
-    responseRows, responseKeyCodeUnits, checkpointIntervals, checkpointKeys, legacyRows, legacySignatureCodeUnits,
+    responseRows, indexedResponseRows, responseKeyCodeUnits, checkpointIntervals, checkpointKeys, legacyRows, legacySignatureCodeUnits,
     responseBufferBytes, legacyBufferBytes, legacySignatureBufferBytes, turnIds: turnIds.size, responseIds: responseIds.size, models: models.size,
     turnIdCodeUnits, responseIdCodeUnits, uuidTurnRows, uniqueLegacySignatures: legacySignatures.size, uniqueLegacyCodeUnits };
 }

@@ -2,7 +2,7 @@
 
 요약·JSONL·SQL·quota 처리의 정확성과 성능을 비교하는 도구를 모은다.
 
-- [thread-token-buffer-ab.cjs](thread-token-buffer-ab.cjs)는 `--base=<이전 커밋> --output=<새 JSON>`으로 응답 토큰 버퍼의 피크 힙·외부 메모리·RSS를 측정한다. 실로그와 합성 10,000·100건의 최초 수집·한 건 추가를 비교하며 SQLite 결과와 네 평균 조회를 대조한다. [보고서와 재실행 방법](../../docs/benchmarks/success/2026-11-26/ThreadTokenBufferAB-2026-11-26.md).
+- [thread-token-buffer-ab.cjs](thread-token-buffer-ab.cjs)는 실로그와 합성 10,000·100건의 최초 수집·한 건 추가에서 피크 힙·외부 메모리·RSS를 측정하고 SQLite 결과와 네 평균 조회를 대조한다. `--base=<이전 커밋>` 또는 `--base-source=<고정 소스 사본>`과 `--output=<새 JSON>`을 전달한다. `--unchanged=true`는 같은 DB 사본에서 무변경 갱신을 추가한다. [보고서와 재실행 방법](../../docs/benchmarks/success/2026-11-26/ThreadTokenBufferAB-2026-11-26.md)
   `--input-workspace=<이전 실행 Workspace> --verify-fixed-rows=true`는 기존 입력을 사본으로 재사용하고 고정 필드 행의 결과와 원본 바이트 위치도 해시로 비교한다.
 - [thread-token-gc-ab.cjs](thread-token-gc-ab.cjs)는 메모리 측정의 `--workspace`와 `--reference` JSON을 받아 같은 빌드·사본에서 자연 GC 이벤트를 수집한다. [GC 보고서와 재실행 방법](../../docs/benchmarks/success/2026-11-26/ThreadTokenGcAB-2026-11-26.md).
 

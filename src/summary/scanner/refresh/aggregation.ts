@@ -18,7 +18,7 @@ interface SummarySource {
 }
 
 interface CodexResponses {
-  indices: Map<string, number>;
+  indices?: Map<string, number>;
   rows: ThreadResponse[];
   tokens: ThreadTokenBuffer;
   // Used only when copies can compete with the canonical file on an equal score.
@@ -56,7 +56,7 @@ export class ThreadAggregation {
     const previous = this.threads.get(key);
     const preferred = !previous || preferTimeline(source, previous.source);
     const group = previous ?? { source, session, order: this.threads.size,
-      codex: file.provider === 'codex' ? { indices: new Map<string, number>(), rows: responses.rows,
+      codex: file.provider === 'codex' ? { rows: responses.rows,
         tokens: new ThreadTokenBuffer(responses.tokens) } : undefined };
     const order = this.sourceOrder++;
     if (previous) {
@@ -170,12 +170,23 @@ function betterClaude(candidate: ClaudeWinner, previous: ClaudeWinner): boolean 
 
 function mergeCodexResponses(target: CodexResponses, { rows, tokens }: ThreadResponses, preferred: boolean,
   hasPrevious: boolean, intervals: readonly (ThreadCheckpointInterval & { responseKeys: string[] })[]): void {
+  // [Winner 정책] 파일 내 winner는 이미 확정되어 있으므로 복사본이나 누계 구간을 비교할 때만 키를 만든다.
+  if (!hasPrevious && !intervals.length) return;
+  let indices = target.indices;
+  if (!indices) {
+    target.indices = indices = new Map();
+    if (hasPrevious) {
+      for (let index = 0; index < target.rows.length; index++)
+        indices.set(responseKey(target.rows[index]), index);
+    }
+  }
+
   // [Winner 정책] 동점 판별용 대표 원본 키는 처음 복사본을 비교할 때부터 따로 관리한다.
   if (hasPrevious) {
     if (preferred) target.canonicalKeys = new Set();
-    else target.canonicalKeys ??= new Set(target.indices.keys());
+    else target.canonicalKeys ??= new Set(indices.keys());
   }
-  const { indices, canonicalKeys } = target;
+  const { canonicalKeys } = target;
   let intervalIndex = 0;
   for (let responseIndex = 0; responseIndex < rows.length; responseIndex++) {
     const response = rows[responseIndex];

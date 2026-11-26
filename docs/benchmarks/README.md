@@ -11,6 +11,7 @@
 
 ## 제품 반영
 
+- [2026-11-26 원본 탐색과 Codex 응답 키 색인의 힙 A/B](success/2026-11-26/RefreshHeapAB-2026-11-26.md) — 디렉터리 순회와 Codex 응답 키 색인 변경이 갱신에서 사용하는 힙에 미치는 영향을 비교했다.
 - [2026-11-26 구형 Codex 누계 비교 서명 ArrayBuffer A/B](success/2026-11-26/LegacySignaturesBufferAB-2026-11-26.md) — 집계 직전 힙과 전체 피크 힙, 프로세스 RSS 및 저장 결과를 비교했다.
 - [2026-11-26 JSONL 고정 필드 바이트 선택 A/B](success/2026-11-26/ByteProjectionAB-2026-11-26.md) — 필요한 값만 디코딩하는 경로의 파일 Worker 힙·할당과 전체 갱신 시간·RSS를 비교했다.
 - [2026-11-26 응답 토큰 ArrayBuffer A/B](success/2026-11-26/ThreadTokenBufferAB-2026-11-26.md) — 실로그·합성 입력의 최초 수집과 1건 추가에서 피크 힙, 외부 메모리와 프로세스 RSS를 비교했다. [자연 GC 후속 측정](success/2026-11-26/ThreadTokenGcAB-2026-11-26.md)

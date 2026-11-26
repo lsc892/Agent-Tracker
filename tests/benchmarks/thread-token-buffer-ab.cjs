@@ -40,13 +40,17 @@ async function treeHash(path) {
   return digest.digest('hex');
 }
 
-async function builds(workspace, revision) {
+async function builds(workspace, revision, baseSource) {
   const paths = ['src', 'localization', 'tsconfig.json'];
   const products = { A: join(workspace, 'A'), B: join(workspace, 'B') };
-  const tar = join(workspace, 'baseline.tar');
-  execFileSync('git', ['archive', '-o', tar, revision, ...paths], { cwd: repo });
   await fs.mkdir(products.A);
-  execFileSync('tar', ['-xf', tar, '-C', products.A]);
+  if (baseSource) {
+    for (const path of paths) await fs.cp(join(baseSource, path), join(products.A, path), { recursive: true });
+  } else {
+    const tar = join(workspace, 'baseline.tar');
+    execFileSync('git', ['archive', '-o', tar, revision, ...paths], { cwd: repo });
+    execFileSync('tar', ['-xf', tar, '-C', products.A]);
+  }
   for (const path of paths) await fs.cp(join(repo, path), join(products.B, path), { recursive: true });
   const hashes = {};
   for (const [variant, product] of Object.entries(products)) {
@@ -180,7 +184,8 @@ async function collect(product, manifest, dbPath) {
     assert.equal(run.interrupted, false, run.error);
     assert.equal(run.failed, 0, 'Source failed');
     return {
-      ms, parsed: run.parsed, bytes: run.bodyBytes, start, peak, boundaries, afterGc, lifetimeMaxRss,
+      ms, discovered: run.discovered, parsed: run.parsed, reused: run.reused, bytes: run.bodyBytes,
+      start, peak, boundaries, afterGc, lifetimeMaxRss,
       stages: run.timings.scan, commit: run.timings.storage.commit,
       ...storedResults(database),
     };
@@ -210,7 +215,12 @@ function checkOracle(sample, expected) {
 }
 
 function compare(A, B) {
-  for (const field of ['parsed', 'bytes', 'totals', 'tables']) assert.deepEqual(A[field], B[field], field);
+  for (const field of ['parsed', 'bytes']) assert.equal(A[field], B[field], field);
+  compareResults(A, B);
+}
+
+function compareResults(A, B) {
+  for (const field of ['totals', 'tables']) assert.deepEqual(A[field], B[field], field);
   for (const dimension of dimensions)
     assert.equal(A.query[dimension].sha256, B.query[dimension].sha256, `Query equality for ${dimension}`);
 }
@@ -250,7 +260,7 @@ async function copySnapshot(inputWorkspace, name, folder) {
   };
 }
 
-async function measureInput(folder, snapshot, products, pairs, warmups, name, verifyFixedRows) {
+async function measureInput(folder, snapshot, products, pairs, warmups, name, verifyFixedRows, measureUnchanged) {
   const manifest = join(folder, 'snapshot.json');
   await fs.writeFile(manifest, JSON.stringify(snapshot));
   let fixedRows;
@@ -275,22 +285,34 @@ async function measureInput(folder, snapshot, products, pairs, warmups, name, ve
       const sample = { order };
       for (const variant of order) {
         const db = join(folder, `sample-${variant}.sqlite`);
-        if (phase === 'append') await fs.copyFile(seed, db);
+        if (phase !== 'cold') await fs.copyFile(seed, db);
         try { sample[variant] = await childRun(products[variant], manifest, db); }
         finally {
           for (const suffix of ['', '-shm', '-wal']) await fs.rm(db + suffix, { force: true });
         }
       }
       compare(sample.A, sample.B);
+      assert.equal(sample.A.discovered, sample.B.discovered);
+      assert.equal(sample.A.reused, sample.B.reused);
       const reference = results[0]?.A;
       if (reference) compare(reference, sample.A);
       if (phase === 'cold') compare(old, sample.A);
+      if (phase === 'unchanged') {
+        for (const variant of order) {
+          const row = sample[variant];
+          assert.equal(row.bytes, 0);
+          assert.equal(row.parsed, 0);
+          compareResults(old, row);
+        }
+      }
       if (index >= 0) results.push(sample);
       if (index === -1 || index >= 0 && (index + 1) % 5 === 0)
         console.log(`${name} ${phase} ${index < 0 ? 'warmups complete' : `${index + 1}/${pairs}`}`);
     }
   };
   await runPhase('cold', cold);
+  const unchanged = [];
+  if (measureUnchanged) await runPhase('unchanged', unchanged);
   const stat = await fs.stat(append.file.path);
   assert.equal(stat.size, append.file.bytes);
   let after, appendSha256;
@@ -315,7 +337,7 @@ async function measureInput(folder, snapshot, products, pairs, warmups, name, ve
     independentTotals: { cold: baseline, append: after },
     appendTarget: { beforeBytes: append.file.bytes, appendedBytes: append.append.length,
       existingModernRows: append.modern, compressed: append.compressed, sha256: appendSha256 },
-    samples: { cold, append: appended },
+    samples: { cold, ...(measureUnchanged ? { unchanged } : {}), append: appended },
   };
 }
 
@@ -324,13 +346,15 @@ async function main() {
   const output = resolve(args.output);
   const pairs = Number(args.pairs ?? 20), warmups = Number(args.warmups ?? 3);
   assert.ok(Number.isSafeInteger(pairs) && pairs >= 2 && pairs % 2 === 0 && Number.isSafeInteger(warmups) && warmups >= 1);
-  const revision = execFileSync('git', ['rev-parse', args.base ?? 'HEAD'], { cwd: repo, encoding: 'utf8' }).trim();
+  assert.ok(!args.base || !args['base-source'], 'Choose --base or --base-source');
+  const baseSource = args['base-source'] && resolve(args['base-source']);
+  const revision = baseSource ? null : execFileSync('git', ['rev-parse', args.base ?? 'HEAD'], { cwd: repo, encoding: 'utf8' }).trim();
   const startedAt = new Date().toISOString();
   const cache = join(repo, 'tests', '.cache');
   await fs.mkdir(cache, { recursive: true });
   const workspace = await fs.mkdtemp(join(cache, 'thread-token-buffer-ab-'));
   console.log(`Workspace: ${relative(repo, workspace)}`);
-  const { products, hashes } = await builds(workspace, revision);
+  const { products, hashes } = await builds(workspace, revision, baseSource);
   const inputs = {};
   const datasets = args.dataset ? [args.dataset] : ['real', '10000', '100'];
   for (const name of datasets) {
@@ -340,7 +364,8 @@ async function main() {
     const snapshot = args['input-workspace'] ? await copySnapshot(args['input-workspace'], name, folder)
       : await makeSnapshot(folder, { after: products.A, real: name === 'real',
         requests: name === 'real' ? 0 : Number(name), 'turns-per-session': name === '100' ? 5 : 50 });
-    inputs[name] = await measureInput(folder, snapshot, products, pairs, warmups, name, args['verify-fixed-rows'] === 'true');
+    inputs[name] = await measureInput(folder, snapshot, products, pairs, warmups, name,
+      args['verify-fixed-rows'] === 'true', args.unchanged === 'true');
   }
   const environment = { platform: process.platform, release: release(), arch: process.arch, node: process.version,
     v8: process.versions.v8, sqlite: process.versions.sqlite, cpu: cpus()[0].model, logicalCpus: cpus().length };

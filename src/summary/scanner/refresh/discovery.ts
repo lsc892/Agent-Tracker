@@ -25,12 +25,12 @@ export async function discoverSources(context: RefreshContext): Promise<void> {
   const paths = loadStoredPaths(database);
   for (const root of roots) {
     try {
-      for await (const path of walk(root.path, check, root.provider === 'codex')) {
+      await walk(root.path, check, root.provider === 'codex', async path => {
         const stat = await lstat(path);
-        if (!stat.isFile()) continue;
+        if (!stat.isFile()) return;
         recordObservation(context, paths, { provider: root.provider, source_root: root.path, path,
           size_bytes: stat.size, mtime_ms: stat.mtimeMs });
-      }
+      });
     }
     catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT' || paths.storedRoots.has(sessionKey(root.provider, root.path)))
@@ -97,21 +97,26 @@ function registerUnseenSources(context: RefreshContext, stored: Iterable<SourceP
   }
 }
 
-async function* walk(directory: string, check: () => void, compressed: boolean): AsyncGenerator<string> {
+async function walk(directory: string, check: () => void, compressed: boolean,
+  visit: (path: string) => Promise<void>): Promise<void> {
   // [탐색 정책] 디렉터리를 순회하며 취소를 확인하고 Zstd 확장자는 Codex 루트에서만 포함한다.
   check();
   const stat = await lstat(directory);
   if (!stat.isDirectory())
     throw new SummaryError('source-root-not-directory');
   const handle = await opendir(directory, { bufferSize: 32 });
-  for await (const entry of handle) {
-    check();
-    const path = join(directory, entry.name);
-    if (entry.isDirectory())
-      yield* walk(path, check, compressed);
-    else if (entry.isFile()) {
-      const name = entry.name.toLowerCase();
-      if (name.endsWith('.jsonl') || compressed && name.endsWith('.jsonl.zst')) yield path;
+  try {
+    for (let entry = await handle.read(); entry; entry = await handle.read()) {
+      check();
+      if (entry.isDirectory()) {
+        await walk(join(directory, entry.name), check, compressed, visit);
+      } else if (entry.isFile()) {
+        const name = entry.name.toLowerCase();
+        if (name.endsWith('.jsonl') || compressed && name.endsWith('.jsonl.zst'))
+          await visit(join(directory, entry.name));
+      }
     }
+  } finally {
+    await handle.close();
   }
 }

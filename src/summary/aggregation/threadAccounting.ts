@@ -13,7 +13,7 @@ export interface CodexThreadEvidence {
 }
 
 interface CodexWinners {
-  indices: ReadonlyMap<string, number>;
+  indices?: ReadonlyMap<string, number>;
   rows: readonly ThreadResponse[];
   tokens: Float64Array;
 }
@@ -138,7 +138,7 @@ interface CheckpointGap {
 function findCheckpointGaps({ checkpoints, responseCount }: CodexThreadEvidence,
   { indices, rows, tokens: winnerTokens }: CodexWinners): CheckpointGap[] {
   // [집계 정책] 파일의 응답 수와 최종 winner 수가 다르면 파일 간 병합으로 차이가 설명될 수 있어 보정을 생략한다.
-  if (!checkpoints.length || responseCount !== indices.size) return [];
+  if (!checkpoints.length || !indices || responseCount !== indices.size) return [];
   const gaps: CheckpointGap[] = [];
   const explicit = emptyTokens();
   const winner = emptyTokens();
