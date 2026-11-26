@@ -2,7 +2,7 @@
 import { lstat } from 'node:fs/promises';
 import type { FileMetadata } from '../db/types';
 import { readJsonl, SummaryError } from '../jsonl';
-import type { JsonShape } from '../jsonl/projection';
+import type { FixedJsonShape, JsonShape } from '../jsonl/projection';
 import { sqlText } from '../parsers/common';
 import { ThreadLogParser, threadFields, type ThreadIdentity, type ThreadLog } from '../parsers/threadUsage';
 import type { ParseEvent, ParsedIdentity, SummaryOptions } from '../types';
@@ -34,7 +34,7 @@ interface ReadOptions {
 }
 
 async function readSourceRows(file: SourceReadFile, onRow: (row: Record<string, unknown>, offset: number) => void,
-  fields: { shape: JsonShape } | { fixedShape: JsonShape }, options: Pick<ReadOptions, 'signal' | 'cancelled' | 'maxLineBytes' | 'onBytes'>):
+  fields: { shape: JsonShape } | { fixedShape: FixedJsonShape }, options: Pick<ReadOptions, 'signal' | 'cancelled' | 'maxLineBytes' | 'onBytes'>):
   Promise<Pick<SourceRead, 'rows' | 'partialLine'>> {
   const { rows, partialLine } = await readJsonl(file.path, file.size_bytes, onRow, {
     signal: options.signal, isCancelled: options.cancelled, maxLineBytes: options.maxLineBytes,

@@ -1,15 +1,14 @@
 // Validates filtered JSONL bytes across chunks and decodes a compact row at LF.
 import { SummaryError } from './errors';
-import type { JsonShape } from './projection';
+import type { FixedJsonShape } from './projection';
 
-type Field = true | JsonShape | undefined;
 type Position = 'first' | 'key' | 'colon' | 'value' | 'after';
 
 interface Container {
   end: '}' | ']';
   position: Position;
-  shape: Field;
-  member?: Field;
+  shape?: FixedJsonShape;
+  member?: FixedJsonShape;
   selected: boolean;
   nonempty: boolean;
 }
@@ -23,9 +22,9 @@ interface JsonString {
 
 const stringRun = /[^"\\\x00-\x1f]+/y;
 const hexDigit = /^[0-9a-f]$/i;
-const keyLimits = new WeakMap<JsonShape, number>();
+const keyLimits = new WeakMap<FixedJsonShape, number>();
 
-function keyLimit(shape: JsonShape): number {
+function keyLimit(shape: FixedJsonShape): number {
   let limit = keyLimits.get(shape);
   if (limit === undefined) {
     // Each UTF-16 code unit can appear as a six-byte JSON escape.
@@ -100,7 +99,7 @@ export class StreamingFixedProjection {
   private invalid = false;
   private edgeSpace = '';
 
-  constructor(private readonly shape: JsonShape, private readonly offset: number) {}
+  constructor(private readonly shape: FixedJsonShape, private readonly offset: number) {}
 
   append(chunk: Buffer, start: number, end: number): void {
     if (this.invalid) return;
@@ -165,9 +164,8 @@ export class StreamingFixedProjection {
       this.startKey(frame);
       return;
     }
-    if (frame.end === ']' && frame.shape === true && frame.position === 'value') this.compact.append(',');
     frame.position = 'after';
-    this.startValue(char, frame.end === ']' ? frame.shape : frame.member);
+    this.startValue(char, frame.member);
   }
 
   /** Preserve String.trim's outer Unicode whitespace without decoding complete rows. */
@@ -186,25 +184,19 @@ export class StreamingFixedProjection {
   }
 
   private startKey(frame: Container): void {
-    frame.member = frame.shape === true ? true : undefined;
-    if (frame.shape === true) {
-      if (frame.selected) this.compact.append(',');
-      frame.selected = true;
-      this.startString('output');
-    } else if (frame.shape) {
-      this.startString('key', keyLimit(frame.shape));
-    } else {
-      this.startString('discard');
-    }
+    frame.member = undefined;
+    if (frame.shape?.fields) this.startString('key', keyLimit(frame.shape));
+    else this.startString('discard');
   }
 
-  private startValue(char: string, shape: Field, root = false): void {
+  private startValue(char: string, shape: FixedJsonShape | undefined, root = false): void {
+    // [필드 선택 정책] 모든 컨테이너는 검증하되 지정한 객체만 하위 선택표로 펼친다.
     if (char === '{' || char === '[') {
       const end = char === '{' ? '}' : ']';
-      const project = shape === true || char === '{' && shape && (root || shape.fields);
+      const project = char === '{' && (root || shape?.fields) ? shape : undefined;
       if (project) this.compact.append(char);
       else if (shape) this.compact.append(char + end);
-      this.containers.push({ end, position: 'first', shape: project ? shape : undefined, selected: false, nonempty: false });
+      this.containers.push({ end, position: 'first', shape: project, selected: false, nonempty: false });
       return;
     }
     if (char === '"') {
@@ -222,7 +214,7 @@ export class StreamingFixedProjection {
   private endContainer(frame: Container): void {
     this.containers.pop();
     if (!frame.shape) return;
-    if (frame.shape !== true && frame.shape.keepNonempty && frame.nonempty && !frame.selected) this.compact.append('"":true');
+    if (frame.shape.keepNonempty && frame.nonempty && !frame.selected) this.compact.append('"":true');
     this.compact.append(frame.end);
   }
 
@@ -299,12 +291,7 @@ export class StreamingFixedProjection {
 
   private endString(token: JsonString): void {
     const frame = this.containers.at(-1);
-    if (frame?.position !== 'colon') return;
-    if (frame.shape === true) {
-      this.compact.append(':');
-      return;
-    }
-    if (token.target !== 'key' || !frame.shape?.fields) return;
+    if (frame?.position !== 'colon' || token.target !== 'key' || !frame.shape?.fields) return;
     const literal = Buffer.from(token.key, 'latin1').toString('utf8');
     const name = literal.includes('\\') ? JSON.parse(literal) as string : literal.slice(1, -1);
     if (!Object.hasOwn(frame.shape.fields, name)) return;

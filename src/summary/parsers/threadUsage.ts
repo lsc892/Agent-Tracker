@@ -3,22 +3,22 @@ import { basename, dirname, sep } from 'node:path';
 import { usageScore } from '../aggregation/winners';
 import type { Provider } from '../db/types';
 import { SummaryError } from '../jsonl';
-import { hasJsonFields, type JsonFields, type JsonShape } from '../jsonl/projection';
+import { hasJsonFields, type FixedJsonShape } from '../jsonl/projection';
 import type { TokenVector } from '../types';
 import { claudeTokens, codexTokens, displayName, object, project, sqlText, string, timestamp } from './common';
 
-const scalar: JsonShape = {};
-const fields = (...keys: string[]): JsonFields => Object.fromEntries(keys.map(key => [key, scalar]));
-const claudeUsage: JsonShape = { fields: fields('input_tokens', 'output_tokens', 'cache_read_input_tokens', 'cache_creation_input_tokens'),
+const scalar: FixedJsonShape = {};
+const fields = (...keys: string[]): Record<string, FixedJsonShape> => Object.fromEntries(keys.map(key => [key, scalar]));
+const claudeUsage: FixedJsonShape = { fields: fields('input_tokens', 'output_tokens', 'cache_read_input_tokens', 'cache_creation_input_tokens'),
   keepNonempty: true };
-const usage: JsonShape = { fields: { ...fields('input_tokens', 'output_tokens', 'cached_input_tokens', 'cache_write_input_tokens'),
+const usage: FixedJsonShape = { fields: { ...fields('input_tokens', 'output_tokens', 'cached_input_tokens', 'cache_write_input_tokens'),
   input_tokens_details: { fields: fields('cached_tokens', 'cache_write_tokens') } } };
-const legacyUsage: JsonShape = { fields: { ...usage.fields, ...fields('reasoning_output_tokens', 'total_tokens') } };
-const lineage: JsonShape = { fields: { subagent: { fields: { thread_spawn: { fields: fields('parent_thread_id') } } } } };
+const legacyUsage: FixedJsonShape = { fields: { ...usage.fields, ...fields('reasoning_output_tokens', 'total_tokens') } };
+const lineage: FixedJsonShape = { fields: { subagent: { fields: { thread_spawn: { fields: fields('parent_thread_id') } } } } };
 const claudeTypes = new Set(['user', 'assistant', 'system', 'progress', 'file-history-snapshot', 'queue-operation', 'summary']);
 
 // Fixed field paths make selection independent of the order of type and payload in a row.
-export const threadFields: Record<Provider, JsonShape> = {
+export const threadFields: Record<Provider, FixedJsonShape> = {
   claude: { fields: { ...fields('type', 'timestamp', 'sessionId', 'requestId', 'isApiErrorMessage'),
     message: { fields: { id: scalar, model: scalar, usage: claudeUsage } } } },
   codex: { fields: { ...fields('type', 'timestamp'), payload: { fields: {

@@ -10,6 +10,11 @@ export interface JsonShape {
   objectOnly?: boolean;
 }
 
+export interface FixedJsonShape {
+  fields?: Readonly<Record<string, FixedJsonShape>>;
+  keepNonempty?: boolean;
+}
+
 const nonempty = Symbol('nonempty JSON object');
 const whitespace = /[\x09\x0a\x0d\x20]+/y;
 const plainString = /[^"\\\x00-\x1f]*"/y;
@@ -26,11 +31,11 @@ export function projectJson(text: string, shape: JsonShape): unknown {
   return new JsonProjection(text).parse(shape);
 }
 
-export function projectFixedJson(text: string, shape: JsonShape): unknown {
+export function projectFixedJson(text: string, shape: FixedJsonShape): unknown {
   return new JsonProjection(text).parseFixed(shape);
 }
 
-function field(fields: JsonFields | undefined, name: string): true | JsonShape | undefined {
+function field<T>(fields: Readonly<Record<string, T>> | undefined, name: string): T | undefined {
   return fields && Object.hasOwn(fields, name) ? fields[name] : undefined;
 }
 
@@ -49,7 +54,8 @@ class JsonProjection {
   }
 
   /** Validate the input once and decode the compact row in one native JSON.parse call. */
-  parseFixed(shape: JsonShape): unknown {
+  parseFixed(shape: FixedJsonShape): unknown {
+    // [파싱 정책] 입력 문법은 모두 확인하고 선택한 조각을 합쳐 한 번만 JSON.parse에 넘긴다.
     const pieces: string[] = [];
     this.space();
     if (this.text[this.offset] === '{') this.fixedObject(shape, pieces);
@@ -59,7 +65,8 @@ class JsonProjection {
     return pieces.length ? JSON.parse(pieces.join('')) : null;
   }
 
-  private fixedObject(shape: JsonShape, pieces: string[]): void {
+  private fixedObject(shape: FixedJsonShape, pieces: string[]): void {
+    // [필드 선택 정책] 키 이스케이프를 해석해 선택표에서 찾고 선택 밖의 값은 문법만 검사한다.
     this.offset++;
     if (this.take('}')) { pieces.push('{}'); return; }
     pieces.push('{');
@@ -84,16 +91,17 @@ class JsonProjection {
     pieces.push('}');
   }
 
-  private fixedValue(shape: true | JsonShape, pieces: string[]): void {
+  private fixedValue(shape: FixedJsonShape, pieces: string[]): void {
+    // [필드 선택 정책] 하위 필드 정의가 있는 객체만 펼치고 나머지 컨테이너는 형태만 보존한다.
     this.space();
     const start = this.offset, char = this.text[start];
-    if (shape !== true && char === '{' && shape.fields) {
+    if (char === '{' && shape.fields) {
       this.fixedObject(shape, pieces);
       return;
     }
     this.skipValue();
-    if (shape !== true && char === '{') pieces.push('{}');
-    else if (shape !== true && char === '[') pieces.push('[]');
+    if (char === '{') pieces.push('{}');
+    else if (char === '[') pieces.push('[]');
     else pieces.push(this.text.slice(start, this.offset));
   }
 

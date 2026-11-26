@@ -3,13 +3,14 @@ import { open } from 'node:fs/promises';
 import { zstdChunks, ZstdError } from './zstd';
 import { SummaryError } from './errors';
 import { JsonlLine } from './line';
-import { projectFixedJson, projectJson, type JsonShape } from './projection';
+import { projectFixedJson, projectJson, type FixedJsonShape, type JsonShape } from './projection';
 import { StreamingFixedProjection } from './streamProjection';
 
 export { SummaryError } from './errors';
 
 /** JSON 문법 오류와 지원하지 않는 최상위 형식을 원본 행 위치로 구분한다. */
-function parseJsonlObject(text: string, offset: number, shape: JsonShape | undefined, fixedShape: JsonShape | undefined): Record<string, unknown> {
+function parseJsonlObject(text: string, offset: number, shape: JsonShape | undefined, fixedShape: FixedJsonShape | undefined): Record<string, unknown> {
+  // [파싱 정책] 고정 필드, 유형별 필드, 전체 JSON 순으로 적용하고 문법 오류와 객체 형식 오류를 구분한다.
   let row: unknown;
   try { row = fixedShape ? projectFixedJson(text, fixedShape) : shape ? projectJson(text, shape) : JSON.parse(text); }
   catch { throw new SummaryError('parse-error', offset); }
@@ -27,7 +28,7 @@ export async function readJsonl(
   size: number,
   onRow: (row: Record<string, unknown>, offset: number) => void | boolean,
   options: { maxLineBytes?: number; signal?: AbortSignal; isCancelled?: () => boolean; onBytes?: (bytes: number) => void;
-    shape?: JsonShape; fixedShape?: JsonShape;
+    shape?: JsonShape; fixedShape?: FixedJsonShape;
     /** Raw file bytes, before image filtering or decompression; valid only during the callback. */
     onChunk?: (chunk: Buffer) => void;
     /** Synchronous processing of at most one chunk; file reads stay outside the callback. */
