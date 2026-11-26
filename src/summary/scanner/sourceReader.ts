@@ -4,7 +4,7 @@ import type { FileMetadata } from '../db/types';
 import { readJsonl, SummaryError } from '../jsonl';
 import type { FixedJsonShape, JsonShape } from '../jsonl/projection';
 import { sqlText } from '../parsers/common';
-import { ThreadLogParser, threadFields, type ThreadIdentity, type ThreadLog } from '../parsers/threadUsage';
+import { ThreadLogParser, threadFields, type ThreadLog } from '../parsers/threadUsage';
 import type { ParseEvent, ParsedIdentity, SummaryOptions } from '../types';
 
 export type SourceReadFile = Pick<FileMetadata, 'provider' | 'path' | 'source_root' | 'mtime_ms'> & { id: number; size_bytes: number };
@@ -52,17 +52,16 @@ export interface ThreadSourceRead {
 }
 
 export async function readThreadSource(file: SourceReadFile, options: Pick<ReadOptions,
-  'signal' | 'cancelled' | 'maxLineBytes' | 'onBytes'> & { onIdentity: (value: ThreadIdentity) => void }): Promise<ThreadSourceRead> {
+  'signal' | 'cancelled' | 'maxLineBytes' | 'onBytes'> & { onFailedSession: (sessionId: string) => void }): Promise<ThreadSourceRead> {
+  // [파싱 정책] 제공자별 고정 필드로 관측한 범위만 읽고 완성한 행이 있을 때 스레드를 확정한다.
   const parser = new ThreadLogParser(file.provider, file.path, file.source_root);
   try {
     const { rows, partialLine } = await readSourceRows(file, (row, offset) => parser.row(row, offset), { fixedShape: threadFields[file.provider] }, options);
     if (!rows) return { partialLine };
-    const { sessionId, threadId, projectKey, projectName, ...usage } = parser.finish();
-    return { partialLine, thread: { ...usage, sessionId: sqlText(sessionId), threadId: sqlText(threadId),
-      projectKey: sqlText(projectKey), projectName: sqlText(projectName) } };
+    return { partialLine, thread: parser.finish() };
   } catch (error) {
     const identity = parser.identity();
-    if (identity) options.onIdentity({ sessionId: sqlText(identity.sessionId), threadId: sqlText(identity.threadId) });
+    if (identity) options.onFailedSession(identity.sessionId);
     throw error;
   }
 }

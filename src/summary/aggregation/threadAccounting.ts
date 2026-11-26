@@ -91,8 +91,8 @@ function leadingLegacyUsage({ legacy, leadingLegacyCount, firstResponse }: Codex
     const row = legacy[index];
     const delta = legacyIncrease(row, state);
     if (index < historical || !delta) continue;
-    // Some logs emit a legacy snapshot for the first response before its identified usage record.
-    if (row.total && firstResponse?.threadTotal && sameUsage(row.total, firstResponse.threadTotal)
+    // [집계 정책] 입력·출력 누계와 증가분이 첫 응답 기록과 일치하면 중복으로 보고 제외한다.
+    if (row.total && firstResponse && sameUsage(row.total, firstResponse.threadTotal)
       && sameUsage(delta, firstResponse.tokens)) continue;
     usage = accumulateThreadUsage(usage, delta, row.model);
   }

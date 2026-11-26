@@ -76,7 +76,7 @@ export interface ThreadLog extends ThreadIdentity {
   checkpoints: ThreadCheckpointInterval[];
   legacy: ThreadLegacy[];
   leadingLegacyCount: number;
-  firstResponse?: { tokens: ThreadTokens; threadTotal?: ThreadTokens };
+  firstResponse?: { tokens: ThreadTokens; threadTotal: ThreadTokens };
 }
 
 export const responseKey = (row: Pick<ThreadResponse, 'turnId' | 'responseId'>): string => JSON.stringify([row.turnId, row.responseId]);
@@ -150,7 +150,9 @@ export class ThreadLogParser {
   finish(): ThreadLog {
     const identity = this.identity();
     if (!identity || !this.recognized) throw new SummaryError('unsupported-schema');
-    return { ...identity, ...this.project, startedAt: this.startedAt, lastAt: this.lastAt,
+    // [DTO 정책] 원본 식별자와 시간 범위에 파일별 winner, 누계 검증 근거를 묶어 ThreadLog를 만든다.
+    const { projectKey, projectName } = this.project;
+    return { ...identity, projectKey: sqlText(projectKey), projectName: sqlText(projectName), startedAt: this.startedAt, lastAt: this.lastAt,
       parentThreadId: this.forkedFromId ?? this.parentThreadId, recordCount: this.recordCount,
       responses: this.responses, checkpoints: this.checkpoints, legacy: this.legacy,
       leadingLegacyCount: this.leadingLegacyCount, firstResponse: this.firstResponse };

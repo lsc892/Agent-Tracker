@@ -44,8 +44,8 @@ function applyPreparation(context: RefreshContext, file: FileState, preparation:
   const { state, result, check } = context;
   const previousSession = file.previous?.session_id;
   if (!preparation.ok) {
-    if (preparation.identity) {
-      state.setSession(file, preparation.identity.sessionId);
+    if (preparation.sessionId !== undefined) {
+      state.setSession(file, preparation.sessionId);
       state.connect(file.provider, previousSession, file.session_id);
     }
     throw new SummaryError(preparation.error.code, preparation.error.offset);
@@ -62,7 +62,7 @@ function applyPreparation(context: RefreshContext, file: FileState, preparation:
   state.setSession(file, sessionId);
   file.relations = { identity: { threadId }, threadUsage: true };
   state.registerPrepared(file, thread);
-  file.changed = needsSourceRead(file, file.previous);
+  file.changed ||= needsSourceRead(file, file.previous);
   if (!file.changed) return;
   state.affect(file.provider, file.session_id);
   state.connect(file.provider, previousSession, file.session_id);
