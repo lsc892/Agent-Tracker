@@ -1,5 +1,5 @@
 {
-  "manifest.description": "Claude and Codex subscription usage and local token totals by thread",
+  "manifest.description": "Claude and Codex subscription usage and local token totals by conversation",
   "manifest.openDashboard": "Agent Tracker: Open Dashboard",
   "manifest.openUsage": "Agent Tracker: Open Usage Statistics",
   "status.refreshName": "Agent Tracker: Refresh Current Usage",
@@ -41,7 +41,7 @@
   "manifest.showResetCredits": "Show available Codex usage resets and their next expiry in the usage card. Shown only when provided by the server.",
   "dashboard.usageStatistics": "Usage statistics",
   "manifest.usageEnabled": "Enable Usage Statistics. Turning this off cancels collection and closes the statistics view without affecting subscription usage lookups.\n\n[Delete statistics data](command:agentTracker.clearUsageData): deletes saved file processing information and aggregated results. Original conversation logs are preserved and recalculated when statistics are reopened.",
-  "manifest.skillsEnabled": "Thread aggregation does not collect Skill statistics.",
+  "manifest.skillsEnabled": "Conversation aggregation does not collect Skill statistics.",
   "manifest.showApiCosts": "Show estimated API costs (USD) in the token statistics table. Subscription usage costs 0. Costs with unconfirmed billing, model rates, or token breakdowns are shown separately. Changing this setting queries saved statistics only.",
   "manifest.excludeEmpty": "Exclude requests with no identified model and no token usage from charts and averages. They remain in the table. Includes zero-token records with an identified model and actual token usage with an unknown model.",
   "manifest.timezone": "IANA time zone for daily and monthly statistics. Leave empty to use the system time zone.",

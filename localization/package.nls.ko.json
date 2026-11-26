@@ -1,5 +1,5 @@
 {
-  "manifest.description": "Claude와 Codex 구독 사용률 및 로컬 스레드별 토큰 통계",
+  "manifest.description": "Claude와 Codex 구독 사용률 및 로컬 대화별 토큰 통계",
   "manifest.openDashboard": "Agent Tracker: 대시보드 열기",
   "manifest.openUsage": "Agent Tracker: 사용 통계 열기",
   "status.refreshName": "Agent Tracker: 현재 사용량 새로고침",
@@ -41,7 +41,7 @@
   "manifest.showResetCredits": "사용량 카드에 Codex 사용량 리셋권의 사용 가능 횟수와 다음 만료 시간을 표시합니다. 서버가 제공한 정보가 있을 때만 표시됩니다.",
   "dashboard.usageStatistics": "사용량 통계",
   "manifest.usageEnabled": "사용량 통계를 사용합니다. 끄면 진행 중인 수집을 중단하고 통계 화면을 닫습니다. 구독 사용량 조회에는 영향을 주지 않습니다.\n\n[통계 계산 데이터 삭제](command:agentTracker.clearUsageData): 저장된 파일 처리 정보와 집계 결과를 삭제합니다. 원본 대화 로그는 유지되며, 통계를 다시 열면 재계산합니다.",
-  "manifest.skillsEnabled": "스레드 집계에서는 Skill 통계 수집을 사용하지 않습니다.",
+  "manifest.skillsEnabled": "대화 집계에서는 Skill 통계를 수집하지 않습니다.",
   "manifest.showApiCosts": "토큰 통계 표에 API 추정 비용(USD)을 표시합니다. 구독은 0원이며 결제 방식·모델 단가·토큰 구성이 미확인인 비용은 별도로 표시합니다. 설정 변경은 저장된 통계만 조회합니다.",
   "manifest.excludeEmpty": "모델 미상이며 토큰 사용량도 없는 요청을 도표와 평균 계산에서 제외합니다. 하단 표에는 계속 표시합니다. 모델을 확인할 수 있는 0토큰 기록과 모델 미상인 실제 토큰 사용량은 포함합니다.",
   "manifest.timezone": "일·월 통계의 IANA 시간대. 비우면 시스템 시간대를 사용합니다.",

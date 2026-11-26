@@ -1,5 +1,5 @@
 {
-  "manifest.description": "Utilisation des abonnements Claude et Codex et tokens locaux par fil",
+  "manifest.description": "Utilisation des abonnements Claude et Codex et tokens locaux par conversation",
   "manifest.openDashboard": "Agent Tracker : Ouvrir le tableau de bord",
   "manifest.openUsage": "Agent Tracker : Ouvrir les statistiques d'utilisation",
   "status.refreshName": "Agent Tracker : Actualiser l'utilisation actuelle",
@@ -41,7 +41,7 @@
   "manifest.showResetCredits": "Afficher les réinitialisations Codex disponibles et leur prochaine expiration, uniquement si le serveur les fournit.",
   "dashboard.usageStatistics": "Statistiques d'utilisation",
   "manifest.usageEnabled": "Activer les statistiques. La désactivation annule la collecte et ferme la vue sans affecter les consultations de l'abonnement.\n\n[Supprimer les données statistiques](command:agentTracker.clearUsageData) : supprime les informations de traitement et résultats agrégés. Les journaux d'origine sont conservés et recalculés à la prochaine ouverture.",
-  "manifest.skillsEnabled": "L’agrégation par fil ne collecte pas les statistiques des Skills.",
+  "manifest.skillsEnabled": "L’agrégation par conversation ne collecte pas les statistiques des Skills.",
   "manifest.showApiCosts": "Afficher les coûts estimés de l'API (USD) dans le tableau de tokens. L'abonnement coûte 0 ; les coûts aux modes, tarifs ou répartitions non confirmés sont séparés. Ce réglage consulte uniquement les statistiques enregistrées.",
   "manifest.excludeEmpty": "Exclure des graphiques et moyennes les requêtes sans modèle identifié ni tokens ; elles restent dans le tableau. Les modèles connus à zéro token et les utilisations réelles aux modèles inconnus sont inclus.",
   "manifest.timezone": "Fuseau IANA des statistiques quotidiennes et mensuelles. Laissez vide pour utiliser celui du système.",
