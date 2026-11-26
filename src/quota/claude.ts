@@ -39,6 +39,7 @@ export class ClaudeQuotaProvider extends BaseQuotaProvider {
    * 알고리즘: GET 요청 후 401일 때만 인증을 다시 읽어 한 번 재시도하고, HTTP 상태를 분류한 뒤 제한된 JSON을 정규화한다.
    */
   protected async readQuota(context: QuotaReadContext): Promise<QuotaSnapshot> {
+    // [취소 정책] 호출자 취소와 조회 전체의 시간 제한을 하나로 합쳐 재시도에도 사용한다.
     const controller = new AbortController();
     const signal = AbortSignal.any([context.signal, controller.signal]);
     let timedOut = false;
@@ -61,6 +62,7 @@ export class ClaudeQuotaProvider extends BaseQuotaProvider {
       signal.throwIfAborted();
       return parseClaudeQuota(body, this.now());
     } catch (error) {
+      // [오류 정책] 시간 초과와 취소를 우선하고 나머지 통신 실패는 공통 오류로 정리한다.
       if (timedOut) throw new QuotaError('timeout', { key: 'quota.claudeTimeout' });
       if (signal.aborted) throw new QuotaError('cancelled', { key: 'quota.claudeCancelled' });
       if (error instanceof QuotaError) throw error;
@@ -72,6 +74,7 @@ export class ClaudeQuotaProvider extends BaseQuotaProvider {
 
   /** 인증 정보를 읽고 취소 여부를 확인한 뒤 HTTP 요청 한 번을 보낸다. */
   private async requestUsage(refresh: boolean, signal: AbortSignal): Promise<Response> {
+    // [인증 정책] 조회 직전 취소 여부를 확인하고 인증 요청의 리디렉션을 차단한다.
     const token = await this.credentials.getAccessToken(refresh, signal);
     signal.throwIfAborted();
     return this.fetcher('https://api.anthropic.com/api/oauth/usage', {
@@ -86,6 +89,7 @@ export class ClaudeQuotaProvider extends BaseQuotaProvider {
     if (response.ok) return;
     // Body cancellation failures must not replace the HTTP status error.
     await response.body?.cancel().catch(() => {});
+    // [오류 정책] 401·403은 인증 오류, 429는 재시도 안내가 포함된 요청 제한으로 분류한다.
     switch (response.status) {
       case 401:
         throw new QuotaError('authentication', { key: 'quota.claudeLoginExpired' });
@@ -105,6 +109,7 @@ export class ClaudeQuotaProvider extends BaseQuotaProvider {
  * 알고리즘: 숫자는 초 단위로, 그 외는 HTTP 날짜로 해석하고 음수 지연을 0으로 보정하며 타이머 상한을 제한한다.
  */
 export function parseRetryAfter(value: string | null, now: number): number | undefined {
+  // [재시도 정책] 초 단위 값 또는 HTTP 날짜를 0 이상인 밀리초 지연으로 바꾸고 타이머 상한을 적용한다.
   if (!value) return undefined;
   const seconds = Number(value);
   if (Number.isFinite(seconds) && seconds >= 0) return Math.min(2_147_000_000, seconds * 1000);

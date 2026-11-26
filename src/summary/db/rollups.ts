@@ -18,6 +18,7 @@ const REPLACE_MISSING_DAYS = `AND (NOT (${SESSION_SET_FILTER}) OR (provider, ses
 ))`;
 
 function dailyUpsert(by: keyof typeof ROLLUP_TABLES): string {
+  // [저장 정책] 집계 기준별 키로 일별 행을 UPSERT하고 NULL까지 포함해 실제로 값이 달라진 행만 갱신한다.
   const table = ROLLUP_TABLES[by];
   const states = [...rollupStates(by), ...DAILY_COST_STATES].map(state => state.name);
   const fields = by === 'model' ? ['model', ...states] : states;
@@ -35,6 +36,7 @@ export class UsageRollupStore {
   constructor(private readonly database: SqliteSession) {}
 
   dailyTimezone(): string {
+    // [시간대 정책] 저장 당시의 시간대를 집계 메타데이터에서 읽고 값이 없으면 실패한다.
     const row = this.database.statement('SELECT timezone FROM usage_rollup_meta WHERE singleton=1').get();
     if (typeof row?.timezone !== 'string') throw new Error('Missing daily usage timezone');
     return row.timezone;
@@ -44,6 +46,7 @@ export class UsageRollupStore {
   setDailyTimezone(timezone: string): void {
     if (this.dailyTimezone() === timezone) return;
     calendarPeriod(0, timezone, 'day');
+    // [SQL 트랜잭션 정책] 잠금 뒤 시간대를 다시 확인하고 변경 시 남아 있는 원본의 파서 버전을 초기화한다.
     this.database.transaction(() => {
       if (this.dailyTimezone() === timezone) return;
       this.database.statement('UPDATE usage_rollup_meta SET timezone=? WHERE singleton=1').run(timezone);
@@ -54,6 +57,8 @@ export class UsageRollupStore {
   replaceDaily(sessions: readonly SessionRef[], summaries: readonly TurnSummaryInput[], retain: boolean,
     profile: StageProfiler<StorageStage>): void {
     if (!sessions.length) return;
+
+    // [SQL 트랜잭션 정책] 소실 원본을 보존하는 세션은 이번에 집계한 날짜만 교체 범위에 넣는다.
     const timezone = this.dailyTimezone();
     const scope = JSON.stringify(sessions.map(row => [row.provider, row.session_id]));
     const missing = retain ? this.database.statement(MISSING_SESSIONS).all(scope).map(row => [row.provider, row.session_id]) : [];
@@ -68,10 +73,10 @@ export class UsageRollupStore {
         const date: [Provider, string, string] = [row.provider, row.session_id, day];
         dates.set(JSON.stringify(date), date);
       }
-      // Missing sessions keep old dates for which this scan could produce no new result.
       params.push(JSON.stringify(missing), JSON.stringify([...dates.values()]));
     }
 
+    // [SQL 트랜잭션 정책] 일별 제공자·모델 합계를 UPSERT하고 새 집계에서 사라진 키는 EXCEPT로 찾아 삭제한다.
     const facts = dailyFacts(summaries);
     for (const by of ['provider', 'model'] as const) {
       const table = ROLLUP_TABLES[by];
@@ -87,6 +92,7 @@ export class UsageRollupStore {
         )`).run(...params, timezone, facts[by]);
       });
     }
+    // [저장 정책] 같은 교체 범위에 남아 있는 이전 도구 집계 행을 지운다.
     this.database.statement(`DELETE FROM usage_capability_daily ${where}`).run(...params);
   }
 

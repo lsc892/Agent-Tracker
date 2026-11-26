@@ -5,6 +5,7 @@ import type { DisplayPercentage, DisplayDetail } from '../configuration/schema';
 
 /** StatusBarItem accepts contributed font icons, rather than SVG or HTML. */
 function quotaBar(percent: number): string {
+  // [표시 정책] 백분율을 0~100으로 제한하고 10% 단위의 가장 가까운 아이콘을 고른다.
   const filled = Math.max(0, Math.min(100, percent));
   return `$(agent-tracker-quota-${Math.round(filled / 10)})`;
 }
@@ -14,6 +15,7 @@ export function remainingBar(usedPercent: number): string {
 }
 
 function resetTime(window: QuotaWindow, now: number): string {
+  // [기간 정책] 초기화까지 남은 시간을 분 단위로 올림하고 경과한 시각은 대기 상태로 표시한다.
   if (window.resetsAt === null || !Number.isFinite(window.resetsAt)) return '';
   const minutes = Math.max(0, Math.ceil((window.resetsAt - now) / 60_000));
   if (!minutes) return t('status.waitingReset');
@@ -25,6 +27,7 @@ function resetTime(window: QuotaWindow, now: number): string {
 
 /** A detailed accessible label, independent of the status bar's display mode. */
 export function quotaHoverSummary(states: readonly QuotaState[], now = Date.now()): string {
+  // [접근성 정책] 상태바 설정과 무관하게 Codex·Claude 순으로 상세 잔여 한도를 읽어 준다.
   const lines = (['codex', 'claude'] as const).map(provider => {
     const state = states.find(value => value.provider === provider);
     if (!state) return undefined;
@@ -51,6 +54,7 @@ export function statusBarPresentation(
     const message = state.refreshing ? t('status.loading') : t('status.unavailable');
     return { text: `${icon} ${message}`, accessibleText: `${name}: ${message}` };
   }
+  // [한도 정책] Codex 기본 한도가 있으면 우선하고 5시간·7일 창은 ID 다음에 기간으로 찾는다.
   const codexWindows = state.provider === 'codex' ? windows.filter(window => window.limitId === 'codex') : [];
   const mainWindows = codexWindows.length ? codexWindows : windows;
   const fiveHour = mainWindows.find(window => window.id === 'five_hour')
@@ -59,6 +63,7 @@ export function statusBarPresentation(
     ?? mainWindows.find(window => window.windowDurationMins === 10080);
   const selected = selectStatusWindows(detail, fiveHour, sevenDay, mainWindows);
   if (!selected.length) return { text: t('status.missingFiveHour', { value0: icon }), accessibleText: t('status.missingFiveHourAccessible', { value0: name }) };
+  // [표시 정책] 사용·잔여 모드에 맞게 백분율을 계산하고 같은 값으로 문구와 접근성 설명을 만든다.
   const values = selected.map(window => {
     const used = Math.max(0, Math.min(100, window.usedPercent));
     const percent = Math.round(percentage === 'remaining' ? 100 - used : used);
@@ -78,6 +83,7 @@ export function statusBarPresentation(
 }
 
 function selectStatusWindows(detail: DisplayDetail, fiveHour: QuotaWindow | undefined, sevenDay: QuotaWindow | undefined, mainWindows: readonly QuotaWindow[]): QuotaWindow[] {
+  // [한도 정책] 간결 모드는 5시간만, 상세 모드는 표준 창을 우선하고 없으면 처음 두 창을 표시한다.
   if (detail === 'compact') return fiveHour ? [fiveHour] : [];
   if (fiveHour || sevenDay) return [sevenDay, fiveHour].filter((window): window is QuotaWindow => window !== undefined);
   return mainWindows.slice(0, 2);

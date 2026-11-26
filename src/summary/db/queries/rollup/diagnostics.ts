@@ -8,6 +8,7 @@ import type { QuerySql } from '../common/types';
  * 알고리즘: 같은 필터로 파일 목록과 상태별 개수를 만들고 ID 기반 페이지 조건을 붙인다.
  */
 export function buildDiagnosticQueries(filter: Pick<SummaryFilter, 'providers'>): { files: QuerySql; counts: QuerySql } {
+  // [페이지 정책] 동일 제공자 범위에서 커서보다 큰 파일 ID를 읽고 개수는 범위 전체에서 센다.
   const where = buildQueryFilter(filter);
   return {
     files: {
@@ -28,6 +29,7 @@ export function buildDiagnosticCountsQuery(providers?: Provider[]): QuerySql {
 }
 
 function diagnosticCounts(where: QuerySql): QuerySql {
+  // [진단 정책] 상태별 파일을 세고 실패·중단 세션의 기존 요약은 세션 중복을 제거한 뒤 합산한다.
   return {
     sql: `SELECT
         COUNT(*) AS files,

@@ -10,6 +10,7 @@ export class WindowsClaudeCredentials implements ClaudeCredentialSource {
   }
 
   async getAccessToken(_refresh: boolean, signal: AbortSignal): Promise<string> {
+    // [인증 정책] 매 조회마다 파일을 다시 읽고 검증 뒤에는 로컬의 원문 참조를 지운다.
     let serialized = await readClaudeCredentialFile(this.dataHome, signal);
     try { return parseClaudeAccessToken(serialized); }
     finally { serialized = undefined; }

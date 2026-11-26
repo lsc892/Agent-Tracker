@@ -20,6 +20,7 @@ interface DiscoveryPaths {
 type Observation = Pick<FileState, 'provider' | 'source_root' | 'path' | 'size_bytes' | 'mtime_ms'>;
 
 export async function discoverSources(context: RefreshContext): Promise<void> {
+  // [탐색 정책] 저장된 경로와 실제 로그를 대조하며 이전 기록이 없는 루트의 ENOENT만 허용한다.
   const { database, roots, check } = context;
   const paths = loadStoredPaths(database);
   for (const root of roots) {
@@ -40,6 +41,7 @@ export async function discoverSources(context: RefreshContext): Promise<void> {
 }
 
 function loadStoredPaths(database: SummaryDatabase): DiscoveryPaths {
+  // [색인 정책] 제공자·경로로 저장 행을 찾고 최대 ID 다음부터 새 파일에 배정한다.
   const paths: DiscoveryPaths = { byPath: new Map(), storedRoots: new Set(), nextId: 1 };
   const stored = database.connection.prepare(`SELECT id, provider, source_root, path, session_id,
     mtime_ms, parser_version, source_missing, processing_status FROM source_file ORDER BY id`).iterate() as unknown as Iterable<StoredSource>;
@@ -52,6 +54,7 @@ function loadStoredPaths(database: SummaryDatabase): DiscoveryPaths {
 }
 
 function recordObservation(context: RefreshContext, paths: DiscoveryPaths, observation: Observation): void {
+  // [탐색 정책] 최초 관측에는 기존 파일 ID를 재사용하고 겹치는 루트는 마지막 관측의 메타데이터로 합친다.
   const { state, result, report } = context;
   const { provider, path } = observation;
   const key = sessionKey(provider, path);
@@ -59,7 +62,6 @@ function recordObservation(context: RefreshContext, paths: DiscoveryPaths, obser
   const { observed, previous } = entry;
   const changed = needsSourceRead(observation, previous);
   if (observed) {
-    // Overlapping roots share one file ID and the last root supplies its metadata.
     result.reused += Number(observed.changed) - Number(changed);
     Object.assign(observed, observation);
     observed.changed = changed;
@@ -77,13 +79,14 @@ function recordObservation(context: RefreshContext, paths: DiscoveryPaths, obser
 }
 
 function registerUnseenSources(context: RefreshContext, stored: Iterable<SourcePath>): void {
+  // [소실 처리 정책] 선택 루트 안의 미관측 파일은 소실로 분류하고 보존 여부에 따라 다시 집계한다.
   const { state, roots, retain } = context;
   const selectedRoots = new Set(roots.map(root => sessionKey(root.provider, root.path)));
   for (const { previous, observed } of stored) {
     if (observed || !previous) continue;
     const selected = selectedRoots.has(sessionKey(previous.provider, previous.source_root));
     const changed = selected && (!previous.source_missing || !retain);
-    // An unobserved file must be statted before it can be read outside the selected roots.
+    // [재수집 정책] 선택 범위 밖에서 필요해진 파일은 실제로 읽기 직전에 크기를 확인한다.
     const file: FileState = { ...previous, size_bytes: 0, previous, changed,
       removed: selected, selected };
     state.trackFile(file);
@@ -95,6 +98,7 @@ function registerUnseenSources(context: RefreshContext, stored: Iterable<SourceP
 }
 
 async function* walk(directory: string, check: () => void, compressed: boolean): AsyncGenerator<string> {
+  // [탐색 정책] 디렉터리를 순회하며 취소를 확인하고 Zstd 확장자는 Codex 루트에서만 포함한다.
   check();
   const stat = await lstat(directory);
   if (!stat.isDirectory())

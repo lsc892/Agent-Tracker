@@ -20,6 +20,7 @@ async function worker(configPath, directory, workers) {
   const { StreamingAggregation } = require('../../dist/src/summary/aggregation/memoryAggregate');
   const dbPath = join(directory, 'summary.sqlite'), database = new SummaryDatabase(dbPath);
   let peak, createdWorkers = 0, activeWorkers = 0, maximumWorkers = 0;
+  // [Worker 측정 정책] 생성 이벤트와 종료 이벤트로 전체 생성 수와 동시 실행 최댓값을 센다.
   process.on('worker', thread => {
     createdWorkers++; activeWorkers++; maximumWorkers = Math.max(maximumWorkers, activeWorkers);
     thread.once('exit', () => { activeWorkers--; });
@@ -29,6 +30,7 @@ async function worker(configPath, directory, workers) {
     const now = memory();
     for (const key of Object.keys(now)) peak[key] = Math.max(peak[key], now[key]);
   };
+  // [측정 정책] 정기 샘플에 더해 동기 집계의 시작과 끝에서도 메모리를 읽는다.
   const originalFinish = StreamingAggregation.prototype.finish;
   StreamingAggregation.prototype.finish = function(...args) {
     sample(); const result = Reflect.apply(originalFinish, this, args); sample(); return result;
@@ -36,6 +38,7 @@ async function worker(configPath, directory, workers) {
   let expected;
   const samples = [];
   try {
+    // [측정 정책] 예열 이후의 실행만 남기고 매번 파서 버전을 초기화해 같은 입력을 재파싱한다.
     for (let iteration = -2; iteration <= 5; iteration++) {
       database.connection.exec('UPDATE manifest SET parser_version=0');
       await gc();
@@ -48,6 +51,7 @@ async function worker(configPath, directory, workers) {
       const elapsedMs = performance.now() - started, beforeGc = memory(), observedPeak = peak;
       peak = undefined;
       if (result.failed || result.interrupted || activeWorkers) throw new Error('Worker comparison did not finish cleanly');
+      // [검증 정책] 반복 결과의 요청 수와 토큰 합계가 기준과 같은지 확인한다.
       const totals = database.connection.prepare('SELECT count(*) requests,sum(total_tokens) tokens FROM turn_summary').get();
       const encoded = JSON.stringify(totals);
       if (expected && encoded !== expected) throw new Error('Worker settings changed request/token totals');
@@ -63,6 +67,7 @@ async function worker(configPath, directory, workers) {
 
 function run(config, directory, workers) {
   return new Promise((done, fail) => {
+    // [실행 격리 정책] 각 Worker 설정을 강제 GC가 가능한 새 프로세스에서 관측한다.
     const child = fork(__filename, ['--child', config, directory, String(workers)], {
       cwd: root, execArgv: ['--expose-gc'], windowsHide: true, stdio: ['ignore', 'ignore', 'pipe', 'ipc'],
     });

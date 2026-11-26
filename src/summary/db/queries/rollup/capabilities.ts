@@ -8,10 +8,13 @@ import { buildDailyUsageFilter } from './source';
  * 알고리즘: 제공자·이름별 횟수를 합산하고 선택적으로 같은 그룹 결과에 전체 개수·합계·최댓값의 window 지표를 붙인다.
  */
 export function buildCapabilityQueries(filter: SummaryFilter, category: string, withTotals = false, timezone = 'UTC'): { counts: QuerySql; ranking: QuerySql } {
+  // [SQL 필터 정책] 분류를 검증하고 통계 시간대의 일별 범위에 분류 조건을 결합한다.
   if (!['skill', 'subagent', 'plugin', 'model'].includes(category)) throw new RangeError('Unknown capability category');
   const where = buildDailyUsageFilter(filter, timezone);
   const scope = `${where.sql} AND category = ?`;
   const values = [...where.values, category];
+
+  // [집계 정책] 제공자·이름별 횟수를 합산해 전체 지표를 구하고 순위에서 이름 미상을 뒤에 둔다.
   return {
     counts: {
       sql: `SELECT

@@ -3,6 +3,7 @@
   'use strict';
   const engine = globalThis.i18next.createInstance();
   const initial = globalThis.agentTrackerLocale;
+  // [번역 정책] 호스트가 전달한 초기 언어 번들을 동기로 로드한다.
   engine.init({ initAsync: false, lng: initial.locale, fallbackLng: false, keySeparator: false,
     resources: { [initial.locale]: { translation: initial.messages } },
     interpolation: { escapeValue: false, prefix: '{', suffix: '}' } });
@@ -13,10 +14,12 @@
    * 알고리즘: 언어가 달라지면 번역 bundle을 교체하고 data-i18n 표시가 붙은 텍스트·접근성·안내 속성만 다시 번역한다.
    */
   globalThis.updateAgentTrackerLocale = bundle => {
+    // [번역 정책] 언어가 바뀔 때만 기존 리소스를 교체한다.
     if (!bundle || bundle.locale === engine.language) return false;
     engine.removeResourceBundle(engine.language, 'translation');
     engine.addResourceBundle(bundle.locale, 'translation', bundle.messages);
     engine.changeLanguage(bundle.locale);
+    // [접근성 정책] 번역 대상으로 표시된 텍스트와 ARIA·안내 속성을 갱신한다.
     document.documentElement.lang = bundle.locale;
     for (const node of document.querySelectorAll('[data-i18n]')) node.textContent = engine.t(node.dataset.i18n);
     for (const attribute of ['aria-label', 'title', 'placeholder']) {

@@ -12,6 +12,7 @@ export type SourceReadFile = Pick<FileMetadata, 'provider' | 'path' | 'source_ro
 export { sqlText } from '../parsers/common';
 
 export function normalizedIdentity(identity: ParsedIdentity): ParsedIdentity {
+  // [DTO 정책] 식별자 객체를 복사한 뒤 문자열 필드를 SQLite와 같은 UTF-8로 맞춘다.
   const result = { ...identity };
   for (const [name, value] of Object.entries(result)) if (typeof value === 'string') Reflect.set(result, name, sqlText(value));
   return result;
@@ -40,6 +41,7 @@ async function readSourceRows(file: SourceReadFile, onRow: (row: Record<string, 
     signal: options.signal, isCancelled: options.cancelled, maxLineBytes: options.maxLineBytes,
     onBytes: options.onBytes, ...fields,
   });
+  // [검증 정책] 읽은 뒤 파일 크기·수정 시각을 확인해 축소나 같은 크기의 변경을 오류로 처리한다.
   const after = await lstat(file.path);
   if (!after.isFile() || after.size < file.size_bytes
     || after.size === file.size_bytes && after.mtimeMs !== file.mtime_ms) throw new SummaryError('file-rewritten-during-read');
@@ -60,6 +62,7 @@ export async function readThreadSource(file: SourceReadFile, options: Pick<ReadO
     if (!rows) return { partialLine };
     return { partialLine, thread: parser.finish() };
   } catch (error) {
+    // [진단 정책] 파싱에 실패해도 앞에서 읽은 세션 ID를 진단에 전달한다.
     const identity = parser.identity();
     if (identity) options.onFailedSession(identity.sessionId);
     throw error;
@@ -72,6 +75,7 @@ export async function readSource(
   event: (value: ParseEvent, index: number) => void,
   options: ReadOptions,
 ): Promise<SourceRead> {
+  // [파싱 정책] 제공자별 파서와 필드 선택기를 필요할 때 불러온다.
   const [{ ClaudeParserAdapter, CodexCurrentParserAdapter }, { sourceFields }] = await Promise.all([
     import('../parsers'), import('../parsers/logFields'),
   ]);
@@ -79,6 +83,7 @@ export async function readSource(
     fileId: file.id, collectCapabilities: options.collectCapabilities };
   let index = 0;
   let identity!: ParsedIdentity;
+  // [DTO 정책] 원본 내 이벤트 순번을 붙이고 자식 참조는 저장용 문자열로 정규화한다.
   const sink = { identity: (value: ParsedIdentity) => { identity = value; }, event: (value: ParseEvent) => event(value, index++),
     child: (reference: string, rootId: string) => options.onChild?.(sqlText(reference), sqlText(rootId)) };
   const parser = file.provider === 'claude' ? new ClaudeParserAdapter(context, sink) : new CodexCurrentParserAdapter(context, sink);

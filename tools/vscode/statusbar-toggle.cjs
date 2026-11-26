@@ -24,6 +24,7 @@ function patchSource(source) {
   if (symbols.length !== 1) throw new Error('내장 ToggleTooltipCommand를 유일하게 찾을 수 없습니다. 지원하지 않는 VS Code 빌드입니다.');
   let original = source;
   let existingPatch;
+  // [패치 식별 정책] 기존 표식의 개수와 순서를 확인하고 주입 부분을 분리해 원래 코드를 재구성한다.
   const markers = [...source.matchAll(/\/\*agent-tracker:statusbar-toggle:v\d+\*\//g)];
   if (markers.length || source.includes(end)) {
     if (markers.length !== 1 || source.split(end).length !== 2 || !/v[1-7]\*\/$/.test(markers[0][0])) throw new Error('토글 패치 표식이 손상되었습니다.');
@@ -33,6 +34,7 @@ function patchSource(source) {
     existingPatch = { start, injection: source.slice(start, afterPatch) };
     original = source.slice(0, start) + source.slice(afterPatch);
   }
+  // [호환성 정책] 지원하는 툴팁 동작에 연결되는 갱신 지점이 유일한지 확인한다.
   const targets = [...original.matchAll(/update\(([\w$]+)\)\{(?=if\(this\.label\.showProgress=\1\.showProgress)/g)];
   if (targets.length !== 1) throw new Error('StatusbarEntryItem.update 연결 지점을 유일하게 찾을 수 없습니다.');
   const target = targets[0], argument = target[1];
@@ -49,6 +51,7 @@ function patchSource(source) {
   const patched = original.slice(0, position) + injection + original.slice(position);
   const alreadyPatched = source === patched;
   const upgradeRequired = !!existingPatch && !alreadyPatched;
+  // [호환성 정책] 기존 주입 위치와 내용이 알려진 버전과 정확히 일치하는 경우에만 업그레이드한다.
   if (upgradeRequired) {
     const historical = getHistoricalInjections({ argument, symbol, condition, mapping, extensionId, end });
     const previousPublisher = historical.map(value =>
@@ -61,6 +64,7 @@ function patchSource(source) {
 }
 
 function appRootFromInstallation(root, launcher = join(root, 'bin', 'code.cmd')) {
+  // [설치 경로 정책] 런처가 가리키는 버전별 앱을 우선 확인하고 일반 리소스 경로도 확인한다.
   if (existsSync(launcher)) {
     const match = readFileSync(launcher, 'utf8').match(/%~dp0\.\.\\([^\\"\r\n]+)\\resources\\app\\out\\cli\.js/);
     if (match && existsSync(join(root, match[1], 'resources', 'app', 'product.json'))) return realpathSync(join(root, match[1], 'resources', 'app'));
@@ -75,6 +79,7 @@ function appRootFromInstallation(root, launcher = join(root, 'bin', 'code.cmd'))
  * 알고리즘: 명시 app root·CLI·실행 파일을 우선하고 기본 설치 후보를 검사하며 버전별 설치 경로는 launcher와 product.json으로 확인한다.
  */
 function resolveAppRoot(options = {}) {
+  // [설치 경로 정책] 명시한 앱 경로와 CLI를 우선하고 실행 파일 후보에서 실제 리소스 경로를 찾는다.
   if (options.appRoot) return realpathSync(resolve(options.appRoot));
   if (options.cli) {
     const launcher = realpathSync(resolve(options.cli));
@@ -98,6 +103,7 @@ function resolveAppRoot(options = {}) {
 }
 
 function atomicWrite(path, contents) {
+  // [쓰기 정책] 원본과 같은 모드의 임시 파일을 배타적으로 만든 뒤 이름을 바꿔 교체한다.
   const temporary = `${path}.agent-tracker-${process.pid}.tmp`;
   try {
     writeFileSync(temporary, contents, { flag: 'wx', mode: statSync(path).mode });
@@ -108,6 +114,7 @@ function atomicWrite(path, contents) {
 }
 
 function backup(path, contents) {
+  // [백업 정책] 최초 백업은 배타적으로 만들고 기존 백업은 해시가 일치하는지 확인한다.
   if (!existsSync(path)) { writeFileSync(path, contents, { flag: 'wx' }); return; }
   if (hash(readFileSync(path)) !== hash(contents)) throw new Error(`기존 백업과 원본이 다릅니다: ${path}`);
 }
@@ -117,6 +124,7 @@ function restoreWorkbench(target, productPath, source, productSource, state) {
   const original = readFileSync(`${target}.agent-tracker-toggle.bak`);
   const originalProduct = readFileSync(`${productPath}.agent-tracker-toggle.bak`);
   if (hash(original) !== state.originalHash || hash(originalProduct) !== state.originalProductHash) throw new Error('백업 무결성 검증 실패.');
+  // [복원 정책] 현재 파일이 기록한 상태 중 하나일 때만 검증된 원본 두 파일을 복원한다.
   const restored = hash(source) === state.originalHash && hash(productSource) === state.originalProductHash;
   if (restored) return 'already-restored';
   if (![state.originalHash, state.patchedHash, state.previousHash].includes(hash(source)) || ![state.originalProductHash, state.patchedProductHash, state.previousProductHash].includes(hash(productSource))) throw new Error('패치 이후 파일이 변경되어 자동 복원을 중단합니다.');
@@ -162,6 +170,7 @@ function operate(options = {}) {
     if (hash(readFileSync(sourceBackup)) !== state.originalHash || hash(originalProductSource) !== state.originalProductHash || hash(result.original) !== state.originalHash) throw new Error('백업 무결성 검증 실패.');
   }
   if (product.checksums?.[checksumKey] !== checksum(source)) throw new Error('현재 workbench 파일이 등록된 무결성 값과 다릅니다. 기존 수정에 덮어쓰지 않습니다.');
+  // [검증 정책] 교체 전에 주입 결과의 JavaScript 구문을 검사하고 product의 체크섬을 다시 계산한다.
   const syntax = spawnSync(process.execPath, ['--input-type=module', '--check'], { input: result.patched, encoding: 'utf8', windowsHide: true, maxBuffer: 1024 * 1024, timeout: 30_000 });
   if (syntax.error || syntax.status !== 0) throw new Error(`패치 JavaScript 구문 검사 실패: ${(syntax.error?.message || syntax.stderr || '').slice(0, 300)}`);
   const patchedProduct = { ...product, checksums: { ...product.checksums, [checksumKey]: checksum(result.patched) } };
@@ -171,6 +180,7 @@ function operate(options = {}) {
   const record = { version: manifest.version, command, originalHash: hash(result.original), patchedHash: hash(result.patched), originalProductHash: hash(originalProductSource), patchedProductHash: hash(patchedProductSource),
     ...(result.upgradeRequired ? { previousHash: hash(source), previousProductHash: hash(productSource) } : {}) };
   // Record both expected file states before mutation, so an interrupted apply is restorable.
+  // [복구 정책] 교체 전 양쪽 파일의 해시를 기록해 중간 중단 뒤에도 원본을 대조할 수 있게 한다.
   writeFileSync(statePath, JSON.stringify(record, null, 2) + '\n');
   try {
     atomicWrite(target, result.patched);
@@ -182,6 +192,7 @@ function operate(options = {}) {
 }
 
 function main(args) {
+  // [실행 옵션 정책] 허용된 옵션만 받고 복원과 확인 모드를 동시에 지정하면 거부한다.
   const options = {};
   for (let index = 0; index < args.length; index++) {
     const arg = args[index];

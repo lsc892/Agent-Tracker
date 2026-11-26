@@ -21,6 +21,7 @@
    * 알고리즘: 기존 내용을 지운 뒤 머리글·행·셀을 DOM으로 생성하고 외부 값은 textContent로 넣으며 빈 결과는 안내로 대체한다.
    */
   function table(target, headers, rows) {
+    // [표시 정책] 빈 페이지에는 안내를 표시하고 행은 DOM에서 텍스트로 구성한다.
     target.replaceChildren();
     if (!rows.length) { target.append(element('p', t('common.noRecords'), 'empty')); return; }
     const node = element('table');
@@ -47,9 +48,11 @@
    * 알고리즘: 파일·요약 진단을 textContent 기반 표로 변환하고 count·다음 cursor 존재 여부로 페이지 설명과 버튼을 갱신한다.
    */
   function render(result) {
+    // [진단 정책] 파일 처리 집계와 각 파일의 처리 위치·마지막 오류를 함께 표시한다.
     const counts = result.counts;
     $('diagnostic-counts').textContent = t('diagnostics.counts', { value0: number(counts.files), value1: number(counts.processing), value2: number(counts.done), value3: number(counts.error), value4: number(counts.interrupted), value5: number(counts.stale_summaries), value6: result.lastRefresh?.error ? t('diagnostics.recentScanSuffix', { value0: result.lastRefresh.error }) : '' });
     table($('diagnostic-files'), [t('diagnostics.providerFile'), t('common.session'), t('diagnostics.statusPosition'), t('diagnostics.recordedAt'), t('common.reason')], result.files.map(row => [`${row.provider} · ${row.path}`, row.session_id, `${row.processing_status} · ${row.processing_position ?? '—'}${row.source_missing ? ` · ${t('diagnostics.sourceMissing')}` : ''}`, date(row.recorded_at), row.last_error]));
+    // [페이지 정책] 첫 페이지에서 이전 이동을 막고 다음 커서가 있으면 다음 이동을 연다.
     $('diagnostic-previous').disabled = offset === 0;
     $('diagnostic-next').disabled = !result.nextFileId && !result.nextSummaryId;
     $('diagnostic-page').textContent = t('diagnostics.pageStart', { value0: number(offset + 1) });
@@ -64,6 +67,7 @@
     if (!message || typeof message !== 'object') return;
     switch (message.type) {
       case 'state':
+        // [표시 정책] 언어·시간대를 바꾸면 마지막 페이지를 다시 표시한다.
         globalThis.updateAgentTrackerLocale?.(message.localization);
         timezone = message.timezone;
         $('configuration-warning').textContent = message.timezoneWarning ?? '';

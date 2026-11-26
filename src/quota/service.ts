@@ -46,6 +46,7 @@ export class QuotaService {
     this.clock = options.clock ?? systemClock;
     this.refreshPolicy = options.refreshPolicy ?? settingDefinitions.quota.refreshPolicy.default;
     this.pollingIntervalMs = intervalMs(options.pollingSeconds ?? settingDefinitions.quota.pollingIntervalSeconds.default);
+    // [설정 정책] 제공자 ID마다 하나의 조회 상태와 예약 시각을 배정한다.
     for (const provider of providers) {
       if (this.entries.has(provider.id)) throw new Error(`Duplicate quota provider: ${provider.id}`);
       this.entries.set(provider.id, { provider, state: new ProviderQuotaState(() => this.clock.now()), nextPollAt: 0,
@@ -54,6 +55,7 @@ export class QuotaService {
   }
 
   start(focused = true): void {
+    // [갱신 정책] 한 번만 시작하고 자동 갱신이 가능한 경우 첫 조회를 즉시 요청한다.
     if (this.started || this.disposed) return;
     this.started = true;
     this.focused = focused;
@@ -62,6 +64,7 @@ export class QuotaService {
   }
 
   setFocused(focused: boolean): void {
+    // [갱신 정책] 포커스가 바뀔 때 자동 갱신 가능 여부를 다시 계산하고 타이머를 재예약한다.
     if (this.disposed || this.focused === focused) return;
     this.focused = focused;
     if (this.started && this.isAutomaticRefreshActive()) this.refreshOnFocus();
@@ -69,6 +72,7 @@ export class QuotaService {
   }
 
   setPollingInterval(seconds: number): void {
+    // [예약 정책] 새 주기를 적용한 시각부터 모든 제공자의 다음 폴링 시점을 계산한다.
     if (this.disposed) return;
     this.pollingIntervalMs = intervalMs(seconds);
     const nextPollAt = this.clock.now() + this.pollingIntervalMs;
@@ -77,6 +81,7 @@ export class QuotaService {
   }
 
   setRefreshPolicy(policy: RefreshPolicy): void {
+    // [갱신 정책] 자동 모드가 활성화되면 모든 제공자에 갱신을 요청하고 예약을 다시 계산한다.
     if (this.refreshPolicy === policy || this.disposed) return;
     this.refreshPolicy = policy;
     if (this.started && this.isAutomaticRefreshActive()) this.refreshAll();
@@ -90,12 +95,13 @@ export class QuotaService {
   refresh(provider: QuotaProviderId, force = false): Promise<void> {
     if (this.disposed) return Promise.resolve();
     const entry = this.entry(provider);
+    // [갱신 정책] 조회 중이면 같은 Promise를 공유하고 강제 갱신 요청만 재실행 표시로 남긴다.
     if (entry.running) {
       if (force) entry.rerunRequested = true;
       return entry.running;
     }
     if (!force && this.shouldSkipAutomaticRefresh(entry)) return Promise.resolve();
-    // Defer execution until running has been installed, including synchronous observers/providers.
+    // [갱신 정책] 조회를 다음 마이크로태스크로 미뤄 즉시 실행되는 구독자도 진행 중 상태를 보게 한다.
     entry.running = Promise.resolve().then(() => this.runRefreshCycle(entry));
     this.emit();
     this.schedule();
@@ -116,6 +122,7 @@ export class QuotaService {
   }
 
   async dispose(): Promise<void> {
+    // [종료 정책] 폴링과 재실행을 막고 활성 조회를 취소한 뒤 각 제공자의 종료를 기다린다.
     this.disposed = true;
     if (this.timer !== undefined) this.clock.clearTimeout(this.timer);
     for (const entry of this.entries.values()) {
@@ -135,14 +142,14 @@ export class QuotaService {
    */
   private async runRefreshCycle(entry: Entry): Promise<void> {
     try {
+      // [갱신 정책] 한 번 조회한 뒤 그동안 모인 강제 갱신 표시를 소진한다.
       await this.read(entry);
       while (!this.disposed && entry.rerunRequested) {
         entry.rerunRequested = false;
         await this.read(entry);
       }
     } finally {
-      // Clear flight ownership in the same continuation that checks the rerun flag.
-      // A separate Promise.finally leaves a microtask gap where a forced rerun is lost.
+      // [갱신 정책] 마지막 재실행 확인과 같은 실행 흐름에서 진행 상태를 비워 강제 요청 누락을 막는다.
       entry.running = null;
       entry.abort = null;
       this.emit();
@@ -156,6 +163,7 @@ export class QuotaService {
    */
   private async read(entry: Entry): Promise<void> {
     if (this.disposed) return;
+    // [상태 정책] 조회마다 취소 신호를 만들고 성공과 실패를 제공자별 상태에 반영한다.
     entry.abort = new AbortController();
     try {
       const snapshot = await entry.provider.read({ signal: entry.abort.signal,
@@ -164,12 +172,14 @@ export class QuotaService {
     } catch (error) {
       if (!this.disposed) entry.state.recordFailure(error);
     } finally {
+      // [예약 정책] 결과와 관계없이 조회가 끝난 시점에서 다음 폴링 시각을 잡는다.
       entry.nextPollAt = this.clock.now() + this.pollingIntervalMs;
     }
   }
 
   /** 가장 이른 폴링·만료 시각에 타이머 하나를 예약한다. */
   private schedule(): void {
+    // [예약 정책] 이전 타이머를 지우고 가장 이른 처리 시각에 맞춰 타이머 하나를 둔다.
     if (this.timer !== undefined) this.clock.clearTimeout(this.timer);
     this.timer = undefined;
     if (this.disposed || !this.started) return;
@@ -186,6 +196,7 @@ export class QuotaService {
 
   /** 포커스 복귀 시 성공 이력이 없거나 실패·5분 경과 상태인 제공자만 갱신한다. */
   private refreshOnFocus(): void {
+    // [갱신 정책] 포커스 복귀 시 신선도를 제공자별로 판단해 오래되거나 실패한 결과만 요청한다.
     const now = this.clock.now();
     for (const [id, entry] of this.entries) {
       if (entry.state.shouldRefreshOnFocus(now)) {
@@ -195,6 +206,7 @@ export class QuotaService {
   }
 
   private shouldSkipAutomaticRefresh(entry: Entry): boolean {
+    // [갱신 정책] 수동 모드, 비활성 창, 재시도 대기 중에는 자동 조회를 건너뛴다.
     return this.refreshPolicy === 'manual' || !this.focused || this.clock.now() < entry.state.nextAllowedAt;
   }
 
@@ -209,6 +221,7 @@ export class QuotaService {
    * 알고리즘: 자동 갱신이 가능한 제공자의 폴링·재시도 시각과 모든 실패 스냅샷의 만료 시각 중 최솟값을 반환한다.
    */
   private getNextWakeAt(): number {
+    // [예약 정책] 자동 폴링 가능 시점과 오류 결과의 만료 시점 중 가장 이른 값을 고른다.
     let due = Infinity;
     for (const entry of this.entries.values()) {
       if (this.isAutomaticRefreshActive() && !entry.running) due = Math.min(due, Math.max(entry.nextPollAt, entry.state.nextAllowedAt));
@@ -219,6 +232,7 @@ export class QuotaService {
 
   /** 만료·폴링을 처리하고 변경 알림과 다음 예약을 연결한다. */
   private handleTimer(): void {
+    // [예약 정책] 보존 기한을 지난 결과를 비우고 폴링·재시도 시각을 모두 지난 제공자를 갱신한다.
     let expired = false;
     for (const [id, entry] of this.entries) {
       expired = entry.state.expire() || expired;
@@ -234,6 +248,7 @@ export class QuotaService {
 
   private emit(): void {
     if (this.disposed) return;
+    // [알림 정책] 관찰자 하나의 실패를 무시해 다른 관찰자와 제공자 정리를 계속 처리한다.
     for (const listener of this.listeners) {
       try { listener(this.getStates()); } catch { /* A UI observer cannot interrupt provider cleanup. */ }
     }
@@ -246,6 +261,7 @@ export class QuotaService {
 }
 
 function intervalMs(seconds: number): number {
+  // [설정 정책] 유한하지 않은 폴링 간격에는 기본값을 쓰고 최솟값을 보장한 뒤 밀리초로 변환한다.
   const { minimum, default: fallback } = settingDefinitions.quota.pollingIntervalSeconds;
   return Math.max(minimum, Number.isFinite(seconds) ? seconds : fallback) * 1000;
 }

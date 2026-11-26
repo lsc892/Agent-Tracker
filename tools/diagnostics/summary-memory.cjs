@@ -17,6 +17,7 @@ const send = value => new Promise((done, fail) => process.send(value, error => e
 const memory = () => ({ ...process.memoryUsage(), lifetimeMaxRss: process.resourceUsage().maxRSS * 1024 });
 
 async function collectGarbage() {
+  // [메모리 측정 정책] 이벤트 루프에 실행 기회를 주고 강제 GC를 두 번 실행한 뒤 메모리를 측정한다.
   await nextTurn();
   global.gc({ type: 'major', execution: 'sync' });
   await nextTurn();
@@ -25,6 +26,7 @@ async function collectGarbage() {
 }
 
 function facts(database) {
+  // [검증 정책] 요청의 정렬된 상세 행을 해시하고 요청 수·토큰 합계도 따로 집계한다.
   const digest = createHash('sha256');
   const query = `SELECT provider,session_id,root_turn_id,status,started_at_ms,completed_at_ms,
     duration_ms,input_tokens,output_tokens,total_tokens,cache_write_input_tokens,cache_read_input_tokens
@@ -35,6 +37,7 @@ function facts(database) {
 }
 
 function transientCounts() {
+  // [메모리 측정 정책] 대표 생성자별 살아 있는 객체 수를 V8에서 읽는다.
   const constructors = {
     ScanState: require('../../dist/src/summary/scanner/refresh/state').ScanState,
     SourceReaderPool: require('../../dist/src/summary/scanner/sourcePool').SourceReaderPool,
@@ -53,6 +56,7 @@ async function inspectDataset(config, mode, directory) {
   const { SummaryDatabase } = require('../../dist/src/summary/db');
   const { refreshSummary } = require('../../dist/src/summary/scanner');
   const { StreamingAggregation } = require('../../dist/src/summary/aggregation/memoryAggregate');
+  // [Worker 측정 정책] 생성·종료 이벤트로 Worker의 최대 동시 실행 수와 잔존 여부를 추적한다.
   const activeWorkers = new Set();
   let createdWorkers = 0, maximumWorkers = 0, observedPeak;
   const onWorker = worker => {
@@ -86,6 +90,7 @@ async function inspectDataset(config, mode, directory) {
   };
   const options = { dbPath, roots: config.roots, timezone: 'Asia/Seoul' };
   const refresh = async (force, cancel = false) => {
+    // [갱신 시나리오 정책] 강제 재파싱은 파서 버전을 초기화하고 취소 시나리오는 파싱 진입 뒤 중단한다.
     if (force) database.connection.exec('UPDATE manifest SET parser_version=0');
     const controller = new AbortController();
     let cancellationScheduled = false;
@@ -103,6 +108,7 @@ async function inspectDataset(config, mode, directory) {
   };
   let expected;
   const check = () => {
+    // [검증 정책] 반복 실행의 상세 행 해시와 준비한 기준 요청·토큰 수를 대조한다.
     const current = facts(database);
     if (expected) must(JSON.stringify(current) === JSON.stringify(expected), 'Repeated aggregation changed the request facts');
     else expected = current;
@@ -110,6 +116,7 @@ async function inspectDataset(config, mode, directory) {
       'Synthetic request/token totals differ from the fixture formula');
   };
   try {
+    // [측정 정책] 세 번 예열한 뒤 GC를 거쳐 비교 시작 메모리와 객체 수를 기록한다.
     for (let index = 0; index < 3; index++) {
       const result = await refresh(true);
       must(!result.interrupted, `Warmup interrupted: ${result.error}`);
@@ -119,6 +126,7 @@ async function inspectDataset(config, mode, directory) {
     const baseline = { memory: memory(), counts: transientCounts(), activeWorkers: activeWorkers.size,
       cachedStatements: database.sqlite.statements.size, totals: expected };
     await send({ type: 'baseline', dataset: config.name, mode, value: baseline });
+    // [측정 정책] 스냅샷 모드는 같은 입력을 반복해 힙 스냅샷의 시작과 끝을 비교한다.
     if (mode === 'snapshots') {
       v8.writeHeapSnapshot(join(directory, 'before.heapsnapshot'));
       for (let index = 1; index <= 20; index++) {
@@ -133,6 +141,7 @@ async function inspectDataset(config, mode, directory) {
       v8.writeHeapSnapshot(join(directory, 'after.heapsnapshot'));
       await send({ type: 'snapshotEndpoint', dataset: config.name, mode, value: endpoint });
     } else {
+      // [측정 정책] 재파싱·무변경·취소를 나눠 최대 및 GC 전후 메모리를 시나리오별로 기록한다.
       for (const scenario of ['reparse', 'unchanged', 'cancel']) {
         const repetitions = scenario === 'cancel' ? 5 : 20;
         for (let index = 1; index <= repetitions; index++) {
@@ -159,6 +168,7 @@ async function inspectDataset(config, mode, directory) {
         await collectGarbage();
         await send({ type: 'counts', dataset: config.name, mode, scenario, value: transientCounts() });
       }
+      // [취소 검증 정책] 취소 이후에도 다시 갱신해 같은 요청 집계로 회복하는지 확인한다.
       const recovery = await refresh(true);
       must(!recovery.interrupted, 'Recovery refresh was interrupted');
       check();
@@ -181,6 +191,7 @@ async function inspectClient(directory, config) {
   const { RefreshController } = require('../../dist/src/summary/client/refresh');
   const { Worker } = require('node:worker_threads');
   const constructors = { SummaryClient, WorkerTransport, RefreshController, Worker };
+  // [수명 측정 정책] 매번 클라이언트를 만들고 해제한 뒤 GC 후에도 남아 있는 객체를 센다.
   for (let iteration = 1; iteration <= 20; iteration++) {
     await (async () => {
       const client = new SummaryClient({ dbPath: join(directory, 'client.sqlite'), roots: config.roots });
@@ -202,6 +213,7 @@ async function inspectClient(directory, config) {
 function runChild(configPath, mode, directory, report) {
   mkdirSync(directory, { recursive: true });
   return new Promise((done, fail) => {
+    // [실행 격리 정책] 데이터셋과 측정 모드는 GC를 켠 별도 프로세스에서 실행한다.
     const child = fork(__filename, ['--child', configPath, mode, directory], {
       cwd: project, execArgv: ['--expose-gc'], windowsHide: true, stdio: ['ignore', 'ignore', 'pipe', 'ipc'],
     });
@@ -224,6 +236,7 @@ function runChild(configPath, mode, directory, report) {
 
 async function summarizeSnapshot(path) {
   const snapshot = JSON.parse(await readFile(path, 'utf8'));
+  // [스냅샷 파싱 정책] V8 메타데이터에서 열 오프셋을 읽어 평탄한 노드 배열을 순회한다.
   const fields = snapshot.snapshot.meta.node_fields, width = fields.length;
   const typeAt = fields.indexOf('type'), nameAt = fields.indexOf('name'), sizeAt = fields.indexOf('self_size');
   const types = snapshot.snapshot.meta.node_types[typeAt];
@@ -254,6 +267,7 @@ async function main() {
     runnerSha256: sha(readFileSync(__filename)), datasets: [], events: [], snapshots: {} };
   console.log(JSON.stringify({ workspace }));
   const configs = [];
+  // [입력 준비 정책] 실제 로그와 크기가 다른 합성 로그를 고정된 입력으로 준비한다.
   for (const spec of [{ name: 'real', real: true }, { name: 'synthetic-10000', requests: 10000, 'turns-per-session': 100 },
     { name: 'synthetic-100', requests: 100, 'turns-per-session': 10 }]) {
     const directory = join(workspace, spec.name);

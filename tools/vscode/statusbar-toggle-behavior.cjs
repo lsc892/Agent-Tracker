@@ -1,4 +1,5 @@
 // 상태 표시줄 사용량 카드의 호버와 클릭 고정을 연결한다.
+// [이벤트 정책] 보이는 호버를 클릭 전까지 유지하고 항목이 해제될 때 캡처 리스너도 정리한다.
 function configureQuotaCardToggle(item, toggle) {
   if (item._agentTrackerCardToggleConfigured) return;
   item._agentTrackerCardToggleConfigured = true;

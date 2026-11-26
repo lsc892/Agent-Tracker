@@ -23,6 +23,7 @@ export class RpcSession {
 
   constructor(readonly child: ChildProcessWithoutNullStreams, private readonly signal: AbortSignal,
     private readonly graceMs: number, private readonly onSnapshot: (value: unknown) => void) {
+    // [종료 정책] 정상 종료 중이 아니거나 종료 신호 없이 실패 코드가 오면 프로세스 오류로 처리한다.
     this.exited = new Promise(resolve => {
       child.once('close', (code, exitSignal) => {
         this.closed = true;
@@ -36,7 +37,7 @@ export class RpcSession {
     child.stdin.on('error', () => this.fail(new QuotaError('process', { key: 'quota.codexCommunicationClosed' })));
     child.stdout.on('error', () => this.fail(new QuotaError('process', { key: 'quota.codexReadFailed' })));
     child.stderr.on('error', () => {});
-    // Drain stderr without retaining arbitrary CLI diagnostics (which can contain secrets).
+    // [통신 정책] stderr는 저장하지 않고 비우며 stdout만 RPC로 해석한다.
     child.stderr.resume();
     child.stdout.on('data', (chunk: Buffer) => this.consume(chunk));
     this.abort = () => this.fail(cancelled());
@@ -45,6 +46,7 @@ export class RpcSession {
   }
 
   request(method: string, params?: unknown): Promise<unknown> {
+    // [통신 정책] 연결 상태를 확인하고 순번을 발급해 응답 전까지 요청을 추적한다.
     if (this.failure) return Promise.reject(this.failure);
     if (this.closed || this.closing) return Promise.reject(new QuotaError('process', { key: 'quota.codexConnectionClosed' }));
     const id = this.nextId++;
@@ -69,11 +71,13 @@ export class RpcSession {
    * 알고리즘: 입력을 닫고 종료를 기다린 뒤 유예 시간을 넘으면 SIGTERM·SIGKILL 순으로 종료를 강화하고 스트림을 해제한다.
    */
   private async closeOnce(): Promise<void> {
+    // [종료 정책] 대기 요청을 취소하고 입력을 닫아 정상 종료를 시작한다.
     this.closing = true;
     this.signal.removeEventListener('abort', this.abort);
     this.rejectPending(cancelled());
     this.child.stdin.end();
     try {
+      // [종료 정책] 유예 시간을 넘으면 SIGTERM, SIGKILL 순으로 종료를 강화하고 회수를 확인한다.
       let stopped = await this.waitExit(this.graceMs);
       if (!stopped) {
         this.child.kill('SIGTERM');
@@ -88,6 +92,7 @@ export class RpcSession {
       }
       if (this.failure && this.failure.code !== 'cancelled') throw this.failure;
     } finally {
+      // [종료 정책] 종료 결과와 관계없이 버퍼와 입출력 스트림을 해제한다.
       this.buffered = '';
       this.child.stdin.destroy();
       this.child.stdout.destroy();
@@ -96,6 +101,7 @@ export class RpcSession {
   }
 
   private async waitExit(ms: number): Promise<boolean> {
+    // [종료 정책] 프로세스 종료와 유예 타이머 중 먼저 끝난 결과를 사용한다.
     if (this.closed) return true;
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
@@ -111,6 +117,7 @@ export class RpcSession {
    */
   private consume(chunk: Buffer): void {
     if (this.closing || this.failure) return;
+    // [파싱 정책] 청크에서 나뉜 UTF-8 문자를 이어 붙이고 개행마다 JSON을 해석한다.
     this.buffered += this.decoder.write(chunk);
     while (true) {
       const newline = this.buffered.indexOf('\n');
@@ -122,6 +129,7 @@ export class RpcSession {
       try { this.receive(JSON.parse(line)); }
       catch { this.fail(protocolError()); return; }
     }
+    // [파싱 정책] 완성되지 않은 줄에도 길이 상한을 적용한다.
     if (this.buffered.length > 1_048_576) this.fail(protocolError());
   }
 
@@ -130,6 +138,7 @@ export class RpcSession {
    * 알고리즘: ID로 대기 요청을 찾고 상태 코드를 공통 오류로 변환하며, 한도 갱신 알림만 허용하고 서버 실행 요청은 거부한다.
    */
   private receive(value: unknown): void {
+    // [통신 정책] 객체 메시지의 method 유무로 서버 호출·알림과 클라이언트 요청의 응답을 구분한다.
     const message = asRecord(value);
     if (!message) throw protocolError();
     if (typeof message.method === 'string') {
@@ -141,8 +150,8 @@ export class RpcSession {
 
   /** 서버 실행 요청은 거부하고 quota 갱신 알림만 전달한다. */
   private handleServerMessage(message: Record<string, unknown>): void {
+    // [통신 정책] ID가 붙은 서버 요청은 거절하고 quota 갱신 알림만 전달한다.
     if (message.id !== undefined) {
-      // A quota read never accepts server-initiated tool execution or login requests.
       this.write({ id: message.id, error: { code: -32601, message: 'Unsupported client method' } });
       return;
     }
@@ -151,10 +160,12 @@ export class RpcSession {
 
   /** 일치하는 대기 요청을 제거하고 응답 결과 또는 분류한 오류로 완료한다. */
   private handleResponse(message: Record<string, unknown>): void {
+    // [통신 정책] 숫자 ID와 일치하는 요청만 찾아 한 번 완료한다.
     if (typeof message.id !== 'number') return;
     const pending = this.pending.get(message.id);
     if (!pending) return;
     this.pending.delete(message.id);
+    // [통신 정책] 분류된 오류를 우선하고 오류·결과가 모두 없으면 프로토콜 실패로 처리한다.
     const error = asRecord(message.error);
     if (error) {
       pending.reject(this.parseResponseError(error));
@@ -169,6 +180,7 @@ export class RpcSession {
 
   /** RPC 오류의 상태 코드만 해석하며 서버 오류 본문은 노출하지 않는다. */
   private parseResponseError(error: Record<string, unknown>): QuotaError {
+    // [오류 정책] 응답 데이터의 상태 코드를 먼저 보고 없으면 RPC 오류 코드를 해석한다.
     const data = asRecord(error.data);
     const status = data?.statusCode ?? data?.status ?? error.code;
     switch (status) {
@@ -187,6 +199,7 @@ export class RpcSession {
     catch { this.fail(new QuotaError('process', { key: 'quota.codexSendFailed' })); }
   }
   private fail(error: QuotaError): void {
+    // [오류 정책] 최초 실패를 유지하고 대기 중인 요청을 모두 같은 오류로 끝낸다.
     this.failure ??= error;
     this.rejectPending(this.failure);
   }

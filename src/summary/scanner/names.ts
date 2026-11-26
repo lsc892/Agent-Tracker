@@ -9,6 +9,7 @@ const key = (provider: string, session: string): string => JSON.stringify([provi
 const indexFields = { fields: { id: {}, thread_name: {} } };
 /** 제공자 제목의 우선순위를 메모리에 병합하며 통계 DB는 여기서 쓰지 않는다. */
 export async function readNames(roots: readonly SourceRoot[], cancelled: () => boolean): Promise<Map<string, string>> {
+  // [이름 정책] 중복 Codex 데이터 홈을 합치고 session_index 이름을 낮은 우선순위로 수집한다.
   const names = new Map<string, string>(), stateNames = new Set<string>();
   const homes = new Set(roots.filter(root => root.provider === 'codex').map(root => resolve(root.dataHome ?? dirname(root.path))));
   for (const home of homes) {
@@ -25,6 +26,7 @@ export async function readNames(roots: readonly SourceRoot[], cancelled: () => b
         }, { isCancelled: cancelled, fixedShape: indexFields });
     }
     catch { /* Optional metadata does not invalidate transcript facts. */ }
+    // [이름 정책] 가장 높은 버전의 상태 DB를 읽고 name이 있으면 title보다 우선한다.
     let source: DatabaseSync | undefined;
     try {
       let latestFile: string | undefined;
@@ -47,6 +49,7 @@ export async function readNames(roots: readonly SourceRoot[], cancelled: () => b
       if (!columns.includes('id') || !columns.includes('title'))
         continue;
       const title = columns.includes('name') ? "coalesce(nullif(trim(name),''),title)" : 'title';
+      // [이름 정책] 상태 DB의 이름을 인덱스 이름보다 우선하고 다음 홈의 인덱스에서도 보존한다.
       for (const row of source.prepare(`SELECT id,${title} AS title FROM threads ORDER BY id`).iterate()) {
         if (cancelled())
           break;

@@ -4,6 +4,7 @@ import { SCHEMA_DAILY_CAPABILITY_SQL, SCHEMA_ROLLUP_SQL } from './rollup-state';
 export { SCHEMA_ROLLUP_SQL } from './rollup-state';
 export const SCHEMA_VERSION = 29;
 
+// [스키마 정책] 레거시 반영 이력은 턴·응답 키로 중복을 막고 턴 삭제에 맞춰 정리한다.
 export const SCHEMA_APPLIED_RESPONSES_SQL = `
 CREATE TABLE IF NOT EXISTS applied_response (
   turn_id INTEGER NOT NULL REFERENCES turn_summary(id) ON DELETE CASCADE,
@@ -16,6 +17,7 @@ CREATE TABLE IF NOT EXISTS applied_response (
 ) WITHOUT ROWID;
 `;
 
+// [스키마 정책] 레거시 도구 사용량은 턴·분류·이름마다 양수 횟수만 저장한다.
 export const SCHEMA_CAPABILITY_SQL = `
 CREATE TABLE IF NOT EXISTS turn_capability_usage (
   turn_id INTEGER NOT NULL REFERENCES turn_summary(id) ON DELETE CASCADE,
@@ -26,6 +28,7 @@ CREATE TABLE IF NOT EXISTS turn_capability_usage (
 ) WITHOUT ROWID;
 `;
 
+// [스키마 정책] 세션의 결제 지정값을 복합 키로 연결해 세션을 지울 때 함께 제거한다.
 const SESSION_BILLING_SQL = `
 CREATE TABLE IF NOT EXISTS session_billing (
   provider TEXT NOT NULL,
@@ -36,6 +39,7 @@ CREATE TABLE IF NOT EXISTS session_billing (
 ) WITHOUT ROWID;
 `;
 
+// [스키마 정책] 레거시 모델별 토큰과 턴 비용에 추정값과 가격표 버전을 보존한다.
 export const SCHEMA_MODEL_SQL = `
 CREATE TABLE IF NOT EXISTS turn_model_usage (
   turn_id INTEGER NOT NULL REFERENCES turn_summary(id) ON DELETE CASCADE,
@@ -58,6 +62,7 @@ CREATE TABLE IF NOT EXISTS turn_costs (
 );
 `;
 
+// [스키마 정책] 표시 이름은 프로젝트 키와 제공자·세션 키로 따로 관리한다.
 const NAMES_SQL = `
 CREATE TABLE IF NOT EXISTS projects (
   project_key TEXT PRIMARY KEY,
@@ -71,6 +76,7 @@ CREATE TABLE IF NOT EXISTS sessions (
 ) WITHOUT ROWID;
 `;
 
+// [스키마 정책] 레거시 상세 행은 세션 내 루트 요청의 유일성과 입력·출력 토큰 합계를 제약한다.
 const TURN_SUMMARY_SQL = `
 CREATE TABLE IF NOT EXISTS turn_summary (
   id INTEGER PRIMARY KEY,
@@ -99,12 +105,14 @@ CREATE TABLE IF NOT EXISTS turn_summary (
 );
 `;
 
+// [조회 정책] 레거시 시간순 조회에 시각 인덱스와 제공자·프로젝트별 시각 인덱스를 사용한다.
 const TURN_SUMMARY_INDEX_SQL = `
 CREATE INDEX IF NOT EXISTS idx_summary_period ON turn_summary(started_at_ms, provider);
 CREATE INDEX IF NOT EXISTS idx_summary_project_period ON turn_summary(provider, project_key, started_at_ms);
 `;
 
 function sourceSql(legacy = false): string {
+  // [스키마 정책] 원본의 제공자·경로 유일성을 유지하고 레거시와 현재 형식의 계보 열을 구분한다.
   const legacyColumns = legacy ? `
   size_bytes INTEGER NOT NULL DEFAULT 0 CHECK(size_bytes >= 0),
   capabilities_collected INTEGER NOT NULL DEFAULT 0 CHECK(capabilities_collected IN (0,1)),` : '';
@@ -130,6 +138,7 @@ CREATE TABLE IF NOT EXISTS source_file (
 `;
 }
 
+// [스키마 정책] 현재 형식은 원본·이름·결제 설정과 일별 집계 테이블로 구성한다.
 export const DAILY_SCHEMA_SQL = `
 ${sourceSql()}
 ${NAMES_SQL}

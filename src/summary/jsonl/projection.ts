@@ -140,6 +140,7 @@ class JsonProjection {
     if (this.match(plainString)) return false;
     // The bounded reader also accepts escape-heavy strings that exceed the regex engine's backtracking stack.
     if (this.text.length - this.offset < 64 * 1024 && this.match(escapedString)) return true;
+    // [파싱 정책] 전체 정규식으로 끝나지 않는 문자열은 이스케이프와 일반 구간을 나눠 순회한다.
     while (this.text[this.offset] !== '"') {
       if (!this.match(stringPart)) invalidJson();
     }
@@ -162,6 +163,7 @@ class JsonProjection {
   private skipValue(): void {
     this.space();
     if (this.text[this.offset] !== '[' && this.text[this.offset] !== '{') { this.skipScalar(); return; }
+    // [파싱 정책] 중첩된 컨테이너의 닫는 기호를 스택에서 추적해 값을 만들지 않고 건너뛴다.
     const endings = this.containerEndings ??= [];
     for (;;) {
       this.space();
@@ -196,6 +198,7 @@ class JsonProjection {
     this.space();
     const start = this.offset;
     const char = this.text[start];
+    // [필드 선택 정책] 정의된 객체 필드와 배열 원소만 읽고 객체 전용 필드의 다른 타입은 버린다.
     if (shape !== true) {
       if (char === '{') {
         if (shape.fields || shape.variant || shape.keepNonempty) return this.object(shape);
@@ -240,6 +243,7 @@ class JsonProjection {
       else result[name] = value;
       return;
     }
+    // [메모리 정책] 문법 검증 후 시작 위치만 남겨 최초 접근 때 값을 해석하고 결과를 재사용한다.
     const text = this.text, start = this.offset;
     this.skipValue();
     Object.defineProperty(result, name, { enumerable: true, configurable: true,
@@ -256,6 +260,7 @@ class JsonProjection {
     const start = this.offset++;
     const result: Record<string, unknown> = {};
     if (this.take('}')) return result;
+    // [필드 선택 정책] type 이전의 값은 필요한지 아직 모르므로 해석 위치만 기록한다.
     let variant: JsonFields | undefined;
     let typeSeen = false, variantChanged = false, hasSelectedField = false;
     let beforeType: { name: string; offset: number }[] | undefined;
@@ -284,6 +289,7 @@ class JsonProjection {
       }
     } while (this.next('}'));
 
+    // [필드 선택 정책] 중복 type이 선택표를 바꾸면 마지막 유형으로 다시 읽고 선행 필드는 최신 값부터 복원한다.
     if (variantChanged) {
       this.offset = start;
       return this.object({ ...shape, fields: { ...shape.fields, ...variant, type: true }, variant: undefined });

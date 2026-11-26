@@ -1,6 +1,7 @@
 // 기존 workbench 패치의 주입 코드를 복원해 업그레이드 대상과 대조한다.
 
 // Preserve the historical v3/v4 function verbatim to verify upgrades safely.
+// [호환성 정책] 기존 설치본과 대조할 수 있도록 역사적 주입 함수의 본문을 그대로 보존한다.
 function configureQuotaHover(item, summary) {
   item._agentTrackerSummary = summary;
   if (item._agentTrackerHoverConfigured) return;
@@ -100,6 +101,7 @@ function configureQuotaDividers(item) {
 
 function getHistoricalInjections({ argument, symbol, condition, mapping, extensionId, end }) {
   const clickOnly = `if(!this._agentTrackerClickOnly){this._agentTrackerClickOnly=true;const stop=event=>{if(this.entry?.extensionId===${JSON.stringify(extensionId)}&&this.entry?.command===${symbol})event.stopImmediatePropagation();};for(const type of ["mouseover","focus"])this.container.addEventListener(type,stop,{capture:true});this._register({dispose:()=>{for(const type of ["mouseover","focus"])this.container.removeEventListener(type,stop,{capture:true});}});}`;
+  // [호환성 정책] 버전별 원본 함수 문자열과 패치 표식을 조합해 정확히 일치하는 설치본을 판별한다.
   const summarySource = configureQuotaHover.toString().replace(/\r\n/g, '\n');
   const cardSource = configureQuotaCardHover.toString().replace(/\r\n/g, '\n');
   const toggleSource = configureQuotaCardToggle.toString().replace(/\r\n/g, '\n');

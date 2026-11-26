@@ -26,10 +26,12 @@ function readDisplaySettings(display: ConfigurationValues['display']) {
  * 알고리즘: 공백을 제거한 시간대를 Intl로 검증하고, 유효하지 않으면 시스템 시간대와 번역된 경고로 대체한다.
  */
 function readUsageSettings(usage: ConfigurationValues['usage'], locale: string) {
+  // [설정 정책] 시스템 시간대를 기본으로 두고 시스템 값이 비어 있으면 UTC를 쓴다.
   let timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
   let timezoneWarning: string | undefined;
   const configuredTimezone: unknown = usage.timezone;
   if (configuredTimezone === '' || configuredTimezone === undefined) return { ...usage, timezone, timezoneWarning };
+  // [설정 정책] 공백을 제거한 설정을 Intl로 검증하고 잘못된 값은 기본값과 번역된 경고로 처리한다.
   try {
     if (typeof configuredTimezone !== 'string') throw new TypeError('Invalid timezone');
     const selected = configuredTimezone.trim();
@@ -48,6 +50,7 @@ function readUsageSettings(usage: ConfigurationValues['usage'], locale: string) 
  * 알고리즘: 상위 경로에 .claude·.codex를 붙이고 보존 기간은 안전한 양의 정수일 때만 적용한다.
  */
 function readProviderSettings(values: ConfigurationValues, dataHome: string) {
+  // [설정 정책] 공통 홈에서 제공자별 경로를 만들고 Claude 보존 기간이 허용 범위 밖이면 비운다.
   const cleanup = values.claude.cleanupPeriodDays;
   return {
     claude: { ...values.claude, dataHome: join(dataHome, '.claude'),
@@ -58,6 +61,7 @@ function readProviderSettings(values: ConfigurationValues, dataHome: string) {
 }
 
 function buildSourceRoots(providers: ReturnType<typeof readProviderSettings>): SourceRoot[] {
+  // [수집 정책] 활성 제공자만 남기고 Codex는 현재 세션과 보관 세션을 모두 수집 대상으로 잡는다.
   return [
     { provider: 'claude' as const, path: join(providers.claude.dataHome, 'projects'), dataHome: providers.claude.dataHome },
     ...['sessions', 'archived_sessions'].map(directory => ({ provider: 'codex' as const,
@@ -70,10 +74,12 @@ function buildSourceRoots(providers: ReturnType<typeof readProviderSettings>): S
  * 알고리즘: 공통 정의에서 값을 한 번씩 읽고 언어·경로·색상·시간대를 정규화한 뒤 활성 제공자의 로그 루트를 파생한다.
  */
 export function readConfiguration(settings: SettingsReader, editorLanguage = 'ko') {
+  // [설정 정책] 언어와 공통 홈을 먼저 확정해 제공자 설정과 수집 경로의 기준으로 사용한다.
   const values = readSettingValues(settings);
   const locale = resolveLocale(values.language, editorLanguage);
   const dataHome = expandPath(values.dataHome.trim() || settingDefinitions.dataHome.default);
   const providers = readProviderSettings(values, dataHome);
+  // [DTO 정책] 원래 설정과 정규화한 표시·통계·제공자 설정을 하나의 스냅샷으로 반환한다.
   return {
     ...values,
     locale,

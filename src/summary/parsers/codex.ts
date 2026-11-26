@@ -46,6 +46,7 @@ export class CodexCurrentParserAdapter {
       this.sessionMetadata(object(row.payload), offset);
       return;
     }
+    // [귀속 정책] 세션 메타데이터가 없으면 일반 행을 건너뛰되 응답 토큰 행은 오류로 보고한다.
     const identity = this.identityValue;
     if (!identity) {
       if (type === 'token_usage_record') throw new SummaryError('missing-session-id', offset);
@@ -57,6 +58,7 @@ export class CodexCurrentParserAdapter {
     }
     if (typeof type === 'string' && !turnRowTypes.has(type)) return;
     const payload = object(row.payload);
+    // [파싱 정책] 이전 로그의 명시 루트 흔적까지 확인한 뒤 지원하는 턴 행을 유형별로 해석한다.
     const suppliedRoot = string(payload.root_turn_id);
     // Preserve explicit-root detection for legacy types that stringify to a known name.
     if (suppliedRoot && (typeof type === 'string' || turnRowTypes.has(String(type)))) this.hasExplicitRoot = true;
@@ -78,6 +80,7 @@ export class CodexCurrentParserAdapter {
     if (!id) throw new SummaryError('missing-session-id', offset);
     // Forked rollouts can contain copied parent session_meta rows. The first identity owns this file.
     if (this.identityValue && id !== this.identityValue.threadId) return;
+    // [귀속 정책] 명시 부모를 우선하고 자식 생성 메타데이터나 이전 관측에서 부모 후보를 보완한다.
     const source = object(payload.source ?? payload.thread_source);
     const subagent = object(source.subagent);
     const spawned = object(subagent.thread_spawn);
@@ -130,6 +133,7 @@ export class CodexCurrentParserAdapter {
     const sessionId = string(payload.session_id);
     if (sessionId) identity.sessionId = sessionId;
     const threadId = string(payload.thread_id) ?? identity.threadId;
+    // [DTO 정책] 응답 사용량 이벤트에 정규화된 토큰과 모델·결제·부모 진단을 붙인다.
     const tokens = codexTokens(object(payload.usage));
     const flags = tokenFlags(tokens);
     if (this.forkMissing) flags.push('missing-parent');
@@ -138,6 +142,7 @@ export class CodexCurrentParserAdapter {
       model: displayName(payload.model) ?? this.model,
       billingMode: billingMode(payload.billing_mode ?? payload.auth_mode ?? this.billing),
       flags, offset });
+    // [진단 정책] 턴 누계는 응답 사용량과 별개로 생성해 합산 결과를 대조하는 데 사용한다.
     if (payload.turn_token_usage) {
       const totals = object(payload.turn_token_usage);
       validateTokens(totals);
@@ -156,6 +161,7 @@ export class CodexCurrentParserAdapter {
   }
 
   private responseItem(payload: Record<string, unknown>, threadId: string, offset: number): void {
+    // [귀속 정책] 도구 결과는 자식 연결에 쓰고 자식 생성 호출은 도구 집계가 꺼져도 보관한다.
     const type = payload.type;
     if (type === 'function_call_output') {
       this.recordChildResult(payload);
@@ -176,6 +182,7 @@ export class CodexCurrentParserAdapter {
     if (!callId) return;
     if (spawnsChild) this.spawnRequests.set(callId, this.root);
     if (!collectCapabilities) return;
+    // [집계 정책] 집계가 켜진 경우 도구 인자에서 기능 사용을 뽑고 호출 ID와 순번을 이벤트 키로 삼는다.
     for (const use of readToolCapabilities(name, () => payload.arguments ?? payload.input)) {
       this.sink.event({ kind: 'capability', rootId: this.root, threadId,
         eventId: `${callId}:${use.index}`, category: use.category, name: use.name, offset });
@@ -189,6 +196,7 @@ export class CodexCurrentParserAdapter {
     const root = this.spawnRequests.get(callId);
     if (!root) return;
     this.spawnRequests.delete(callId);
+    // [파싱 정책] 반환 문자열은 자식 식별자 필드만 읽고 해석할 수 없는 결과는 건너뛴다.
     let output: Record<string, unknown>;
     try {
       const value = payload.output;
@@ -210,6 +218,7 @@ export class CodexCurrentParserAdapter {
     if (suppliedTurn) this.turn = suppliedTurn;
     if (suppliedRoot) this.root = suppliedRoot;
     else if (ownTurns && suppliedTurn) this.root = suppliedTurn;
+    // [상태 정책] 시작·사용자 입력·완료·중단을 처리하고 현재 응답 포맷을 만나기 전까지만 구형 누계를 해석한다.
     switch (string(payload.type)) {
       case 'task_started': {
         this.currentClosed = false; this.hasUserInTurn = false; this.pendingLifecycle = true;
@@ -278,11 +287,13 @@ export class CodexCurrentParserAdapter {
     if (!this.root || !this.turn) throw new SummaryError('missing-root-turn', offset);
     const total = info.total_token_usage ? codexTokens(object(info.total_token_usage)) : this.highWater;
     const last = info.last_token_usage ? codexTokens(object(info.last_token_usage)) : null;
+    // [집계 정책] 누계와 개별 사용량 조합이 직전 기록과 같으면 중복으로 제외한다.
     const signature = JSON.stringify([total, last]);
     if (signature === this.legacySignature) return;
     this.legacySignature = signature;
     const tokens = { ...total };
     const flags: string[] = this.forkMissing ? ['missing-parent'] : [];
+    // [집계 정책] 개별 사용량을 우선하고 없으면 항목별 최고 누계와의 양수 차이만 사용한다.
     let regression = false;
     for (const key of tokenFields) {
       if (total[key] < this.highWater[key]) regression = true;

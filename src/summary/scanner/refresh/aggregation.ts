@@ -43,6 +43,7 @@ export class ThreadAggregation {
   private sourceOrder = 0;
 
   add(file: FileState, session: string, log: ThreadLog): void {
+    // [Winner 정책] 같은 스레드의 복사본 중 응답 유무, 많은 기록, 최신 수정 시각, 경로 오름차순으로 대표를 고른다.
     const { responses, checkpoints, legacy, leadingLegacyCount, firstResponse, ...thread } = log;
     const source: SummarySource = { file, thread, hasResponses: responses.length > 0, order: {} };
     const key = JSON.stringify([session, thread.threadId]);
@@ -58,12 +59,15 @@ export class ThreadAggregation {
       } else source.order.copyOrder = order;
     } else this.threads.set(key, group);
 
+    // [Winner 정책] Claude는 세션·메시지·요청 ID로, Codex는 스레드 안에서 턴·응답 ID로 비교한다.
     if (!group.codex) {
       this.addClaude(group, source.order, responses);
       return;
     }
     const intervals = preferred ? checkpoints.map(interval => ({ ...interval, responseKeys: [] as string[] })) : [];
     mergeCodexResponses(group.codex, responses, preferred, !!previous, intervals);
+
+    // [집계 정책] 대표 원본의 누계 구간과 레거시 기록을 부모 이력 비교에 쓸 수 있도록 색인한다.
     if (preferred) {
       source.codex = { checkpoints: intervals, legacy, leadingLegacyCount, firstResponse, responseCount: responses.length };
       const parent = this.parents.get(thread.threadId);
@@ -79,9 +83,13 @@ export class ThreadAggregation {
       if (!affected.has(group.session)) continue;
       const { file, thread, codex } = group.source;
       const { sessionId, threadId, projectKey, projectName, startedAt, lastAt, parentThreadId } = thread;
+
+      // [집계 정책] Claude는 확정 응답을 합산하고 Codex는 부모 이력과 누계 검증까지 반영한다.
       const parent = parentThreadId && parentThreadId !== threadId ? this.parents.get(parentThreadId) : undefined;
       const usage = codex && group.codex ? consumeCodexThread(codex, group.codex.winners, parent?.codex) : claude.get(group);
       if (!usage) continue;
+
+      // [DTO 정책] 스레드 ID를 요청 키에 넣고 토큰·모델 합계와 최초·최종 시각 차이를 담는다.
       const duration = startedAt !== null && lastAt !== null && lastAt > startedAt ? lastAt - startedAt : null;
       summaries.push({
         provider: file.provider, session_id: sessionId, session_name: names.get(group.session),
@@ -101,6 +109,7 @@ export class ThreadAggregation {
   }
 
   private addClaude(group: ThreadCandidate, source: SourceOrder, responses: readonly ThreadResponse[]): void {
+    // [Winner 정책] 세션·응답·요청 조합마다 비교 결과가 더 좋은 Claude 응답 하나만 남긴다.
     for (const response of responses) {
       const key = JSON.stringify([group.session, response.responseId]);
       let requests = this.claude.get(key);
@@ -115,7 +124,7 @@ export class ThreadAggregation {
   private summarizeClaude(affected: ReadonlySet<string>): Map<ThreadCandidate, ThreadUsage> {
     const usage = new Map<ThreadCandidate, ThreadUsage>();
     for (const requests of this.claude.values()) {
-      // Resolve an unidentified request only when exactly one known request used this response ID.
+      // [Winner 정책] 같은 메시지 ID에 확인된 요청 ID가 하나일 때만 요청 ID 없는 후보와 비교한다.
       const anonymous = requests.size === 2 ? requests.get(undefined) : undefined;
       for (const entry of requests.values()) {
         if (entry === anonymous) continue;
@@ -138,7 +147,7 @@ function preferTimeline(candidate: SummarySource, previous: SummarySource): bool
 function betterClaude(candidate: ClaudeWinner, previous: ClaudeWinner): boolean {
   const score = usageScore(candidate.response), previousScore = usageScore(previous.response);
   if (score !== previousScore) return score > previousScore;
-  // Equal usage keeps the last transcript within the original group order. Canonical comes after all copies.
+  // [Winner 정책] 동점은 스레드 그룹, 원본, 행 순으로 나중 후보를 택하며 그룹 안에서 대표 원본을 마지막에 둔다.
   if (candidate.group !== previous.group) return candidate.group.order > previous.group.order;
   if (candidate.source !== previous.source)
     return (candidate.source.copyOrder ?? Infinity) > (previous.source.copyOrder ?? Infinity);
@@ -147,6 +156,7 @@ function betterClaude(candidate: ClaudeWinner, previous: ClaudeWinner): boolean 
 
 function mergeCodexResponses(target: CodexResponses, responses: readonly ThreadResponse[], preferred: boolean,
   hasPrevious: boolean, intervals: readonly (ThreadCheckpointInterval & { responseKeys: string[] })[]): void {
+  // [Winner 정책] 동점 판별용 대표 원본 키는 처음 복사본을 비교할 때부터 따로 관리한다.
   if (hasPrevious) {
     if (preferred) target.canonicalKeys = new Set();
     else target.canonicalKeys ??= new Set(target.winners.keys());
@@ -156,11 +166,13 @@ function mergeCodexResponses(target: CodexResponses, responses: readonly ThreadR
   for (let responseIndex = 0; responseIndex < responses.length; responseIndex++) {
     const response = responses[responseIndex];
     const key = responseKey(response), prior = winners.get(key);
+    // [집계 정책] 대표 원본의 응답 키를 누계 구간에 붙이고 인접한 두 구간의 경계 키는 공유한다.
     for (let interval = intervals[intervalIndex]; interval && interval.start.responseIndex <= responseIndex; interval = intervals[++intervalIndex]) {
       interval.responseKeys.push(key);
-      // Adjacent intervals share their boundary response.
       if (interval.end.responseIndex > responseIndex) break;
     }
+
+    // [Winner 정책] 입력+출력 토큰 합이 큰 응답을 택하고 동점이면 대표 원본을 우선한다.
     if (prior) {
       const score = usageScore(response), previousScore = usageScore(prior);
       if (score < previousScore || score === previousScore && !preferred && canonicalKeys?.has(key)) continue;

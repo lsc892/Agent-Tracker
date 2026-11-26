@@ -18,11 +18,13 @@ export async function acquireRefreshLock(
   const {DatabaseSync}=await import('node:sqlite');
   const connection=new DatabaseSync(`${databasePath}.refresh-lock.sqlite`);
   try {
+    // [SQL 트랜잭션 정책] SQLite 대기 대신 75ms마다 EXCLUSIVE 잠금을 다시 시도하며 그 사이 취소를 확인한다.
     connection.exec('PRAGMA busy_timeout=0');
     while (true) {
       if (signal?.aborted || isCancelled?.()) throw new SummaryError('interrupted');
       try {
         connection.exec('BEGIN EXCLUSIVE');
+        // [SQL 트랜잭션 정책] 해제 함수는 한 번만 롤백하고 연결을 닫아 잠금을 반환한다.
         let released=false;
         return () => {
           if (released) return;

@@ -2,6 +2,7 @@
 import type { TurnSummaryInput } from './types';
 import { modelValues, validateSummary } from './memoryStore/values';
 
+// [DTO 정책] 제공자·모델 배열의 필드 순서를 한 곳에서 정의해 SQL의 위치 기반 역직렬화에 사용한다.
 const columns = [
   'provider', 'project_key', 'session_id', 'started_at_ms', 'status', 'duration_ms', 'duration_quality',
   'input_tokens', 'output_tokens', 'total_tokens', 'cache_write_input_tokens', 'cache_read_input_tokens',
@@ -15,6 +16,7 @@ export function dailyFacts(summaries: readonly TurnSummaryInput[]): { provider: 
   const provider: unknown[][] = [];
   const model: unknown[][] = [];
   for (const row of summaries) {
+    // [DTO 정책] 요약을 검증하고 제공자·모델 행에 공통으로 들어갈 식별자와 시간 필드를 만든다.
     validateSummary(row);
     const models = modelValues(row);
     const prefix = [row.provider, row.project_key, row.session_id, row.started_at_ms ?? null, row.status,
@@ -45,5 +47,6 @@ export function dailyFacts(summaries: readonly TurnSummaryInput[]): { provider: 
     provider.push([...prefix, ...totals, null, Number(hasModel),
       apiCost, costComponents - pricedModels, costComponents, billing]);
   }
+  // [DTO 정책] 제공자와 모델의 행 배열을 각각 JSON으로 변환해 집계 SQL에 전달한다.
   return { provider: JSON.stringify(provider), model: JSON.stringify(model) };
 }

@@ -11,6 +11,7 @@ const MAX_EPOCH_MS = 8.64e15;
 
 export const providerName = (id: QuotaProviderId): string => id === 'claude' ? 'Claude' : 'Codex';
 export function escapeHtml(value: string): string {
+  // [표시 정책] HTML 구문에 쓰이는 문자를 엔티티로 바꿔 텍스트로 표시한다.
   return value.replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]!);
 }
 export type DashboardMessage =
@@ -29,6 +30,7 @@ export type DashboardMessage =
  * 알고리즘: 명령 종류·열거 값·ID 길이·숫자 범위를 검사하고 허용 필드만 새 메시지로 복사해 임의 파일·명령 선택을 차단한다.
  */
 export function parseDashboardMessage(input: unknown): DashboardMessage | null {
+  // [DTO 정책] 허용된 명령만 분기하고 입력 전체 대신 검증된 필드로 새 메시지를 만든다.
   if (!input || typeof input !== 'object') return null;
   const value = input as Record<string, unknown>;
   switch (value.type) {
@@ -43,6 +45,7 @@ export function parseDashboardMessage(input: unknown): DashboardMessage | null {
 }
 
 function parseSessionBillingMessage(value: Record<string, unknown>): DashboardMessage | null {
+  // [결제 정책] 사용 가능한 제공자, 제한 길이의 세션 ID, 허용 결제 방식만 받는다.
   if (value.provider !== 'claude' && value.provider !== 'codex') return null;
   if (typeof value.sessionId !== 'string') return null;
   if (!value.sessionId || value.sessionId.length > MAX_ID_LENGTH) return null;
@@ -51,6 +54,7 @@ function parseSessionBillingMessage(value: Record<string, unknown>): DashboardMe
 }
 
 function parseNamesMessage(value: Record<string, unknown>): DashboardMessage | null {
+  // [DTO 정책] 이름 요청 ID와 종류를 검사하고 고정 페이지 크기와 제한된 오프셋을 부여한다.
   if (!value.query || typeof value.query !== 'object') return null;
   if (!Number.isSafeInteger(value.requestId) || (value.requestId as number) < 0) return null;
   const raw = value.query as Record<string, unknown>;
@@ -72,6 +76,7 @@ function applyNamesProjectFilter(query: NameQuery, raw: Record<string, unknown>)
 }
 
 function parseUsageMessage(value: Record<string, unknown>): DashboardMessage | null {
+  // [DTO 정책] 조회 제어값을 먼저 검증하고 표시 옵션·필터·기간을 허용 필드로 조립한다.
   if (!value.query || typeof value.query !== 'object') return null;
   const raw = value.query as Record<string, unknown>;
   const query = parseUsageControls(raw);
@@ -86,11 +91,13 @@ function parseUsageMessage(value: Record<string, unknown>): DashboardMessage | n
 }
 
 function parseUsageControls(raw: Record<string, unknown>): UsageQuery | null {
+  // [페이지 정책] 요청 단위 선택을 일별로 매핑한 뒤 집계 차원과 페이지 크기를 검증한다.
   const groupBy = raw.groupBy === 'turn' ? 'day' : raw.groupBy;
   if (!['day', 'month', 'project', 'session', 'all'].includes(String(groupBy))) return null;
   const limit = raw.limit === undefined ? DEFAULT_PAGE_LIMIT : raw.limit;
   if (!validPageLimit(limit)) return null;
   const query: UsageQuery = { groupBy: groupBy as UsageQuery['groupBy'], limit, offset: boundedOffset(raw.offset) };
+  // [조회 정책] 표 정렬·화면 구역·도구별 페이지 옵션을 각각 검증한다.
   const sort = parseUsageSort(raw);
   if (sort === null) return null;
   if (sort !== undefined) query.tableSort = sort;
@@ -106,6 +113,7 @@ function parseUsageControls(raw: Record<string, unknown>): UsageQuery | null {
 }
 
 function parseUsageSort(raw: Record<string, unknown>): UsageSort | null | undefined {
+  // [정렬 정책] 생략은 유지하고 정렬을 지정했다면 알려진 열과 방향만 허용한다.
   if (raw.tableSort === undefined) return undefined;
   if (!raw.tableSort || typeof raw.tableSort !== 'object') return null;
   const sort = raw.tableSort as Record<string, unknown>;
@@ -115,6 +123,7 @@ function parseUsageSort(raw: Record<string, unknown>): UsageSort | null | undefi
 }
 
 function applyCapabilityOffsets(query: UsageQuery, raw: Record<string, unknown>): void {
+  // [페이지 정책] 지원하는 도구 분류별로 오프셋을 허용 범위에 맞춘다.
   if (!raw.capabilityOffsets || typeof raw.capabilityOffsets !== 'object') return;
   const offsets = raw.capabilityOffsets as Record<string, unknown>;
   query.capabilityOffsets = Object.fromEntries((['skill', 'subagent', 'plugin', 'model'] as const)
@@ -127,7 +136,7 @@ function parseCapabilityLimits(raw: Record<string, unknown>): UsageQuery['capabi
   const limits = raw.capabilityLimits as Record<string, unknown>;
   const pageSizes: NonNullable<UsageQuery['capabilityLimits']> = {};
   for (const category of ['skill', 'subagent', 'plugin', 'model'] as const) {
-    // Omitted categories keep their defaults; a supplied invalid size rejects the query.
+    // [페이지 정책] 빠진 도구 분류는 기본값을 쓰고 잘못된 크기가 하나라도 있으면 요청을 거부한다.
     if (limits[category] === undefined) continue;
     if (!validPageLimit(limits[category])) return null;
     pageSizes[category] = limits[category];
@@ -136,6 +145,7 @@ function parseCapabilityLimits(raw: Record<string, unknown>): UsageQuery['capabi
 }
 
 function applyUsagePresentation(query: UsageQuery, raw: Record<string, unknown>): void {
+  // [표시 정책] 비용은 불리언으로, 차트 지표와 분류는 지원하는 값으로 제한한다.
   if (typeof raw.includeCosts === 'boolean') {
     query.includeCosts = raw.includeCosts;
   }
@@ -148,6 +158,7 @@ function applyUsagePresentation(query: UsageQuery, raw: Record<string, unknown>)
 }
 
 function applyUsageFilters(query: UsageQuery, raw: Record<string, unknown>): void {
+  // [조회 정책] 제공자와 비어 있지 않은 제한 길이의 프로젝트·세션 ID만 필터에 쓴다.
   if (raw.provider === 'claude' || raw.provider === 'codex') {
     query.provider = raw.provider;
   }
@@ -160,6 +171,7 @@ function applyUsageFilters(query: UsageQuery, raw: Record<string, unknown>): voi
 }
 
 function applyTimestampRange(query: UsageQuery, raw: Record<string, unknown>): void {
+  // [기간 정책] Date 범위에 들어오는 안전한 정수 밀리초만 사용한다.
   for (const key of ['fromMs', 'toMs'] as const) {
     if (typeof raw[key] !== 'number') continue;
     if (!Number.isSafeInteger(raw[key])) continue;
@@ -170,6 +182,7 @@ function applyTimestampRange(query: UsageQuery, raw: Record<string, unknown>): v
 }
 
 function applyCalendarRange(message: Extract<DashboardMessage, { type: 'queryUsage' }>, raw: Record<string, unknown>): void {
+  // [기간 정책] 지원하는 최근 기간을 우선하고 개별 경계는 연-월-일 형식만 복사한다.
   if (raw.recentDays === 7 || raw.recentDays === 30 || raw.recentDays === 90) {
     message.recentDays = raw.recentDays;
     return;

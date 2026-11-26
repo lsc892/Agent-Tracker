@@ -91,6 +91,7 @@ function tokenVector({ input, output, cacheRead, cacheWrite }: TokenVector): Thr
 }
 
 function optionalCheckpoint(value: unknown): ThreadTokens | undefined {
+  // [진단 정책] 보조 누계의 토큰 형식이 지원되지 않으면 해당 누계만 건너뛴다.
   if (value == null) return undefined;
   try { return tokenVector(codexTokens(object(value))); }
   catch (error) {
@@ -127,6 +128,7 @@ export class ThreadLogParser {
   private firstResponse?: ThreadLog['firstResponse'];
 
   constructor(private readonly provider: Provider, path: string, sourceRoot: string) {
+    // [귀속 정책] Claude는 경로로 스레드와 프로젝트를, Codex는 원본 루트의 상위 경로로 프로젝트를 정한다.
     const parts = path.split(/[\\/]/);
     const subagents = provider === 'claude' ? parts.lastIndexOf('subagents') : -1;
     this.claudeChild = subagents > 0;
@@ -165,6 +167,7 @@ export class ThreadLogParser {
   }
 
   private claude(row: Record<string, unknown>, offset: number): void {
+    // [파싱 정책] 메인 로그의 세션 ID와 전체 시간 범위를 추적하고 assistant 행의 사용량만 읽는다.
     const type = string(row.type);
     if (!type) return;
     if (!this.claudeChild) {
@@ -178,6 +181,8 @@ export class ThreadLogParser {
     if (!hasJsonFields(raw)) return;
     const tokens = claudeTokens(raw), model = displayName(message.model);
     if ((model === '<synthetic>' || row.isApiErrorMessage === true) && tokens.input + tokens.output === 0) return;
+
+    // [Winner 정책] 메시지 ID와 요청 ID를 묶어 파일 내 중복 응답을 비교한다.
     const responseId = identifier(message.id);
     if (!responseId) throw new SummaryError('missing-response-id', offset);
     const requestId = identifier(row.requestId);
@@ -186,6 +191,7 @@ export class ThreadLogParser {
   }
 
   private codex(row: Record<string, unknown>, offset: number): void {
+    // [파싱 정책] session_meta에서 스레드와 부모를 식별하고, 행 유형에 따라 응답·턴 문맥·레거시 누계를 읽는다.
     const type = row.type, payload = object(row.payload);
     if (type === 'session_meta') {
       const threadId = identifier(payload.id);
@@ -215,6 +221,8 @@ export class ThreadLogParser {
       this.turnId = identifier(payload.turn_id) ?? this.turnId;
       if (payload.type === 'token_count' && this.threadId) this.recordLegacy(object(payload.info), this.codexModel(payload));
     }
+
+    // [파싱 정책] 행 시각과 이벤트의 시작·종료 시각을 밀리초로 맞춰 시간 범위를 갱신한다.
     this.observeTime(timestamp(row.timestamp) ?? timestamp(payload.timestamp));
     if (type === 'event_msg') {
       const time = payload.type === 'task_started' ? payload.started_at : payload.completed_at;
@@ -226,8 +234,8 @@ export class ThreadLogParser {
     return sqlText(displayName(payload.model) ?? this.model ?? '');
   }
 
-  /** Replacements keep their first appearance index and carry the winning row's order. */
   private keepResponse(key: string, candidate: ThreadResponse): number | undefined {
+    // [Winner 정책] 입력+출력 토큰이 많은 후보를 택하고 동점이면 나중 행으로 교체하되 첫 등장 인덱스를 유지한다.
     const index = this.responseIndices.get(key);
     if (index !== undefined) {
       if (usageScore(candidate) >= usageScore(this.responses[index])) this.responses[index] = candidate;
@@ -240,14 +248,19 @@ export class ThreadLogParser {
   }
 
   private recordResponse(payload: Record<string, unknown>, offset: number): void {
+    // [파싱 정책] 응답 ID와 턴 ID를 확인하고 사용량을 공통 토큰 필드로 정규화한다.
     const responseId = identifier(payload.response_id);
     if (!responseId) throw new SummaryError('missing-response-id', offset);
     if (!this.turnId) throw new SummaryError('missing-root-turn', offset);
     const candidate = { responseId, turnId: this.turnId, model: this.codexModel(payload),
       tokens: tokenVector(codexTokens(object(payload.usage))) };
     this.recordCount++;
+
+    // [Winner 정책] 턴 ID와 응답 ID가 같은 후보를 파일 내 winner 하나로 합친다.
     const responseIndex = this.keepResponse(responseKey(candidate), candidate);
     if (responseIndex === undefined) return;
+
+    // [집계 정책] 첫 등장 행의 사용량으로 구간 합계를 늘리고 누계가 있으면 체크포인트를 기록한다.
     this.intervalUsage += candidate.tokens.input + candidate.tokens.output;
     const threadTotal = optionalCheckpoint(payload.thread_token_usage);
     if (!threadTotal) return;
@@ -257,6 +270,7 @@ export class ThreadLogParser {
   }
 
   private recordCheckpoint(end: ThreadCheckpoint): void {
+    // [집계 정책] 체크포인트마다 구간을 닫고 응답으로 설명되지 않은 증가량이 있을 수 있는 구간만 남긴다.
     const start = this.previousCheckpoint;
     const usage = this.intervalUsage;
     this.previousCheckpoint = end;
@@ -272,6 +286,7 @@ export class ThreadLogParser {
   }
 
   private recordLegacy(info: Record<string, unknown>, model: string): void {
+    // [집계 정책] 누계와 개별 사용량을 순서대로 보존하고 첫 응답 이전 기록 수를 따로 센다.
     const rawTotal = object(info.total_token_usage), rawLast = object(info.last_token_usage);
     const total = info.total_token_usage ? codexTokens(rawTotal) : undefined;
     const last = info.last_token_usage ? codexTokens(rawLast) : undefined;

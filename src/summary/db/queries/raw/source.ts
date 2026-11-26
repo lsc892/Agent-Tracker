@@ -11,7 +11,7 @@ const HAS_MODEL = `EXISTS(
 
 // #region 모델별 원본 열
 
-// NULL means usage was not recorded; '' means recorded usage has an unknown model.
+// [집계 정책] NULL은 사용량 기록 부재, 빈 문자열은 기록된 사용량의 모델 미상을 뜻한다.
 const MODEL_NAME = `CASE
   WHEN coalesce(m.model, '') = ''
     AND coalesce(m.input_tokens + m.output_tokens, t.total_tokens) = 0
@@ -19,6 +19,7 @@ const MODEL_NAME = `CASE
   ELSE coalesce(m.model, '')
 END AS model`;
 
+// [집계 정책] 모델 행이 없을 때 요청 토큰을 사용하고 모델 행이 있으면 해당 행의 캐시 값을 보존한다.
 const MODEL_TOKENS = `
   coalesce(m.input_tokens, t.input_tokens) AS input_tokens,
   coalesce(m.output_tokens, t.output_tokens) AS output_tokens,
@@ -51,6 +52,7 @@ const MODEL_COSTS = `
   END AS unknown_costs`;
 
 function modelTurns(costs: boolean): string {
+  // [SQL 조회 정책] 모델 행이 없는 요청도 LEFT JOIN으로 유지하고 비용이 필요할 때만 비용 표를 조인한다.
   return `(
     SELECT
       ${TURN_DIMENSIONS},
@@ -70,9 +72,11 @@ function modelTurns(costs: boolean): string {
  * 알고리즘: 모델 기준은 LEFT JOIN으로 기록 부재·모델 미상을 보존하고 제공자 기준은 요청을 유지하며 비용 열은 요청될 때만 연결한다.
  */
 export function usageTurns(costs = false, by: UsageBasis = 'provider'): string {
+  // [집계 정책] 모델 기준은 모델 행으로 펼치고 제공자 기준은 요청마다 한 행을 유지한다.
   if (by === 'model') return modelTurns(costs);
   if (by !== 'provider') throw new RangeError('Unknown usage grouping basis');
 
+  // [결제 정책] 제공자 조회는 비용 옵션이 켜진 경우에만 요청 비용과 결제 방식을 읽는다.
   const source = costs ? `(
     SELECT
       t.*,
@@ -92,6 +96,7 @@ export function usageTurns(costs = false, by: UsageBasis = 'provider'): string {
 
 /** 일별 이관은 사용량 열과 결제 방식에 독립적인 API 추정치만 읽는다. */
 export function rollupUsageTurns(by: UsageBasis): string {
+  // [집계 정책] 모델별 이관에서는 비용 표본을 모델 행마다 하나씩 기록한다.
   if (by === 'model') return `(
     SELECT
       ${TURN_DIMENSIONS},
@@ -104,6 +109,8 @@ export function rollupUsageTurns(by: UsageBasis): string {
     LEFT JOIN turn_model_usage m ON m.turn_id = t.id
     LEFT JOIN turn_costs c ON c.turn_id = t.id
   )`;
+
+  // [집계 정책] 제공자별 이관에서는 모델의 API 추정치와 표본 수를 요청별로 먼저 합산한다.
   return `(
     SELECT
       ${TURN_DIMENSIONS},

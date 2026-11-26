@@ -23,8 +23,7 @@ export class JsonlLine {
    */
   append(chunk: Buffer, start: number, end: number): void {
     this.bytes += end - start;
-    // Cache the next delimiter: searching the entire remaining chunk for an absent
-    // backslash again for every string would make quote-heavy input quadratic.
+    // [파싱 정책] 따옴표·이스케이프 위치를 재사용하고 문자열 문맥에서만 두 경계를 함께 본다.
     const search = chunk.subarray(0, end);
     const find = (byte: number, from: number): number => {
       const found = search.indexOf(byte, from);
@@ -54,8 +53,8 @@ export class JsonlLine {
         index++;
         continue;
       }
+      // [메모리 정책] 이미지 본문은 버리고 버려지는 구간의 제어 문자는 직접 검증한다.
       if (this.image) {
-        // Discard without retaining Base64; JSON.parse cannot check these bytes.
         if (/[\x00-\x1f]/.test(chunk.toString('latin1', index, boundary))) throw new SummaryError('parse-error', this.offset);
         discard(index, boundary);
       } else this.retain(chunk, index, boundary);
@@ -65,11 +64,13 @@ export class JsonlLine {
   }
 
   private retain(chunk: Buffer, start: number, end: number): void {
+    // [메모리 정책] 보존할 바이트만 예산에 포함하고 소비 콜백이 있으면 중간 버퍼를 만들지 않는다.
     if (end - start > this.maxBytes - this.length) throw new SummaryError('line-byte-budget-exceeded', this.offset);
     if (this.consume) {
       this.length += end - start;
       return;
     }
+    // [메모리 정책] 작은 첫 블록으로 시작해 행이 길어지면 64KiB까지 블록을 늘린다.
     while (start < end) {
       if (this.block && this.used === this.block.length) {
         this.blocks.push(this.block);
@@ -102,6 +103,7 @@ export class JsonlLine {
   }
 
   private probeImage(byte: number, probe: string): void {
+    // [파싱 정책] 문자열 앞부분만 검사하고 확인한 Base64 이미지 헤더 뒤에서 본문 제거를 시작한다.
     const next = probe + String.fromCharCode(byte);
     this.probe = next;
     const prefix = 'data:image/';
@@ -115,9 +117,7 @@ export class JsonlLine {
   }
 
   private trackImageByte(byte: number): boolean {
-    // JSON.parse cannot validate discarded bytes. Preserve its string escape/control checks here.
-    // 제어 문자 → 이전 Unicode/escape 완성 → 새 escape·종료 따옴표 순서로 해석한다.
-    // 순서를 바꾸면 이스케이프된 따옴표가 이미지 문자열을 일찍 닫을 수 있다.
+    // [파싱 정책] 버릴 이미지 문자열도 제어 문자와 이전 이스케이프를 먼저 검사한 뒤 종료 따옴표를 판별한다.
     if (byte < 32) throw new SummaryError('parse-error', this.offset);
     if (this.unicode) {
       if (!((byte >= 48 && byte <= 57) || (byte >= 65 && byte <= 70) || (byte >= 97 && byte <= 102))) {
@@ -140,6 +140,7 @@ export class JsonlLine {
   }
 
   text(): string {
+    // [DTO 정책] 사용한 블록과 마지막 일부만 합쳐 UTF-8로 변환한다.
     if (!this.block) return '';
     const tail = this.block.subarray(0, this.used);
     return (this.blocks.length ? Buffer.concat([...this.blocks, tail], this.length) : tail).toString('utf8').trim();

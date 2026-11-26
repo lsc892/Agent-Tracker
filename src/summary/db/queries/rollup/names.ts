@@ -8,6 +8,7 @@ import type { QuerySql } from '../common/types';
  * 알고리즘: 제공자·프로젝트 범위의 일별 행을 ID로 그룹화하고 이름·고정 키로 정렬한 행과 전체 개수 SQL을 함께 생성한다.
  */
 export function buildNameQueries(query: NameQuery, withTotal = false): { count: QuerySql; rows: QuerySql } {
+  // [SQL 필터 정책] 프로젝트 목록은 제공자 범위로, 세션 목록은 필요하면 프로젝트 범위까지 좁힌다.
   if (!['project', 'session'].includes(query.kind)) throw new RangeError('Unknown name kind');
   const session = query.kind === 'session';
   const where = buildQueryFilter({
@@ -15,6 +16,8 @@ export function buildNameQueries(query: NameQuery, withTotal = false): { count: 
     providers: query.providers,
     projectKey: session ? query.projectKey : undefined,
   });
+
+  // [DTO 정책] 프로젝트는 키 하나로, 세션은 제공자·프로젝트·세션 키로 구분해 이름과 최초 시각을 조회한다.
   const groups = session ? 'provider, project_key, session_id' : 'project_key';
   const provider = session ? 'provider' : 'NULL';
   const sessionId = session ? 'session_id' : 'NULL';
@@ -24,6 +27,8 @@ export function buildNameQueries(query: NameQuery, withTotal = false): { count: 
         WHERE s.provider = usage.provider AND s.session_id = usage.session_id
       )` : 'NULL';
   const sessionStartedAt = session ? 'MIN(min_started_at_ms)' : 'NULL';
+
+  // [페이지 정책] 이름은 대소문자를 무시해 정렬하고 고정 키까지 비교한 뒤 페이지를 자른다.
   const sessionNameOrder = session ? "COALESCE(session_name, '이름 없는 세션') COLLATE NOCASE, provider," : '';
   const sessionIdOrder = session ? ', session_started_at_ms, session_id' : '';
   return {

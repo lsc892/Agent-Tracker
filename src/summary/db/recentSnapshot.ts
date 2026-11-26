@@ -7,10 +7,12 @@ import { calendarPeriod } from './timezone';
 export interface RecentWindow { fromMs: number; toMs: number }
 
 export function copyRecentUsage(source: DatabaseSync, target: SummaryDatabase, { fromMs, toMs }: RecentWindow, timezone: string): void {
+  // [시간대 정책] 끝 시각을 제외한 밀리초 범위를 현지 날짜의 양끝을 포함하는 범위로 바꾼다.
   const bounds = [calendarPeriod(fromMs, timezone, 'day'), calendarPeriod(toMs - 1, timezone, 'day')];
   const where = 'WHERE local_day BETWEEN ? AND ?';
   const recent = `SELECT * FROM ${ROLLUP_TABLES.provider} ${where}`;
   const snapshot = target.connection;
+  // [SQL 트랜잭션 정책] 원본·이름과 결제에 필요한 세션을 먼저 복사한 뒤 범위 내 일별 행을 함께 확정한다.
   target.transaction(() => {
     copyRows(source, snapshot, 'source_file', 'SELECT * FROM source_file');
     copyRows(source, snapshot, 'projects', `SELECT * FROM projects WHERE project_key IN (SELECT project_key FROM (${recent}))`, bounds);
@@ -25,7 +27,7 @@ export function copyRecentUsage(source: DatabaseSync, target: SummaryDatabase, {
 
 function copyRows(source: DatabaseSync, target: DatabaseSync, table: string, sql: string, params: readonly string[] = []): void {
   const select = source.prepare(sql);
-  // Older source_file schemas can have a different physical column order.
+  // [DTO 정책] 스키마 버전마다 물리적 순서가 다를 수 있어 대상 DB의 열 이름으로 값을 맞춘다.
   const columns = target.prepare(`PRAGMA table_info(${table})`).all().map(column => String(column.name));
   const insert = target.prepare(`INSERT INTO ${table} (${columns.join(', ')}) VALUES (${columns.map(() => '?').join(', ')})`);
   for (const row of select.iterate(...params)) insert.run(...columns.map(column => row[column]));

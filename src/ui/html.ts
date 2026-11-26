@@ -4,6 +4,7 @@ import { escapeHtml } from './presentation';
 import { settingDefinitions } from '../configuration/schema';
 
 function pageSizeInput(id: string): string {
+  // [페이지 정책] 각 페이지 크기 입력은 1~1000의 정수와 기본값 100으로 초기화한다.
   return `<label class="page-size"><span data-i18n="dashboard.rowsPerPage">${escapeHtml(t('dashboard.rowsPerPage'))}</span><input id="${id}" type="number" min="1" max="1000" step="1" value="100" required inputmode="numeric" data-i18n-title="dashboard.pageSizeHelp" title="${escapeHtml(t('dashboard.pageSizeHelp'))}"></label>`;
 }
 
@@ -12,6 +13,7 @@ function pageSizeInput(id: string): string {
  * 알고리즘: 공통 기본 색상·번역 문구를 escape해 폼에 넣고 CSP와 nonce로 연결된 로컬 스크립트만 실행하게 한다.
  */
 export function colorSettingsHtml(scriptUri:string,styleUri:string,cspSource:string,nonce:string):string {
+  // [Webview 정책] 공통 색상 기본값과 번역을 폼에 넣고 nonce가 붙은 스크립트만 허용한다.
   return `<!DOCTYPE html><html lang="${escapeHtml(getLocale())}"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${escapeHtml(cspSource)}; script-src 'nonce-${escapeHtml(nonce)}';">
 <title data-i18n="color.title">${escapeHtml(t('color.title'))}</title><link rel="stylesheet" href="${escapeHtml(styleUri)}"></head>
@@ -33,6 +35,7 @@ export function colorSettingsHtml(scriptUri:string,styleUri:string,cspSource:str
  * 알고리즘: 번역·외부 속성 값을 HTML escape하고 CSP로 자원을 차단한 뒤 nonce를 가진 로컬 스크립트와 스타일만 연결한다.
  */
 export function dashboardHtml(scriptUri: string, styleUri: string, cspSource: string, nonce: string): string {
+  // [초기화 정책] 필터를 비활성 상태로 만들고 통계 조회가 준비되면 화면 스크립트에서 연다.
   return `<!DOCTYPE html>
 <html lang="${escapeHtml(getLocale())}"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${escapeHtml(cspSource)}; script-src 'nonce-${escapeHtml(nonce)}';">
@@ -50,6 +53,7 @@ export function dashboardHtml(scriptUri: string, styleUri: string, cspSource: st
 <div id="chart-by-control" class="filter-toggle"><span><span data-i18n="dashboard.grouping">${escapeHtml(t('dashboard.grouping'))}</span></span><div class="segmented" role="group" data-i18n-aria-label="dashboard.grouping" aria-label="${escapeHtml(t('dashboard.grouping'))}"><button id="chart-provider" type="button" aria-pressed="true"><span data-i18n="dashboard.byProvider">${escapeHtml(t('dashboard.byProvider'))}</span></button><button id="chart-model" type="button" aria-pressed="false"><span data-i18n="dashboard.byModel">${escapeHtml(t('dashboard.byModel'))}</span></button></div></div>
 <label><span data-i18n="dashboard.dateRange">${escapeHtml(t('dashboard.dateRange'))}</span><select id="date-range" aria-controls="from-date-control to-date-control"><option value="7" data-i18n="dashboard.last7Days">${escapeHtml(t('dashboard.last7Days'))}</option><option value="30" selected data-i18n="dashboard.last30Days">${escapeHtml(t('dashboard.last30Days'))}</option><option value="90" data-i18n="dashboard.last90Days">${escapeHtml(t('dashboard.last90Days'))}</option><option value="all" data-i18n="dashboard.allTime">${escapeHtml(t('dashboard.allTime'))}</option><option value="custom" data-i18n="dashboard.customDateRange">${escapeHtml(t('dashboard.customDateRange'))}</option></select></label>
 ${(['from', 'to'] as const).map(bound => {
+    // [기간 정책] 양쪽 경계에 키보드용 문자열 입력과 달력 선택기를 한 쌍으로 구성한다.
     const caption = bound === 'from' ? 'dashboard.fromDate' : 'dashboard.toDate';
     return `<div id="${bound}-date-control" class="date-filter" hidden><label for="${bound}-day" data-i18n="${caption}">${escapeHtml(t(caption))}</label><div class="date-input"><input id="${bound}-day" type="text" placeholder="year-month-day" inputmode="numeric" pattern="[0-9]{4}-[0-9]{2}-[0-9]{2}" maxlength="10" autocomplete="off" spellcheck="false" disabled><input id="${bound}-day-picker" type="date" data-i18n-aria-label="${caption}" aria-label="${escapeHtml(t(caption))}" disabled></div></div>`;
   }).join('')}
@@ -82,6 +86,7 @@ ${(['skill','subagent','plugin','model'] as const).map(category=>`<section class
  * 알고리즘: 진단 표·페이지 조작 영역과 번역을 조립하고 속성 escape·CSP·nonce를 적용해 로컬 자원만 연결한다.
  */
 export function diagnosticsHtml(scriptUri: string, styleUri: string, cspSource: string, nonce: string): string {
+  // [Webview 정책] 파일 진단 표의 초기 틀을 만들고 스타일 출처와 실행 가능한 스크립트를 제한한다.
   return `<!DOCTYPE html>
 <html lang="${escapeHtml(getLocale())}"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${escapeHtml(cspSource)}; script-src 'nonce-${escapeHtml(nonce)}';">

@@ -20,6 +20,7 @@ export class ClaudeParserAdapter {
   private billing: BillingMode = 'unknown';
 
   constructor(private readonly context: FileContext, private readonly sink: ParseSink) {
+    // [귀속 정책] 파일명으로 스레드를 구분하고 하위 에이전트는 경로에서 부모 세션을 찾는다.
     const parts = context.path.split(/[\\/]/);
     const subagentIndex = parts.lastIndexOf('subagents');
     const isMain = subagentIndex < 0;
@@ -35,6 +36,7 @@ export class ClaudeParserAdapter {
     const type = string(row.type);
     if (!type) return;
     this.updateMetadata(row, type);
+    // [파싱 정책] 사용자 행에서 요청 경계를 먼저 세우고 응답·시스템 행은 갱신된 요청에 귀속한다.
     const promptId = string(row.promptId);
     if (type === 'user') {
       this.recordUser(row, promptId, offset);
@@ -62,6 +64,7 @@ export class ClaudeParserAdapter {
   }
 
   private updateSessionTitle(row: Record<string, unknown>, type: string): void {
+    // [이름 정책] 메인 세션의 유효한 제목만 받고 사용자 제목이 있으면 이후 AI 제목은 무시한다.
     if (!this.identityValue.isMain || (type !== 'ai-title' && type !== 'custom-title')) return;
     if (type === 'ai-title' && this.customTitle) return;
     const sessionName = displayName(type === 'custom-title' ? row.customTitle : row.aiTitle);
@@ -87,12 +90,14 @@ export class ClaudeParserAdapter {
   }
 
   private identifyRequest(rootId: string | undefined, external: boolean): void {
+    // [귀속 정책] 식별자가 없는 행은 이전 요청을 따라가고 새 요청에서 오류·중단 상태를 초기화한다.
     const previousRoot = this.currentRoot;
     this.currentRoot = rootId ?? previousRoot;
     if (external || this.currentRoot !== previousRoot) { this.apiFailed = false; this.stopBlocked = false; }
   }
 
   private recordToolUsage(content: unknown, rootId: string, offset: number): void {
+    // [집계 정책] ID와 이름이 있는 도구 호출만 분류하고 호출 내부 순번을 이벤트 키에 포함한다.
     if (!Array.isArray(content)) return;
     for (const item of content) {
       const call = object(item);
@@ -115,6 +120,7 @@ export class ClaudeParserAdapter {
     if (rootId && this.context.collectCapabilities !== false) this.recordToolUsage(message.content, rootId, offset);
     this.recordAssistantUsage(row, message, rootId, offset);
     if (!rootId) return;
+    // [상태 정책] API 오류를 실패로, 정상 종료 사유를 완료로 기록해 마지막 응답 시각을 보존한다.
     this.apiFailed = row.isApiErrorMessage === true;
     this.stopBlocked = false;
     const time = timestamp(row.timestamp);
@@ -134,10 +140,12 @@ export class ClaudeParserAdapter {
     const synthetic = model === '<synthetic>';
     // Local error notices carry a zero usage vector, rather than an API response.
     // Retain any reported tokens, but never treat the placeholder as a model.
+    // [집계 정책] 토큰이 없는 로컬 오류 안내는 제외하고 사용량이 있으면 가상 모델명만 비운다.
     if ((synthetic || row.isApiErrorMessage === true) && tokens.input + tokens.output <= 0) return;
     if (!rootId) throw new SummaryError('missing-root-turn', offset);
     const responseId = string(message.id);
     if (!responseId) throw new SummaryError('missing-response-id', offset);
+    // [DTO 정책] 응답별 토큰에 메시지·행·세션 순으로 찾은 결제 유형을 붙인다.
     const usageBillingValue = message.billing_mode ?? row.billing_mode ?? row.auth_mode ?? this.billing;
     const requestId = string(row.requestId);
     this.sink.event({ kind: 'usage', rootId, responseId, requestId: requestId ?? null,
@@ -160,6 +168,7 @@ export class ClaudeParserAdapter {
     }
     // A blocked stop hook must keep the request open, including later duration records.
     if (this.stopBlocked) return;
+    // [상태 정책] 명시 소요 시간은 정확값, 완료 시각만 있는 시스템 이벤트는 유도값으로 전달한다.
     if (subtype === 'turn_duration' && typeof row.durationMs === 'number') {
       const time = timestamp(row.timestamp);
       this.sink.event({ kind: 'turn', rootId, isMain: this.identityValue.isMain, duration: number(row.durationMs),
@@ -185,6 +194,7 @@ export class ClaudeParserAdapter {
     const preventedContinuation = row.preventedContinuation;
     if (typeof preventedContinuation !== 'boolean') return;
     this.stopBlocked = preventedContinuation;
+    // [상태 정책] 계속 실행을 막은 hook은 진행 중으로 두고, 나머지는 API 오류 여부로 완료를 정한다.
     const completed = !this.stopBlocked && !this.apiFailed;
     const time = timestamp(row.timestamp);
     this.sink.event({ kind: 'turn', rootId, isMain: this.identityValue.isMain, completed,

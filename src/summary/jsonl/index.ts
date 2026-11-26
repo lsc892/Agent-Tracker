@@ -34,6 +34,7 @@ export async function readJsonl(
     /** Synchronous processing of at most one chunk; file reads stay outside the callback. */
     processBatch?: (parseRows: () => void) => void } = {},
 ): Promise<{ partialLine: boolean; bytes: number; rows: number }> {
+  // [메모리 정책] 행 예산은 기본 4MiB로 두고 읽기 버퍼는 관측 크기와 64KiB 중 작은 값에 맞춘다.
   const maxLine = options.maxLineBytes ?? 4 * 1024 * 1024;
   if (!Number.isSafeInteger(maxLine) || maxLine < 1) throw new RangeError('maxLineBytes must be a positive integer');
   const compressed = path.toLowerCase().endsWith('.jsonl.zst');
@@ -44,6 +45,8 @@ export async function readJsonl(
   let read = 0;
   let lineOffset = 0;
   let rows = 0;
+
+  // [파싱 정책] 스캔에서 관측한 크기까지만 최대 64KiB씩 읽고 압축 해제 전 바이트를 전달한다.
   const chunks = async function* (): AsyncGenerator<Buffer> {
     while (read < size) {
       if (options.signal?.aborted || options.isCancelled?.()) throw new SummaryError('interrupted', read);
@@ -58,6 +61,7 @@ export async function readJsonl(
     }
   };
 
+  // [파싱 정책] LF로 행을 나누고 이미지가 없는 짧은 한 청크 행은 바로 UTF-8로 읽는다.
   function parseChunk(chunk: Buffer): boolean {
     let index = 0;
     while (index < chunk.length) {
@@ -70,6 +74,8 @@ export async function readJsonl(
         // JsonlLine strips literal image bodies and validates their discarded bytes.
         if (!/data:image\//i.test(candidate)) text = candidate;
       }
+
+      // [파싱 정책] 청크를 넘기거나 이미지가 든 행은 상태를 이어받아 읽고, 고정 스키마가 있으면 필요한 필드만 누적한다.
       if (text === undefined) {
         if (!line) {
           projection = options.fixedShape && new StreamingFixedProjection(options.fixedShape, lineOffset);
@@ -80,6 +86,8 @@ export async function readJsonl(
         if (!projection) text = line.text();
         sourceBytes = line.bytes;
       }
+
+      // [파싱 정책] LF에서 완성된 객체를 행 시작 오프셋과 함께 전달하고 다음 행의 상태를 초기화한다.
       const row = projection ? projection.finish() : text ? parseJsonlObject(text, lineOffset, options.shape, options.fixedShape) : undefined;
       if (row) {
         rows++;
@@ -93,6 +101,7 @@ export async function readJsonl(
     return false;
   }
 
+  // [파싱 정책] Zstd는 읽는 중에 풀고, 끝에 LF가 없는 행은 보류로 표시하며 파일은 항상 닫는다.
   try {
     for await (const chunk of compressed ? zstdChunks(chunks()) : chunks()) {
       if (options.signal?.aborted || options.isCancelled?.()) throw new SummaryError('interrupted', read);

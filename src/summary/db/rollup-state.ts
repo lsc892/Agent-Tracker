@@ -9,7 +9,7 @@ export interface RollupState {
 
 // #region 집계 상태: 총량·완료 표본·세션 시작
 
-// 평균 대신 합계와 분모를 저장해 여러 날짜를 다시 병합할 수 있게 한다.
+// [집계 정책] 저장할 상태를 합계와 분모로 나눠 여러 날짜를 다시 병합할 수 있게 한다.
 const states: RollupState[] = [];
 const addState = (
   name: string,
@@ -24,7 +24,7 @@ const RECORDED_USAGE = '(has_recorded_usage = 1)';
 const TOKEN_FIELDS = ['input_tokens', 'output_tokens', 'total_tokens'];
 const CACHE_FIELDS = ['cache_write_input_tokens', 'cache_read_input_tokens'];
 
-// 총량에는 모든 상태를 포함하고, 캐시 미상 여부를 별도 개수로 보존한다.
+// [집계 정책] 총량은 모든 상태를 포함하고 캐시가 알려진 표본 수는 별도로 보존한다.
 for (const field of TOKEN_FIELDS) {
   addState(field, `SUM(${field})`);
 }
@@ -37,7 +37,7 @@ for (const field of CACHE_FIELDS) {
   addState(`${field}_known`, `COUNT(${field})`);
 }
 
-// c는 완료 전체, r은 사용량이 기록된 완료 표본이다.
+// [집계 정책] c는 완료 전체, r은 사용량이 기록된 완료 표본으로 평균의 분모를 구분한다.
 const COMPLETED_SAMPLES = [
   { prefix: 'c', condition: "status = 'completed'" },
   { prefix: 'r', condition: `status = 'completed' AND ${RECORDED_USAGE}` },
@@ -46,8 +46,9 @@ const AVERAGE_FIELDS = [...TOKEN_FIELDS, ...CACHE_FIELDS, 'duration_ms'];
 const DURATION_QUALITIES = ['exact', 'derived', 'approximate'];
 
 for (const { prefix, condition } of COMPLETED_SAMPLES) {
+  // [집계 정책] 완료 표본별 토큰·시간 합계를 남기고 캐시나 시간이 있는 표본만 알려진 값으로 센다.
   for (const field of AVERAGE_FIELDS) {
-    // AVG(duration_ms) uses floating-point accumulation in the raw query as well.
+    // [집계 정책] 상세 조회의 AVG와 같게 소요 시간은 실수로 누적한다.
     const value = field === 'duration_ms' ? '1.0 * duration_ms' : field;
     const type = field === 'duration_ms' ? 'REAL' : 'INTEGER';
     addState(`${prefix}_${field}`, `coalesce(SUM(CASE WHEN ${condition} THEN ${value} END),0)`, type);
@@ -55,6 +56,7 @@ for (const { prefix, condition } of COMPLETED_SAMPLES) {
       addState(`${prefix}_${field}_known`, `COUNT(CASE WHEN ${condition} THEN ${field} END)`);
     }
   }
+  // [집계 정책] 소요 시간의 품질 분류와 누락 건수를 각각 센다.
   for (const quality of DURATION_QUALITIES) {
     addState(`${prefix}_${quality}`, `SUM(${condition} AND duration_quality = '${quality}')`);
   }
@@ -62,6 +64,8 @@ for (const { prefix, condition } of COMPLETED_SAMPLES) {
 }
 
 addState('min_started_at_ms', 'MIN(started_at_ms)', 'INTEGER', 'MIN');
+
+// [결제 정책] API 추정 비용과 실제 결제 유형 기준 비용을 따로 합치고 미확정 성분 수도 보존한다.
 export const DAILY_COST_STATES = [
   { name: 'api_cost_usd', expression: 'SUM(api_cost_usd)', type: 'REAL' },
   { name: 'api_unknown_costs', expression: 'SUM(api_unknown_costs)', type: 'INTEGER' },
@@ -86,6 +90,7 @@ export const ROLLUP_TABLES = {
 } as const;
 
 export function dailyKeyColumns(by: keyof typeof ROLLUP_TABLES): readonly string[] {
+  // [스키마 정책] 두 집계가 제공자·세션·프로젝트·현지 날짜 키를 공유하고 모델 집계는 모델 키를 추가한다.
   const keys = ['provider', 'session_id', 'project_key', 'local_day'];
   return by === 'model' ? [...keys, 'model_key'] : keys;
 }
@@ -95,6 +100,7 @@ export function dailyKeyColumns(by: keyof typeof ROLLUP_TABLES): readonly string
 // #region 일별 집계 테이블 DDL
 
 const dailyTablesSql = (['provider', 'model'] as const).map(by => {
+  // [스키마 정책] 집계 정의에서 상태 열과 복합 기본 키를 생성해 일별 두 테이블에 같은 계산 기준을 적용한다.
   const table = ROLLUP_TABLES[by];
   const modelColumns = by === 'model' ? 'model TEXT,\n  model_key TEXT NOT NULL,' : '';
   const stateColumns = [...rollupStates(by), ...DAILY_COST_STATES].map(state => `${state.name} ${state.type}`).join(',\n  ');
@@ -121,6 +127,7 @@ CREATE TABLE IF NOT EXISTS usage_rollup_meta (
 );
 ${dailyTablesSql}`;
 
+// [스키마 정책] 도구 사용량 키는 일별 집계의 제공자·세션·프로젝트·현지 날짜에 분류와 이름을 더한다.
 export const SCHEMA_DAILY_CAPABILITY_SQL = `
 CREATE TABLE IF NOT EXISTS usage_capability_daily (
   provider TEXT NOT NULL,

@@ -17,6 +17,7 @@ export class SourceQueue<T extends { id: number }> {
   private readonly queued = new Set<T>();
 
   add(value: T): void {
+    // [큐 정책] 중복을 Set으로 걸러낸 뒤 부모와 비교하며 올려 최소 힙을 유지한다.
     if (this.queued.has(value)) return;
     this.queued.add(value);
     let index = this.heap.length;
@@ -31,6 +32,7 @@ export class SourceQueue<T extends { id: number }> {
   }
 
   take(): T | undefined {
+    // [큐 정책] 최솟값을 뺀 자리는 마지막 값과 더 작은 자식을 비교하며 내려 채운다.
     const first = this.heap[0];
     if (!first) return undefined;
     this.queued.delete(first);
@@ -51,6 +53,7 @@ export class SourceQueue<T extends { id: number }> {
 
   /** 큐를 변경하지 않고 ID가 작은 준비 후보만 제한된 선행 읽기에 제공한다. */
   preview(limit: number, accept: (value: T) => boolean): T[] {
+    // [큐 정책] 보조 힙에 방문할 자식을 넣어 원본을 건드리지 않고 ID 순으로 후보를 탐색한다.
     const result: T[] = [], frontier = new SourceQueue<{ id: number; heapIndex: number }>();
     if (this.heap.length) frontier.add({ id: this.heap[0].id, heapIndex: 0 });
     while (result.length < limit) {
@@ -72,6 +75,7 @@ export class OrderedGroups<T> {
   private readonly order = new Map<T, number>();
 
   constructor(values: Iterable<T>, keys: (value: T) => Iterable<string>) {
+    // [색인 정책] 입력 위치를 기록하고 값이 갖는 모든 그룹 키에 멤버를 등록한다.
     let index = 0;
     for (const value of values) {
       this.order.set(value, index++);
@@ -80,6 +84,7 @@ export class OrderedGroups<T> {
   }
 
   members(keys: Iterable<string>): T[] {
+    // [색인 정책] 여러 그룹의 합집합을 만든 뒤 기록한 입력 순서로 되돌린다.
     const members = new Set<T>();
     for (const key of keys)
       for (const value of this.groups.get(key) ?? []) members.add(value);

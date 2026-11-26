@@ -11,6 +11,7 @@ export async function readBoundedJson(response: Response): Promise<unknown> {
   let bytes = 0;
   const chunks: Uint8Array[] = [];
   try {
+    // [파싱 정책] 청크 크기를 누적해 1MiB를 넘기기 전에 중단하고 다 읽은 본문만 JSON으로 해석한다.
     while (true) {
       const part = await reader.read();
       if (part.done) break;
@@ -21,6 +22,7 @@ export async function readBoundedJson(response: Response): Promise<unknown> {
     try { return JSON.parse(Buffer.concat(chunks).toString('utf8')); }
     catch { throw new QuotaError('protocol', { key: 'quota.claudeInvalidJson' }); }
   } finally {
+    // [종료 정책] 본문 읽기가 실패해도 reader를 취소·해제하고 기존 파싱 오류는 유지한다.
     try { await reader.cancel(); } catch { /* Preserve the safe error above. */ }
     reader.releaseLock();
   }

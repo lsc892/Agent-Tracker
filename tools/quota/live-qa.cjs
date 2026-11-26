@@ -14,6 +14,7 @@ const root = resolve(__dirname, '../..');
 function optionsFromArgs(args) {
   const options = { real: false, providers: ['codex', 'claude'], timeoutMs: 15000,
     output: join(root, 'tests/results/quota-live.json') };
+  // [입력 검증 정책] 허용 옵션만 해석하고 실계정 조회는 명시 플래그가 있을 때만 허용한다.
   for (const arg of args) {
     if (arg === '--real') { options.real = true; continue; }
     const match = /^--(provider|timeout-ms|output|codex-executable|codex-home|claude-home)=(.+)$/.exec(arg);
@@ -41,6 +42,7 @@ async function boundedBody(response) {
   const chunks = [];
   let bytes = 0;
   try {
+    // [응답 크기 정책] 스트림을 1MiB까지 읽고 중간 실패에도 reader를 취소하고 잠금을 해제한다.
     for (;;) {
       const { done, value } = await reader.read();
       if (done) break;
@@ -52,6 +54,7 @@ async function boundedBody(response) {
   } finally { await reader.cancel().catch(() => {}); reader.releaseLock(); }
 }
 function safeError(error) {
+  // [진단 정책] 허용된 오류 코드와 유효한 재시도 시간만 보고한다.
   const codes = new Set(['authentication', 'unsupported-account', 'rate-limit', 'network', 'timeout', 'cancelled',
     'protocol', 'process', 'unavailable', 'reference-protocol', 'snapshot-mismatch', 'presentation-mismatch',
     'unexpected-rpc', 'process-exit-unconfirmed', 'missing-evidence']);
@@ -60,6 +63,7 @@ function safeError(error) {
 }
 function verify(snapshot, expected) {
   const { statusBarPresentation } = require('../../dist/src/ui/statusBarPresentation');
+  // [검증 정책] 같은 서버 응답에서 구한 수치를 제품 결과 및 상태바 표시와 대조한다.
   compareSnapshot(snapshot, expected);
   return { serverValuesMatch: true, presentation: checkPresentation(snapshot, expected, statusBarPresentation),
     windows: expected.windows.map(row => ({ ...row, remainingPercent: Math.max(0, Math.min(100, 100 - row.usedPercent)),
@@ -83,6 +87,7 @@ async function readClaude(options, signal, dependencies = {}) {
       statuses.push(response.status);
       if (!response.ok) return response;
       try {
+        // [검증 정책] 크기 범위 안의 응답으로 기대 값을 만들고 동일한 바이트를 제품 파서에 되돌린다.
         const body = await boundedBody(response);
         expected = expectedClaude(JSON.parse(body.toString('utf8')));
         return new Response(body, { status: response.status, headers: response.headers });
@@ -137,6 +142,7 @@ async function readCodex(options, signal, directory, dependencies = {}) {
   let evidence;
   try { evidence = JSON.parse(await readFile(evidencePath, 'utf8')); }
   catch { /* Missing evidence is an explicit failure, never an implicit pass. */ }
+  // [프로세스 정책] 관찰기와 실제 Codex 서버가 둘 다 종료됐는지 수명 이벤트와 PID로 확인한다.
   const proxyPid = lifecycle.find(event => event.event === 'started')?.pid;
   const processExitConfirmed = lifecycle.some(event => event.event === 'stopped') && alive(proxyPid) === false
     && evidence?.nativeExitConfirmed === true && alive(evidence.nativePid) === false;
@@ -165,6 +171,7 @@ async function runQa(options, dependencies = {}) {
   const directory = await mkdtemp(join(cache, 'run-'));
   try {
     const results = [];
+    // [실행 정책] 선택 제공자를 순차 검증하고 개별 실패도 결과에 남겨 다음 제공자를 계속 검사한다.
     for (const id of options.providers) {
       const read = dependencies[id] ?? (id === 'codex' ? readCodex : (options, signal) => readClaude(options, signal));
       try { results.push(await read(options, signal, directory)); }
@@ -184,6 +191,7 @@ async function runQa(options, dependencies = {}) {
  */
 async function main(args = process.argv.slice(2)) {
   const options = optionsFromArgs(args);
+  // [취소 정책] 종료 신호를 공통 취소 신호로 전달하고 보고 작업이 끝나면 리스너를 제거한다.
   const controller = new AbortController();
   const abort = () => controller.abort();
   process.once('SIGINT', abort); process.once('SIGTERM', abort);

@@ -12,6 +12,7 @@ export class MacClaudeCredentials implements ClaudeCredentialSource {
   }
 
   async getAccessToken(_refresh: boolean, signal: AbortSignal): Promise<string> {
+    // [인증 정책] 조회할 때마다 원본을 읽고 검증 뒤에는 로컬의 원문 참조를 지운다.
     let serialized: string | undefined;
     try {
       serialized = await this.readCredentialText(signal);
@@ -21,6 +22,7 @@ export class MacClaudeCredentials implements ClaudeCredentialSource {
 
   /** 파일을 읽었으면 검증 단계로 넘기고 기본 경로의 읽기 실패에만 Keychain을 사용한다. */
   private async readCredentialText(signal: AbortSignal): Promise<string | undefined> {
+    // [인증 정책] 파일 읽기를 우선하고 기본 데이터 홈에서만 Keychain을 대체 소스로 쓴다.
     const serialized = await readClaudeCredentialFile(this.dataHome, signal);
     if (serialized !== undefined) return serialized;
     if (this.dataHome !== defaultClaudeDataHome()) return undefined;
@@ -31,6 +33,7 @@ export class MacClaudeCredentials implements ClaudeCredentialSource {
 /** Keychain 실행 실패는 원문 오류를 노출하지 않고 공통 로그인 안내로 이어지게 한다. */
 async function tryReadKeychainCredentials(signal: AbortSignal): Promise<string | undefined> {
   try {
+    // [실행 정책] 대체 조회에 취소·시간·출력 크기 제한을 적용한다.
     return await new Promise<string>((resolve, reject) => {
       execFile('/usr/bin/security', ['find-generic-password', '-s', 'Claude Code-credentials', '-w'],
         { signal, timeout: 5_000, maxBuffer: 1_048_576, windowsHide: true },

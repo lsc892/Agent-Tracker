@@ -15,6 +15,7 @@ const cancelled = (): boolean => Boolean(Atomics.load(cancellation, 0)
   || externalCancellation && Atomics.load(externalCancellation, 0));
 
 port.on('message', (file: SourceReadFile) => {
+  // [진행 정책] 읽은 바이트를 100ms 단위로 모아 보고하고 마지막 잔여량은 파일 결과와 함께 보낸다.
   let pendingBytes = 0, lastReportAtMs = performance.now();
   void prepareSource(file, { maxLineBytes: options.maxLineBytes, cancelled,
     onBytes: count => {

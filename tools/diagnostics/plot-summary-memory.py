@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 def main():
     report_path = Path(sys.argv[1])
     report = json.loads(report_path.read_text(encoding="utf-8"))
+    # [표본 선택 정책] 실제 로그를 전부 재파싱한 메모리 표본만 사용한다.
     rows = [
         event
         for event in report["events"]
@@ -31,6 +32,7 @@ def main():
         axis.set_ylabel("Memory (MB, 1 MB = 1,000,000 bytes)")
         axis.set_xlim(0.5, 20.5)
         axis.set_xticks([1, 5, 10, 15, 20])
+    # [시각화 정책] GC 전후 힙과 프로세스 RSS를 두 패널에서 같은 반복 축으로 비교한다.
     axes[0].plot(iterations, [row["beforeGc"]["heapUsed"] / 1e6 for row in rows],
                  color="#d97706", marker="o", markersize=3, label="JS heap before forced GC")
     axes[0].plot(iterations, [row["afterGc"]["heapUsed"] / 1e6 for row in rows],
@@ -53,6 +55,7 @@ def main():
     if len(sys.argv) < 3:
         return
     worker_path = Path(sys.argv[2])
+    # [집계 정책] Worker 설정별로 관측 RSS와 경과 시간의 중앙값을 계산해 막대로 표시한다.
     variants = json.loads(worker_path.read_text(encoding="utf-8"))["variants"]
     labels = [str(variant["requestedWorkers"]) for variant in variants]
     rss = [median(sample["observedPeak"]["rss"] for sample in variant["samples"]) / 1e6 for variant in variants]

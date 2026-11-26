@@ -10,6 +10,7 @@ const { dirname, join, resolve } = require('node:path');
  * 알고리즘: 루트 확장 identity·버전을 검증하고 설치 파일을 복사한 뒤 같은 버전 manifest와 VSIX SHA-256 metadata를 기록한다.
  */
 function prepareInstaller(root, destination, vsix) {
+  // [패키징 정책] 원본 확장의 이름·게시자·버전을 검증한 뒤 설치 패키지에도 같은 버전을 쓴다.
   const extension = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
   const template = JSON.parse(readFileSync(join(root, 'tools/npm/manifest.json'), 'utf8'));
   if (extension.name !== 'agent-tracker' || extension.publisher !== 'AgentTracker') throw new Error('Unexpected Agent Tracker extension identity.');
@@ -18,6 +19,7 @@ function prepareInstaller(root, destination, vsix) {
     ...template, version: extension.version, license: extension.license,
     repository: extension.repository, engines: { node: extension.engines.node },
   };
+  // [검증 정책] 설치기가 검증할 확장 ID, 최소 VS Code 버전과 VSIX SHA-256을 기록한다.
   const metadata = {
     id: `${extension.publisher}.${extension.name}`, version: extension.version,
     vscode: extension.engines.vscode,
@@ -48,6 +50,7 @@ function main() {
   });
   const output = join(root, 'artifacts/npm');
   mkdirSync(output, { recursive: true });
+  // [패키징 정책] 임시 디렉터리에 설치 파일을 준비하고 npm pack 결과의 이름·버전·파일 목록을 대조한다.
   const staging = mkdtempSync(join(output, '.staging-'));
   try {
     const manifest = prepareInstaller(root, staging, vsix);

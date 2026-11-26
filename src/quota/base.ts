@@ -11,12 +11,13 @@ export abstract class BaseQuotaProvider implements QuotaProvider {
   private closing: Promise<void> | undefined;
 
   read(context: QuotaReadContext): Promise<QuotaSnapshot> {
+    // [취소 정책] 종료가 시작되면 새 조회를 거절하고 활성 조회에는 호출자·종료 신호를 함께 전달한다.
     if (this.closing) return Promise.reject(new QuotaError('cancelled', this.closedMessage));
 
     const controller = new AbortController();
     const signal = AbortSignal.any([context.signal, controller.signal]);
     this.active.add(controller);
-    // Install ownership before invoking provider code, including synchronous failures.
+    // [종료 정책] 제공자를 호출하기 전에 조회를 추적하고 완료 시 취소 핸들과 Promise를 함께 제거한다.
     const reading = Promise.resolve().then(() =>
       this.readQuota({ ...context, signal })).finally(() => {
       this.active.delete(controller);
@@ -27,6 +28,7 @@ export abstract class BaseQuotaProvider implements QuotaProvider {
   }
 
   dispose(): Promise<void> {
+    // [종료 정책] 모든 활성 조회를 취소하고 정리가 끝날 때까지 같은 종료 Promise를 공유한다.
     if (!this.closing) {
       this.closing = Promise.resolve().then(async () => {
         await Promise.allSettled(this.reads);

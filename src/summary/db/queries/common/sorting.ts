@@ -5,6 +5,7 @@ import type { UsageBasis } from './types';
 // #region 그룹별 표시 기준 열
 
 function scopeColumn(grouping: UsageGrouping): string {
+  // [정렬 정책] 그룹에 따라 기간·세션 시작 시각·프로젝트명·제공자 중 표시 기준 열을 고른다.
   switch (grouping) {
     case 'day':
     case 'month':
@@ -27,6 +28,7 @@ function scopeColumn(grouping: UsageGrouping): string {
  * 알고리즘: 허용된 열·방향을 SQL 식으로 매핑하고 미상 값을 뒤로 보낸 뒤 모델 출시일·숫자 버전·고정 식별자를 보조 정렬로 붙인다.
  */
 export function usageTableOrder(sort: UsageSort, grouping: UsageGrouping, model: boolean, includeCosts = false): string {
+  // [정렬 정책] 허용된 정렬 기준과 방향만 SQL 식으로 변환한다.
   if (!USAGE_SORT_KEYS.includes(sort.key) || !['asc', 'desc'].includes(sort.direction)) {
     throw new RangeError('Unknown table sort');
   }
@@ -34,6 +36,7 @@ export function usageTableOrder(sort: UsageSort, grouping: UsageGrouping, model:
   const isCalendar = grouping === 'day' || grouping === 'month';
   const scope = scopeColumn(grouping);
 
+  // [정렬 정책] 표의 표시 기준에 맞춰 캐시를 뺀 입력 토큰과 모델 출시일을 정렬 식으로 매핑한다.
   const expressions = {
     model: model ? 'agent_tracker_model_release(model)' : 'provider',
     period: scope,
@@ -49,7 +52,7 @@ export function usageTableOrder(sort: UsageSort, grouping: UsageGrouping, model:
   };
   const expression = expressions[sort.key];
 
-  // 시간·모델 미상 값은 선택 열의 오름차순·내림차순과 관계없이 뒤로 보낸다.
+  // [정렬 정책] 시간·모델 미상 값은 정렬 방향과 관계없이 뒤로 보낸다.
   const unknown: string[] = [];
   if (isCalendar) unknown.push('period IS NULL');
   if (model) unknown.push("coalesce(model, '') = ''");
@@ -67,7 +70,7 @@ export function usageTableOrder(sort: UsageSort, grouping: UsageGrouping, model:
     order.push(`${scope} IS NULL`, `${scope} DESC`);
   }
 
-  // 표시 값이 같아도 페이지 순서가 바뀌지 않도록 고정 식별자를 붙인다.
+  // [페이지 정책] 표시 값이 같아도 페이지 순서가 안정적이도록 고정 식별자를 마지막에 붙인다.
   order.push('provider');
   if (model) order.push('model');
   order.push('project_key', 'session_id');
@@ -80,6 +83,7 @@ export function usageTableOrder(sort: UsageSort, grouping: UsageGrouping, model:
 // #region 시간·모델 미상 우선순위
 
 export function unknownOrder(by: UsageBasis, time?: string): string {
+  // [정렬 정책] 시간과 모델 미상을 먼저 한데 뒤로 보내고 개별 미상 여부로 순서를 정한다.
   const flags: string[] = [];
   if (time) flags.push(time);
   if (by === 'model') flags.push("coalesce(model, '') = ''");

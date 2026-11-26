@@ -7,6 +7,7 @@ import { capabilityArguments } from './logFields';
 type Use = Pick<CapabilityEvent, 'category' | 'name'>;
 
 function argumentsObject(value: unknown): Record<string, unknown> {
+  // [파싱 정책] 문자열 인자는 필요한 필드만 해석하고 올바르지 않은 JSON은 빈 인자로 취급한다.
   if (typeof value !== 'string') return object(value);
   try { return object(projectJson(value, capabilityArguments)); } catch { return {}; }
 }
@@ -42,6 +43,7 @@ function *nestedCalls(code: string): Generator<{ name: string; input: string }> 
     if (code.startsWith('/*',i)) { const end=code.indexOf('*/',i+2);i=end<0 ? code.length : end+2;continue; }
     const match = code.startsWith('tools.',i) ? /^tools\.([\w]+)\s*\(/.exec(code.slice(i)) : null;
     if (!match || i>0 && /[\w.]/.test(code[i-1])) { i++;continue; }
+    // [파싱 정책] 문자열 안의 괄호를 무시하며 깊이가 0이 될 때까지 중첩 호출 인자를 찾는다.
     const start=i+match[0].length;
     let depth=1,end=start;
     for (;end<code.length && depth;end++) {
@@ -58,6 +60,7 @@ function nestedArgumentsObject(raw: string): Record<string, unknown> {
   const args = argumentsObject(raw);
   // Object literals often have unquoted keys. Extract only supported scalar fields.
   const fields = /(?:^|[,{]\s*)["']?(cmd|command|file_path|path|skill|subagent_type|agent_type)["']?\s*:\s*/g;
+  // [파싱 정책] 지원 필드의 첫 출현만 검사하고 보간이나 이어 붙이기가 있는 값은 추출하지 않는다.
   const seen = new Set<string>();
   for (const field of raw.matchAll(fields)) {
     const key = field[1];
@@ -92,6 +95,7 @@ function skillPaths(value: string): Use[] {
 }
 
 function readsFile(command: string): boolean {
+  // [검증 정책] 인용된 부분을 건너뛰어 실제 토큰 경계의 파일 읽기 명령만 찾는다.
   for (let i=0;i<command.length;) {
     if ('\'"`'.includes(command[i])) { i=stringEnd(command,i);continue; }
     if ((i===0 || /[\s;|(&]/.test(command[i-1])) && /^(?:Get-Content|cat|type|head|tail|sed|read_file)\b/i.test(command.slice(i))) return true;
@@ -143,6 +147,7 @@ function directUses<Input>(name: string, input: Input, readArguments: (input: In
       addShellSkillUses(readArguments(input), uses);
       break;
   }
+  // [집계 정책] MCP 이름에서 플러그인을 보완하고 분류·정규화한 이름별로 중복을 없앤다.
   const plugin=/^mcp__(.+?)__/.exec(name)?.[1];
   if (plugin) uses.push({category:'plugin',name:displayName(plugin)!});
   if (!uses.length) return uses;
@@ -170,6 +175,7 @@ export function *readToolCapabilities(name: string, readInput: () => unknown): G
     for (const use of directUses(toolName, readInput, read => argumentsObject(read()))) yield { ...use, index: 0 };
     return;
   }
+  // [집계 정책] exec 문자열의 정적 호출을 순회하고 같은 호출에서 파생된 사용량에는 순번을 공유한다.
   const input = readInput();
   if (typeof input !== 'string') return;
   let index = 0;

@@ -17,6 +17,7 @@ export type StoredSource = FileMetadata & Pick<SourceFileRow, 'id' | 'source_mis
 /** 경로의 마지막 반영 시각과 재수집이 필요한 상태를 비교한다. */
 export function needsSourceRead(file: Pick<FileMetadata, 'mtime_ms' | 'source_root'>,
   previous: StoredSource | undefined): boolean {
+  // [재수집 정책] 수정 시각·원본 루트·파서 버전이 달라졌거나 마지막 처리가 완료되지 않은 파일을 다시 읽는다.
   return !previous || previous.mtime_ms !== file.mtime_ms || previous.source_root !== file.source_root
     || previous.source_missing === 1 || previous.processing_status !== 'done'
     || previous.parser_version !== PARSER_VERSION;
@@ -65,6 +66,7 @@ export class ScanState {
   }
 
   affect(provider: Provider, session: string | null | undefined): void {
+    // [큐 정책] 세션이 처음 영향을 받을 때 아직 처리하지 않은 관련 파일을 예약한다.
     if (!session) return;
     const value = sessionKey(provider, session);
     if (this.affected.has(value)) return;
@@ -73,6 +75,7 @@ export class ScanState {
   }
 
   connect(provider: Provider, a: string | null | undefined, b: string | null | undefined): void {
+    // [저장 정책] 파일의 이전·현재 세션을 양방향으로 연결해 같은 반영 단위에 둔다.
     if (!a || !b || a === b) return;
     const left = sessionKey(provider, a), right = sessionKey(provider, b);
     for (const [from, to] of [[left, right], [right, left]]) {
@@ -85,6 +88,7 @@ export class ScanState {
   }
 
   fail(file: FileState, error: unknown): void {
+    // [진단 정책] 파일당 최초 실패만 세고 이전·현재 귀속 모두를 변경 대상으로 표시한다.
     if (!file.error) this.result.failed++;
     file.error = error instanceof SummaryError ? error : new SummaryError('source-read-error');
     this.affect(file.provider, file.previous?.session_id);
@@ -111,6 +115,7 @@ export class ScanState {
   }
 
   setSession(file: FileState, session: string | null): void {
+    // [색인 정책] 세션이 바뀌면 이전 멤버십을 지우고 새 세션에 등록한다.
     if (file.session_id === session) return;
     if (file.session_id) removeMember(this.sessionFiles, sessionKey(file.provider, file.session_id), file);
     file.session_id = session;
@@ -118,6 +123,7 @@ export class ScanState {
   }
 
   registerPrepared(file: FileState, thread: ThreadLog): void {
+    // [집계 정책] 스레드를 세션 집계에 넘기고 부모 검색에 필요한 식별자와 레거시 여부만 파일에 남긴다.
     const { sessionId, threadId, parentThreadId, legacy } = thread;
     this.aggregation.add(file, sessionKey(file.provider, sessionId), thread);
     file.prepared = { sessionId, threadId, parentThreadId, hasLegacy: legacy.length > 0 };

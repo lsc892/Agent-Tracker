@@ -26,6 +26,7 @@ const METRIC_COLUMNS: Record<ChartMetric, string> = {
   averageDuration: 'avg_duration_ms',
 };
 
+// [결제 정책] 세션 결제 재분류가 있으면 구독·API·미상 기준으로 보존된 일별 비용 상태를 다시 해석한다.
 const DAILY_COSTS = `,
   SUM(CASE billing_override WHEN 'subscription' THEN 0 WHEN 'api' THEN api_cost_usd
     WHEN 'unknown' THEN NULL ELSE recorded_cost_usd END) AS cost_usd,
@@ -43,11 +44,14 @@ export function buildRollupUsageQueries(
   filter: SummaryFilter, grouping: UsageGrouping, timezone: string,
   by: UsageBasis, sortBy?: ChartMetric, tableSort?: UsageSort, withTotal = false,
 ): RollupUsageQueries {
+  // [SQL 조회 정책] 그룹·집계 기준과 통계 시간대를 검증한 뒤 일별 테이블을 선택한다.
   if (!['total', 'project', 'session', 'day', 'month'].includes(grouping)) throw new RangeError('Unknown usage grouping');
   if (by !== 'provider' && by !== 'model') throw new RangeError('Unknown usage grouping basis');
   calendarPeriod(0, timezone, 'day');
 
   const source = buildDailyUsageSource(filter, grouping, timezone, by);
+
+  // [집계 정책] 요청한 차원으로 일별 상태를 병합하고 필요한 평균·비용·전체 개수 열만 추가한다.
   const dimensions = rollupDimensions(grouping, by);
   const groupColumns = dimensions.groups.join(', ');
   const includeComponentAverages = filter.chartMetric === undefined || filter.chartMetric === 'averageTokens';
@@ -59,6 +63,7 @@ export function buildRollupUsageQueries(
     ) AS usage
     GROUP BY ${groupColumns}`;
 
+  // [페이지 정책] 표 정렬 또는 지표 순서를 전체 그룹에 적용한 뒤 페이지를 자른다.
   const metricOrder = sortBy ? `${METRIC_COLUMNS[sortBy]} DESC, ${groupColumns}` : groupColumns;
   const orderedSource = tableSort
     ? `SELECT * FROM (
@@ -73,6 +78,7 @@ export function buildRollupUsageQueries(
     LIMIT ?
     OFFSET ?`;
 
+  // [페이지 정책] 전체 개수도 같은 일별 범위와 그룹 키를 사용한다.
   return {
     rows: { sql: rowsSql, values: source.values },
     count: {
@@ -93,6 +99,7 @@ export function buildRollupUsageQueries(
 // #region 조회 차원·기간·정렬
 
 function rollupDimensions(grouping: UsageGrouping, by: UsageBasis): RollupDimensions {
+  // [집계 정책] 제공자는 항상 그룹에 두고 선택된 모델·프로젝트·세션·기간 차원만 더한다.
   const calendar = grouping === 'day' || grouping === 'month';
   const project = grouping === 'project' || grouping === 'session';
   const session = grouping === 'session';
@@ -103,6 +110,7 @@ function rollupDimensions(grouping: UsageGrouping, by: UsageBasis): RollupDimens
   if (session) groups.push('session_id');
   if (calendar) groups.push('period');
 
+  // [DTO 정책] 이름은 저장 메타데이터를 읽고 세션 시작 시각은 기간과 무관한 일별 최솟값으로 구한다.
   const projectName = project
     ? `(SELECT project_name
         FROM projects p
@@ -137,6 +145,7 @@ function rollupDimensions(grouping: UsageGrouping, by: UsageBasis): RollupDimens
 }
 
 function rollupPeriod(grouping: UsageGrouping): string {
+  // [기간 정책] 일자 키로 일·월 값을 만들고 빈 키는 기간 미상으로 유지한다.
   switch (grouping) {
     case 'day':
       return "NULLIF(local_day, '')";

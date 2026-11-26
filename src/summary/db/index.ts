@@ -32,6 +32,7 @@ export class SummaryDatabase {
   private readonly reader: SummaryReader;
 
   constructor(options: SqliteSessionOptions) {
+    // [연결 정책] 파일·결제·조회 저장소가 하나의 SQLite 연결을 공유하도록 구성한다.
     this.sqlite = new SqliteSession(options);
     this.connection = this.sqlite.connection;
     this.sources = new SourceFileStore(this.sqlite);
@@ -56,6 +57,7 @@ export class SummaryDatabase {
   }
 
   clearData(): void {
+    // [SQL 트랜잭션 정책] 일별 집계와 원본·세션·프로젝트를 같은 트랜잭션에서 제거한다.
     this.sqlite.transaction(() => {
       this.sqlite.rollups.clear();
       this.connection.exec('DELETE FROM source_file; DELETE FROM sessions; DELETE FROM projects;');
@@ -113,6 +115,7 @@ export class SummaryDatabase {
 
   /** @deprecated 일별 집계에 저장된 표본 수를 반환한다. */
   queryTurnsCount(filter: SummaryFilter = {}, by: 'provider' | 'model' = 'provider'): number {
+    // [조회 정책] 선택된 집계 기준과 저장 시간대에 맞춰 일별 요청 건수를 합산한다.
     const where = buildDailyUsageFilter(filter, this.sqlite.rollups.dailyTimezone());
     const row = this.connection.prepare(`SELECT COALESCE(SUM(turn_count), 0) AS count
       FROM ${ROLLUP_TABLES[by]} AS usage WHERE ${where.sql}`).get(...where.values);

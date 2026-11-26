@@ -41,6 +41,8 @@ export class MemoryStore {
   replaceBatch(replacements: readonly MemoryReplacement[]): SavedSessionNames {
     const savedNames = new Map<string, string>();
     if (!replacements.length) return savedNames;
+
+    // [SQL 트랜잭션 정책] 모든 입력을 한 트랜잭션에 넣고 삭제나 중복 세션이 없을 때만 일괄 반영한다.
     this.profile.measure('replace', () => this.database.transaction(() => {
       const inputs: BatchReplacement[] = replacements.map(replacement => ({
         ...replacement, sessions: [...replacement.sessions], removedFileIds: [...replacement.removedFileIds ?? []],
@@ -49,13 +51,14 @@ export class MemoryStore {
         this.saveSnapshots(inputs.map(replacement => this.prepare(replacement)), savedNames);
         return;
       }
-      // Repeated sessions and removals still see the effects of earlier snapshots in this transaction.
+      // [SQL 트랜잭션 정책] 중복 세션이나 삭제가 있으면 앞 입력이 반영된 상태에서 다음 입력을 처리한다.
       for (const replacement of inputs) this.saveSnapshots([this.prepare(replacement)], savedNames);
     }, this.profile));
     return savedNames;
   }
 
   private canCombine(replacements: readonly BatchReplacement[]): boolean {
+    // [SQL 트랜잭션 정책] 삭제 파일이 있거나 같은 제공자·세션을 두 번 교체할 때는 순차 반영한다.
     const seen = new Set<string>();
     for (const replacement of replacements) {
       if (replacement.removedFileIds.length) return false;
@@ -69,6 +72,7 @@ export class MemoryStore {
   }
 
   private prepare(replacement: BatchReplacement): PreparedReplacement {
+    // [SQL 트랜잭션 정책] 삭제 파일의 현재 귀속을 조회해 저장 대상 세션에 속하는지 확인한다.
     const { sessions, removed } = this.profile.measure('prepare', () => {
       const sessions = new Map(replacement.sessions.map(session => [sessionKey(session.provider, session.session_id), session]));
       const removed = new Map<number, SourceSession>();
@@ -83,6 +87,8 @@ export class MemoryStore {
       }
       return { sessions, removed };
     });
+
+    // [DTO 정책] 요약을 제공자·세션·스레드 키로 색인하고 범위를 벗어나거나 중복된 요약을 거부한다.
     const summaries = this.profile.measure('indexSummaries', () => {
       const summaries = new Map<string, TurnSummaryInput>();
       for (const summary of replacement.summaries) {
@@ -101,12 +107,16 @@ export class MemoryStore {
     const now = new Date().toISOString();
     const summaries = plans.flatMap(plan => [...plan.summaries.values()]);
     const sessions = plans.flatMap(plan => [...plan.sessions.values()]);
+
+    // [SQL 트랜잭션 정책] 이름과 원본 상태를 먼저 저장해 소실 여부가 일별 집계에 반영되게 한다.
     this.profile.measure('metadata', () => this.saveNames(summaries, savedNames));
     for (const plan of plans) {
       this.profile.measure('source_file', () => this.saveFiles(plan, now));
       this.profile.measure('removeSources', () => this.removeSources(plan, now));
     }
     if (!sessions.length) return;
+
+    // [SQL 트랜잭션 정책] 같은 트랜잭션에서 대상 세션의 일별 집계를 교체하고 참조가 끊긴 이름을 정리한다.
     const scope = JSON.stringify(sessions.map(row => [row.provider, row.session_id]));
     const projects = this.database.statement(`SELECT DISTINCT project_key FROM usage_request_daily
       WHERE (provider, session_id) IN (${SESSION_KEYS})`).all(scope).map(row => row.project_key);
@@ -116,6 +126,7 @@ export class MemoryStore {
   }
 
   private requireSession(provider: unknown, session: unknown, sessions: ReplacementSessions): void {
+    // [저장 정책] 세션 없는 원본은 허용하고 세션이 있으면 교체 범위에 포함되어야 한다.
     if (session !== null && !sessions.has(sessionKey(provider, session))) {
       throw new Error('Source is outside the replacement session group');
     }
@@ -123,6 +134,7 @@ export class MemoryStore {
 
   private saveFiles({ replacement, sessions }: PreparedReplacement, now: string): void {
     if (!replacement.files.length) return;
+    // [저장 정책] 다시 읽은 원본은 파일 ID로 갱신하고 계보가 명시된 입력만 기존 계보를 덮어쓴다.
     const select = this.database.statement('SELECT provider,session_id FROM source_file WHERE id=?');
     const save = this.database.statement(`INSERT INTO source_file(id,provider,source_root,path,session_id,mtime_ms,parser_version,
         thread_id,thread_usage,source_missing,processing_status,processing_position,recorded_at,last_error)
@@ -133,6 +145,8 @@ export class MemoryStore {
         thread_usage=CASE WHEN ? THEN excluded.thread_usage ELSE source_file.thread_usage END,
         source_missing=0,
         processing_status='done',processing_position='committed',recorded_at=excluded.recorded_at,last_error=NULL`);
+
+    // [저장 정책] 파일의 제공자 변경은 거부하고 이전·현재 세션이 모두 교체 범위에 속하는지 확인한다.
     for (const file of replacement.files) {
       const previous = select.get(file.id);
       if (previous) {
@@ -149,6 +163,7 @@ export class MemoryStore {
 
   private removeSources(plan: PreparedReplacement, now: string): void {
     if (!plan.removed.size) return;
+    // [저장 정책] 사용량을 유지할 세션의 파일은 소실 표시를 남기고 나머지는 파일 행을 삭제한다.
     const retained = plan.replacement.retainDeletedSourceUsage ? this.retainedSessions(plan) : new Set<string>();
     for (const [id, file] of plan.removed) {
       if (retained.has(sessionKey(file.provider, file.session_id))) {
@@ -161,6 +176,7 @@ export class MemoryStore {
 
   /** Another copy of the same thread can supply the corresponding usage again. */
   private retainedSessions({ removed, summaries }: PreparedReplacement): Set<string> {
+    // [저장 정책] 스레드별 사용량이 있으면 같은 스레드의 재집계 여부를 확인하고 그 외에는 세션 단위로 판단한다.
     const retained = new Set<string>(), checked = new Set<string>();
     const liveSessions = new Set(Array.from(summaries.values(), row => sessionKey(row.provider, row.session_id)));
     const hasUsage = this.database.statement(`SELECT 1 FROM usage_model_daily WHERE provider=? AND session_id=?
@@ -175,6 +191,8 @@ export class MemoryStore {
         ? summaries.has(threadKey(provider, session_id, threadId))
         : liveSessions.has(key);
       if (live) continue;
+
+      // [저장 정책] 다시 집계할 수 없고 기존 일별 테이블에 모델명이 있는 양의 사용량이 남은 세션만 보존한다.
       checked.add(key);
       if (hasUsage.get(provider, session_id)) retained.add(key);
     }
@@ -182,6 +200,7 @@ export class MemoryStore {
   }
 
   private saveNames(summaries: readonly TurnSummaryInput[], savedNames: Map<string, string>): void {
+    // [저장 정책] 프로젝트와 세션을 키별로 모으고 세션 이름은 비어 있지 않은 마지막 입력을 선택한다.
     const projects = new Map<string, string>(), sessions = new Map<string, SessionName>();
     for (const summary of summaries) {
       const { provider, session_id } = summary;
@@ -190,6 +209,8 @@ export class MemoryStore {
       if (!sessions.has(key) || name !== null) sessions.set(key, { provider, session_id, name });
     }
     if (!sessions.size) return;
+
+    // [저장 정책] 프로젝트 이름은 바뀐 경우만 갱신하고 빈 세션 이름은 이미 저장한 이름을 덮어쓰지 않는다.
     const project = this.database.statement(`INSERT INTO projects VALUES(?,?) ON CONFLICT(project_key) DO UPDATE SET project_name=excluded.project_name
       WHERE project_name<>excluded.project_name`);
     for (const [key, name] of projects) project.run(key, name);
@@ -202,12 +223,15 @@ export class MemoryStore {
   }
 
   private pruneNames(scope: string, projects: readonly unknown[], savedNames: Map<string, string>): void {
+    // [저장 정책] 교체 범위에서 일별 행이 모두 사라진 세션을 지우고 확정 이름 목록에서도 제외한다.
     const deleted = this.database.statement(`DELETE FROM sessions
       WHERE (provider, session_id) IN (${SESSION_KEYS}) AND NOT EXISTS(
         SELECT 1 FROM usage_request_daily d WHERE d.provider=sessions.provider AND d.session_id=sessions.session_id)
       RETURNING provider,session_id`).iterate(scope);
     for (const row of deleted) savedNames.delete(sessionKey(row.provider, row.session_id));
     if (!projects.length) return;
+
+    // [저장 정책] 교체 전 집계가 참조하던 프로젝트 중 다른 일별 행에서 쓰지 않는 이름만 정리한다.
     this.database.statement(`DELETE FROM projects WHERE project_key IN (SELECT value FROM json_each(?))
       AND NOT EXISTS(SELECT 1 FROM usage_request_daily d WHERE d.project_key=projects.project_key)`).run(JSON.stringify(projects));
   }

@@ -7,10 +7,13 @@ type PricedModel = [name: string, input: number, output: number, cacheWrite: num
 
 /** 요청의 수치 범위와 토큰 합계·캐시 포함 관계를 기존 순서대로 검사한다. */
 export function validateSummary(row: TurnSummaryInput): void {
+  // [검증 정책] 토큰 수는 0 이상의 안전 정수여야 하고 전체 토큰은 입력과 출력의 합과 일치해야 한다.
   for (const name of ['input_tokens', 'output_tokens', 'total_tokens'] as const) {
     nonnegative(row[name], name);
   }
   if (row.total_tokens !== row.input_tokens + row.output_tokens) throw new RangeError('Invalid total tokens');
+
+  // [검증 정책] 값이 있는 소요 시간과 캐시 토큰만 검증하고 캐시 합은 입력 토큰 이하여야 한다.
   if (row.duration_ms != null) nonnegative(row.duration_ms, 'duration_ms');
   for (const name of ['cache_write_input_tokens', 'cache_read_input_tokens'] as const) {
     if (row[name] != null) nonnegative(row[name], name);
@@ -23,6 +26,7 @@ export function validateSummary(row: TurnSummaryInput): void {
 /** 모델별 사용량을 검증하고 스레드 합계와 같은지 확인한 뒤 추정 비용을 붙인다. */
 export function modelValues(summary: TurnSummaryInput): PricedModel[] {
   if (!summary.model_usage) return [];
+  // [DTO 정책] 각 모델의 토큰을 검증하고 제공자별 추정 비용을 붙이면서 토큰 성분을 누적한다.
   let input = 0;
   let output = 0;
   let cacheRead = 0;
@@ -39,6 +43,7 @@ export function modelValues(summary: TurnSummaryInput): PricedModel[] {
       estimateCost(summary.provider, model),
     ]);
   }
+  // [검증 정책] 캐시 미상은 합계 비교에서 0으로 보고 모델별 합이 스레드 토큰과 일치해야 한다.
   const totalsMatch = input === summary.input_tokens && output === summary.output_tokens
     && cacheRead === (summary.cache_read_input_tokens ?? 0) && cacheWrite === (summary.cache_write_input_tokens ?? 0);
   if (!totalsMatch) throw new RangeError('Model totals must match the request summary');
@@ -47,6 +52,7 @@ export function modelValues(summary: TurnSummaryInput): PricedModel[] {
 
 /** 모델의 비음수 토큰과 캐시 포함 관계를 원래 검증 순서대로 확인한다. */
 function validateModel(model: ModelUsageInput): void {
+  // [검증 정책] 모델별로도 캐시 합이 입력의 일부인지 확인해 가격 계산에 올바른 성분을 전달한다.
   nonnegative(model.input_tokens, 'model input tokens');
   nonnegative(model.output_tokens, 'model output tokens');
   if (model.cache_write_input_tokens != null) nonnegative(model.cache_write_input_tokens, 'model cache write tokens');

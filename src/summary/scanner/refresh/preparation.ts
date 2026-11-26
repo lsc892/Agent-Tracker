@@ -6,11 +6,13 @@ import type { RefreshContext } from './context';
 import { needsSourceRead, PARSER_VERSION, type FileState, type ScanState } from './state';
 
 export async function prepareChanged(context: RefreshContext): Promise<void> {
+  // [큐 정책] 변경되었고 소실되지 않은 파일을 ID 순서로 준비한다.
   const changed = [...context.state.files.values()].filter(file => file.changed && !file.removed).sort((a, b) => a.id - b.id);
   await inspectBatch(context, changed);
 }
 
 export async function inspectBatch(context: RefreshContext, batch: readonly FileState[]): Promise<void> {
+  // [병렬 처리 정책] 준비는 제한된 구간에서 앞서 진행해도 파일 결과는 입력 순서로 적용한다.
   const { state, sourcePool } = context;
   for (let index = 0; index < batch.length; index++) {
     const candidates = batch.slice(index, index + sourcePool.lookahead).filter(file => file.selected && state.ready(file));
@@ -21,11 +23,13 @@ export async function inspectBatch(context: RefreshContext, batch: readonly File
 
 export async function inspectSource(context: RefreshContext, file: FileState): Promise<void> {
   const { state, result, scan, sourcePool, report, cancelled } = context;
+  // [재수집 정책] 이미 시도한 파일을 건너뛰고 선택 범위 밖 파일은 관측값을 다시 얻어 읽는다.
   context.check();
   if (!state.ready(file)) return;
   file.attempted = true;
   if (!file.selected && !await refreshOutsideSource(context, file))
     return;
+  // [진행 정책] 재사용 예정 파일을 실제로 읽으면 재사용 건수를 조정한다.
   try {
     if (!file.changed && file.selected)
       result.reused = Math.max(0, result.reused - 1);
@@ -43,6 +47,7 @@ export async function inspectSource(context: RefreshContext, file: FileState): P
 function applyPreparation(context: RefreshContext, file: FileState, preparation: SourcePreparation): void {
   const { state, result, check } = context;
   const previousSession = file.previous?.session_id;
+  // [진단 정책] 읽기에 실패해도 세션 식별자가 있으면 이전 귀속과 연결한 뒤 원본 오류를 전달한다.
   if (!preparation.ok) {
     if (preparation.sessionId !== undefined) {
       state.setSession(file, preparation.sessionId);
@@ -58,6 +63,7 @@ function applyPreparation(context: RefreshContext, file: FileState, preparation:
     applyEmptySource(state, file, partialLine);
     return;
   }
+  // [귀속 정책] 준비된 스레드의 귀속을 반영하고 파일이 변경된 경우 이전·현재 세션을 함께 갱신한다.
   const { sessionId, threadId } = thread;
   state.setSession(file, sessionId);
   file.relations = { identity: { threadId }, threadUsage: true };
@@ -69,6 +75,7 @@ function applyPreparation(context: RefreshContext, file: FileState, preparation:
 }
 
 function applyEmptySource(state: ScanState, file: FileState, partialLine: boolean): void {
+  // [저장 정책] 이전 세션이 있고 미완성 행만 남았으면 교체를 보류한다.
   const previousSession = file.previous?.session_id;
   state.affect(file.provider, previousSession);
   if (partialLine && previousSession) {
@@ -88,6 +95,7 @@ async function refreshOutsideSource(context: RefreshContext, file: FileState): P
     return true;
   }
   catch (error) {
+    // [소실 처리 정책] 보존 중인 원본의 경로가 여전히 없으면 소실로 등록하고 다른 읽기 실패는 진단으로 남긴다.
     if ((error as NodeJS.ErrnoException).code === 'ENOENT' && retain && file.previous?.source_missing) {
       file.removed = true;
       file.changed = true;

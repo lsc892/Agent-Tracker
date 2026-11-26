@@ -25,6 +25,7 @@ export const capabilityArguments: JsonShape = { fields: Object.fromEntries(
 export const spawnOutput: JsonShape = { deferred: true, fields: fields('agent_id', 'task_name') };
 
 function claudeFields(collectCapabilities: boolean): JsonShape {
+  // [파싱 정책] 행 유형마다 식별·제목·사용량 필드를 고르고 도구 분석이 켜졌을 때만 호출 내용을 보관한다.
   const identity = fields('cwd', 'promptId', 'sessionId');
   const tools: JsonShape = { deferred: true, items: { objectOnly: true, variant: select({ tool_use: {
     ...fields('id', 'name'), input: { ...capabilityArguments, deferred: true },
@@ -52,11 +53,13 @@ function codexFields(collectCapabilities: boolean): JsonShape {
   const args = { ...capabilityArguments, deferred: true };
   const toolCall = { ...callIds, ...fields('name'), arguments: args, input: args };
   const completed = fields('completed_at', 'duration_ms');
+  // [파싱 정책] 집계 설정과 별개로 자식 생성 추적에 필요한 호출과 결과 식별자를 유지한다.
   const responseVariant = select({
     function_call_output: { ...callIds, output: spawnOutput },
     function_call: collectCapabilities ? toolCall : { name: scalar, call_id: { deferred: true }, id: { deferred: true } },
     ...(collectCapabilities ? { custom_tool_call: toolCall } : {}),
   });
+  // [파싱 정책] 행 유형과 이벤트 유형마다 사용할 payload를 정해 필요한 값의 해석을 늦춘다.
   const variants = select({
     session_meta: { payload: { fields: { ...billing,
       ...fields('agent_path', 'cwd', 'forked_from_id', 'id', 'model', 'name', 'parent_thread_id', 'session_id', 'thread_name', 'title'),

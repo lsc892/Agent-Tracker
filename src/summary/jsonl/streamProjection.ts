@@ -40,6 +40,7 @@ const isDigit = (char: string): boolean => char >= '0' && char <= '9';
 type NumberState = 'start' | 'sign' | 'zero' | 'integer' | 'dot' | 'fraction' | 'exponent' | 'exponentSign' | 'exponentDigits';
 
 function nextNumber(state: NumberState, char: string): NumberState | undefined {
+  // [파싱 정책] JSON 숫자의 부호·정수·소수·지수 상태를 바이트마다 전이한다.
   if (state === 'start' && char === '-') return 'sign';
   if (state === 'exponent' && (char === '+' || char === '-')) return 'exponentSign';
   switch (state) {
@@ -74,6 +75,7 @@ class CompactRow {
   append(value: string): void {
     if (!value) return;
     const end = this.length + value.length;
+    // [메모리 정책] 필요한 경우 버퍼를 두 배로 키워 선택된 바이트의 반복 복사를 줄인다.
     if (!this.buffer || end > this.buffer.length) {
       const next = Buffer.allocUnsafe(Math.max(end, (this.buffer?.length ?? 128) * 2));
       this.buffer?.copy(next, 0, 0, this.length);
@@ -103,7 +105,7 @@ export class StreamingFixedProjection {
 
   append(chunk: Buffer, start: number, end: number): void {
     if (this.invalid) return;
-    // Latin-1 is a bounded byte view in the lexer. UTF-8 decoding happens only for selected data and lookup keys.
+    // [파싱 정책] 한 문자당 한 바이트로 읽으며 이전 청크에서 남은 문자열·스칼라 상태를 이어 간다.
     const bytes = chunk.toString('latin1', start, end);
     try {
       let index = 0;
@@ -117,12 +119,13 @@ export class StreamingFixedProjection {
       }
     } catch (error) {
       if (!(error instanceof SyntaxError)) throw error;
-      // A trailing row without LF is deferred, including ordinary JSON syntax errors.
+      // [진단 정책] 문법 오류는 표시만 해두고 개행이 있을 때 확정한다.
       this.invalid = true;
     }
   }
 
   finish(): Record<string, unknown> | undefined {
+    // [파싱 정책] 개행에서 남은 토큰과 최상위 객체를 검사하고 필터링된 JSON만 디코딩한다.
     if (this.invalid || this.string || this.literal || this.containers.length || this.edgeSpace
       || this.number && !endsNumber(this.number)) throw new SummaryError('parse-error', this.offset);
     if (!this.seenRoot) return undefined;
@@ -132,6 +135,7 @@ export class StreamingFixedProjection {
   }
 
   private readStructure(char: string): void {
+    // [파싱 정책] 스택이 비어 있으면 루트 한 개만 허용하고 양끝 공백을 따로 해석한다.
     const frame = this.containers.at(-1);
     if (!frame) {
       if (this.readEdgeSpace(char)) return;
@@ -142,6 +146,7 @@ export class StreamingFixedProjection {
       return;
     }
     if (char === ' ' || char === '\t' || char === '\r') return;
+    // [파싱 정책] 스택 맨 위 컨테이너의 상태로 다음 키·값·닫는 기호를 판별한다.
     if (frame.position === 'after') {
       if (char === frame.end) this.endContainer(frame);
       else if (char === ',') frame.position = frame.end === '}' ? 'key' : 'value';
@@ -203,6 +208,7 @@ export class StreamingFixedProjection {
       this.startString(shape ? 'output' : 'discard');
       return;
     }
+    // [필드 선택 정책] 리터럴·숫자도 문법 상태를 추적하고 선택된 바이트만 결과에 쌓는다.
     this.scalarSelected = !!shape;
     if (char === 'n') this.literal = 'ull';
     else if (char === 't') this.literal = 'rue';
@@ -219,6 +225,7 @@ export class StreamingFixedProjection {
   }
 
   private readScalar(bytes: string, index: number): number {
+    // [파싱 정책] 숫자의 마지막 유효 상태와 리터럴의 남은 글자를 다음 청크로 넘긴다.
     const start = index;
     if (this.number) {
       let state = this.number;
@@ -249,6 +256,7 @@ export class StreamingFixedProjection {
   }
 
   private readString(bytes: string, index: number, token: JsonString): number {
+    // [파싱 정책] 일반 바이트는 묶어 건너뛰고 이스케이프는 남은 16진수 개수까지 추적한다.
     const start = index;
     while (index < bytes.length) {
       if (!token.escape) {
@@ -282,6 +290,7 @@ export class StreamingFixedProjection {
   }
 
   private saveString(token: JsonString, bytes: string, start: number, end: number): void {
+    // [메모리 정책] 선택한 값만 결과에 넣고 어떤 키와도 맞을 수 없는 긴 키는 버린다.
     if (token.target === 'output') this.compact.append(bytes.slice(start, end));
     else if (token.target === 'key') {
       if (token.key.length + end - start <= token.keyLimit) token.key += bytes.slice(start, end);
@@ -290,6 +299,7 @@ export class StreamingFixedProjection {
   }
 
   private endString(token: JsonString): void {
+    // [필드 선택 정책] 후보 키를 UTF-8로 복원해 선택표에 있을 때만 하위 필드와 출력 키를 확정한다.
     const frame = this.containers.at(-1);
     if (frame?.position !== 'colon' || token.target !== 'key' || !frame.shape?.fields) return;
     const literal = Buffer.from(token.key, 'latin1').toString('utf8');
