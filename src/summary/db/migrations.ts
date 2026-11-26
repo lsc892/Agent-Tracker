@@ -1,10 +1,12 @@
 // 이전 상세 행을 일별 통계로 이관하고 현재 스키마를 연다.
 import type { DatabaseSync } from 'node:sqlite';
+import { deserialize } from 'node:v8';
 import { DAILY_SCHEMA_SQL, SCHEMA_VERSION, SCHEMA_MODEL_SQL } from './schema';
 import { ROLLUP_FORMAT_VERSION, ROLLUP_TABLES } from './rollup-state';
 import { aggregateUsageSource } from './queries/rollup/source';
 import { rollupUsageTurns } from './queries/raw/source';
 import { calendarPeriod } from './timezone';
+import type { SourceRelationMetadata } from './types';
 
 function schemaVersion(connection: DatabaseSync): number {
   const version = Number(connection.prepare('PRAGMA user_version').get()?.user_version);
@@ -34,9 +36,31 @@ export function migrateSchema(connection: DatabaseSync, timezone: string, transa
       for (const column of ['size_bytes', 'capabilities_collected']) {
         if (columns.some(existing => existing.name === column)) connection.exec(`ALTER TABLE source_file DROP COLUMN ${column}`);
       }
+      if (!columns.some(column => column.name === 'thread_id'))
+        connection.exec('ALTER TABLE source_file ADD COLUMN thread_id TEXT');
+      if (!columns.some(column => column.name === 'thread_usage'))
+        connection.exec('ALTER TABLE source_file ADD COLUMN thread_usage INTEGER NOT NULL DEFAULT 0 CHECK(thread_usage IN (0,1))');
+      if (columns.some(column => column.name === 'relation_meta')) migrateSourceRelations(connection);
     }
     connection.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
   });
+}
+
+/** Convert stored relationships in bounded batches before discarding the old payload. */
+function migrateSourceRelations(connection: DatabaseSync): void {
+  const first = connection.prepare('SELECT id,relation_meta FROM source_file WHERE relation_meta IS NOT NULL ORDER BY id LIMIT 256');
+  const next = connection.prepare('SELECT id,relation_meta FROM source_file WHERE id>? AND relation_meta IS NOT NULL ORDER BY id LIMIT 256');
+  first.setReadBigInts(true);
+  next.setReadBigInts(true);
+  const save = connection.prepare('UPDATE source_file SET thread_id=?,thread_usage=? WHERE id=?');
+  for (let rows = first.all(); rows.length; rows = next.all(rows[rows.length - 1].id)) {
+    for (const { id, relation_meta } of rows) {
+      if (!(relation_meta instanceof Uint8Array)) continue;
+      const relation = deserialize(relation_meta) as SourceRelationMetadata;
+      save.run(relation.identity.threadId, Number(relation.threadUsage === true), id);
+    }
+  }
+  connection.exec('ALTER TABLE source_file DROP COLUMN relation_meta');
 }
 
 function migrateUsage(connection: DatabaseSync, version: number, timezone: string): void {
@@ -82,8 +106,6 @@ function prepareLegacyTables(connection: DatabaseSync): void {
   for (const column of ['complete_position', 'prefix_hash', 'source_identity', 'content_hash', 'dev', 'inode', 'last_seen_scan_id']) {
     if (sourceColumns.some(existing => existing.name === column)) connection.exec(`ALTER TABLE source_file DROP COLUMN ${column}`);
   }
-  if (!sourceColumns.some(column => column.name === 'relation_meta'))
-    connection.exec('ALTER TABLE source_file ADD COLUMN relation_meta BLOB');
   if (!sourceColumns.some(column => column.name === 'source_missing'))
     connection.exec('ALTER TABLE source_file ADD COLUMN source_missing INTEGER NOT NULL DEFAULT 0 CHECK(source_missing IN (0,1))');
 }

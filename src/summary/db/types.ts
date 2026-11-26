@@ -27,6 +27,11 @@ export type SourceRelationMetadata = LegacySourceRelation | {
   identity: Pick<ParsedIdentity, 'threadId'>;
 };
 
+export interface StoredSourceRelation {
+  identity: Pick<ParsedIdentity, 'threadId'>;
+  threadUsage?: true;
+}
+
 export interface FileMetadata {
   provider: Provider;
   source_root: string;
@@ -48,6 +53,8 @@ export interface FileMetadata {
 
 export interface SourceFileRow extends FileMetadata {
   id: number;
+  thread_id: string | null;
+  thread_usage: 0 | 1;
   /** @deprecated Present in v23 rows of historical callers only. */
   source_identity?: string | null;
   /** @deprecated Present in v23 rows of historical callers only. */

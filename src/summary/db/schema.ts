@@ -2,7 +2,7 @@
 import { SCHEMA_DAILY_CAPABILITY_SQL, SCHEMA_ROLLUP_SQL } from './rollup-state';
 
 export { SCHEMA_ROLLUP_SQL } from './rollup-state';
-export const SCHEMA_VERSION = 28;
+export const SCHEMA_VERSION = 29;
 
 export const SCHEMA_APPLIED_RESPONSES_SQL = `
 CREATE TABLE IF NOT EXISTS applied_response (
@@ -105,16 +105,20 @@ CREATE INDEX IF NOT EXISTS idx_summary_project_period ON turn_summary(provider, 
 `;
 
 function sourceSql(legacy = false): string {
+  const legacyColumns = legacy ? `
+  size_bytes INTEGER NOT NULL DEFAULT 0 CHECK(size_bytes >= 0),
+  capabilities_collected INTEGER NOT NULL DEFAULT 0 CHECK(capabilities_collected IN (0,1)),` : '';
   return `
 CREATE TABLE IF NOT EXISTS source_file (
   id INTEGER PRIMARY KEY,
   provider TEXT NOT NULL CHECK(provider IN ('claude', 'codex')),
   source_root TEXT NOT NULL,
   path TEXT NOT NULL,
-  session_id TEXT,${legacy ? '\n  size_bytes INTEGER NOT NULL DEFAULT 0 CHECK(size_bytes >= 0),' : ''}
+  session_id TEXT,${legacyColumns}
   mtime_ms REAL NOT NULL DEFAULT 0,
   parser_version INTEGER NOT NULL DEFAULT 0,
-  relation_meta BLOB,${legacy ? '\n  capabilities_collected INTEGER NOT NULL DEFAULT 0 CHECK(capabilities_collected IN (0,1)),' : ''}
+  ${legacy ? 'relation_meta BLOB,' : `thread_id TEXT,
+  thread_usage INTEGER NOT NULL DEFAULT 0 CHECK(thread_usage IN (0,1)),`}
   source_missing INTEGER NOT NULL DEFAULT 0 CHECK(source_missing IN (0,1)),
   processing_status TEXT NOT NULL DEFAULT 'processing'
     CHECK(processing_status IN ('processing','done','error','interrupted')),

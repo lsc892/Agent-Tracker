@@ -52,10 +52,11 @@ function pendingParents({ state }: RefreshContext, lookedUp: Set<string>): Set<s
 
 function indexAvailableCodexThreads({ database, state, check }: RefreshContext): Map<string, FileState[]> {
   const threads = new Map<string, FileState[]>();
+  const threadIds = database.codexSourceThreadIds();
   for (const file of state.files.values()) {
     check();
     if (file.provider !== 'codex' || !state.ready(file) || !file.previous) continue;
-    const id = database.sourceRelations(file.id)?.identity.threadId;
+    const id = threadIds.get(file.id);
     if (!id) continue;
     const candidates = threads.get(id);
     if (candidates) candidates.push(file);

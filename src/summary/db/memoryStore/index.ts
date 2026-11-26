@@ -1,7 +1,7 @@
 // 메모리 집계에서 원본 상태와 일별 합계를 한 트랜잭션으로 반영한다.
-import { deserialize, serialize } from 'node:v8';
 import type { SqliteSession } from '../connection';
-import type { Provider, SessionRef, SourceRelationMetadata, TurnSummaryInput } from '../types';
+import type { Provider, SessionRef, SourceFileRow, TurnSummaryInput } from '../types';
+import { SOURCE_THREAD_ID, sourceThreadId } from '../sourceFiles';
 import { StageProfiler, type StorageStage } from '../../profiling';
 import type { MemoryReplacement, SavedSessionNames } from './types';
 
@@ -13,7 +13,7 @@ interface BatchReplacement extends MemoryReplacement {
 }
 
 type ReplacementSessions = Map<string, SessionRef>;
-type SourceSession = { provider: Provider; session_id: string | null; relation_meta: Uint8Array | null };
+type SourceSession = Pick<SourceFileRow, 'provider' | 'session_id' | 'thread_usage'> & { thread_id: string | Uint8Array | null };
 
 interface PreparedReplacement {
   replacement: BatchReplacement;
@@ -73,7 +73,7 @@ export class MemoryStore {
       const sessions = new Map(replacement.sessions.map(session => [sessionKey(session.provider, session.session_id), session]));
       const removed = new Map<number, SourceSession>();
       if (replacement.removedFileIds.length) {
-        const select = this.database.statement('SELECT provider,session_id,relation_meta FROM source_file WHERE id=?');
+        const select = this.database.statement(`SELECT provider,session_id,${SOURCE_THREAD_ID},thread_usage FROM source_file WHERE id=?`);
         for (const id of replacement.removedFileIds) {
           const file = select.get(id) as SourceSession | undefined;
           if (!file) continue;
@@ -125,11 +125,12 @@ export class MemoryStore {
     if (!replacement.files.length) return;
     const select = this.database.statement('SELECT provider,session_id FROM source_file WHERE id=?');
     const save = this.database.statement(`INSERT INTO source_file(id,provider,source_root,path,session_id,mtime_ms,parser_version,
-        relation_meta,source_missing,processing_status,processing_position,recorded_at,last_error)
-      VALUES(?,?,?,?,?,?,?,?,0,'done','committed',?,NULL)
+        thread_id,thread_usage,source_missing,processing_status,processing_position,recorded_at,last_error)
+      VALUES(?,?,?,?,?,?,?,?,?,0,'done','committed',?,NULL)
       ON CONFLICT(id) DO UPDATE SET source_root=excluded.source_root,path=excluded.path,session_id=excluded.session_id,
         mtime_ms=excluded.mtime_ms,parser_version=excluded.parser_version,
-        relation_meta=CASE WHEN ? THEN excluded.relation_meta ELSE source_file.relation_meta END,
+        thread_id=CASE WHEN ? THEN excluded.thread_id ELSE source_file.thread_id END,
+        thread_usage=CASE WHEN ? THEN excluded.thread_usage ELSE source_file.thread_usage END,
         source_missing=0,
         processing_status='done',processing_position='committed',recorded_at=excluded.recorded_at,last_error=NULL`);
     for (const file of replacement.files) {
@@ -140,8 +141,9 @@ export class MemoryStore {
       }
       this.requireSession(file.provider, file.session_id, sessions);
       const relations = file.relations;
+      const replaceRelation = Number(relations !== undefined);
       save.run(file.id, file.provider, file.source_root, file.path, file.session_id, file.mtime_ms, file.parser_version,
-        relations ? serialize(relations) : null, now, Number(relations !== undefined));
+        relations?.identity.threadId ?? null, Number(relations?.threadUsage === true), now, replaceRelation, replaceRelation);
     }
   }
 
@@ -168,9 +170,9 @@ export class MemoryStore {
       if (session_id === null) continue;
       const key = sessionKey(provider, session_id);
       if (checked.has(key)) continue;
-      const relation = file.relation_meta && deserialize(file.relation_meta) as SourceRelationMetadata;
-      const live = relation && relation.threadUsage
-        ? summaries.has(threadKey(provider, session_id, relation.identity.threadId))
+      const threadId = sourceThreadId(file.thread_id);
+      const live = file.thread_usage === 1 && threadId !== undefined
+        ? summaries.has(threadKey(provider, session_id, threadId))
         : liveSessions.has(key);
       if (live) continue;
       checked.add(key);

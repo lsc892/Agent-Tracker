@@ -4,7 +4,7 @@ import type { NameQuery, NameResult } from '../types';
 import type {
   BillingMode, CapabilityCategory, CapabilityPage, ChartMetric, DiagnosticsPage, FileMetadata,
   KeysetPage, SourceFileRow, OffsetPage, ProcessingStatus, Provider, SummaryFilter,
-  TurnSummaryRow, UsagePage, UsageGrouping, UsageRow, UsageSort, SourceRelationMetadata, SessionRef,
+  TurnSummaryRow, UsagePage, UsageGrouping, UsageRow, UsageSort, StoredSourceRelation, SessionRef,
 } from './types';
 import { SqliteSession, type SqliteSessionOptions } from './connection';
 import { SourceFileStore } from './sourceFiles';
@@ -66,8 +66,12 @@ export class SummaryDatabase {
     return this.sources.findSourceFile(provider, path);
   }
 
-  sourceRelations(fileId: number): SourceRelationMetadata | undefined {
+  sourceRelations(fileId: number): StoredSourceRelation | undefined {
     return this.sources.loadRelations(fileId);
+  }
+
+  codexSourceThreadIds(): Map<number, string> {
+    return this.sources.codexThreadIds();
   }
 
   observeFile(metadata: FileMetadata): SourceFileRow {

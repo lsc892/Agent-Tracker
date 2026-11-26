@@ -295,7 +295,7 @@ Claude credential·로그 보존 설정은 `<dataHome>/.claude`, Codex App Serve
 
 변경 원본과 영향 세션의 파일을 읽으면서 응답 키별 최고값과 첫·마지막 시각을 모은다. 파일별 최고값은 수집기에 도착할 때 바로 합친다. Claude 반복 응답은 세션에서 한 번, 새 Codex의 응답 사용량은 스레드의 턴·응답당 한 번 집계한다. Codex 누계 검산은 최종 최고값과 기준 파일의 관측 순서를 사용한다. 구형 Codex는 부모와 일치한 복사 앞부분을 제외하고 관측된 증가분을 합산한다. [파싱 필드](LogParsingFields.md)
 
-`source_file.relation_meta`는 관련 원본을 찾는 데 필요한 스레드 식별자와 소실 보존 기준을 보관한다. 세션 식별자는 파일 행에서 관리한다. 스키마 v26은 이전 DB를 열 때 기존 스레드·모델·도구 사용량을 날짜별로 이관하고 상세 테이블을 지운다. 매 갱신에서 확정된 winner와 스레드 합계는 SQL의 일별 집계 입력으로 사용한다.
+`source_file.thread_id`는 관련 원본을 찾는 데 필요한 스레드 식별자를 보관한다. 구형 Codex 부모를 대조할 때는 저장된 Codex 스레드 ID를 한 SQL 문으로 읽는다. 소실 보존은 `thread_usage`가 1이면 스레드, 0이면 세션을 기준으로 다른 복사본을 확인한다. 스키마 v26은 이전 DB를 열 때 기존 스레드·모델·도구 사용량을 날짜별로 이관하고 상세 테이블을 지운다. 매 갱신에서 확정된 winner와 스레드 합계는 SQL의 일별 집계 입력으로 사용한다.
 
 파일 준비 풀은 최대 4 Worker와 2배 선행 창으로 큰 파일을 병렬 준비한다. 단일 파일과 작은 입력은 통계 Worker가 직접 파싱한다. 성공한 연결 성분은 발견할 때 관측한 파일별 수정 시각을 통계와 함께 저장한다. 파싱 보류·오류·취소·저장 실패는 반영하지 못한 파일의 이전 시각을 유지한다. 읽는 중에 파일이 늘어나면 당시 관측한 바이트까지 반영하고, 이후 추가된 내용은 다음 수정 시각 비교에서 읽는다.
 
@@ -609,6 +609,8 @@ DB 위치는 `ExtensionContext.globalStorageUri` 아래로 한다. 현재 표는
 
 스키마 v28은 `source_file`의 `size_bytes`와 `capabilities_collected`를 제거한다. 읽기 범위는 파싱 전에 관측한 현재 파일 크기로 정하고, 재수집 여부는 기존 파일 수정 시각과 처리 상태를 비교해 정한다.
 
+스키마 v29는 기존 관계 BLOB의 스레드 ID와 소실 보존 기준을 `thread_id`와 `thread_usage`로 옮긴 뒤 BLOB 컬럼을 삭제한다.
+
 ```sql
 PRAGMA foreign_keys = ON;
 PRAGMA journal_mode = WAL;
@@ -621,7 +623,9 @@ CREATE TABLE source_file (
   session_id          TEXT,                                   -- 마지막 정상 summary의 논리 session
   mtime_ms            REAL NOT NULL DEFAULT 0,                -- 정상 반영 시 관측한 파일 수정 시각(epoch ms)
   parser_version      INTEGER NOT NULL DEFAULT 0,             -- 마지막 정상 반영한 parser 버전; 미처리는 0
-  relation_meta       BLOB,                                   -- 스레드 ID와 소실 보존 기준
+  thread_id           TEXT,                                   -- 부모 조회와 복사본 대조에 쓰는 스레드 ID
+  thread_usage        INTEGER NOT NULL DEFAULT 0              -- 1: 스레드 단위, 0: 세션 단위 소실 보존
+                        CHECK(thread_usage IN (0,1)),
   source_missing      INTEGER NOT NULL DEFAULT 0              -- 원본 삭제 후 요청 snapshot을 보존 중이면 1
                         CHECK(source_missing IN (0,1)),
   processing_status   TEXT NOT NULL DEFAULT 'processing'      -- 최근 시도 상태; 실패나 중단 시 재시도
