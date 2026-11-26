@@ -1,12 +1,10 @@
 // 통계 갱신·취소·삭제 요청의 중복과 실행 순서를 관리한다.
 import { WorkerTransport } from './transport';
-import type { RecentWindow } from '../db/recentSnapshot';
-import type { RefreshResult, SourceRoot, UsageQuery } from '../types';
+import type { RefreshResult, SourceRoot } from '../types';
 
 export interface RefreshOptions {
   roots?: SourceRoot[];
   timezone?: string;
-  recentUsage?: RecentWindow & Pick<UsageQuery, 'providers' | 'includeCosts' | 'excludeEmptyUsage'>;
 }
 
 /** 진행 중 갱신·삭제를 공유하고 Worker에 갱신 취소를 전달한다. */

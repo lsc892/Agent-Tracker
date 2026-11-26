@@ -41,7 +41,6 @@
   let latestProgress;
   let latestRefreshResult;
   let busy = false;
-  let showingPreview = false;
   let selectedProject;
   let selectedSession;
   let openNameKind;
@@ -110,9 +109,8 @@
     }
   }
   function updateSectionControls() {
-    // [미리보기 정책] 임시 결과가 표시되는 동안에는 토큰 구역만 보여 준다.
-    $('token-section').hidden = !showingPreview && section !== 'tokens';
-    $('skill-section').hidden = showingPreview || section !== 'skills';
+    $('token-section').hidden = section !== 'tokens';
+    $('skill-section').hidden = section !== 'skills';
     $('group-control').hidden = section !== 'tokens';
     $('chart-by-control').hidden = section !== 'tokens';
     for (const name of ['tokens', 'skills']) $(`section-${name}`).setAttribute('aria-pressed', String(section === name));
@@ -289,7 +287,7 @@
    * 알고리즘: 문자열은 textContent로 넣고 정렬 가능한 헤더에만 방향·접근성 속성을 붙이며 클릭 시 첫 페이지부터 호스트에 다시 조회한다.
    */
   function table(target, headers, rows, sortKeys = []) {
-    // [표시 정책] 빈 결과는 안내로 대신하고 미리보기에는 헤더 정렬을 제공하지 않는다.
+    // [표시 정책] 빈 결과는 안내하고 정렬 키에 해당하는 헤더에 정렬을 제공한다.
     target.replaceChildren();
     if (!rows.length) { target.append(element('p', t('common.noRecords'), 'empty')); return; }
     const node = element('table');
@@ -297,7 +295,7 @@
     const tr = element('tr');
     for (const [index, header] of headers.entries()) {
       const label = typeof header === 'string' ? header : header.label;
-      const key = showingPreview ? undefined : sortKeys[index];
+      const key = sortKeys[index];
       const cell = tableHeader(header, label, key);
       tr.append(cell);
     }
@@ -465,14 +463,13 @@
     $('chart-detail').textContent = '';
     if (!chart) return;
 
-    // [차트 정책] 모델·기간 미상을 뒤로 보내고 표 페이지와 미리보기 범위를 표시한다.
+    // [차트 정책] 모델·기간 미상을 뒤로 보내고 현재 표 페이지의 범위를 표시한다.
     const metric = chart.metric;
-    if (!showingPreview) $('chart-metric').value = metric;
+    $('chart-metric').value = metric;
     const title = chartMetrics[metric];
     $('chart-title').textContent = title;
     const rows = [...chart.rows].sort((a, b) => unknownPriority(a, chart.mode) - unknownPriority(b, chart.mode));
-    const pageOffset = showingPreview ? 0 : offset;
-    const pageRange = result.rows.length ? t('dashboard.pageRange', { value0: number(pageOffset + 1), value1: number(pageOffset + result.rows.length), value2: number(result.total) }) : t('dashboard.zeroItems');
+    const pageRange = result.rows.length ? t('dashboard.pageRange', { value0: number(offset + 1), value1: number(offset + result.rows.length), value2: number(result.total) }) : t('dashboard.zeroItems');
     $('chart-scope').textContent = t('dashboard.chartScope', { value0: pageRange });
     if (rows.length < result.rows.length) $('chart-scope').textContent += t('dashboard.emptyExcludedSuffix', { value0: number(result.rows.length - rows.length) });
     if (chart.by === 'model') $('chart-scope').textContent += t('dashboard.modelScopeSuffix');
@@ -672,7 +669,7 @@
     // [표시 정책] 도구 결과는 분류별 표에 표시하고 토큰 결과는 표와 차트에 함께 반영한다.
     latestUsage = result;
     if (result.capabilitiesEnabled !== undefined) setCapabilitiesEnabled(result.capabilitiesEnabled);
-    if (!showingPreview && section === 'skills' && !capabilitiesEnabled) return;
+    if (section === 'skills' && !capabilitiesEnabled) return;
     if (result.capabilities) {
       renderCapabilityTables(result.capabilities);
       return;
@@ -908,11 +905,8 @@
     offset = 0;
     query();
   }
-  function showUsage(result, preview) {
-    // [미리보기 정책] 결과의 출처에 따라 안내와 화면 단계를 바꾸고 같은 렌더러로 표시한다.
-    showingPreview = preview;
-    $('preview-period').hidden = !preview;
-    $('usage-controls').setAttribute('data-stage', preview ? 'preview' : 'ready');
+  function showUsage(result) {
+    $('usage-controls').hidden = false;
     $('error').hidden = true;
     updateSectionControls();
     renderUsage(result);
@@ -927,8 +921,7 @@
       latestRefreshResult = undefined;
       latestUsage = undefined;
       controls.disabled = true;
-      controls.setAttribute('data-stage', 'loading');
-      $('preview-period').hidden = true;
+      controls.hidden = true;
       closeNames();
     }
     $('retry-usage').hidden = busy || !controls.disabled;
@@ -939,8 +932,7 @@
     if (!message || typeof message !== 'object') return;
     switch (message.type) {
       case 'state': applyState(message); break;
-      case 'usage': showUsage(message.result, false); break;
-      case 'previewUsage': showUsage(message.result, true); break;
+      case 'usage': showUsage(message.result); break;
       case 'filtersReady': $('usage-controls').disabled = false; $('retry-usage').hidden = true; break;
       case 'names': renderNames(message); break;
       case 'busy': updateBusy(message.busy); break;

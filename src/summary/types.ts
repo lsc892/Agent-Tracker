@@ -67,7 +67,6 @@ export interface RefreshResult {
 }
 export interface SummaryProgress {
   phase: 'scanning' | 'parsing' | 'committing' | 'complete';
-  recentUsage?: UsageResult;
   discovered: number;
   parsed: number;
   failed: number;

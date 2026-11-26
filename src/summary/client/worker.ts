@@ -76,25 +76,10 @@ async function run(message: WorkerMessage): Promise<void> {
       case 'refresh': {
         const config = refresh ?? {};
         cancellation = new AbortController();
-        // [조회 정책] 최신 사용량 미리보기를 요청한 경우 스냅샷에서 일별 토큰 첫 페이지를 읽는다.
-        let recentUsage: UsageResult | undefined;
-        const preview = config.recentUsage && {
-          ...config.recentUsage,
-          onReady: (snapshot: SummaryDatabase) => {
-            recentUsage = queryUsage({
-              ...config.recentUsage, timezone: options.timezone, groupBy: 'day', chartMetric: 'tokens',
-              limit: 100, unknownTime: 'exclude',
-            }, snapshot);
-          },
-        };
-
-        // [갱신 정책] 공유 취소 버퍼와 취소 신호를 넘기고 미리보기는 다음 진행 알림에 한 번만 붙인다.
+        // [갱신 정책] 공유 취소 버퍼와 취소 신호를 넘기고 진행 상태를 알린다.
         try {
           lastRefresh = await refreshSummary(database, {...options,cancellation:config.cancellation}, cancellation.signal,
-            progress => {
-              port.postMessage({ progress: recentUsage ? { ...progress, recentUsage } : progress });
-              recentUsage = undefined;
-            }, preview);
+            progress => port.postMessage({ progress }));
           result=lastRefresh;
         } finally {
           cancellation = undefined;

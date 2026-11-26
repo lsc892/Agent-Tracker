@@ -26,8 +26,6 @@ export class SourceReaderPool {
   private readonly jobs = new Map<number, SourceJob>();
   private readonly pending: SourceJob[] = [];
   private readonly slots = new Set<WorkerSlot>();
-  private readonly prepared = new Map<number, SourcePreparation>();
-  private capture = false;
   private closed = false;
   private readonly abort = (): void => { Atomics.store(this.cancellation, 0, 1); };
 
@@ -39,15 +37,10 @@ export class SourceReaderPool {
     options.signal?.addEventListener('abort', this.abort, { once: true });
   }
 
-  capturePreparations(enabled: boolean): void {
-    this.capture = enabled;
-  }
-
   /** 준비 결과까지 무제한 쌓지 않도록 최대 2×Worker 수의 파일만 선행한다. */
   prefetch(files: readonly SourceReadFile[]): void {
     // [병렬 처리 정책] 취소 여부와 미소비 작업 한도를 확인해 아직 준비하지 않은 파일만 예약한다.
     if (this.closed || this.options.cancelled() || this.concurrency === 1) return;
-    if (this.prepared.size) files = files.filter(file => !this.prepared.has(file.id));
     if (files.length < 2 && !this.slots.size) return;
     // [병렬 처리 정책] 풀이 비어 있고 후보 전체 크기가 1MiB 미만이면 Worker를 시작하지 않는다.
     if (!this.slots.size && files.reduce((bytes, file) => bytes + file.size_bytes, 0) < MIN_PREFETCH_BYTES) return;
@@ -57,21 +50,13 @@ export class SourceReaderPool {
     }
   }
 
-  async read(file: SourceReadFile, fixedObservation: boolean): Promise<SourcePreparation> {
+  async read(file: SourceReadFile): Promise<SourcePreparation> {
     if (this.closed || this.options.cancelled()) return this.failure('interrupted');
-    // [재사용 정책] 미리보기에서 같은 파일 경계로 준비한 성공 결과를 전체 갱신에서 한 번 사용한다.
-    const prepared = this.prepared.get(file.id);
-    if (prepared && !this.capture) {
-      this.prepared.delete(file.id);
-      return prepared;
-    }
     const job = this.jobs.get(file.id);
     try {
       // [병렬 처리 정책] 기존 작업이나 Worker가 없으면 현재 스레드에서 파일을 준비한다.
-      const result = await (job || this.slots.size
+      return await (job || this.slots.size
         ? (job ?? this.enqueue(file, true)).promise : prepareSource(file, this.options));
-      if (this.capture && fixedObservation && result.ok) this.prepared.set(file.id, result);
-      return result;
     }
     finally { this.jobs.delete(file.id); }
   }
@@ -83,7 +68,6 @@ export class SourceReaderPool {
     this.options.signal?.removeEventListener('abort', this.abort);
     for (const job of this.jobs.values()) job.resolve(this.failure('interrupted'));
     this.jobs.clear(); this.pending.length = 0;
-    this.prepared.clear();
     const workers = [...this.slots].map(slot => slot.worker);
     this.slots.clear();
     await Promise.all(workers.map(worker => worker.terminate().catch(() => undefined)));

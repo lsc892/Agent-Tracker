@@ -72,9 +72,8 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
   let deferScan = false;
   let failScan = false;
   let summaryProgress: ((value: import('../../src/summary/types').SummaryProgress) => void) | undefined;
-  const recentProgress: import('../../src/summary/types').SummaryProgress = {
+  const parsingProgress: import('../../src/summary/types').SummaryProgress = {
     phase: 'parsing', discovered: 0, parsed: 0, failed: 0, bodyBytes: 0,
-    recentUsage: { rows: [], total: 0, coverage: { files: 0, processing: 0, done: 0, error: 0, interrupted: 0, stale_summaries: 0 } },
   };
   let lastRoots: import('../../src/summary/types').SourceRoot[] = [];
   let lastQuery: import('../../src/summary/types').UsageQuery = {};
@@ -328,11 +327,12 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     const pending = queries;
     dashboard.receive({ type: 'queryUsage', query: { groupBy: 'month', recentDays: 90 } });
     dashboard.receive({ type: 'queryNames', requestId: 1, query: { kind: 'project' } });
-    summaryProgress?.(recentProgress);
+    summaryProgress?.(parsingProgress);
     await tick();
     assert.equal(queries, pending, 'regular queries wait for the commit');
     assert.equal(lastNameQuery, undefined);
-    assert.ok(dashboard.messages.some(message => message.type === 'previewUsage'));
+    assert.ok(dashboard.messages.some(message => message.type === 'progress'));
+    assert.ok(!dashboard.messages.some(message => message.type === 'usage'));
     assert.ok(!dashboard.messages.some(message => message.type === 'filtersReady'));
     finishDeferredScan(); deferScan = false; await tick();
     assert.ok(dashboard.messages.some(message => message.type === 'filtersReady'));
@@ -460,13 +460,13 @@ test('quota controls never scan summaries; usage entry alone refreshes usage and
     await click('agentTracker.openUsage');
     const closingPanel = panels.at(-1)!;
     closingPanel.webview.receive({type: 'ready'}); await tick();
-    summaryProgress?.(recentProgress);
     const scansBeforeReopen = scans;
     closingPanel.dispose();
     await click('agentTracker.openUsage');
     const reopened = panels.at(-1)!.webview;
     reopened.receive({type: 'ready'}); await tick();
-    assert.ok(reopened.messages.some(message => message.type === 'previewUsage'), 'reopening replays the running scan preview');
+    assert.ok(reopened.messages.some(message => message.type === 'busy' && message.busy === true));
+    assert.ok(!reopened.messages.some(message => message.type === 'usage'));
     assert.ok(!reopened.messages.some(message => message.type === 'filtersReady'));
     finishDeferredScan(); await tick();
     assert.equal(scans, scansBeforeReopen, 'reopening while a scan runs shares that scan');

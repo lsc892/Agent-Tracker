@@ -2,7 +2,7 @@
 
 한 번의 스캔 갱신을 책임별 모듈로 나눈다. [상위 진입점](../index.ts)은 기존 공개 API를 유지하고, 이 폴더의 index가 실행 순서를 조율한다. 갱신마다 context와 ScanState를 한 번 생성하며 단계들은 기존 Map·Set·DTO의 참조를 공유한다.
 
-- [index.ts](index.ts) — 갱신 잠금과 Worker 수명, 스캔과 미리보기의 실행 순서를 관리한다.
+- [index.ts](index.ts) — 갱신 잠금과 Worker 수명, 스캔·집계·저장 순서를 관리한다.
 - [context.ts](context.ts) — 각 단계에 전달하는 실행 환경·상태 참조의 계약을 정의한다.
 - [state.ts](state.ts) — 파일과 세션 상태를 관리하고 재파싱·소실 처리에 필요한 시점에 관계 색인을 구성한다.
 - [discovery.ts](discovery.ts) — 경로별로 관측을 모아 수정 시각으로 재파싱 후보를 고르고 원본 소실을 판단한다.

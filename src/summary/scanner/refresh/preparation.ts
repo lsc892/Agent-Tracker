@@ -33,7 +33,7 @@ export async function inspectSource(context: RefreshContext, file: FileState): P
   try {
     if (!file.changed && file.selected)
       result.reused = Math.max(0, result.reused - 1);
-    const preparation = await scan.measureAsync('readSources', () => sourcePool.read(file, file.selected));
+    const preparation = await scan.measureAsync('readSources', () => sourcePool.read(file));
     report();
     applyPreparation(context, file, preparation);
   }

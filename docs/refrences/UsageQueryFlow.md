@@ -1,6 +1,6 @@
 # 통계 화면에서 SQLite까지의 조회 흐름
 
-이미 갱신된 사용량 화면에서 필터·정렬·페이지를 바꾸면 Worker가 SQLite의 일별 집계를 조회한다. 화면 진입이나 새로 고침 시의 원본 갱신은 별도로 진행된다. 갱신 중 최근 30일 미리보기는 메모리 SQLite에 복사하고 재집계한 일별 행을 같은 조회 함수에 전달한다. [화면의 갱신과 조회](../../src/ui/dashboard.ts) · [미리보기 조회](../../src/summary/client/worker.ts)
+화면 진입이나 새로 고침 때 변경된 원본을 집계하고 일별 결과를 저장용 SQLite에 반영한다. 갱신이 성공하면 첫 표를 조회한다. 기본 기간은 최근 30일이며 복원된 선택 조건이 있으면 그 조건을 적용한다. 이후 필터·정렬·페이지를 바꾸면 Worker가 같은 일별 집계를 다시 조회한다. [화면의 갱신과 조회](../../src/ui/dashboard.ts) · [Worker 조회](../../src/summary/client/worker.ts)
 
 ```text
 Webview queryUsage

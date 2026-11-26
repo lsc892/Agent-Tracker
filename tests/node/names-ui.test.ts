@@ -56,27 +56,25 @@ const sessions = [
   {provider:'claude',project_key:'/project',project_name:'Project',session_id:'three',session_name:null,session_started_at_ms:null},
 ];
 
-test('the recent preview keeps saved filters locked until SQLite refresh succeeds', () => {
+test('saved filters stay hidden and locked until SQLite refresh succeeds', () => {
   const { get, receive, messages } = view({ section: 'skills', dateRange: '90', chartMetric: 'requests' });
   const result = { rows: [], total: 0, coverage: {} };
   receive({ type: 'busy', busy: true });
-  receive({ type: 'previewUsage', result });
   assert.equal(get('usage-controls').disabled, true);
-  assert.equal(get('token-section').hidden, false);
-  assert.equal(get('skill-section').hidden, true);
-  assert.equal(get('preview-period').hidden, false);
+  assert.equal(get('usage-controls').hidden, true);
   assert.equal(get('date-range').value, '90');
   assert.equal(get('chart-metric').value, 'requests');
   assert.equal(messages[0].query?.recentDays, 90);
   receive({ type: 'busy', busy: false });
   assert.equal(get('usage-controls').disabled, true);
+  assert.equal(get('usage-controls').hidden, true);
   assert.equal(get('retry-usage').hidden, false);
   get('retry-usage').listeners.get('click')!();
   assert.equal(messages.at(-1)?.type, 'retryUsage');
   receive({ type: 'filtersReady' });
   receive({ type: 'usage', result: { ...result, capabilitiesEnabled: false } });
   assert.equal(get('usage-controls').disabled, false);
-  assert.equal(get('preview-period').hidden, true);
+  assert.equal(get('usage-controls').hidden, false);
   assert.equal(get('skill-section').hidden, false);
 });
 

@@ -20,7 +20,6 @@ const source = (session: string, input: number, timestamp?: Date) => [
   ...(timestamp ? [{ type: 'event_msg', timestamp, payload: { type: 'task_started', root_turn_id: 'turn', turn_id: 'turn' } }] : []),
   usage(input),
 ].map(row => JSON.stringify(row)).join('\n') + '\n';
-const recentWindow = () => ({ fromMs: Date.now() - 30 * 86_400_000, toMs: Date.now() + 86_400_000 });
 
 async function fixture<T>(action: (path: string, options: { dbPath: string; roots: { provider: 'codex'; path: string }[] }) => Promise<T>): Promise<T> {
   const path = await mkdtemp(join(tmpdir(), 'tracker-mtime-'));
@@ -32,42 +31,7 @@ function cutoff(db: SummaryDatabase): number | undefined {
   return db.connection.prepare('SELECT started_ms FROM summary_refresh WHERE id=1').get()?.started_ms as number | undefined;
 }
 
-test('cold dashboard scan previews recent sources and reuses their reads for the complete snapshot', async () => fixture(async (path, options) => {
-  const recentPath = join(path, 'recent.jsonl'), olderPath = join(path, 'older.jsonl');
-  const recentSource = source('recent', 120), olderSource = source('older', 240);
-  await writeFile(recentPath, recentSource);
-  await writeFile(olderPath, olderSource);
-  await utimes(olderPath, old, old);
-  const baseline = new SummaryDatabase(':memory:');
-  const database = new SummaryDatabase(options.dbPath);
-  let previewSessions: string[] | undefined;
-  let checkpointAtPreview: number | undefined;
-  let committedAtPreview: number | undefined;
-  try {
-    const result = await refreshSummary(database, options, undefined, undefined, {
-      ...recentWindow(),
-      onReady: db => {
-        previewSessions = db.queryTurns().map(row => row.session_id);
-        checkpointAtPreview = cutoff(database);
-        committedAtPreview = database.queryTurnsCount();
-      },
-    });
-    assert.equal(checkpointAtPreview, undefined);
-    assert.equal(committedAtPreview, 0);
-    assert.deepEqual(previewSessions, ['recent']);
-    assert.equal(result.bodyBytes, Buffer.byteLength(recentSource + olderSource));
-    assert.equal(result.parsed, 2);
-    assert.ok(cutoff(database) !== undefined);
-    assert.equal((await refreshSummary(baseline, options)).failed, 0);
-    const facts = (db: SummaryDatabase) => db.queryTurns().map(({ updated_at: _updatedAt, ...row }) => row);
-    assert.deepEqual(facts(database), facts(baseline));
-  } finally {
-    database.close();
-    baseline.close();
-  }
-}));
-
-test('warm refresh previews a new response and the unchanged winner before releasing SQLite queries', async () => fixture(async (path, options) => {
+test('warm refresh commits the new response and related winner before releasing SQLite queries', async () => fixture(async (path, options) => {
   const file = join(path, 'existing.jsonl'), companion = join(path, 'copy-of-existing.jsonl'), unchanged = join(path, 'unchanged.jsonl');
   const now = new Date();
   const existing = source('existing', 120, now);
@@ -79,24 +43,15 @@ test('warm refresh previews a new response and the unchanged winner before relea
   for (const log of [file, companion, unchanged]) await utimes(log, old, old);
   const client = new SummaryClient(options);
   const database = new SummaryDatabase(options.dbPath);
-  const recentUsage = recentWindow();
   let release: (() => void) | undefined;
-  let previewTotal: number | undefined;
-  let firstBytes: number | undefined;
   let refreshed = false;
   try {
     await client.refresh();
-    const previous = cutoff(database)!;
     await appendFile(file, added);
-    const changedAt = new Date(previous + 10);
+    const changedAt = new Date(old.getTime() + 1_000);
     await utimes(file, changedAt, changedAt);
     release = await acquireRefreshLock(options.dbPath);
-    client.subscribe(progress => {
-      if (!progress.recentUsage) return;
-      previewTotal = progress.recentUsage.rows.reduce((sum, row) => sum + (row.total_tokens ?? 0), 0);
-      firstBytes = progress.bodyBytes;
-    });
-    const refreshing = client.refresh({ recentUsage }).then(result => { refreshed = true; return result; });
+    const refreshing = client.refresh().then(result => { refreshed = true; return result; });
     const current = Promise.all([
       client.query({ groupBy: 'all' }),
       client.queryNames({ kind: 'session' }),
@@ -108,8 +63,6 @@ test('warm refresh previews a new response and the unchanged winner before relea
     const result = await refreshing;
     assert.equal(result.interrupted, false);
     assert.equal(result.failed, 0);
-    assert.equal(previewTotal, 281);
-    assert.equal(firstBytes, result.bodyBytes);
     assert.equal(result.bodyBytes, Buffer.byteLength(existing + added + companionSource));
     assert.equal(result.parsed, 2);
     const { page, afterRefresh } = await current;

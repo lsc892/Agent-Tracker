@@ -174,12 +174,12 @@ export async function run(): Promise<void> {
               check(!document.getElementById('diagnostics') && !document.getElementById('diagnostic-files'),'diagnostic logs are absent from the statistics page');
               check(!document.getElementById('quota') && !document.querySelector('[data-tab="quota"]') && !document.getElementById('refresh-usage'),'quota and summary refresh controls are absent from statistics');
               check(document.getElementById('configuration-warning').hidden === ${JSON.stringify(!expectTimezoneWarning)},'invalid timezone warning is visible and clears after correction');
-            } else if (message.type === 'previewUsage') {
-              check(document.getElementById('usage-controls').disabled,'recent preview locks statistics controls');
-              check(!document.getElementById('preview-period').hidden && document.getElementById('token-section').hidden === false,'recent preview shows the default token view');
-              check(message.result.rows.length === 1 && message.result.rows[0].total_tokens === 150,'recent preview shows the fixture request');
+            } else if (message.type === 'busy' && message.busy) {
+              const controls = document.getElementById('usage-controls');
+              check(controls.disabled && controls.hidden,'SQLite refresh hides and locks statistics controls');
             } else if (phase === 'usage' && message.type === 'usage') {
-              check(!document.getElementById('usage-controls').disabled,'the committed view enables statistics controls');
+              const controls = document.getElementById('usage-controls');
+              check(!controls.disabled && !controls.hidden,'the committed view shows and enables statistics controls');
               check(message.result.rows.length === 1 && message.result.rows[0].total_tokens === 150,'recent thirty days include the fixture request');
               check(document.getElementById('date-range').value === '30','statistics defaults to recent thirty days');
               check(document.getElementById('from-date-control').hidden && document.getElementById('to-date-control').hidden,'preset periods hide custom date inputs');

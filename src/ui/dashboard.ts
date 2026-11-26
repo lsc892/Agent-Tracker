@@ -4,7 +4,7 @@ import { randomBytes } from 'node:crypto';
 import * as vscode from 'vscode';
 import type { TrackerConfiguration } from '../configuration';
 import type { SummaryClient } from '../summary/client';
-import type { UsageQuery, UsageResult } from '../summary/types';
+import type { UsageQuery } from '../summary/types';
 import { dashboardHtml, diagnosticsHtml } from './html';
 import { calendarPeriod, periodBounds } from '../summary/db/timezone';
 import { parseDashboardMessage, type DashboardMessage } from './presentation';
@@ -30,19 +30,11 @@ export class Dashboard implements vscode.Disposable {
   private toDay: string | undefined;
   private recentDays: 7 | 30 | 90 | undefined = DEFAULT_RECENT_DAYS;
   private refreshPromise: Promise<void> | undefined;
-  private recentPreview: UsageResult | undefined;
   private filtersReady = false;
   private readonly unsubscribe: () => void;
 
   constructor(private readonly dependencies: DashboardDependencies) {
-    this.unsubscribe = dependencies.summary.subscribe(({ recentUsage, ...progress }) => {
-      // [미리보기 정책] 모든 진행률은 전달하고 최근 사용량은 갱신이 진행 중일 때만 게시한다.
-      this.post({ type: 'progress', progress });
-      if (recentUsage && this.refreshPromise) {
-        this.recentPreview = recentUsage;
-        this.postPreview();
-      }
-    });
+    this.unsubscribe = dependencies.summary.subscribe(progress => this.post({ type: 'progress', progress }));
   }
 
   /**
@@ -213,30 +205,19 @@ export class Dashboard implements vscode.Disposable {
   private async refreshUsage(newWebview = false): Promise<void> {
     if (!this.ready || !this.dependencies.settings().usage.enabled) return;
 
-    // [갱신 정책] 새 패널에서도 진행 중인 스캔과 미리보기를 공유한다.
+    // [갱신 정책] 새 패널에서도 진행 중인 스캔을 공유한다.
     if (this.refreshPromise) {
-      if (newWebview) {
-        this.post({ type: 'busy', busy: true });
-        this.postPreview();
-      }
+      if (newWebview) this.post({ type: 'busy', busy: true });
       return this.refreshPromise;
     }
 
-    // [갱신 정책] 기존 조회를 무효화하고 최근 사용량 미리보기와 전체 스캔을 요청한다.
+    // [갱신 정책] 기존 조회를 무효화하고 영속 갱신을 요청한다.
     this.filtersReady = false;
     this.queryVersion++;
     this.post({ type: 'busy', busy: true });
     this.refreshPromise = (async () => {
       const settings = this.dependencies.settings();
-      const timezone = settings.usage.timezone;
-      const { fromDay, toDay } = recentCalendarDays(DEFAULT_RECENT_DAYS, timezone);
-      const result = await this.dependencies.summary.refresh({
-        roots: settings.roots, timezone, recentUsage: {
-          fromMs: periodBounds(fromDay, timezone).fromMs, toMs: periodBounds(toDay, timezone).toMs,
-          providers: this.providers(), includeCosts: settings.usage.showApiCosts,
-          excludeEmptyUsage: settings.usage.excludeEmptyUsage,
-        },
-      });
+      const result = await this.dependencies.summary.refresh({ roots: settings.roots, timezone: settings.usage.timezone });
 
       // [갱신 정책] 스캔 결과를 알리고 실패나 중단이 없을 때만 필터를 활성화한다.
       if (!this.ready || !this.dependencies.settings().usage.enabled) return;
@@ -247,16 +228,11 @@ export class Dashboard implements vscode.Disposable {
       }
       void this.loadDashboard().catch(error => this.error(error));
     })().finally(() => {
-      // [갱신 정책] 갱신 종료 시 진행 상태와 임시 미리보기를 정리한다.
+      // [갱신 정책] 갱신 종료 시 진행 상태를 정리한다.
       this.refreshPromise = undefined;
-      this.recentPreview = undefined;
       this.post({ type: 'busy', busy: false });
     });
     return this.refreshPromise;
-  }
-
-  private postPreview(): void {
-    if (this.recentPreview) this.post({ type: 'previewUsage', result: { ...this.recentPreview, groupBy: 'day' } });
   }
 
   private async loadDashboard(): Promise<void> {
