@@ -2,6 +2,7 @@
 
 - [통계 파이프라인 단순화](CodeFreeze-Simplification.md) — 현재 수집·파싱·저장 경로에서 제거한 중복 계산과 내부 분기, 호출 계약을 확인한 항목.
 - [긴 처리 흐름의 구간 주석](CodeFreeze-FlowComments.md) — quota·통계·대시보드에서 단계별 한 줄 주석을 추가한 위치.
+- [수집 경로 힙 피크와 추가 unboxing 후보](SummaryHeapProfile-2026-11-26.md) — 파일 Worker의 JSONL 할당, 통계 스레드의 무변경 재탐색 피크, 집계 직전 문자열·숫자 구조를 실측했다.
 - [벤치마크 채택 이력](../../benchmarks/README.md) — 기존 결과를 제품 반영 여부와 날짜로 정리한 목차.
 
 ## quota·설정 정리
