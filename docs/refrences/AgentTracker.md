@@ -43,15 +43,15 @@ Codex sessions/**/*.jsonl ──┘                              │
 
 Claude·Codex quota 제공자는 `BaseQuotaProvider` 추상 클래스를 상속한다. 공통 `read()`는 조회별 취소 신호와 진행 중 Promise를 소유하고 `readQuota(context)`를 호출해 같은 `QuotaSnapshot` 계약으로 사용량을 반환한다. 공통 `dispose()`는 추가 조회를 차단하고 모든 조회를 취소한 뒤 제공자의 정리가 끝날 때까지 기다리며 중복 호출은 같은 Promise를 반환한다. 인증·HTTP/RPC·응답 정규화와 timeout 시작 시점은 각 제공자에 둔다. 특히 Codex의 process 종료 확인은 조회의 일부로 유지한다. `QuotaProvider` 인터페이스는 서비스의 의존 계약으로 유지한다.
 
-제공자의 `readQuota()`는 조회·재시도·timeout·취소·정리 순서를 조율한다. [codex.ts](../src/quota/codex.ts)는 실행·handshake·계정 검증·한도 조회를 연결하고, [codex/rpcSession.ts](../src/quota/codex/rpcSession.ts)의 `RpcSession`이 child·stream·decoder·요청 ID·대기 Promise와 종료 수명을 함께 소유한다. [codex/response.ts](../src/quota/codex/response.ts)는 한도·reset credit 해석, [codex/executable.ts](../src/quota/codex/executable.ts)는 실행 파일 탐색, [codex/errors.ts](../src/quota/codex/errors.ts)는 공유 오류 생성을 맡는다. 내부 모듈은 provider 진입점을 역참조하지 않는다.
+제공자의 `readQuota()`는 조회·재시도·timeout·취소·정리 순서를 조율한다. [codex.ts](../../src/quota/codex.ts)는 실행·handshake·계정 검증·한도 조회를 연결하고, [codex/rpcSession.ts](../../src/quota/codex/rpcSession.ts)의 `RpcSession`이 child·stream·decoder·요청 ID·대기 Promise와 종료 수명을 함께 소유한다. [codex/response.ts](../../src/quota/codex/response.ts)는 한도·reset credit 해석, [codex/executable.ts](../../src/quota/codex/executable.ts)는 실행 파일 탐색, [codex/errors.ts](../../src/quota/codex/errors.ts)는 공유 오류 생성을 맡는다. 내부 모듈은 provider 진입점을 역참조하지 않는다.
 
 Codex 제공자 내부에서는 실행 환경·세션 준비, 초기화, 계정 확인, quota 응답 처리, 오류 분류와 종료 확인을 같은 클래스의 private 메소드로 나눈다. `readQuota()`는 조회별 timeout·알림 허용 상태와 단계 순서를 소유한다. 계정 검증 직후 알림을 허용하고 quota 응답 뒤 process 종료까지 기다린 다음 취소를 다시 확인하며, 실패 경로도 같은 세션을 정리한다.
 
-Codex 응답의 [parseCodexQuota()](../src/quota/codex/response.ts#L15)는 응답 확인·창 목록 변환·빈 결과 거부·선택 credit·snapshot 조립을 연결한다. [창 목록 변환](../src/quota/codex/response.ts#L25)은 한도 묶음을 한 번 순회하고, [묶음 해석](../src/quota/codex/response.ts#L37)은 공통 식별자·이름을 확정한 뒤 primary·secondary 처리를 순서대로 호출한다. [창 추가](../src/quota/codex/response.ts#L47)는 없는 창을 건너뛰고 검증된 창에 표시 정보를 연결해 기존 결과 배열에 바로 쓴다. 별도 한도별 결과 배열이나 중첩 창 순회를 두지 않으며 기존 입력 우선순위·검증·출력 순서를 유지한다.
+Codex 응답의 [parseCodexQuota()](../../src/quota/codex/response.ts#L16)는 응답 확인·창 목록 변환·빈 결과 거부·선택 credit·snapshot 조립을 연결한다. [창 목록 변환](../../src/quota/codex/response.ts#L27)은 한도 묶음을 한 번 순회하고, [묶음 해석](../../src/quota/codex/response.ts#L39)은 공통 식별자·이름을 확정한 뒤 primary·secondary 처리를 순서대로 호출한다. [창 추가](../../src/quota/codex/response.ts#L50)는 없는 창을 건너뛰고 검증된 창에 표시 정보를 연결해 기존 결과 배열에 바로 쓴다. 별도 한도별 결과 배열이나 중첩 창 순회를 두지 않으며 기존 입력 우선순위·검증·출력 순서를 유지한다.
 
-[claude.ts](../src/quota/claude.ts)는 인증·요청·401 재확인 1회·HTTP 상태 분류와 Retry-After를 조율한다. [claude/httpBody.ts](../src/quota/claude/httpBody.ts)는 제한된 본문 읽기와 reader 해제, [claude/response.ts](../src/quota/claude/response.ts)는 quota 창 검증·정규화를 맡는다. 기존 제공자 파일과 [quota 공개 진입점](../src/quota/index.ts)의 클래스·options·parser·실행 파일 탐색 export를 유지한다. Claude HTTP 본문과 Codex RPC 메시지의 기존 크기 제한을 유지하며 두 파서 모두 별도의 창 개수 상한 없이 유효한 창을 변환한다. HTTP User-Agent와 RPC 초기화 정보의 버전은 공통 모듈에서 `package.json`의 실제 확장 버전을 읽어 사용한다.
+[claude.ts](../../src/quota/claude.ts)는 인증·요청·401 재확인 1회·HTTP 상태 분류와 Retry-After를 조율한다. [claude/httpBody.ts](../../src/quota/claude/httpBody.ts)는 제한된 본문 읽기와 reader 해제, [claude/response.ts](../../src/quota/claude/response.ts)는 quota 창 검증·정규화를 맡는다. 기존 제공자 파일과 [quota 공개 진입점](../../src/quota/index.ts)의 클래스·options·parser·실행 파일 탐색 export를 유지한다. Claude HTTP 본문과 Codex RPC 메시지의 기존 크기 제한을 유지하며 두 파서 모두 별도의 창 개수 상한 없이 유효한 창을 변환한다. HTTP User-Agent와 RPC 초기화 정보의 버전은 공통 모듈에서 `package.json`의 실제 확장 버전을 읽어 사용한다.
 
-[QuotaService](../src/quota/service.ts)는 provider 목록·진행 중 조회·취소·강제 재실행·focus·갱신 정책·poll 시각·단일 timer·구독자를 소유한다. `refresh()`는 중복 요청과 갱신 조건을 판단하고 조회 사이클에 위임하며, 마지막 재실행 확인과 `running` 해제는 같은 비동기 흐름에서 처리한다. 성공·알림·실패는 [ProviderQuotaState](../src/quota/providerState.ts)에 전달한다. 이 상태 객체가 provider 하나의 snapshot·마지막 성공 시각·오류·실패 횟수·재시도 가능 시각을 단독 소유하며 수용·backoff·만료·화면 상태 복제를 수행한다. 서비스는 상태 필드를 직접 수정하지 않고, 상태 객체는 provider·timer·listener를 호출하지 않는다.
+[QuotaService](../../src/quota/service.ts)는 provider 목록·진행 중 조회·취소·강제 재실행·focus·갱신 정책·poll 시각·단일 timer·구독자를 소유한다. `refresh()`는 중복 요청과 갱신 조건을 판단하고 조회 사이클에 위임하며, 마지막 재실행 확인과 `running` 해제는 같은 비동기 흐름에서 처리한다. 성공·알림·실패는 [ProviderQuotaState](../../src/quota/providerState.ts)에 전달한다. 이 상태 객체가 provider 하나의 snapshot·마지막 성공 시각·오류·실패 횟수·재시도 가능 시각을 단독 소유하며 수용·backoff·만료·화면 상태 복제를 수행한다. 서비스는 상태 필드를 직접 수정하지 않고, 상태 객체는 provider·timer·listener를 호출하지 않는다.
 
 포커스 복귀·재시도·snapshot 보존 정책 상수는 상태 파일에, timer 최대 지연은 서비스에 둔다. 실패 snapshot의 일반 오류 30분·rate limit 오류 24시간 보존 기간은 상태 파일의 `snapshotRetentionMs()`에서 선택해 예약과 실제 만료가 공유한다. 시계는 callback으로 지연 조회해 기존 guard와 읽기 시점을 유지하고, 구독자마다 snapshot을 복제한다.
 
@@ -63,9 +63,9 @@ Codex 응답의 [parseCodexQuota()](../src/quota/codex/response.ts#L15)는 응�
 
 JSONL의 선택 필드로 스레드와 토큰 근거를 구성한다. 수집기는 동일 스레드에 대한 복수 파일의 응답을 비교하고, 구형 Codex 복사 이력을 확인할 때 필요한 부모 파일을 읽는다. [스레드 파서](../../src/summary/parsers/threadUsage.ts) · [응답 비교](../../src/summary/scanner/refresh/aggregation.ts) · [토큰 합산](../../src/summary/aggregation/threadAccounting.ts)
 
-[Worker](../src/summary/client/worker.ts)는 메시지 큐·DB 지연 생성·취소·갱신 잠금을 조율한다. [JSONL 진입점](../../src/summary/jsonl/index.ts)은 파일·압축·행 콜백·offset·취소와 자원 수명을 조율하고, [line.ts](../../src/summary/jsonl/line.ts)는 행의 이미지 제거·문자열 문법·바이트 예산 상태를 맡는다. [errors.ts](../../src/summary/jsonl/errors.ts)의 단일 SummaryError를 진입점에서 재노출하여 기존 오류 식별과 호출 경로를 유지한다. [수집기](../../src/summary/scanner/index.ts)는 끝까지 읽을 byte 경계를 정하고 후보와 근거를 수집한다. [통계 SQL](../src/summary/db/queries/README.md)은 공통 정책·원본·롤업 조회로 나눈다.
+[Worker](../../src/summary/client/worker.ts)는 메시지 큐·DB 지연 생성·취소·갱신 잠금을 조율한다. [JSONL 진입점](../../src/summary/jsonl/index.ts)은 파일·압축·행 콜백·offset·취소와 자원 수명을 조율하고, [line.ts](../../src/summary/jsonl/line.ts)는 행의 이미지 제거·문자열 문법·바이트 예산 상태를 맡는다. [errors.ts](../../src/summary/jsonl/errors.ts)의 단일 SummaryError를 진입점에서 재노출하여 기존 오류 식별과 호출 경로를 유지한다. [수집기](../../src/summary/scanner/index.ts)는 끝까지 읽을 byte 경계를 정하고 후보와 근거를 수집한다. [통계 SQL](../../src/summary/db/queries/README.md)은 공통 정책·원본·롤업 조회로 나눈다.
 
-[화면 메시지 파서](../src/ui/presentation.ts)는 종류별 파서를 선택하고 사용량의 필수 제어값과 선택 표현·대상·epoch·달력 범위를 구분한다. 제어값 오류는 메시지를 거부하고 잘못된 선택 필터는 생략한다. [quota 카드](../src/ui/quotaTooltip.ts)는 제공자 창·credit·조회 상태를 순서대로 조립하고, [Webview](../media/dashboard.js)는 날짜 검증·요청 구성·표 머리글/행·state 갱신을 같은 파일의 함수로 연결한다.
+[화면 메시지 파서](../../src/ui/presentation.ts)는 종류별 파서를 선택하고 사용량의 필수 제어값과 선택 표현·대상·epoch·달력 범위를 구분한다. 제어값 오류는 메시지를 거부하고 잘못된 선택 필터는 생략한다. [quota 카드](../../src/ui/quotaTooltip.ts)는 제공자 창·credit·조회 상태를 순서대로 조립하고, [Webview](../../media/dashboard.js)는 날짜 검증·요청 구성·표 머리글/행·state 갱신을 같은 파일의 함수로 연결한다.
 
 현재 quota는 서버 조회 결과를 사용하고, 과거 token 통계는 JSONL 수정 시각으로 영향 session을 찾아 요청·모델·비용 집계를 함께 갱신한다.
 
@@ -259,7 +259,7 @@ Agent Tracker의 VS Code 설정은 다음 순서의 소제목과 목차 하위 �
 
 `agentTracker.language`는 기본 `auto`로 VS Code 표시 언어를 따르며 여섯 언어를 명시적으로 지정할 수 있다. 확장의 실행 중 문구는 명시적 언어를 우선하고 `auto`일 때 VS Code 표시 언어를 사용하며, 지원하지 않는 언어는 영어로 fallback한다. 지역 태그는 지원하는 기본 언어로 묶는다. 누락된 번역 키는 한국어로 fallback하며 한국어 JSON을 원문과 번역 키의 기준으로 둔다. 상태 표시줄·카드·안내와 열린 통계·데이터 확인·색상 화면을 현재 언어로 다시 표시한다. 숫자·날짜도 언어를 따르며 집계 시간대·원본 이름·진단 코드는 보존한다. 언어 전환은 서버 조회나 원본 재집계를 유발하지 않는다.
 
-기능별 키를 가진 언어별 JSON과 공통 i18next 계층을 사용한다. 언어 목록·번역 원본·`package.nls` 생성물은 루트의 `localization/`에 모으고 `localization/languages.json`에서 설정 선택지·manifest 번역·패키지 리소스를 생성한다. 실행용 JSON은 `dist/localization/`에서 읽는다. VS Code가 요구하는 루트의 `package.nls*.json`은 패키징·VS Code 테스트·F5 디버깅 동안만 복사하고 작업 뒤 원래 상태로 복원한다. 번역 키·변수·누락과 화면 코드의 한국어 문자열을 검사한다. 명령 팔레트·VS Code Settings의 카테고리·설명·선택지는 VS Code 표시 언어를 따르며 확장 Language 설정과 독립적이다. 기본 `package.nls.json`은 영어로 생성하고 한국어는 `package.nls.ko.json`으로 제공한다. 지원하지 않는 VS Code 언어의 정적 manifest 문구는 영어로 fallback한다. 추가 절차와 구현 근거는 [로컬라이징 문서](research/2026-10-09/Localization.md)에 기록한다.
+기능별 키를 가진 언어별 JSON과 공통 i18next 계층을 사용한다. 언어 목록·번역 원본·`package.nls` 생성물은 루트의 `localization/`에 모으고 `localization/languages.json`에서 설정 선택지·manifest 번역·패키지 리소스를 생성한다. 실행용 JSON은 `dist/localization/`에서 읽는다. VS Code가 요구하는 루트의 `package.nls*.json`은 패키징·VS Code 테스트·F5 디버깅 동안만 복사하고 작업 뒤 원래 상태로 복원한다. 번역 키·변수·누락과 화면 코드의 한국어 문자열을 검사한다. 명령 팔레트·VS Code Settings의 카테고리·설명·선택지는 VS Code 표시 언어를 따르며 확장 Language 설정과 독립적이다. 기본 `package.nls.json`은 영어로 생성하고 한국어는 `package.nls.ko.json`으로 제공한다. 지원하지 않는 VS Code 언어의 정적 manifest 문구는 영어로 fallback한다. 추가 절차와 구현 근거는 [로컬라이징 문서](../research/2026-10-09/Localization.md)에 기록한다.
 
 ## 4. 기능 2 — 일·월·프로젝트·세션 총량과 스레드 평균
 
@@ -718,7 +718,7 @@ DB 모듈은 변경 이유별로 책임을 나눈다. `src/summary/db/index.ts`�
 
 미귀속 원본(`session_id=null`)은 이번 갱신에서 읽었고 오류가 없는 파일만 최종 저장한다. 저장 입력은 ID와 출처 메타데이터를 투영한다.
 
-갱신 결과는 `timings.totalMs`와 `timings.scan`·`timings.storage`의 고정 단계별 `{calls,totalMs}`를 반환하며 Worker 진단의 `lastRefresh.timings`로도 제공한다. 단조 시계로 잠금·탐색·원본 처리·관계 확장·최종 집계·성분별 저장과 SQL의 BEGIN·비교·facts/모델/Skill/비용·provider/model rollup DELETE/INSERT·COMMIT을 측정한다. 최종 이름 수집·UPSERT와 세션 결제 설정 조회는 `storage.metadata`로 구분한다. 상위·하위 단계는 중첩되므로 합산하지 않는다. 파일별 상태·본문·경로는 계측에 포함하거나 영속화하지 않는다. 관측 기록 등 `replaceMemory` 밖 transaction은 바깥 단계에 포함되며 세부 측정 범위와 실패 시 해석은 [구간 계측 보고서](research/2026-11-09/ScanStorageProfile-2026-11-09.md)를 따른다.
+갱신 결과는 `timings.totalMs`와 `timings.scan`·`timings.storage`의 고정 단계별 `{calls,totalMs}`를 반환하며 Worker 진단의 `lastRefresh.timings`로도 제공한다. 단조 시계로 잠금·탐색·원본 처리·관계 확장·최종 집계·성분별 저장과 SQL의 BEGIN·비교·facts/모델/Skill/비용·provider/model rollup DELETE/INSERT·COMMIT을 측정한다. 최종 이름 수집·UPSERT와 세션 결제 설정 조회는 `storage.metadata`로 구분한다. 상위·하위 단계는 중첩되므로 합산하지 않는다. 파일별 상태·본문·경로는 계측에 포함하거나 영속화하지 않는다. 관측 기록 등 `replaceMemory` 밖 transaction은 바깥 단계에 포함되며 세부 측정 범위와 실패 시 해석은 [구간 계측 보고서](../research/2026-11-09/ScanStorageProfile-2026-11-09.md)를 따른다.
 
 입력에 `updated_at`이 있으면 그 값을 사용하고 생략되면 실제 변경·일괄 재삽입 시각으로 기록한다. 부분 반영 경로의 변경 없는 요청은 이전 시각을 유지한다. 요청별 시각은 facts의 `updated_at`, 파일의 최근 반영·진단 시각은 `source_file.recorded_at`, 마지막으로 반영한 파일시스템 수정 시각은 `source_file.mtime_ms`에서 확인한다.
 
@@ -861,7 +861,7 @@ schema version 2는 기존 `turn_summary`의 행·id·source_file 참조를 보�
 
 ### 8.3 사용량 도표
 
-`media/dashboard.js`의 동일 IIFE에서 `renderChart()`가 범례·배치·축·범주·막대 조립을 순서대로 호출한다. 막대는 [성분과 상세 설명 조립](../media/dashboard.js#L536), [가로·세로 및 모델·제공자 레이블 조립](../media/dashboard.js#L558)을 구분하며 레이블 분기는 조기 반환으로 표현한다. `updateUsage()`는 Skill·요청·집계 표를 구분하고 토큰 페이지와 품질 안내를 이어 갱신한다. 배치 값은 지역 객체로 전달하며 기존 상태 소유권과 `renderUsage()`의 스크롤 복원 범위를 유지한다. 호스트의 `parseDashboardMessage()`는 메시지 종류를 선택하고 같은 파일의 비공개 `parseUsageMessage()`가 사용량 조회 필드를 검증한다. 필수 제어값 오류의 전체 거부와 잘못된 선택 필터 생략을 구분한다.
+`media/dashboard.js`의 동일 IIFE에서 `renderChart()`가 범례·배치·축·범주·막대 조립을 순서대로 호출한다. 막대는 [성분과 상세 설명 조립](../../media/dashboard.js#L608), [가로·세로 및 모델·제공자 레이블 조립](../../media/dashboard.js#L631)을 구분하며 레이블 분기는 조기 반환으로 표현한다. `updateUsage()`는 Skill·요청·집계 표를 구분하고 토큰 페이지와 품질 안내를 이어 갱신한다. 배치 값은 지역 객체로 전달하며 기존 상태 소유권과 `renderUsage()`의 스크롤 복원 범위를 유지한다. 호스트의 `parseDashboardMessage()`는 메시지 종류를 선택하고 같은 파일의 비공개 `parseUsageMessage()`가 사용량 조회 필드를 검증한다. 필수 제어값 오류의 전체 거부와 잘못된 선택 필터 생략을 구분한다.
 
 사용량 통계 표 위의 총 토큰·평균 토큰 도표는 `Input / Output / Cache Write / Cache Read`를 각각 VS Code 테마의 파랑·주황·보라·초록으로 구분해 쌓은 누적 막대로 표시한다. 제공자에 관계없이 같은 토큰 항목은 같은 색상을 사용하며 모든 구간은 불투명하게 표시한다. 도표 위의 토큰 구성 범례는 이 순서의 이름과 막대에 적용한 색상을 함께 표시하고 좁은 화면에서는 줄바꿈한다. 구성이 미확인인 막대가 있으면 회색 ‘구성 미확인’을 범례에 추가한다. 제공자별·모델별의 총 토큰·평균 토큰 도표에서 같은 범례를 사용하며, 평균 시간·요청 수와 빈 결과에서는 범례를 비우고 숨긴다. 총 토큰 막대는 항목별 총량, 평균 토큰 막대는 항목별 완료 요청 평균을 쌓는다. Input은 cache read/write를 제외한 화면 표시 값을 사용한다. 별도의 ‘토큰 구성’ 지표는 두지 않는다.
 
