@@ -143,6 +143,37 @@ Utilisez **Agent Tracker : Supprimer les données statistiques** pour effacer le
 
 </details>
 
-<br><br>
+## Collecte des statistiques d'utilisation
 
-[Référence d'utilisation et de développement (en coréen)](docs/Development.ko.md)
+Agent Tracker lit les journaux JSONL locaux de Claude et Codex, y compris les journaux Codex compressés avec Zstd, et en extrait les champs nécessaires aux statistiques. La clé du projet provient du répertoire de journaux du projet pour Claude et du répertoire parent de la racine des journaux pour Codex.
+
+### Champs lus dans les journaux
+
+| Rôle | Claude | Codex |
+| --- | --- | --- |
+| Session et fil de conversation | Utilise `sessionId` dans le journal principal ou le nom du fichier si ce champ est absent. Les journaux des sous-agents sont identifiés par le dossier de leur session et leur nom de fichier. | Identifie le fil avec `payload.id` dans `session_meta` ou `payload.thread_id` dans `token_usage_record`. Si `payload.session_id` est absent, utilise l'identifiant du fil comme identifiant de session. |
+| Modèle et réponse | Lit `message.model`, `message.id` et `requestId` dans les lignes `assistant`. Le champ `isApiErrorMessage` sert à écarter les réponses d'erreur avec zéro token. | Lit `payload.model` dans les lignes d'utilisation ou dans le contexte de la session ou du tour. Les champs `payload.turn_id` et `payload.response_id` identifient la réponse. |
+| Tokens d'entrée, de sortie et de cache | Lit `input_tokens`, `output_tokens`, `cache_read_input_tokens` et `cache_creation_input_tokens` dans `message.usage`. | Lit `input_tokens` et `output_tokens` dans `payload.usage`. Les compteurs de cache proviennent de `cached_input_tokens` et `cache_write_input_tokens` ou de `input_tokens_details.cached_tokens` et `input_tokens_details.cache_write_tokens`. |
+| Compteurs cumulés et références au fil parent | — | Lit `payload.thread_token_usage`, `payload.turn_token_usage` et, dans les événements `token_count` de l'ancien format, `payload.info.total_token_usage` et `payload.info.last_token_usage`. Dans `session_meta`, relève `forked_from_id` ou une référence `parent_thread_id` directe ou imbriquée. |
+| Horodatage | Lit `timestamp` dans la ligne. | Lit `timestamp` dans la ligne ou `payload.timestamp`, ainsi que `payload.started_at` et `payload.completed_at` dans les événements. |
+
+### Des journaux aux totaux quotidiens
+
+1. Parcourt le JSONL ligne par ligne et extrait les champs dont les chemins sont prédéfinis. Si une ligne s'étend sur plusieurs blocs de lecture, conserve l'état de l'analyse syntaxique du JSON et les valeurs déjà extraites. Ignore les données d'image en Base64 pendant la lecture.
+2. Claude repère les doublons par `(message.id, requestId)` au sein d'une session, et Codex par `(turn_id, response_id)` au sein d'un fil. Lorsqu'un seul identifiant de requête est connu pour un message Claude, les lignes sans cet identifiant entrent aussi dans la comparaison. Pour chaque réponse en double, seule la ligne ayant la plus grande somme de tokens d'entrée et de sortie est comptée. Claude ajoute à l'entrée les tokens lus et écrits dans le cache. Codex utilise le total d'entrée consigné dans le journal.
+3. Compare les enregistrements Codex de l'ancien format avec le fil parent pour écarter l'historique copié, puis additionne les augmentations vérifiées des compteurs restants. Si le cumul du fil présente une hausse inexpliquée par les réponses, celle-ci est vérifiée à l'aide des cumuls par tour ou des anciens enregistrements avant d'être ajoutée.
+4. Regroupe les totaux des fils selon la date de leur premier horodatage dans le fuseau horaire des statistiques. Si le premier et le dernier horodatage diffèrent, leur écart donne la durée enregistrée, temps d'inactivité compris.
+
+### Tables SQLite
+
+| Table | Données stockées |
+| --- | --- |
+| `source_file` | Chemins des journaux, identifiants de session et de fil, horodatages de modification, versions de l'analyseur, état du traitement et présence ou absence du fichier source. |
+| `usage_request_daily` | Totaux de tokens, de durée et de coût, et nombres d'échantillons par fournisseur, session, projet et date locale. |
+| `usage_model_daily` | Totaux quotidiens et nombres d'échantillons avec une clé de modèle supplémentaire. |
+| `projects`, `sessions` | Noms d'affichage des projets et des sessions. |
+| `session_billing` | Mode de facturation choisi par l'utilisateur pour chaque fournisseur et session. |
+| `usage_rollup_meta` | Fuseau horaire et version du format utilisés pour l'agrégation quotidienne. |
+| `usage_capability_daily` | Nombres d'utilisations d'outils migrés depuis l'ancien schéma. La vue des statistiques d'outils consulte cette table. |
+
+La vue des statistiques filtre les lignes quotidiennes par fournisseur ou modèle selon la période sélectionnée, puis les regroupe selon le critère choisi. Les moyennes sont calculées à partir des totaux et des nombres d'échantillons enregistrés.

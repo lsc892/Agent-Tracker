@@ -143,6 +143,37 @@ npm 包和 VS Code 扩展需要分别卸载。
 
 </details>
 
-<br><br>
+## 用量统计的收集方式
 
-[使用与开发参考（韩语）](docs/Development.ko.md)
+Agent Tracker 从本地 Claude 和 Codex JSONL 日志中提取统计所需的字段，也支持 Zstd 压缩的 Codex 日志。Claude 的项目键取自项目日志目录，Codex 的项目键取自日志根目录的上一级目录。
+
+### 读取的日志字段
+
+| 用途 | Claude | Codex |
+| --- | --- | --- |
+| 会话和线程 | 使用主日志的 `sessionId`，缺失时使用文件名。子代理日志通过所属会话目录和文件名来识别。 | 使用 `session_meta` 中的 `payload.id` 或 `token_usage_record` 中的 `payload.thread_id` 识别线程。缺少 `payload.session_id` 时，使用线程 ID 作为会话 ID。 |
+| 模型和响应 | 读取 `assistant` 行的 `message.model`、`message.id` 和 `requestId`。`isApiErrorMessage` 用于过滤 Token 数为零的错误响应。 | 从用量记录或会话、轮次上下文中读取 `payload.model`，通过 `payload.turn_id` 和 `payload.response_id` 识别响应。 |
+| 输入、输出和缓存 Token | 从 `message.usage` 读取 `input_tokens`、`output_tokens`、`cache_read_input_tokens` 和 `cache_creation_input_tokens`。 | 从 `payload.usage` 读取 `input_tokens` 和 `output_tokens`。缓存计数取自 `cached_input_tokens` 和 `cache_write_input_tokens`，也可取自 `input_tokens_details.cached_tokens` 和 `input_tokens_details.cache_write_tokens`。 |
+| 累计值和父线程引用 | — | 读取 `payload.thread_token_usage`、`payload.turn_token_usage`，以及旧格式 `token_count` 事件中的 `payload.info.total_token_usage` 和 `payload.info.last_token_usage`。从 `session_meta` 读取 `forked_from_id`，或直接、嵌套的 `parent_thread_id`。 |
+| 时间 | 读取每行的 `timestamp`。 | 读取行的 `timestamp` 或 `payload.timestamp`，以及事件中的 `payload.started_at` 和 `payload.completed_at`。 |
+
+### 从日志解析到每日聚合
+
+1. 逐行处理 JSONL，提取预先指定路径下的字段。一行跨越多个读取块时，保留 JSON 语法解析状态和已提取的值。读取时跳过图片的 Base64 数据。
+2. Claude 在同一会话内按 `(message.id, requestId)` 去重，Codex 在同一线程内按 `(turn_id, response_id)` 去重。如果 Claude 的同一条消息只有一个已知请求 ID，也会比较缺少请求 ID 的记录。重复响应只计入输入与输出 Token 数之和最大的一条。Claude 将缓存读取和写入的 Token 数计入输入总数，Codex 则使用日志中记录的输入总数。
+3. 将旧格式的 Codex 记录与父线程比对，跳过复制的历史记录，再汇总其余累计值中已确认的增量。线程累计值中若有响应总量无法解释的增量，则用轮次累计值或旧格式记录核实后再计入。
+4. 按统计时区将线程的首个时间戳转换为日期，并按日汇总。首尾时间戳不同时，以两者的差值作为记录时长，其中包含空闲时间。
+
+### SQLite 数据表
+
+| 表 | 存储内容 |
+| --- | --- |
+| `source_file` | 日志路径、会话和线程 ID、修改时间、解析器版本、处理状态和源文件是否缺失。 |
+| `usage_request_daily` | 按提供商、会话、项目和本地日期存储 Token、时长和费用总量，以及样本数。 |
+| `usage_model_daily` | 在同一组每日聚合键上加上模型键，存储按模型汇总的总量和样本数。 |
+| `projects`、`sessions` | 项目和会话的显示名称。 |
+| `session_billing` | 用户为各提供商和会话指定的计费方式。 |
+| `usage_rollup_meta` | 每日聚合使用的时区和格式版本。 |
+| `usage_capability_daily` | 从旧版数据库结构迁移的工具使用次数，供工具统计查询。 |
+
+统计页面按所选时间段筛选数据，并将每日记录按提供商或模型分组汇总。平均值根据保存的总量和对应的样本数计算。

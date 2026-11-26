@@ -143,6 +143,37 @@ Usa **Agent Tracker: Eliminar datos estadísticos** para borrar los resultados a
 
 </details>
 
-<br><br>
+## Cómo se recopilan las estadísticas de uso
 
-[Referencia de uso y desarrollo (en coreano)](docs/Development.ko.md)
+Agent Tracker lee los registros JSONL locales de Claude y Codex, incluidos los de Codex comprimidos con Zstd, y extrae los campos necesarios para las estadísticas. La clave del proyecto se obtiene del directorio de registros del proyecto en Claude y del directorio padre de la raíz de los registros en Codex.
+
+### Campos de los registros
+
+| Finalidad | Claude | Codex |
+| --- | --- | --- |
+| Sesión e hilo | Usa `sessionId` en el registro principal o el nombre del archivo si falta ese campo. Los registros de subagentes se identifican por la carpeta de la sesión a la que pertenecen y el nombre del archivo. | Identifica el hilo con `payload.id` en `session_meta` o `payload.thread_id` en `token_usage_record`. Si falta `payload.session_id`, usa el ID del hilo como ID de sesión. |
+| Modelo y respuesta | Lee `message.model`, `message.id` y `requestId` en las filas `assistant`. Usa `isApiErrorMessage` para descartar respuestas de error con cero tokens. | Lee `payload.model` en las filas de uso o en el contexto de la sesión o el turno. `payload.turn_id` y `payload.response_id` identifican la respuesta. |
+| Tokens de entrada, salida y caché | Lee `input_tokens`, `output_tokens`, `cache_read_input_tokens` y `cache_creation_input_tokens` en `message.usage`. | Lee `input_tokens` y `output_tokens` en `payload.usage`. Los recuentos de caché proceden de `cached_input_tokens` y `cache_write_input_tokens` o de `input_tokens_details.cached_tokens` y `input_tokens_details.cache_write_tokens`. |
+| Contadores acumulados y referencias al hilo padre | — | Lee `payload.thread_token_usage`, `payload.turn_token_usage` y los campos `payload.info.total_token_usage` y `payload.info.last_token_usage` de los eventos `token_count` del formato anterior. En `session_meta`, busca `forked_from_id` o una referencia `parent_thread_id` directa o anidada. |
+| Marcas de tiempo | Lee `timestamp` de la fila. | Lee `timestamp` de la fila o `payload.timestamp`, además de `payload.started_at` y `payload.completed_at` en los eventos. |
+
+### Del análisis de los registros a los totales diarios
+
+1. Procesa el JSONL línea por línea y extrae los campos de rutas predefinidas. Si una línea abarca varios bloques de lectura, conserva el estado del análisis de JSON y los valores extraídos. Omite los datos Base64 de las imágenes durante la lectura.
+2. Claude detecta duplicados por `(message.id, requestId)` dentro de la sesión y Codex por `(turn_id, response_id)` dentro del hilo. Si un mensaje de Claude tiene un único ID de solicitud conocido, también compara los registros que carecen de ese ID. Si una respuesta está duplicada, se cuenta una sola vez el registro con la mayor suma de tokens de entrada y salida. Claude suma los tokens leídos y escritos en caché a los tokens de entrada y Codex usa el total de entrada registrado.
+3. Compara los registros de Codex del formato anterior con el hilo padre para omitir el historial copiado y sumar los incrementos verificados de los contadores restantes. Si el acumulado del hilo muestra un incremento que las respuestas no explican, lo verifica con los acumulados por turno o los registros del formato anterior antes de sumarlo.
+4. Agrupa los totales de cada hilo por la fecha de su primera marca de tiempo en la zona horaria de las estadísticas. Si la primera y la última marca difieren, usa la diferencia como duración registrada, incluido el tiempo de inactividad.
+
+### Tablas de SQLite
+
+| Tabla | Datos almacenados |
+| --- | --- |
+| `source_file` | Rutas de los registros, ID de sesión e hilo, fechas de modificación, versiones del analizador, estado de procesamiento y si falta el archivo original. |
+| `usage_request_daily` | Totales de tokens, duración y coste, y recuentos de muestras por proveedor, sesión, proyecto y fecha local. |
+| `usage_model_daily` | Totales diarios y recuentos de muestras con una clave adicional para el modelo. |
+| `projects`, `sessions` | Nombres visibles de los proyectos y las sesiones. |
+| `session_billing` | Modo de facturación que el usuario seleccionó para cada proveedor y sesión. |
+| `usage_rollup_meta` | Zona horaria y versión del formato de agregación diaria. |
+| `usage_capability_daily` | Recuentos de uso de herramientas migrados desde el esquema anterior. La vista de estadísticas de herramientas consulta esta tabla. |
+
+La vista de estadísticas filtra los datos diarios del proveedor o modelo por el período seleccionado y los agrupa según el criterio elegido. Calcula los promedios a partir de los totales y recuentos de muestras almacenados.
