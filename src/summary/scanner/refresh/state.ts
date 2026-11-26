@@ -126,7 +126,7 @@ export class ScanState {
     // [집계 정책] 스레드를 세션 집계에 넘기고 부모 검색에 필요한 식별자와 레거시 여부만 파일에 남긴다.
     const { sessionId, threadId, parentThreadId, legacy } = thread;
     this.aggregation.add(file, sessionKey(file.provider, sessionId), thread);
-    file.prepared = { sessionId, threadId, parentThreadId, hasLegacy: legacy.length > 0 };
+    file.prepared = { sessionId, threadId, parentThreadId, hasLegacy: legacy.signatures.length > 0 };
     if (file.provider === 'codex') this.preparedCodexFiles.push(file);
   }
 }

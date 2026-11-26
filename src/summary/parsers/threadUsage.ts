@@ -1,11 +1,12 @@
 // Selects file-local response winners while preserving ordered Codex accounting evidence.
 import { basename, dirname, sep } from 'node:path';
-import { usageScore } from '../aggregation/winners';
+import { tokenUsageScore } from '../aggregation/winners';
 import type { Provider } from '../db/types';
 import { SummaryError } from '../jsonl';
 import { hasJsonFields, type FixedJsonShape } from '../jsonl/projection';
 import type { TokenVector } from '../types';
 import { claudeTokens, codexTokens, displayName, object, project, sqlText, string, timestamp } from './common';
+import { scoreThreadTokens, ThreadTokenBuffer, type ThreadTokens } from './threadTokens';
 
 const scalar: FixedJsonShape = {};
 const fields = (...keys: string[]): Record<string, FixedJsonShape> => Object.fromEntries(keys.map(key => [key, scalar]));
@@ -29,16 +30,18 @@ export const threadFields: Record<Provider, FixedJsonShape> = {
   } } } },
 };
 
-export type ThreadTokens = Pick<TokenVector, 'input' | 'output' | 'cacheRead' | 'cacheWrite'>;
-
 export interface ThreadResponse {
   responseId: string;
   requestId?: string;
   turnId?: string;
-  tokens: ThreadTokens;
   model: string;
   /** Claude can use the winning row's order to break ties within a file. */
   order?: number;
+}
+
+export interface ThreadResponses {
+  rows: ThreadResponse[];
+  tokens: Float64Array<ArrayBuffer>;
 }
 
 export interface ThreadCheckpoint {
@@ -54,10 +57,10 @@ export interface ThreadCheckpointInterval {
 }
 
 export interface ThreadLegacy {
-  total?: ThreadTokens;
-  last?: ThreadTokens;
-  signature: string;
-  model: string;
+  signatures: string[];
+  models: string[];
+  /** Each row stores two consecutive vectors, the cumulative total and the last usage. */
+  tokens: Float64Array<ArrayBuffer>;
 }
 
 export interface ThreadIdentity {
@@ -72,9 +75,9 @@ export interface ThreadLog extends ThreadIdentity {
   lastAt: number | null;
   parentThreadId?: string;
   recordCount: number;
-  responses: ThreadResponse[];
+  responses: ThreadResponses;
   checkpoints: ThreadCheckpointInterval[];
-  legacy: ThreadLegacy[];
+  legacy: ThreadLegacy;
   leadingLegacyCount: number;
   firstResponse?: { tokens: ThreadTokens; threadTotal: ThreadTokens };
 }
@@ -120,10 +123,13 @@ export class ThreadLogParser {
   private recordCount = 0;
   private readonly responseIndices = new Map<string, number>();
   private readonly responses: ThreadResponse[] = [];
+  private readonly responseTokens = new ThreadTokenBuffer();
   private readonly checkpoints: ThreadCheckpointInterval[] = [];
   private previousCheckpoint?: ThreadCheckpoint;
   private intervalUsage = 0;
-  private readonly legacy: ThreadLegacy[] = [];
+  private readonly legacySignatures: string[] = [];
+  private readonly legacyModels: string[] = [];
+  private readonly legacyTokens = new ThreadTokenBuffer();
   private leadingLegacyCount = 0;
   private firstResponse?: ThreadLog['firstResponse'];
 
@@ -156,7 +162,8 @@ export class ThreadLogParser {
     const { projectKey, projectName } = this.project;
     return { ...identity, projectKey: sqlText(projectKey), projectName: sqlText(projectName), startedAt: this.startedAt, lastAt: this.lastAt,
       parentThreadId: this.forkedFromId ?? this.parentThreadId, recordCount: this.recordCount,
-      responses: this.responses, checkpoints: this.checkpoints, legacy: this.legacy,
+      responses: { rows: this.responses, tokens: this.responseTokens.values }, checkpoints: this.checkpoints,
+      legacy: { signatures: this.legacySignatures, models: this.legacyModels, tokens: this.legacyTokens.values },
       leadingLegacyCount: this.leadingLegacyCount, firstResponse: this.firstResponse };
   }
 
@@ -186,8 +193,8 @@ export class ThreadLogParser {
     const responseId = identifier(message.id);
     if (!responseId) throw new SummaryError('missing-response-id', offset);
     const requestId = identifier(row.requestId);
-    this.keepResponse(JSON.stringify([responseId, requestId]), { responseId, requestId, tokens: tokenVector(tokens),
-      model: model === '<synthetic>' ? '' : sqlText(model ?? ''), order: this.recordCount++ });
+    this.keepResponse(JSON.stringify([responseId, requestId]), { responseId, requestId,
+      model: model === '<synthetic>' ? '' : sqlText(model ?? ''), order: this.recordCount++ }, tokens);
   }
 
   private codex(row: Record<string, unknown>, offset: number): void {
@@ -234,16 +241,20 @@ export class ThreadLogParser {
     return sqlText(displayName(payload.model) ?? this.model ?? '');
   }
 
-  private keepResponse(key: string, candidate: ThreadResponse): number | undefined {
+  private keepResponse(key: string, candidate: ThreadResponse, tokens: ThreadTokens): number | undefined {
     // [Winner 정책] 입력+출력 토큰이 많은 후보를 택하고 동점이면 나중 행으로 교체하되 첫 등장 인덱스를 유지한다.
     const index = this.responseIndices.get(key);
     if (index !== undefined) {
-      if (usageScore(candidate) >= usageScore(this.responses[index])) this.responses[index] = candidate;
+      if (tokenUsageScore(tokens.input, tokens.output) >= scoreThreadTokens(this.responseTokens.values, index)) {
+        this.responses[index] = candidate;
+        this.responseTokens.write(index, tokens);
+      }
       return;
     }
     const next = this.responses.length;
     this.responseIndices.set(key, next);
     this.responses.push(candidate);
+    this.responseTokens.write(next, tokens);
     return next;
   }
 
@@ -252,19 +263,19 @@ export class ThreadLogParser {
     const responseId = identifier(payload.response_id);
     if (!responseId) throw new SummaryError('missing-response-id', offset);
     if (!this.turnId) throw new SummaryError('missing-root-turn', offset);
-    const candidate = { responseId, turnId: this.turnId, model: this.codexModel(payload),
-      tokens: tokenVector(codexTokens(object(payload.usage))) };
+    const candidate = { responseId, turnId: this.turnId, model: this.codexModel(payload) };
+    const tokens = codexTokens(object(payload.usage));
     this.recordCount++;
 
     // [Winner 정책] 턴 ID와 응답 ID가 같은 후보를 파일 내 winner 하나로 합친다.
-    const responseIndex = this.keepResponse(responseKey(candidate), candidate);
+    const responseIndex = this.keepResponse(responseKey(candidate), candidate, tokens);
     if (responseIndex === undefined) return;
 
     // [집계 정책] 첫 등장 행의 사용량으로 구간 합계를 늘리고 누계가 있으면 체크포인트를 기록한다.
-    this.intervalUsage += candidate.tokens.input + candidate.tokens.output;
+    this.intervalUsage += tokens.input + tokens.output;
     const threadTotal = optionalCheckpoint(payload.thread_token_usage);
     if (!threadTotal) return;
-    if (responseIndex === 0 && this.leadingLegacyCount) this.firstResponse = { tokens: candidate.tokens, threadTotal };
+    if (responseIndex === 0 && this.leadingLegacyCount) this.firstResponse = { tokens: tokenVector(tokens), threadTotal };
     this.recordCheckpoint({ responseIndex, model: candidate.model, threadTotal,
       turnTotal: optionalCheckpoint(payload.turn_token_usage) });
   }
@@ -295,6 +306,10 @@ export class ThreadLogParser {
     const signature = JSON.stringify([this.turnId ?? null, checkpointSignature(total, rawTotal), checkpointSignature(last, rawLast)]);
     this.recordCount++;
     if (!this.responses.length) this.leadingLegacyCount++;
-    this.legacy.push({ signature, model, total: total && tokenVector(total), last: last && tokenVector(last) });
+    const index = this.legacySignatures.length;
+    this.legacySignatures.push(signature);
+    this.legacyModels.push(model);
+    this.legacyTokens.write(index * 2, total);
+    this.legacyTokens.write(index * 2 + 1, last);
   }
 }

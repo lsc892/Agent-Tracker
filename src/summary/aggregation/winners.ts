@@ -2,9 +2,13 @@
 import type { TokenVector } from '../types';
 
 export function usageScore({ tokens }: { tokens: Pick<TokenVector, 'input' | 'output'> }): number | bigint {
+  return tokenUsageScore(tokens.input, tokens.output);
+}
+
+export function tokenUsageScore(input: number, output: number): number | bigint {
   // [Winner 정책] 입력과 출력 토큰을 더하고 안전 정수 범위를 넘으면 BigInt로 정확한 점수를 계산한다.
-  const total = tokens.input + tokens.output;
-  return Number.isSafeInteger(total) ? total : BigInt(tokens.input) + BigInt(tokens.output);
+  const total = input + output;
+  return Number.isSafeInteger(total) ? total : BigInt(input) + BigInt(output);
 }
 
 export function isBetterUsage(score: number | bigint, order: number, previousScore: number | bigint, previousOrder: number): boolean {

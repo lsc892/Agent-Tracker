@@ -2,6 +2,9 @@
 
 요약·JSONL·SQL·quota 처리의 정확성과 성능을 비교하는 도구를 모은다.
 
+- [thread-token-buffer-ab.cjs](thread-token-buffer-ab.cjs)는 `--base=<이전 커밋> --output=<새 JSON>`으로 응답 토큰 버퍼의 피크 힙·외부 메모리·RSS를 측정한다. 실로그와 합성 10,000·100건의 최초 수집·한 건 추가를 비교하며 SQLite 결과와 네 평균 조회를 대조한다. [보고서와 재실행 방법](../../docs/benchmarks/success/2026-11-26/ThreadTokenBufferAB-2026-11-26.md).
+- [thread-token-gc-ab.cjs](thread-token-gc-ab.cjs)는 메모리 측정의 `--workspace`와 `--reference` JSON을 받아 같은 빌드·사본에서 자연 GC 이벤트를 수집한다. [GC 보고서와 재실행 방법](../../docs/benchmarks/success/2026-11-26/ThreadTokenGcAB-2026-11-26.md).
+
 - [historical-summary-ab.cjs](historical-summary-ab.cjs)는 최근 30일 첫 화면 기록 커밋·v0.3.1·현재 빌드를 고정 입력에 적용한다. 수집·증분 갱신·평균 조회·최근 30일 백엔드 응답, 힙·RSS와 SQLite 파일 크기를 비교한다. [보고서와 실행 명령](../../docs/benchmarks/success/2026-11-24/HistoricalSummaryAB-2026-11-24.md).
 
 - [thread-usage-ab.cjs](thread-usage-ab.cjs)는 같은 실로그를 빈 SQLite DB에 빌드별 한 번 수집하고 [원본 검산](thread-usage-oracle.cjs)과 토큰 합계를 대조한다. `--same-stats`를 주면 스레드·모델·비용·원본 상태와 조회 결과도 비교한다. [즉시 병합 결과와 재실행 방법](../../docs/benchmarks/success/2026-11-24/StreamingThreadResponseAB-2026-11-24.md).
