@@ -112,6 +112,7 @@ function sampleHeap(config, role) {
 function aggregationShape(aggregation) {
   let checkpointIntervals = 0, checkpointKeys = 0, responseRows = 0, responseKeyCodeUnits = 0;
   let legacyRows = 0, legacySignatureCodeUnits = 0, responseBufferBytes = 0, legacyBufferBytes = 0;
+  let legacySignatureBufferBytes = 0;
   let turnIdCodeUnits = 0, responseIdCodeUnits = 0, uniqueLegacyCodeUnits = 0, uuidTurnRows = 0;
   const turnIds = new Set(), responseIds = new Set(), legacySignatures = new Set(), models = new Set();
   const uuid = /^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/i;
@@ -136,9 +137,18 @@ function aggregationShape(aggregation) {
     const legacy = source.codex?.legacy;
     if (!legacy) continue;
     const signatures = legacy.signatures ?? legacy;
-    legacyRows += signatures.length;
     legacyBufferBytes += legacy.tokens?.byteLength ?? 0;
-    for (const entry of signatures) {
+    let keys = signatures;
+    if (signatures.rowIds) {
+      const { rowIds, offsets, bytes } = signatures;
+      legacySignatureBufferBytes += rowIds.buffer.byteLength + offsets.buffer.byteLength + bytes.buffer.byteLength;
+      const buffer = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+      const dictionary = Array.from({ length: Math.max(0, offsets.length - 1) }, (_, id) =>
+        buffer.toString('utf8', offsets[id], offsets[id + 1]));
+      keys = Array.from(rowIds, id => dictionary[id]);
+    }
+    legacyRows += keys.length;
+    for (const entry of keys) {
       const key = typeof entry === 'string' ? entry : entry.signature;
       legacySignatureCodeUnits += key.length;
       if (legacySignatures.has(key)) continue;
@@ -148,7 +158,7 @@ function aggregationShape(aggregation) {
   }
   return { groups: aggregation.threads.size, claudeMessageGroups: aggregation.claude.size, parentIndex: aggregation.parents.size,
     responseRows, responseKeyCodeUnits, checkpointIntervals, checkpointKeys, legacyRows, legacySignatureCodeUnits,
-    responseBufferBytes, legacyBufferBytes, turnIds: turnIds.size, responseIds: responseIds.size, models: models.size,
+    responseBufferBytes, legacyBufferBytes, legacySignatureBufferBytes, turnIds: turnIds.size, responseIds: responseIds.size, models: models.size,
     turnIdCodeUnits, responseIdCodeUnits, uuidTurnRows, uniqueLegacySignatures: legacySignatures.size, uniqueLegacyCodeUnits };
 }
 

@@ -909,9 +909,9 @@ Extension Host 메모리에 유지하는 값:
 
 누계 Worker는 갱신 동안 파일 출처, 스레드 정보, 병합한 응답별 최고값과 Codex 누계 검산 기록을 보유한다. 스레드 합계와 모델별 토큰을 확정하고 쓰기 트랜잭션에서 영향 세션의 합계를 교체한다. 경로별 마지막 정상 수정 시각과 스레드 식별자는 이후 변경 판정과 관련 원본 확장에 사용한다.
 
-파일 준비 풀의 선행 창은 처리 중인 작업 수를 제한한다. 파싱을 끝낸 응답의 입력·출력·캐시 토큰과 구형 Codex의 누계·개별 사용량은 파일별 `Float64Array`에 연속으로 담는다. 병렬 경로에서 파일 Worker는 이 배열의 `ArrayBuffer` 소유권을 수집기에 넘긴다. ID·모델·비교 서명은 문자열로 다루고, 확정한 스레드·모델 합계를 SQLite에 전달한다. Worker별 JSONL/Zstd 버퍼와 미소비 결과도 메모리를 사용한다.
+파일 준비 풀의 선행 창은 처리 중인 작업 수를 제한한다. 파싱을 끝낸 응답의 입력·출력·캐시 토큰과 구형 Codex의 누계·개별 사용량은 파일별 `Float64Array`에 연속으로 담는다. 구형 Codex 누계가 있는 파일에만 전용 작업 상태와 Worker 결과를 만든다. 비교 서명은 파일별 고유 UTF-8 바이트와 행별 정수 인덱스로 보관한다. 부모와 자식의 서명은 순서대로 바이트를 대조하고, 같은 파일 안의 중복은 인덱스로 판별한다. 병렬 경로에서 파일 Worker는 토큰과 서명의 `ArrayBuffer` 소유권을 수집기에 넘긴다. 확정한 스레드·모델 합계를 SQLite에 전달한다. Worker별 JSONL/Zstd 버퍼와 미소비 결과도 메모리를 사용한다.
 
-토큰 버퍼의 바이트는 V8 힙 밖에 있으며 프로세스 RSS에 포함된다. Node 24.14.1에서는 수신한 버퍼가 수신 스레드의 `external`에 잡힌다. `arrayBuffers`는 해당 스레드의 할당기가 직접 확보한 바이트를 센다. RSS는 모든 Worker와 SQLite의 네이티브 메모리도 포함한다. [Node.js 지표 구현](https://github.com/nodejs/node/blob/v24.14.1/src/node_process_methods.cc#L204-L229) · [Agent Tracker 실측](../benchmarks/success/2026-11-26/ThreadTokenBufferAB-2026-11-26.md)
+토큰과 서명 버퍼의 바이트는 V8 힙 밖에 있으며 프로세스 RSS에 포함된다. Node 24.14.1에서는 수신한 버퍼가 수신 스레드의 `external`에 잡힌다. `arrayBuffers`는 해당 스레드의 할당기가 직접 확보한 바이트를 센다. RSS는 모든 Worker와 SQLite의 네이티브 메모리도 포함한다. [Node.js 지표 구현](https://github.com/nodejs/node/blob/v24.14.1/src/node_process_methods.cc#L204-L229) · [토큰 버퍼 실측](../benchmarks/success/2026-11-26/ThreadTokenBufferAB-2026-11-26.md) · [서명 버퍼 실측](../benchmarks/success/2026-11-26/LegacySignaturesBufferAB-2026-11-26.md)
 
 메모리에 유지하지 않는 값:
 

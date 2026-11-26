@@ -11,7 +11,7 @@ interface SourceOrder {
 
 interface SummarySource {
   file: FileState;
-  thread: Omit<ThreadLog, 'responses' | 'checkpoints' | 'legacy' | 'leadingLegacyCount' | 'firstResponse'>;
+  thread: Omit<ThreadLog, 'responses' | 'checkpoints' | 'legacy'>;
   hasResponses: boolean;
   order: SourceOrder;
   codex?: CodexThreadEvidence;
@@ -49,7 +49,7 @@ export class ThreadAggregation {
 
   add(file: FileState, session: string, log: ThreadLog): void {
     // [Winner 정책] 같은 스레드의 복사본 중 응답 유무, 많은 기록, 최신 수정 시각, 경로 오름차순으로 대표를 고른다.
-    const { responses, checkpoints, legacy, leadingLegacyCount, firstResponse, ...thread } = log;
+    const { responses, checkpoints, legacy, ...thread } = log;
     const responseCount = responses.rows.length;
     const source: SummarySource = { file, thread, hasResponses: responseCount > 0, order: {} };
     const key = JSON.stringify([session, thread.threadId]);
@@ -76,7 +76,7 @@ export class ThreadAggregation {
 
     // [집계 정책] 대표 원본의 누계 구간과 레거시 기록을 부모 이력 비교에 쓸 수 있도록 색인한다.
     if (preferred) {
-      source.codex = { checkpoints: intervals, legacy, leadingLegacyCount, firstResponse, responseCount };
+      source.codex = { checkpoints: intervals, legacy, responseCount };
       const parent = this.parents.get(thread.threadId);
       if (!parent || preferTimeline(source, parent)) this.parents.set(thread.threadId, source);
     }
@@ -95,7 +95,7 @@ export class ThreadAggregation {
       const parent = parentThreadId && parentThreadId !== threadId ? this.parents.get(parentThreadId) : undefined;
       const winners = group.codex;
       const usage = codex && winners
-        ? consumeCodexThread(codex, { indices: winners.indices, rows: winners.rows, tokens: winners.tokens.values }, parent?.codex)
+        ? consumeCodexThread(codex, { indices: winners.indices, rows: winners.rows, tokens: winners.tokens.values }, parent?.codex?.legacy)
         : claude.get(group);
       if (!usage) continue;
 

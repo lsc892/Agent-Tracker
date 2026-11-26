@@ -11,6 +11,7 @@
 
 ## 제품 반영
 
+- [2026-11-26 구형 Codex 누계 비교 서명 ArrayBuffer A/B](success/2026-11-26/LegacySignaturesBufferAB-2026-11-26.md) — 집계 직전 힙과 전체 피크 힙, 프로세스 RSS 및 저장 결과를 비교했다.
 - [2026-11-26 JSONL 고정 필드 바이트 선택 A/B](success/2026-11-26/ByteProjectionAB-2026-11-26.md) — 필요한 값만 디코딩하는 경로의 파일 Worker 힙·할당과 전체 갱신 시간·RSS를 비교했다.
 - [2026-11-26 응답 토큰 ArrayBuffer A/B](success/2026-11-26/ThreadTokenBufferAB-2026-11-26.md) — 실로그·합성 입력의 최초 수집과 1건 추가에서 피크 힙, 외부 메모리와 프로세스 RSS를 비교했다. [자연 GC 후속 측정](success/2026-11-26/ThreadTokenGcAB-2026-11-26.md)
 - [2026-11-26 임시 DB 없이 최근 30일 통계 열기 A/B](failure/2026-11-26/DirectDashboardRefreshAB-2026-11-26.md) — 같은 빌드에서 메모리 미리보기 생략이 첫 표, 최종 표, 메모리와 SQLite 크기에 미치는 영향을 비교했다. 이후 직접 갱신을 적용했다. [기능 결정 일지](../AgentTracker-일지.md)

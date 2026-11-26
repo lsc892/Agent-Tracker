@@ -6,6 +6,7 @@ import { SummaryError } from '../jsonl';
 import { hasJsonFields, type FixedJsonShape } from '../jsonl/projection';
 import type { TokenVector } from '../types';
 import { claudeTokens, codexTokens, displayName, object, project, sqlText, string, timestamp } from './common';
+import { packLegacySignatures, type LegacySignatures } from './legacySignatures';
 import { scoreThreadTokens, ThreadTokenBuffer, type ThreadTokens } from './threadTokens';
 
 const scalar: FixedJsonShape = {};
@@ -57,11 +58,18 @@ export interface ThreadCheckpointInterval {
 }
 
 export interface ThreadLegacy {
-  signatures: string[];
+  signatures: LegacySignatures;
   models: string[];
   /** Each row stores two consecutive vectors, the cumulative total and the last usage. */
   tokens: Float64Array<ArrayBuffer>;
+  leadingCount: number;
+  firstResponse?: { tokens: ThreadTokens; threadTotal: ThreadTokens };
 }
+
+type PendingLegacy = Omit<ThreadLegacy, 'signatures' | 'tokens'> & {
+  signatures: string[];
+  tokens: ThreadTokenBuffer;
+};
 
 export interface ThreadIdentity {
   sessionId: string;
@@ -77,9 +85,7 @@ export interface ThreadLog extends ThreadIdentity {
   recordCount: number;
   responses: ThreadResponses;
   checkpoints: ThreadCheckpointInterval[];
-  legacy: ThreadLegacy;
-  leadingLegacyCount: number;
-  firstResponse?: { tokens: ThreadTokens; threadTotal: ThreadTokens };
+  legacy?: ThreadLegacy;
 }
 
 export const responseKey = (row: Pick<ThreadResponse, 'turnId' | 'responseId'>): string => JSON.stringify([row.turnId, row.responseId]);
@@ -127,11 +133,7 @@ export class ThreadLogParser {
   private readonly checkpoints: ThreadCheckpointInterval[] = [];
   private previousCheckpoint?: ThreadCheckpoint;
   private intervalUsage = 0;
-  private readonly legacySignatures: string[] = [];
-  private readonly legacyModels: string[] = [];
-  private readonly legacyTokens = new ThreadTokenBuffer();
-  private leadingLegacyCount = 0;
-  private firstResponse?: ThreadLog['firstResponse'];
+  private legacy?: PendingLegacy;
 
   constructor(private readonly provider: Provider, path: string, sourceRoot: string) {
     // [귀속 정책] Claude는 경로로 스레드와 프로젝트를, Codex는 원본 루트의 상위 경로로 프로젝트를 정한다.
@@ -160,11 +162,14 @@ export class ThreadLogParser {
     if (!identity || !this.recognized) throw new SummaryError('unsupported-schema');
     // [DTO 정책] 원본 식별자와 시간 범위에 파일별 winner, 누계 검증 근거를 묶어 ThreadLog를 만든다.
     const { projectKey, projectName } = this.project;
+    const pending = this.legacy;
+    const legacy = pending && {
+      signatures: packLegacySignatures(pending.signatures), models: pending.models, tokens: pending.tokens.values,
+      leadingCount: pending.leadingCount, firstResponse: pending.firstResponse,
+    };
     return { ...identity, projectKey: sqlText(projectKey), projectName: sqlText(projectName), startedAt: this.startedAt, lastAt: this.lastAt,
       parentThreadId: this.forkedFromId ?? this.parentThreadId, recordCount: this.recordCount,
-      responses: { rows: this.responses, tokens: this.responseTokens.values }, checkpoints: this.checkpoints,
-      legacy: { signatures: this.legacySignatures, models: this.legacyModels, tokens: this.legacyTokens.values },
-      leadingLegacyCount: this.leadingLegacyCount, firstResponse: this.firstResponse };
+      responses: { rows: this.responses, tokens: this.responseTokens.values }, checkpoints: this.checkpoints, legacy };
   }
 
   private observeTime(value: number | null): void {
@@ -275,7 +280,7 @@ export class ThreadLogParser {
     this.intervalUsage += tokens.input + tokens.output;
     const threadTotal = optionalCheckpoint(payload.thread_token_usage);
     if (!threadTotal) return;
-    if (responseIndex === 0 && this.leadingLegacyCount) this.firstResponse = { tokens: tokenVector(tokens), threadTotal };
+    if (responseIndex === 0 && this.legacy?.leadingCount) this.legacy.firstResponse = { tokens, threadTotal };
     this.recordCheckpoint({ responseIndex, model: candidate.model, threadTotal,
       turnTotal: optionalCheckpoint(payload.turn_token_usage) });
   }
@@ -304,12 +309,13 @@ export class ThreadLogParser {
     if (!total && !last) return;
     // Timestamps can change when the same legacy prefix is written to a fork's file.
     const signature = JSON.stringify([this.turnId ?? null, checkpointSignature(total, rawTotal), checkpointSignature(last, rawLast)]);
+    const legacy = this.legacy ??= { signatures: [], models: [], tokens: new ThreadTokenBuffer(), leadingCount: 0 };
     this.recordCount++;
-    if (!this.responses.length) this.leadingLegacyCount++;
-    const index = this.legacySignatures.length;
-    this.legacySignatures.push(signature);
-    this.legacyModels.push(model);
-    this.legacyTokens.write(index * 2, total);
-    this.legacyTokens.write(index * 2 + 1, last);
+    if (!this.responses.length) legacy.leadingCount++;
+    const index = legacy.signatures.length;
+    legacy.signatures.push(signature);
+    legacy.models.push(model);
+    legacy.tokens.write(index * 2, total);
+    legacy.tokens.write(index * 2 + 1, last);
   }
 }

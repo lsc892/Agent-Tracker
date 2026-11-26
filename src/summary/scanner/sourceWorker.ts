@@ -27,10 +27,13 @@ port.on('message', (file: SourceReadFile) => {
     },
   }).then(result => {
     const thread = result.ok ? result.read.thread : undefined;
-    // 수집기가 토큰 버퍼의 소유권을 넘겨받아 같은 숫자 데이터를 다시 할당하지 않는다.
+    // 수집기가 토큰과 비교 서명 버퍼의 소유권을 넘겨받는다.
     const transfer: ArrayBuffer[] = [];
     if (thread?.responses.tokens.length) transfer.push(thread.responses.tokens.buffer);
-    if (thread?.legacy.tokens.length) transfer.push(thread.legacy.tokens.buffer);
+    if (thread?.legacy) {
+      const { tokens, signatures: { bytes, offsets, rowIds } } = thread.legacy;
+      transfer.push(tokens.buffer, bytes.buffer, offsets.buffer, rowIds.buffer);
+    }
     port.postMessage({ id: file.id, result, bytes: pendingBytes }, transfer);
   });
 });

@@ -1,14 +1,16 @@
 // Counts recorded response usage and reconciles gaps supported by independent cumulative records.
 import type { ModelUsageInput } from '../db/types';
-import type { ThreadCheckpointInterval, ThreadLegacy, ThreadLog, ThreadResponse } from '../parsers/threadUsage';
+import { copiedLegacyPrefix } from '../parsers/legacySignatures';
+import type { ThreadCheckpointInterval, ThreadLegacy, ThreadResponse } from '../parsers/threadUsage';
 import { readOptionalThreadTokens, readThreadTokens, type ThreadTokens } from '../parsers/threadTokens';
 
 type ModelUsage = ModelUsageInput & { cache_read_input_tokens: number; cache_write_input_tokens: number };
 
-export type CodexThreadEvidence = Pick<ThreadLog, 'legacy' | 'leadingLegacyCount' | 'firstResponse'> & {
+export interface CodexThreadEvidence {
+  legacy?: ThreadLegacy;
   responseCount: number;
   checkpoints: readonly (ThreadCheckpointInterval & { responseKeys: readonly string[] })[];
-};
+}
 
 interface CodexWinners {
   indices: ReadonlyMap<string, number>;
@@ -26,10 +28,13 @@ const positive = (tokens: ThreadTokens): boolean => tokens.input > 0 || tokens.o
 const sameUsage = (left: ThreadTokens, right: ThreadTokens): boolean => left.input === right.input && left.output === right.output;
 const regressed = (total: ThreadTokens, previous: ThreadTokens): boolean => total.input < previous.input || total.output < previous.output;
 
-function increase(total: ThreadTokens, previous: ThreadTokens): ThreadTokens {
+function increase(total: ThreadTokens, previous: ThreadTokens, delta = emptyTokens()): ThreadTokens {
   // [집계 정책] 토큰 항목마다 직전 누계를 빼고 음수는 0으로 처리한다.
-  return { input: Math.max(0, total.input - previous.input), output: Math.max(0, total.output - previous.output),
-    cacheRead: Math.max(0, total.cacheRead - previous.cacheRead), cacheWrite: Math.max(0, total.cacheWrite - previous.cacheWrite) };
+  delta.input = Math.max(0, total.input - previous.input);
+  delta.output = Math.max(0, total.output - previous.output);
+  delta.cacheRead = Math.max(0, total.cacheRead - previous.cacheRead);
+  delta.cacheWrite = Math.max(0, total.cacheWrite - previous.cacheWrite);
+  return delta;
 }
 
 export function accumulateThreadUsage(usage: ThreadUsage | undefined, tokens: ThreadTokens, model: string): ThreadUsage {
@@ -55,25 +60,21 @@ export function accumulateThreadUsage(usage: ThreadUsage | undefined, tokens: Th
   return result;
 }
 
-/** A fork can repeat the parent's records with new file timestamps. */
-function copiedPrefix(legacy: readonly string[], parent: readonly string[] | undefined): number {
-  if (!parent || legacy === parent) return 0;
-  // [귀속 정책] 부모와 자식의 레거시 서명을 처음부터 비교해 첫 불일치 전까지를 복사 이력으로 본다.
-  const limit = Math.min(legacy.length, parent.length);
-  let copied = 0;
-  while (copied < limit && legacy[copied] === parent[copied]) copied++;
-  return copied;
-}
-
 interface LegacyPosition {
   previous?: ThreadTokens;
+  delta: ThreadTokens;
 }
 
 function legacyIncrease(total: ThreadTokens | undefined, last: ThreadTokens | undefined, state: LegacyPosition): ThreadTokens | undefined {
   // [집계 정책] 비교할 이전 누계가 없으면 개별 사용량만 반영한다.
   const previous = state.previous;
   if (!total) {
-    if (previous && last) for (const key of components) previous[key] += last[key];
+    if (previous && last) {
+      previous.input += last.input;
+      previous.output += last.output;
+      previous.cacheRead += last.cacheRead;
+      previous.cacheWrite += last.cacheWrite;
+    }
     return last && positive(last) ? last : undefined;
   }
   if (!previous) {
@@ -91,22 +92,26 @@ function legacyIncrease(total: ThreadTokens | undefined, last: ThreadTokens | un
   }
 
   // [집계 정책] 입력 또는 출력이 늘어난 경우만 반환하고 다음 비교 기준에는 항목별 최댓값을 보존한다.
-  const delta = increase(total, previous);
-  for (const key of components) previous[key] = Math.max(previous[key], total[key]);
+  const delta = increase(total, previous, state.delta);
+  previous.input = Math.max(previous.input, total.input);
+  previous.output = Math.max(previous.output, total.output);
+  previous.cacheRead = Math.max(previous.cacheRead, total.cacheRead);
+  previous.cacheWrite = Math.max(previous.cacheWrite, total.cacheWrite);
   return positive(delta) ? delta : undefined;
 }
 
-function leadingLegacyUsage({ legacy, leadingLegacyCount, firstResponse }: CodexThreadEvidence, historical: number): ThreadUsage | undefined {
-  if (leadingLegacyCount <= historical) return;
+function leadingLegacyUsage(legacy: ThreadLegacy, historical: number): ThreadUsage | undefined {
+  const { leadingCount, firstResponse, signatures: { rowIds, offsets } } = legacy;
+  if (leadingCount <= historical) return;
   // [귀속 정책] 복사 이력으로 비교 기준을 복구하고 첫 응답 전의 자체 증가분만 더한다.
-  const state: LegacyPosition = {};
-  const seen = new Set<string>();
+  const state: LegacyPosition = { delta: emptyTokens() };
+  const seen = new Uint8Array(new ArrayBuffer(offsets.length - 1));
   const totalTokens = emptyTokens(), lastTokens = emptyTokens();
   let usage: ThreadUsage | undefined;
-  for (let index = 0; index < leadingLegacyCount; index++) {
-    const signature = legacy.signatures[index];
-    if (seen.has(signature)) continue;
-    seen.add(signature);
+  for (let index = 0; index < leadingCount; index++) {
+    const signature = rowIds[index];
+    if (seen[signature]) continue;
+    seen[signature] = 1;
     const total = readOptionalThreadTokens(legacy.tokens, index * 2, totalTokens);
     const last = readOptionalThreadTokens(legacy.tokens, index * 2 + 1, lastTokens);
     const delta = legacyIncrease(total, last, state);
@@ -159,8 +164,9 @@ function findCheckpointGaps({ checkpoints, responseCount }: CodexThreadEvidence,
     if (!positive(tokens)) continue;
 
     // [집계 정책] 같은 턴에서 턴과 스레드의 입력·출력 증가량이 일치하면 차이를 확정한다.
-    const verified = sameTurn && !!start.turnTotal && !!end.turnTotal && !regressed(end.turnTotal, start.turnTotal)
-      && sameUsage(delta, increase(end.turnTotal, start.turnTotal));
+    const verified = sameTurn && !!start.turnTotal && !!end.turnTotal
+      && delta.input === end.turnTotal.input - start.turnTotal.input
+      && delta.output === end.turnTotal.output - start.turnTotal.output;
     gaps.push({ model: start.model === end.model ? end.model : '', tokens, before, after, verified });
   }
   return gaps;
@@ -181,7 +187,7 @@ function corroborateGaps(legacy: ThreadLegacy, historical: number, gaps: readonl
   const open = new Set<CheckpointGap>();
   let previous = emptyTokens(), next = emptyTokens();
   let hasPrevious = false;
-  for (let index = historical; index < legacy.signatures.length; index++) {
+  for (let index = historical; index < legacy.signatures.rowIds.length; index++) {
     const total = readOptionalThreadTokens(legacy.tokens, index * 2, next);
     if (!total) continue;
     if (hasPrevious && regressed(total, previous)) open.clear();
@@ -197,10 +203,11 @@ function corroborateGaps(legacy: ThreadLegacy, historical: number, gaps: readonl
 }
 
 export function consumeCodexThread(source: CodexThreadEvidence, winners: CodexWinners,
-  parent?: Pick<ThreadLog, 'legacy'>): ThreadUsage | undefined {
+  parent?: ThreadLegacy): ThreadUsage | undefined {
   // [집계 정책] 부모와 일치하는 접두사를 찾아 빼고 첫 응답 전에 기록된 레거시 사용량을 계산한다.
-  const historical = copiedPrefix(source.legacy.signatures, parent?.legacy.signatures);
-  let usage = leadingLegacyUsage(source, historical);
+  const { legacy } = source;
+  const historical = legacy && parent ? copiedLegacyPrefix(legacy.signatures, parent.signatures) : 0;
+  let usage = legacy && leadingLegacyUsage(legacy, historical);
   if (!winners.rows.length) return usage;
 
   // [집계 정책] 최종 winner의 토큰을 스레드 합계와 모델별 합계에 한 번씩 더한다.
@@ -212,7 +219,7 @@ export function consumeCodexThread(source: CodexThreadEvidence, winners: CodexWi
 
   // [집계 정책] 체크포인트 증가량에서 winner 합계를 뺀 차이를 턴 누계나 레거시 기록으로 검증한 뒤 보충한다.
   const gaps = findCheckpointGaps(source, winners);
-  corroborateGaps(source.legacy, historical, gaps);
+  if (legacy) corroborateGaps(legacy, historical, gaps);
   for (const gap of gaps) if (gap.verified) usage = accumulateThreadUsage(usage, gap.tokens, gap.model);
   return usage;
 }
