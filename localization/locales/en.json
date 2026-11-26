@@ -12,7 +12,6 @@
   "quota.claudeRateLimited": "Claude usage requests are rate limited. Retrying later.",
   "quota.claudeAccessDenied": "Check your Claude Code subscription sign-in and usage access permissions.",
   "quota.claudeHttpFailed": "Could not fetch Claude usage (HTTP {value0}).",
-  "quota.claudeSignInAgain": "Sign in to Claude Code again.",
   "quota.claudeTimeout": "Claude usage lookup timed out.",
   "quota.claudeNetworkFailed": "Could not connect to Claude usage. Check your network and Claude Code sign-in.",
   "quota.claudeUnsupportedResponse": "Unsupported Claude usage response format.",

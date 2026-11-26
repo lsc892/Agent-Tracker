@@ -12,7 +12,6 @@
   "quota.claudeRateLimited": "Les consultations de Claude sont limitées. Une nouvelle tentative aura lieu plus tard.",
   "quota.claudeAccessDenied": "Vérifiez la connexion à l'abonnement Claude Code et les droits d'accès à l'utilisation.",
   "quota.claudeHttpFailed": "Impossible de récupérer l'utilisation de Claude (HTTP {value0}).",
-  "quota.claudeSignInAgain": "Reconnectez-vous à Claude Code.",
   "quota.claudeTimeout": "La consultation de Claude a expiré.",
   "quota.claudeNetworkFailed": "Impossible de joindre le service d'utilisation de Claude. Vérifiez le réseau et votre connexion à Claude Code.",
   "quota.claudeUnsupportedResponse": "Format de réponse d'utilisation de Claude non pris en charge.",

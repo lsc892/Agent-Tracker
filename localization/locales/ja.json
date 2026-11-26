@@ -12,7 +12,6 @@
   "quota.claudeRateLimited": "Claude 使用量の取得がレート制限されています。後で再試行します。",
   "quota.claudeAccessDenied": "Claude Code のサブスクリプションへのサインインと使用量へのアクセス権を確認してください。",
   "quota.claudeHttpFailed": "Claude 使用量を取得できません（HTTP {value0}）。",
-  "quota.claudeSignInAgain": "Claude Code に再度サインインしてください。",
   "quota.claudeTimeout": "Claude 使用量の取得がタイムアウトしました。",
   "quota.claudeNetworkFailed": "Claude 使用量サービスに接続できません。ネットワークと Claude Code へのサインインを確認してください。",
   "quota.claudeUnsupportedResponse": "Claude 使用量の応答形式に対応していません。",

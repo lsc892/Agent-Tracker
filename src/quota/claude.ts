@@ -43,22 +43,23 @@ export class ClaudeQuotaProvider extends BaseQuotaProvider {
     const signal = AbortSignal.any([context.signal, controller.signal]);
     let timedOut = false;
     const timeout = setTimeout(() => { timedOut = true; controller.abort(); }, this.timeoutMs);
-    timeout.unref?.();
+    timeout.unref();
     try {
-      for (let attempt = 0; attempt < 2; attempt += 1) {
+      // [인증 정책] 최초 응답이 401이면 본문을 폐기하고 인증을 다시 읽어 한 번 더 조회한다.
+      signal.throwIfAborted();
+      let response = await this.requestUsage(false, signal);
+      if (response.status === 401) {
+        // A failed body stream must not erase the status needed for auth/retry policy.
+        await response.body?.cancel().catch(() => {});
         signal.throwIfAborted();
-        const response = await this.requestUsage(attempt === 1, signal);
-        if (response.status === 401 && attempt === 0) {
-          // A failed body stream must not erase the status needed for auth/retry policy.
-          await response.body?.cancel().catch(() => {});
-          continue;
-        }
-        await this.ensureUsageResponseOk(response);
-        const body = await readBoundedJson(response);
-        signal.throwIfAborted();
-        return parseClaudeQuota(body, this.now());
+        response = await this.requestUsage(true, signal);
       }
-      throw new QuotaError('authentication', { key: 'quota.claudeSignInAgain' });
+
+      // [파싱 정책] HTTP 상태를 확인하고 제한된 크기의 JSON만 공통 quota로 변환한다.
+      await this.ensureUsageResponseOk(response);
+      const body = await readBoundedJson(response);
+      signal.throwIfAborted();
+      return parseClaudeQuota(body, this.now());
     } catch (error) {
       if (timedOut) throw new QuotaError('timeout', { key: 'quota.claudeTimeout' });
       if (signal.aborted) throw new QuotaError('cancelled', { key: 'quota.claudeCancelled' });

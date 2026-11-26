@@ -13,7 +13,7 @@ export interface QuotaClock {
 
 const systemClock: QuotaClock = {
   now: Date.now,
-  setTimeout: (callback, delay) => { const timer = setTimeout(callback, delay); timer.unref?.(); return timer; },
+  setTimeout: (callback, delay) => setTimeout(callback, delay).unref(),
   clearTimeout: timer => clearTimeout(timer as ReturnType<typeof setTimeout>),
 };
 export interface QuotaServiceOptions {

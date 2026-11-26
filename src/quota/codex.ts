@@ -61,7 +61,9 @@ export class CodexQuotaProvider extends BaseQuotaProvider {
         this.forwardQuotaUpdate(value, now, context);
       });
       timeout = setTimeout(() => { timedOut = true; controller.abort(); }, this.options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
-      timeout.unref?.();
+      timeout.unref();
+
+      // [인증 정책] RPC 초기화 후 구독 계정을 확인하고 저장된 토큰 갱신은 요청하지 않는다.
       await this.requestInitialization(session);
       this.notifyInitialized(session, startedAt);
       const accountResult = await session.request('account/read', { refreshToken: false });
@@ -119,11 +121,6 @@ export class CodexQuotaProvider extends BaseQuotaProvider {
   private verifyAccountResponse(value: unknown, session: RpcSession, startedAt: number): void {
     const accountResult = asRecord(value);
     this.phase('account-read', session.child.pid, performance.now() - startedAt);
-    this.ensureSupportedAccount(accountResult);
-  }
-
-  /** 로그인 상태와 구독 계정 유형을 확인한 뒤에만 quota 조회·알림을 허용한다. */
-  private ensureSupportedAccount(accountResult: Record<string, unknown> | null): void {
     const account = asRecord(accountResult?.account);
     if (!account) throw new QuotaError('authentication', { key: 'quota.codexLoginRequired' });
     if (account.type !== 'chatgpt' && account.type !== 'chatgptAuthTokens') {
