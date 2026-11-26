@@ -7,7 +7,7 @@ import { sqlText } from '../parsers/common';
 import { ThreadLogParser, threadFields, type ThreadIdentity, type ThreadLog } from '../parsers/threadUsage';
 import type { ParseEvent, ParsedIdentity, SummaryOptions } from '../types';
 
-export type SourceReadFile = Pick<FileMetadata, 'provider' | 'path' | 'source_root' | 'size_bytes' | 'mtime_ms'> & { id: number };
+export type SourceReadFile = Pick<FileMetadata, 'provider' | 'path' | 'source_root' | 'mtime_ms'> & { id: number; size_bytes: number };
 
 export { sqlText } from '../parsers/common';
 

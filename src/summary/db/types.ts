@@ -24,7 +24,7 @@ interface LegacySourceRelation {
 
 export type SourceRelationMetadata = LegacySourceRelation | {
   threadUsage: true;
-  identity: Pick<ParsedIdentity, 'sessionId' | 'threadId'>;
+  identity: Pick<ParsedIdentity, 'threadId'>;
 };
 
 export interface FileMetadata {
@@ -32,12 +32,13 @@ export interface FileMetadata {
   source_root: string;
   path: string;
   session_id: string | null;
-  size_bytes: number;
   mtime_ms: number;
   parser_version: number;
   /** Parsed identity for retaining usage when the source disappears. */
   relations?: SourceRelationMetadata | null;
-  /** 0 when Skill counts were skipped; re-enable rebuilds these sources. */
+  /** @deprecated Accepted in old callers' input. File size is observed when the file is read. */
+  size_bytes?: number;
+  /** @deprecated Accepted in old callers' input. The current schema does not store Skill coverage per file. */
   capabilities_collected?: 0 | 1;
   /** @deprecated Accepted in old callers' input. Schema v24 does not store it. */
   dev?: string | null;

@@ -12,7 +12,6 @@ interface SourceOrder {
 interface SummarySource {
   file: FileState;
   thread: Omit<ThreadLog, 'responses' | 'checkpoints' | 'legacy' | 'leadingLegacyCount' | 'firstResponse'>;
-  partialLine: boolean;
   hasResponses: boolean;
   order: SourceOrder;
   codex?: CodexThreadEvidence;
@@ -43,9 +42,9 @@ export class ThreadAggregation {
   private readonly claude = new Map<string, Map<string | undefined, ClaudeWinner>>();
   private sourceOrder = 0;
 
-  add(file: FileState, session: string, log: ThreadLog, partialLine: boolean): void {
+  add(file: FileState, session: string, log: ThreadLog): void {
     const { responses, checkpoints, legacy, leadingLegacyCount, firstResponse, ...thread } = log;
-    const source: SummarySource = { file, thread, partialLine, hasResponses: responses.length > 0, order: {} };
+    const source: SummarySource = { file, thread, hasResponses: responses.length > 0, order: {} };
     const key = JSON.stringify([session, thread.threadId]);
     const previous = this.threads.get(key);
     const preferred = !previous || preferTimeline(source, previous.source);
@@ -78,24 +77,21 @@ export class ThreadAggregation {
     for (const group of this.threads.values()) {
       check();
       if (!affected.has(group.session)) continue;
-      const { file, thread, partialLine, codex } = group.source;
+      const { file, thread, codex } = group.source;
       const { sessionId, threadId, projectKey, projectName, startedAt, lastAt, parentThreadId } = thread;
       const parent = parentThreadId && parentThreadId !== threadId ? this.parents.get(parentThreadId) : undefined;
       const usage = codex && group.codex ? consumeCodexThread(codex, group.codex.winners, parent?.codex) : claude.get(group);
       if (!usage) continue;
       const duration = startedAt !== null && lastAt !== null && lastAt > startedAt ? lastAt - startedAt : null;
-      const flags = [partialLine ? 'partial-line' : '',
-        parentThreadId && !parent && codex?.legacy.length ? 'missing-fork-parent' : ''].filter(Boolean);
       summaries.push({
         provider: file.provider, session_id: sessionId, session_name: names.get(group.session),
         root_turn_id: threadId, project_key: projectKey, project_name: projectName,
-        started_at_ms: startedAt, completed_at_ms: lastAt, duration_ms: duration,
+        started_at_ms: startedAt, duration_ms: duration,
         duration_quality: duration === null ? 'missing' : 'approximate',
         input_tokens: usage.input, output_tokens: usage.output, total_tokens: usage.input + usage.output,
         cache_read_input_tokens: usage.cacheRead, cache_write_input_tokens: usage.cacheWrite,
         // The aggregate storage uses the completed bucket as the denominator for its averages.
-        status: 'completed', quality_flags: flags.join(',') || null,
-        diagnostic_file_id: flags.length ? file.id : null,
+        status: 'completed',
         model_usage: [...usage.models.values()].filter(row => row.model || row.input_tokens || row.output_tokens),
       });
     }
@@ -146,7 +142,7 @@ function betterClaude(candidate: ClaudeWinner, previous: ClaudeWinner): boolean 
   if (candidate.group !== previous.group) return candidate.group.order > previous.group.order;
   if (candidate.source !== previous.source)
     return (candidate.source.copyOrder ?? Infinity) > (previous.source.copyOrder ?? Infinity);
-  return candidate.response.order > previous.response.order;
+  return (candidate.response.order ?? 0) > (previous.response.order ?? 0);
 }
 
 function mergeCodexResponses(target: CodexResponses, responses: readonly ThreadResponse[], preferred: boolean,

@@ -192,8 +192,7 @@ function persistNames(context: RefreshContext, names: ReadonlyMap<string, string
 
 function finalFile(file: FileState): FileMetadata & { id: number } {
   return { id: file.id, provider: file.provider, source_root: file.source_root, path: file.path,
-    session_id: file.session_id, size_bytes: file.size_bytes, mtime_ms: file.mtime_ms,
-    parser_version: file.parser_version, capabilities_collected: file.capabilities_collected, relations: file.relations };
+    session_id: file.session_id, mtime_ms: file.mtime_ms, parser_version: file.parser_version, relations: file.relations };
 }
 
 export function recordFailure(context: RefreshContext, file: FileState): void {

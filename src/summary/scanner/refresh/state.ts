@@ -24,6 +24,7 @@ export function needsSourceRead(file: Pick<FileMetadata, 'mtime_ms' | 'source_ro
 
 export interface FileState extends FileMetadata {
   id: number;
+  size_bytes: number;
   previous?: StoredSource;
   changed: boolean;
   removed: boolean;
@@ -116,9 +117,9 @@ export class ScanState {
     this.indexSession(file);
   }
 
-  registerPrepared(file: FileState, thread: ThreadLog, partialLine: boolean): void {
+  registerPrepared(file: FileState, thread: ThreadLog): void {
     const { sessionId, threadId, parentThreadId, legacy } = thread;
-    this.aggregation.add(file, sessionKey(file.provider, sessionId), thread, partialLine);
+    this.aggregation.add(file, sessionKey(file.provider, sessionId), thread);
     file.prepared = { sessionId, threadId, parentThreadId, hasLegacy: legacy.length > 0 };
     if (file.provider === 'codex') this.preparedCodexFiles.push(file);
   }

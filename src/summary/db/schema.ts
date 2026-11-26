@@ -2,7 +2,7 @@
 import { SCHEMA_DAILY_CAPABILITY_SQL, SCHEMA_ROLLUP_SQL } from './rollup-state';
 
 export { SCHEMA_ROLLUP_SQL } from './rollup-state';
-export const SCHEMA_VERSION = 27;
+export const SCHEMA_VERSION = 28;
 
 export const SCHEMA_APPLIED_RESPONSES_SQL = `
 CREATE TABLE IF NOT EXISTS applied_response (
@@ -104,18 +104,17 @@ CREATE INDEX IF NOT EXISTS idx_summary_period ON turn_summary(started_at_ms, pro
 CREATE INDEX IF NOT EXISTS idx_summary_project_period ON turn_summary(provider, project_key, started_at_ms);
 `;
 
-const SOURCE_SQL = `
+function sourceSql(legacy = false): string {
+  return `
 CREATE TABLE IF NOT EXISTS source_file (
   id INTEGER PRIMARY KEY,
   provider TEXT NOT NULL CHECK(provider IN ('claude', 'codex')),
   source_root TEXT NOT NULL,
   path TEXT NOT NULL,
-  session_id TEXT,
-  size_bytes INTEGER NOT NULL DEFAULT 0 CHECK(size_bytes >= 0),
+  session_id TEXT,${legacy ? '\n  size_bytes INTEGER NOT NULL DEFAULT 0 CHECK(size_bytes >= 0),' : ''}
   mtime_ms REAL NOT NULL DEFAULT 0,
   parser_version INTEGER NOT NULL DEFAULT 0,
-  relation_meta BLOB,
-  capabilities_collected INTEGER NOT NULL DEFAULT 0 CHECK(capabilities_collected IN (0,1)),
+  relation_meta BLOB,${legacy ? '\n  capabilities_collected INTEGER NOT NULL DEFAULT 0 CHECK(capabilities_collected IN (0,1)),' : ''}
   source_missing INTEGER NOT NULL DEFAULT 0 CHECK(source_missing IN (0,1)),
   processing_status TEXT NOT NULL DEFAULT 'processing'
     CHECK(processing_status IN ('processing','done','error','interrupted')),
@@ -125,9 +124,10 @@ CREATE TABLE IF NOT EXISTS source_file (
   UNIQUE(provider, path)
 );
 `;
+}
 
 export const DAILY_SCHEMA_SQL = `
-${SOURCE_SQL}
+${sourceSql()}
 ${NAMES_SQL}
 ${SESSION_BILLING_SQL}
 ${SCHEMA_ROLLUP_SQL}
@@ -136,7 +136,7 @@ ${SCHEMA_DAILY_CAPABILITY_SQL}
 
 /** Legacy DDL used to describe the on-disk format before daily-only storage. */
 export const SCHEMA_SQL = `
-${SOURCE_SQL}
+${sourceSql(true)}
 ${NAMES_SQL}
 ${TURN_SUMMARY_SQL}
 ${TURN_SUMMARY_INDEX_SQL}

@@ -37,7 +37,8 @@ export interface ThreadResponse {
   turnId?: string;
   tokens: ThreadTokens;
   model: string;
-  order: number;
+  /** Claude can use the winning row's order to break ties within a file. */
+  order?: number;
 }
 
 export interface ThreadCheckpoint {
@@ -241,7 +242,8 @@ export class ThreadLogParser {
     if (!responseId) throw new SummaryError('missing-response-id', offset);
     if (!this.turnId) throw new SummaryError('missing-root-turn', offset);
     const candidate = { responseId, turnId: this.turnId, model: this.codexModel(payload),
-      tokens: tokenVector(codexTokens(object(payload.usage))), order: this.recordCount++ };
+      tokens: tokenVector(codexTokens(object(payload.usage))) };
+    this.recordCount++;
     const responseIndex = this.keepResponse(responseKey(candidate), candidate);
     if (responseIndex === undefined) return;
     this.intervalUsage += candidate.tokens.input + candidate.tokens.output;

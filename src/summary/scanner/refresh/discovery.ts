@@ -42,8 +42,7 @@ export async function discoverSources(context: RefreshContext): Promise<void> {
 function loadStoredPaths(database: SummaryDatabase): DiscoveryPaths {
   const paths: DiscoveryPaths = { byPath: new Map(), storedRoots: new Set(), nextId: 1 };
   const stored = database.connection.prepare(`SELECT id, provider, source_root, path, session_id,
-    size_bytes, mtime_ms, parser_version, capabilities_collected,
-    source_missing, processing_status FROM source_file ORDER BY id`).iterate() as unknown as Iterable<StoredSource>;
+    mtime_ms, parser_version, source_missing, processing_status FROM source_file ORDER BY id`).iterate() as unknown as Iterable<StoredSource>;
   for (const previous of stored) {
     paths.byPath.set(sessionKey(previous.provider, previous.path), { previous });
     paths.storedRoots.add(sessionKey(previous.provider, previous.source_root));
@@ -66,8 +65,7 @@ function recordObservation(context: RefreshContext, paths: DiscoveryPaths, obser
     observed.changed = changed;
   } else {
     const file: FileState = { ...observation, changed, id: previous?.id ?? paths.nextId++, previous,
-      session_id: previous?.session_id ?? null, selected: true, removed: false, parser_version: PARSER_VERSION,
-      capabilities_collected: 0 };
+      session_id: previous?.session_id ?? null, selected: true, removed: false, parser_version: PARSER_VERSION };
     entry.observed = file;
     paths.byPath.set(key, entry);
     state.trackFile(file);
@@ -85,7 +83,8 @@ function registerUnseenSources(context: RefreshContext, stored: Iterable<SourceP
     if (observed || !previous) continue;
     const selected = selectedRoots.has(sessionKey(previous.provider, previous.source_root));
     const changed = selected && (!previous.source_missing || !retain);
-    const file: FileState = { ...previous, previous, changed,
+    // An unobserved file must be statted before it can be read outside the selected roots.
+    const file: FileState = { ...previous, size_bytes: 0, previous, changed,
       removed: selected, selected };
     state.trackFile(file);
     if (changed && file.session_id) {

@@ -30,6 +30,10 @@ export function migrateSchema(connection: DatabaseSync, timezone: string, transa
         DROP INDEX IF EXISTS idx_usage_request_daily_project_day;
         DROP INDEX IF EXISTS idx_usage_model_daily_day;
         DROP INDEX IF EXISTS idx_usage_model_daily_project_day;`);
+      const columns = connection.prepare('PRAGMA table_info(source_file)').all();
+      for (const column of ['size_bytes', 'capabilities_collected']) {
+        if (columns.some(existing => existing.name === column)) connection.exec(`ALTER TABLE source_file DROP COLUMN ${column}`);
+      }
     }
     connection.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
   });
@@ -80,10 +84,8 @@ function prepareLegacyTables(connection: DatabaseSync): void {
   }
   if (!sourceColumns.some(column => column.name === 'relation_meta'))
     connection.exec('ALTER TABLE source_file ADD COLUMN relation_meta BLOB');
-  for (const column of ['capabilities_collected', 'source_missing']) {
-    if (!sourceColumns.some(existing => existing.name === column))
-      connection.exec(`ALTER TABLE source_file ADD COLUMN ${column} INTEGER NOT NULL DEFAULT 0 CHECK(${column} IN (0,1))`);
-  }
+  if (!sourceColumns.some(column => column.name === 'source_missing'))
+    connection.exec('ALTER TABLE source_file ADD COLUMN source_missing INTEGER NOT NULL DEFAULT 0 CHECK(source_missing IN (0,1))');
 }
 
 function migrateLegacyUsage(connection: DatabaseSync, timezone: string): void {

@@ -54,15 +54,14 @@ function applyPreparation(context: RefreshContext, file: FileState, preparation:
   result.parsed++;
   const { partialLine, thread } = preparation.read;
   file.parser_version = PARSER_VERSION;
-  file.capabilities_collected = 0;
   if (!thread) {
     applyEmptySource(state, file, partialLine);
     return;
   }
   const { sessionId, threadId } = thread;
   state.setSession(file, sessionId);
-  file.relations = { identity: { sessionId, threadId }, threadUsage: true };
-  state.registerPrepared(file, thread, partialLine);
+  file.relations = { identity: { threadId }, threadUsage: true };
+  state.registerPrepared(file, thread);
   file.changed = needsSourceRead(file, file.previous);
   if (!file.changed) return;
   state.affect(file.provider, file.session_id);

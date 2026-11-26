@@ -2,7 +2,6 @@
 import { deserialize, serialize } from 'node:v8';
 import type { SqliteSession } from '../connection';
 import type { Provider, SessionRef, SourceRelationMetadata, TurnSummaryInput } from '../types';
-import { nonnegative } from '../validation';
 import { StageProfiler, type StorageStage } from '../../profiling';
 import type { MemoryReplacement, SavedSessionNames } from './types';
 
@@ -125,16 +124,15 @@ export class MemoryStore {
   private saveFiles({ replacement, sessions }: PreparedReplacement, now: string): void {
     if (!replacement.files.length) return;
     const select = this.database.statement('SELECT provider,session_id FROM source_file WHERE id=?');
-    const save = this.database.statement(`INSERT INTO source_file(id,provider,source_root,path,session_id,size_bytes,mtime_ms,parser_version,
-        capabilities_collected,relation_meta,source_missing,processing_status,processing_position,recorded_at,last_error)
-      VALUES(?,?,?,?,?,?,?,?,?,?,0,'done','committed',?,NULL)
+    const save = this.database.statement(`INSERT INTO source_file(id,provider,source_root,path,session_id,mtime_ms,parser_version,
+        relation_meta,source_missing,processing_status,processing_position,recorded_at,last_error)
+      VALUES(?,?,?,?,?,?,?,?,0,'done','committed',?,NULL)
       ON CONFLICT(id) DO UPDATE SET source_root=excluded.source_root,path=excluded.path,session_id=excluded.session_id,
-        size_bytes=excluded.size_bytes,mtime_ms=excluded.mtime_ms,parser_version=excluded.parser_version,
+        mtime_ms=excluded.mtime_ms,parser_version=excluded.parser_version,
         relation_meta=CASE WHEN ? THEN excluded.relation_meta ELSE source_file.relation_meta END,
-        capabilities_collected=excluded.capabilities_collected,source_missing=0,
+        source_missing=0,
         processing_status='done',processing_position='committed',recorded_at=excluded.recorded_at,last_error=NULL`);
     for (const file of replacement.files) {
-      nonnegative(file.size_bytes, 'size_bytes');
       const previous = select.get(file.id);
       if (previous) {
         if (previous.provider !== file.provider) throw new Error('Source provider cannot change');
@@ -142,8 +140,8 @@ export class MemoryStore {
       }
       this.requireSession(file.provider, file.session_id, sessions);
       const relations = file.relations;
-      save.run(file.id, file.provider, file.source_root, file.path, file.session_id, file.size_bytes, file.mtime_ms, file.parser_version,
-        file.capabilities_collected ?? 1, relations ? serialize(relations) : null, now, Number(relations !== undefined));
+      save.run(file.id, file.provider, file.source_root, file.path, file.session_id, file.mtime_ms, file.parser_version,
+        relations ? serialize(relations) : null, now, Number(relations !== undefined));
     }
   }
 
