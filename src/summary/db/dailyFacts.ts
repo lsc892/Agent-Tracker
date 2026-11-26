@@ -23,10 +23,14 @@ export function dailyFacts(summaries: readonly TurnSummaryInput[]): { provider: 
       row.cache_write_input_tokens === undefined ? 0 : row.cache_write_input_tokens,
       row.cache_read_input_tokens === undefined ? 0 : row.cache_read_input_tokens];
     const billing = row.billing ?? 'unknown';
+
+    // [DTO 정책] 모델별 토큰·가격을 펼치고 모델 행이 없으면 스레드 전체 사용량을 대체 행으로 넣는다.
+    let hasModel = false;
     let apiCost: number | null = null;
     let pricedModels = 0;
     for (const [name, input, output, write, read, price] of models) {
-      const total = Number(input) + Number(output);
+      const total = input + output;
+      hasModel ||= name !== '';
       if (typeof price === 'number') {
         apiCost = (apiCost ?? 0) + price;
         pricedModels++;
@@ -35,8 +39,11 @@ export function dailyFacts(summaries: readonly TurnSummaryInput[]): { provider: 
         price, Number(price === null), 1, billing]);
     }
     if (!models.length) model.push([...prefix, ...totals, row.total_tokens ? '' : null, 0, null, 1, 1, billing]);
-    provider.push([...prefix, ...totals, null, Number(models.some(([name]) => name !== '')),
-      apiCost, Math.max(1, models.length) - pricedModels, Math.max(1, models.length), billing]);
+
+    // [DTO 정책] 제공자 행에 전체 토큰과 확인된 비용 합계, 가격을 알 수 없는 항목 수를 담는다.
+    const costComponents = Math.max(1, models.length);
+    provider.push([...prefix, ...totals, null, Number(hasModel),
+      apiCost, costComponents - pricedModels, costComponents, billing]);
   }
   return { provider: JSON.stringify(provider), model: JSON.stringify(model) };
 }

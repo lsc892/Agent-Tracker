@@ -18,7 +18,7 @@ export function buildDailyUsageSource(
   const { sql: where, values } = buildDailyUsageFilter(usageFilter, timezone);
   const columns = [
     'provider', 'project_key', 'session_id', 'local_day',
-    ...(by === 'model' ? ['model', 'model_key'] : []),
+    ...(by === 'model' ? ['model'] : []),
     ...rollupStates(by).map(state => state.name),
   ];
   if (filter.includeCosts) columns.push(...DAILY_COST_STATES.map(state => state.name),
