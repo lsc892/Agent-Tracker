@@ -21,9 +21,8 @@ export function dailyFacts(summaries: readonly TurnSummaryInput[]): { provider: 
     const models = modelValues(row);
     const prefix = [row.provider, row.project_key, row.session_id, row.started_at_ms ?? null, row.status,
       row.duration_ms ?? null, row.duration_quality];
-    const totals = [row.input_tokens, row.output_tokens, row.total_tokens,
-      row.cache_write_input_tokens === undefined ? 0 : row.cache_write_input_tokens,
-      row.cache_read_input_tokens === undefined ? 0 : row.cache_read_input_tokens];
+    const { input_tokens: inputTokens, output_tokens: outputTokens, total_tokens: totalTokens,
+      cache_write_input_tokens: cacheWrite = 0, cache_read_input_tokens: cacheRead = 0 } = row;
     const billing = row.billing ?? 'unknown';
 
     // [DTO 정책] 모델별 토큰·가격을 펼치고 모델 행이 없으면 스레드 전체 사용량을 대체 행으로 넣는다.
@@ -40,11 +39,12 @@ export function dailyFacts(summaries: readonly TurnSummaryInput[]): { provider: 
       model.push([...prefix, input, output, total, write, read, name || (total ? '' : null), name ? 1 : 0,
         price, Number(price === null), 1, billing]);
     }
-    if (!models.length) model.push([...prefix, ...totals, row.total_tokens ? '' : null, 0, null, 1, 1, billing]);
+    if (!models.length) model.push([...prefix, inputTokens, outputTokens, totalTokens, cacheWrite, cacheRead,
+      totalTokens ? '' : null, 0, null, 1, 1, billing]);
 
     // [DTO 정책] 제공자 행에 전체 토큰과 확인된 비용 합계, 가격을 알 수 없는 항목 수를 담는다.
     const costComponents = Math.max(1, models.length);
-    provider.push([...prefix, ...totals, null, Number(hasModel),
+    provider.push([...prefix, inputTokens, outputTokens, totalTokens, cacheWrite, cacheRead, null, Number(hasModel),
       apiCost, costComponents - pricedModels, costComponents, billing]);
   }
   // [DTO 정책] 제공자와 모델의 행 배열을 각각 JSON으로 변환해 집계 SQL에 전달한다.
