@@ -16,21 +16,30 @@ export async function readNames(roots: readonly SourceRoot[], cancelled: () => b
       break;
     try {
       const path = join(home, 'session_index.jsonl'), stat = await lstat(path);
-      if (stat.isFile() && !stat.isSymbolicLink())
+      if (stat.isFile())
         await readJsonl(path, stat.size, row => {
           const id = string(row.id), name = displayName(row.thread_name);
-          if (id && name && !stateNames.has(key('codex', id)))
-            names.set(key('codex', id), name);
+          if (!id || !name) return;
+          const session = key('codex', id);
+          if (!stateNames.has(session)) names.set(session, name);
         }, { isCancelled: cancelled, fixedShape: indexFields });
     }
     catch { /* Optional metadata does not invalidate transcript facts. */ }
     let source: DatabaseSync | undefined;
     try {
-      const paths = (await readdir(home)).filter(path => /^state_\d+\.sqlite$/.test(path)).sort((a, b) => Number(b.match(/\d+/)![0]) - Number(a.match(/\d+/)![0]));
-      if (!paths.length)
-        continue;
-      const path = join(home, paths[0]), stat = await lstat(path);
-      if (!stat.isFile() || stat.isSymbolicLink())
+      let latestFile: string | undefined;
+      let latestVersion = -1;
+      for (const file of await readdir(home)) {
+        const match = /^state_(\d+)\.sqlite$/.exec(file);
+        if (!match) continue;
+        const version = Number(match[1]);
+        if (version <= latestVersion) continue;
+        latestFile = file;
+        latestVersion = version;
+      }
+      if (!latestFile) continue;
+      const path = join(home, latestFile), stat = await lstat(path);
+      if (!stat.isFile())
         continue;
       source = new DatabaseSync(path, { readOnly: true });
       source.exec('PRAGMA busy_timeout=250;PRAGMA query_only=ON;PRAGMA cache_size=-512;PRAGMA mmap_size=0');
