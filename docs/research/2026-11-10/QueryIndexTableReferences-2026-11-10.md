@@ -78,7 +78,7 @@ Agent Tracker는 조회와 갱신이 서로 다른 순서를 요구한다.
 
 **Covering index**는 조회에 필요한 열을 인덱스에서 모두 얻어 본체 행의 재조회를 줄인다. 하지만 수십 개 집계 지표까지 넣으면 인덱스와 매 쓰기의 유지 비용이 커진다. 현재 일별 보조 인덱스가 모든 지표의 SUM까지 covering한다는 뜻은 아니다. [SQLite covering index](https://www.sqlite.org/queryplanner.html#covering_indexes).
 
-이 저장소의 [기존 세션 시간 인덱스 비교](../../benchmarks/2026-11-03/SessionTimeIndexAB-summary.md)는 `(provider, session_id, started_at_ms)` 추가만으로 일관된 갱신 개선을 확인하지 못했다. 따라서 같은 인덱스를 새 개선책처럼 다시 제안하지 않는다.
+이 저장소의 [기존 세션 시간 인덱스 비교](../../benchmarks/success/2026-11-03/SessionTimeIndexAB-summary.md)는 `(provider, session_id, started_at_ms)` 추가만으로 일관된 갱신 개선을 확인하지 못했다. 따라서 같은 인덱스를 새 개선책처럼 다시 제안하지 않는다.
 
 ## 4. 테이블 개선: 원본과 반복 조회에 필요한 요약을 나눈다
 
@@ -96,7 +96,7 @@ TimescaleDB의 실시간 집계는 기존 집계와 최근 미집계 원본을 �
 
 Home Assistant는 반복되는 속성을 `state_attributes`에 한 번 저장해 참조하고, 통계의 설명은 `statistics_meta`에 둔다. Agent Tracker도 이름을 `projects`, `sessions`에 분리한다. 이처럼 자주 반복되는 큰 값을 분리하면 중복 저장과 갱신량을 줄일 수 있지만 표시할 때 JOIN 비용이 생긴다. [속성 공유](https://contributors.home-assistant.io/data/guides/query-the-database/#attributes), [현재 스키마](../../../src/summary/db/schema.ts).
 
-사용하지 않는 열을 제거하는 것은 행 폭과 계산·직렬화 비용을 줄이는 별도 방법이다. 이 저장소에서는 이미 요청 daily 41→38개, 모델 daily 41→37개로 상태를 줄였다. 기존 1회 비교에서는 daily 본체 공간이 감소했지만 실행 시간 개선은 일관되지 않았다. **공간 감소를 그대로 속도 개선율로 바꾸어 말하지 않는다.** [기존 열 제거 결과](../../benchmarks/2026-11-10/RollupTrimAB-2026-11-10.md).
+사용하지 않는 열을 제거하는 것은 행 폭과 계산·직렬화 비용을 줄이는 별도 방법이다. 이 저장소에서는 이미 요청 daily 41→38개, 모델 daily 41→37개로 상태를 줄였다. 기존 1회 비교에서는 daily 본체 공간이 감소했지만 실행 시간 개선은 일관되지 않았다. **공간 감소를 그대로 속도 개선율로 바꾸어 말하지 않는다.** [기존 열 제거 결과](../../benchmarks/success/2026-11-10/RollupTrimAB-2026-11-10.md).
 
 현재 daily는 `WITHOUT ROWID`라 복합 PK가 본체의 저장 키다. 세션별 교체와 잘 맞는 부분이 있지만, 긴 복합 키는 보조 인덱스도 크게 만들고 넓은 행은 불리할 수 있다. 따라서 모든 테이블을 같은 형식으로 바꾸는 규칙은 적절하지 않다. [SQLite 공식 적용 조건](https://www.sqlite.org/withoutrowid.html#when_to_use_without_rowid).
 
@@ -113,9 +113,9 @@ Home Assistant는 반복되는 속성을 `state_attributes`에 한 번 저장해
 
 GitLab의 batch 갱신도 범위를 제한하고 집합으로 처리하는 참고 사례다. SQLite는 원격 DB 왕복이 없어도 JS↔SQLite 호출, statement 실행 준비와 반복 인덱스 탐색 비용이 있으므로 호출 축소의 여지가 있다. [GitLab batching](https://docs.gitlab.com/development/database/batching_best_practices/).
 
-기존 [rollup 배칭 보고서](../../benchmarks/2026-11-10/RollupBatchAB-2026-11-10.md)에서는 실제 SQL 호출이 1,488→100회, 해당 rollup 구간 중앙값이 70.517→26.265ms였다. 전체 refresh는 3,102.307→3,039.996ms로 약 2% 감소했다. **부분 구간의 약 63% 감소와 전체 성능 개선은 다르다.** 이번에 새로 측정한 값은 아니다.
+기존 [rollup 배칭 보고서](../../benchmarks/success/2026-11-10/RollupBatchAB-2026-11-10.md)에서는 실제 SQL 호출이 1,488→100회, 해당 rollup 구간 중앙값이 70.517→26.265ms였다. 전체 refresh는 3,102.307→3,039.996ms로 약 2% 감소했다. **부분 구간의 약 63% 감소와 전체 성능 개선은 다르다.** 이번에 새로 측정한 값은 아니다.
 
-이름·결제 설정도 이미 요청별 반복을 고유 프로젝트·세션별 처리로 바꿨다. N개 요청, P개 프로젝트, S개 세션이면 해당 SQL 호출을 O(N)에서 O(P+S)로 줄이는 방식이다. 모든 요청을 읽고 처리하는 전체 알고리즘이 O(P+S)가 되는 것은 아니다. [현재 이름 저장](../../../src/summary/db/memoryStore.ts), [기존 결과·단일 관측의 한계](../../benchmarks/2026-11-10/MetadataBatchAB-2026-11-10.md).
+이름·결제 설정도 이미 요청별 반복을 고유 프로젝트·세션별 처리로 바꿨다. N개 요청, P개 프로젝트, S개 세션이면 해당 SQL 호출을 O(N)에서 O(P+S)로 줄이는 방식이다. 모든 요청을 읽고 처리하는 전체 알고리즘이 O(P+S)가 되는 것은 아니다. [현재 이름 저장](../../../src/summary/db/memoryStore.ts), [기존 결과·단일 관측의 한계](../../benchmarks/success/2026-11-10/MetadataBatchAB-2026-11-10.md).
 
 ### 5.2 추가 후보: pg_ivm처럼 이전 기여분을 빼고 새 기여분을 더한다
 

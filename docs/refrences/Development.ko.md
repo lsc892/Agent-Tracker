@@ -180,7 +180,7 @@ npm run benchmark:quota # 합성 App Server 성공/오류/timeout/취소의 시�
 
 대량 benchmark는 `BENCHMARK_FILES`, `BENCHMARK_TURNS` 환경 변수로 조절합니다. 결과는 `tests/results/benchmarks/summary.json`에 남으며 실제 개인 대화 기록은 사용하지 않습니다. quota 자원 측정 옵션과 한계는 [측정 안내](QuotaBenchmark.md)를 참고하세요.
 
-현재 수집은 원본을 한 번 읽으며 그룹 winner 비교 → DTO 갱신 → 패자 폐기를 수행하고, 남은 winner를 최종 세션·요청 그룹으로 병합합니다. 패자 모델을 별도 행으로 복원하지 않습니다. 이전 TEMP 제목 인덱스와 SQL transaction 측정 실행기는 제거했으며 [제목 A/B](benchmarks/2026-10-08/RequestTitleAB.md)·[transaction 결과](benchmarks/2026-10-08/RequestTitleTransactions.md)는 과거 설계 기록으로 보존합니다. 구현·정합성과 성능은 [단일 읽기 A/B 기록](benchmarks/2026-11-08/SinglePassWinnerAB-2026-11-08.md)을 참고하세요.
+현재 수집은 원본을 한 번 읽으며 그룹 winner 비교 → DTO 갱신 → 패자 폐기를 수행하고, 남은 winner를 최종 세션·요청 그룹으로 병합합니다. 패자 모델을 별도 행으로 복원하지 않습니다. 이전 TEMP 제목 인덱스와 SQL transaction 측정 실행기는 제거했으며 [제목 A/B](../benchmarks/success/2026-10-08/RequestTitleAB.md)·[transaction 결과](../benchmarks/success/2026-10-08/RequestTitleTransactions.md)는 과거 설계 기록으로 보존합니다. 구현·정합성과 성능은 [단일 읽기 A/B 기록](../benchmarks/success/2026-11-08/SinglePassWinnerAB-2026-11-08.md)을 참고하세요.
 
 `$quota-qa` 또는 [quota-qa 스킬](../.agents/skills/quota-qa/SKILL.md)로 실제 계정 검증을 실행합니다. `test:quota:live`는 Claude의 OAuth usage 응답과 Codex의 실제 App Server 응답을 동일 응답 기준으로 제품 provider와 대조하고 사용/남음 표시 반올림·잔량 막대·Codex 프로세스 종료도 검사합니다. 결과는 `tests/results/quota-live.json`에 남으며 토큰·계정 식별자는 저장하지 않습니다. 두 제공자 중 하나라도 인증 오류·429·timeout·불일치이면 종료 코드 1입니다. 429는 자동 재시도하지 않습니다. 일반 `check`와 CI는 합성 입력으로 QA 도구를 검사하며 실제 계정을 호출하지 않습니다. 설치된 VS Code나 제공자 웹 화면의 대조는 별도 검증입니다.
 

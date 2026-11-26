@@ -34,4 +34,4 @@
 
 ## 후속 실측
 
-성능·정합성 측정 요청에 따라 [합성 파싱·계보 900 checks](../../benchmarks/2026-11-11/AlgorithmMinimizeParsingValidation-2026-11-11.json)와 [실제·합성 A/B](../../benchmarks/2026-11-11/AlgorithmMinimizeAB-2026-11-11.md)를 실행했다. 이벤트 순서·identity·flags·제목·도구·오류·청크·압축·파일 경계와 독립 기대값을 통과했다. 실제 symlink 생성은 Windows EPERM으로 생략했다. 현재 입력의 원본 준비는 2625.875→2566.574ms였지만 I/O·Worker·winner 비용을 포함하며 개별 파싱 함수의 효과로 분리하지 않는다. 10,000건의 해당 구간 차이는 미미하고 100건은 소폭 악화했다. 비공개 실제 로그 전체의 독립 파서 oracle은 없다.
+성능·정합성 측정 요청에 따라 [합성 파싱·계보 900 checks](../../benchmarks/success/2026-11-11/AlgorithmMinimizeParsingValidation-2026-11-11.json)와 [실제·합성 A/B](../../benchmarks/success/2026-11-11/AlgorithmMinimizeAB-2026-11-11.md)를 실행했다. 이벤트 순서·identity·flags·제목·도구·오류·청크·압축·파일 경계와 독립 기대값을 통과했다. 실제 symlink 생성은 Windows EPERM으로 생략했다. 현재 입력의 원본 준비는 2625.875→2566.574ms였지만 I/O·Worker·winner 비용을 포함하며 개별 파싱 함수의 효과로 분리하지 않는다. 10,000건의 해당 구간 차이는 미미하고 100건은 소폭 악화했다. 비공개 실제 로그 전체의 독립 파서 oracle은 없다.

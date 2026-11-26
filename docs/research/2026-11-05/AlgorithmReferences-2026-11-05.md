@@ -2,7 +2,7 @@
 
 조사 기준: **2026-11-05, Asia/Seoul**. Agent Tracker의 현재 코드와 공식 문서·원 논문·개발자 공개 소스를 대조했다. 설명 아래의 데이터는 이해를 위한 합성 예시다.
 
-아래의 현재 구현 비교는 영속 turn metadata 도입 전 기준이다. 이후 전수 파싱을 유지하면서 변경 요청만 재집계하는 구조와 검증 결과는 [metadata A/B 보고서](../../benchmarks/2026-11-05/MetadataKeyedAB-2026-11-05.md)에 기록한다.
+아래의 현재 구현 비교는 영속 turn metadata 도입 전 기준이다. 이후 전수 파싱을 유지하면서 변경 요청만 재집계하는 구조와 검증 결과는 [metadata A/B 보고서](../../benchmarks/success/2026-11-05/MetadataKeyedAB-2026-11-05.md)에 기록한다.
 
 핵심은 **읽고 만드는 양을 줄이고, 같은 작업을 묶고, 이미 계산한 결과를 다시 사용하는 것**이다.
 
@@ -198,7 +198,7 @@ On-Demand: 구조 탐색 → 해당 경로 접근 → input 숫자를 변환
 
 현재 구현은 `JSON.parse()`를 바꾸기보다 그 앞의 줄 구성·복사·버리는 값의 보관 비용을 줄였다. 따옴표/역슬래시 탐색 위치를 재사용해 같은 남은 구간을 반복 검색하지 않는 것도 포함된다. [현재 reader](../../../src/summary/jsonl/index.ts)
 
-기존 저장소의 2026-10-09 보고서는 고정된 실제 입력 53,271행의 **파싱 구간만** 4,941.028→1,718.516 ms(중앙값)로 줄었다고 기록한다. 당시 adapter·파일 I/O·SQLite는 제외했다. 이번 조사에서 새로 실행한 측정이나 전체 갱신 속도가 아니다. [기존 JSONL 파싱 비교](../../benchmarks/2026-10-09/JsonlParsingBranches-2026-10-09.md)
+기존 저장소의 2026-10-09 보고서는 고정된 실제 입력 53,271행의 **파싱 구간만** 4,941.028→1,718.516 ms(중앙값)로 줄었다고 기록한다. 당시 adapter·파일 I/O·SQLite는 제외했다. 이번 조사에서 새로 실행한 측정이나 전체 갱신 속도가 아니다. [기존 JSONL 파싱 비교](../../benchmarks/success/2026-10-09/JsonlParsingBranches-2026-10-09.md)
 
 후보 비교 시에는 메타데이터·사용량·도구·대형 이미지·대형 중첩 본문을 섞고, UTF-8 청크 경계·escape·미완성 행·오류 offset·중복 집계가 현재 결과와 같은지 함께 확인해야 한다. 읽어야 하는 원본 바이트가 그대로라면 I/O의 O(N) 자체는 사라지지 않는다.
 
@@ -336,7 +336,7 @@ COMMIT;
 
 **현재 대응.** `SessionStore.replaceSessions()`가 manifest, facts, 자식·비용, rollup과 이름 정리를 한 transaction으로 묶는다. 논리 요청의 `UNIQUE(provider, session_id, root_turn_id)`와 snapshot 교체가 재시도 시 통계의 중복 누적을 막는다. 단, metadata 방문·TEMP 비교·작은 세션의 재쓰기까지 사라지는 보장은 아니다. 현재에는 영속 dirty 큐나 byte checkpoint를 추가하지 않았다.
 
-**검증 범위.** 이번 작업은 코드와 공개 레퍼런스 조사다. 후보 알고리즘을 구현하거나 신규 성능 실측을 수행하지 않았다. 기존 [IncrementalRefresh 결과](../../benchmarks/2026-10-29/IncrementalRefresh-2026-10-29.md)도 증분 저장의 전체 시간 개선이 일관되지 않았다고 기록한다. 비교 비용·재파싱·쓰기량을 함께 측정해야 실제 이득을 판단할 수 있다.
+**검증 범위.** 이번 작업은 코드와 공개 레퍼런스 조사다. 후보 알고리즘을 구현하거나 신규 성능 실측을 수행하지 않았다. 기존 [IncrementalRefresh 결과](../../benchmarks/failure/2026-10-29/IncrementalRefresh-2026-10-29.md)도 증분 저장의 전체 시간 개선이 일관되지 않았다고 기록한다. 비교 비용·재파싱·쓰기량을 함께 측정해야 실제 이득을 판단할 수 있다.
 
 ## 4. 월·일·프로젝트·세션·평균 조회: 작은 집계를 다시 합친다
 
@@ -567,7 +567,7 @@ WHERE local_day<>'' AND substr(local_day,1,7)='2026-11';
 
 **쉽게 설명하면:** 인덱스를 만들었다는 사실보다 ‘실제로 어느 구간을 읽었는지’를 본다. `EXPLAIN QUERY PLAN`의 `SEARCH`, `COVERING INDEX`, `USE TEMP B-TREE`를 확인하고 같은 입력의 읽기·쓰기·공간을 비교한다. 출력 문자열은 SQLite 버전에 따라 바뀔 수 있다. [SQLite EXPLAIN QUERY PLAN](https://www.sqlite.org/eqp.html).
 
-기존 [11월 3일 세션 시간 인덱스 A/B](../../benchmarks/2026-11-03/SessionTimeIndexAB-2026-11-03.md)는 `(provider,session_id,started_at_ms)` 하나를 **실험 후보**로 추가했다. 합성 1만 요청 DB의 기존 데이터에 처음 생성한 공간은 +424KiB였고, 1,000요청/세션 입력의 요청 추가 갱신은 +3.735~5.933ms였다. 이는 당시 장비·입력의 기존 실측이며 새 측정이 아니다. 현재 schema v16에는 그 인덱스가 없다. 읽기 후보 평가와 갱신 비용을 함께 봐야 한다.
+기존 [11월 3일 세션 시간 인덱스 A/B](../../benchmarks/failure/2026-11-03/SessionTimeIndexAB-2026-11-03.md)는 `(provider,session_id,started_at_ms)` 하나를 **실험 후보**로 추가했다. 합성 1만 요청 DB의 기존 데이터에 처음 생성한 공간은 +424KiB였고, 1,000요청/세션 입력의 요청 추가 갱신은 +3.735~5.933ms였다. 이는 당시 장비·입력의 기존 실측이며 새 측정이 아니다. 현재 schema v16에는 그 인덱스가 없다. 읽기 후보 평가와 갱신 비용을 함께 봐야 한다.
 
 현재 [connection.ts](../../../src/summary/db/connection.ts)는 열 때 `PRAGMA main.optimize=0x10002`, 이후 하루 간격·닫을 때 `PRAGMA main.optimize`를 이미 실행한다. 이는 장기간 연결의 통계를 유지하는 SQLite 권장 패턴과 대응한다. 새 기능으로 중복 도입할 필요는 없다. [SQLite ANALYZE §2.1](https://www.sqlite.org/lang_analyze.html#periodically_run_pragma_optimize).
 
@@ -598,7 +598,7 @@ LIMIT 100;
 
 위 표는 병목에 따른 **조사·비교 순서**이며 새 기능의 채택 결정이나 성능 보장이 아니다. JSON 구조 인덱스(Mison)는 문자 위치를 찾는 자료구조이고, SQLite B-tree 인덱스는 DB 행을 찾는 자료구조다. 둘은 이름이 같아도 대상으로 하는 비용이 다르다.
 
-기존 [JSONL 파싱 비교](../../benchmarks/2026-10-09/JsonlParsingBranches-2026-10-09.md), [증분 갱신 비교](../../benchmarks/2026-10-29/IncrementalRefresh-2026-10-29.md), [단순 인덱스 비교](../../benchmarks/2026-11-03/SimpleIndexAB-2026-11-03.md), [TEMP 묶음 제품 확인](../../benchmarks/2026-11-04/TempBatchProduct-2026-11-04.md)는 각 시점·입력의 결과다. 논문의 속도 배수나 과거 실험 수치를 현재 제품 전체의 개선율로 옮기지 않는다.
+기존 [JSONL 파싱 비교](../../benchmarks/success/2026-10-09/JsonlParsingBranches-2026-10-09.md), [증분 갱신 비교](../../benchmarks/failure/2026-10-29/IncrementalRefresh-2026-10-29.md), [단순 인덱스 비교](../../benchmarks/failure/2026-11-03/SimpleIndexAB-2026-11-03.md), [TEMP 묶음 제품 확인](../../benchmarks/success/2026-11-04/TempBatchProduct-2026-11-04.md)는 각 시점·입력의 결과다. 논문의 속도 배수나 과거 실험 수치를 현재 제품 전체의 개선율로 옮기지 않는다.
 
 검증: 4·5절의 SQL **9개 블록**을 Node v24.19.0 / SQLite 3.53.3 메모리 DB에서 실행했다. 일·월·프로젝트·세션 합계, 완료 평균 260, 기록된 완료 평균 325, 알려진 완료 소요 시간 평균 2333.333…ms를 기대값과 대조하고 원본·일별 집계 결과의 일치를 확인했다. 복합 인덱스 `SEARCH`와 `COVERING INDEX` 실행 계획도 확인했다.
 

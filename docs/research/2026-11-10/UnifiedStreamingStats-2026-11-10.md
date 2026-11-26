@@ -56,7 +56,7 @@ metadata 보관은 O(M) 이벤트 객체에서 O(U+고유 check/도구 키+필�
 - 변경 전 빌드와 최종 빌드의 이벤트 입력 96 seed ×4파일 ×154이벤트=59,136개에서 전체 요청 결과·orphan이 일치했다. 별도로 기존 독립 SQL oracle 32 seed와 새 경계 테스트 5개가 통과했다. 입력 객체 보존·최초 제목·시각 역행·부모로 합쳐지는 다중 root·wildcard 진단 순서·BigInt·Worker snapshot을 포함한다.
 - `npm run check`: 타입·린트 통과, 전체 432개 중 426개 통과. 남은 계보·취소 관련 6개 실패는 변경 전 A의 관련 59개 검사에서도 동일하게 재현했다. 실패를 통과시키기 위한 테스트 삭제나 기대값 완화는 하지 않았다.
 
-최종 원시 결과·입력 및 소스/빌드 hash는 [정합성 JSON](../../benchmarks/2026-11-10/UnifiedStreamStatsValidationFinal-2026-11-10.json), 추가 검증 요약은 [Checks JSON](../../benchmarks/2026-11-10/UnifiedStreamStatsChecks-2026-11-10.json)에 있다. 앞선 실패 후보의 원인 분석은 별도 기록으로 보존한다.
+최종 원시 결과·입력 및 소스/빌드 hash는 [정합성 JSON](../../benchmarks/success/2026-11-10/UnifiedStreamStatsValidationFinal-2026-11-10.json), 추가 검증 요약은 [Checks JSON](../../benchmarks/success/2026-11-10/UnifiedStreamStatsChecks-2026-11-10.json)에 있다. 앞선 실패 후보의 원인 분석은 별도 기록으로 보존한다.
 
 ### 현재 데이터·10,000요청의 시간 변화
 

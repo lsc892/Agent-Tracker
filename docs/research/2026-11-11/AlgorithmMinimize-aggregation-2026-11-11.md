@@ -27,4 +27,4 @@
 
 ## 후속 실측
 
-성능·정합성 측정 요청에 따라 [독립 계보 oracle을 포함한 170 그래프](../../benchmarks/2026-11-11/AlgorithmMinimizeParsingValidation-2026-11-11.json), 실제·합성 A/B와 거래 경계를 검증했다. 누락·충돌·순환·깊은 역순 계보·중복 원본·공유 그룹·root별 원본 배열을 통과했다. [A/B](../../benchmarks/2026-11-11/AlgorithmMinimizeAB-2026-11-11.md)의 현재 관계 확대는 2.134→1.621ms였지만 계보 함수 단독 측정은 아니다. 전체 최종 집계의 개선은 크지 않고 합성 10,000건은 소폭 느렸다.
+성능·정합성 측정 요청에 따라 [독립 계보 oracle을 포함한 170 그래프](../../benchmarks/success/2026-11-11/AlgorithmMinimizeParsingValidation-2026-11-11.json), 실제·합성 A/B와 거래 경계를 검증했다. 누락·충돌·순환·깊은 역순 계보·중복 원본·공유 그룹·root별 원본 배열을 통과했다. [A/B](../../benchmarks/success/2026-11-11/AlgorithmMinimizeAB-2026-11-11.md)의 현재 관계 확대는 2.134→1.621ms였지만 계보 함수 단독 측정은 아니다. 전체 최종 집계의 개선은 크지 않고 합성 10,000건은 소폭 느렸다.

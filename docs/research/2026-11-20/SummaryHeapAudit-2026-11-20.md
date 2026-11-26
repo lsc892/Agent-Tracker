@@ -42,4 +42,4 @@
 - 파일 Worker는 각 갱신이 끝날 때 0개였다. 합성 100요청에서 통계 클라이언트를 20회 만들고 조회한 뒤 종료했으며 매회 GC 후 `SummaryClient`, `WorkerTransport`, `RefreshController` 인스턴스와 활성 Worker가 0개였다.
 - 관측 범위는 통계 스캔, DB 저장·조회, 차트 데이터 생성과 Worker 수명이다. VS Code Webview 렌더러와 실계정 quota 메모리는 미측정이다.
 
-[측정 표본 JSON](SummaryHeapAudit-2026-11-20.json) · [11월 16일 집계 메모리 진단](../2026-11-16/SummaryMemory-2026-11-16.md) · [11월 20일 전수 해시 시간 비교](../../benchmarks/2026-11-20/ContentFingerprintFailure-2026-11-20.md)
+[측정 표본 JSON](SummaryHeapAudit-2026-11-20.json) · [11월 16일 집계 메모리 진단](../2026-11-16/SummaryMemory-2026-11-16.md) · [11월 20일 전수 해시 시간 비교](../../benchmarks/failure/2026-11-20/ContentFingerprintFailure-2026-11-20.md)

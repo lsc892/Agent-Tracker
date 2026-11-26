@@ -312,7 +312,7 @@ Claude credential·로그 보존 설정은 `<dataHome>/.claude`, Codex App Serve
 
 날짜별 토큰·모델·비용·이름·source_file·삭제는 성분별 snapshot에서 함께 확정한다. 정상 독립 성분은 최대 16성분·합계 1,000스레드까지 한 동기 transaction에서 확정한다. 1성분과 1,000스레드 초과 성분은 단일 저장 경로를 사용하고, 보류·원본 오류·삭제 성분 앞에서는 대기 묶음을 먼저 확정한다.
 
-저장은 방문한 연결 성분을 한 번씩 처리하고 COMMIT이 성공한 뒤 해당 원본을 settled로 표시한다. 묶음 실패 시 전체 rollback 후 준비된 입력으로 성분별 저장을 재시도하여 실패 범위를 격리한다. Worker 양보와 취소 확인은 transaction 사이에서 수행한다. 취소 시 이미 확정된 묶음은 유지하고 대기 묶음은 반영하지 않는다. 강제 종료 시 진행 중인 정상 묶음 전체가 미확정 단위다. [트랜잭션 A/B](../benchmarks/2026-11-10/TransactionBatchAB-2026-11-10.md).
+저장은 방문한 연결 성분을 한 번씩 처리하고 COMMIT이 성공한 뒤 해당 원본을 settled로 표시한다. 묶음 실패 시 전체 rollback 후 준비된 입력으로 성분별 저장을 재시도하여 실패 범위를 격리한다. Worker 양보와 취소 확인은 transaction 사이에서 수행한다. 취소 시 이미 확정된 묶음은 유지하고 대기 묶음은 반영하지 않는다. 강제 종료 시 진행 중인 정상 묶음 전체가 미확정 단위다. [트랜잭션 A/B](../benchmarks/success/2026-11-10/TransactionBatchAB-2026-11-10.md).
 
 #### 4.4.1 파일과 집계 결과가 커져 메모리·DB 잠금이 늘어나는 문제
 
@@ -704,7 +704,7 @@ DB당 통계 시간대 하나를 사용한다. 시간대를 바꾸면 남아 있
 
 복수 변경 세션과 새 사용량은 JSON 목록으로 고정 SQL에 바인딩한다. SQLite의 `json_each`와 `GROUP BY`가 제공자·프로젝트·세션·날짜 및 모델별 결과를 만든다. UPSERT는 네 차원과 모델별 표의 `model_key`를 충돌 키로 사용한다. 집계 실패 시 파일 수정 시각과 일별 행을 함께 롤백하고 준비된 입력으로 성분별 저장을 재시도한다.
 
-일별 집계 SQL은 그 범위 조건을 먼저 적용한 뒤 필요한 지표 열·현지 일·사용량 유무만 `scoped AS MATERIALIZED` 입력으로 만든다. 사용량 유무는 토큰이 양수이면 1, 0토큰이면 모델 기록 여부로 한 번 확정하여 완료/기록 표본 식들이 공유한다. 날짜 UDF 호출 수 자체는 기존과 같다. 제공자/모델의 원본 fallback·NULL·38/37개 영속 집계 상태를 유지하며 부분 날짜의 raw `UNION ALL`도 같은 입력 생성기를 쓴다. 이 임시 결과는 SQL 실행 동안만 존재하며 파싱용 영속/명시적 TEMP 테이블을 추가하지 않는다. [저장·집계 SQL A/B](../benchmarks/2026-11-10/QueryMinimizeAB-2026-11-10.md).
+일별 집계 SQL은 그 범위 조건을 먼저 적용한 뒤 필요한 지표 열·현지 일·사용량 유무만 `scoped AS MATERIALIZED` 입력으로 만든다. 사용량 유무는 토큰이 양수이면 1, 0토큰이면 모델 기록 여부로 한 번 확정하여 완료/기록 표본 식들이 공유한다. 날짜 UDF 호출 수 자체는 기존과 같다. 제공자/모델의 원본 fallback·NULL·38/37개 영속 집계 상태를 유지하며 부분 날짜의 raw `UNION ALL`도 같은 입력 생성기를 쓴다. 이 임시 결과는 SQL 실행 동안만 존재하며 파싱용 영속/명시적 TEMP 테이블을 추가하지 않는다. [저장·집계 SQL A/B](../benchmarks/success/2026-11-10/QueryMinimizeAB-2026-11-10.md).
 
 DB 모듈은 변경 이유별로 책임을 나눈다. `src/summary/db/index.ts`의 `SummaryDatabase`는 worker·scanner API를 연결하고 `connection.ts`는 연결·PRAGMA·statement cache·transaction·optimize·close를 소유한다. `migrations.ts`는 버전 전환, `sourceFiles.ts`는 파일 관측·진단, [memoryStore/index.ts](../../src/summary/db/memoryStore/index.ts)는 최종 결과의 트랜잭션·비교·영속 반영, `billing.ts`는 비용 분류·재계산을 맡는다. [memoryStore/values.ts](../../src/summary/db/memoryStore/values.ts)는 상태 없는 입력 검증·SQL 값 변환·비교 정렬을, [types.ts](../../src/summary/db/memoryStore/types.ts)는 저장 입력·결과 계약을 정의한다. 기존 [memoryStore.ts](../../src/summary/db/memoryStore.ts)는 같은 API를 재노출한다. 이전 SessionStore·SessionChanges와 SQL staging·metadata 구현은 제거했다.
 
@@ -919,9 +919,9 @@ Extension Host 메모리에 유지하는 값:
 
 SQLite query는 기간과 project/session filter를 먼저 적용하고 turn_summary는 page 단위로 가져온다. 기본 page size는 100으로 한다. 통계의 도표·표 하단에는 `페이지당 행 수` 숫자 입력칸을 이전 버튼 바로 왼쪽에 배치하고 페이지 이동 조작 전체를 오른쪽에 모은다. 1~1,000 사이 정수를 직접 입력하고 Enter 또는 입력칸 이탈로 적용하며 빈 값·소수·범위 밖 값은 입력 오류를 표시하고 조회하지 않는다. 토큰 도표와 표는 같은 값을 공유하고, Skill 네 분류는 각각 독립적인 값을 사용한다. 개수 변경은 해당 표만 첫 페이지로 되돌리며 기간·대상·정렬을 유지하고 원본 로그를 다시 읽지 않는다. 적용한 개수는 기존 조회 선택과 함께 Webview state에 보존하며 `초기화`는 모두 100행으로 되돌린다. 프로젝트·세션 이름 목록과 데이터 확인의 조회 크기는 기존 100개를 유지한다.
 
-집계 조회의 주 입력은 요청 facts `K`행에서 선택된 일별 상태 `r`행과 부분 날짜의 raw 입력 `B`행으로 줄어든다. 범위 탐색·주 순회 모델은 `O(log N + K)`에서 `O(log R + r + B)`로 바뀌지만 GROUP BY·정렬 비용은 별도로 남는다. 추가 영속 공간은 실제 요청·모델 일별 조합 수 `O(R + Rm)`이다. 세션·날짜·모델 조합이 매 turn마다 달라지면 집계 행 수도 facts와 비슷해져 최악의 선형 비용은 유지된다. 최초 구축·시간대 변경에는 전체 재집계, 세션 변경에는 해당 세션 재집계와 추가 인덱스·WAL 비용이 생긴다. 소량·좁은 기간은 고정 경계 계산 비용으로 느려질 수 있으며 자동 임계값·결과 캐시는 추가하지 않았다. 실제 제품 경로의 전후 시간·공간·transaction 비교는 [SQL 측정 보고서](benchmarks/2026-10-15/SqlExplainBenchmark-2026-10-15.md)에 둔다.
+집계 조회의 주 입력은 요청 facts `K`행에서 선택된 일별 상태 `r`행과 부분 날짜의 raw 입력 `B`행으로 줄어든다. 범위 탐색·주 순회 모델은 `O(log N + K)`에서 `O(log R + r + B)`로 바뀌지만 GROUP BY·정렬 비용은 별도로 남는다. 추가 영속 공간은 실제 요청·모델 일별 조합 수 `O(R + Rm)`이다. 세션·날짜·모델 조합이 매 turn마다 달라지면 집계 행 수도 facts와 비슷해져 최악의 선형 비용은 유지된다. 최초 구축·시간대 변경에는 전체 재집계, 세션 변경에는 해당 세션 재집계와 추가 인덱스·WAL 비용이 생긴다. 소량·좁은 기간은 고정 경계 계산 비용으로 느려질 수 있으며 자동 임계값·결과 캐시는 추가하지 않았다. 실제 제품 경로의 전후 시간·공간·transaction 비교는 [SQL 측정 보고서](../benchmarks/success/2026-10-15/SqlExplainBenchmark-2026-10-15.md)에 둔다.
 
-요청 제목은 메모리 집계 중 provider·session·root별로 처음 관측한 메인 제목을 선택한다. 동점 winner의 원본 우선순위는 변경 파일을 source_file ID 순으로 처리하고 이후 관련 파일도 같은 순서로 확장해 유지한다. 메모리 집계는 최종 저장 transaction 전에 실행하며 실제 `replaceMemory`의 BEGIN IMMEDIATE/COMMIT 구간과 나누어 측정한다. 이전 TEMP partial index·SQL 준비 방식의 기록은 [과거 측정 보고서](benchmarks/2026-10-08/RequestTitleTransactions.md)에 보존한다.
+요청 제목은 메모리 집계 중 provider·session·root별로 처음 관측한 메인 제목을 선택한다. 동점 winner의 원본 우선순위는 변경 파일을 source_file ID 순으로 처리하고 이후 관련 파일도 같은 순서로 확장해 유지한다. 메모리 집계는 최종 저장 transaction 전에 실행하며 실제 `replaceMemory`의 BEGIN IMMEDIATE/COMMIT 구간과 나누어 측정한다. 이전 TEMP partial index·SQL 준비 방식의 기록은 [과거 측정 보고서](../benchmarks/success/2026-10-08/RequestTitleTransactions.md)에 보존한다.
 
 같은 스레드의 여러 원본을 묶고 응답 키의 중복을 접는다. Codex의 구형 앞부분은 부모와 일치하는 복사 기록을 확인한 뒤 처리한다. 재작성이나 삭제의 영향을 받은 세션은 관련 원본에서 스레드·모델의 토큰을 다시 합산한다.
 
@@ -958,7 +958,7 @@ SQLite 사용 자체가 고정 메모리를 보장하지 않는다. worker의 di
 
 JSONL reader는 64 KiB 이하 단위로 파일을 읽고 Buffer의 LF 위치에 맞춰 청크 안에 완성된 일반 줄을 바로 디코딩한다. 청크 경계를 넘거나 이미지가 있는 고정 필드 행은 `JsonlLine`이 이미지 본문을 거른 바이트 구간을 선택 파서에 즉시 전달한다. 파서는 문법 상태를 이어 가면서 선택된 필드만 모으고 LF에서 한 번 디코딩한다. 진단 reader는 필터를 통과한 줄을 조립한 뒤 파싱한다. 이미지 제거와 보관 바이트 한도는 `JsonlLine`이 적용하며, 원본 byte offset은 필터링 전 줄의 길이로 계산한다.
 
-일반 JSONL의 원본 바이트 N에 대한 파싱 시간은 O(N)이다. 압축 입력은 원본을 읽고 해제한 JSONL을 같은 파서로 처리한다. 읽기 청크 C, 가장 큰 선택 행 S, 최대 중첩 깊이 D에 대한 고정 필드 reader의 보조 공간은 O(C + S + D)다. 진단 reader는 청크와 보관한 전체 행의 크기에 비례한다. 행 객체·adapter·DB 상태와 Zstd 디코더 공간은 별도다. 파서 버전 25는 원본 토큰 집계 규칙도 변경하므로 기존 정상 파일을 다음 갱신에서 다시 읽는다. [행별 디코딩 제품 A/B](../benchmarks/2026-11-21/JsonlLineProductAB-2026-11-21.md) · [스레드 토큰 정합성 A/B](../benchmarks/2026-11-24/ResponseThreadAccountingAB-2026-11-24.md)
+일반 JSONL의 원본 바이트 N에 대한 파싱 시간은 O(N)이다. 압축 입력은 원본을 읽고 해제한 JSONL을 같은 파서로 처리한다. 읽기 청크 C, 가장 큰 선택 행 S, 최대 중첩 깊이 D에 대한 고정 필드 reader의 보조 공간은 O(C + S + D)다. 진단 reader는 청크와 보관한 전체 행의 크기에 비례한다. 행 객체·adapter·DB 상태와 Zstd 디코더 공간은 별도다. 파서 버전 25는 원본 토큰 집계 규칙도 변경하므로 기존 정상 파일을 다음 갱신에서 다시 읽는다. [행별 디코딩 제품 A/B](../benchmarks/success/2026-11-21/JsonlLineProductAB-2026-11-21.md) · [스레드 토큰 정합성 A/B](../benchmarks/success/2026-11-24/ResponseThreadAccountingAB-2026-11-24.md)
 
 ## 11. 검증 및 시뮬레이션
 
