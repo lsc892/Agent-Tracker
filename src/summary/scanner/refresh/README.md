@@ -8,9 +8,14 @@
 - [discovery.ts](discovery.ts) — 경로별로 관측을 모아 수정 시각으로 재파싱 후보를 고르고 원본 소실을 판단한다.
 - [preparation.ts](preparation.ts) — 변경·관련 원본의 파싱 결과를 반영하고 부모 관계 메타를 준비한다.
 - [relations.ts](relations.ts) — 관계 큐·스레드 계보·부모 요청 귀속을 담당한다.
-- [aggregation.ts](aggregation.ts) — 파일별 winner를 병합해 최종 요청과 반영할 응답을 반환한다.
-- [persistence.ts](persistence.ts) — 쓰기 트랜잭션에 전달할 요청·응답 snapshot과 파일별 정상 반영 수정 시각을 구성한다.
+- [aggregation.ts](aggregation.ts) — 파일별 winner를 병합하고 Codex 누계를 검산해 스레드별 합계를 만든다.
+- [persistence.ts](persistence.ts) — 쓰기 트랜잭션에 전달할 스레드별 합계와 파일별 정상 반영 수정 시각을 구성한다.
 
 의존 방향은 갱신 조율 → 책임별 함수 → 공유 상태·기존 reader/집계/DB 모듈이다. 관계 확장은 준비 함수를 호출하고 준비 함수는 상태만 갱신하므로 관계 모듈을 역참조하지 않는다. 전체 context를 Worker 메시지로 보내거나 단계마다 복제하지 않는다.
 
 파일 준비 풀·reader·이름·잠금·작업 큐 구현은 상위 scanner 폴더에서 재사용한다.
+
+## 관련 문서
+
+- [winner 정책](../../../../docs/refrences/WinnerPolicy.md) — 응답 비교 키와 동점 처리, Codex 누계 검산.
+- [SQLite 테이블](../../../../docs/refrences/SQLiteTables.md) — 현재 테이블의 키와 저장·이관 규칙.

@@ -22,3 +22,8 @@
 - [timezone.ts](timezone.ts) — 지정 시간대의 일·월 집계 키와 UTC 기간 경계를 계산한다.
 - [types.ts](types.ts) — DB 저장 입력·조회 필터·페이지·집계·진단 타입을 정의한다.
 - [validation.ts](validation.ts) — 페이지 상한과 비음수 정수를 검증한다.
+
+## 관련 문서
+
+- [SQLite 테이블](../../../docs/refrences/SQLiteTables.md) — 현재 테이블의 키와 저장·이관 규칙.
+- [SQL 조회 흐름](../../../docs/refrences/UsageQueryFlow.md) — Webview 요청부터 SQLite 실행과 표·차트 반환까지.

@@ -4,6 +4,8 @@
 > 검증일: 2026-10-02
 > 의사결정 이력: [Agent Tracker 일지](../AgentTracker-일지.md)
 
+현재 구현의 세부 규칙은 [LogParsingFields](LogParsingFields.md), [winner 정책](WinnerPolicy.md), [SQLite 테이블](SQLiteTables.md), [SQL 조회 흐름](UsageQueryFlow.md)에 있다.
+
 ## 1. 목표
 
 VS Code 확장으로 다음 두 기능을 제공한다.
@@ -722,7 +724,7 @@ DB 모듈은 변경 이유별로 책임을 나눈다. `src/summary/db/index.ts`�
 
 입력에 `updated_at`이 있으면 그 값을 사용하고 생략되면 실제 변경·일괄 재삽입 시각으로 기록한다. 부분 반영 경로의 변경 없는 요청은 이전 시각을 유지한다. 요청별 시각은 facts의 `updated_at`, 파일의 최근 반영·진단 시각은 `source_file.recorded_at`, 마지막으로 반영한 파일시스템 수정 시각은 `source_file.mtime_ms`에서 확인한다.
 
-`reader.ts`는 조회 실행·페이지·결과 변환과 rollup/raw 경로 선택, `validation.ts`는 공통 수치·페이지 검증을 맡는다. [queries/](../src/summary/db/queries/README.md)는 `common/`의 타입·필터·정렬, `raw/`의 원본·통계·요청·이름·도구·진단, `rollup/`의 최종 조회·일별 소스·병합 지표로 나눈다. 기존 `queries.ts`와 `rollup-queries.ts`는 공개 함수·타입만 재노출하며 내부 구현은 필요한 파일을 직접 참조한다. `rollup-state.ts`는 병합 가능한 상태와 schema, `rollups.ts`는 구축·세션별 갱신·조회 snapshot을 맡는다. SQL은 역할별 구역에서 절·목록·CASE·서브쿼리를 여러 줄로 표현한다. 실제 통계 worker는 `queryUsagePage()` 한 번으로 페이지 행과 전체 개수를 같은 snapshot에서 읽고, 반환된 행으로 도표를 만든다. 요청별·비용 포함·구버전 Node의 raw 조회도 같은 페이지 계약을 사용하며 별도의 도표 조회 메서드와 누계 요청·응답 계약은 두지 않는다. 목록과 개수는 같은 필터·그룹 정의를 사용하고 모델 해석은 공통 facts 표현식을 재사용한다. SQL 구조와 바인딩을 함께 반환하며 시간대·기간·ID는 SQL 문자열에 삽입하지 않는다. 집계 표본·NULL·미상 정렬을 보존한다.
+[reader.ts](../../src/summary/db/reader.ts)는 일별 조회 실행·페이지·결과 변환을 맡는다. [queries/](../../src/summary/db/queries/README.md)의 `common/`은 타입·필터·정렬, `rollup/`은 일별 소스·병합 지표와 화면 조회 SQL, `raw/`는 이전 상세 형식의 이관·검증 SQL을 관리한다. 통계 Worker는 `queryUsagePage()`로 페이지 행과 전체 개수를 같은 스냅샷에서 읽고, 반환된 행으로 도표를 만든다. 비용 표시도 일별 행과 세션 결제 설정을 사용한다. SQL 빌더는 쿼리 구조와 바인딩 값을 함께 반환한다. [SQL 조립·실행·결과 반환](UsageQueryFlow.md)
 
 SQLite 조회 계획용 통계는 DB 열기에서 `PRAGMA main.optimize=0x10002`, 첫 스캔 완료와 이후 24시간 이상 지난 스캔 완료 및 연결 종료에서 `PRAGMA main.optimize`로 수집한다. `main`만 지정하여 TEMP 파싱 테이블은 분석하지 않는다. 스키마 이관 뒤에도 열기 시 통계 수집이 적용된다. 통계 수집은 선택적 유지보수여서 실패가 스캔·연결 정리를 실패시키지 않고 다음 실행 시점에 다시 시도한다. `PRAGMA optimize`는 필요한 `ANALYZE`를 선택하는 SQLite 기능이다. [SQLite 권고](https://www.sqlite.org/lang_analyze.html).
 

@@ -3,7 +3,6 @@
 설계 기준·의사결정·개발 절차와 조사·성능 검증 기록을 둔다.
 
 - [Performance-v0.3.0.ko.md](Performance-v0.3.0.ko.md): v0.2.0 대비 v0.3.0의 알고리즘 구간별 구조·기존 실측 개선량·실제 로그의 동등성 한계와 남은 병목을 정리한다.
-- [AgentTracker.md](refrences/AgentTracker.md): 현재 기능과 데이터 처리 구조의 설계 기준을 정의한다.
 - [현재 기능 의사결정 일지](AgentTracker-일지.md) — 2026-11-10부터의 결정과 검증 이력.
 - [이전 일지](refrences/AgentTracker-일지.md) — 2026-10-01~11-09의 결정과 검증 이력.
 - [Development.ko.md](refrences/Development.ko.md): 사용법·설정·개발·패키징 절차를 안내한다.
@@ -18,3 +17,11 @@
 - [RequestTitleAB.md](benchmarks/success/2026-10-08/RequestTitleAB.md): 요청 제목 TEMP 인덱스와 집계 통합 방식의 A/B 검증을 기록한다.
 - [RequestTitleTransactions.md](benchmarks/success/2026-10-08/RequestTitleTransactions.md): 요청 제목 집계의 실제 갱신·트랜잭션 측정을 기록한다.
 - [DateStorageAB-2026-10-25.md](benchmarks/failure/2026-10-25/DateStorageAB-2026-10-25.md): 날짜 저장 순서·집계 기본 키·조회 SQL·정렬 인덱스의 A/B 결과와 정확성 제약을 기록한다.
+
+## 관련 문서
+
+- [설계 명세](refrences/AgentTracker.md) — 기능의 설계 기준과 정책.
+- [LogParsingFields](refrences/LogParsingFields.md) — Claude·Codex JSONL 필드와 해석 규칙.
+- [winner 정책](refrences/WinnerPolicy.md) — 응답 비교 키와 동점 처리, Codex 누계 검산.
+- [SQLite 테이블](refrences/SQLiteTables.md) — 현재 테이블의 키와 저장·이관 규칙.
+- [SQL 조회 흐름](refrences/UsageQueryFlow.md) — Webview 요청부터 SQLite 실행과 표·차트 반환까지.

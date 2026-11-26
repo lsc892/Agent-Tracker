@@ -10,3 +10,7 @@ quota와 사용량 통계를 VS Code 상태바·툴팁·Webview에 표시한다.
 - [quotaTooltip.ts](quotaTooltip.ts): 제공자별 quota·초기화 시각·조회 상태를 Markdown 카드로 구성한다.
 - [statusBar.ts](statusBar.ts) — `QuotaStatusBar`: quota 항목·툴팁·새로고침 버튼과 남은 시간 표시를 관리한다.
 - [statusBarPresentation.ts](statusBarPresentation.ts): quota를 상태바 문구·백분율 아이콘·접근성 설명으로 변환한다.
+
+## 관련 문서
+
+- [SQL 조회 흐름](../../docs/refrences/UsageQueryFlow.md) — Webview 요청부터 SQLite 실행과 표·차트 반환까지.
