@@ -19,11 +19,24 @@ interface SelectedWinner {
   root: Root;
   reference: WinnerReference;
   tokens: UsageWinner['tokens'];
-  responseKey: string;
   request: string | null;
   score: number | bigint;
   ordinal: number;
   position: number;
+}
+
+function compareId(left: string, right: string): number {
+  return left < right ? -1 : Number(left > right);
+}
+
+function compareClaudeResponses(left: SelectedWinner, right: SelectedWinner): number {
+  return compareId(left.reference.responseId, right.reference.responseId)
+    || compareId(left.request ?? 'no-req', right.request ?? 'no-req');
+}
+
+function compareCodexResponses(left: SelectedWinner, right: SelectedWinner): number {
+  const a = left.reference, b = right.reference;
+  return compareId(a.responseId, b.responseId) || compareId(a.threadId, b.threadId) || compareId(a.turnId, b.turnId);
 }
 
 /** 파일별 winner를 세션의 응답 키 순서로 합쳐 집계한다. */
@@ -31,7 +44,8 @@ export class StreamingAggregation {
   private readonly sources = new Map<number, UsageSource>();
   private readonly requests: Map<string, string | null>;
   private readonly sessions = new Map<string, UsageSource[]>();
-  private readonly roots = new Map<string, Root>();
+  private readonly sessionRoots = new Map<string, Map<string, Root>>();
+  private readonly roots: Root[] = [];
   private readonly totals = new Map<string, UsageContribution['tokens']>();
   private readonly checks = new Map<string, { source: SourcePlan; rootId: string; check: SourceCheck; ordinal: number }>();
   private readonly capabilities = new Set<string>();
@@ -45,7 +59,10 @@ export class StreamingAggregation {
       this.sources.set(source.file.id, source);
       const id = key(source.file.provider, source.file.session_id);
       let files = this.sessions.get(id);
-      if (!files) this.sessions.set(id, files = []);
+      if (!files) {
+        this.sessions.set(id, files = []);
+        this.sessionRoots.set(id, new Map());
+      }
       files.push(source);
     }
 
@@ -56,6 +73,7 @@ export class StreamingAggregation {
   /** 파싱 중 접은 요청 상태와 파일별 winner를 등록한다. */
   addSource(fileId: number, prepared: SourceWinnersSnapshot | DetailedSourceWinnersSnapshot): void {
     const source = this.sources.get(fileId)!, file = source.file;
+    const roots = this.sessionRoots.get(key(file.provider, file.session_id))!;
     const parentRootId = file.identity.parentRootId;
     const outcomes = new Map<string, Outcome>();
     for (const state of prepared.roots.values()) {
@@ -63,13 +81,13 @@ export class StreamingAggregation {
       const inherited = source.inheritedRoots.has(state.rootId);
       const rootId = parentRootId ?? state.rootId;
       if (!inherited) {
-        if (state.usageOffset !== null) this.observeRequest(file, parentRootId || state.rootId, state.usageOffset);
-        if (state.checkOffset !== null) this.observeRequest(file, rootId, state.checkOffset);
+        if (state.usageOffset !== null) this.observeRequest(file, roots, parentRootId || state.rootId, state.usageOffset);
+        if (state.checkOffset !== null) this.observeRequest(file, roots, rootId, state.checkOffset);
 
         // [집계 정책] 메인 원본의 메인 턴과 독립 서브에이전트의 턴에서 요청 상태와 제목을 병합한다.
         for (const [isMain, turn] of state.turns) {
           if (!file.identity.isMain && !file.identity.standaloneSubagent) continue;
-          const target = this.observeRequest(file, rootId, turn.offset);
+          const target = this.observeRequest(file, roots, rootId, turn.offset);
           if (!isMain && !file.identity.standaloneSubagent) continue;
           mergeTurn(target, turn, source.base);
           if (turn.outcome) this.recordOutcome(outcomes, target, turn.outcome.event,
@@ -79,7 +97,7 @@ export class StreamingAggregation {
         // [진단 정책] 스레드·턴별 최신 누계를 등록하고 미리 기록한 위치를 쓸 수 없으면 검사 위치도 남긴다.
         const checkRootId = parentRootId || state.rootId;
         for (const check of state.checks.values()) {
-          if (checkRootId !== rootId || state.checkOffset === null) this.observeRequest(file, checkRootId, check.offset);
+          if (checkRootId !== rootId || state.checkOffset === null) this.observeRequest(file, roots, checkRootId, check.offset);
           this.recordCheck(source, checkRootId, check);
         }
       }
@@ -88,10 +106,10 @@ export class StreamingAggregation {
       for (const { event, positions } of state.capabilities.values()) {
         for (const position of positions) {
           if (!eligible(source, event, position.index)) continue;
-          const observed = this.observeRequest(file, rootId, position.offset);
+          const observed = this.observeRequest(file, roots, rootId, position.offset);
           // [귀속 정책] 부모 ID가 비어 있으면 도구 이벤트가 가리키는 원래 요청에 반영한다.
           const capabilityRootId = parentRootId || event.rootId;
-          const root = capabilityRootId === rootId ? observed : this.observeRequest(file, capabilityRootId, position.offset);
+          const root = capabilityRootId === rootId ? observed : this.observeRequest(file, roots, capabilityRootId, position.offset);
           this.recordCapability(root, event);
           break;
         }
@@ -103,7 +121,7 @@ export class StreamingAggregation {
       for (const { rootId, index, offset, responseId } of file.evidence.legacy) {
         if (index > source.legacyCutoff && !source.inheritedRoots.has(rootId)
           && responseId !== file.evidence.legacyPrefix?.overlap)
-          this.observeRequest(file, parentRootId || rootId, offset);
+          this.observeRequest(file, roots, parentRootId || rootId, offset);
       }
     }
 
@@ -112,44 +130,44 @@ export class StreamingAggregation {
     source.usage = { winners, references };
   }
 
-  private selectUsage(source: SourcePlan, winner: UsageWinner, reference: WinnerReference, position: number): SelectedWinner {
-    const { file } = source, { rootId, requestId, responseId, threadId, turnId } = reference;
+  private selectUsage(source: SourcePlan, roots: ReadonlyMap<string, Root>,
+    winner: UsageWinner, reference: WinnerReference, position: number): SelectedWinner {
+    const { file } = source, { rootId, requestId, responseId } = reference;
     // [귀속 정책] 등록된 대상 요청을 찾고 누락된 Claude 요청 ID는 세션의 응답별 근거로 보정한다.
-    const root = this.roots.get(key(file.provider, file.session_id, file.identity.parentRootId || rootId))!;
+    const root = roots.get(file.identity.parentRootId || rootId)!;
     const request = file.provider === 'claude' && requestId === null
       ? this.requests.get(key(file.session_id, responseId)) ?? null : requestId;
 
-    // [Winner 정책] Claude는 응답·요청 ID, Codex는 응답·스레드·턴 ID를 중복 비교 키로 쓴다.
-    const responseKey = file.provider === 'claude' ? key(responseId, request ?? 'no-req') : key(responseId, threadId, turnId);
-    return { source, root, reference, tokens: winner.tokens, responseKey, request,
+    return { source, root, reference, tokens: winner.tokens, request,
       score: usageScore(winner), ordinal: source.base + winner.referenceId, position };
   }
 
-  private applySessionUsage(sources: readonly UsageSource[]): void {
+  private applySessionUsage(files: readonly UsageSource[], roots: ReadonlyMap<string, Root>): void {
     // [Winner 정책] 원본 순으로 후보를 모으고 제외된 winner는 점수순 대체 후보 중 첫 유효 항목으로 바꾼다.
     const candidates: SelectedWinner[] = [];
-    for (const source of sources.slice().sort((a, b) => a.base - b.base)) {
+    for (const source of files.slice().sort((a, b) => a.base - b.base)) {
       if (!source.usage) continue;
       const { winners, references } = source.usage;
       for (const entry of winners) {
         const reference = references.get(entry.referenceId)!;
         if (eligibleWinner(source, reference.rootId, entry.referenceId)) {
-          candidates.push(this.selectUsage(source, entry, reference, candidates.length));
+          candidates.push(this.selectUsage(source, roots, entry, reference, candidates.length));
           continue;
         }
         const winner = reference.later?.find(item => eligibleWinner(source, references.get(item.referenceId)!.rootId, item.referenceId));
-        if (winner) candidates.push(this.selectUsage(source, winner, references.get(winner.referenceId)!, candidates.length));
+        if (winner) candidates.push(this.selectUsage(source, roots, winner, references.get(winner.referenceId)!, candidates.length));
       }
       source.usage = undefined;
     }
 
-    // [Winner 정책] 응답 키로 정렬해 입력+출력 합이 큰 후보를 남기고 동점이면 이벤트 순서가 나중인 후보를 택한다.
-    candidates.sort((a, b) => a.responseKey < b.responseKey ? -1 : Number(a.responseKey > b.responseKey));
+    // [Winner 정책] 원래 ID 필드로 같은 응답을 모아 입력+출력 합과 이벤트 순서로 winner를 고른다.
+    const compareResponses = files[0].file.provider === 'claude' ? compareClaudeResponses : compareCodexResponses;
+    candidates.sort(compareResponses);
     const selected: (SelectedWinner | undefined)[] = [];
     for (let index = 0; index < candidates.length;) {
       const first = candidates[index++];
       let winner = first;
-      while (index < candidates.length && candidates[index].responseKey === first.responseKey) {
+      while (index < candidates.length && compareResponses(candidates[index], first) === 0) {
         const candidate = candidates[index++];
         if (isBetterUsage(candidate.score, candidate.ordinal, winner.score, winner.ordinal)) winner = candidate;
       }
@@ -192,11 +210,14 @@ export class StreamingAggregation {
       || outcome.orderingAt === before.orderingAt && outcome.ordinal > before.ordinal) root.outcome = outcome;
   }
 
-  private observeRequest(file: StreamingAggregateFile, rootId: string, offset: number): Root {
+  private observeRequest(file: StreamingAggregateFile, roots: Map<string, Root>, rootId: string, offset: number): Root {
     // [귀속 정책] 제공자·세션·요청 단위로 메인 원본 유무와 최소 파일 ID·오프셋을 추적한다.
-    const id = key(file.provider, file.session_id, rootId);
-    let root = this.roots.get(id);
-    if (!root) this.roots.set(id, root = createRoot(file, rootId, offset));
+    let root = roots.get(rootId);
+    if (!root) {
+      root = createRoot(file, rootId, offset);
+      roots.set(rootId, root);
+      this.roots.push(root);
+    }
     if (file.id < root.firstFile.id) root.firstFile = file;
     root.offset = Math.min(root.offset, offset); root.hasMain ||= file.identity.isMain;
     return root;
@@ -204,9 +225,9 @@ export class StreamingAggregation {
 
   finish(check?: () => void): MemoryAggregateResult {
     // [Winner 정책] 세션별로 중복을 해소하고 확정된 응답만 요청 집계에 반영한다.
-    for (const sources of this.sessions.values()) {
+    for (const [id, files] of this.sessions) {
       check?.();
-      this.applySessionUsage(sources);
+      this.applySessionUsage(files, this.sessionRoots.get(id)!);
     }
 
     // [진단 정책] 확정 응답의 턴별 합계가 로그에 기록된 누계와 다르면 불일치 플래그를 남긴다.
@@ -216,7 +237,7 @@ export class StreamingAggregation {
       if (!missingInput && !missingOutput) continue;
       if (sum && verified && missingInput >= 0 && missingOutput >= 0) {
         const { file } = source;
-        const root = this.roots.get(key(file.provider, file.session_id, rootId))!;
+        const root = this.sessionRoots.get(key(file.provider, file.session_id))!.get(rootId)!;
         const billingMode = root.billing.size === 1 ? root.billing.keys().next().value : undefined;
         addUsage(root, { model: verified.model, billingMode, tokens: {
           input: missingInput, output: missingOutput,
@@ -227,16 +248,18 @@ export class StreamingAggregation {
     }
 
     // [DTO 정책] 요청·모델·도구 집계와 메인 원본을 찾지 못한 요청의 진단을 반환한다.
-    return materialize(this.roots.values(), this.sessions, this.collectCapabilities);
+    return materialize(this.roots, this.sessions, this.collectCapabilities);
   }
 
-  private applyUsage({ source, root, reference, tokens, responseKey, request }: SelectedWinner): void {
+  private applyUsage({ source, root, reference, tokens, request }: SelectedWinner): void {
     const { file } = source, { model, billingMode, threadId, turnId } = reference;
     // [집계 정책] 확정한 응답의 토큰·모델·결제 정보를 귀속된 요청에 합산한다.
     addUsage(root, { model, billingMode, tokens }, this.collectCapabilities);
 
     // [DTO 정책] 확정 응답의 키·귀속·토큰을 콜백에 전달한다.
-    this.onApplied?.({ provider: file.provider, sessionId: file.session_id, rootId: root.rootId, responseKey, tokens });
+    this.onApplied?.({ provider: file.provider, sessionId: file.session_id, rootId: root.rootId, tokens,
+      responseKey: file.provider === 'claude' ? key(reference.responseId, request ?? 'no-req')
+        : key(reference.responseId, threadId, turnId) });
 
     // [진단 정책] 누계 검사용 턴별 합계를 쌓고, 보정 후에도 요청 ID가 없는 Claude 응답을 표시한다.
     const id = key(file.provider, file.session_id, threadId, turnId);
