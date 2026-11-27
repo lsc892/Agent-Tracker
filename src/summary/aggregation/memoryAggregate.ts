@@ -14,7 +14,7 @@ export type { MaterializedTurnSummary, MemoryAggregateResult } from './turns';
 
 interface UsageSource extends SourcePlan { usage?: ReferencedWinners }
 
-interface SelectedWinner {
+interface ResponseCandidate {
   source: SourcePlan;
   root: Root;
   reference: WinnerReference;
@@ -25,16 +25,18 @@ interface SelectedWinner {
   position: number;
 }
 
+const MISSING_CLAUDE_REQUEST = 'no-req';
+
 function compareId(left: string, right: string): number {
   return left < right ? -1 : Number(left > right);
 }
 
-function compareClaudeResponses(left: SelectedWinner, right: SelectedWinner): number {
+function compareClaudeResponses(left: ResponseCandidate, right: ResponseCandidate): number {
   return compareId(left.reference.responseId, right.reference.responseId)
-    || compareId(left.request ?? 'no-req', right.request ?? 'no-req');
+    || compareId(left.request ?? MISSING_CLAUDE_REQUEST, right.request ?? MISSING_CLAUDE_REQUEST);
 }
 
-function compareCodexResponses(left: SelectedWinner, right: SelectedWinner): number {
+function compareCodexResponses(left: ResponseCandidate, right: ResponseCandidate): number {
   const a = left.reference, b = right.reference;
   return compareId(a.responseId, b.responseId) || compareId(a.threadId, b.threadId) || compareId(a.turnId, b.turnId);
 }
@@ -81,7 +83,8 @@ export class StreamingAggregation {
       const inherited = source.inheritedRoots.has(state.rootId);
       const rootId = parentRootId ?? state.rootId;
       if (!inherited) {
-        if (state.usageOffset !== null) this.observeRequest(file, roots, parentRootId || state.rootId, state.usageOffset);
+        const usageRootId = parentRootId || state.rootId;
+        if (state.usageOffset !== null) this.observeRequest(file, roots, usageRootId, state.usageOffset);
         if (state.checkOffset !== null) this.observeRequest(file, roots, rootId, state.checkOffset);
 
         // [집계 정책] 메인 원본의 메인 턴과 독립 서브에이전트의 턴에서 요청 상태와 제목을 병합한다.
@@ -95,10 +98,9 @@ export class StreamingAggregation {
         }
 
         // [진단 정책] 스레드·턴별 최신 누계를 등록하고 미리 기록한 위치를 쓸 수 없으면 검사 위치도 남긴다.
-        const checkRootId = parentRootId || state.rootId;
         for (const check of state.checks.values()) {
-          if (checkRootId !== rootId || state.checkOffset === null) this.observeRequest(file, roots, checkRootId, check.offset);
-          this.recordCheck(source, checkRootId, check);
+          if (usageRootId !== rootId || state.checkOffset === null) this.observeRequest(file, roots, usageRootId, check.offset);
+          this.recordCheck(source, usageRootId, check);
         }
       }
 
@@ -130,8 +132,8 @@ export class StreamingAggregation {
     source.usage = { winners, references };
   }
 
-  private selectUsage(source: SourcePlan, roots: ReadonlyMap<string, Root>,
-    winner: UsageWinner, reference: WinnerReference, position: number): SelectedWinner {
+  private createResponseCandidate(source: SourcePlan, roots: ReadonlyMap<string, Root>,
+    winner: UsageWinner, reference: WinnerReference, position: number): ResponseCandidate {
     const { file } = source, { rootId, requestId, responseId } = reference;
     // [귀속 정책] 등록된 대상 요청을 찾고 누락된 Claude 요청 ID는 세션의 응답별 근거로 보정한다.
     const root = roots.get(file.identity.parentRootId || rootId)!;
@@ -144,18 +146,20 @@ export class StreamingAggregation {
 
   private applySessionUsage(files: readonly UsageSource[], roots: ReadonlyMap<string, Root>): void {
     // [Winner 정책] 원본 순으로 후보를 모으고 제외된 winner는 점수순 대체 후보 중 첫 유효 항목으로 바꾼다.
-    const candidates: SelectedWinner[] = [];
+    const candidates: ResponseCandidate[] = [];
     for (const source of files.slice().sort((a, b) => a.base - b.base)) {
       if (!source.usage) continue;
       const { winners, references } = source.usage;
       for (const entry of winners) {
-        const reference = references.get(entry.referenceId)!;
-        if (eligibleWinner(source, reference.rootId, entry.referenceId)) {
-          candidates.push(this.selectUsage(source, roots, entry, reference, candidates.length));
-          continue;
+        let winner = entry;
+        let reference = references.get(entry.referenceId)!;
+        if (!eligibleWinner(source, reference.rootId, entry.referenceId)) {
+          const fallback = reference.later?.find(item => eligibleWinner(source, references.get(item.referenceId)!.rootId, item.referenceId));
+          if (!fallback) continue;
+          winner = fallback;
+          reference = references.get(fallback.referenceId)!;
         }
-        const winner = reference.later?.find(item => eligibleWinner(source, references.get(item.referenceId)!.rootId, item.referenceId));
-        if (winner) candidates.push(this.selectUsage(source, roots, winner, references.get(winner.referenceId)!, candidates.length));
+        candidates.push(this.createResponseCandidate(source, roots, winner, reference, candidates.length));
       }
       source.usage = undefined;
     }
@@ -163,7 +167,7 @@ export class StreamingAggregation {
     // [Winner 정책] 원래 ID 필드로 같은 응답을 모아 입력+출력 합과 이벤트 순서로 winner를 고른다.
     const compareResponses = files[0].file.provider === 'claude' ? compareClaudeResponses : compareCodexResponses;
     candidates.sort(compareResponses);
-    const selected: (SelectedWinner | undefined)[] = [];
+    const selected: (ResponseCandidate | undefined)[] = [];
     for (let index = 0; index < candidates.length;) {
       const first = candidates[index++];
       let winner = first;
@@ -251,14 +255,14 @@ export class StreamingAggregation {
     return materialize(this.roots, this.sessions, this.collectCapabilities);
   }
 
-  private applyUsage({ source, root, reference, tokens, request }: SelectedWinner): void {
+  private applyUsage({ source, root, reference, tokens, request }: ResponseCandidate): void {
     const { file } = source, { model, billingMode, threadId, turnId } = reference;
     // [집계 정책] 확정한 응답의 토큰·모델·결제 정보를 귀속된 요청에 합산한다.
     addUsage(root, { model, billingMode, tokens }, this.collectCapabilities);
 
     // [DTO 정책] 확정 응답의 키·귀속·토큰을 콜백에 전달한다.
     this.onApplied?.({ provider: file.provider, sessionId: file.session_id, rootId: root.rootId, tokens,
-      responseKey: file.provider === 'claude' ? key(reference.responseId, request ?? 'no-req')
+      responseKey: file.provider === 'claude' ? key(reference.responseId, request ?? MISSING_CLAUDE_REQUEST)
         : key(reference.responseId, threadId, turnId) });
 
     // [진단 정책] 누계 검사용 턴별 합계를 쌓고, 보정 후에도 요청 ID가 없는 Claude 응답을 표시한다.
