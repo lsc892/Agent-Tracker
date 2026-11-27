@@ -14,6 +14,14 @@ export type { MaterializedTurnSummary, MemoryAggregateResult } from './turns';
 
 interface UsageSource extends SourcePlan { usage?: ReferencedWinners }
 
+interface RecordedCheck {
+  source: SourcePlan;
+  rootId: string;
+  check: SourceCheck;
+  ordinal: number;
+  sum?: UsageContribution['tokens'];
+}
+
 interface ResponseCandidate {
   source: SourcePlan;
   root: Root;
@@ -48,8 +56,7 @@ export class StreamingAggregation {
   private readonly sessions = new Map<string, UsageSource[]>();
   private readonly sessionRoots = new Map<string, Map<string, Root>>();
   private readonly roots: Root[] = [];
-  private readonly totals = new Map<string, UsageContribution['tokens']>();
-  private readonly checks = new Map<string, { source: SourcePlan; rootId: string; check: SourceCheck; ordinal: number }>();
+  private readonly checks = new Map<string, RecordedCheck>();
   private readonly capabilities = new Set<string>();
 
   constructor(files: readonly StreamingAggregateFile[], private readonly collectCapabilities = true,
@@ -193,7 +200,7 @@ export class StreamingAggregation {
     const { file } = source, ordinal = source.base + check.index;
     const id = key(file.provider, file.session_id, check.threadId, check.turnId), previous = this.checks.get(id);
     if (!previous || ordinal > previous.ordinal)
-      this.checks.set(id, { source, rootId, check, ordinal });
+      this.checks.set(id, { source, rootId, check, ordinal, sum: previous?.sum });
   }
 
   private recordOutcome(outcomes: Map<string, Outcome>, root: Root, event: TurnEvent,
@@ -235,8 +242,7 @@ export class StreamingAggregation {
     }
 
     // [진단 정책] 확정 응답의 턴별 합계가 로그에 기록된 누계와 다르면 불일치 플래그를 남긴다.
-    for (const [id, { source, rootId, check: { input, output, verified } }] of this.checks) {
-      const sum = this.totals.get(id);
+    for (const { source, rootId, check: { input, output, verified }, sum } of this.checks.values()) {
       const missingInput = input - (sum?.input ?? 0), missingOutput = output - (sum?.output ?? 0);
       if (!missingInput && !missingOutput) continue;
       if (sum && verified && missingInput >= 0 && missingOutput >= 0) {
@@ -266,11 +272,14 @@ export class StreamingAggregation {
         : key(reference.responseId, threadId, turnId) });
 
     // [진단 정책] 누계 검사용 턴별 합계를 쌓고, 보정 후에도 요청 ID가 없는 Claude 응답을 표시한다.
-    const id = key(file.provider, file.session_id, threadId, turnId);
-    let sum = this.totals.get(id);
-    if (!sum) this.totals.set(id, sum = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 });
-    sum.input += tokens.input; sum.output += tokens.output;
-    sum.cacheRead += accountedCacheRead(tokens); sum.cacheWrite += accountedCacheWrite(tokens);
+    if (this.checks.size) {
+      const check = this.checks.get(key(file.provider, file.session_id, threadId, turnId));
+      if (check) {
+        const sum = check.sum ??= { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
+        sum.input += tokens.input; sum.output += tokens.output;
+        sum.cacheRead += accountedCacheRead(tokens); sum.cacheWrite += accountedCacheWrite(tokens);
+      }
+    }
     if (file.provider === 'claude' && request === null) addFlag(source.flags, root.rootId, 'missing-request-id');
   }
 }
