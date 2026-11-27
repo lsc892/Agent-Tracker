@@ -71,6 +71,7 @@
 
 ## 미채택·철회 및 검증 한계
 
+- [2026-11-27 작은 JSONL 파일의 일괄 읽기 A/B](failure/2026-11-27/SmallJsonlWholeFileAB-2026-11-27.md) — 4 MiB 이하 파일을 통째로 읽으면 실로그 수집은 빨라졌고 RSS와 파일 워커 힙은 늘었다.
 - [2026-11-27 JSONL 경계 줄의 청크별 선택 파싱 A/B](failure/2026-11-27/LongJsonlStreamingAB-2026-11-27.md) — 파일 워커 `ArrayBuffer` 피크는 낮아졌지만 전체 시간과 RSS 차이가 작고 파일 워커 힙이 늘어 철회했다.
 - [2026-11-27 스트리밍 JSON 라이브러리 A/B](failure/2026-11-27/StreamingJsonLibrariesAB-2026-11-27.md) — `stream-json`과 `@streamparser/json`으로 청크에서 후보 필드를 골라 최초 수집·증분 시간과 V8 힙·RSS를 비교했다.
 - [2026-11-27 대화·Skill 집계 최소화 A/B](failure/2026-11-27/CurrentAggregationMinimizeAB-2026-11-27.md) — 실로그 피크 힙이 증가했고, 응답 병합만 분리한 비교에서도 집계 시간이 늘어 변경을 철회했다. [날짜별 자료](failure/2026-11-27/README.md)
