@@ -175,6 +175,6 @@ A project is a working folder. A session is one chat containing a series of conv
 | `projects`, `sessions` | Display names for project and session keys. |
 | `session_billing` | The billing mode selected for each provider and session. |
 | `usage_rollup_meta` | The time zone and format version used for daily aggregation. |
-| `usage_capability_daily` | Tool usage counts migrated from the previous schema and read by the tools statistics view. |
+| `usage_capability_daily` | Daily usage counts for skills, subagents, plugins, and models. |
 
 The statistics view filters and groups the daily provider or model rows for the selected period. It uses the stored totals and sample counts to calculate averages.

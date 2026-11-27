@@ -175,6 +175,6 @@ Un projet est un dossier de travail. Une session regroupe les conversations d’
 | `projects`, `sessions` | Noms d'affichage des projets et des sessions. |
 | `session_billing` | Mode de facturation choisi par l'utilisateur pour chaque fournisseur et session. |
 | `usage_rollup_meta` | Fuseau horaire et version du format utilisés pour l'agrégation quotidienne. |
-| `usage_capability_daily` | Nombres d'utilisations d'outils migrés depuis l'ancien schéma. La vue des statistiques d'outils consulte cette table. |
+| `usage_capability_daily` | Nombre quotidien d’utilisations des compétences, des sous-agents, des extensions et des modèles. |
 
 La vue des statistiques filtre les lignes quotidiennes par fournisseur ou modèle selon la période sélectionnée, puis les regroupe selon le critère choisi. Les moyennes sont calculées à partir des totaux et des nombres d'échantillons enregistrés.

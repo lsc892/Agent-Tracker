@@ -75,16 +75,23 @@ export class Dashboard implements vscode.Disposable {
     const message = {
       type: 'state', localization: localizationBundle(), timezone: settings.usage.timezone,
       timezoneWarning: settings.usage.timezoneWarning, providers: this.providers(),
-      capabilitiesEnabled: false, showApiCosts: settings.usage.showApiCosts,
+      capabilitiesEnabled: settings.usage.skillsEnabled, showApiCosts: settings.usage.showApiCosts,
     };
     if (this.diagnosticsPanel) this.diagnosticsPanel.title = t('diagnostics.title');
     this.post(message);
     this.postDiagnostics(message);
   }
 
-  configurationChanged(): void {
+  configurationChanged(rebuildCapabilities = false): void {
     this.queryVersion++;
     this.update();
+    if (rebuildCapabilities && this.ready) {
+      void (this.refreshPromise ?? Promise.resolve()).then(() => {
+        const { usage } = this.dependencies.settings();
+        if (this.ready && usage.enabled && usage.skillsEnabled) return this.refreshUsage();
+      }).catch(error => this.error(error));
+      return;
+    }
     if (this.ready || this.diagnosticsReady) void this.loadDashboard().catch(error => this.error(error));
   }
 

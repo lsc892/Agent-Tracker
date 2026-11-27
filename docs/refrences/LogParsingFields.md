@@ -9,7 +9,8 @@
 | 서브에이전트 귀속 | 공유된 `promptId` 또는 도구 결과의 `toolUseResult.agentId` | 명시된 부모 대화 ID 또는 부모의 `spawn_agent` 결과에 기록된 `agent_id`·`task_name`과 자식의 스레드 ID·`agent_path` |
 | 응답과 모델 | `message.id`, `requestId`, `message.model`, `message.usage` | `thread_id`, `turn_id`, `response_id`, `payload.model`, `payload.usage` |
 | 토큰 누계와 fork | 응답 사용량의 입력·출력·캐시 성분 | `thread_token_usage`, `turn_token_usage`, 구형 `token_count`의 `total_token_usage`·`last_token_usage`, `forked_from_id`·`parent_thread_id` |
+| Skill | `assistant.message.content`의 `tool_use` | `response_item`의 function/custom tool 호출과 `exec`의 정적 도구 호출 |
 
-일반·Zstd JSONL에서 필요한 필드를 선택하고 이미지 Base64를 건너뛴다. 파일 준비 Worker는 응답 후보, 대화 경계, 부모 참조를 반환한다. 집계기는 세션 안에서 응답을 중복 제거하고 확인된 자식 사용량을 부모 대화에 합산한다. 대화 수와 소요 시간은 메인 에이전트의 완료 시점과 수명주기를 따른다. 출처를 여전히 확인할 수 없는 자식의 기록은 독립 대화로 집계하지 않는다.
+일반·Zstd JSONL에서 필요한 필드를 선택하고 이미지 Base64를 건너뛴다. 파일 준비 Worker는 응답 후보, 대화 경계, 부모 참조와 호출 근거를 반환한다. 집계기는 세션 안에서 응답을 중복 제거하고 확인된 자식 사용량을 부모 대화에 합산한다. 대화 수와 소요 시간은 메인 에이전트의 완료 시점과 수명주기를 따른다. 출처를 여전히 확인할 수 없는 자식의 기록은 독립 대화로 집계하지 않는다.
 
-대화의 시작 시각을 집계 시간대의 날짜로 바꾸어 제공자·모델의 일별 행을 갱신한다. 원본 상태와 집계 결과는 같은 트랜잭션에서 반영한다. [파싱 필드](../../src/summary/parsers/logFields.ts) · [귀속 해소](../../src/summary/scanner/refresh/relations.ts) · [응답 비교](WinnerPolicy.md) · [SQLite 저장](SQLiteTables.md)
+대화의 시작 시각을 집계 시간대의 날짜로 바꾸어 제공자·모델·Skill의 일별 행을 갱신한다. 원본 상태와 집계 결과는 같은 트랜잭션에서 반영한다. [파싱 필드](../../src/summary/parsers/logFields.ts) · [귀속 해소](../../src/summary/scanner/refresh/relations.ts) · [응답 비교](WinnerPolicy.md) · [SQLite 저장](SQLiteTables.md)

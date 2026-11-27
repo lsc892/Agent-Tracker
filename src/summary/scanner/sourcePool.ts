@@ -107,7 +107,7 @@ export class SourceReaderPool {
   private startWorker(): void {
     // [취소 정책] 정리용 취소 버퍼와 갱신 전체의 취소 버퍼를 새 Worker에 공유한다.
     const worker = new Worker(join(__dirname, 'sourceWorker.js'), { workerData: {
-      maxLineBytes: this.options.maxLineBytes,
+      maxLineBytes: this.options.maxLineBytes, collectCapabilities: this.options.collectCapabilities,
       cancellation: this.cancellation.buffer, externalCancellation: this.options.externalCancellation,
     } });
     const slot: WorkerSlot = { worker };

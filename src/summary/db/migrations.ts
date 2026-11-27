@@ -37,9 +37,10 @@ export function migrateSchema(connection: DatabaseSync, timezone: string, transa
         DROP INDEX IF EXISTS idx_usage_model_daily_project_day;`);
       // [스키마 정책] 실제 파일 열을 확인해 폐기된 열은 지우고 필요한 계보 열만 추가한다.
       const columns = connection.prepare('PRAGMA table_info(source_file)').all();
-      for (const column of ['size_bytes', 'capabilities_collected']) {
-        if (columns.some(existing => existing.name === column)) connection.exec(`ALTER TABLE source_file DROP COLUMN ${column}`);
-      }
+      if (columns.some(column => column.name === 'size_bytes'))
+        connection.exec('ALTER TABLE source_file DROP COLUMN size_bytes');
+      if (!columns.some(column => column.name === 'capabilities_collected'))
+        connection.exec('ALTER TABLE source_file ADD COLUMN capabilities_collected INTEGER NOT NULL DEFAULT 0 CHECK(capabilities_collected IN (0,1))');
       if (!columns.some(column => column.name === 'thread_id'))
         connection.exec('ALTER TABLE source_file ADD COLUMN thread_id TEXT');
       if (!columns.some(column => column.name === 'thread_usage'))

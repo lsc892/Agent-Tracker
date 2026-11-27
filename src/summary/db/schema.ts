@@ -2,7 +2,7 @@
 import { SCHEMA_DAILY_CAPABILITY_SQL, SCHEMA_ROLLUP_SQL } from './rollup-state';
 
 export { SCHEMA_ROLLUP_SQL } from './rollup-state';
-export const SCHEMA_VERSION = 29;
+export const SCHEMA_VERSION = 30;
 
 // [스키마 정책] 레거시 반영 이력은 턴·응답 키로 중복을 막고 턴 삭제에 맞춰 정리한다.
 export const SCHEMA_APPLIED_RESPONSES_SQL = `
@@ -113,9 +113,7 @@ CREATE INDEX IF NOT EXISTS idx_summary_project_period ON turn_summary(provider, 
 
 function sourceSql(legacy = false): string {
   // [스키마 정책] 원본의 제공자·경로 유일성을 유지하고 레거시와 현재 형식의 계보 열을 구분한다.
-  const legacyColumns = legacy ? `
-  size_bytes INTEGER NOT NULL DEFAULT 0 CHECK(size_bytes >= 0),
-  capabilities_collected INTEGER NOT NULL DEFAULT 0 CHECK(capabilities_collected IN (0,1)),` : '';
+  const legacyColumns = legacy ? '\n  size_bytes INTEGER NOT NULL DEFAULT 0 CHECK(size_bytes >= 0),' : '';
   return `
 CREATE TABLE IF NOT EXISTS source_file (
   id INTEGER PRIMARY KEY,
@@ -125,6 +123,7 @@ CREATE TABLE IF NOT EXISTS source_file (
   session_id TEXT,${legacyColumns}
   mtime_ms REAL NOT NULL DEFAULT 0,
   parser_version INTEGER NOT NULL DEFAULT 0,
+  capabilities_collected INTEGER NOT NULL DEFAULT 0 CHECK(capabilities_collected IN (0,1)),
   ${legacy ? 'relation_meta BLOB,' : `thread_id TEXT,
   thread_usage INTEGER NOT NULL DEFAULT 0 CHECK(thread_usage IN (0,1)),`}
   source_missing INTEGER NOT NULL DEFAULT 0 CHECK(source_missing IN (0,1)),

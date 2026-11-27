@@ -44,7 +44,7 @@ function loadStoredPaths(database: SummaryDatabase): DiscoveryPaths {
   // [색인 정책] 제공자·경로로 저장 행을 찾고 최대 ID 다음부터 새 파일에 배정한다.
   const paths: DiscoveryPaths = { byPath: new Map(), storedRoots: new Set(), nextId: 1 };
   const stored = database.connection.prepare(`SELECT id, provider, source_root, path, session_id,
-    mtime_ms, parser_version, source_missing, processing_status FROM source_file ORDER BY id`).iterate() as unknown as Iterable<StoredSource>;
+    mtime_ms, parser_version, capabilities_collected, source_missing, processing_status FROM source_file ORDER BY id`).iterate() as unknown as Iterable<StoredSource>;
   for (const previous of stored) {
     paths.byPath.set(sessionKey(previous.provider, previous.path), { previous });
     paths.storedRoots.add(sessionKey(previous.provider, previous.source_root));
@@ -60,7 +60,7 @@ function recordObservation(context: RefreshContext, paths: DiscoveryPaths, obser
   const key = sessionKey(provider, path);
   const entry = paths.byPath.get(key) ?? {};
   const { observed, previous } = entry;
-  const changed = needsSourceRead(observation, previous);
+  const changed = needsSourceRead(observation, previous, context.collect);
   if (observed) {
     result.reused += Number(observed.changed) - Number(changed);
     Object.assign(observed, observation);

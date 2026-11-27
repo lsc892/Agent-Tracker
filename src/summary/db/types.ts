@@ -43,7 +43,7 @@ export interface FileMetadata {
   relations?: SourceRelationMetadata | null;
   /** @deprecated Accepted in old callers' input. File size is observed when the file is read. */
   size_bytes?: number;
-  /** @deprecated Accepted in old callers' input. The current schema does not store Skill coverage per file. */
+  /** Whether the last successful scan included capability usage. */
   capabilities_collected?: 0 | 1;
   /** @deprecated Accepted in old callers' input. Schema v24 does not store it. */
   dev?: string | null;

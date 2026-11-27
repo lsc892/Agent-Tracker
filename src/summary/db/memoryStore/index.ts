@@ -61,7 +61,8 @@ export class MemoryStore {
     // [SQL 트랜잭션 정책] 삭제 파일이 있거나 같은 제공자·세션을 두 번 교체할 때는 순차 반영한다.
     const seen = new Set<string>();
     for (const replacement of replacements) {
-      if (replacement.removedFileIds.length) return false;
+      if (replacement.removedFileIds.length
+        || Boolean(replacement.preserveCapabilities) !== Boolean(replacements[0].preserveCapabilities)) return false;
       for (const session of replacement.sessions) {
         const key = sessionKey(session.provider, session.session_id);
         if (seen.has(key)) return false;
@@ -121,7 +122,8 @@ export class MemoryStore {
     const projects = this.database.statement(`SELECT DISTINCT project_key FROM usage_request_daily
       WHERE (provider, session_id) IN (${SESSION_KEYS})`).all(scope).map(row => row.project_key);
     const retain = plans.some(({ replacement }) => replacement.retainDeletedSourceUsage === true);
-    this.profile.measure('rollups', () => this.database.rollups.replaceDaily(sessions, summaries, retain, this.profile));
+    const preserveCapabilities = plans[0].replacement.preserveCapabilities === true;
+    this.profile.measure('rollups', () => this.database.rollups.replaceDaily(sessions, summaries, retain, this.profile, preserveCapabilities));
     this.profile.measure('pruneNames', () => this.pruneNames(scope, projects, savedNames));
   }
 
@@ -136,11 +138,12 @@ export class MemoryStore {
     if (!replacement.files.length) return;
     // [저장 정책] 다시 읽은 원본은 파일 ID로 갱신하고 계보가 명시된 입력만 기존 계보를 덮어쓴다.
     const select = this.database.statement('SELECT provider,session_id FROM source_file WHERE id=?');
-    const save = this.database.statement(`INSERT INTO source_file(id,provider,source_root,path,session_id,mtime_ms,parser_version,
+    const save = this.database.statement(`INSERT INTO source_file(id,provider,source_root,path,session_id,mtime_ms,parser_version,capabilities_collected,
         thread_id,thread_usage,source_missing,processing_status,processing_position,recorded_at,last_error)
-      VALUES(?,?,?,?,?,?,?,?,?,0,'done','committed',?,NULL)
+      VALUES(?,?,?,?,?,?,?,coalesce(?,0),?,?,0,'done','committed',?,NULL)
       ON CONFLICT(id) DO UPDATE SET source_root=excluded.source_root,path=excluded.path,session_id=excluded.session_id,
         mtime_ms=excluded.mtime_ms,parser_version=excluded.parser_version,
+        capabilities_collected=coalesce(?,source_file.capabilities_collected),
         thread_id=CASE WHEN ? THEN excluded.thread_id ELSE source_file.thread_id END,
         thread_usage=CASE WHEN ? THEN excluded.thread_usage ELSE source_file.thread_usage END,
         source_missing=0,
@@ -156,8 +159,10 @@ export class MemoryStore {
       this.requireSession(file.provider, file.session_id, sessions);
       const relations = file.relations;
       const replaceRelation = Number(relations !== undefined);
+      const capabilities = file.capabilities_collected ?? null;
       save.run(file.id, file.provider, file.source_root, file.path, file.session_id, file.mtime_ms, file.parser_version,
-        relations?.identity.threadId ?? null, Number(relations?.threadUsage === true), now, replaceRelation, replaceRelation);
+        capabilities, relations?.identity.threadId ?? null, Number(relations?.threadUsage === true), now,
+        capabilities, replaceRelation, replaceRelation);
     }
   }
 

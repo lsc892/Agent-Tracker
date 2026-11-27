@@ -20,11 +20,10 @@ export type StoredSource = FileMetadata & Pick<SourceFileRow, 'id' | 'source_mis
 
 /** 경로의 마지막 반영 시각과 재수집이 필요한 상태를 비교한다. */
 export function needsSourceRead(file: Pick<FileMetadata, 'mtime_ms' | 'source_root'>,
-  previous: StoredSource | undefined): boolean {
-  // [재수집 정책] 수정 시각·원본 루트·파서 버전이 달라졌거나 마지막 처리가 완료되지 않은 파일을 다시 읽는다.
+  previous: StoredSource | undefined, collect: boolean): boolean {
   return !previous || previous.mtime_ms !== file.mtime_ms || previous.source_root !== file.source_root
     || previous.source_missing === 1 || previous.processing_status !== 'done'
-    || previous.parser_version !== PARSER_VERSION;
+    || previous.parser_version !== PARSER_VERSION || collect && previous.capabilities_collected !== 1;
 }
 
 export interface FileState extends FileMetadata {

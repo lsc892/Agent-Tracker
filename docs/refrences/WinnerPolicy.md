@@ -7,6 +7,6 @@
 | Claude | 같은 세션의 `message.id`, `requestId` | 원본 반영 순서상 나중 후보를 택한다. 확인된 요청 ID가 한 종류면 요청 ID가 빠진 같은 메시지도 함께 비교한다. |
 | Codex | 같은 세션의 스레드 ID, `turn_id`, `response_id` | 원본 반영 순서상 나중 후보를 택한다. |
 
-파일 준비 중 응답마다 우선 후보를 남기고 세션을 모을 때 다시 비교한다. 원본에서 확인한 복사 접두사는 제외한다. 구형 Codex와 현재 형식이 섞인 파일은 첫 응답의 스레드 누계와 맞는 이전 기록을 사용한다. 턴의 입력·출력 증가가 스레드 누계와 일치하는 구간에서는 확정한 응답을 합산한 뒤 확인된 차이를 보충한다. [파일 안의 후보](../../src/summary/aggregation/sourceWinners.ts) · [원본 간 근거](../../src/summary/aggregation/sourceEvidence.ts) · [최종 집계와 누계 확인](../../src/summary/aggregation/memoryAggregate.ts)
+파일 준비 중 응답마다 우선 후보를 남기고 세션을 모을 때 다시 비교한다. 원본에서 확인한 복사 접두사와 동일한 부모 스킬 호출은 제외한다. 구형 Codex와 현재 형식이 섞인 파일은 첫 응답의 스레드 누계와 맞는 이전 기록을 사용한다. 턴의 입력·출력 증가가 스레드 누계와 일치하는 구간에서는 확정한 응답을 합산한 뒤 확인된 차이를 보충한다. [파일 안의 후보](../../src/summary/aggregation/sourceWinners.ts) · [원본 간 근거](../../src/summary/aggregation/sourceEvidence.ts) · [최종 집계와 누계 확인](../../src/summary/aggregation/memoryAggregate.ts)
 
-최종 응답을 해당 대화에 합산한다. 부모 대화가 확인된 서브에이전트의 기록도 그 대화에 합산하며 시작·완료·소요 시간은 메인 에이전트에서 읽는다. 제공자·세션·프로젝트·날짜 및 모델별 일별 합계를 저장한다. [파싱 필드](LogParsingFields.md) · [일별 저장](SQLiteTables.md)
+최종 응답과 도구 호출을 해당 대화에 합산한다. 부모 대화가 확인된 서브에이전트의 기록도 그 대화에 합산하며 시작·완료·소요 시간은 메인 에이전트에서 읽는다. 제공자·세션·프로젝트·날짜 및 모델별 일별 합계를 저장한다. [파싱 필드](LogParsingFields.md) · [일별 저장](SQLiteTables.md)

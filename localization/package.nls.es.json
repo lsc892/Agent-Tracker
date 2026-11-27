@@ -41,7 +41,7 @@
   "manifest.showResetCredits": "Mostrar los restablecimientos de Codex disponibles y su próxima caducidad, solo si el servidor los proporciona.",
   "dashboard.usageStatistics": "Estadísticas de uso",
   "manifest.usageEnabled": "Activar estadísticas de uso. Desactivarlas cancela la recopilación y cierra la vista sin afectar las consultas de suscripción.\n\n[Eliminar datos estadísticos](command:agentTracker.clearUsageData): elimina información de procesamiento y resultados agregados. Se conservan los registros originales y se recalculan al reabrir las estadísticas.",
-  "manifest.skillsEnabled": "La agregación por conversación no recopila estadísticas de Skills.",
+  "manifest.skillsEnabled": "Recopila recuentos de uso de habilidades, subagentes, complementos y modelos.",
   "manifest.showApiCosts": "Mostrar costos estimados de API (USD) en la tabla de tokens. La suscripción cuesta 0; los costos sin facturación, tarifas o desglose confirmado se muestran aparte. Cambiar el ajuste solo consulta estadísticas guardadas.",
   "manifest.excludeEmpty": "Excluir de gráficos y promedios las solicitudes sin modelo identificado ni tokens; permanecen en la tabla. Se incluyen registros de cero tokens con modelo conocido y uso real con modelo desconocido.",
   "manifest.timezone": "Zona horaria IANA para estadísticas diarias y mensuales. Vacío usa la del sistema.",

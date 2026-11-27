@@ -55,7 +55,7 @@ export class UsageRollupStore {
   }
 
   replaceDaily(sessions: readonly SessionRef[], summaries: readonly TurnSummaryInput[], retain: boolean,
-    profile: StageProfiler<StorageStage>): void {
+    profile: StageProfiler<StorageStage>, preserveCapabilities = false): void {
     if (!sessions.length) return;
 
     // [SQL 트랜잭션 정책] 소실 원본을 보존하는 세션은 이번에 집계한 날짜만 교체 범위에 넣는다.
@@ -92,8 +92,25 @@ export class UsageRollupStore {
         )`).run(...params, timezone, facts[by]);
       });
     }
-    // [저장 정책] 같은 교체 범위에 남아 있는 이전 도구 집계 행을 지운다.
-    this.database.statement(`DELETE FROM usage_capability_daily ${where}`).run(...params);
+    if (preserveCapabilities) {
+      this.database.statement(`DELETE FROM usage_capability_daily WHERE ${SESSION_SET_FILTER}
+        AND NOT EXISTS (SELECT 1 FROM usage_request_daily AS usage
+          WHERE usage.provider=usage_capability_daily.provider AND usage.session_id=usage_capability_daily.session_id)`).run(scope);
+    } else {
+      const capabilities = [];
+      for (const row of summaries) {
+        for (const use of row.capability_usage ?? []) {
+          capabilities.push([row.provider, row.session_id, row.project_key, row.started_at_ms ?? null,
+            use.category, use.name, use.usage_count]);
+        }
+      }
+      this.database.statement(`DELETE FROM usage_capability_daily ${where}`).run(...params);
+      if (capabilities.length) this.database.statement(`INSERT INTO usage_capability_daily
+        SELECT json_extract(value,'$[0]'), json_extract(value,'$[1]'), json_extract(value,'$[2]'),
+          coalesce(agent_tracker_period(json_extract(value,'$[3]'), ?, 'day'),''),
+          json_extract(value,'$[4]'), json_extract(value,'$[5]'), sum(json_extract(value,'$[6]'))
+        FROM json_each(?) GROUP BY 1,2,3,4,5,6`).run(timezone, JSON.stringify(capabilities));
+    }
   }
 
   clear(): void {

@@ -15,6 +15,7 @@ import { scheduleStatusBarTogglePatch } from './ui/statusBarTogglePatch';
 
 interface ConfigurationChanges {
   cleanup: boolean;
+  capabilities: boolean;
   retention: boolean;
   usageSources: boolean;
   providers: boolean;
@@ -69,7 +70,7 @@ export class AgentTrackerApp {
       dbPath: join(this.context.globalStorageUri.fsPath, 'agent-tracker.sqlite'),
       roots: this.settings.roots,
       timezone: this.settings.usage.timezone,
-      collectCapabilities: false,
+      collectCapabilities: this.settings.usage.skillsEnabled,
       retainDeletedSourceUsage: this.settings.usage.retainDeletedSourceUsage,
     });
     this.dashboard = this.track(new Dashboard({
@@ -177,6 +178,8 @@ export class AgentTrackerApp {
     // [수집 정책] 보존 설정을 먼저 반영하고 수집 루트나 활성화 상태가 달라지면 갱신을 취소한다.
     if (changes.cleanup) await this.applyClaudeCleanup();
     if (this.disposed) return;
+    if (changes.capabilities) await this.summary?.setCapabilityCollectionEnabled(this.settings.usage.skillsEnabled);
+    if (this.disposed) return;
     if (changes.retention) await this.summary?.setDeletedSourceRetentionEnabled(this.settings.usage.retainDeletedSourceUsage);
     if (this.disposed) return;
     if (changes.usageSources) {
@@ -190,7 +193,7 @@ export class AgentTrackerApp {
     if (this.disposed) return;
     this.render();
     this.colorSettings?.update();
-    this.dashboard?.configurationChanged();
+    this.dashboard?.configurationChanged(changes.capabilities && this.settings.usage.skillsEnabled);
   }
 
   private configurationChanges(previous: TrackerConfiguration, next: TrackerConfiguration): ConfigurationChanges {
@@ -198,6 +201,7 @@ export class AgentTrackerApp {
     const tracking = previous.claude.enabled !== next.claude.enabled || previous.codex.enabled !== next.codex.enabled;
     return {
       cleanup: previous.claude.cleanupPeriodDays !== next.claude.cleanupPeriodDays || previous.claude.dataHome !== next.claude.dataHome,
+      capabilities: previous.usage.skillsEnabled !== next.usage.skillsEnabled,
       retention: previous.usage.retainDeletedSourceUsage !== next.usage.retainDeletedSourceUsage,
       usageSources: previous.usage.enabled !== next.usage.enabled || JSON.stringify(previous.roots) !== JSON.stringify(next.roots),
       providers: tracking || previous.claude.dataHome !== next.claude.dataHome || previous.codex.dataHome !== next.codex.dataHome || previous.codex.executable !== next.codex.executable,

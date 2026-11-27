@@ -6,7 +6,7 @@ import { isPreparedFile, sessionKey, type FileState, type PreparedFile, type Sca
 type AggregateSource = PreparedFile & { session_id: string };
 
 export function collectWinners(context: RefreshContext, names: ReadonlyMap<string, string>): MemoryAggregateResult {
-  const { state, check } = context;
+  const { state, collect, check } = context;
   const sources = state.preparedFiles.filter((file): file is AggregateSource => isPreparedFile(file) && !!file.session_id);
   if (!sources.length) return { summaries: [], orphans: [] };
   sources.sort(compareSourceOrder);
@@ -17,7 +17,7 @@ export function collectWinners(context: RefreshContext, names: ReadonlyMap<strin
       identity: { ...identity, sessionName, parentRootId: file.prepared.parentRootId },
       evidence: winners.evidence, flags: sourceFlags(state, file) };
   });
-  const aggregation = new StreamingAggregation(inputs, false);
+  const aggregation = new StreamingAggregation(inputs, collect);
   for (const file of sources) {
     check();
     if (state.affected.has(sessionKey(file.provider, file.session_id))) aggregation.addSource(file.id, file.prepared.winners);

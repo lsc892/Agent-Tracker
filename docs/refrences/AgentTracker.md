@@ -11,13 +11,13 @@
 VS Code 확장으로 다음 두 기능을 제공한다.
 
 1. Claude와 Codex의 현재 구독 quota 사용률과 reset 시각을 상태 표시줄에서 확인한다.
-2. 로컬 JSONL을 SQLite에 반영해 일·월·프로젝트·세션별 토큰 총량과 대화 수, 대화당 평균 토큰·소요 시간, 모델별 도표·표, API 추정 비용을 조회한다.
+2. 로컬 JSONL을 SQLite에 반영해 일·월·프로젝트·세션별 토큰 총량과 대화 수, 대화당 평균 토큰·소요 시간, 모델별 도표·표, API 추정 비용과 Skill 사용 횟수를 조회한다.
 
 핵심 설계 원칙은 다음과 같다.
 
 - quota는 실시간성이 중요하므로 작은 최신 상태만 메모리에 유지한다.
 - 과거 누계는 화면을 열거나 사용자가 새로 고침을 요청할 때 파일별 저장 시각과 현재 수정 시각을 비교하고 달라진 JSONL을 처음부터 읽어 갱신한다.
-- SQLite는 원본 상태·수정 시각, 이름·결제 설정과 날짜별 토큰·모델·비용 집계를 저장한다. 대화별 토큰과 시간은 수집 중에 계산한다.
+- SQLite는 원본 상태·수정 시각, 이름·결제 설정과 날짜별 토큰·모델·비용·Skill 집계를 저장한다. 대화별 토큰과 시간은 수집 중에 계산한다.
 
 프로젝트는 작업 폴더다. 세션은 채팅 목록에 보이는 한 채팅이며, 같은 세션에서 대화를 이어간다. 대화는 사람이 메시지를 보낸 뒤 메인 에이전트가 답변을 완료하는 한 턴이다. 해당 턴의 서브에이전트 사용량은 부모 대화에 합산한다.
 
@@ -65,7 +65,7 @@ Codex 응답의 [parseCodexQuota()](../../src/quota/codex/response.ts#L16)는 �
 
 구현은 client·scanner·jsonl·aggregation·models·db·parsers로 묶는다. scanner는 파일 준비와 스레드별 응답 후보 선택, aggregation은 확정 사용량 합산과 Codex 누계 대조, db는 최종 저장·조회를 담당한다. Worker 기본 실행 파일은 client/worker.js다. [summary 책임별 안내](../../src/summary/README.md)
 
-JSONL의 선택 필드로 대화 경계와 토큰·부모 귀속 근거를 구성한다. 수집기는 부모 귀속과 복사 이력을 확인할 때 필요한 파일을 읽고, 세션 단위로 후보를 비교해 확정한 응답을 대화에 더한다. [파싱 필드](LogParsingFields.md) · [응답 비교](../../src/summary/scanner/refresh/aggregation.ts) · [최종 집계](../../src/summary/aggregation/memoryAggregate.ts)
+JSONL의 선택 필드로 대화 경계와 토큰·호출 근거를 구성한다. 수집기는 부모 귀속과 복사 이력을 확인할 때 필요한 파일을 읽고, 세션 단위로 후보를 비교해 확정한 응답을 대화에 더한다. [파싱 필드](LogParsingFields.md) · [응답 비교](../../src/summary/scanner/refresh/aggregation.ts) · [최종 집계](../../src/summary/aggregation/memoryAggregate.ts)
 
 [Worker](../../src/summary/client/worker.ts)는 메시지 큐·DB 지연 생성·취소·갱신 잠금을 조율한다. [JSONL 진입점](../../src/summary/jsonl/index.ts)은 파일·압축·행 콜백·offset·취소와 자원 수명을 조율하고, [line.ts](../../src/summary/jsonl/line.ts)는 행의 이미지 제거·문자열 문법·바이트 예산 상태를 맡는다. [errors.ts](../../src/summary/jsonl/errors.ts)의 단일 SummaryError를 진입점에서 재노출하여 기존 오류 식별과 호출 경로를 유지한다. [수집기](../../src/summary/scanner/index.ts)는 끝까지 읽을 byte 경계를 정하고 후보와 근거를 수집한다. [통계 SQL](../../src/summary/db/queries/README.md)은 공통 정책·원본·롤업 조회로 나눈다.
 
@@ -331,7 +331,7 @@ Claude credential·로그 보존 설정은 `<dataHome>/.claude`, Codex App Serve
 1. 디렉터리를 순회하고 이번에 관측한 경로로 원본 소실을 판정한다. 각 파일은 정상 반영한 수정 시각과 비교한다. 마지막 트랜잭션에서 남은 이름 변경을 반영한다.
 2. 관련 원본을 관측한 byte 경계까지 64 KiB 이하 단위로 읽는다. 알려진 형식의 완성된 Codex `response_item`은 JSON 문법을 확인하고 행 시각을 직접 사용한다. 그 외에는 원본 바이트에서 고정 필드를 모아 LF에서 디코딩한다. 줄 예산·이미지 본문 생략·미완성 줄 보류·읽는 중 원본 재작성 감지는 유지한다. [파싱 필드](LogParsingFields.md)
 3. 파일을 받는 즉시 응답별 최고 사용량을 병합한다. Codex는 기준 파일의 누계·구형 기록을 유지하고, 병합된 응답 값으로 구형 증가분과 새 형식의 검증된 누락분을 확인한다.
-4. 쓰기 트랜잭션에서 메모리의 대화 합계를 SQL에 바인딩한다. 영향 세션의 일별·모델별 결과를 계산하고 이전 일별 행을 교체한다. 파일별 수정 시각도 함께 반영한다.
+4. 쓰기 트랜잭션에서 메모리의 대화 합계를 SQL에 바인딩한다. 영향 세션의 일별·모델별·Skill 결과를 계산하고 이전 일별 행을 교체한다. 파일별 수정 시각과 Skill 수집 여부도 함께 반영한다.
 5. 대시보드는 영속 갱신이 끝나면 저장된 일별 결과를 조회한다.
 
 **처리 결과** — 세션의 최종 합계는 파일 전체를 다시 읽어 계산한 값으로 교체하므로 재시도 시 중복 가산되지 않는다. 정상 성분의 COMMIT·취소 경계는 최대 16성분·1,000스레드의 저장 묶음이다.
@@ -611,7 +611,7 @@ schema v4는 이전 summary의 cache component를 NULL로 유지해 미확인 �
 
 ## 8. SQLite schema
 
-DB 위치는 `ExtensionContext.globalStorageUri` 아래로 한다. 현재 표는 파일 상태의 `source_file`, 이름의 `projects`·`sessions`, 세션 결제 선택의 `session_billing`, 일별 사용량의 `usage_request_daily`·`usage_model_daily`와 집계 설정의 `usage_rollup_meta`다. `usage_capability_daily`는 이전 도구 사용량을 일별로 보관한다. 아래의 상세 표 정의는 이전 DB의 형식을 설명하며, v26에서는 이관과 상세 테이블 삭제를 같은 트랜잭션에서 진행한다.
+DB 위치는 `ExtensionContext.globalStorageUri` 아래로 한다. 현재 표는 파일 상태의 `source_file`, 이름의 `projects`·`sessions`, 세션 결제 선택의 `session_billing`, 일별 사용량의 `usage_request_daily`·`usage_model_daily`·`usage_capability_daily`와 집계 설정의 `usage_rollup_meta`다. 아래의 상세 표 정의는 이전 DB의 형식을 설명하며, v26에서는 이관과 상세 테이블 삭제를 같은 트랜잭션에서 진행한다.
 
 스키마 v27은 `source_file`의 루트·세션 보조 인덱스 두 개와 일별 사용량 표 두 개의 날짜·프로젝트 보조 인덱스 네 개를 제거한다. 새 DB는 기본 키와 고유 제약에 필요한 구조로 시작한다. 기존 DB는 파일·사용량 행을 보존하고 같은 마이그레이션 트랜잭션에서 보조 인덱스만 삭제한다. 회수한 페이지는 이후 쓰기에 재사용한다.
 
@@ -780,9 +780,7 @@ Claude는 `message.model`, Codex는 usage record의 model 또는 해당 turn_con
 
 요금은 로컬 대화 기록의 모델·토큰을 [Anthropic 표준 단가](https://platform.claude.com/docs/en/about-claude/pricing)와 [OpenAI 표준 단가](https://developers.openai.com/api/docs/pricing)로 계산한 추정 USD 비용이다. 단가 버전은 `2026-10-07-standard-text`다. Input에서 cache write/read를 뺀 뒤 각 component를 한 번씩 계산한다. 미지원 모델·cache 구성·cache write 단가는 NULL로 남기고 확인한 비용과 미확인 건수를 함께 표시한다. 구독은 사용자의 지시에 따라 추가 사용 비용 0원이며 구독 결제액 자체를 합산하지 않는다. 실제 청구액·충전 잔액 조회, 로컬 기록에 없는 다른 API 호출, 도구 요금·할인·빠른 처리·긴 문맥·캐시 보관 기간별 추가 요금은 포함하지 않는다.
 
-### 8.1.1 이전 Skill 사용 횟수 저장과 조회
-
-대화 수집은 Skill 사용 횟수를 갱신하지 않는다. 다음 설명은 기존 DB와 저장 API에 남아 있는 이전 형식을 다룬다.
+### 8.1.1 Skill 사용 횟수 저장과 조회
 
 Skill 통계의 집계 대상·기간/비율 기준·분류별 사용 기준에 관한 부연설명은 네 분류 표·페이지 버튼 다음의 맨 아래에 표시한다. 별도 스킬 사용 횟수 도표와 분류·지표 선택은 표시하지 않는다.
 
@@ -790,11 +788,11 @@ Skill 통계의 집계 대상·기간/비율 기준·분류별 사용 기준에 
 
 Skill은 각 표 안의 비율 막대에서 상대 사용량을 표시한다. worker는 분류별 현재 페이지와 전체 범위의 `maxUses`·`totalUses`를 반환하며, 화면은 이 값으로 페이지에 독립적인 최대 막대와 비율을 계산한다. 별도의 상위 20개 조회·`chartRows`와 구형 응답 fallback은 두지 않는다. 빈 결과는 각 표에 기록 없음 안내를 표시한다. 이전 Webview state의 Skill 도표 분류·지표 값은 사용하지 않는다.
 
-`agentTracker.usage.skillsEnabled`는 기본 true로 사용자 지시 여부와 관계없이 AI의 호출 기록을 포함한다. 지시·자율 여부를 프롬프트 본문으로 추정하거나 구분 저장하지 않는다. OFF에서는 진행 중인 수집을 취소하고 worker의 Skill 호출 인식·모델 응답 횟수 합산과 Skill 조회를 중단한다. 토큰·모델별 토큰·API 비용·quota 기능은 유지한다. Skill 화면은 기존 표를 비우고 OFF 안내와 설정 열기 버튼을 제공한다.
+`agentTracker.usage.skillsEnabled`는 기본 true이며 사용자 지시와 AI가 선택한 호출을 모두 포함한다. OFF일 때는 이후 갱신에서 호출 인식과 모델 응답 횟수 합산을 생략한다. Skill 화면은 OFF 안내와 설정 열기 버튼을 표시한다.
 
-OFF 동안 토큰을 갱신할 때는 같은 논리 요청의 기존 Skill 행을 유지하며 새로 수집한 토큰 결과와 함께 저장한다. 사라진 요청은 기존 삭제 규칙을 따른다. schema v7은 source_file에 `capabilities_collected`를 추가하며 토큰만 처리한 파일은 0, Skill까지 처리한 파일은 1로 정상 metadata와 함께 저장한다. 이전 DB의 요청·토큰·비용·횟수는 유지하고 새 field는 0으로 둔다. ON으로 돌아오면 정상 파일도 이 값이 0이면 재파싱하여 원본에 남은 OFF 기간 호출을 복구한다. 집계를 교체하므로 이전 횟수에 중복 가산하지 않는다. 열린 통계 창은 즉시 갱신하고 닫힌 창에서는 다음 진입까지 기다린다. 설정 전환은 quota를 조회하지 않는다.
+스키마 v30의 `source_file.capabilities_collected`에는 마지막 정상 파일 읽기가 Skill을 포함했는지 기록한다. 수집을 다시 켜면 0인 파일의 남은 원본에서 횟수를 복원한다. 열린 통계 창에서는 갱신을 시작하며 닫힌 창에서는 다음 진입에서 갱신한다.
 
-schema v6의 `turn_capability_usage`는 `(turn_id, category, name)`을 기본 키로 양수 `usage_count`를 저장한다. 요청 삭제 시 cascade하고 session 교체·원본 삭제·통계 계산 데이터 삭제에 함께 반영한다. 이전 DB의 요청·토큰·비용은 유지하며 parser version 12의 다음 갱신에서 원본을 한 번 재파싱한다. 호출 인자·명령·스킬 파일 경로·본문·호출 ID는 영속화하지 않는다.
+대화별 횟수를 제공자·세션·프로젝트·시작일·분류·이름으로 합산해 `usage_capability_daily`에 저장한다. 수집을 끈 동안 통계를 보존하고 세션의 사용량을 삭제할 때 연결된 Skill 행도 정리한다. 호출 인자와 호출 ID는 수집 중에만 사용한다.
 
 | 분류 | 사용 1회의 기준과 표시 이름 |
 |---|---|
@@ -913,9 +911,9 @@ Extension Host 메모리에 유지하는 값:
 - 사용량·데이터 확인 Webview마다 현재 보이는 제한된 한 page의 row
 - worker가 보내는 작은 진행 상태와 현재 조회 page·제한된 제공자별·모델별 도표 결과
 
-누계 Worker는 갱신 동안 파일별 응답 후보, 대화 경계, 부모 관계와 Codex 누계 확인 근거를 보유한다. 확정한 대화·모델 사용량으로 영향 세션의 일별 합계를 교체한다. 마지막 정상 수정 시각과 스레드 식별자는 변경 판정과 관련 원본 탐색에 사용한다.
+누계 Worker는 갱신 동안 파일별 응답 후보, 대화 경계, 부모 관계와 Codex 누계 확인 근거를 보유한다. 확정한 대화·모델·Skill 사용량으로 영향 세션의 일별 합계를 교체한다. 마지막 정상 수정 시각과 스레드 식별자는 변경 판정과 관련 원본 탐색에 사용한다.
 
-원본 탐색에서 하위 디렉터리의 항목도 같은 관측 함수에 전달한다. 파일 준비 단계는 원본 안의 응답을 비교한다. 세션 집계는 파일 간 비교와 부모 대화의 귀속을 마친 뒤 응답을 합산한다. [응답 중복 제거](WinnerPolicy.md)
+원본 탐색에서 하위 디렉터리의 항목도 같은 관측 함수에 전달한다. 파일 준비 단계는 원본 안의 응답을 비교한다. 세션 집계는 파일 간 비교와 부모 대화의 귀속을 마친 뒤 응답과 호출을 합산한다. [응답 중복 제거](WinnerPolicy.md)
 
 파일 준비 풀의 선행 창은 처리 중인 작업 수를 제한한다. 파싱을 끝낸 응답의 입력·출력·캐시 토큰과 구형 Codex의 누계·개별 사용량은 파일별 `Float64Array`에 연속으로 담는다. 구형 Codex 누계가 있는 파일에만 전용 작업 상태와 Worker 결과를 만든다. 비교 서명은 파일별 고유 UTF-8 바이트와 행별 정수 인덱스로 보관한다. 부모와 자식의 서명은 순서대로 바이트를 대조하고, 같은 파일 안의 중복은 인덱스로 판별한다. 병렬 경로에서 파일 Worker는 토큰과 서명의 `ArrayBuffer` 소유권을 수집기에 넘긴다. 확정한 스레드·모델 합계를 SQLite에 전달한다. Worker별 JSONL/Zstd 버퍼와 미소비 결과도 메모리를 사용한다.
 
@@ -1112,7 +1110,7 @@ last successful session update
 - 조회 중 provider notification은 수신 즉시 반영하고 활성 창의 정기 조회는 제공자별 기본 15분 간격으로 수행한다. 조회 사이 Codex App Server는 상주하지 않는다.
 - 상태바 사용량 항목 안에서 Claude는 왼쪽, Codex는 오른쪽이고, 바로 위 툴팁에서 quota·reset·마지막 성공 갱신 시각을 볼 수 있다.
 - 호버하면 상태 표시줄의 상세/압축 설정과 관계없이 제공자별 주간·5시간 남은 비율·초기화 카운트다운과 사용량 창 열기 안내를 표시한다. 클릭하면 Markdown Quota 카드가 뜨고 공통 새로고침·상세/압축 설정·설정·사용량 통계 링크를 사용할 수 있다. 패치한 로컬 VS Code에서는 상세 요약 호버, 클릭 유지·재클릭 닫기, 닫은 뒤 요약 복원과 바깥 클릭·Esc 후 재열기를 실제 UI에서 검증한다.
-- 누계 refresh는 JSONL 수정 시각으로 재파싱 대상을 고르고 영향 세션의 관련 원본을 확장한다. 확인한 응답과 누계 근거로 일별 대화 합계를 교체한다. 변경 없는 갱신의 본문 읽기는 0바이트다.
+- 누계 refresh는 JSONL 수정 시각과 Skill 수집 상태로 재파싱 대상을 고르고 영향 세션의 관련 원본을 확장한다. 확인한 응답과 호출로 일별 대화 합계를 교체한다. 변경 없는 갱신의 본문 읽기는 0바이트다.
 - 전체 본문은 스트림으로 읽고 Worker의 source_file·유효성 근거·winner DTO·최종 집계 비용은 별도로 측정한다. Extension Host·Webview·DB 조회의 page 경계는 유지한다.
 - 영속 table은 source_file·projects·sessions·turn_summary·turn_model_usage·turn_costs·session_billing·turn_capability_usage와 조회용 일별 집계다. 요청·모델·비용·Skill·이름·source_file·삭제는 함께 commit하며 turn metadata 캐시는 두지 않는다. 부재 판정은 전체 탐색 성공 후 수행한다.
 - 오류·중단은 네 진단 항목으로 기록하고 자동 재시도하지 않는다. 다음 화면 진입·수동 새로 고침에서 새로 조사한다.

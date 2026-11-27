@@ -45,7 +45,7 @@ export async function inspectSource(context: RefreshContext, file: FileState): P
 }
 
 function applyPreparation(context: RefreshContext, file: FileState, preparation: SourcePreparation): void {
-  const { state, result, check } = context;
+  const { state, result, check, collect } = context;
   const previousSession = file.previous?.session_id;
   // [진단 정책] 읽기에 실패해도 세션 식별자가 있으면 이전 귀속과 연결한 뒤 원본 오류를 전달한다.
   if (!preparation.ok) {
@@ -59,6 +59,7 @@ function applyPreparation(context: RefreshContext, file: FileState, preparation:
   result.parsed++;
   const { read, winners } = preparation;
   file.parser_version = PARSER_VERSION;
+  file.capabilities_collected = collect ? 1 : 0;
   if (!read.identity) {
     applyEmptySource(state, file, read.partialLine);
     return;
@@ -67,7 +68,7 @@ function applyPreparation(context: RefreshContext, file: FileState, preparation:
   state.setSession(file, identity.sessionId);
   file.relations = { identity: { threadId: identity.threadId }, threadUsage: true };
   state.registerPrepared(file, { identity, winners, partialLine: read.partialLine });
-  file.changed ||= needsSourceRead(file, file.previous);
+  file.changed ||= needsSourceRead(file, file.previous, collect);
   if (!file.changed) return;
   state.affect(file.provider, file.session_id);
   state.connect(file.provider, previousSession, file.session_id);

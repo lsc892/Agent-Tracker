@@ -44,12 +44,14 @@ export async function refreshSummary(
     if (cancelled()) throw new SummaryError('interrupted');
   };
   const retain = options.retainDeletedSourceUsage !== false;
+  const collect = options.collectCapabilities !== false;
   const sourcePool = new SourceReaderPool({ workers: options.sourceWorkers,
-    maxLineBytes: options.maxLineBytes, signal, cancelled, externalCancellation: options.cancellation, onBytes });
+    maxLineBytes: options.maxLineBytes, collectCapabilities: collect,
+    signal, cancelled, externalCancellation: options.cancellation, onBytes });
   const state = new ScanState(result);
   const roots = options.roots.map(root => ({ ...root, path: resolve(root.path) }));
   const context: RefreshContext = { database, result, scan, storage, state, sourcePool,
-    roots, retain, cancelled, check, report: publish };
+    roots, retain, collect, cancelled, check, report: publish };
 
   // [SQL 트랜잭션 정책] 갱신 전체의 창 간 잠금을 확보한 뒤 스캔하고 중단은 원본 진단에 남긴다.
   let release: (() => void) | undefined;

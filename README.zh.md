@@ -175,6 +175,6 @@ npm 包和 VS Code 扩展需要分别卸载。
 | `projects`、`sessions` | 项目和会话的显示名称。 |
 | `session_billing` | 用户为各提供商和会话指定的计费方式。 |
 | `usage_rollup_meta` | 每日聚合使用的时区和格式版本。 |
-| `usage_capability_daily` | 从旧版数据库结构迁移的工具使用次数，供工具统计查询。 |
+| `usage_capability_daily` | 技能、子代理、插件和模型的每日使用次数。 |
 
 统计页面按所选时间段筛选数据，并将每日记录按提供商或模型分组汇总。平均值根据保存的总量和对应的样本数计算。

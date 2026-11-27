@@ -175,6 +175,6 @@ Un proyecto es una carpeta de trabajo. Una sesión agrupa las conversaciones de 
 | `projects`, `sessions` | Nombres visibles de los proyectos y las sesiones. |
 | `session_billing` | Modo de facturación que el usuario seleccionó para cada proveedor y sesión. |
 | `usage_rollup_meta` | Zona horaria y versión del formato de agregación diaria. |
-| `usage_capability_daily` | Recuentos de uso de herramientas migrados desde el esquema anterior. La vista de estadísticas de herramientas consulta esta tabla. |
+| `usage_capability_daily` | Recuentos diarios de habilidades, subagentes, complementos y modelos. |
 
 La vista de estadísticas filtra los datos diarios del proveedor o modelo por el período seleccionado y los agrupa según el criterio elegido. Calcula los promedios a partir de los totales y recuentos de muestras almacenados.

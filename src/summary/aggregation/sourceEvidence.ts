@@ -181,9 +181,8 @@ export function prepareSources(files: readonly StreamingAggregateFile[]): {
 
     // [집계 정책] 양쪽 복사 구간에 같은 키가 있는 도구 이벤트를 복제본으로 표시한다.
     for (const [id, index] of source.file.evidence.capabilities) {
-      if (index > source.legacyCutoff) continue;
       const match = parent.file.evidence.capabilities.get(id);
-      if (match !== undefined && match <= parentCutoff)
+      if (match !== undefined && (identity.forkedFromId || index <= source.legacyCutoff && match <= parentCutoff))
         source.copiedCapabilities.add(id);
     }
   }
@@ -218,6 +217,6 @@ export function eligibleWinner(source: SourcePlan, rootId: string, referenceId: 
 export function eligible(source: SourcePlan, event: ParseEvent, index: number): boolean {
   // [집계 정책] 도구는 복제된 호출만 제외하고 나머지 이벤트는 요청의 상속 여부를 확인한다.
   if (event.kind === 'usage') return eligibleUsage(source, event, index);
-  if (event.kind === 'capability' && index <= source.legacyCutoff && source.copiedCapabilities.has(capabilityKey(event))) return false;
+  if (event.kind === 'capability' && source.copiedCapabilities.has(capabilityKey(event))) return false;
   return !(event.kind !== 'capability' && source.inheritedRoots.has(event.rootId));
 }

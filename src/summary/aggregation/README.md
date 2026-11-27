@@ -1,6 +1,6 @@
 # aggregation
 
-파일별 응답 후보를 비교하고, 확정된 모델과 토큰을 부모 대화에 반영한다. [스캔 집계 진입점](../scanner/refresh/aggregation.ts)
+파일별 응답 후보를 비교하고, 확정된 모델·토큰·도구 호출을 부모 대화에 반영한다. [스캔 집계 진입점](../scanner/refresh/aggregation.ts)
 
 - [memoryAggregate.ts](memoryAggregate.ts) — `StreamingAggregation`: 세션별로 파일 winner를 병합해 요청·모델·진단을 만든다.
 - [threadAccounting.ts](threadAccounting.ts) — 이전 스레드별 집계의 토큰 합산과 Codex 누계 검산을 구현한다.

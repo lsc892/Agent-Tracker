@@ -10,7 +10,7 @@ export interface MemoryReplacement {
   retainDeletedSourceUsage?: boolean;
   /** @deprecated Response records are no longer persisted. */
   appliedResponses?: readonly AppliedResponse[];
-  /** @deprecated Skill history is managed at the daily level. */
+  /** Preserve saved Skill rows during refreshes with collection disabled. */
   preserveCapabilities?: boolean;
 }
 

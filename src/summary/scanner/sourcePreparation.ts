@@ -5,6 +5,7 @@ import type { ParsedIdentity } from '../types';
 import { readSource, type SourceRead, type SourceReadFile } from './sourceReader';
 
 export interface SourcePreparationOptions {
+  collectCapabilities?: boolean;
   maxLineBytes?: number;
   cancelled: () => boolean;
   signal?: AbortSignal;
@@ -21,7 +22,7 @@ export async function prepareSource(file: SourceReadFile, options: SourcePrepara
   try {
     const read = await readSource(file, (event, index) => winners.add(event, index), {
       ...options,
-      collectCapabilities: false,
+      collectCapabilities: options.collectCapabilities !== false,
       onIdentity: value => { identity = value; },
       onChild: (reference, rootId) => winners.evidence.child(reference, rootId),
     });
