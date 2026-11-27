@@ -21,7 +21,7 @@ interface RollupDimensions {
 
 const METRIC_COLUMNS: Record<ChartMetric, string> = {
   tokens: 'total_tokens',
-  requests: 'turn_count',
+  requests: 'completed_turns',
   averageTokens: 'avg_tokens_per_turn',
   averageDuration: 'avg_duration_ms',
 };

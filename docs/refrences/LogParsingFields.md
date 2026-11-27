@@ -1,25 +1,15 @@
-# Claude·Codex JSONL에서 읽는 스레드 필드
+# Claude·Codex JSONL에서 읽는 대화·사용량 필드
 
-파서 버전 25는 JSONL 행에서 토큰·시각·모델·스레드 ID·세션 ID와 응답 중복 및 fork 복사 확인에 필요한 참조를 읽는다. `type`은 값의 해석 방식을 고른다. 파일 경로, 수정 시각, 관측 크기는 원본 순서 선택과 읽기 범위에 사용한다.
+파서 v26은 사용자 요청과 메인 에이전트의 응답을 하나의 대화로 묶는다. 세션은 한 채팅에서 이어진 대화의 묶음이고 프로젝트는 작업 폴더다. 로그에 기록된 작업 디렉터리 `cwd`를 사용하고, 값이 없으면 로그 위치에서 프로젝트 키를 얻는다.
 
-## 원본 필드와 용도
+| 항목 | Claude | Codex |
+| --- | --- | --- |
+| 세션과 스레드 | 메인 로그의 `sessionId` 또는 파일명. 서브에이전트의 세션은 `subagents/`의 상위 폴더, 스레드는 파일명으로 식별한다. | `session_meta.payload.id` 또는 사용량 행의 `thread_id`가 스레드를 식별한다. `session_id`를 세션 키로 쓰며, 값이 없으면 부모 스레드 또는 현재 스레드 식별자로 시작한다. |
+| 대화 경계와 시간 | 사용자 행의 `promptId` 또는 `uuid`, 응답의 `stop_reason`, 시스템의 종료 및 `durationMs` | `root_turn_id`, `turn_id`, 사용자 메시지와 작업 시작·완료·중단 이벤트 |
+| 서브에이전트 귀속 | 공유된 `promptId` 또는 도구 결과의 `toolUseResult.agentId` | 명시된 부모 대화 ID 또는 부모의 `spawn_agent` 결과에 기록된 `agent_id`·`task_name`과 자식의 스레드 ID·`agent_path` |
+| 응답과 모델 | `message.id`, `requestId`, `message.model`, `message.usage` | `thread_id`, `turn_id`, `response_id`, `payload.model`, `payload.usage` |
+| 토큰 누계와 fork | 응답 사용량의 입력·출력·캐시 성분 | `thread_token_usage`, `turn_token_usage`, 구형 `token_count`의 `total_token_usage`·`last_token_usage`, `forked_from_id`·`parent_thread_id` |
 
-| 항목 | Claude | Codex | 용도 |
-| --- | --- | --- | --- |
-| 세션·스레드 | 메인의 `sessionId`. 기본값은 파일명이며, `subagents/` 아래서는 디렉터리와 파일명으로 세션과 스레드를 각각 구분 | `session_meta.payload.id`, `payload.thread_id`, `payload.session_id`. 세션 ID가 없으면 스레드 ID 사용 | `(provider, session_id, thread_id)` 비교 키와 세션 필터 |
-| 모델 | `assistant.message.model` | 사용량 행의 `payload.model`, 세션·턴 문맥의 `payload.model` | 스레드 안의 모델별 토큰 합계 |
-| 입력·출력·캐시 | `message.usage`의 `input_tokens`, `output_tokens`, `cache_read_input_tokens`, `cache_creation_input_tokens` | `payload.usage`, `thread_token_usage`, `turn_token_usage`와 구형 `token_count.info`의 `total_token_usage`·`last_token_usage`. 입출력과 평면·중첩 캐시 값을 읽고, 구형 행의 `reasoning_output_tokens`·`total_tokens`는 복사 비교에 쓴다. | 스레드·모델별 사용량, 누락 구간 검산, API 추정 비용 |
-| 응답과 부모 참조 | `message.id`, `requestId`, 빈 오류 응답 거르기에 쓰는 `isApiErrorMessage` | `payload.turn_id`, `payload.response_id`, `session_meta`의 `forked_from_id` 또는 직접·중첩 `parent_thread_id` | 응답별 최고 사용량 선택 및 부모에서 복사된 구형 앞부분 대조 |
-| 시간 | 행 `timestamp` | 행과 `payload`의 `timestamp`, `event_msg` 시작·완료 시각 | 첫 시각으로 일·월을 결정하고 마지막 시각과의 차이를 기록 시간으로 사용 |
+일반·Zstd JSONL에서 필요한 필드를 선택하고 이미지 Base64를 건너뛴다. 파일 준비 Worker는 응답 후보, 대화 경계, 부모 참조를 반환한다. 집계기는 세션 안에서 응답을 중복 제거하고 확인된 자식 사용량을 부모 대화에 합산한다. 대화 수와 소요 시간은 메인 에이전트의 완료 시점과 수명주기를 따른다. 출처를 여전히 확인할 수 없는 자식의 기록은 독립 대화로 집계하지 않는다.
 
-제목, `cwd`, 로그의 결제 방식, 본문과 도구 인자는 건너뛴다. 프로젝트 표시는 원본 경로에서 파생하며 Codex 이름 색인은 표시용으로 별도 조회한다. [스레드 필드 및 파서](../../src/summary/parsers/threadUsage.ts)
-
-## 읽기와 합산
-
-1. 일반·Zstd JSONL에서 이미지 Base64 본문을 거르고 고정 필드 경로의 조각을 모은다. 한 청크에서 완성된 Codex `response_item`은 알려진 접두사와 나머지 JSON 구조가 맞으면 행 시각을 직접 사용한다. 나머지 줄은 고정 필드 선택기로 문법을 검사하고 LF에서 축소된 줄을 `JSON.parse`에 넘긴다. 줄 예산과 원본 위치는 리더가 관리한다.
-2. 파일 안에서 응답 키의 기존 점수와 새 토큰을 비교하고, 이긴 후보의 응답 객체와 토큰을 보관한다. 파일 준비 Worker는 스레드 식별·시각과 파일별 최고값, Codex 검산용 순서·누계를 전달한다. 수집기는 이를 `(제공자, 세션, 스레드)`에 합친다. 식별된 응답의 존재 여부, 중복 제거 전 사용량 기록 수, 최신 수정 시각, 경로 순으로 시간과 Codex 누계 검산에 쓸 기준 파일을 고른다. [비교 키와 동점 처리](WinnerPolicy.md)
-3. Claude는 세션 내 `(message.id, requestId)`마다 `입력 + 출력`이 가장 큰 행을 스레드에 한 번 반영한다. 같은 메시지에 확인된 `requestId`가 한 종류면 해당 후보를 요청 ID가 없는 후보와 함께 비교한다. 새 Codex는 스레드 내 `(turn_id, response_id)`마다 같은 비교를 하고 `payload.usage`를 더한다. 중단 전에 기록된 사용량도 합산한다.
-4. 구형 Codex는 순서대로 보관한 구형 스냅샷을 부모와 비교한다. 일치한 복사 앞부분으로 기준 누계를 잡고 그 사용량을 제외한다. 그 밖의 첫 누계에서는 확인되는 `last_token_usage`만 합산한다. 이후 이미 본 스냅샷을 건너뛰고 검증 가능한 증가분을 계산한다. 새 형식과 섞인 파일에서는 첫 응답 전에 기록된 구형 사용량을 보존한다. 응답이 처음 등장할 때 기록된 사용량으로 이미 설명되는 새 형식 누계 구간은 읽는 중에 제외한다. 남은 구간은 최종 응답별 최고값으로 다시 계산하고, 설명되지 않은 증가분은 같은 턴 누계 또는 구형 스냅샷이 뒷받침할 때만 보충한다. 부모 원본 없이 복사 여부를 확인할 수 있는 범위는 제한된다.
-5. 메모리 집계 입력의 호환 필드 `root_turn_id`에 스레드 ID를 넣고 `model_usage`에 모델별 값을 담는다. 스레드 첫 시각의 날짜로 묶어 `usage_request_daily`와 `usage_model_daily`에 일별 합계와 평균에 필요한 표본 수를 저장한다. 기록 시간에는 첫 시각과 마지막 시각 사이의 유휴 시간도 포함된다. 이전 파서 버전의 파일은 다음 갱신에서 다시 읽고, 소실 원본은 일별 저장의 보존 기준을 적용한다. [현재 SQLite 테이블과 보존 규칙](SQLiteTables.md)
-
-[JSONL 필드 선택](../../src/summary/jsonl/projection.ts) · [스레드별 선택](../../src/summary/scanner/refresh/aggregation.ts) · [토큰 합산](../../src/summary/aggregation/threadAccounting.ts) · [SQLite 저장](../../src/summary/scanner/refresh/persistence.ts)
+대화의 시작 시각을 집계 시간대의 날짜로 바꾸어 제공자·모델의 일별 행을 갱신한다. 원본 상태와 집계 결과는 같은 트랜잭션에서 반영한다. [파싱 필드](../../src/summary/parsers/logFields.ts) · [귀속 해소](../../src/summary/scanner/refresh/relations.ts) · [응답 비교](WinnerPolicy.md) · [SQLite 저장](SQLiteTables.md)

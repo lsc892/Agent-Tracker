@@ -12,7 +12,8 @@ import type { RefreshContext } from './context';
 import { discoverSources } from './discovery';
 import { commitComponents, finishScan, recordFailure } from './persistence';
 import { prepareChanged } from './preparation';
-import { expandRelatedSources } from './relations';
+import { expandRelatedSources, resolveClaudeParentRequests, resolveParentRequests } from './relations';
+import { collectWinners } from './aggregation';
 import { ScanState } from './state';
 
 export { PARSER_VERSION } from './state';
@@ -86,10 +87,13 @@ async function scanUnderLock(context: RefreshContext, publish: PublishProgress, 
   publish('parsing');
   await scan.measureAsync('parseChanged', () => prepareChanged(context));
   await scan.measureAsync('expandRelated', () => expandRelatedSources(context));
+  scan.measure('resolveParents', () => {
+    resolveParentRequests(context);
+    resolveClaudeParentRequests(state);
+  });
   check();
 
-  // [DTO 정책] 확정된 winner와 검증된 누계를 반영해 변경 세션의 스레드별 저장 요약을 만든다.
-  const summaries = scan.measure('aggregate', () => state.aggregation.summarize(state.affected, names, check));
+  const summaries = scan.measure('aggregate', () => collectWinners(context, names).summaries.filter(row => row.hasMain));
 
   // [저장 정책] 연결된 세션을 확정하고 남은 원본 상태와 이름을 저장한다.
   publish('committing');

@@ -1,8 +1,8 @@
 // 현재·이전 Codex 로그의 식별 정보·요청·사용량·도구 호출을 공통 이벤트로 변환한다.
 import { SummaryError } from '../jsonl';
 import { projectJson } from '../jsonl/projection';
-import type { FileContext, ParsedIdentity, ParseSink, TokenVector } from '../types';
-import { billingMode, codexTokens, displayName, number, object, project, requestTitle, string, timestamp, tokenFlags, validateTokens } from './common';
+import type { CheckEvent, FileContext, ParsedIdentity, ParseSink, TokenVector, UsageEvent } from '../types';
+import { billingMode, codexTokens, displayName, number, object, project, requestTitle, string, timestamp, tokenFlags } from './common';
 import { readToolCapabilities } from './capabilities';
 import { spawnOutput } from './logFields';
 
@@ -24,6 +24,7 @@ export class CodexCurrentParserAdapter {
   private turn: string | undefined;
   private sawCurrent = false;
   private legacySignature: string | undefined;
+  private legacyLast: TokenVector | null = null;
   private highWater: TokenVector = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0 };
   private currentClosed = false;
   private hasUserInTurn = false;
@@ -33,6 +34,8 @@ export class CodexCurrentParserAdapter {
   private model: string | undefined;
   private billing: import('../db/types').BillingMode = 'unknown';
   private readonly spawnRequests = new Map<string, string>();
+  private usageTurn?: string;
+  private checkpointBase?: { input: number; output: number; model: string | undefined };
 
   constructor(private readonly context: FileContext, private readonly sink: ParseSink) {}
 
@@ -47,17 +50,20 @@ export class CodexCurrentParserAdapter {
       return;
     }
     // [귀속 정책] 세션 메타데이터가 없으면 일반 행을 건너뛰되 응답 토큰 행은 오류로 보고한다.
+    const payload = object(row.payload);
+    if (!this.identityValue && type === 'token_usage_record' && string(payload.thread_id))
+      this.sessionMetadata({ ...payload, id: payload.thread_id }, offset);
     const identity = this.identityValue;
     if (!identity) {
       if (type === 'token_usage_record') throw new SummaryError('missing-session-id', offset);
       return;
     }
     if (type === 'response_item') {
-      this.responseItem(object(row.payload), identity.threadId, offset);
+      this.responseItem(payload, identity.threadId, offset);
       return;
     }
     if (typeof type === 'string' && !turnRowTypes.has(type)) return;
-    const payload = object(row.payload);
+    if (type === 'token_usage_record' && string(payload.thread_id) && payload.thread_id !== identity.threadId) return;
     // [파싱 정책] 이전 로그의 명시 루트 흔적까지 확인한 뒤 지원하는 턴 행을 유형별로 해석한다.
     const suppliedRoot = string(payload.root_turn_id);
     // Preserve explicit-root detection for legacy types that stringify to a known name.
@@ -109,7 +115,7 @@ export class CodexCurrentParserAdapter {
     suppliedRoot: string | undefined, suppliedTurn: string | undefined): void {
     // Rootless subagents retain their own turn ids until the spawn binding identifies the parent request.
     const ownTurns = isMain || !this.hasExplicitRoot;
-    this.model = displayName(payload.model);
+    this.model = displayName(payload.model) ?? this.model;
     if (payload.billing_mode !== undefined || payload.auth_mode !== undefined) this.billing = billingMode(payload.billing_mode ?? payload.auth_mode);
     if (suppliedTurn && suppliedTurn !== this.turn) { this.hasUserInTurn = false; this.currentClosed = false; }
     this.turn = suppliedTurn ?? this.turn;
@@ -122,8 +128,6 @@ export class CodexCurrentParserAdapter {
    */
   private currentUsage(payload: Record<string, unknown>, identity: ParsedIdentity,
     suppliedRoot: string | undefined, suppliedTurn: string | undefined, offset: number): void {
-    this.sawCurrent = true;
-    // Mixed generations can coexist. Source evidence excludes legacy usage when this file contains current usage.
     const rootId = this.currentUsageRoot(identity.isMain, suppliedRoot, suppliedTurn);
     const turnId = suppliedTurn ?? this.turn;
     const responseId = string(payload.response_id);
@@ -135,20 +139,57 @@ export class CodexCurrentParserAdapter {
     const threadId = string(payload.thread_id) ?? identity.threadId;
     // [DTO 정책] 응답 사용량 이벤트에 정규화된 토큰과 모델·결제·부모 진단을 붙인다.
     const tokens = codexTokens(object(payload.usage));
+    const model = displayName(payload.model) ?? this.model;
+    const legacyPrefix = !this.sawCurrent && this.legacySignature !== undefined
+      ? this.matchLegacyPrefix(payload.thread_token_usage, tokens) : undefined;
+    this.sawCurrent = true;
     const flags = tokenFlags(tokens);
     if (this.forkMissing) flags.push('missing-parent');
     this.sink.event({ kind: 'usage', rootId, turnId, responseId, requestId: null,
-      threadId, tokens, schema: 'current',
-      model: displayName(payload.model) ?? this.model,
+      threadId, tokens, schema: 'current', legacyPrefix,
+      model,
       billingMode: billingMode(payload.billing_mode ?? payload.auth_mode ?? this.billing),
       flags, offset });
     // [진단 정책] 턴 누계는 응답 사용량과 별개로 생성해 합산 결과를 대조하는 데 사용한다.
+    const firstInTurn = this.usageTurn !== turnId;
+    this.usageTurn = turnId;
+    if (firstInTurn) this.checkpointBase = undefined;
     if (payload.turn_token_usage) {
-      const totals = object(payload.turn_token_usage);
-      validateTokens(totals);
+      const totals = codexTokens(object(payload.turn_token_usage));
+      const verified = this.verifyCheckpoint(payload.thread_token_usage, totals, tokens, model, firstInTurn);
       this.sink.event({ kind: 'check', rootId, threadId, turnId,
-        input: number(totals.input_tokens), output: number(totals.output_tokens), offset });
+        input: totals.input, output: totals.output, verified, offset });
     }
+  }
+
+  private verifyCheckpoint(value: unknown, turn: TokenVector, response: TokenVector,
+    model: string | undefined, firstInTurn: boolean): CheckEvent['verified'] {
+    const raw = object(value);
+    if (raw.input_tokens === undefined && raw.output_tokens === undefined) return;
+    const thread = codexTokens(raw);
+    const input = thread.input - turn.input, output = thread.output - turn.output;
+    if (firstInTurn && input >= 0 && output >= 0 && turn.input === response.input && turn.output === response.output) {
+      this.checkpointBase = { input, output, model };
+    }
+    const base = this.checkpointBase;
+    if (!base) return;
+    if (base.input !== input || base.output !== output) {
+      this.checkpointBase = undefined;
+      return;
+    }
+    if (base.model !== model) base.model = undefined;
+    return { model: base.model, cacheRead: turn.cacheRead, cacheWrite: turn.cacheWrite };
+  }
+
+  private matchLegacyPrefix(value: unknown, usage: TokenVector): UsageEvent['legacyPrefix'] {
+    const recorded = object(value);
+    if (this.legacySignature === undefined || recorded.input_tokens === undefined && recorded.output_tokens === undefined) return;
+    const total = codexTokens(recorded);
+    const prefix = this.highWater;
+    if (total.input - usage.input === prefix.input && total.output - usage.output === prefix.output) return {};
+    if (total.input === prefix.input && total.output === prefix.output
+      && this.legacyLast?.input === usage.input && this.legacyLast.output === usage.output)
+      return { overlap: `legacy-${this.legacySignature}` };
   }
 
   /** 명시 root를 우선하고 미연결 자식만 자신의 turn을 부모 후보보다 먼저 사용한다. */
@@ -157,7 +198,7 @@ export class CodexCurrentParserAdapter {
     if (!isMain && !this.hasExplicitRoot) {
       return suppliedTurn ?? this.turn ?? this.root;
     }
-    return this.root ?? suppliedTurn;
+    return suppliedTurn !== undefined && suppliedTurn !== this.turn ? suppliedTurn : this.root ?? suppliedTurn;
   }
 
   private responseItem(payload: Record<string, unknown>, threadId: string, offset: number): void {
@@ -229,7 +270,8 @@ export class CodexCurrentParserAdapter {
         break;
       }
       case 'user_message':
-        this.recordUserMessage(payload, timestamp(row.timestamp), identity.isMain, ownTurns, offset);
+        this.recordUserMessage(payload, timestamp(row.timestamp), identity.isMain,
+          ownTurns && !suppliedRoot && !suppliedTurn, offset);
         break;
       case 'task_complete':
       case 'task_completed':
@@ -251,8 +293,8 @@ export class CodexCurrentParserAdapter {
 
   /** 명시 시작 이벤트가 없는 이전 형식에서도 다음 사용자 요청을 별도 root로 구분한다. */
   private recordUserMessage(payload: Record<string, unknown>, time: number | null, isMain: boolean,
-    ownTurns: boolean, offset: number): void {
-    if (ownTurns && (!this.root || this.currentClosed || this.hasUserInTurn && !this.pendingLifecycle)) {
+    inferRoot: boolean, offset: number): void {
+    if (inferRoot && (!this.root || this.currentClosed || this.hasUserInTurn && !this.pendingLifecycle)) {
       this.root = string(payload.id) ?? (time === null ? undefined : `legacy-${time}`);
       this.turn = this.root;
     }
@@ -285,19 +327,21 @@ export class CodexCurrentParserAdapter {
       this.root = this.turn = this.turn ?? `legacy-${identity.threadId}`;
     }
     if (!this.root || !this.turn) throw new SummaryError('missing-root-turn', offset);
+    const previouslyObserved = this.legacySignature !== undefined;
     const total = info.total_token_usage ? codexTokens(object(info.total_token_usage)) : this.highWater;
     const last = info.last_token_usage ? codexTokens(object(info.last_token_usage)) : null;
     // [집계 정책] 누계와 개별 사용량 조합이 직전 기록과 같으면 중복으로 제외한다.
     const signature = JSON.stringify([total, last]);
     if (signature === this.legacySignature) return;
     this.legacySignature = signature;
+    this.legacyLast = last;
     const tokens = { ...total };
     const flags: string[] = this.forkMissing ? ['missing-parent'] : [];
     // [집계 정책] 개별 사용량을 우선하고 없으면 항목별 최고 누계와의 양수 차이만 사용한다.
     let regression = false;
     for (const key of tokenFields) {
       if (total[key] < this.highWater[key]) regression = true;
-      tokens[key] = last ? last[key] : Math.max(0, total[key] - this.highWater[key]);
+      tokens[key] = last ? last[key] : previouslyObserved ? Math.max(0, total[key] - this.highWater[key]) : 0;
       this.highWater[key] = Math.max(this.highWater[key], total[key]);
     }
     if (regression) flags.push('counter-regression');

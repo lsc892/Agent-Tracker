@@ -146,7 +146,7 @@ Usa **Agent Tracker: Eliminar datos estadísticos** para borrar los resultados a
 
 ## Cómo se recopilan las estadísticas de uso
 
-Agent Tracker lee los registros JSONL locales de Claude y Codex, incluidos los de Codex comprimidos con Zstd, y extrae los campos necesarios para las estadísticas. La clave del proyecto se obtiene del directorio de registros del proyecto en Claude y del directorio padre de la raíz de los registros en Codex.
+Un proyecto es una carpeta de trabajo. Una sesión agrupa las conversaciones de un mismo chat. Cada conversación abarca desde un mensaje del usuario hasta la respuesta del agente principal e incluye el uso de los subagentes vinculados. Agent Tracker lee registros JSONL y registros de Codex comprimidos con Zstd.
 
 ### Campos de los registros
 
@@ -163,7 +163,7 @@ Agent Tracker lee los registros JSONL locales de Claude y Codex, incluidos los d
 1. Procesa el JSONL línea por línea y extrae los campos de rutas predefinidas. Si una línea abarca varios bloques de lectura, conserva el estado del análisis de JSON y los valores extraídos. Omite los datos Base64 de las imágenes durante la lectura.
 2. Claude detecta duplicados por `(message.id, requestId)` dentro de la sesión y Codex por `(turn_id, response_id)` dentro del hilo. Si un mensaje de Claude tiene un único ID de solicitud conocido, también compara los registros que carecen de ese ID. Si una respuesta está duplicada, se cuenta una sola vez el registro con la mayor suma de tokens de entrada y salida. Claude suma los tokens leídos y escritos en caché a los tokens de entrada y Codex usa el total de entrada registrado.
 3. Compara los registros de Codex del formato anterior con el hilo padre para omitir el historial copiado y sumar los incrementos verificados de los contadores restantes. Si el acumulado del hilo muestra un incremento que las respuestas no explican, lo verifica con los acumulados por turno o los registros del formato anterior antes de sumarlo.
-4. Agrupa los totales de cada hilo por la fecha de su primera marca de tiempo en la zona horaria de las estadísticas. Si la primera y la última marca difieren, usa la diferencia como duración registrada, incluido el tiempo de inactividad.
+4. Agrupa el uso por la fecha de inicio de cada conversación en la zona horaria de las estadísticas. Cuenta las conversaciones completadas y calcula la duración media con las que tienen una duración registrada.
 
 ### Tablas de SQLite
 

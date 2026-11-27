@@ -104,9 +104,10 @@ export class SourceWinners {
   }
 
   private *selected(): IterableIterator<ParsedUsageWinner> {
-    // [Winner 정책] 현행 포맷 사용량이 하나라도 있는 파일은 레거시 winner를 제외한다.
+    // A mixed file keeps only the legacy prefix verified by its first current checkpoint.
     for (const winner of this.winners.values()) {
-      if (!this.evidence.current || winner.event.schema !== 'legacy') yield winner;
+      if (winner.event.schema !== 'legacy' || !this.evidence.current
+        || this.evidence.legacyPrefix && this.evidence.legacyPrefix.overlap !== winner.event.responseId) yield winner;
     }
   }
 
@@ -168,13 +169,14 @@ export class SourceWinners {
       }
       case 'check': {
         // [진단 정책] 요청의 최소 검사 위치와 스레드·턴별 최신 누계값을 따로 보존한다.
-        const { threadId, turnId, offset, input, output } = event;
+        const { threadId, turnId, offset, input, output, verified } = event;
         root.checkOffset = root.checkOffset === null ? offset : Math.min(root.checkOffset, offset);
         const id = key(threadId, turnId), previous = root.checks.get(id);
-        if (!previous) root.checks.set(id, { threadId, turnId, input, output, offset, index });
+        if (!previous) root.checks.set(id, { threadId, turnId, input, output, verified, offset, index });
         else if (index > previous.index) {
           previous.input = input;
           previous.output = output;
+          previous.verified = verified;
           previous.offset = offset;
           previous.index = index;
         }

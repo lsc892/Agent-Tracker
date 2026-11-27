@@ -139,12 +139,15 @@ export interface UsageEvent {
   model?: string;
   billingMode?: import('./db/types').BillingMode;
   schema?: 'current' | 'legacy';
+  /** The first current response verified a preceding cumulative prefix. */
+  legacyPrefix?: { overlap?: string };
   flags?: string[];
   offset: number;
 }
 export interface CheckEvent {
   kind: 'check'; rootId: string; threadId: string; turnId: string;
   input: number; output: number; offset: number;
+  verified?: { model?: string; cacheRead: number; cacheWrite: number };
 }
 export interface CapabilityEvent {
   kind: 'capability'; rootId: string; threadId: string; eventId: string;

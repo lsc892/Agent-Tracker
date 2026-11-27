@@ -1,16 +1,20 @@
 // 한 갱신의 파일 상태·관계 색인·큐를 소유하고 상태 변경 시 색인 일관성을 유지한다.
+import type { SourceWinnersSnapshot } from '../../aggregation/sourceWinners';
 import type { FileMetadata, SourceFileRow, Provider } from '../../db/types';
 import { SummaryError } from '../../jsonl';
-import type { ThreadLog } from '../../parsers/threadUsage';
-import type { RefreshResult } from '../../types';
+import type { ParsedIdentity, RefreshResult } from '../../types';
 import { sqlText } from '../sourceReader';
 import { addMember, removeMember, SourceQueue } from '../worklist';
-import { ThreadAggregation } from './aggregation';
 
-export const PARSER_VERSION = 25;
+export const PARSER_VERSION = 26;
 export const sessionKey = (provider: Provider, session: string): string => JSON.stringify([provider, sqlText(session)]);
 
-type PreparedSource = Pick<ThreadLog, 'sessionId' | 'threadId' | 'parentThreadId'> & { hasLegacy: boolean };
+export interface PreparedSource {
+  identity: ParsedIdentity;
+  winners: SourceWinnersSnapshot;
+  partialLine: boolean;
+  parentRootId?: string;
+}
 
 export type StoredSource = FileMetadata & Pick<SourceFileRow, 'id' | 'source_missing' | 'processing_status'>;
 
@@ -49,10 +53,15 @@ export class ScanState {
   readonly affected = new Set<string>();
   readonly links = new Map<string, Set<string>>();
   private readonly sessionFiles = new Map<string, Set<FileState>>();
-  readonly preparedCodexFiles: FileState[] = [];
-  readonly aggregation = new ThreadAggregation();
+  readonly codexFiles: FileState[] = [];
+  private readonly preparedCodex: FileState[] = [];
+  readonly preparedFiles: FileState[] = [];
+  private readonly seenReferences = new Set<string>();
+  readonly pendingReferences = new Set<string>();
   readonly relatedQueue = new SourceQueue<FileState>();
+  readonly missingParents = new Set<number>();
   readonly savedSessionNames = new Map<string, string>();
+  lineageDirty = false;
   private indexesEnabled = false;
 
   constructor(private readonly result: RefreshResult) {}
@@ -66,7 +75,6 @@ export class ScanState {
   }
 
   affect(provider: Provider, session: string | null | undefined): void {
-    // [큐 정책] 세션이 처음 영향을 받을 때 아직 처리하지 않은 관련 파일을 예약한다.
     if (!session) return;
     const value = sessionKey(provider, session);
     if (this.affected.has(value)) return;
@@ -75,7 +83,6 @@ export class ScanState {
   }
 
   connect(provider: Provider, a: string | null | undefined, b: string | null | undefined): void {
-    // [저장 정책] 파일의 이전·현재 세션을 양방향으로 연결해 같은 반영 단위에 둔다.
     if (!a || !b || a === b) return;
     const left = sessionKey(provider, a), right = sessionKey(provider, b);
     for (const [from, to] of [[left, right], [right, left]]) {
@@ -88,7 +95,6 @@ export class ScanState {
   }
 
   fail(file: FileState, error: unknown): void {
-    // [진단 정책] 파일당 최초 실패만 세고 이전·현재 귀속 모두를 변경 대상으로 표시한다.
     if (!file.error) this.result.failed++;
     file.error = error instanceof SummaryError ? error : new SummaryError('source-read-error');
     this.affect(file.provider, file.previous?.session_id);
@@ -97,14 +103,19 @@ export class ScanState {
 
   trackFile(file: FileState): void {
     this.files.set(file.id, file);
-    if (this.indexesEnabled) this.indexSession(file);
+    if (this.indexesEnabled) this.indexFile(file);
   }
 
   /** 무변경 스캔은 관계 색인을 만들지 않는다. 이후에 등록한 파일은 바로 색인한다. */
   indexRelatedSources(): void {
     if (this.indexesEnabled) return;
     this.indexesEnabled = true;
-    for (const file of this.files.values()) this.indexSession(file);
+    for (const file of this.files.values()) this.indexFile(file);
+  }
+
+  private indexFile(file: FileState): void {
+    this.indexSession(file);
+    if (file.provider === 'codex') this.codexFiles.push(file);
   }
 
   private indexSession(file: FileState): void {
@@ -115,18 +126,29 @@ export class ScanState {
   }
 
   setSession(file: FileState, session: string | null): void {
-    // [색인 정책] 세션이 바뀌면 이전 멤버십을 지우고 새 세션에 등록한다.
     if (file.session_id === session) return;
     if (file.session_id) removeMember(this.sessionFiles, sessionKey(file.provider, file.session_id), file);
     file.session_id = session;
     this.indexSession(file);
   }
 
-  registerPrepared(file: FileState, thread: ThreadLog): void {
-    // [집계 정책] 스레드를 세션 집계에 넘기고 부모 검색에 필요한 식별자와 레거시 여부만 파일에 남긴다.
-    const { sessionId, threadId, parentThreadId, legacy } = thread;
-    this.aggregation.add(file, sessionKey(file.provider, sessionId), thread);
-    file.prepared = { sessionId, threadId, parentThreadId, hasLegacy: legacy !== undefined };
-    if (file.provider === 'codex') this.preparedCodexFiles.push(file);
+  registerPrepared(file: FileState, prepared: PreparedSource): void {
+    file.prepared = prepared;
+    this.preparedFiles.push(file);
+    const { identity } = prepared;
+    this.seenReferences.add(identity.threadId);
+    this.pendingReferences.delete(identity.threadId);
+    if (file.provider !== 'codex') return;
+    this.preparedCodex.push(file);
+    this.lineageDirty = true;
+    for (const reference of [identity.parentThreadId, identity.forkedFromId]) {
+      if (!reference || this.seenReferences.has(reference)) continue;
+      this.seenReferences.add(reference);
+      this.pendingReferences.add(reference);
+    }
+  }
+
+  preparedCodexFiles(): PreparedFile[] {
+    return this.preparedCodex.filter(isPreparedFile).sort((a, b) => a.id - b.id);
   }
 }

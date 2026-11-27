@@ -17,6 +17,7 @@ export class ClaudeParserAdapter {
   private apiFailed = false;
   private stopBlocked = false;
   private customTitle = false;
+  private hasProjectFolder = false;
   private billing: BillingMode = 'unknown';
 
   constructor(private readonly context: FileContext, private readonly sink: ParseSink) {
@@ -28,6 +29,7 @@ export class ClaudeParserAdapter {
     this.identityValue = { sessionId: session ?? '', threadId: isMain ? session ?? '' : basename(context.path, '.jsonl'),
       parentThreadId: isMain ? null : session ?? null, isMain,
       ...project(isMain ? dirname(context.path) : parts.slice(0, subagentIndex - 1).join(sep)) };
+    if (!isMain) this.currentRoot = this.identityValue.threadId;
   }
 
   row(row: Record<string, unknown>, offset: number): void {
@@ -60,7 +62,10 @@ export class ClaudeParserAdapter {
       if (sessionId) this.identityValue.sessionId = this.identityValue.threadId = sessionId;
     }
     const cwd = string(row.cwd);
-    if (cwd) Object.assign(this.identityValue, project(cwd));
+    if (cwd && !this.hasProjectFolder) {
+      Object.assign(this.identityValue, project(cwd));
+      this.hasProjectFolder = true;
+    }
   }
 
   private updateSessionTitle(row: Record<string, unknown>, type: string): void {
@@ -79,10 +84,14 @@ export class ClaudeParserAdapter {
    */
   private recordUser(row: Record<string, unknown>, promptId: string | undefined, offset: number): void {
     const mayStartRequest = row.isMeta !== true && row.isSidechain !== true;
-    const content = mayStartRequest ? object(row.message).content : undefined;
-    const external = mayStartRequest
-      && !(Array.isArray(content) && content.some((item: unknown) => object(item).type === 'tool_result'));
+    const content = object(row.message).content;
+    const toolResult = Array.isArray(content) && content.some((item: unknown) => object(item).type === 'tool_result');
+    const external = mayStartRequest && !toolResult;
     this.identifyRequest(promptId ?? (external ? string(row.uuid) : undefined), external);
+    if (toolResult && this.currentRoot) {
+      const agent = string(object(row.toolUseResult).agentId);
+      if (agent) this.sink.child?.(agent.startsWith('agent-') ? agent : `agent-${agent}`, this.currentRoot);
+    }
     if (!external || !this.currentRoot) return;
     this.sink.event({ kind: 'turn', rootId: this.currentRoot, isMain: this.identityValue.isMain,
       startedAt: timestamp(row.timestamp), title: requestTitle(content),

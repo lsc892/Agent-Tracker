@@ -146,7 +146,7 @@ Use **Agent Tracker: Delete Statistics Data** to clear aggregated statistics. Or
 
 ## How usage statistics are collected
 
-Agent Tracker reads local Claude and Codex JSONL logs, including Zstd-compressed Codex logs, and picks out the fields needed for usage statistics. The project key comes from the project log directory for Claude and the parent of the log root for Codex.
+A project is a working folder. A session is one chat containing a series of conversations. One conversation runs from a user message to the main agent’s reply and includes usage from subagents linked to it. Agent Tracker reads JSONL logs, including Zstd-compressed Codex logs.
 
 ### Log fields
 
@@ -163,7 +163,7 @@ Agent Tracker reads local Claude and Codex JSONL logs, including Zstd-compressed
 1. Select known field paths line by line. For lines spanning read chunks, keep the selected fields and JSON syntax state across chunk boundaries. Skip image Base64 while reading.
 2. Count each response once. Claude matches `(message.id, requestId)` within a session, while Codex matches `(turn_id, response_id)` within a thread. If a Claude message has only one known request ID, also compare records missing that ID. For duplicates, use the record with the highest input-plus-output token count. Claude adds cache reads and writes to its input count, while Codex uses the logged input total.
 3. For Codex, compare legacy records with the parent thread to skip copied history and sum verified increases in the remaining counters. Use turn counters or legacy records to verify any extra usage suggested by a thread counter before adding it.
-4. Group thread totals by the date of the first timestamp in the statistics time zone. When the first and last timestamps differ, use their difference as recorded time, including idle time.
+4. Group usage by the conversation start date in the statistics time zone. Count completed conversations and calculate average duration from the ones with a recorded duration.
 
 ### SQLite tables
 

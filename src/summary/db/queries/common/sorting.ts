@@ -45,7 +45,7 @@ export function usageTableOrder(sort: UsageSort, grouping: UsageGrouping, model:
     cacheWrite: 'cache_write_input_tokens',
     cacheRead: 'cache_read_input_tokens',
     tokens: 'total_tokens',
-    requests: 'turn_count',
+    requests: 'completed_turns',
     averageTokens: 'avg_tokens_per_turn',
     averageDuration: 'avg_duration_ms',
     cost: includeCosts ? 'cost_usd' : 'NULL',

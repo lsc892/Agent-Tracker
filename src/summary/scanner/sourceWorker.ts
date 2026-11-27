@@ -1,4 +1,4 @@
-// DB에 접근하지 않고 전달받은 스레드 로그 하나의 사용량을 집계한다.
+// DB에 접근하지 않고 원본 로그 하나에서 대화별 집계 근거를 구성한다.
 import { parentPort, workerData } from 'node:worker_threads';
 import { prepareSource } from './sourcePreparation';
 import type { SourceReadFile } from './sourceReader';
@@ -26,14 +26,6 @@ port.on('message', (file: SourceReadFile) => {
       lastReportAtMs = performance.now();
     },
   }).then(result => {
-    const thread = result.ok ? result.read.thread : undefined;
-    // 수집기가 토큰과 비교 서명 버퍼의 소유권을 넘겨받는다.
-    const transfer: ArrayBuffer[] = [];
-    if (thread?.responses.tokens.length) transfer.push(thread.responses.tokens.buffer);
-    if (thread?.legacy) {
-      const { tokens, signatures: { bytes, offsets, rowIds } } = thread.legacy;
-      transfer.push(tokens.buffer, bytes.buffer, offsets.buffer, rowIds.buffer);
-    }
-    port.postMessage({ id: file.id, result, bytes: pendingBytes }, transfer);
+    port.postMessage({ id: file.id, result, bytes: pendingBytes });
   });
 });

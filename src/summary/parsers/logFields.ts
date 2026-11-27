@@ -17,7 +17,9 @@ const billing = { billing_mode: true, auth_mode: true } as const;
 const tokens = fields(...tokenFields);
 const codexUsage: JsonShape = { fields: { ...tokens, input_tokens_details: { fields: fields('cached_tokens', 'cache_write_tokens') } } };
 const titleText = { text: { deferred: true } } as const;
-const titleContent: JsonShape = { items: { objectOnly: true, variant: select({ text: titleText, input_text: titleText }) } };
+const titleContent: JsonShape = { items: { objectOnly: true, variant: select({
+  text: titleText, input_text: titleText, tool_result: {},
+}) } };
 const deferredScalar: JsonShape = { deferred: true };
 export const capabilityArguments: JsonShape = { fields: Object.fromEntries(
   ['agent_type', 'cmd', 'command', 'file_path', 'name', 'path', 'skill', 'subagent_type'].map(name => [name, deferredScalar]),
@@ -34,6 +36,7 @@ function claudeFields(collectCapabilities: boolean): JsonShape {
     'ai-title': { ...identity, ...fields('aiTitle') },
     'custom-title': { ...identity, ...fields('customTitle') },
     user: { ...identity, ...fields('isMeta', 'isSidechain', 'timestamp', 'uuid'),
+      toolUseResult: { fields: fields('agentId') },
       message: { fields: { content: { ...titleContent, deferred: true } } } },
     assistant: {
       ...identity, ...fields('isApiErrorMessage', 'requestId', 'timestamp'),
@@ -67,7 +70,7 @@ function codexFields(collectCapabilities: boolean): JsonShape {
     } } },
     turn_context: { payload: { fields: { ...turn, ...billing, model: scalar } } },
     token_usage_record: { payload: { fields: { ...turn, ...billing, ...fields('model', 'response_id', 'session_id', 'thread_id'),
-      usage: codexUsage, turn_token_usage: { fields: tokens },
+      usage: codexUsage, turn_token_usage: codexUsage, thread_token_usage: codexUsage,
     } } },
     event_msg: { timestamp: { deferred: true }, payload: { fields: turn, variant: select({
       task_started: fields('started_at'),

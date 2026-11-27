@@ -397,7 +397,7 @@
   const compact = value => value == null ? '—' : new Intl.NumberFormat(globalThis.agentTrackerI18n.language, { notation: 'compact', maximumFractionDigits: 1 }).format(value);
   const compactDuration = value => value == null || value < 1000 ? duration(value) : t('dashboard.seconds', { value0: compact(value / 1000) });
   function chartValue(row, metric) {
-    return row[({ tokens: 'total_tokens', requests: 'turn_count', averageTokens: 'avg_tokens_per_turn', averageDuration: 'avg_duration_ms' })[metric]];
+    return row[({ tokens: 'total_tokens', requests: 'completed_turns', averageTokens: 'avg_tokens_per_turn', averageDuration: 'avg_duration_ms' })[metric]];
   }
   function unknownPriority(row, mode) {
     const model = row.model !== undefined && !row.model;
@@ -706,7 +706,7 @@
     const costHeaders = showCosts ? [t('dashboard.estimatedApiCost')] : [];
     const costSortKeys = showCosts ? ['cost'] : [];
     table($('usage-table'), [model ? t('common.model') : t('common.provider'), t('dashboard.periodProjectSession'), ...tokenHeaders, t('dashboard.totalTokens'), t('dashboard.completedTotal'), t('dashboard.averageTokens'), t('dashboard.averageTimeSamples'), ...costHeaders], rows.map(row => [
-      seriesName(row, model), usageScopeLabel(row, groupBy), ...tokenValues(row), number(row.total_tokens), number(row.turn_count), number(row.avg_tokens_per_turn), t('dashboard.timeSamples', { value0: duration(row.avg_duration_ms), value1: number(row.turns_with_duration) }), ...costValues(row),
+      seriesName(row, model), usageScopeLabel(row, groupBy), ...tokenValues(row), number(row.total_tokens), number(row.completed_turns), number(row.avg_tokens_per_turn), t('dashboard.timeSamples', { value0: duration(row.avg_duration_ms), value1: number(row.turns_with_duration) }), ...costValues(row),
     ]), ['model', 'period', ...tokenSortKeys, 'requests', 'averageTokens', 'averageDuration', ...costSortKeys]);
   }
 

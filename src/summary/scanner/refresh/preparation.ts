@@ -49,25 +49,24 @@ function applyPreparation(context: RefreshContext, file: FileState, preparation:
   const previousSession = file.previous?.session_id;
   // [진단 정책] 읽기에 실패해도 세션 식별자가 있으면 이전 귀속과 연결한 뒤 원본 오류를 전달한다.
   if (!preparation.ok) {
-    if (preparation.sessionId !== undefined) {
-      state.setSession(file, preparation.sessionId);
+    if (preparation.identity) {
+      state.setSession(file, preparation.identity.sessionId);
       state.connect(file.provider, previousSession, file.session_id);
     }
     throw new SummaryError(preparation.error.code, preparation.error.offset);
   }
   check();
   result.parsed++;
-  const { partialLine, thread } = preparation.read;
+  const { read, winners } = preparation;
   file.parser_version = PARSER_VERSION;
-  if (!thread) {
-    applyEmptySource(state, file, partialLine);
+  if (!read.identity) {
+    applyEmptySource(state, file, read.partialLine);
     return;
   }
-  // [귀속 정책] 준비된 스레드의 귀속을 반영하고 파일이 변경된 경우 이전·현재 세션을 함께 갱신한다.
-  const { sessionId, threadId } = thread;
-  state.setSession(file, sessionId);
-  file.relations = { identity: { threadId }, threadUsage: true };
-  state.registerPrepared(file, thread);
+  const { identity } = read;
+  state.setSession(file, identity.sessionId);
+  file.relations = { identity: { threadId: identity.threadId }, threadUsage: true };
+  state.registerPrepared(file, { identity, winners, partialLine: read.partialLine });
   file.changed ||= needsSourceRead(file, file.previous);
   if (!file.changed) return;
   state.affect(file.provider, file.session_id);

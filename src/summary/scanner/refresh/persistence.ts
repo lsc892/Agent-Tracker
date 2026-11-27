@@ -137,10 +137,10 @@ function commitComponent(context: RefreshContext, entry: ComponentCommit): void 
   }
 }
 
-/** 연결 성분의 스레드 합계와 정상 반영할 파일 버전을 묶는다. */
+/** 연결 성분의 대화 합계와 정상 반영할 파일 버전을 묶는다. */
 function componentReplacement(context: RefreshContext, { component, members, summaries }: ComponentCommit): MemoryReplacement {
   const { retain } = context;
-  // [DTO 정책] 연결된 세션 키를 풀고 스레드 요약, 저장할 파일 버전, 삭제된 파일 ID를 묶는다.
+  // [DTO 정책] 연결된 세션 키를 풀고 대화 요약, 저장할 파일 버전, 삭제된 파일 ID를 묶는다.
   const sessions = [...component].map(value => {
     const [provider, session_id] = JSON.parse(value) as [Provider, string];
     return { provider, session_id };

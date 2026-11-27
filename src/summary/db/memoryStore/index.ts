@@ -175,10 +175,15 @@ export class MemoryStore {
   }
 
   /** Another copy of the same thread can supply the corresponding usage again. */
-  private retainedSessions({ removed, summaries }: PreparedReplacement): Set<string> {
+  private retainedSessions({ removed, summaries, replacement }: PreparedReplacement): Set<string> {
     // [저장 정책] 스레드별 사용량이 있으면 같은 스레드의 재집계 여부를 확인하고 그 외에는 세션 단위로 판단한다.
     const retained = new Set<string>(), checked = new Set<string>();
     const liveSessions = new Set(Array.from(summaries.values(), row => sessionKey(row.provider, row.session_id)));
+    const liveThreads = new Set<string>();
+    for (const file of replacement.files) {
+      if (file.session_id && file.relations?.threadUsage && liveSessions.has(sessionKey(file.provider, file.session_id)))
+        liveThreads.add(threadKey(file.provider, file.session_id, file.relations.identity.threadId));
+    }
     const hasUsage = this.database.statement(`SELECT 1 FROM usage_model_daily WHERE provider=? AND session_id=?
       AND model<>'' AND total_tokens>0 LIMIT 1`);
     for (const file of removed.values()) {
@@ -187,9 +192,9 @@ export class MemoryStore {
       const key = sessionKey(provider, session_id);
       if (checked.has(key)) continue;
       const threadId = sourceThreadId(file.thread_id);
-      const live = file.thread_usage === 1 && threadId !== undefined
-        ? summaries.has(threadKey(provider, session_id, threadId))
-        : liveSessions.has(key);
+      const thread = threadId === undefined ? undefined : threadKey(provider, session_id, threadId);
+      const live = file.thread_usage === 1 && thread !== undefined
+        ? liveThreads.has(thread) || summaries.has(thread) : liveSessions.has(key);
       if (live) continue;
 
       // [저장 정책] 다시 집계할 수 없고 기존 일별 테이블에 모델명이 있는 양의 사용량이 남은 세션만 보존한다.

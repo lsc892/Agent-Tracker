@@ -54,9 +54,11 @@ export function addFlag(flags: Map<string, Set<string>>, rootId: string, flag: s
 export class SourceEvidence {
   eventCount = 0;
   current = false;
+  legacyPrefix?: UsageEvent['legacyPrefix'];
   readonly flags = new Map<string, Set<string>>();
-  readonly legacy: { index: number; rootId: string; signature: string; offset: number }[] = [];
+  readonly legacy: { index: number; rootId: string; signature: string; offset: number; responseId: string }[] = [];
   readonly nonLegacyRoots = new Set<string>();
+  readonly startedRoots = new Set<string>();
   readonly capabilities = new Map<string, number>();
   readonly requests = new Map<string, string | null>();
   readonly legacyRequests = new Map<string, string | null>();
@@ -75,6 +77,7 @@ export class SourceEvidence {
     // [진단 정책] 원본의 이벤트 순번 범위와 요청별 플래그를 기록한다.
     this.eventCount = Math.max(this.eventCount, index + 1);
     if ('flags' in event) for (const flag of event.flags ?? []) addFlag(this.flags, event.rootId, flag);
+    if (event.kind === 'turn' && event.startedAt !== undefined) this.startedRoots.add(event.rootId);
 
     // [집계 정책] 동일 도구 이벤트는 처음 관측한 인덱스만 남겨 복사 구간 판정에 쓴다.
     if (event.kind === 'capability') {
@@ -85,8 +88,12 @@ export class SourceEvidence {
     if (event.kind !== 'usage') return;
 
     // [귀속 정책] 현행 포맷의 존재를 표시하고 레거시 사용량은 복사 이력 비교용 서명을 남긴다.
-    if (event.schema === 'current') this.current = true;
-    if (event.schema === 'legacy') this.legacy.push({ index, rootId: event.rootId, signature: legacySignature(event), offset: event.offset });
+    if (event.schema === 'current' && !this.current) {
+      this.current = true;
+      this.legacyPrefix = event.legacyPrefix;
+    }
+    if (event.schema === 'legacy') this.legacy.push({ index, rootId: event.rootId, signature: legacySignature(event),
+      offset: event.offset, responseId: event.responseId });
     else this.nonLegacyRoots.add(event.rootId);
 
     // [귀속 정책] 포맷별로 응답 ID와 요청 ID를 연결하고 서로 다른 요청이 관측되면 미확정으로 둔다.
@@ -149,8 +156,8 @@ export function prepareSources(files: readonly StreamingAggregateFile[]): {
     for (const flags of source.flags.values()) flags.delete('missing-parent');
 
     // [귀속 정책] 부모와 자식의 레거시 사용량 서명을 처음부터 비교해 일치하는 접두사의 끝을 구한다.
-    const childRows = source.file.evidence.current ? [] : source.file.evidence.legacy;
-    const parentRows = parent.file.evidence.current ? [] : parent.file.evidence.legacy;
+    const childRows = source.file.evidence.legacy;
+    const parentRows = parent.file.evidence.legacy;
     let parentCutoff = -1;
     for (let index = 0; index < Math.min(childRows.length, parentRows.length); index++) {
       const child = childRows[index], ancestor = parentRows[index];
@@ -158,22 +165,26 @@ export function prepareSources(files: readonly StreamingAggregateFile[]): {
       source.legacyCutoff = child.index; parentCutoff = ancestor.index;
       source.inheritedRoots.add(child.rootId);
     }
-    if (source.legacyCutoff < 0) continue;
-
     // [귀속 정책] 복사된 행을 표시하고 접두사 이후 사용량이나 새 포맷 사용량이 있는 요청은 계속 집계한다.
     const copiedLegacyIndices = new Set<number>();
     for (const { index, rootId } of childRows) {
       if (index > source.legacyCutoff) source.inheritedRoots.delete(rootId);
       else copiedLegacyIndices.add(index);
     }
-    source.copiedLegacyIndices = copiedLegacyIndices;
+    if (copiedLegacyIndices.size) source.copiedLegacyIndices = copiedLegacyIndices;
+    if (identity.forkedFromId) {
+      for (const root of source.file.evidence.startedRoots) {
+        if (parent.file.evidence.startedRoots.has(root)) source.inheritedRoots.add(root);
+      }
+    }
     for (const rootId of source.file.evidence.nonLegacyRoots) source.inheritedRoots.delete(rootId);
 
     // [집계 정책] 양쪽 복사 구간에 같은 키가 있는 도구 이벤트를 복제본으로 표시한다.
     for (const [id, index] of source.file.evidence.capabilities) {
       if (index > source.legacyCutoff) continue;
       const match = parent.file.evidence.capabilities.get(id);
-      if (match !== undefined && match <= parentCutoff) source.copiedCapabilities.add(id);
+      if (match !== undefined && match <= parentCutoff)
+        source.copiedCapabilities.add(id);
     }
   }
 
@@ -195,7 +206,8 @@ export function prepareSources(files: readonly StreamingAggregateFile[]): {
 export function eligibleUsage(source: SourcePlan, event: Pick<UsageEvent, 'schema' | 'rootId'>, index: number): boolean {
   // [귀속 정책] 상속된 요청을 제외하고 레거시는 현행 포맷이 없는 파일의 복사 접두사 이후만 허용한다.
   return !source.inheritedRoots.has(event.rootId)
-    && (event.schema !== 'legacy' || !source.file.evidence.current && index > source.legacyCutoff);
+    && (event.schema !== 'legacy' || (!source.file.evidence.current || source.file.evidence.legacyPrefix !== undefined)
+      && index > source.legacyCutoff);
 }
 
 export function eligibleWinner(source: SourcePlan, rootId: string, referenceId: number): boolean {

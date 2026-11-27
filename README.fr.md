@@ -146,7 +146,7 @@ Utilisez **Agent Tracker : Supprimer les données statistiques** pour effacer le
 
 ## Collecte des statistiques d'utilisation
 
-Agent Tracker lit les journaux JSONL locaux de Claude et Codex, y compris les journaux Codex compressés avec Zstd, et en extrait les champs nécessaires aux statistiques. La clé du projet provient du répertoire de journaux du projet pour Claude et du répertoire parent de la racine des journaux pour Codex.
+Un projet est un dossier de travail. Une session regroupe les conversations d’un même chat. Une conversation va du message de l’utilisateur à la réponse de l’agent principal et inclut l’usage des sous-agents associés. Agent Tracker lit les journaux JSONL et les journaux Codex compressés avec Zstd.
 
 ### Champs lus dans les journaux
 
@@ -163,7 +163,7 @@ Agent Tracker lit les journaux JSONL locaux de Claude et Codex, y compris les jo
 1. Parcourt le JSONL ligne par ligne et extrait les champs dont les chemins sont prédéfinis. Si une ligne s'étend sur plusieurs blocs de lecture, conserve l'état de l'analyse syntaxique du JSON et les valeurs déjà extraites. Ignore les données d'image en Base64 pendant la lecture.
 2. Claude repère les doublons par `(message.id, requestId)` au sein d'une session, et Codex par `(turn_id, response_id)` au sein d'un fil. Lorsqu'un seul identifiant de requête est connu pour un message Claude, les lignes sans cet identifiant entrent aussi dans la comparaison. Pour chaque réponse en double, seule la ligne ayant la plus grande somme de tokens d'entrée et de sortie est comptée. Claude ajoute à l'entrée les tokens lus et écrits dans le cache. Codex utilise le total d'entrée consigné dans le journal.
 3. Compare les enregistrements Codex de l'ancien format avec le fil parent pour écarter l'historique copié, puis additionne les augmentations vérifiées des compteurs restants. Si le cumul du fil présente une hausse inexpliquée par les réponses, celle-ci est vérifiée à l'aide des cumuls par tour ou des anciens enregistrements avant d'être ajoutée.
-4. Regroupe les totaux des fils selon la date de leur premier horodatage dans le fuseau horaire des statistiques. Si le premier et le dernier horodatage diffèrent, leur écart donne la durée enregistrée, temps d'inactivité compris.
+4. Regroupe l’usage par date de début de la conversation dans le fuseau horaire des statistiques. Compte les conversations terminées et calcule la durée moyenne pour celles dont la durée est connue.
 
 ### Tables SQLite
 

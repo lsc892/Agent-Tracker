@@ -73,7 +73,7 @@ export async function readThreadSource(file: SourceReadFile, options: Pick<ReadO
   }
 }
 
-/** 기존 응답별 파서를 쓰는 진단 도구에 파싱 이벤트를 전달한다. */
+/** 원본을 읽어 제공자별 대화·응답·도구 이벤트를 전달한다. */
 export async function readSource(
   file: SourceReadFile,
   event: (value: ParseEvent, index: number) => void,

@@ -3,8 +3,8 @@ import type { AppliedResponse } from '../db/appliedResponses';
 import type { CapabilityEvent, TurnEvent } from '../types';
 import { addFlag, eligible, eligibleWinner, key, prepareSources,
   type SourcePlan, type StreamingAggregateFile } from './sourceEvidence';
-import { addCapability, addUsage, createRoot, materialize, max, mergeTurn,
-  type MemoryAggregateResult, type Outcome, type Root } from './turns';
+import { accountedCacheRead, accountedCacheWrite, addCapability, addUsage, createRoot, materialize, max, mergeTurn,
+  type MemoryAggregateResult, type Outcome, type Root, type UsageContribution } from './turns';
 import { referenceWinners, type DetailedSourceWinnersSnapshot, type ReferencedWinners,
   type SourceCheck, type SourceWinnersSnapshot, type UsageWinner, type WinnerReference } from './sourceWinners';
 import { isBetterUsage, usageScore } from './winners';
@@ -32,8 +32,8 @@ export class StreamingAggregation {
   private readonly requests: Map<string, string | null>;
   private readonly sessions = new Map<string, UsageSource[]>();
   private readonly roots = new Map<string, Root>();
-  private readonly totals = new Map<string, { input: number; output: number }>();
-  private readonly checks = new Map<string, { source: SourcePlan; rootId: string; input: number; output: number; ordinal: number }>();
+  private readonly totals = new Map<string, UsageContribution['tokens']>();
+  private readonly checks = new Map<string, { source: SourcePlan; rootId: string; check: SourceCheck; ordinal: number }>();
   private readonly capabilities = new Set<string>();
 
   constructor(files: readonly StreamingAggregateFile[], private readonly collectCapabilities = true,
@@ -98,10 +98,11 @@ export class StreamingAggregation {
       }
     }
 
-    // [귀속 정책] 현재 포맷이 없는 원본은 복사 접두사 이후의 유효한 레거시 요청을 등록한다.
-    if (!file.evidence.current) {
-      for (const { rootId, index, offset } of file.evidence.legacy) {
-        if (index > source.legacyCutoff && !source.inheritedRoots.has(rootId))
+    // 복사 이력과 첫 현재 응답의 중복을 제외한 구형 요청을 등록한다.
+    if (!file.evidence.current || file.evidence.legacyPrefix) {
+      for (const { rootId, index, offset, responseId } of file.evidence.legacy) {
+        if (index > source.legacyCutoff && !source.inheritedRoots.has(rootId)
+          && responseId !== file.evidence.legacyPrefix?.overlap)
           this.observeRequest(file, parentRootId || rootId, offset);
       }
     }
@@ -170,7 +171,7 @@ export class StreamingAggregation {
     const { file } = source, ordinal = source.base + check.index;
     const id = key(file.provider, file.session_id, check.threadId, check.turnId), previous = this.checks.get(id);
     if (!previous || ordinal > previous.ordinal)
-      this.checks.set(id, { source, rootId, input: check.input, output: check.output, ordinal });
+      this.checks.set(id, { source, rootId, check, ordinal });
   }
 
   private recordOutcome(outcomes: Map<string, Outcome>, root: Root, event: TurnEvent,
@@ -209,9 +210,20 @@ export class StreamingAggregation {
     }
 
     // [진단 정책] 확정 응답의 턴별 합계가 로그에 기록된 누계와 다르면 불일치 플래그를 남긴다.
-    for (const [id, { source, rootId, input, output }] of this.checks) {
+    for (const [id, { source, rootId, check: { input, output, verified } }] of this.checks) {
       const sum = this.totals.get(id);
-      if (input !== (sum?.input ?? 0) || output !== (sum?.output ?? 0)) addFlag(source.flags, rootId, 'token-total-mismatch');
+      const missingInput = input - (sum?.input ?? 0), missingOutput = output - (sum?.output ?? 0);
+      if (!missingInput && !missingOutput) continue;
+      if (sum && verified && missingInput >= 0 && missingOutput >= 0) {
+        const { file } = source;
+        const root = this.roots.get(key(file.provider, file.session_id, rootId))!;
+        const billingMode = root.billing.size === 1 ? root.billing.keys().next().value : undefined;
+        addUsage(root, { model: verified.model, billingMode, tokens: {
+          input: missingInput, output: missingOutput,
+          cacheRead: Math.max(0, verified.cacheRead - sum.cacheRead),
+          cacheWrite: Math.max(0, verified.cacheWrite - sum.cacheWrite),
+        } }, false);
+      } else addFlag(source.flags, rootId, 'token-total-mismatch');
     }
 
     // [DTO 정책] 요청·모델·도구 집계와 메인 원본을 찾지 못한 요청의 진단을 반환한다.
@@ -229,8 +241,9 @@ export class StreamingAggregation {
     // [진단 정책] 누계 검사용 턴별 합계를 쌓고, 보정 후에도 요청 ID가 없는 Claude 응답을 표시한다.
     const id = key(file.provider, file.session_id, threadId, turnId);
     let sum = this.totals.get(id);
-    if (!sum) this.totals.set(id, sum = { input: 0, output: 0 });
+    if (!sum) this.totals.set(id, sum = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 });
     sum.input += tokens.input; sum.output += tokens.output;
+    sum.cacheRead += accountedCacheRead(tokens); sum.cacheWrite += accountedCacheWrite(tokens);
     if (file.provider === 'claude' && request === null) addFlag(source.flags, root.rootId, 'missing-request-id');
   }
 }
