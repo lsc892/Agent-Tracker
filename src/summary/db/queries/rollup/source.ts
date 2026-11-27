@@ -64,18 +64,20 @@ export function buildDailyUsageFilter(filter: SummaryFilter, timezone: string): 
 }
 
 /** 소실된 행을 정리할 때 새 집계와 같은 날짜·모델 키를 사용한다. */
-export function dailyKeySource(by: UsageBasis, source: string): string {
-  // [SQL 조회 정책] 삭제 대조용 키는 삽입 때와 같은 현지 일자 및 모델 키 계산식을 사용한다.
-  const keys = dailyKeyColumns(by).map(key => key === 'local_day' ? LOCAL_DAY : key === 'model_key' ? MODEL_KEY : key);
-  return `SELECT ${keys.join(', ')} FROM ${source} AS usage`;
+export function dailyKeySource(by: UsageBasis): string {
+  // [SQL 조회 정책] 미리 계산한 일자와 원래 모델명을 받고 모델 키는 삽입과 같은 식으로 계산한다.
+  const columns = dailyKeyColumns(by).map((key, index) =>
+    `json_extract(value, '$[${index}]') AS ${key === 'model_key' ? 'model' : key}`);
+  const keys = dailyKeyColumns(by).map(key => key === 'model_key' ? MODEL_KEY : key);
+  return `SELECT ${keys.join(', ')} FROM (SELECT ${columns.join(', ')} FROM json_each(?))`;
 }
 
 /** 스레드 합계를 현지 날짜와 모델별로 묶어 합계와 평균 표본 수를 계산한다. */
-export function aggregateUsageSource(by: UsageBasis, source: string): string {
+export function aggregateUsageSource(by: UsageBasis, source: string, localDay = LOCAL_DAY): string {
   // [집계 정책] 현지 날짜와 활성 모델 차원으로 투영하고 양수 토큰이나 모델 기록을 사용량 표본으로 표시한다.
   const input = [
     'provider', 'project_key', 'session_id',
-    `${LOCAL_DAY} AS local_day`,
+    `${localDay} AS local_day`,
     ...(by === 'model' ? ['model'] : ['started_at_ms']),
     'input_tokens', 'output_tokens', 'total_tokens',
     'cache_write_input_tokens', 'cache_read_input_tokens',

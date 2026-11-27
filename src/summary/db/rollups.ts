@@ -24,7 +24,7 @@ function dailyUpsert(by: keyof typeof ROLLUP_TABLES): string {
   const fields = by === 'model' ? ['model', ...states] : states;
   const incoming = fields.map(field => `excluded.${field}`);
   return `INSERT INTO ${table}
-    SELECT * FROM (${aggregateUsageSource(by, DAILY_FACTS_SOURCE)}) WHERE true
+    SELECT * FROM (${aggregateUsageSource(by, DAILY_FACTS_SOURCE, 'local_day')}) WHERE true
     ON CONFLICT(${dailyKeyColumns(by).join(', ')}) DO UPDATE SET
       (${fields.join(', ')}) = (${incoming.join(', ')})
     WHERE (${fields.map(field => `${table}.${field}`).join(', ')}) IS NOT (${incoming.join(', ')})`;
@@ -77,19 +77,19 @@ export class UsageRollupStore {
     }
 
     // [SQL 트랜잭션 정책] 일별 제공자·모델 합계를 UPSERT하고 새 집계에서 사라진 키는 EXCEPT로 찾아 삭제한다.
-    const facts = dailyFacts(summaries);
+    const facts = dailyFacts(summaries, timezone);
     for (const by of ['provider', 'model'] as const) {
       const table = ROLLUP_TABLES[by];
       profile.measure(by === 'provider' ? 'rollupRequestInsert' : 'rollupModelInsert', () => {
-        this.database.statement(DAILY_UPSERTS[by]).run(timezone, facts[by]);
+        this.database.statement(DAILY_UPSERTS[by]).run(facts[by]);
       });
       const keys = dailyKeyColumns(by).join(', ');
       profile.measure(by === 'provider' ? 'rollupRequestDelete' : 'rollupModelDelete', () => {
         this.database.statement(`DELETE FROM ${table} WHERE (${keys}) IN (
           SELECT ${keys} FROM ${table} ${where}
           EXCEPT
-          ${dailyKeySource(by, DAILY_FACTS_SOURCE)}
-        )`).run(...params, timezone, facts[by]);
+          ${dailyKeySource(by)}
+        )`).run(...params, by === 'provider' ? facts.requestKeys : facts.modelKeys);
       });
     }
     if (preserveCapabilities) {
