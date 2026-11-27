@@ -1,0 +1,602 @@
+{
+  "collection": {
+    "dateSeoul": "2026-11-27",
+    "source": "c324bbcf8e8d4f3b68f2454e89c7c7ed171c4379c88adcacde3e1ff1439e611b",
+    "node": "v24.14.1",
+    "sqlite": "3.51.2",
+    "datasets": {
+      "100": {
+        "files": 20,
+        "bytes": 56145,
+        "inputSha256": "5fbbc8b2d0a80284456f3d97a00119c52f82a2519a16dd171411f3795febaa60",
+        "responses": {
+          "claude": {
+            "candidates": 50,
+            "winners": 50,
+            "hasCheck": 0,
+            "sort": {
+              "first": 40,
+              "second": 0,
+              "third": 0,
+              "equal": 0
+            },
+            "group": {
+              "first": 40,
+              "second": 0,
+              "third": 0,
+              "equal": 0
+            }
+          },
+          "codex": {
+            "candidates": 50,
+            "winners": 50,
+            "hasCheck": 0,
+            "sort": {
+              "first": 40,
+              "second": 0,
+              "third": 0,
+              "equal": 0
+            },
+            "group": {
+              "first": 40,
+              "second": 0,
+              "third": 0,
+              "equal": 0
+            }
+          }
+        },
+        "fallbackAttempts": 0,
+        "fallbackFound": 0,
+        "handoff": {
+          "batches": 2,
+          "summaries": 100,
+          "sessions": 20,
+          "scopeBytes": 682,
+          "provider": {
+            "rows": 100,
+            "bytes": 14546
+          },
+          "model": {
+            "rows": 100,
+            "bytes": 15716
+          }
+        }
+      },
+      "10000": {
+        "files": 200,
+        "bytes": 5641710,
+        "inputSha256": "00e56c3e107cd49ee73a5b8cb7a51a0ca450bd824c9971158d245d6e0a5e1e2d",
+        "responses": {
+          "claude": {
+            "candidates": 5000,
+            "winners": 5000,
+            "hasCheck": 0,
+            "sort": {
+              "first": 5053,
+              "second": 0,
+              "third": 0,
+              "equal": 0
+            },
+            "group": {
+              "first": 4900,
+              "second": 0,
+              "third": 0,
+              "equal": 0
+            }
+          },
+          "codex": {
+            "candidates": 5000,
+            "winners": 5000,
+            "hasCheck": 0,
+            "sort": {
+              "first": 4900,
+              "second": 0,
+              "third": 0,
+              "equal": 0
+            },
+            "group": {
+              "first": 4900,
+              "second": 0,
+              "third": 0,
+              "equal": 0
+            }
+          }
+        },
+        "fallbackAttempts": 0,
+        "fallbackFound": 0,
+        "handoff": {
+          "batches": 13,
+          "summaries": 10000,
+          "sessions": 200,
+          "scopeBytes": 6813,
+          "provider": {
+            "rows": 10000,
+            "bytes": 1458633
+          },
+          "model": {
+            "rows": 10000,
+            "bytes": 1576133
+          }
+        }
+      },
+      "real": {
+        "files": 751,
+        "bytes": 506096130,
+        "inputSha256": "3184ebf12b9d432f2f6b398f08bae1e6eb29b40dd0cbeb0ec9bc71fed673ebc0",
+        "responses": {
+          "claude": {
+            "candidates": 100,
+            "winners": 100,
+            "hasCheck": 0,
+            "sort": {
+              "first": 88,
+              "second": 0,
+              "third": 0,
+              "equal": 0
+            },
+            "group": {
+              "first": 88,
+              "second": 0,
+              "third": 0,
+              "equal": 0
+            }
+          },
+          "codex": {
+            "candidates": 29023,
+            "winners": 29023,
+            "hasCheck": 20436,
+            "sort": {
+              "first": 73374,
+              "second": 189,
+              "third": 0,
+              "equal": 0
+            },
+            "group": {
+              "first": 28610,
+              "second": 122,
+              "third": 0,
+              "equal": 0
+            }
+          }
+        },
+        "fallbackAttempts": 930,
+        "fallbackFound": 0,
+        "handoff": {
+          "batches": 28,
+          "summaries": 1731,
+          "sessions": 440,
+          "scopeBytes": 21600,
+          "provider": {
+            "rows": 1731,
+            "bytes": 353874
+          },
+          "model": {
+            "rows": 1732,
+            "bytes": 369182
+          }
+        }
+      }
+    }
+  },
+  "sqlite": {
+    "node": "v24.14.1",
+    "sqlite": "3.51.2",
+    "datasets": {
+      "100": {
+        "dbBytes": 69632,
+        "pageBytes": 4096,
+        "schema": [
+          "projects",
+          "session_billing",
+          "sessions",
+          "source_file",
+          "usage_capability_daily",
+          "usage_model_daily",
+          "usage_request_daily",
+          "usage_rollup_meta"
+        ],
+        "objects": [
+          {
+            "name": "usage_model_daily",
+            "bytes": 12288,
+            "payload": 7328
+          },
+          {
+            "name": "sqlite_schema",
+            "bytes": 12288,
+            "payload": 5385
+          },
+          {
+            "name": "source_file",
+            "bytes": 12288,
+            "payload": 7040
+          },
+          {
+            "name": "usage_rollup_meta",
+            "bytes": 4096,
+            "payload": 15
+          },
+          {
+            "name": "usage_request_daily",
+            "bytes": 4096,
+            "payload": 3272
+          },
+          {
+            "name": "usage_capability_daily",
+            "bytes": 4096,
+            "payload": 3350
+          },
+          {
+            "name": "sqlite_stat1",
+            "bytes": 4096,
+            "payload": 292
+          },
+          {
+            "name": "sqlite_autoindex_source_file_1",
+            "bytes": 4096,
+            "payload": 2939
+          },
+          {
+            "name": "sessions",
+            "bytes": 4096,
+            "payload": 600
+          },
+          {
+            "name": "session_billing",
+            "bytes": 4096,
+            "payload": 0
+          },
+          {
+            "name": "projects",
+            "bytes": 4096,
+            "payload": 320
+          }
+        ],
+        "billingRows": 0,
+        "rowCounts": {
+          "usage_request_daily": 20,
+          "usage_model_daily": 40
+        },
+        "mismatches": {
+          "usage_request_daily": {
+            "total_tokens": 0,
+            "c_total_tokens": 0,
+            "r_total_tokens": 0,
+            "c_duration_missing": 0,
+            "r_duration_missing": 0
+          },
+          "usage_model_daily": {
+            "total_tokens": 0,
+            "c_total_tokens": 0,
+            "r_total_tokens": 0,
+            "c_duration_missing": 0,
+            "r_duration_missing": 0
+          }
+        },
+        "packedBaseline": [
+          {
+            "name": "usage_model_daily",
+            "bytes": 12288,
+            "payload": 7328
+          },
+          {
+            "name": "usage_request_daily",
+            "bytes": 4096,
+            "payload": 3272
+          }
+        ],
+        "packedReduced": [
+          {
+            "name": "usage_model_daily",
+            "bytes": 12288,
+            "payload": 7318
+          },
+          {
+            "name": "usage_request_daily",
+            "bytes": 4096,
+            "payload": 3262
+          }
+        ],
+        "pathSummary": {
+          "rows": 20,
+          "roots": 2,
+          "rootBytes": 2160,
+          "pathBytes": 2710,
+          "matchedPrefixBytes": 2160,
+          "unmatched": 0
+        }
+      },
+      "10000": {
+        "dbBytes": 331776,
+        "pageBytes": 4096,
+        "schema": [
+          "projects",
+          "session_billing",
+          "sessions",
+          "source_file",
+          "usage_capability_daily",
+          "usage_model_daily",
+          "usage_request_daily",
+          "usage_rollup_meta"
+        ],
+        "objects": [
+          {
+            "name": "usage_model_daily",
+            "bytes": 86016,
+            "payload": 75100
+          },
+          {
+            "name": "source_file",
+            "bytes": 81920,
+            "payload": 71200
+          },
+          {
+            "name": "usage_capability_daily",
+            "bytes": 45056,
+            "payload": 33500
+          },
+          {
+            "name": "usage_request_daily",
+            "bytes": 40960,
+            "payload": 33870
+          },
+          {
+            "name": "sqlite_autoindex_source_file_1",
+            "bytes": 36864,
+            "payload": 29872
+          },
+          {
+            "name": "sqlite_schema",
+            "bytes": 12288,
+            "payload": 5385
+          },
+          {
+            "name": "sessions",
+            "bytes": 12288,
+            "payload": 6000
+          },
+          {
+            "name": "usage_rollup_meta",
+            "bytes": 4096,
+            "payload": 15
+          },
+          {
+            "name": "sqlite_stat1",
+            "bytes": 4096,
+            "payload": 302
+          },
+          {
+            "name": "session_billing",
+            "bytes": 4096,
+            "payload": 0
+          },
+          {
+            "name": "projects",
+            "bytes": 4096,
+            "payload": 320
+          }
+        ],
+        "billingRows": 0,
+        "rowCounts": {
+          "usage_request_daily": 200,
+          "usage_model_daily": 400
+        },
+        "mismatches": {
+          "usage_request_daily": {
+            "total_tokens": 0,
+            "c_total_tokens": 0,
+            "r_total_tokens": 0,
+            "c_duration_missing": 0,
+            "r_duration_missing": 0
+          },
+          "usage_model_daily": {
+            "total_tokens": 0,
+            "c_total_tokens": 0,
+            "r_total_tokens": 0,
+            "c_duration_missing": 0,
+            "r_duration_missing": 0
+          }
+        },
+        "packedBaseline": [
+          {
+            "name": "usage_model_daily",
+            "bytes": 81920,
+            "payload": 75100
+          },
+          {
+            "name": "usage_request_daily",
+            "bytes": 40960,
+            "payload": 33870
+          }
+        ],
+        "packedReduced": [
+          {
+            "name": "usage_model_daily",
+            "bytes": 81920,
+            "payload": 75000
+          },
+          {
+            "name": "usage_request_daily",
+            "bytes": 40960,
+            "payload": 33470
+          }
+        ],
+        "pathSummary": {
+          "rows": 200,
+          "roots": 2,
+          "rootBytes": 22000,
+          "pathBytes": 27500,
+          "matchedPrefixBytes": 22000,
+          "unmatched": 0
+        }
+      },
+      "real": {
+        "dbBytes": 1019904,
+        "pageBytes": 4096,
+        "schema": [
+          "projects",
+          "session_billing",
+          "sessions",
+          "source_file",
+          "usage_capability_daily",
+          "usage_model_daily",
+          "usage_request_daily",
+          "usage_rollup_meta"
+        ],
+        "objects": [
+          {
+            "name": "source_file",
+            "bytes": 364544,
+            "payload": 332416
+          },
+          {
+            "name": "sqlite_autoindex_source_file_1",
+            "bytes": 188416,
+            "payload": 155124
+          },
+          {
+            "name": "usage_model_daily",
+            "bytes": 131072,
+            "payload": 112539
+          },
+          {
+            "name": "usage_capability_daily",
+            "bytes": 131072,
+            "payload": 113242
+          },
+          {
+            "name": "usage_request_daily",
+            "bytes": 122880,
+            "payload": 100881
+          },
+          {
+            "name": "sessions",
+            "bytes": 53248,
+            "payload": 44681
+          },
+          {
+            "name": "sqlite_schema",
+            "bytes": 12288,
+            "payload": 5385
+          },
+          {
+            "name": "usage_rollup_meta",
+            "bytes": 4096,
+            "payload": 15
+          },
+          {
+            "name": "sqlite_stat1",
+            "bytes": 4096,
+            "payload": 302
+          },
+          {
+            "name": "session_billing",
+            "bytes": 4096,
+            "payload": 0
+          },
+          {
+            "name": "projects",
+            "bytes": 4096,
+            "payload": 2423
+          }
+        ],
+        "billingRows": 0,
+        "rowCounts": {
+          "usage_request_daily": 463,
+          "usage_model_daily": 484
+        },
+        "mismatches": {
+          "usage_request_daily": {
+            "total_tokens": 0,
+            "c_total_tokens": 0,
+            "r_total_tokens": 0,
+            "c_duration_missing": 0,
+            "r_duration_missing": 0
+          },
+          "usage_model_daily": {
+            "total_tokens": 0,
+            "c_total_tokens": 0,
+            "r_total_tokens": 0,
+            "c_duration_missing": 0,
+            "r_duration_missing": 0
+          }
+        },
+        "packedBaseline": [
+          {
+            "name": "usage_model_daily",
+            "bytes": 126976,
+            "payload": 112539
+          },
+          {
+            "name": "usage_request_daily",
+            "bytes": 114688,
+            "payload": 100881
+          }
+        ],
+        "packedReduced": [
+          {
+            "name": "usage_model_daily",
+            "bytes": 126976,
+            "payload": 112894
+          },
+          {
+            "name": "usage_request_daily",
+            "bytes": 114688,
+            "payload": 100700
+          }
+        ],
+        "pathSummary": {
+          "rows": 751,
+          "roots": 3,
+          "rootBytes": 81859,
+          "pathBytes": 146228,
+          "matchedPrefixBytes": 81859,
+          "unmatched": 0
+        }
+      }
+    }
+  },
+  "sourceRootDictionary": {
+    "candidate": "store source_root as integer foreign key, retain provider/path uniqueness and absolute path",
+    "inputs": {
+      "100": {
+        "baseline": 16384,
+        "reduced": 24576,
+        "differences": 0,
+        "foreignKeyIssues": 0
+      },
+      "10000": {
+        "baseline": 118784,
+        "reduced": 102400,
+        "differences": 0,
+        "foreignKeyIssues": 0
+      },
+      "real": {
+        "baseline": 516096,
+        "reduced": 438272,
+        "differences": 0,
+        "foreignKeyIssues": 0
+      }
+    }
+  },
+  "modelKeyReconstruction": {
+    "expression": "CASE WHEN model_key='N' THEN NULL ELSE substr(model_key,2) END",
+    "inputs": {
+      "100": {
+        "mismatches": 0,
+        "baseline": 12288,
+        "reduced": 12288
+      },
+      "10000": {
+        "mismatches": 0,
+        "baseline": 81920,
+        "reduced": 81920
+      },
+      "real": {
+        "mismatches": 0,
+        "baseline": 126976,
+        "reduced": 126976
+      }
+    }
+  }
+}
