@@ -1,11 +1,37 @@
 // JSONL 한 행의 이미지 제거와 문자열 문법·바이트 예산 상태를 관리한다.
 import { SummaryError } from './errors';
 
+const MAX_REUSED_LINE_BYTES = 256 * 1024;
+
+/** Store retained spans contiguously and reuse bounded storage within the file reader. */
+export class JsonlLineBuffer {
+  private buffer?: Buffer;
+  private length = 0;
+
+  constructor(private readonly maxBytes: number) {}
+
+  append(source: Buffer, start: number, end: number): void {
+    const required = this.length + end - start;
+    if (!this.buffer || this.buffer.length < required) {
+      const grown = Math.max(required, this.buffer ? this.buffer.length * 2 : 1024);
+      const next = Buffer.allocUnsafe(Math.min(this.maxBytes, grown));
+      this.buffer?.copy(next, 0, 0, this.length);
+      this.buffer = next;
+    }
+    source.copy(this.buffer, this.length, start, end);
+    this.length = required;
+  }
+
+  takeText(): string {
+    const text = this.buffer?.toString('utf8', 0, this.length).trim() ?? '';
+    this.length = 0;
+    if (this.buffer && this.buffer.length > MAX_REUSED_LINE_BYTES) this.buffer = undefined;
+    return text;
+  }
+}
+
 /** 이미지 Base64 본문을 제외한 JSON 한 행을 메모리 상한 안에서 구성한다. */
 export class JsonlLine {
-  private readonly blocks: Buffer[] = [];
-  private block?: Buffer;
-  private used = 0;
   private length = 0;
   private inString = false;
   private escaped = false;
@@ -15,7 +41,7 @@ export class JsonlLine {
   bytes = 0;
 
   constructor(private readonly maxBytes: number, private readonly offset: number,
-    private readonly consume?: (chunk: Buffer, start: number, end: number) => void) {}
+    private readonly consume: (chunk: Buffer, start: number, end: number) => void) {}
 
   /**
    * 책임: 행의 일반 구간을 빠르게 복사하고 문자열 경계를 추적한다.
@@ -34,12 +60,12 @@ export class JsonlLine {
     let index = start;
     let retainedStart = start;
     const discard = (from: number, to: number): void => {
-      if (retainedStart < from) this.consume?.(chunk, retainedStart, from);
+      if (retainedStart < from) this.consume(chunk, retainedStart, from);
       retainedStart = to;
     };
     while (index < end) {
       if (this.probe !== undefined || this.escaped || this.unicode) {
-        if (this.trackStringByte(chunk[index])) this.retain(chunk, index, index + 1);
+        if (this.trackStringByte(chunk[index])) this.retain(1);
         else discard(index, index + 1);
         index++;
         continue;
@@ -48,7 +74,7 @@ export class JsonlLine {
       if (escape < index) escape = find(92, index);
       const boundary = this.inString ? Math.min(quote, escape) : quote;
       if (boundary <= index) {
-        if (this.trackStringByte(chunk[index])) this.retain(chunk, index, index + 1);
+        if (this.trackStringByte(chunk[index])) this.retain(1);
         else discard(index, index + 1);
         index++;
         continue;
@@ -59,33 +85,15 @@ export class JsonlLine {
           if (chunk[position] < 32) throw new SummaryError('parse-error', this.offset);
         }
         discard(index, boundary);
-      } else this.retain(chunk, index, boundary);
+      } else this.retain(boundary - index);
       index = boundary;
     }
-    if (retainedStart < end) this.consume?.(chunk, retainedStart, end);
+    if (retainedStart < end) this.consume(chunk, retainedStart, end);
   }
 
-  private retain(chunk: Buffer, start: number, end: number): void {
-    // [메모리 정책] 보존할 바이트만 예산에 포함하고 소비 콜백이 있으면 중간 버퍼를 만들지 않는다.
-    if (end - start > this.maxBytes - this.length) throw new SummaryError('line-byte-budget-exceeded', this.offset);
-    if (this.consume) {
-      this.length += end - start;
-      return;
-    }
-    // [메모리 정책] 작은 첫 블록으로 시작해 행이 길어지면 64KiB까지 블록을 늘린다.
-    while (start < end) {
-      if (this.block && this.used === this.block.length) {
-        this.blocks.push(this.block);
-        this.block = undefined;
-        this.used = 0;
-      }
-      const block = this.block ??= Buffer.allocUnsafe(Math.min(this.blocks.length ? 64 * 1024 : 1024, this.maxBytes - this.length));
-      const count = Math.min(end - start, block.length - this.used);
-      chunk.copy(block, this.used, start, start + count);
-      start += count;
-      this.used += count;
-      this.length += count;
-    }
+  private retain(bytes: number): void {
+    this.length += bytes;
+    if (this.length > this.maxBytes) throw new SummaryError('line-byte-budget-exceeded', this.offset);
   }
 
   /** Advance string state and report whether this byte belongs in the retained JSON. */
@@ -141,10 +149,4 @@ export class JsonlLine {
     }
   }
 
-  text(): string {
-    // [DTO 정책] 사용한 블록과 마지막 일부만 합쳐 UTF-8로 변환한다.
-    if (!this.block) return '';
-    const tail = this.block.subarray(0, this.used);
-    return (this.blocks.length ? Buffer.concat([...this.blocks, tail], this.length) : tail).toString('utf8').trim();
-  }
 }

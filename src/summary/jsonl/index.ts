@@ -2,7 +2,7 @@
 import { open } from 'node:fs/promises';
 import { zstdChunks, ZstdError } from './zstd';
 import { SummaryError } from './errors';
-import { JsonlLine } from './line';
+import { JsonlLine, JsonlLineBuffer } from './line';
 import { projectJson, type FixedJsonShape, type JsonShape } from './projection';
 import { StreamingFixedProjection } from './streamProjection';
 
@@ -55,7 +55,8 @@ export async function readJsonl(
   const file = await open(path, 'r');
   const buffer = Buffer.allocUnsafe(Math.min(64 * 1024, Math.max(1, size)));
   const projection = options.fixedShape && new StreamingFixedProjection(options.fixedShape);
-  const appendProjected = projection?.append.bind(projection);
+  const lineBuffer = new JsonlLineBuffer(maxLine);
+  const appendLine = projection ? projection.append.bind(projection) : lineBuffer.append.bind(lineBuffer);
   let line: JsonlLine | undefined;
   let read = 0;
   let lineOffset = 0;
@@ -108,10 +109,10 @@ export async function readJsonl(
 
       // [파싱 정책] 청크를 넘기거나 이미지가 든 행은 상태를 이어받아 읽고, 고정 스키마가 있으면 필요한 필드만 누적한다.
       if (needsLine) {
-        line ??= new JsonlLine(maxLine, lineOffset, appendProjected);
+        line ??= new JsonlLine(maxLine, lineOffset, appendLine);
         line.append(chunk, index, end);
         if (newline < 0) break;
-        if (!projection) text = line.text();
+        if (!projection) text = lineBuffer.takeText();
       }
 
       // [파싱 정책] LF에서 완성된 객체를 행 시작 오프셋과 함께 전달하고 다음 행의 상태를 초기화한다.
