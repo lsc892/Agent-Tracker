@@ -49,6 +49,7 @@ npx agent-tracker-vscode@latest
 ```
 
 完了したら、VS Code のコマンドパレットで **Developer: Reload Window** を実行してください。
+Agent Tracker に使用量カードのクリック動作の更新が表示されたら、VS Code を完全に終了し、少し待ってから開き直してください。対応する Windows・Linux のローカル環境では、終了時にパッチが適用されます。
 
 <details>
 <summary>追加オプション：グローバルインストール・プロファイル指定・macOS設定</summary>

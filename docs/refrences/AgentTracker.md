@@ -199,7 +199,11 @@ manual refresh
 
 상태 표시줄 오른쪽에 Claude·Codex 통합 사용량 항목과 새로고침 버튼을 배치한다. 통합 항목 안에서는 Claude가 왼쪽, Codex가 오른쪽이다. 마우스를 올리면 `StatusBarItem.tooltip`의 `MarkdownString` 사용량 카드가 바로 위에 나타나고, 항목과 카드에서 마우스를 옮기면 닫힌다. 로컬 VS Code에 토글 패치를 적용하면 호버 중 클릭으로 카드에 포커스를 주고 고정한다. 닫힌 상태에서 클릭해도 카드가 열려 고정된다. 고정된 카드는 마우스를 옮겨도 유지되며 항목을 클릭하거나 카드 밖을 클릭하거나 Esc를 눌러 닫는다. 클릭으로 닫은 뒤에는 항목을 벗어났다가 다시 마우스를 올리면 임시 호버가 나타난다. 상태 표시줄의 상세/압축 설정은 카드 내용에 영향을 주지 않는다. Codex·Claude 순서의 주간·5시간 잔량과 초기화 시간 텍스트 요약은 접근성 label에 유지한다. 하단 quota 패널이나 별도 창은 만들지 않는다.
 
-클릭 명령은 `agentTracker.toggleQuotaTooltip`이다. `tools/vscode/statusbar-toggle.cjs`가 Agent Tracker의 이 명령만 내부 `ToggleTooltipCommand` 객체로 변환한다. 공개 API의 기능은 아니므로 확장 설치·활성화와 패치 적용을 구분한다. 원본 백업과 복원 명령을 제공하며 VS Code 업데이트 뒤 재적용한다. 패치가 없는 설치에서는 기본 호버와 클릭 열기 경로를 사용한다.
+클릭 명령은 `agentTracker.toggleQuotaTooltip`이다. `tools/vscode/statusbar-toggle.cjs`가 Agent Tracker의 이 명령만 내부 `ToggleTooltipCommand` 객체로 변환한다. 배포된 확장은 로컬 Windows·Linux 데스크톱에서 시작할 때 확인된 버전과 파일 속성을 먼저 대조한다. 확인 기록이 없거나 설치가 달라졌으면 백그라운드에서 설치를 검사하고 필요한 패치를 전체 종료 뒤 적용한다. 다음 실행부터 내장 토글을 사용한다. 쓰기 권한과 지원되는 workbench 구조가 필요하며, macOS 서명 번들과 원격 호스트는 자동 적용 대상에서 제외한다. 수동 복원한 설치에서는 재적용을 건너뛰며, 패치가 없는 설치에서는 기본 호버와 클릭 열기 경로를 사용한다.
+
+자동 적용은 패치를 예약한 VS Code의 메인 프로세스 종료를 기다린다. workbench 교체 직후 작업이 중단된 경우, 현재 workbench와 product 파일 및 재구성한 product의 해시가 기존 작업 기록과 일치할 때만 체크섬 교체를 이어서 적용한다. 이전 패치에서 갱신 중 두 파일이 모두 직전 상태에 남아 있으면, 작업 기록에 저장된 두 파일의 해시를 확인해 갱신을 재시도한다.
+
+패치 준비에서 workbench의 SHA-256을 작업 기록과 product 체크섬에 함께 사용한다. 종료 대기에는 수정 범위, 삽입 코드, product 내용과 해시만 보관한다. 적용할 때 기존 해시와 일치하는 workbench에 같은 편집을 다시 수행한다.
 
 `src/ui/quotaTooltip.ts`가 현재 snapshot으로 카드 내용을 만든다. 외부 label과 오류 메시지는 `appendText`로 이스케이프하고, 명령 링크는 필요한 명령만 `isTrusted.enabledCommands`에 허용한다. 위치와 스타일은 VS Code 기본 툴팁을 따른다. API 근거와 구현 상세는 [StatusBarPopup.md](../research/2026-10-05/StatusBarPopup.md)에 정리한다.
 

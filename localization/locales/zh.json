@@ -6,6 +6,7 @@
   "extension.dataCleared": "已删除统计计算数据。下次打开使用统计时，将从原始日志重新计算。",
   "extension.clearFailed": "无法删除统计数据。请等待其他窗口的统计处理结束后重试。",
   "extension.configurationFailed": "无法应用 Agent Tracker 设置。请检查设置值。",
+  "extension.restartForStatusBarToggle": "Agent Tracker 正在更新用量卡片的点击行为。请完全退出 VS Code，稍等片刻后重新打开。",
   "quota.claudeCancelled": "已取消 Claude 使用量查询。",
   "quota.claudeLoginRequired": "请登录 Claude Code 后刷新使用量。",
   "quota.claudeLoginExpired": "Claude Code 登录已过期。请重新登录。",

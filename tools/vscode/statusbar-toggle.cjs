@@ -1,7 +1,7 @@
 // VS Code 상태바의 quota 카드 토글 패치를 검사·적용·복원한다.
-const { existsSync, readFileSync, writeFileSync, renameSync, unlinkSync, statSync, realpathSync } = require('node:fs');
+const { existsSync, readFileSync, writeFileSync, openSync, closeSync, renameSync, unlinkSync, statSync, realpathSync } = require('node:fs');
 const { dirname, join, resolve } = require('node:path');
-const { createHash } = require('node:crypto');
+const { createHash, randomUUID } = require('node:crypto');
 const { spawnSync } = require('node:child_process');
 const { configureQuotaCardToggle } = require('./statusbar-toggle-behavior.cjs');
 const { configureQuotaDividers } = require('./statusbar-toggle-view.cjs');
@@ -12,8 +12,14 @@ const extensionId = 'AgentTracker.agent-tracker';
 const checksumKey = 'vs/workbench/workbench.desktop.main.js';
 const begin = '/*agent-tracker:statusbar-toggle:v7*/';
 const end = '/*agent-tracker:statusbar-toggle:end*/';
-const hash = value => createHash('sha256').update(value).digest('hex');
-const checksum = value => createHash('sha256').update(value).digest('base64').replace(/=+$/, '');
+const sha256 = value => createHash('sha256').update(value).digest();
+const hash = value => sha256(value).toString('hex');
+const encodeChecksum = digest => digest.toString('base64').replace(/=+$/, '');
+const checksum = value => encodeChecksum(sha256(value));
+
+function replaceInjection(source, { start, end }, injection) {
+  return source.slice(0, start) + injection + source.slice(end);
+}
 
 /**
  * 책임: 지원하는 workbench 코드에 quota 클릭 토글 패치만 생성한다.
@@ -26,9 +32,11 @@ function patchSource(source) {
   let existingPatch;
   // [패치 식별 정책] 기존 표식의 개수와 순서를 확인하고 주입 부분을 분리해 원래 코드를 재구성한다.
   const markers = [...source.matchAll(/\/\*agent-tracker:statusbar-toggle:v\d+\*\//g)];
-  if (markers.length || source.includes(end)) {
-    if (markers.length !== 1 || source.split(end).length !== 2 || !/v[1-7]\*\/$/.test(markers[0][0])) throw new Error('토글 패치 표식이 손상되었습니다.');
-    const start = markers[0].index, finish = source.indexOf(end);
+  const finish = source.indexOf(end);
+  if (markers.length || finish !== -1) {
+    if (markers.length !== 1 || finish === -1 || source.indexOf(end, finish + end.length) !== -1
+      || !/v[1-7]\*\/$/.test(markers[0][0])) throw new Error('토글 패치 표식이 손상되었습니다.');
+    const start = markers[0].index;
     if (finish < start) throw new Error('토글 패치 표식 순서가 잘못되었습니다.');
     const afterPatch = finish + end.length;
     existingPatch = { start, injection: source.slice(start, afterPatch) };
@@ -48,8 +56,7 @@ function patchSource(source) {
   const dividerSource = configureQuotaDividers.toString().replace(/\r\n/g, '\n');
   const injection = `${begin}if(${condition}){(${toggleSource})(this,${symbol});${mapping}(${dividerSource})(this);}${end}`;
   const position = target.index + target[0].length;
-  const patched = original.slice(0, position) + injection + original.slice(position);
-  const alreadyPatched = source === patched;
+  const alreadyPatched = existingPatch?.start === position && existingPatch.injection === injection;
   const upgradeRequired = !!existingPatch && !alreadyPatched;
   // [호환성 정책] 기존 주입 위치와 내용이 알려진 버전과 정확히 일치하는 경우에만 업그레이드한다.
   if (upgradeRequired) {
@@ -60,7 +67,9 @@ function patchSource(source) {
       throw new Error('기존 토글 패치가 예상 코드와 다릅니다. 자동으로 덮어쓰지 않습니다.');
     }
   }
-  return { original, patched, alreadyPatched, upgradeRequired };
+  const edit = { start: position, end: position + (existingPatch?.injection.length ?? 0), injection };
+  const patched = alreadyPatched ? source : replaceInjection(source, edit, injection);
+  return { original, patched, alreadyPatched, upgradeRequired, edit };
 }
 
 function appRootFromInstallation(root, launcher = join(root, 'bin', 'code.cmd')) {
@@ -104,19 +113,131 @@ function resolveAppRoot(options = {}) {
 
 function atomicWrite(path, contents) {
   // [쓰기 정책] 원본과 같은 모드의 임시 파일을 배타적으로 만든 뒤 이름을 바꿔 교체한다.
-  const temporary = `${path}.agent-tracker-${process.pid}.tmp`;
+  const temporary = `${path}.agent-tracker-${randomUUID()}.tmp`;
+  const file = openSync(temporary, 'wx', existsSync(path) ? statSync(path).mode : undefined);
   try {
-    writeFileSync(temporary, contents, { flag: 'wx', mode: statSync(path).mode });
+    try { writeFileSync(file, contents); }
+    finally { closeSync(file); }
     renameSync(temporary, path);
   } finally {
     if (existsSync(temporary)) unlinkSync(temporary);
   }
 }
 
-function backup(path, contents) {
-  // [백업 정책] 최초 백업은 배타적으로 만들고 기존 백업은 해시가 일치하는지 확인한다.
-  if (!existsSync(path)) { writeFileSync(path, contents, { flag: 'wx' }); return; }
-  if (hash(readFileSync(path)) !== hash(contents)) throw new Error(`기존 백업과 원본이 다릅니다: ${path}`);
+function workbenchPath(appRoot) {
+  return join(appRoot, 'out', ...checksumKey.split('/'));
+}
+
+function installationStamp(target, productPath) {
+  return [target, productPath].map(path => {
+    const { size, mtimeMs, ctimeMs } = statSync(path);
+    return `${size}:${mtimeMs}:${ctimeMs}`;
+  }).join('|');
+}
+
+function isInstallationVerified(appRoot, version) {
+  const target = workbenchPath(appRoot);
+  try {
+    const state = JSON.parse(readFileSync(`${target}.agent-tracker-toggle.json`, 'utf8'));
+    return state.version === version && state.verifiedPatch === begin
+      && state.verifiedFiles === installationStamp(target, join(appRoot, 'product.json'));
+  } catch {
+    // A missing or unreadable record still needs the full installer check.
+    return false;
+  }
+}
+
+function rememberVerification(statePath, state, stamp) {
+  if (state.verifiedPatch === begin && state.verifiedFiles === stamp) return;
+  atomicWrite(statePath, JSON.stringify({ ...state, verifiedPatch: begin, verifiedFiles: stamp }, null, 2) + '\n');
+}
+
+function rememberAppliedPatch(statePath, state, target, productPath) {
+  try {
+    rememberVerification(statePath, state, installationStamp(target, productPath));
+  } catch {
+    // The patch is committed. The next launch can reverify it and cache the result.
+  }
+}
+
+function createLock(path) {
+  let file;
+  try {
+    file = openSync(path, 'wx');
+  } catch (error) {
+    if (error.code !== 'EEXIST') throw error;
+    return false;
+  }
+  try {
+    try { writeFileSync(file, String(process.pid)); }
+    finally { closeSync(file); }
+  } catch (error) {
+    removeLock(path);
+    throw error;
+  }
+  return true;
+}
+
+function removeLock(path) {
+  try { unlinkSync(path); }
+  catch (error) { if (error.code !== 'ENOENT') throw error; }
+}
+
+function isRunning(pid) {
+  try { process.kill(pid, 0); return true; }
+  catch (error) {
+    if (error.code === 'ESRCH') return false;
+    if (error.code === 'EPERM') return true;
+    throw error;
+  }
+}
+
+function readLockOwner(path) {
+  try { return Number(readFileSync(path, 'utf8')); }
+  catch (error) {
+    if (error.code === 'ENOENT') return undefined;
+    throw error;
+  }
+}
+
+function lockWorkbench(appRoot) {
+  const path = `${workbenchPath(appRoot)}.agent-tracker-toggle.lock`;
+  const release = () => removeLock(path);
+  if (createLock(path)) return release;
+  const owner = readLockOwner(path);
+  if (!Number.isInteger(owner) || owner <= 0 || owner > 0x7fffffff || isRunning(owner)) return undefined;
+
+  // Serialize reclamation for the dead owner so a concurrent caller cannot remove a new lock.
+  const recovery = `${path}.${owner}.recovery`;
+  if (!createLock(recovery)) return undefined;
+  try {
+    if (readLockOwner(path) === owner) removeLock(path);
+    return createLock(path) ? release : undefined;
+  } finally {
+    removeLock(recovery);
+  }
+}
+
+function backup(path, contents, expectedHash, previousVersionHash) {
+  if (!existsSync(path)) { atomicWrite(path, contents); return; }
+  const backupHash = hash(readFileSync(path));
+  if (backupHash === expectedHash) return;
+  // An in-place VS Code update can leave a verified backup from the previous version.
+  if (previousVersionHash === backupHash) { atomicWrite(path, contents); return; }
+  throw new Error(`기존 백업과 원본이 다릅니다: ${path}`);
+}
+
+function productWithWorkbenchChecksum(product, workbenchDigest) {
+  const checksums = { ...product.checksums, [checksumKey]: encodeChecksum(workbenchDigest) };
+  return JSON.stringify({ ...product, checksums }, null, '\t') + '\n';
+}
+
+function readUnchangedFile(path, expectedHash) {
+  const bytes = readFileSync(path);
+  if (hash(bytes) !== expectedHash) {
+    throw new Error('패치를 준비한 뒤 VS Code 설치 파일이 변경되었습니다.');
+  }
+  return bytes;
 }
 
 function restoreWorkbench(target, productPath, source, productSource, state) {
@@ -125,9 +246,10 @@ function restoreWorkbench(target, productPath, source, productSource, state) {
   const originalProduct = readFileSync(`${productPath}.agent-tracker-toggle.bak`);
   if (hash(original) !== state.originalHash || hash(originalProduct) !== state.originalProductHash) throw new Error('백업 무결성 검증 실패.');
   // [복원 정책] 현재 파일이 기록한 상태 중 하나일 때만 검증된 원본 두 파일을 복원한다.
-  const restored = hash(source) === state.originalHash && hash(productSource) === state.originalProductHash;
-  if (restored) return 'already-restored';
-  if (![state.originalHash, state.patchedHash, state.previousHash].includes(hash(source)) || ![state.originalProductHash, state.patchedProductHash, state.previousProductHash].includes(hash(productSource))) throw new Error('패치 이후 파일이 변경되어 자동 복원을 중단합니다.');
+  const sourceHash = hash(source), productHash = hash(productSource);
+  if (sourceHash === state.originalHash && productHash === state.originalProductHash) return 'already-restored';
+  if (![state.originalHash, state.patchedHash, state.previousHash].includes(sourceHash)
+    || ![state.originalProductHash, state.patchedProductHash, state.previousProductHash].includes(productHash)) throw new Error('패치 이후 파일이 변경되어 자동 복원을 중단합니다.');
   try {
     atomicWrite(target, original);
     atomicWrite(productPath, originalProduct);
@@ -137,16 +259,45 @@ function restoreWorkbench(target, productPath, source, productSource, state) {
   return 'restored';
 }
 
+function applyPreparedPatch(appRoot, edit, record, { originalProduct, patchedProduct, previousVersion }) {
+  const target = workbenchPath(appRoot);
+  const productPath = join(appRoot, 'product.json');
+  const statePath = `${target}.agent-tracker-toggle.json`;
+  const sourceBackup = `${target}.agent-tracker-toggle.bak`;
+  const productBackup = `${productPath}.agent-tracker-toggle.bak`;
+  // The same verified input and edit reproduce the workbench checked during preparation.
+  const source = readUnchangedFile(target, record.previousHash ?? record.originalHash);
+  readUnchangedFile(productPath, record.previousProductHash ?? record.originalProductHash);
+  const sourceText = source.toString('utf8');
+  const original = record.previousHash ? replaceInjection(sourceText, edit, '') : source;
+  backup(sourceBackup, original, record.originalHash, previousVersion?.originalHash);
+  backup(productBackup, originalProduct, record.originalProductHash, previousVersion?.originalProductHash);
+  // Record both expected file states before mutation, so an interrupted apply is restorable.
+  atomicWrite(statePath, JSON.stringify(record, null, 2) + '\n');
+  atomicWrite(target, replaceInjection(sourceText, edit, edit.injection));
+  try {
+    atomicWrite(productPath, patchedProduct);
+  } catch (error) {
+    atomicWrite(target, source);
+    throw error;
+  }
+  rememberAppliedPatch(statePath, record, target, productPath);
+  return { status: record.previousHash ? 'upgraded' : 'patched', appRoot, version: record.version, backup: sourceBackup };
+}
+
 /**
  * 책임: workbench 패치·복원의 무결성과 복구 가능한 상태를 관리한다.
  * 알고리즘: 대상·해시·백업·구문을 검증하고 변경 전 양쪽 기대 상태를 기록한 뒤 파일과 checksum을 교체하며 실패하면 이전 상태로 되돌린다.
  */
-function operate(options = {}) {
-  const appRoot = resolveAppRoot(options);
-  const target = join(appRoot, 'out', ...checksumKey.split('/'));
+function prepareOperation(appRoot, options) {
+  const target = workbenchPath(appRoot);
   const productPath = join(appRoot, 'product.json');
   const manifest = JSON.parse(readFileSync(join(appRoot, 'package.json'), 'utf8'));
   if (!/code/i.test(manifest.name) || typeof manifest.version !== 'string') throw new Error('VS Code 앱 디렉터리가 아닙니다.');
+  if (options.expectedVersion && manifest.version !== options.expectedVersion) {
+    throw new Error('실행 중인 VS Code와 설치 디렉터리의 버전이 다릅니다.');
+  }
+  const verificationStamp = options.expectedVersion ? installationStamp(target, productPath) : undefined;
   const source = readFileSync(target, 'utf8');
   const productSource = readFileSync(productPath, 'utf8');
   const product = JSON.parse(productSource);
@@ -155,40 +306,86 @@ function operate(options = {}) {
   const productBackup = `${productPath}.agent-tracker-toggle.bak`;
   const state = existsSync(statePath) ? JSON.parse(readFileSync(statePath, 'utf8')) : undefined;
   if (options.restore) {
-    return { status: restoreWorkbench(target, productPath, source, productSource, state), appRoot, version: manifest.version };
+    const status = restoreWorkbench(target, productPath, source, productSource, state);
+    if (!state.manuallyRestored) atomicWrite(statePath, JSON.stringify({ ...state, manuallyRestored: true }, null, 2) + '\n');
+    return { status, appRoot, version: manifest.version };
+  }
+  const sourceDigest = sha256(source);
+  const sourceHash = sourceDigest.toString('hex');
+  const productHash = hash(productSource);
+  if (options.expectedVersion && state?.manuallyRestored
+    && sourceHash === state.originalHash && productHash === state.originalProductHash) {
+    rememberVerification(statePath, state, verificationStamp);
+    return { status: 'already-restored', appRoot, version: manifest.version };
   }
   const result = patchSource(source);
   if (result.alreadyPatched) {
-    if (!state || hash(source) !== state.patchedHash || hash(productSource) !== state.patchedProductHash) throw new Error('패치 파일과 백업 기록이 일치하지 않습니다.');
-    return { status: 'already-patched', appRoot, version: manifest.version };
+    if (!state || sourceHash !== state.patchedHash) throw new Error('패치 파일과 백업 기록이 일치하지 않습니다.');
+    if (productHash === state.patchedProductHash) {
+      if (verificationStamp) rememberVerification(statePath, state, verificationStamp);
+      return { status: 'already-patched', appRoot, version: manifest.version };
+    }
+    if (options.check || state.version !== manifest.version
+      || productHash !== (state.previousProductHash ?? state.originalProductHash)) {
+      throw new Error('패치 파일과 백업 기록이 일치하지 않습니다.');
+    }
+    // The workbench was replaced before an interruption. Finish the recorded product replacement.
+    const recoveredProduct = productWithWorkbenchChecksum(product, sourceDigest);
+    if (hash(recoveredProduct) !== state.patchedProductHash) throw new Error('기록된 체크섬 변경을 재구성할 수 없습니다.');
+    if (hash(readFileSync(sourceBackup)) !== state.originalHash || hash(readFileSync(productBackup)) !== state.originalProductHash) {
+      throw new Error('백업 무결성 검증 실패.');
+    }
+    return () => {
+      readUnchangedFile(target, state.patchedHash);
+      readUnchangedFile(productPath, productHash);
+      atomicWrite(productPath, recoveredProduct);
+      rememberAppliedPatch(statePath, state, target, productPath);
+      return { status: 'recovered', appRoot, version: manifest.version, backup: sourceBackup };
+    };
   }
   if (options.check) throw new Error('클릭 토글 패치가 적용되어 있지 않습니다. npm run patch:vscode를 실행하세요.');
   let originalProductSource = productSource;
   if (result.upgradeRequired) {
-    if (!state || hash(source) !== state.patchedHash || hash(productSource) !== state.patchedProductHash) throw new Error('기존 패치 파일과 백업 기록이 일치하지 않습니다.');
+    const matchesInstalledPatch = sourceHash === state?.patchedHash && productHash === state.patchedProductHash;
+    // A failed upgrade can leave both old files in place after saving the new patch record.
+    const matchesPreviousPatch = state?.version === manifest.version
+      && sourceHash === state.previousHash && productHash === state.previousProductHash;
+    if (!matchesInstalledPatch && !matchesPreviousPatch) throw new Error('기존 패치 파일과 백업 기록이 일치하지 않습니다.');
     originalProductSource = readFileSync(productBackup, 'utf8');
     if (hash(readFileSync(sourceBackup)) !== state.originalHash || hash(originalProductSource) !== state.originalProductHash || hash(result.original) !== state.originalHash) throw new Error('백업 무결성 검증 실패.');
   }
-  if (product.checksums?.[checksumKey] !== checksum(source)) throw new Error('현재 workbench 파일이 등록된 무결성 값과 다릅니다. 기존 수정에 덮어쓰지 않습니다.');
+  if (product.checksums?.[checksumKey] !== encodeChecksum(sourceDigest)) throw new Error('현재 workbench 파일이 등록된 무결성 값과 다릅니다. 기존 수정에 덮어쓰지 않습니다.');
   // [검증 정책] 교체 전에 주입 결과의 JavaScript 구문을 검사하고 product의 체크섬을 다시 계산한다.
   const syntax = spawnSync(process.execPath, ['--input-type=module', '--check'], { input: result.patched, encoding: 'utf8', windowsHide: true, maxBuffer: 1024 * 1024, timeout: 30_000 });
   if (syntax.error || syntax.status !== 0) throw new Error(`패치 JavaScript 구문 검사 실패: ${(syntax.error?.message || syntax.stderr || '').slice(0, 300)}`);
-  const patchedProduct = { ...product, checksums: { ...product.checksums, [checksumKey]: checksum(result.patched) } };
-  const patchedProductSource = JSON.stringify(patchedProduct, null, '\t') + '\n';
-  backup(sourceBackup, result.original);
-  backup(productBackup, originalProductSource);
-  const record = { version: manifest.version, command, originalHash: hash(result.original), patchedHash: hash(result.patched), originalProductHash: hash(originalProductSource), patchedProductHash: hash(patchedProductSource),
-    ...(result.upgradeRequired ? { previousHash: hash(source), previousProductHash: hash(productSource) } : {}) };
-  // Record both expected file states before mutation, so an interrupted apply is restorable.
-  // [복구 정책] 교체 전 양쪽 파일의 해시를 기록해 중간 중단 뒤에도 원본을 대조할 수 있게 한다.
-  writeFileSync(statePath, JSON.stringify(record, null, 2) + '\n');
+  const patchedDigest = sha256(result.patched);
+  const patchedProductSource = productWithWorkbenchChecksum(product, patchedDigest);
+  const record = {
+    version: manifest.version, command,
+    originalHash: result.upgradeRequired ? state.originalHash : sourceHash,
+    patchedHash: patchedDigest.toString('hex'),
+    originalProductHash: result.upgradeRequired ? state.originalProductHash : productHash,
+    patchedProductHash: hash(patchedProductSource),
+    ...(result.upgradeRequired ? { previousHash: sourceHash, previousProductHash: productHash } : {}),
+  };
+  const previousVersion = !result.upgradeRequired && state?.version && state.version !== manifest.version ? state : undefined;
+  const { edit } = result;
+  const products = { originalProduct: originalProductSource, patchedProduct: patchedProductSource, previousVersion };
+  // Keep only the edit and hashes while the desktop process is still running.
+  return () => applyPreparedPatch(appRoot, edit, record, products);
+}
+
+function operate(options = {}) {
+  const appRoot = resolveAppRoot(options);
+  if (options.check) return prepareOperation(appRoot, options);
+  const unlock = lockWorkbench(appRoot);
+  if (!unlock) throw new Error('다른 프로세스에서 클릭 토글 패치를 처리 중입니다.');
   try {
-    atomicWrite(target, result.patched);
-    atomicWrite(productPath, patchedProductSource);
-  } catch (error) {
-    atomicWrite(target, source); atomicWrite(productPath, productSource); throw error;
+    const prepared = prepareOperation(appRoot, options);
+    return typeof prepared === 'function' ? prepared() : prepared;
+  } finally {
+    unlock();
   }
-  return { status: result.upgradeRequired ? 'upgraded' : 'patched', appRoot, version: manifest.version, backup: sourceBackup };
 }
 
 function main(args) {
@@ -210,7 +407,7 @@ function main(args) {
   console.log(JSON.stringify(operate(options), null, 2));
 }
 
-module.exports = { command, patchSource, resolveAppRoot, operate, checksum, hash };
+module.exports = { command, patchSource, resolveAppRoot, operate, checksum, hash, isRunning, lockWorkbench, prepareOperation, isInstallationVerified };
 if (require.main === module) {
   try { main(process.argv.slice(2)); } catch (error) { console.error(error.message); process.exitCode = 1; }
 }

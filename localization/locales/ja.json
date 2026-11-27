@@ -6,6 +6,7 @@
   "extension.dataCleared": "統計の計算データを削除しました。次に使用統計を開くと、元のログから再計算します。",
   "extension.clearFailed": "統計データを削除できません。他のウィンドウでの統計処理が終わってから再試行してください。",
   "extension.configurationFailed": "Agent Tracker の設定を適用できません。設定値を確認してください。",
+  "extension.restartForStatusBarToggle": "Agent Tracker は使用量カードのクリック動作を更新します。VS Code を完全に終了し、少し待ってから開き直してください。",
   "quota.claudeCancelled": "Claude 使用量の取得をキャンセルしました。",
   "quota.claudeLoginRequired": "Claude Code にサインインしてから使用量を更新してください。",
   "quota.claudeLoginExpired": "Claude Code のサインイン期限が切れました。再度サインインしてください。",

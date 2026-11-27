@@ -49,6 +49,7 @@ npx agent-tracker-vscode@latest
 ```
 
 Al finalizar, ejecuta **Developer: Reload Window** desde la paleta de comandos de VS Code.
+Si Agent Tracker te pide actualizar el comportamiento al hacer clic en la tarjeta de uso, cierra VS Code por completo, espera un momento y vuelve a abrirlo. El parche se aplica al salir en las instalaciones locales compatibles de Windows y Linux.
 
 <details>
 <summary>Más opciones: instalación global · perfiles · configuración de macOS</summary>

@@ -49,6 +49,7 @@ npx agent-tracker-vscode@latest
 ```
 
 完成后，在 VS Code 命令面板运行 **Developer: Reload Window**。
+如果 Agent Tracker 提示更新用量卡片的点击行为，请完全退出 VS Code，稍等片刻后重新打开。在受支持的 Windows 和 Linux 本地安装中，补丁会在退出后自动应用。
 
 <details>
 <summary>更多选项：全局安装 · 配置文件 · macOS 设置</summary>

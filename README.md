@@ -49,6 +49,7 @@ npx agent-tracker-vscode@latest
 ```
 
 When it finishes, run **Developer: Reload Window** from the VS Code Command Palette.
+If Agent Tracker prompts you to update the usage card's click behavior, fully quit VS Code, wait a moment, and reopen it. Agent Tracker applies the patch on exit on supported local Windows and Linux installations.
 
 <details>
 <summary>More options: global install · profiles · macOS setup</summary>

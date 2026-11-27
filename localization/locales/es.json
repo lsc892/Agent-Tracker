@@ -6,6 +6,7 @@
   "extension.dataCleared": "Se eliminaron los datos estadísticos. Al volver a abrir las estadísticas, se recalcularán desde los registros originales.",
   "extension.clearFailed": "No se pudieron eliminar los datos estadísticos. Espere a que termine el procesamiento en otras ventanas y vuelva a intentarlo.",
   "extension.configurationFailed": "No se pudieron aplicar los ajustes de Agent Tracker. Revise sus valores.",
+  "extension.restartForStatusBarToggle": "Agent Tracker está actualizando el comportamiento al hacer clic en su tarjeta de uso. Cierra VS Code por completo, espera un momento y vuelve a abrirlo.",
   "quota.claudeCancelled": "Se canceló la consulta de uso de Claude.",
   "quota.claudeLoginRequired": "Inicie sesión en Claude Code y actualice el uso.",
   "quota.claudeLoginExpired": "La sesión de Claude Code ha caducado. Inicie sesión de nuevo.",

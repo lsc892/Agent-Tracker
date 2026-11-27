@@ -6,6 +6,7 @@
   "extension.dataCleared": "통계 계산 데이터를 삭제했습니다. 다음에 사용량 통계를 열면 원본 로그에서 다시 계산합니다.",
   "extension.clearFailed": "통계 계산 데이터를 삭제하지 못했습니다. 다른 창의 통계 처리가 끝난 뒤 다시 시도해 주세요.",
   "extension.configurationFailed": "Agent Tracker 설정을 적용하지 못했습니다. 설정 값을 확인해 주세요.",
+  "extension.restartForStatusBarToggle": "Agent Tracker 사용량 카드의 클릭 동작을 업데이트합니다. VS Code를 완전히 종료한 뒤 잠시 기다렸다 다시 열어 주세요.",
   "quota.claudeCancelled": "Claude quota 조회가 취소되었습니다.",
   "quota.claudeLoginRequired": "Claude Code에서 로그인한 뒤 다시 조회해 주세요.",
   "quota.claudeLoginExpired": "Claude Code 로그인 정보가 만료되었습니다. 다시 로그인해 주세요.",

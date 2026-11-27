@@ -49,6 +49,7 @@ npx agent-tracker-vscode@latest
 ```
 
 완료되면 VS Code 명령 팔레트에서 **Developer: Reload Window**를 실행하세요.
+Agent Tracker에 사용량 카드 클릭 동작 업데이트 안내가 표시되면 VS Code를 완전히 종료하고 잠시 후 다시 여세요. 지원되는 로컬 Windows·Linux 설치에서는 종료 후 패치가 자동으로 적용됩니다.
 
 <details>
 <summary>추가 옵션: 전역 설치 · 프로필 지정 · macOS 설정</summary>

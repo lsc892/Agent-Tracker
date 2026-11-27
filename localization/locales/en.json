@@ -6,6 +6,7 @@
   "extension.dataCleared": "Statistics data deleted. Usage statistics will be recalculated from the original logs the next time you open them.",
   "extension.clearFailed": "Could not delete statistics data. Try again after statistics processing in other windows has finished.",
   "extension.configurationFailed": "Could not apply Agent Tracker settings. Check the setting values.",
+  "extension.restartForStatusBarToggle": "Agent Tracker is updating click behavior for its usage card. Fully quit VS Code, wait a moment, and reopen it.",
   "quota.claudeCancelled": "Claude usage lookup cancelled.",
   "quota.claudeLoginRequired": "Sign in to Claude Code, then refresh usage.",
   "quota.claudeLoginExpired": "Your Claude Code sign-in has expired. Sign in again.",

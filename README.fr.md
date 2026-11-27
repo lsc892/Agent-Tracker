@@ -49,6 +49,7 @@ npx agent-tracker-vscode@latest
 ```
 
 Une fois terminé, lancez **Developer: Reload Window** depuis la palette de commandes de VS Code.
+Si Agent Tracker vous invite à mettre à jour le comportement au clic de la carte d’utilisation, quittez complètement VS Code, patientez un instant, puis rouvrez-le. Le correctif s’applique à la fermeture sur les installations locales compatibles de Windows et Linux.
 
 <details>
 <summary>Autres options : installation globale · profils · configuration macOS</summary>

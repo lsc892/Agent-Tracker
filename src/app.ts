@@ -11,6 +11,7 @@ import { SummaryClient } from './summary/client';
 import { ColorSettings } from './ui/colorSettings';
 import { Dashboard } from './ui/dashboard';
 import { QuotaStatusBar } from './ui/statusBar';
+import { scheduleStatusBarTogglePatch } from './ui/statusBarTogglePatch';
 
 interface ConfigurationChanges {
   cleanup: boolean;
@@ -47,6 +48,7 @@ export class AgentTrackerApp {
     this.registerCommands();
     this.registerListeners();
     this.startMonitoring();
+    scheduleStatusBarTogglePatch(this.context);
   }
 
   /**
