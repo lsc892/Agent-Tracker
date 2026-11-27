@@ -70,6 +70,7 @@
 
 ## 미채택·철회 및 검증 한계
 
+- [2026-11-27 대화·Skill 집계 최소화 A/B](failure/2026-11-27/CurrentAggregationMinimizeAB-2026-11-27.md) — 실로그 피크 힙이 증가했고, 응답 병합만 분리한 비교에서도 집계 시간이 늘어 변경을 철회했다. [날짜별 자료](failure/2026-11-27/README.md)
 - [2026-11-25 SQLite 일별 기본 키 날짜 우선 A/B](failure/2026-11-25/DailyDateClusterAB-2026-11-25.md) — 날짜를 기본 키 맨 앞으로 옮겼을 때 일별 조회의 단축과 월·세션 조회의 지연을 비교했다. [날짜별 자료](failure/2026-11-25/README.md)
 - [2026-11-24 최종 winner 맵 하나로 통합한 A/B](failure/2026-11-24/SingleWinnerMapAB-2026-11-24.md) — 파일별 winner 선택을 없애고 최종 맵에서 한 번만 선택했을 때 집계 시간과 피크 힙이 늘어나는지 확인했다. [날짜별 자료](failure/2026-11-24/README.md)
 - [2026-11-23 SQLite v22 보조 인덱스 제거 후 조회 실험](failure/2026-11-23/DbTradeoff-IndexRemovalExplain.md) — 이전 요청 단위 스키마에서 보조 인덱스 9개를 제거한 뒤 조회 시간, 실행 계획, 회수 가능한 공간을 비교했다. [날짜별 자료](failure/2026-11-23/README.md)
