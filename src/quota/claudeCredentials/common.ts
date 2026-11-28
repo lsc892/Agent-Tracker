@@ -24,13 +24,11 @@ export async function readClaudeCredentialFile(dataHome: string, signal: AbortSi
     // [인증 정책] 일반 파일인지와 크기 상한을 확인한 뒤 취소 가능한 읽기를 시작한다.
     const path = join(dataHome, '.credentials.json');
     const metadata = await stat(path);
-    if (metadata.size > 1_048_576 || !metadata.isFile()) throw new Error('Invalid credential file');
-    return await readFile(path, { encoding: 'utf8', signal });
-  } catch {
-    // [오류 정책] 취소는 즉시 전달하고 나머지 읽기 실패는 대체 소스를 선택할 수 있게 빈 값으로 돌려준다.
-    if (signal.aborted) throw new QuotaError('cancelled', { key: 'quota.claudeCancelled' });
-    return undefined;
-  }
+    if (metadata.size <= 1_048_576 && metadata.isFile()) return await readFile(path, { encoding: 'utf8', signal });
+  } catch { /* An unavailable file can use the platform fallback. */ }
+  // [오류 정책] 취소는 즉시 전달하고 나머지 읽기 실패는 대체 소스를 선택할 수 있게 빈 값으로 돌려준다.
+  if (signal.aborted) throw new QuotaError('cancelled', { key: 'quota.claudeCancelled' });
+  return undefined;
 }
 
 export function parseClaudeAccessToken(serialized: string | undefined): string {
