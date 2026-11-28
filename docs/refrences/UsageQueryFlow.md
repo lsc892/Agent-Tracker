@@ -31,7 +31,7 @@ Webview queryUsage
 
 ```sql
 SELECT provider, local_day AS period,
-       SUM(total_tokens) AS total_tokens, COUNT(*) OVER() AS _total
+       SUM(input_tokens + output_tokens) AS total_tokens, COUNT(*) OVER() AS _total
 FROM usage_request_daily
 WHERE provider = ? AND local_day >= ? AND local_day < ?
 GROUP BY provider, local_day

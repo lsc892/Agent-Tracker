@@ -8,6 +8,9 @@ import { calendarPeriod, periodBounds } from '../../timezone';
 const LOCAL_DAY = "coalesce(agent_tracker_period(started_at_ms, ?, 'day'), '')";
 const MODEL_KEY = "CASE WHEN model IS NULL THEN 'N' ELSE 'V' || model END";
 
+// 바이트 기준으로 접두사를 제거해 이름 안의 NUL도 그대로 유지한다.
+const MODEL_NAME = "CASE WHEN model_key = 'N' THEN NULL ELSE CAST(substr(CAST(model_key AS BLOB), length(CAST('V' AS BLOB)) + 1) AS TEXT) END AS model";
+
 export function buildDailyUsageSource(
   filter: SummaryFilter, grouping: UsageGrouping, timezone: string, by: UsageBasis,
 ): QuerySql & { countSql: string } {
@@ -21,7 +24,7 @@ export function buildDailyUsageSource(
   // [SQL 조회 정책] 활성 집계 열만 읽고 비용 요청에 한해 비용 상태와 세션별 결제 재분류를 읽는다.
   const dimensions = [
     'provider', 'project_key', 'session_id', 'local_day',
-    ...(by === 'model' ? ['model'] : []),
+    ...(by === 'model' ? [MODEL_NAME] : []),
   ];
   const columns = [...dimensions, ...rollupStates(by).map(state => state.name)];
   const from = `FROM ${ROLLUP_TABLES[by]} AS usage`;
@@ -84,7 +87,7 @@ export function aggregateUsageSource(by: UsageBasis, source: string, localDay = 
     'provider', 'project_key', 'session_id',
     `${localDay} AS local_day`,
     ...(by === 'model' ? ['model'] : ['started_at_ms']),
-    'input_tokens', 'output_tokens', 'total_tokens',
+    'input_tokens', 'output_tokens',
     'cache_write_input_tokens', 'cache_read_input_tokens',
     'status', 'duration_ms', 'duration_quality',
     'CASE WHEN total_tokens > 0 THEN 1 ELSE has_model END AS has_recorded_usage',
@@ -94,7 +97,7 @@ export function aggregateUsageSource(by: UsageBasis, source: string, localDay = 
   // [집계 정책] 일별 그룹 키와 합계·평균에 필요한 상태 열을 조합한다.
   const columns = ['provider', 'project_key', 'session_id', 'local_day'];
   if (by === 'model') {
-    columns.push('model', `${MODEL_KEY} AS model_key`);
+    columns.push(`${MODEL_KEY} AS model_key`);
   }
   columns.push(...[...rollupStates(by), ...DAILY_COST_STATES].map(state => `${state.expression} AS ${state.name}`));
 

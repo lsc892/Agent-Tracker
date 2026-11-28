@@ -21,8 +21,7 @@ function dailyStatements(by: keyof typeof ROLLUP_TABLES, insertStage: StorageSta
   // [저장 정책] 집계 기준별 키로 일별 행을 UPSERT하고 NULL까지 포함해 실제로 값이 달라진 행만 갱신한다.
   const table = ROLLUP_TABLES[by];
   const keys = dailyKeyColumns(by).join(', ');
-  const states = [...rollupStates(by), ...DAILY_COST_STATES].map(state => state.name);
-  const fields = by === 'model' ? ['model', ...states] : states;
+  const fields = [...rollupStates(by), ...DAILY_COST_STATES].map(state => state.name);
   const incoming = fields.map(field => `excluded.${field}`);
   const upsert = `INSERT INTO ${table}
     SELECT * FROM (${aggregateUsageSource(by, DAILY_FACTS_SOURCE, 'local_day')}) WHERE true

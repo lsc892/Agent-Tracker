@@ -2,7 +2,7 @@
 import { SCHEMA_DAILY_CAPABILITY_SQL, SCHEMA_ROLLUP_SQL } from './rollup-state';
 
 export { SCHEMA_ROLLUP_SQL } from './rollup-state';
-export const SCHEMA_VERSION = 31;
+export const SCHEMA_VERSION = 32;
 export const SESSION_BILLING_COLUMN_SQL = "billing_mode TEXT CHECK(billing_mode IN ('subscription','api','unknown'))";
 
 // [스키마 정책] 레거시 반영 이력은 턴·응답 키로 중복을 막고 턴 삭제에 맞춰 정리한다.

@@ -611,7 +611,7 @@ schema v4는 이전 summary의 cache component를 NULL로 유지해 미확인 �
 
 ## 8. SQLite schema
 
-DB 위치는 `ExtensionContext.globalStorageUri` 아래로 한다. 스키마 v31의 표는 파일 상태의 `source_file`, 프로젝트 이름의 `projects`, 세션 이름과 결제 지정값의 `sessions`, 일별 사용량의 `usage_request_daily`·`usage_model_daily`·`usage_capability_daily`, 집계 설정의 `usage_rollup_meta`다. 아래의 상세 표 정의는 이전 DB의 형식을 설명하며, v26에서는 이관과 상세 테이블 삭제를 같은 트랜잭션에서 진행한다.
+DB 위치는 `ExtensionContext.globalStorageUri` 아래로 한다. 스키마 v32의 표는 파일 상태의 `source_file`, 프로젝트 이름의 `projects`, 세션 이름과 결제 지정값의 `sessions`, 일별 사용량의 `usage_request_daily`·`usage_model_daily`·`usage_capability_daily`, 집계 설정의 `usage_rollup_meta`다. 아래의 상세 표 정의는 이전 DB의 형식을 설명하며, v26에서는 이관과 상세 테이블 삭제를 같은 트랜잭션에서 진행한다.
 
 스키마 v27은 `source_file`의 루트·세션 보조 인덱스 두 개와 일별 사용량 표 두 개의 날짜·프로젝트 보조 인덱스 네 개를 제거한다. 새 DB는 기본 키와 고유 제약에 필요한 구조로 시작한다. 기존 DB는 파일·사용량 행을 보존하고 같은 마이그레이션 트랜잭션에서 보조 인덱스만 삭제한다. 회수한 페이지는 이후 쓰기에 재사용한다.
 
@@ -693,14 +693,14 @@ CREATE INDEX idx_summary_project_period
 
 ```
 
-현재 조회는 비용 포함 여부와 관계없이 일별 행을 사용한다. 날짜 범위와 제공자·프로젝트·날짜 인덱스가 조회를 지원하고, 세션별 교체는 일별 행 기본 키의 앞 두 열을 사용한다. `source_file`의 루트·세션 인덱스는 증분 수집에 사용한다.
+현재 조회는 일별 행에 제공자·날짜·프로젝트 조건을 적용한다. 세션별 교체는 일별 행 기본 키의 앞 두 열을 사용한다. v27에서 원본 파일과 일별 사용량의 보조 인덱스를 제거했다.
 
 schema v16은 일별 집계를 세션 선두 PK와 집계 형식 v1로 복원했다. v17에서 추가했던 turn_metadata·모델·도구·의존 키 캐시는 v18에서 제거했다. v19·집계 형식 v2는 미사용 집계 열을 제거하기 위해 기존 일별 집계와 metadata만 폐기하고 첫 집계 조회에서 재구축한다. 요청·이름·모델·비용·Skill·source_file와 식별자는 보존하며 원본 로그를 다시 파싱하지 않는다. 조회는 기존 facts·모델·비용·이름 JOIN을 사용한다. 과거 월 PK 실험은 일별 집계에만 적용했던 변경이다.
 
 | 표 | 저장 단위와 내용 | 인덱스 |
 | --- | --- | --- |
-| `usage_request_daily` | provider·프로젝트·세션·현지 일별 요청 상태 | PK(provider, session_id, project_key, local_day), (local_day, provider), (provider, project_key, local_day) |
-| `usage_model_daily` | 같은 단위에 모델별 상태 추가. NULL 모델과 빈 모델명은 서로 다른 model_key로 저장 | 요청 표와 같은 PK에 model_key 추가, 같은 두 보조 인덱스 |
+| `usage_request_daily` | provider·프로젝트·세션·현지 일별 요청 상태 | PK(provider, session_id, project_key, local_day) |
+| `usage_model_daily` | 같은 단위에 모델별 상태 추가. 조회 시 `model_key`에서 NULL·빈 이름·모델명을 복원 | 요청 표와 같은 PK에 model_key 추가 |
 | `usage_rollup_meta` | singleton=1, 현재 시간대, 집계 형식 버전 | singleton PK |
 | `usage_capability_daily` | 이전 도구 통계의 제공자·세션·프로젝트·현지 일·분류·이름별 횟수 | PK(provider, session_id, project_key, local_day, category, name) |
 
@@ -712,7 +712,7 @@ DB당 통계 시간대 하나를 사용한다. 시간대를 바꾸면 남아 있
 
 복수 변경 세션과 새 사용량은 JSON 목록으로 고정 SQL에 바인딩한다. SQLite의 `json_each`와 `GROUP BY`가 제공자·프로젝트·세션·날짜 및 모델별 결과를 만든다. UPSERT는 네 차원과 모델별 표의 `model_key`를 충돌 키로 사용한다. 집계 실패 시 파일 수정 시각과 일별 행을 함께 롤백하고 준비된 입력으로 성분별 저장을 재시도한다.
 
-일별 집계 SQL은 그 범위 조건을 먼저 적용한 뒤 필요한 지표 열·현지 일·사용량 유무만 `scoped AS MATERIALIZED` 입력으로 만든다. 사용량 유무는 토큰이 양수이면 1, 0토큰이면 모델 기록 여부로 한 번 확정하여 완료/기록 표본 식들이 공유한다. 날짜 UDF 호출 수 자체는 기존과 같다. 제공자/모델의 원본 fallback·NULL·38/37개 영속 집계 상태를 유지하며 부분 날짜의 raw `UNION ALL`도 같은 입력 생성기를 쓴다. 이 임시 결과는 SQL 실행 동안만 존재하며 파싱용 영속/명시적 TEMP 테이블을 추가하지 않는다. [저장·집계 SQL A/B](../benchmarks/success/2026-11-10/QueryMinimizeAB-2026-11-10.md).
+일별 집계 SQL은 범위 조건을 적용한 입력에서 지표 열·현지 일·사용량 유무를 `scoped AS MATERIALIZED`에 준비한다. 사용량 유무는 토큰이 양수이면 1, 0토큰이면 모델 기록 여부로 정한다. v32의 제공자·모델 테이블은 비용 열을 제외한 집계 상태를 각각 31개, 30개 저장한다. 조회는 총토큰과 시간 누락 건수를 계산하고, 완료 전체와 사용량이 기록된 완료에는 동일한 입력·출력 합계와 각 표본의 분모를 사용한다. 모델명은 `model_key`에서 복원한다. [현재 SQLite 테이블](SQLiteTables.md)
 
 DB 모듈은 변경 이유별로 책임을 나눈다. `src/summary/db/index.ts`의 `SummaryDatabase`는 worker·scanner API를 연결하고 `connection.ts`는 연결·PRAGMA·statement cache·transaction·optimize·close를 소유한다. `migrations.ts`는 버전 전환, `sourceFiles.ts`는 파일 관측·진단, [memoryStore/index.ts](../../src/summary/db/memoryStore/index.ts)는 최종 결과의 트랜잭션·비교·영속 반영, `billing.ts`는 비용 분류·재계산을 맡는다. [memoryStore/values.ts](../../src/summary/db/memoryStore/values.ts)는 상태 없는 입력 검증·SQL 값 변환·비교 정렬을, [types.ts](../../src/summary/db/memoryStore/types.ts)는 저장 입력·결과 계약을 정의한다. 기존 [memoryStore.ts](../../src/summary/db/memoryStore.ts)는 같은 API를 재노출한다. 이전 SessionStore·SessionChanges와 SQL staging·metadata 구현은 제거했다.
 

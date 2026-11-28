@@ -2,7 +2,7 @@
 import type { DatabaseSync } from 'node:sqlite';
 import { deserialize } from 'node:v8';
 import { DAILY_SCHEMA_SQL, SCHEMA_VERSION, SCHEMA_MODEL_SQL, SESSION_BILLING_COLUMN_SQL } from './schema';
-import { ROLLUP_FORMAT_VERSION, ROLLUP_TABLES } from './rollup-state';
+import { dailyTableColumnNames, dailyTableSql, ROLLUP_FORMAT_VERSION, ROLLUP_TABLES } from './rollup-state';
 import { aggregateUsageSource } from './queries/rollup/source';
 import { rollupUsageTurns } from './queries/raw/source';
 import { calendarPeriod } from './timezone';
@@ -47,10 +47,26 @@ export function migrateSchema(connection: DatabaseSync, timezone: string, transa
         connection.exec('ALTER TABLE source_file ADD COLUMN thread_usage INTEGER NOT NULL DEFAULT 0 CHECK(thread_usage IN (0,1))');
       if (columns.some(column => column.name === 'relation_meta')) migrateSourceRelations(connection);
       migrateSessionBilling(connection);
+      migrateCompactDailyStates(connection);
     }
     // [SQL 트랜잭션 정책] 이관 작업을 모두 마친 트랜잭션 안에서 스키마 버전을 기록한다.
     connection.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
   });
+}
+
+function migrateCompactDailyStates(connection: DatabaseSync): void {
+  // 이전 일별 행에서 계속 저장할 열만 한 번 복사해 파생 집계 값과 중복 모델명을 제거한다.
+  for (const by of ['provider', 'model'] as const) {
+    const table = ROLLUP_TABLES[by];
+    const columns = connection.prepare(`PRAGMA table_info(${table})`).all();
+    if (!columns.some(column => column.name === 'total_tokens')) continue;
+    const next = `${table}_v32`;
+    const retained = dailyTableColumnNames(by).join(', ');
+    connection.exec(`${dailyTableSql(by, next)}
+      INSERT INTO ${next} (${retained}) SELECT ${retained} FROM ${table};
+      DROP TABLE ${table};
+      ALTER TABLE ${next} RENAME TO ${table};`);
+  }
 }
 
 function migrateSessionBilling(connection: DatabaseSync): void {

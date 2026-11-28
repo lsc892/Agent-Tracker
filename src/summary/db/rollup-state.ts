@@ -21,7 +21,7 @@ const addState = (
 };
 
 const RECORDED_USAGE = '(has_recorded_usage = 1)';
-const TOKEN_FIELDS = ['input_tokens', 'output_tokens', 'total_tokens'];
+const TOKEN_FIELDS = ['input_tokens', 'output_tokens'];
 const CACHE_FIELDS = ['cache_write_input_tokens', 'cache_read_input_tokens'];
 
 // [집계 정책] 총량은 모든 상태를 포함하고 캐시가 알려진 표본 수는 별도로 보존한다.
@@ -42,25 +42,26 @@ const COMPLETED_SAMPLES = [
   { prefix: 'c', condition: "status = 'completed'" },
   { prefix: 'r', condition: `status = 'completed' AND ${RECORDED_USAGE}` },
 ];
-const AVERAGE_FIELDS = [...TOKEN_FIELDS, ...CACHE_FIELDS, 'duration_ms'];
 const DURATION_QUALITIES = ['exact', 'derived', 'approximate'];
 
+// [집계 정책] 사용량 미기록 요청의 입력·출력은 0이므로 두 표본에서 같은 토큰 합계를 쓴다.
+for (const field of TOKEN_FIELDS) {
+  addState(`c_${field}`, `coalesce(SUM(CASE WHEN status = 'completed' THEN ${field} END),0)`);
+}
+
 for (const { prefix, condition } of COMPLETED_SAMPLES) {
-  // [집계 정책] 완료 표본별 토큰·시간 합계를 남기고 캐시나 시간이 있는 표본만 알려진 값으로 센다.
-  for (const field of AVERAGE_FIELDS) {
+  // [집계 정책] 캐시·시간 합계와 알려진 건수는 표본별로 남긴다.
+  for (const field of [...CACHE_FIELDS, 'duration_ms']) {
     // [집계 정책] 상세 조회의 AVG와 같게 소요 시간은 실수로 누적한다.
     const value = field === 'duration_ms' ? '1.0 * duration_ms' : field;
     const type = field === 'duration_ms' ? 'REAL' : 'INTEGER';
     addState(`${prefix}_${field}`, `coalesce(SUM(CASE WHEN ${condition} THEN ${value} END),0)`, type);
-    if (field.startsWith('cache_') || field === 'duration_ms') {
-      addState(`${prefix}_${field}_known`, `COUNT(CASE WHEN ${condition} THEN ${field} END)`);
-    }
+    addState(`${prefix}_${field}_known`, `COUNT(CASE WHEN ${condition} THEN ${field} END)`);
   }
   // [집계 정책] 소요 시간의 품질 분류와 누락 건수를 각각 센다.
   for (const quality of DURATION_QUALITIES) {
     addState(`${prefix}_${quality}`, `SUM(${condition} AND duration_quality = '${quality}')`);
   }
-  addState(`${prefix}_duration_missing`, `SUM(${condition} AND duration_ms IS NULL)`);
 }
 
 addState('min_started_at_ms', 'MIN(started_at_ms)', 'INTEGER', 'MIN');
@@ -99,24 +100,28 @@ export function dailyKeyColumns(by: keyof typeof ROLLUP_TABLES): readonly string
 
 // #region 일별 집계 테이블 DDL
 
-const dailyTablesSql = (['provider', 'model'] as const).map(by => {
-  // [스키마 정책] 집계 정의에서 상태 열과 복합 기본 키를 생성해 일별 두 테이블에 같은 계산 기준을 적용한다.
-  const table = ROLLUP_TABLES[by];
-  const modelColumns = by === 'model' ? 'model TEXT,\n  model_key TEXT NOT NULL,' : '';
-  const stateColumns = [...rollupStates(by), ...DAILY_COST_STATES].map(state => `${state.name} ${state.type}`).join(',\n  ');
+type RollupBasis = keyof typeof ROLLUP_TABLES;
 
+function dailyTableColumns(by: RollupBasis): readonly { name: string; type: string }[] {
+  const dimensions = ['provider', 'project_key', 'session_id', 'local_day'].map(name => ({ name, type: 'TEXT NOT NULL' }));
+  if (by === 'model') dimensions.push({ name: 'model_key', type: 'TEXT NOT NULL' });
+  return [...dimensions, ...rollupStates(by), ...DAILY_COST_STATES];
+}
+
+export function dailyTableColumnNames(by: RollupBasis): readonly string[] {
+  return dailyTableColumns(by).map(column => column.name);
+}
+
+export function dailyTableSql(by: RollupBasis, table: string = ROLLUP_TABLES[by]): string {
+  // [스키마 정책] 최초 구축과 이관에 같은 열 정의와 복합 기본 키를 사용한다.
+  const columns = dailyTableColumns(by).map(({ name, type }) => `${name} ${type}`).join(',\n  ');
   return `
 CREATE TABLE IF NOT EXISTS ${table} (
-  provider TEXT NOT NULL,
-  project_key TEXT NOT NULL,
-  session_id TEXT NOT NULL,
-  local_day TEXT NOT NULL,
-  ${modelColumns}
-  ${stateColumns},
+  ${columns},
   PRIMARY KEY(${dailyKeyColumns(by).join(', ')})
 ) WITHOUT ROWID;
 `;
-}).join('');
+}
 
 /** 영속 일별 합계와 해당 합계를 계산한 시간대. */
 export const SCHEMA_ROLLUP_SQL = `
@@ -125,7 +130,7 @@ CREATE TABLE IF NOT EXISTS usage_rollup_meta (
   timezone TEXT NOT NULL,
   format_version INTEGER NOT NULL
 );
-${dailyTablesSql}`;
+${dailyTableSql('provider')}${dailyTableSql('model')}`;
 
 // [스키마 정책] 도구 사용량 키는 일별 집계의 제공자·세션·프로젝트·현지 날짜에 분류와 이름을 더한다.
 export const SCHEMA_DAILY_CAPABILITY_SQL = `

@@ -190,7 +190,7 @@ export class MemoryStore {
         liveThreads.add(threadKey(file.provider, file.session_id, file.relations.identity.threadId));
     }
     const hasUsage = this.database.statement(`SELECT 1 FROM usage_model_daily WHERE provider=? AND session_id=?
-      AND model<>'' AND total_tokens>0 LIMIT 1`);
+      AND model_key NOT IN ('N','V') AND input_tokens + output_tokens > 0 LIMIT 1`);
     for (const file of removed.values()) {
       const { provider, session_id } = file;
       if (session_id === null) continue;
