@@ -27,9 +27,6 @@ async function fixture<T>(action: (path: string, options: { dbPath: string; root
   finally { await rm(path, { recursive: true, force: true }); }
 }
 
-function cutoff(db: SummaryDatabase): number | undefined {
-  return db.connection.prepare('SELECT started_ms FROM summary_refresh WHERE id=1').get()?.started_ms as number | undefined;
-}
 
 test('warm refresh commits the new response and related winner before releasing SQLite queries', async () => fixture(async (path, options) => {
   const file = join(path, 'existing.jsonl'), companion = join(path, 'copy-of-existing.jsonl'), unchanged = join(path, 'unchanged.jsonl');
@@ -90,9 +87,6 @@ test('reopen skips old mtimes and reparses only the newer independent file from 
     const rewritten = source('one', 456);
     await writeFile(one, rewritten);
     await utimes(one, old, old);
-    const archived = join(path, 'archived.jsonl');
-    await writeFile(archived, source('archived', 10));
-    await utimes(archived, old, old);
     db.connection.exec(`CREATE TEMP TRIGGER reject_unchanged_file_update BEFORE UPDATE ON main.source_file
       BEGIN SELECT RAISE(ABORT, 'unchanged files must not be rewritten'); END;`);
     const unchanged = await refreshSummary(db, options);
@@ -101,108 +95,38 @@ test('reopen skips old mtimes and reparses only the newer independent file from 
     assert.equal(unchanged.parsed, 0);
     assert.equal(unchanged.bodyBytes, 0);
     assert.equal(db.queryTurnsCount(), 2);
-    assert.equal(db.queryTurns().find(row => row.session_id === 'one')?.total_tokens, 130);
+    assert.equal(db.queryUsage({}, 'session').find(row => row.session_id === 'one')?.total_tokens, 130);
     db.connection.exec('DROP TRIGGER reject_unchanged_file_update');
 
-    const previous = cutoff(db);
-    assert.ok(previous !== undefined);
-    const time = new Date(previous + 1);
+    const time = new Date(old.getTime() + 60_000);
     await utimes(one, time, time);
     const updated = await refreshSummary(db, options);
     assert.equal(updated.failed, 0);
     assert.equal(updated.parsed, 1);
     assert.equal(updated.bodyBytes, Buffer.byteLength(rewritten));
-    assert.equal(db.queryTurns().find(row => row.session_id === 'one')?.total_tokens, 463);
-    assert.equal(db.queryTurns().find(row => row.session_id === 'two')?.total_tokens, 241);
+    assert.equal(db.queryUsage({}, 'session').find(row => row.session_id === 'one')?.total_tokens, 463);
+    assert.equal(db.queryUsage({}, 'session').find(row => row.session_id === 'two')?.total_tokens, 241);
   } finally { db.close(); }
 }));
 
-test('a migration discards per-file offsets and retains previously committed facts', async () => fixture(async (path, options) => {
-  const file = join(path, 'one.jsonl');
-  await writeFile(file, source('one', 123));
-  const previous = new SummaryDatabase(options.dbPath);
-  try {
-    assert.equal((await refreshSummary(previous, options)).failed, 0);
-    previous.connection.exec(`DROP TABLE applied_response;
-      DROP TABLE summary_refresh;
-      ALTER TABLE source_file DROP COLUMN relation_meta;
-      ALTER TABLE source_file ADD COLUMN complete_position INTEGER NOT NULL DEFAULT 100;
-      ALTER TABLE source_file ADD COLUMN prefix_hash TEXT;
-      UPDATE source_file SET parser_version=18;
-      PRAGMA user_version=20;`);
-  } finally { previous.close(); }
 
+test('failed daily writes keep the source mtime and retry the same file', async () => fixture(async (path, options) => {
   const db = new SummaryDatabase(options.dbPath);
   try {
-    assert.equal(db.queryTurns()[0].total_tokens, 130);
-    const columns = db.connection.prepare('PRAGMA table_info(source_file)').all().map(row => row.name);
-    assert.ok(!columns.includes('complete_position') && !columns.includes('prefix_hash'));
-    assert.equal((await refreshSummary(db, options)).parsed, 1);
-    assert.equal(db.queryTurns()[0].total_tokens, 130);
-    assert.equal(db.connection.prepare('SELECT COUNT(*) AS count FROM applied_response').get()?.count, 1);
-    assert.deepEqual(db.connection.prepare('PRAGMA foreign_key_check').all(), []);
-    db.clearData();
-    assert.equal(cutoff(db), undefined);
-    assert.equal(db.connection.prepare('SELECT COUNT(*) AS count FROM applied_response').get()?.count, 0);
-  } finally { db.close(); }
-}));
-
-test('v22 migration preserves existing summaries and replaces the source cache with applied responses', async () => fixture(async (path, options) => {
-  const file = join(path, 'one.jsonl');
-  await writeFile(file, source('one', 123));
-  const previous = new SummaryDatabase(options.dbPath);
-  let summaryId: number;
-  try {
-    assert.equal((await refreshSummary(previous, options)).failed, 0);
-    summaryId = previous.queryTurns()[0].id;
-    previous.connection.exec(`DROP TABLE applied_response;
-      ALTER TABLE source_file DROP COLUMN relation_meta;
-      CREATE TABLE source_winner_snapshot (file_id INTEGER PRIMARY KEY REFERENCES source_file(id), state BLOB NOT NULL);
-      CREATE TABLE source_winner_candidate (file_id INTEGER REFERENCES source_winner_snapshot(file_id), position INTEGER NOT NULL);
-      INSERT INTO source_winner_snapshot SELECT id, x'01' FROM source_file;
-      INSERT INTO source_winner_candidate SELECT file_id, 0 FROM source_winner_snapshot;
-      UPDATE source_file SET parser_version=19;
-      PRAGMA user_version=22;`);
-  } finally { previous.close(); }
-
-  const db = new SummaryDatabase(options.dbPath);
-  try {
-    assert.equal(db.queryTurns()[0].total_tokens, 130);
-    assert.equal(db.queryTurns()[0].id, summaryId);
-    assert.equal(db.connection.prepare("SELECT count(*) AS n FROM sqlite_schema WHERE name LIKE 'source_winner_%'").get()?.n, 0);
+    const file = join(path, 'session.jsonl');
+    await writeFile(file, source('session', 100));
     assert.equal((await refreshSummary(db, options)).failed, 0);
-    assert.equal(db.queryTurns()[0].total_tokens, 130);
-    assert.equal(db.queryTurns()[0].id, summaryId);
-    assert.equal(db.connection.prepare('SELECT count(*) AS n FROM applied_response').get()?.n, 1);
-    await appendFile(file, `${JSON.stringify(usage(140))}\n`);
+    const accepted = db.findSourceFile('codex', file);
+    const previous = db.queryUsage();
+    assert.ok(accepted);
+    db.connection.exec("CREATE TEMP TRIGGER reject_daily BEFORE UPDATE ON main.usage_request_daily BEGIN SELECT RAISE(ABORT, 'reject daily'); END;");
+    await appendFile(file, JSON.stringify(usage(200, 'second')) + '\n');
+    assert.equal((await refreshSummary(db, options)).failed, 1);
+    assert.deepEqual(db.queryUsage(), previous);
+    assert.equal(db.findSourceFile('codex', file)?.mtime_ms, accepted.mtime_ms);
+    db.connection.exec('DROP TRIGGER reject_daily');
     assert.equal((await refreshSummary(db, options)).failed, 0);
-    assert.equal(db.queryTurns()[0].total_tokens, 147);
-    assert.equal(db.connection.prepare('SELECT count(*) AS n FROM applied_response').get()?.n, 1);
-    assert.deepEqual(db.connection.prepare('PRAGMA foreign_key_check').all(), []);
-  } finally { db.close(); }
-}));
-
-test('failure in the final SQLite transaction keeps the previous cutoff and allows a retry', async () => fixture(async (path, options) => {
-  const file = join(path, 'one.jsonl');
-  await writeFile(file, source('one', 123));
-  const db = new SummaryDatabase(options.dbPath);
-  try {
-    assert.equal((await refreshSummary(db, options)).failed, 0);
-    const previous = cutoff(db);
-    assert.ok(previous !== undefined);
-    await writeFile(file, source('one', 456));
-    const time = new Date(previous + 1);
-    await utimes(file, time, time);
-    db.connection.exec(`CREATE TEMP TRIGGER reject_refresh BEFORE UPDATE ON main.summary_refresh
-      BEGIN SELECT RAISE(ABORT, 'reject checkpoint'); END;`);
-    assert.equal((await refreshSummary(db, options)).interrupted, true);
-    assert.equal(cutoff(db), previous);
-    db.connection.exec('DROP TRIGGER reject_refresh');
-    const retry = await refreshSummary(db, options);
-    assert.equal(retry.failed, 0);
-    assert.equal(retry.parsed, 1);
-    const advanced = cutoff(db);
-    assert.ok(advanced !== undefined && advanced > previous);
-    assert.equal(db.queryTurns()[0].total_tokens, 463);
+    assert.ok(db.queryUsage()[0].total_tokens > previous[0].total_tokens);
+    assert.equal((await refreshSummary(db, options)).bodyBytes, 0);
   } finally { db.close(); }
 }));

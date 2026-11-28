@@ -31,34 +31,28 @@ async function fixture(run:(db:SummaryDatabase,options:SummaryOptions,path:strin
   try{await run(db,options,path);}finally{db.close();await rm(directory,{recursive:true,force:true});}
 }
 
-test('a discarded current usage DTO still contributes token quality flags and their later removal',async()=>fixture(async(db,options,path)=>{
+test('a discarded current usage DTO does not affect saved daily totals',async()=>fixture(async(db,options,path)=>{
   await writeFile(path,source(response(100,200)));
   assert.equal((await refreshSummary(db,options)).failed,0);
-  const initial=db.queryTurns()[0];assert.equal(initial.total_tokens,203);
-  assert.match(initial.quality_flags??'',/component-clamped/,
-    'the warning belongs to the observed source even when the warned DTO loses');
+  const initial=db.queryUsage()[0];assert.equal(initial.total_tokens,203);
   await writeFile(path,source(response(100,20)));
   assert.equal((await refreshSummary(db,options)).failed,0);
-  const corrected=db.queryTurns()[0];assert.equal(corrected.total_tokens,203);
-  assert.doesNotMatch(corrected.quality_flags??'',/component-clamped/);
-  assert.equal(db.queryTurns({}, {},'model')[0].model,'gpt-5.6-sol');
+  const corrected=db.queryUsage()[0];assert.equal(corrected.total_tokens,203);
+  assert.equal(db.queryUsage({}, 'total','UTC',{},'model')[0].model,'gpt-5.6-sol');
   assert.deepEqual(db.connection.prepare('PRAGMA foreign_key_check').all(),[]);
 }));
 
-test('discarded source usage is absorbed into the source hash without rewriting unchanged facts',async()=>fixture(async(db,options,path)=>{
+test('changing discarded source usage leaves the accepted daily aggregates untouched',async()=>fixture(async(db,options,path)=>{
   await writeFile(path,source(response(100)));
   assert.equal((await refreshSummary(db,options)).failed,0);
-  const before=db.queryTurns()[0];
-  const signature=()=>db.findSourceFile('codex',path)?.content_hash;
-  const originalSignature=signature();assert.equal(typeof originalSignature,'string');
+  const before=db.queryUsage()[0];
   db.connection.exec(`CREATE TABLE greedy_fact_writes(operation TEXT);
-    CREATE TRIGGER greedy_fact_insert AFTER INSERT ON turn_summary BEGIN INSERT INTO greedy_fact_writes VALUES('insert'); END;
-    CREATE TRIGGER greedy_fact_update AFTER UPDATE ON turn_summary BEGIN INSERT INTO greedy_fact_writes VALUES('update'); END;
-    CREATE TRIGGER greedy_fact_delete AFTER DELETE ON turn_summary BEGIN INSERT INTO greedy_fact_writes VALUES('delete'); END;`);
+    CREATE TRIGGER greedy_fact_insert AFTER INSERT ON usage_request_daily BEGIN INSERT INTO greedy_fact_writes VALUES('insert'); END;
+    CREATE TRIGGER greedy_fact_update AFTER UPDATE ON usage_request_daily BEGIN INSERT INTO greedy_fact_writes VALUES('update'); END;
+    CREATE TRIGGER greedy_fact_delete AFTER DELETE ON usage_request_daily BEGIN INSERT INTO greedy_fact_writes VALUES('delete'); END;`);
   await writeFile(path,source(response(90,0,'gpt-6-sol')));
   assert.equal((await refreshSummary(db,options)).failed,0);
-  assert.notEqual(signature(),originalSignature,'the raw source hash must reflect even a discarded DTO');
-  assert.deepEqual(db.queryTurns()[0],before,'the selected normalized facts are unchanged');
+  assert.deepEqual(db.queryUsage()[0],before,'the selected normalized facts are unchanged');
   assert.equal(db.connection.prepare('SELECT count(*) n FROM greedy_fact_writes').get()?.n,0);
   assert.deepEqual(db.connection.prepare('PRAGMA foreign_key_check').all(),[]);
 }));
@@ -75,16 +69,15 @@ test('a real legacy fork discards the losing zero-token model together with its 
     payload:{type:'task_complete',turn_id:'root',root_turn_id:'root'}};
   const cumulative=(input:number)=>({type:'event_msg',payload:{type:'token_count',
     info:{total_token_usage:{input_tokens:input,output_tokens:0}}}});
-  await writeFile(parent,jsonl([metadata('parent'),start,context(),cumulative(100),end]));
-  await writeFile(path,jsonl([metadata('child','parent'),start,context(),cumulative(100),cumulative(90),
+  await writeFile(parent,jsonl([metadata('parent'),start,context(),cumulative(0),cumulative(100),end]));
+  await writeFile(path,jsonl([metadata('child','parent'),start,context(),cumulative(0),cumulative(100),cumulative(90),
     context('gpt-6-sol'),cumulative(100),end]));
   const result=await refreshSummary(db,options);
   assert.equal(result.failed,0);
   assert.equal(result.parsed,2,'each source is read once while its winner DTOs are selected');
   assert.equal(result.bodyBytes,(await stat(parent)).size+(await stat(path)).size);
-  const turn=db.queryTurns()[0];assert.equal(turn.total_tokens,100);
-  assert.match(turn.quality_flags??'',/counter-regression/);
-  const models=db.connection.prepare('SELECT model,input_tokens,output_tokens FROM turn_model_usage ORDER BY model').all();
+  const turn=db.queryUsage()[0];assert.equal(turn.total_tokens,100);
+  const models=db.queryUsage({}, 'total','UTC',{},'model');
   assert.deepEqual(models.map(row=>[row.model,row.input_tokens,row.output_tokens]),[
     ['gpt-5.6-sol',100,0],
   ],'only the final winner model is displayed; a discarded duplicate contributes no separate model row');

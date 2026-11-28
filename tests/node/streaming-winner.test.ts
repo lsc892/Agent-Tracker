@@ -71,14 +71,14 @@ test('discarded usage retains its root, smallest offset and diagnostic flags', (
 });
 
 test('copied prefix excludes every repeated copied capability but keeps the later fresh call', () => {
-  const capability = (threadId: string, offset: number): ParseEvent => ({ kind: 'capability', rootId: 'root', threadId,
-    eventId: 'tool', category: 'skill', name: 'sample', offset });
+  const capability = (threadId: string, offset: number, eventId = 'tool'): ParseEvent => ({ kind: 'capability', rootId: 'root', threadId,
+    eventId, category: 'skill', name: 'sample', offset });
   const parent = file(1, [capability('parent', 0), usage(100, { threadId: 'parent', schema: 'legacy', offset: 1 })]);
   parent.identity.threadId = 'parent';
   const child = file(2, [capability('child', 0), capability('child', 1),
     usage(100, { threadId: 'child', schema: 'legacy', offset: 2 }),
     usage(20, { threadId: 'child', schema: 'legacy', responseId: 'new-response', offset: 3 }),
-    capability('child', 4)]);
+    capability('child', 4, 'fresh-tool')]);
   child.identity.threadId = 'child'; child.identity.forkedFromId = 'parent';
   const result = run([parent, child]);
   assert.equal(result.summaries[0].total_tokens, 124);

@@ -5,7 +5,6 @@ import { mkdtemp, mkdir, writeFile, appendFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, normalize } from 'node:path';
 import { SummaryDatabase, type TurnSummaryInput } from '../../src/summary/db';
-import { ageLogFixtures } from '../fixtures/summary-mtime';
 import { SummaryClient } from '../../src/summary/client';
 import { refreshSummary } from '../../src/summary/scanner';
 import { toolCapabilities } from '../../src/summary/parsers/capabilities';
@@ -48,7 +47,7 @@ test('Claude counts deduplicate tool identities and model responses, survive rep
   const root=join(directory,'projects');await mkdir(root);
   const db=new SummaryDatabase(join(directory,'db.sqlite'));
   t.after(async()=>{db.close();await rm(directory,{recursive:true,force:true});});
-  const options={dbPath:join(directory,'db.sqlite'),roots:[{provider:'claude' as const,path:root}]};
+  const options={dbPath:join(directory,'db.sqlite'),roots:[{provider:'claude' as const,path:root}],timezone:'Asia/Seoul'};
   const row=assistant('one',[call('s','Skill',{skill:'review:check'}),call('a','Agent',{subagent_type:'Explore'})]);
   const file=join(root,'s.jsonl');
   await writeFile(file,text([
@@ -65,9 +64,8 @@ test('Claude counts deduplicate tool identities and model responses, survive rep
   for (const filter of [{projectKey:'/other'},{providers:['codex' as const]},{sessionId:'other'},{toMs:Date.parse('2026-10-03T15:00:00Z')}]) {
     assert.equal(db.queryCapabilities(filter,'skill').totalUses,0);
   }
-  ageLogFixtures(file);
   assert.equal((await refreshSummary(db,options)).reused,1);
-  db.connection.exec("DELETE FROM turn_capability_usage; UPDATE source_file SET parser_version=10; UPDATE summary_refresh SET scope='v10';");
+  db.connection.exec("DELETE FROM usage_capability_daily; UPDATE source_file SET parser_version=10;");
   assert.equal((await refreshSummary(db,options)).parsed,1,'previous parser versions rebuild unchanged sources');
   assert.equal(db.queryCapabilities({},'skill').totalUses,2);
   await appendFile(file,text([{type:'custom-title',customTitle:'new'}]));
@@ -75,7 +73,7 @@ test('Claude counts deduplicate tool identities and model responses, survive rep
   await appendFile(file,'{invalid}\n');
   assert.equal((await refreshSummary(db,options)).failed,1);
   assert.equal(db.queryCapabilities({},'skill').totalUses,2);
-  const stored=JSON.stringify(db.connection.prepare('SELECT * FROM turn_capability_usage').all());
+  const stored=JSON.stringify(db.connection.prepare('SELECT * FROM usage_capability_daily').all());
   assert.ok(!stored.includes('SKILL.md') && !stored.includes('subagent_type'));
   db.clearData();assert.equal(db.queryCapabilities({},'skill').totalUses,0);
 });
@@ -117,8 +115,8 @@ test('Codex current and legacy model counts, exec calls, descendant calls and ab
   assert.equal(result.capabilities?.plugin.totalUses,1);
   assert.equal(result.capabilities?.model.totalUses,2);
   assert.ok(result.capabilities?.model.rows.every(row=>row.percentage===50));
-  assert.equal((await client.query({section:'skills'})).capabilities?.model.totalUses,3);
-  assert.equal((await client.query({section:'skills',projectKey:normalize('/other')})).capabilities?.model.rows[0].name,'');
+  assert.equal((await client.query({section:'skills'})).capabilities?.model.totalUses,2);
+  assert.equal((await client.query({section:'skills',projectKey:normalize('/other')})).capabilities?.model.totalUses,0,'a baseline-only legacy snapshot does not count as a model response');
   await rm(root,{recursive:true,force:true});
   assert.equal((await client.query({section:'skills',projectKey:normalize('/project')})).capabilities?.skill.totalUses,2,'queries reuse DB without source scanning');
 });
@@ -163,7 +161,7 @@ test('capability ratios combine enabled providers within each category and recom
   } finally {db.close();}
 });
 
-test('capability pagination uses the full denominator, date filters exclude unknown starts and v5 migration preserves summaries',async t=>{
+test('capability pagination uses the full denominator and date filters exclude unknown starts',async t=>{
   const directory=await mkdtemp(join(tmpdir(),'tracker-capabilities-migration-'));
   const file=join(directory,'db.sqlite');let db=new SummaryDatabase(file);
   t.after(async()=>{db.close();await rm(directory,{recursive:true,force:true});});
@@ -181,12 +179,10 @@ test('capability pagination uses the full denominator, date filters exclude unkn
   assert.ok(Math.abs([...first.rows,...second.rows].reduce((n,row)=>n+row.percentage,0)-100)<1e-10);
   assert.equal(db.queryCapabilities({fromMs:0},'skill').totalUses,0);
   assert.deepEqual(db.queryCapabilities({fromMs:0},'skill').rows,[]);
-  const before=db.queryTurns();
-  assert.throws(()=>db.replaceMemory({sessions:[{provider:'codex',session_id:'s'}],files:[],summaries:[summary('bad','/other',0)]}));
-  assert.equal(db.queryCapabilities({},'skill').totalUses,105);
-  db.connection.exec('DROP TABLE turn_capability_usage; PRAGMA user_version=5;');
+  const before=db.queryUsage();
   db.close();db=new SummaryDatabase(file);
-  assert.deepEqual(db.queryTurns(),before);assert.equal(db.queryCapabilities({},'skill').totalUses,0);
+  assert.deepEqual(db.queryUsage(),before);
+  assert.equal(db.queryCapabilities({},'skill').totalUses,105);
   assert.deepEqual(db.connection.prepare('PRAGMA foreign_key_check').all(),[]);
 });
 
@@ -221,7 +217,7 @@ test('capability pages retain filtered maxima and the denominator of omitted ent
       {...summary('outside','/other',1000),provider:'claude',session_id:'other',started_at_ms:startedAt-86_400_000},
     ]});
     assert.equal(db.queryCapabilities({},'skill').rows[0].name,'outside');
-    for (const filter of [{provider:'codex' as const},{projectKey:'/project'},{sessionId:'s'},{fromMs:startedAt,toMs:startedAt+1}]) {
+    for (const filter of [{provider:'codex' as const},{projectKey:'/project'},{sessionId:'s'},{fromMs:startedAt,toMs:startedAt+86_400_000}]) {
       const page=db.queryCapabilities(filter,'skill',7,7);
       assert.equal(page.rows.length,7);assert.equal(page.maxUses,25);assert.equal(page.totalUses,325);
       assert.deepEqual(page.rows.map(row=>row.name),Array.from({length:7},(_,i)=>`rank-${i+7}`));
@@ -262,13 +258,12 @@ test('default collection includes autonomous AI calls; disabling freezes counts 
   assert.equal((await client.refresh()).parsed,1);
   const tokens=await client.query({groupBy:'turn',includeCosts:true});
   assert.equal(tokens.rows[0].total_tokens,30);assert.equal(tokens.rows[0].cost_usd,0);
-  let db=new SummaryDatabase(dbPath);
+  const db=new SummaryDatabase(dbPath);
   try {
     assert.equal(db.queryCapabilities({},'skill').totalUses,1,'off preserves previous counts through a token rebuild');
     assert.equal(db.queryCapabilities({},'model').totalUses,1,'off does not accumulate model response counts');
     assert.equal(db.findSourceFile('claude',file)?.capabilities_collected,0);
   } finally {db.close();}
-  ageLogFixtures(file);
   assert.equal((await client.refresh()).reused,1,'off does not repeatedly reparse an unchanged source');
   await client.dispose();client=new SummaryClient({...options,collectCapabilities:false});
   assert.equal((await client.query({section:'skills'})).capabilitiesEnabled,false,'off persists after worker restart');
@@ -280,13 +275,10 @@ test('default collection includes autonomous AI calls; disabling freezes counts 
   assert.equal((await client.refresh()).reused,1);
   assert.equal((await client.query({section:'skills'})).capabilities?.skill.totalUses,2,'backfill does not add previous counts twice');
   await client.dispose();
-  db=new SummaryDatabase(dbPath);
+  const reopened=new SummaryDatabase(dbPath);
   try {
-    const before=db.queryTurns();
-    db.connection.exec('ALTER TABLE source_file DROP COLUMN capabilities_collected; PRAGMA user_version=6;');
-    db.close();db=new SummaryDatabase(dbPath);
-    assert.deepEqual(db.queryTurns(),before,'v6 migration preserves tokens and request identities');
-    assert.equal(db.queryCapabilities({},'skill').totalUses,2,'v6 migration preserves historical counts');
-    assert.equal(db.findSourceFile('claude',file)?.capabilities_collected,0,'legacy coverage is rebuilt on the next enabled scan');
-  } finally {db.close();}
+    assert.equal(reopened.queryUsage()[0].total_tokens,30);
+    assert.equal(reopened.queryCapabilities({},'skill').totalUses,2,'reopened daily storage retains Skill counts');
+    assert.equal(reopened.findSourceFile('claude',file)?.capabilities_collected,1);
+  } finally {reopened.close();}
 });

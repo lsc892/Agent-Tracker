@@ -29,24 +29,17 @@ test('Claude error notices retain request outcomes without model responses and v
   ]));
   await writeFile(join(root, 'session', 'subagents', 'agent-error.jsonl'), jsonl([notice('success', 'child-error')]));
   assert.equal((await refreshSummary(db, options)).failed, 0);
-  const turns = db.queryTurns();
-  assert.equal(turns.length, 3);
-  assert.equal(turns.find(row => row.root_turn_id === 'spent-before-error')!.status, 'failed');
-  assert.equal(turns.find(row => row.root_turn_id === 'notice-only')!.status, 'failed');
-  assert.equal(turns.find(row => row.root_turn_id === 'success')!.status, 'completed');
+  assert.equal(db.queryUsage()[0].turn_count, 3);
+  assert.equal(db.queryUsage()[0].completed_turns, 1);
   assert.equal(db.queryUsage()[0].total_tokens, 40);
   assert.equal(db.queryUsage()[0].avg_tokens_per_turn, 25);
   const models = db.queryCapabilities({}, 'model');
   assert.equal(models.totalUses, 2);
   assert.equal(models.rows[0].name, 'claude-sonnet-4-6');
   assert.equal(models.rows[0].percentage, 100);
-  assert.equal(db.queryTurns({}, {}, 'model').find(row => row.root_turn_id === 'notice-only')!.model, null);
   assert.equal(db.queryUsage({}, 'total', 'UTC', {}, 'model').some(row => row.model === '<synthetic>'), false);
 
-  db.connection.exec(`UPDATE source_file SET parser_version=11;
-    UPDATE summary_refresh SET scope='v11';
-    INSERT INTO turn_model_usage SELECT id,'<synthetic>',0,0,0,0,NULL,'old' FROM turn_summary WHERE root_turn_id='notice-only';
-    INSERT INTO turn_capability_usage SELECT id,'model','<synthetic>',1 FROM turn_summary WHERE root_turn_id='notice-only';`);
+  db.connection.exec("UPDATE source_file SET parser_version=11; UPDATE usage_capability_daily SET usage_count=3 WHERE category='model';");
   assert.equal(db.queryCapabilities({}, 'model').totalUses, 3);
   const rebuilt = await refreshSummary(db, options);
   assert.equal(rebuilt.failed, 0);
@@ -57,7 +50,7 @@ test('Claude error notices retain request outcomes without model responses and v
   assert.equal((await refreshSummary(db, options)).parsed, 0, 'the repair runs only once');
 });
 
-test('Codex empty snapshots do not add model uses or an empty model to real requests, while unknown tokens remain', async t => {
+test('Codex empty snapshots do not count and later usage keeps the last explicit model', async t => {
   const directory = await mkdtemp(join(tmpdir(), 'tracker-model-empty-'));
   const root = join(directory, 'sessions');
   await mkdir(root);
@@ -82,10 +75,11 @@ test('Codex empty snapshots do not add model uses or an empty model to real requ
   assert.equal((await refreshSummary(db, options)).failed, 0);
   assert.equal(db.queryUsage()[0].turn_count, 4);
   assert.equal(db.queryUsage()[0].total_tokens, 125);
-  const turns = db.queryTurns({}, {}, 'model');
-  assert.deepEqual(turns.map(row => row.model), [null, 'gpt-6.1-sol', '', null]);
-  assert.equal(turns.find(row => row.model === '')!.total_tokens, 25);
+  const turns = db.queryUsage({}, 'total', 'UTC', {}, 'model');
+  assert.deepEqual(new Set(turns.map(row => row.model)), new Set([null, 'gpt-6.1-sol']));
+  assert.equal(turns.find(row => row.model === null)?.turn_count, 2);
+  assert.equal(turns.find(row => row.model === 'gpt-6.1-sol')!.total_tokens, 125, 'the last explicit model covers later snapshots without a model');
   const models = db.queryCapabilities({}, 'model');
   assert.equal(models.totalUses, 2);
-  assert.deepEqual(models.rows.map(row => [row.name, row.usage_count, row.percentage]), [['gpt-6.1-sol', 1, 50], ['', 1, 50]]);
+  assert.deepEqual(models.rows.map(row => [row.name, row.usage_count, row.percentage]), [['gpt-6.1-sol', 2, 100]]);
 });

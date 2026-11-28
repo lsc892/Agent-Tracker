@@ -1,5 +1,4 @@
 // 요청 제목의 정규화·저장·하위 에이전트 제외와 표·차트 노출을 검증한다.
-import { queryChart } from '../fixtures/usage-chart';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
@@ -26,27 +25,7 @@ test('request titles are bounded text and prefer user requests over Codex editor
   assert.equal(requestTitle([{ type: 'tool_result', content: 'not a request' }]), undefined);
 });
 
-test('v7 summaries migrate without losing tokens or session metadata', async t => {
-  const directory = await mkdtemp(join(tmpdir(), 'tracker-title-migration-'));
-  t.after(() => rm(directory, { recursive: true, force: true }));
-  const path = join(directory, 'db.sqlite');
-  const previous = new SummaryDatabase(path);
-  previous.replaceMemory({files: [], sessions: [{ provider: 'claude', session_id: 's' }], summaries: [{
-    provider: 'claude', project_key: '/project', project_name: 'Project', session_id: 's', session_name: 'Session',
-    root_turn_id: 'r', duration_quality: 'missing', input_tokens: 10, output_tokens: 5,
-    total_tokens: 15, status: 'completed',
-  }] });
-  previous.connection.exec('ALTER TABLE turn_summary DROP COLUMN request_title; PRAGMA user_version=7');
-  previous.close();
-  const migrated = new SummaryDatabase(path);
-  try {
-    assert.equal(migrated.queryTurns()[0].request_title, null);
-    assert.equal(migrated.queryTurns()[0].session_name, 'Session');
-    assert.equal(migrated.queryUsage()[0].total_tokens, 15);
-  } finally { migrated.close(); }
-});
-
-test('rebuild merges ProjectFarm model rows and persists bounded titles through both parsers and model charts', async t => {
+test('rebuild merges path aliases and does not persist request titles in daily storage', async t => {
   const directory = await mkdtemp(join(tmpdir(), 'tracker-titles-'));
   const root = join(directory, 'logs'); await mkdir(root);
   const db = new SummaryDatabase(join(directory, 'db.sqlite'));
@@ -64,27 +43,17 @@ test('rebuild merges ProjectFarm model rows and persists bounded titles through 
     ]));
   }
   assert.equal((await refreshSummary(db, options)).failed, 0);
-  assert.deepEqual(db.queryTurns().map(row => row.request_title), ['Request a', 'Request b']);
   assert.equal(db.queryUsage({}, 'project', 'UTC', {}, 'model').length, 1);
   assert.equal(db.queryUsage({}, 'project', 'UTC', {}, 'model')[0].total_tokens, 30);
   assert.equal(db.queryCapabilities({}, 'model').totalUses, 2);
   assert.equal(db.queryNames({ kind: 'project' }).total, 1);
-  assert.deepEqual(queryChart(db, {}, 'turn', 'UTC', 'tokens', 'model').rows.map(row => 'request_title' in row ? row.request_title : null).sort(), ['Request a', 'Request b']);
-  db.connection.prepare('INSERT INTO projects VALUES (?,?)').run('C:\\Work\\ProjectFarm', 'ProjectFarm');
-  db.connection.prepare('UPDATE turn_summary SET project_key=? WHERE session_id=?').run('C:\\Work\\ProjectFarm', 'a');
-  db.connection.exec("UPDATE source_file SET parser_version=12; UPDATE summary_refresh SET scope='v12'");
-  // This direct SQL fixture simulates a historical database before maintained rollups existed.
-  db.connection.exec('DELETE FROM usage_rollup_meta; DELETE FROM usage_request_daily; DELETE FROM usage_model_daily;');
-  assert.equal(db.queryUsage({}, 'project', 'UTC', {}, 'model').length, 2, 'old case-sensitive keys reproduce the duplicate');
-  assert.equal((await refreshSummary(db, options)).parsed, 2);
-  assert.equal(db.queryUsage({}, 'project', 'UTC', {}, 'model').length, 1);
-  assert.equal(db.queryUsage({}, 'project', 'UTC', {}, 'model')[0].total_tokens, 30);
   const claudeRoot = join(directory, 'claude'); await mkdir(claudeRoot);
   await writeFile(join(claudeRoot, 'claude.jsonl'), jsonl([
     { type: 'user', sessionId: 'claude', promptId: 'c', cwd: '/project', message: { content: [{ type: 'text', text: 'Claude title\nHidden body' }] } },
     { type: 'assistant', promptId: 'c', requestId: 'response', message: { id: 'response', model: 'claude-sonnet-4-6', usage: { input_tokens: 1, output_tokens: 1 } } },
   ]));
   assert.equal((await refreshSummary(db, { ...options, roots: [{ provider: 'claude', path: claudeRoot }] })).failed, 0);
-  assert.equal(db.queryTurns({ provider: 'claude' })[0].request_title, 'Claude title');
-  assert.ok(!JSON.stringify(db.connection.prepare('SELECT request_title FROM turn_summary').all()).includes('Hidden body'));
+  assert.equal(db.queryUsage({provider:'claude'})[0].total_tokens,2);
+  const stored = db.connection.prepare('SELECT * FROM usage_request_daily').all();
+  assert.doesNotMatch(JSON.stringify(stored), /Claude title|Hidden body/);
 });

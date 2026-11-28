@@ -65,7 +65,8 @@ test('current Codex uses response usage and treats cumulative snapshots as valid
     {type:'event_msg',payload:{type:'task_complete',turn_id:'t',duration_ms:400},timestamp:'2026-10-01T00:00:01Z'}]);
   assert.equal(events.filter(event=>event.kind==='usage').length,1);assert.equal((events.find(event=>event.kind==='usage') as UsageEvent).tokens.input,100);
   assert.deepEqual(events.find(event => event.kind === 'check'), {
-    kind: 'check', rootId: 't', threadId: 'thread-one', turnId: 't', input: 100, output: 10, offset: 1,
+    kind: 'check', rootId: 't', threadId: 'thread-one', turnId: 't', input: 100, output: 10,
+    verified: { model: undefined, cacheRead: 0, cacheWrite: 0 }, offset: 1,
   });
   assert.ok(events.some(event=>event.kind==='turn' && event.duration===400));
 });
@@ -119,7 +120,7 @@ test('legacy high-water clamps regression and suppresses repeated snapshots',() 
   const count = (input:number) => ({type:'event_msg',payload:{type:'token_count',info:{total_token_usage:{input_tokens:input,output_tokens:0}}}});
   const events = codex([{type:'turn_context',payload:{turn_id:'t'}},count(100),count(100),count(60),count(120)]);
   const usage = events.filter((event): event is UsageEvent => event.kind==='usage');
-  assert.deepEqual(usage.map(event=>event.tokens.input),[100,0,20]);assert.ok(usage[1].flags!.includes('counter-regression'));
+  assert.deepEqual(usage.map(event=>event.tokens.input),[0,0,20]);assert.ok(usage[1].flags!.includes('counter-regression'));
 });
 
 test('legacy external user messages form distinct requests when lifecycle turn ids are unavailable', () => {

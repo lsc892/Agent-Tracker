@@ -9,7 +9,7 @@
 
 | 실행 시점 | 검증·산출물 |
 |---|---|
-| PR 및 기본 브랜치 push | 타입 검사·lint·빌드, parser fixture 회귀 테스트, manifest·SQLite 통합 테스트, quota 갱신·process 종료, 최소 지원·stable VS Code의 실제 light/dark Webview 테스트 |
+| PR 및 기본 브랜치 push | 타입 검사·lint·빌드, parser fixture 회귀 테스트, 원본 파일·SQLite 일별 집계 통합 테스트, quota 갱신·process 종료, 최소 지원·stable VS Code의 실제 light/dark Webview 테스트 |
 | 정기 실행 및 수동 실행 | 대량 파일·큰 session benchmark, 메모리·buffer·대기열 한도와 처리 시간 측정 |
 | 릴리스 버전 tag | 해당 commit의 CI 통과 확인 후 VSIX·npx 설치용 npm tarball 생성과 artifact 보관. npm 공개 게시는 수동 수행 |
 | 릴리스 전 수동 확인 | 실제 CLI 로그인·실시간 quota 조회, 실행 환경별 인증·data home, light/dark 화면의 가독성 |
@@ -23,7 +23,7 @@
 - 설치 경로 탐색 테스트는 반환값과 기대값 모두 물리 경로 기준으로 비교한다. macOS의 `/var`·`/private/var`처럼 같은 디렉터리를 가리키는 별칭은 문자열 차이만으로 실패하지 않으며, 명시적으로 선택한 설치와 잘못된 대상의 거부는 계속 검증한다.
 - 상태바 command와 Webview 이벤트 연결은 자동 검증하고, 화면 가독성과 실제 로그인·원격 quota 연동은 수동 확인한다.
 - `npm run test:vscode`는 별도 프로필에서 실제 확장을 활성화하고 합성 로그로 탭·필터·빈 상태·테마 적용을 검증한다. Linux CI는 Xvfb를 사용하며 결과 JSON과 확장 호스트 로그를 artifact로 보관한다.
-- 화면 테스트의 합성 요청은 통계 시간대의 실행일에 생성하고 같은 기준일의 다음 날로 빈 기간을 만든다. 기본 최근 7일 조회·직접 설정의 날짜 입력 활성화·초기화 후 최근 7일 복원을 검증하며, 첫 조회가 비면 즉시 기대값 실패를 보고한다.
+- 화면 테스트의 합성 요청은 통계 시간대의 실행일에 생성하고 같은 기준일의 다음 날로 빈 기간을 만든다. 기본 최근 30일 조회, 갱신 전 필터 잠금, 세션 선택과 결제 분류, 직접 설정의 날짜 입력 활성화, 초기화 후 최근 30일 복원을 검증한다. 화면이 다음 상태에 도달하지 않으면 타임아웃에 마지막 단계가 표시된다.
 - 화면 테스트는 실행 중인 VS Code의 내장 테마 ID를 확인해 dark/light Modern·고대비 테마를 반드시 검증한다. `Dark 2026`·`Light 2026`은 해당 버전에 제공되는 경우 추가 검증하고, 테마 종류가 실제 적용된 뒤 화면을 연다.
 - 화면 테스트의 SQLite 읽기 연결은 최대 5초 잠금 대기를 설정한다. DB 파일이 생성된 직후 worker의 WAL·schema 초기화와 겹치는 조회가 일시적인 잠금만으로 실패하지 않게 하며, schema 생성은 기존 제한 시간 내에 확인한다.
 - CI는 수동 실행도 지원하고 같은 PR의 이전 실행은 새 실행이 시작되면 취소한다. verify·화면·릴리스 패키징 job에는 15분 제한을 두고, 공통 Actions는 Node 24 런타임의 검증된 릴리스 commit으로 고정한다. 릴리스 산출물 업로드는 파일이 없으면 실패한다.
@@ -33,28 +33,28 @@
 
 ## 상세 검증 항목
 
-### manifest와 session 재집계
+### 원본 파일과 세션 재집계
 
 - 변경 없는 session은 body read 0 bytes; 같은 session의 다른 파일 변경 시 함께 재집계
 - append/truncate/replace 후 session 전체 재집계가 full rebuild 결과와 일치
 - newline 없는 마지막 row 보류
 - winner 파일 삭제 후 남은 원본을 재파싱하여 duplicate runner-up 복구
-- 경로 이동은 source_identity와 이전 byte 범위의 SHA-256으로 검증하며, inode가 재사용돼도 내용이 다른 원본은 별도로 보존
-- 파일 session 귀속 변경 시 이전·새 session의 summary와 manifest를 함께 교체
+- 새 경로의 로그는 다시 읽고 같은 응답을 중복 집계하지 않는다. 소실 원본의 보존 여부는 다시 계산할 수 있는 스레드·세션과 기존 일별 사용량으로 판단한다.
+- 파일의 세션 귀속이 바뀌면 이전·새 세션의 일별 집계와 원본 상태를 함께 반영
 - n개보다 많은 파일과 큰 session도 metadata·parser buffer·대기열 한도 유지
-- 묶음 경계의 duplicate와 main/subagent 기록도 사용자 요청당 summary 한 행
-- session 교체 실패 시 summary·정상 metadata·삭제가 함께 rollback
+- 묶음 경계를 넘는 중복 응답과 메인·하위 에이전트 기록을 메모리에서 요청별로 합친 뒤 일별 집계에 반영
+- session 교체 실패 시 summary·원본 상태·삭제가 함께 rollback
 - 파일 하나의 parse 실패 시 이전 summary 유지, 상태·처리 위치·기록 시각·오류만 기록
 - 오류·중단 후 자동 재시도 없이 종료; 다음 화면 진입·수동 새로 고침에서 새로 조사
-- 전체 순회 완료 전 부재 판정 금지; 접근 실패·취소 시 summary 교체와 삭제 금지
+- 전체 순회 완료 전 부재 판정 금지; 접근 실패·취소 시 일별 집계 교체와 삭제 금지
 - NULL 방문 표시를 포함한 미방문 파일을 keyset pagination으로 이번 실행의 임시 목록에 기록
-- 부재 flag 없이 session 교체와 manifest 삭제를 함께 commit; 실패 시 둘 다 보존
+- 부재 flag 없이 session 교체와 원본 상태 삭제를 함께 commit; 실패 시 둘 다 보존
 - 다음 사용자 요청에서 새 scan으로 재조사; 다시 나타난 파일은 삭제 대상으로 판정하지 않음
 - 대상에서 제외된 루트는 이번 scan의 삭제 판정에서 제외
 - 여러 창의 refresh 직렬 실행; 일부 session 반영을 전체 최신 통계로 표시하지 않음
-- 영속 schema는 manifest·projects·sessions·turn_summary로 구성하며 이름은 요청별 행에 반복 저장하지 않음
+- SQLite는 `source_file`, 프로젝트·세션 이름과 결제 설정, 제공자·모델·도구 일별 합계를 저장한다. 상세 형식의 구버전 fixture로 일별 이관과 메타데이터 보존을 검증한다.
 - 동일 프로젝트의 중복 세션 제목은 ID로 분리하며 이름 검색·행 선택·제목 변경을 검증
-- 기존 DB 전환은 요청 ID·통계·manifest 참조를 보존
+- v31 결제값 이관과 v32 일별 테이블 열 압축 이후에도 조회 합계와 사용량 표본 수가 일치해야 한다.
 
 ### Claude parser
 
@@ -96,14 +96,13 @@
 
 ### 총량·평균·디버깅 조회
 
-- 일·월·프로젝트·세션 총량이 사용자 요청 summary 합계와 일치
+- 일·월·프로젝트·세션 총량이 입력 대화의 일별 합계와 일치
 - 진행 중 요청은 확인한 token 총량에 포함하고 완료 turn 평균에서 제외
 - duration NULL은 평균의 분모에서 제외하고 유효 표본 수 표시
 - 서로 다른 경로의 같은 project 이름은 project_key로 구분
 - configured timezone의 일·월 경계, DST, 시각 미상 요청의 별도 표시
 - main/subagent가 많은 요청도 turn 평균 분모에는 사용자 요청 한 개로 반영
-- manifest의 진단 네 column으로 최근 상태·처리 위치·기록 시각·오류 표시
-- summary의 문제 파일·byte 위치·원인을 표시하고 이전 정상 수치를 보존
+- 저장된 원본 진단에서 최근 처리 상태·위치·오류와 실패·중단 세션의 기존 집계 건수를 확인한다. 실패한 갱신은 이전에 정상 반영한 일별 값을 보존한다.
 
 ## 참고
 

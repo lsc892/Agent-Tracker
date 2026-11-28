@@ -1,4 +1,4 @@
-// 웹뷰 메시지의 허용 범위와 자산·보안 정책·요청 상태 표를 검증한다.
+// 웹뷰 메시지의 허용 범위와 자산·보안 정책·일별 사용량 표를 검증한다.
 import { createTranslator } from '../../src/localization';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -16,7 +16,7 @@ test('webview boundary only permits bounded known queries and provider commands'
   assert.equal(parseDashboardMessage({ type: 'tab', tab: 'quota' }), null);
   assert.equal(parseDashboardMessage({ type: 'tab', tab: 'diagnostics' }), null);
   assert.deepEqual(parseDashboardMessage({ type: 'queryUsage', query: { groupBy: 'turn', offset: -1, dbPath: '/secret', provider: 'claude' } }), {
-    type: 'queryUsage', query: { groupBy: 'turn', limit: 100, offset: 0, provider: 'claude' },
+    type: 'queryUsage', query: { groupBy: 'day', limit: 100, offset: 0, provider: 'claude' },
   });
   assert.equal(parseDashboardMessage({ type: 'queryUsage', query: { groupBy: 'DROP TABLE' } }), null);
 });
@@ -87,8 +87,8 @@ test('webview uses external local assets, a nonce CSP, and text-only dynamic lab
   }
 });
 
-test('request table renders API failures separately from completed and running requests', () => {
-  /** 요청 상태 표 검증에 필요한 DOM 요소와 자식 조작을 모사한다. */
+test('daily usage table displays completed counts and duration samples', () => {
+  /** 일별 사용량 표에 필요한 DOM 요소와 자식 조작을 모사한다. */
   class Element {
     textContent = '';value = '';children: Element[] = [];
     append(...children: Element[]): void {this.children.push(...children);}
@@ -101,7 +101,7 @@ test('request table renders API failures separately from completed and running r
     if (!elements.has(id)) elements.set(id,new Element());
     return elements.get(id)!;
   };
-  getElement('group').value = 'turn';
+  getElement('group').value = 'day';
   let receive: ((event: {data:unknown})=>void) | undefined;
   new Script(readFileSync(join(__dirname,'../../../media/dashboard.js'),'utf8')).runInNewContext({ agentTrackerI18n: createTranslator('ko'),
     acquireVsCodeApi:()=>({getState:()=>undefined,setState:()=>undefined,postMessage:()=>undefined}),
@@ -109,11 +109,14 @@ test('request table renders API failures separately from completed and running r
     window:{addEventListener:(_name:string,listener:typeof receive)=>{receive=listener;}},
   });
   assert.ok(receive);
-  receive({data:{type:'usage',result:{groupBy:'turn',total:3,
-    rows:['completed','failed','in_progress'].map(status=>({provider:'claude',project_name:'Project',
-      root_turn_id:status,session_id:'session',started_at_ms:null,duration_ms:null,duration_quality:'missing',status})),
+  receive({data:{type:'usage',result:{groupBy:'day',total:2,
+    rows:[
+      { provider:'claude', period:'2026-10-01', total_tokens:150, completed_turns:2, avg_tokens_per_turn:50, avg_duration_ms:3000, turns_with_duration:1 },
+      { provider:'claude', period:'2026-10-02', total_tokens:25, completed_turns:0, avg_tokens_per_turn:null, avg_duration_ms:null, turns_with_duration:0 },
+    ],
     coverage:{files:1,done:1,error:0,interrupted:0,stale_summaries:0},
   }}});
   const rows = getElement('usage-table').children[0].children[1].children;
-  assert.deepEqual(rows.map(row=>row.children.at(-1)!.textContent),['완료 · missing','실패 · missing','진행 중 · missing']);
+  assert.deepEqual(rows.map(row=>row.children.slice(-4, -1).map(cell=>cell.textContent)), [['150','2','50'],['25','0','—']]);
+  assert.deepEqual(rows.map(row=>row.children.at(-1)!.textContent),['3초 / 1개','— / 0개']);
 });

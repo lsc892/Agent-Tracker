@@ -1,22 +1,11 @@
 // 독립 기대 값으로 롤업의 평균·모델·날짜·세션 필터 의미를 검증한다.
 import assert from 'node:assert/strict';
-import { resolve } from 'node:path';
 import { test, type TestContext } from 'node:test';
 import { SummaryDatabase, type ModelUsageInput, type SummaryFilter, type TurnSummaryInput,
   type UsageGrouping, type UsageRow } from '../../src/summary/db';
-import { buildUsageCountQuery, buildUsageQuery, type QuerySql, type UsageBasis } from '../../src/summary/db/queries';
+import type { UsageBasis } from '../../src/summary/db/queries';
 
-interface Prototype {
-  TIMEZONE: string;
-  install(database: SummaryDatabase): void;
-  refresh(database: SummaryDatabase): void;
-  build(filter: SummaryFilter, grouping: UsageGrouping, timezone: string, by: UsageBasis): {
-    mode: string; rows: QuerySql; count: QuerySql;
-  };
-}
-
-// The candidate stays outside product code; this path is relative to dist/tests/node.
-const prototype = require(resolve(__dirname, '../../../tests/benchmarks/sql-rollup-prototype.cjs')) as Prototype;
+const TIMEZONE = 'Asia/Seoul';
 const epoch = (local: string): number => Date.parse(`${local}+09:00`);
 
 function turn(id: string, local: string | null, tokens: number, overrides: Partial<TurnSummaryInput> = {}): TurnSummaryInput {
@@ -37,24 +26,16 @@ function model(name: string, tokens: number): ModelUsageInput {
 }
 
 function fixture(t: TestContext, rows: TurnSummaryInput[]): SummaryDatabase {
-  const db = new SummaryDatabase(':memory:');
+  const db = new SummaryDatabase({ databasePath: ':memory:', timezone: TIMEZONE });
   t.after(() => db.close());
   const sessions = new Map(rows.map(row => [`${row.provider}:${row.session_id}`, { provider: row.provider, session_id: row.session_id }]));
   db.replaceMemory({sessions: sessions.values(), files: [], summaries: rows });
-  prototype.install(db);
-  db.transaction(() => prototype.refresh(db));
   return db;
 }
 
 function read(db: SummaryDatabase, filter: SummaryFilter = {}, grouping: UsageGrouping = 'total', by: UsageBasis = 'provider'): UsageRow[] {
-  const candidate = prototype.build(filter, grouping, prototype.TIMEZONE, by);
-  const query = buildUsageQuery(filter, grouping, prototype.TIMEZONE, by);
-  const actual = db.connection.prepare(candidate.rows.sql).all(...candidate.rows.values, 1000, 0) as unknown as UsageRow[];
-  const original = db.connection.prepare(query.sql).all(...query.values, 1000, 0) as unknown as UsageRow[];
-  assert.deepEqual(actual, original, 'Every output field must agree with the original SQL');
-  const originalCount = buildUsageCountQuery(filter, grouping, prototype.TIMEZONE, by);
-  assert.equal(db.connection.prepare(candidate.count.sql).get(...candidate.count.values)?.count, actual.length);
-  assert.equal(db.connection.prepare(originalCount.sql).get(...originalCount.values)?.count, actual.length);
+  const actual = db.queryUsage(filter, grouping, TIMEZONE, {}, by);
+  assert.equal(db.queryUsageCount(filter, grouping, TIMEZONE, by), actual.length);
   return actual;
 }
 
@@ -138,7 +119,7 @@ test('cache null propagation uses the selected completed sample and duration exc
   }
 });
 
-test('partial-day boundaries are exclusive at the end and unknown time stays in its own group', t => {
+test('daily bounds are exclusive at the end and unknown time stays in its own group', t => {
   const db = fixture(t, [
     turn('before', '2026-10-01T11:59:59', 1),
     turn('lower', '2026-10-01T12:00:00', 10),
@@ -147,18 +128,16 @@ test('partial-day boundaries are exclusive at the end and unknown time stays in 
     turn('upper-excluded', '2026-10-03T12:00:00', 100),
     turn('unknown', null, 40),
   ]);
-  const range = { fromMs: epoch('2026-10-01T12:00:00'), toMs: epoch('2026-10-03T12:00:00') };
-  assert.equal(prototype.build(range, 'total', prototype.TIMEZONE, 'provider').mode, 'rollup-plus-raw-boundaries');
-  expect(read(db, range)[0], { total_tokens: 60, turn_count: 3, avg_tokens_per_turn: 20 });
-  expect(read(db, { ...range, unknownTime: 'include' })[0], { total_tokens: 100, turn_count: 4 });
+  const range = { fromMs: epoch('2026-10-01T00:00:00'), toMs: epoch('2026-10-03T00:00:00') };
+  expect(read(db, range)[0], { total_tokens: 31, turn_count: 3, avg_tokens_per_turn: 31 / 3 });
+  expect(read(db, { ...range, unknownTime: 'include' })[0], { total_tokens: 71, turn_count: 4 });
   expect(read(db, { ...range, unknownTime: 'only' })[0], { total_tokens: 40, turn_count: 1 });
   const calendar = read(db, range, 'day');
   assert.deepEqual(calendar.map(row => [row.period, row.total_tokens]), [
-    ['2026-10-01', 10], ['2026-10-02', 20], ['2026-10-03', 30], [null, 40],
+    ['2026-10-01', 11], ['2026-10-02', 20], [null, 40],
   ]);
-  expect(read(db, { fromMs: range.fromMs, toMs: epoch('2026-10-01T13:00:00') })[0], { total_tokens: 10, turn_count: 1 });
+  assert.throws(() => read(db, { fromMs: range.fromMs, toMs: epoch('2026-10-01T13:00:00') }), /local midnight/);
   const aligned = { fromMs: epoch('2026-10-02T00:00:00'), toMs: epoch('2026-10-03T00:00:00') };
-  assert.equal(prototype.build(aligned, 'total', prototype.TIMEZONE, 'provider').mode, 'rollup');
   expect(read(db, aligned)[0], { total_tokens: 20, turn_count: 1 });
   assert.deepEqual(read(db, { fromMs: range.toMs, toMs: range.fromMs }), []);
 });

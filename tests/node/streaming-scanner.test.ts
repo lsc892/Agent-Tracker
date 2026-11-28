@@ -39,10 +39,10 @@ test('one source read accepts its fixed boundary and collects a later append on 
   });
   const refreshed = await refreshSummary(db, options);
   assert.equal(refreshed.failed, 0); assert.equal(refreshed.interrupted, false);
-  assert.equal(reads, 1); assert.equal(db.queryTurns()[0].total_tokens, 202);
+  assert.equal(reads, 1); assert.equal(db.queryUsage()[0].total_tokens, 202);
   spy.mock.restore();
   assert.equal((await refreshSummary(db, options)).failed, 0);
-  assert.equal(db.queryTurns()[0].total_tokens, 302);
+  assert.equal(db.queryUsage()[0].total_tokens, 302);
 }));
 
 test('a rewrite after the completed single read is observed by the next refresh', async t => fixture(async (db, options, path) => {
@@ -58,14 +58,14 @@ test('a rewrite after the completed single read is observed by the next refresh'
   assert.equal(reads, 1);
   assert.equal(refreshed.interrupted, false);
   assert.equal(refreshed.failed, 0);
-  assert.equal(db.queryTurns()[0].total_tokens, 202);
+  assert.equal(db.queryUsage()[0].total_tokens, 202);
   spy.mock.restore();
   assert.equal((await refreshSummary(db, options)).failed, 0);
-  assert.equal(db.queryTurns()[0].total_tokens, 902);
+  assert.equal(db.queryUsage()[0].total_tokens, 902);
 }));
 
 test('cancelling after evidence collection publishes no partial winner result', async t => fixture(async (db, options, path) => {
-  const before = db.queryTurns(), controller = new AbortController();
+  const before = db.queryUsage(), controller = new AbortController();
   await writeFile(path, source(200));
   const original = reader.readSource;
   t.mock.method(reader, 'readSource', async (...args: Parameters<typeof original>) => {
@@ -73,5 +73,6 @@ test('cancelling after evidence collection publishes no partial winner result', 
   });
   const refreshed = await refreshSummary(db, options, controller.signal);
   assert.equal(refreshed.interrupted, true); assert.equal(refreshed.error, 'interrupted');
-  assert.deepEqual(db.queryTurns().map(row => ({ ...row })), before.map(row => ({ ...row, last_error: 'interrupted' })));
+  assert.ok(before.length > 0, 'the fixture has accepted usage');
+  assert.deepEqual(db.queryUsage(), before);
 }));

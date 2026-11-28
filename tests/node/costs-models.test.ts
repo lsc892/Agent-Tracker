@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { SummaryDatabase, type TurnSummaryInput } from '../../src/summary/db';
 import { SummaryClient } from '../../src/summary/client';
 import { refreshSummary } from '../../src/summary/scanner';
-import { estimateCost, PRICING_VERSION } from '../../src/summary/models/pricing';
+import { estimateCost } from '../../src/summary/models/pricing';
 import { parseDashboardMessage } from '../../src/ui/presentation';
 
 const text = (rows: unknown[]): string => rows.map(row=>JSON.stringify(row)).join('\n')+'\n';
@@ -40,10 +40,9 @@ test('model totals deduplicate whole responses, retain subagent models and prese
   assert.ok(Math.abs(models.rows.reduce((sum,row)=>sum+(row.cost_usd ?? 0),0)-expected)<1e-12);
   assert.ok(Math.abs(db.queryUsage(filter)[0].cost_usd!-expected)<1e-12);
   assert.equal(db.queryUsage(filter)[0].unknown_costs,0);
-  assert.equal(db.queryTurns(filter)[0].billing_mode,'api');
-  assert.equal(db.connection.prepare('SELECT pricing_version FROM turn_costs').get()?.pricing_version,PRICING_VERSION);
+  assert.equal(db.queryUsage(filter,'session')[0].billing_mode,'api');
   for (const group of ['day','month','project','session','total'] as const) {
-    const grouped = db.queryUsage(filter,group,'Asia/Seoul');
+    const grouped = db.queryUsage(filter,group,'UTC');
     assert.ok(Math.abs(grouped.reduce((sum,row)=>sum+(row.cost_usd ?? 0),0)-expected)<1e-12);
     assert.equal(grouped.reduce((sum,row)=>sum+row.turn_count,0),1);
   }
@@ -64,10 +63,10 @@ test('model totals deduplicate whole responses, retain subagent models and prese
   assert.equal(db.queryUsage(filter)[0].cost_usd,0);
   assert.equal(db.queryUsage(filter)[0].unknown_costs,0);
   assert.ok(db.queryUsagePage(filter,'total','UTC',{sortBy:'tokens'},'model').rows.every(row=>row.cost_usd===0));
-  assert.equal(db.queryTurns().length,1,'model breakdown never multiplies request counts');
+  assert.equal(db.queryTurnsCount(),1,'model breakdown never multiplies request counts');
   assert.equal(db.queryUsage()[0].completed_turns,1);
   db.clearData();
-  for (const table of ['turn_model_usage','turn_costs','session_billing']) assert.equal(db.connection.prepare(`SELECT count(*) AS count FROM ${table}`).get()?.count,0);
+  for (const table of ['usage_model_daily','usage_request_daily','sessions']) assert.equal(db.connection.prepare(`SELECT count(*) AS count FROM ${table}`).get()?.count,0);
 });
 
 test('Codex current and legacy metadata attribute actual model tokens and explicit billing without guessing missing authentication',async t => {
@@ -84,15 +83,15 @@ test('Codex current and legacy metadata attribute actual model tokens and explic
   await writeFile(join(directory,'legacy.jsonl'),text([
     {type:'session_meta',payload:{id:'legacy',cwd:'/project',auth_mode:'api_key'}},
     {type:'turn_context',payload:{turn_id:'l',model:'gpt-5.4'}},
-    {type:'event_msg',payload:{type:'token_count',info:{total_token_usage:{input_tokens:100,output_tokens:50,cached_input_tokens:50}}}},
-    {type:'event_msg',payload:{type:'token_count',info:{total_token_usage:{input_tokens:100,output_tokens:50,cached_input_tokens:50}}}},
+    {type:'event_msg',payload:{type:'token_count',info:{total_token_usage:{input_tokens:100,output_tokens:50,cached_input_tokens:50},last_token_usage:{input_tokens:100,output_tokens:50,cached_input_tokens:50}}}},
+    {type:'event_msg',payload:{type:'token_count',info:{total_token_usage:{input_tokens:100,output_tokens:50,cached_input_tokens:50},last_token_usage:{input_tokens:100,output_tokens:50,cached_input_tokens:50}}}},
   ]));
   await writeFile(join(directory,'unknown.jsonl'),text([
     {type:'session_meta',payload:{id:'unknown',cwd:'/project'}},
     {type:'token_usage_record',payload:{turn_id:'u',root_turn_id:'u',response_id:'unknown',usage:{input_tokens:1,output_tokens:1}}},
   ]));
   assert.equal((await refreshSummary(db,options)).failed,0);
-  const turns = db.queryTurns({includeCosts:true});
+  const turns = db.queryUsage({includeCosts:true},'session');
   assert.equal(turns.find(row=>row.session_id==='current')?.cost_usd,0);
   assert.equal(db.sessionBilling('codex','current'),'subscription');
   assert.equal(turns.find(row=>row.session_id==='unknown')?.cost_usd,null);
@@ -118,22 +117,6 @@ const summary = (root: string, model: string): TurnSummaryInput => ({
   model_usage:[{model,input_tokens:100,output_tokens:10,cache_read_input_tokens:0,cache_write_input_tokens:0}],
 });
 
-test('v4 migration retains historical totals and ids while model and billing coverage remain unknown until rebuilt',async t => {
-  const directory = await mkdtemp(join(tmpdir(),'tracker-cost-migration-'));
-  const path = join(directory,'db.sqlite');
-  let db = new SummaryDatabase(path);
-  t.after(async()=>{db.close();await rm(directory,{recursive:true,force:true});});
-  db.replaceMemory({sessions:[{provider:'claude',session_id:'s'}],files:[],summaries:[summary('r','claude-sonnet-4-6')]});
-  const id = db.queryTurns()[0].id;
-  db.connection.exec('DROP TABLE turn_costs; DROP TABLE turn_model_usage; DROP TABLE session_billing; PRAGMA user_version=4;');
-  db.close();db = new SummaryDatabase(path);
-  assert.equal(db.queryTurns()[0].id,id);assert.equal(db.queryTurns()[0].total_tokens,110);
-  const totals = db.queryUsagePage({includeCosts:true},'total','UTC',{sortBy:'tokens'},'model').rows[0];
-  assert.equal(totals.model,'');assert.equal(totals.total_tokens,110);
-  assert.equal(totals.cost_usd,null);assert.equal(totals.unknown_costs,1);
-  assert.deepEqual(db.connection.prepare('PRAGMA foreign_key_check').all(),[]);
-});
-
 test('model total pages include the full scope, retain unknown legacy totals and roll back invalid splits',()=>{
   const db = new SummaryDatabase(':memory:');
   try {
@@ -152,9 +135,9 @@ test('model total pages include the full scope, retain unknown legacy totals and
     assert.equal(db.queryUsage({includeCosts:true})[0].cost_usd,null);
     assert.equal(db.queryUsage({includeCosts:true})[0].unknown_costs,1);
     db.setSessionBilling('claude','s','subscription');
-    assert.equal(db.queryTurns({includeCosts:true})[0].cost_usd,0);
+    assert.equal(db.queryUsage({includeCosts:true},'session')[0].cost_usd,0);
     assert.throws(()=>db.replaceMemory({sessions:[{provider:'claude',session_id:'s'}],files:[],summaries:[{...rows[0],model_usage:[]}]}),/Model totals/);
-    assert.equal(db.queryTurns({includeCosts:true})[0].cost_usd,0,'invalid replacement preserves earlier costs and billing');
+    assert.equal(db.queryUsage({includeCosts:true},'session')[0].cost_usd,0,'invalid replacement preserves earlier costs and billing');
   } finally {db.close();}
 });
 

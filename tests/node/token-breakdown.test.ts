@@ -9,8 +9,7 @@ import { readFileSync } from 'node:fs';
 import { Script } from 'node:vm';
 import { SummaryDatabase, type TurnSummaryInput } from '../../src/summary/db';
 import { ageLogFixtures } from '../fixtures/summary-mtime';
-import { SCHEMA_VERSION } from '../../src/summary/db/schema';
-import { refreshSummary, PARSER_VERSION } from '../../src/summary/scanner';
+import { refreshSummary } from '../../src/summary/scanner';
 import { codexTokens } from '../../src/summary/parsers';
 import type { Provider, SummaryOptions } from '../../src/summary/types';
 
@@ -53,7 +52,7 @@ test('Claude cache components survive response deduplication, subagents and ever
   await writeFile(join(root, 'session', 'subagents', 'child.jsonl'), jsonl([claudeUsage('child', 20, 10, 40, 5)]));
   ageLogFixtures(join(root, 'session.jsonl'), join(root, 'session', 'subagents', 'child.jsonl'));
   assert.equal((await refreshSummary(database, options)).failed, 0);
-  const turn = database.queryTurns()[0];
+  const turn = database.queryUsage()[0];
   assert.deepEqual(breakdown(turn), [120, 15, 40, 100]);
   assert.equal(turn.total_tokens, 275);
   for (const grouping of ['total', 'day', 'month', 'project', 'session'] as const) {
@@ -78,13 +77,13 @@ test('Codex reads its official flat and API detail cache fields without adding t
     usage('one', flat), usage('one', flat), usage('two', nested),
   ]));
   assert.equal((await refreshSummary(database, options)).failed, 0);
-  const turn = database.queryTurns()[0];
+  const turn = database.queryUsage()[0];
   assert.deepEqual(breakdown(turn), [400, 200, 400, 1200]);
   assert.equal(turn.total_tokens, 2200);
   assert.deepEqual(breakdown(database.queryUsage()[0]), breakdown(turn));
 });
 
-test('legacy Codex cumulative cache snapshots are differenced and repeated snapshots are ignored', async t => {
+test('legacy Codex uses a baseline and counts only observed cache deltas', async t => {
   const { database, options, root } = await fixture(t, 'codex');
   const count = (input: number, read: number, write: number, output: number) => ({ type: 'event_msg', payload: {
     type: 'token_count', info: { total_token_usage: {
@@ -97,44 +96,17 @@ test('legacy Codex cumulative cache snapshots are differenced and repeated snaps
     count(1000, 600, 200, 100), count(1000, 600, 200, 100), count(1500, 900, 300, 150),
   ]));
   assert.equal((await refreshSummary(database, options)).failed, 0);
-  assert.deepEqual(breakdown(database.queryTurns()[0]), [300, 150, 300, 900]);
-  assert.equal(database.queryUsage()[0].total_tokens, 1650);
-});
-
-test('v3 migration preserves totals and marks cache counts unknown until unchanged sources are rebuilt', async t => {
-  const state = await fixture(t);
-  const file = join(state.root, 'session.jsonl');
-  await writeFile(file, jsonl([claudeUser, claudeUsage('main')]));
-  await refreshSummary(state.database, state.options);
-  state.database.connection.exec(`ALTER TABLE turn_summary DROP COLUMN cache_write_input_tokens;
-    ALTER TABLE turn_summary DROP COLUMN cache_read_input_tokens;
-    ALTER TABLE turn_summary ADD COLUMN turn_index INTEGER NOT NULL DEFAULT 1;
-    DROP INDEX IF EXISTS idx_summary_session;
-    CREATE INDEX idx_summary_session ON turn_summary(provider,session_id,turn_index);
-    UPDATE source_file SET parser_version=4;
-    PRAGMA user_version=3;`);
-  state.database.close();
-  state.database = new SummaryDatabase(state.options.dbPath);
-  assert.equal(state.database.connection.prepare('PRAGMA user_version').get()?.user_version, SCHEMA_VERSION);
-  assert.equal(state.database.queryTurns()[0].total_tokens, 200);
-  assert.equal(state.database.queryTurns()[0].cache_read_input_tokens, null);
-  assert.equal(state.database.queryUsage()[0].cache_write_input_tokens, null);
-  const refreshed = await refreshSummary(state.database, state.options);
-  assert.equal(refreshed.failed, 0);
-  assert.equal(refreshed.parsed, 1, 'parser version rebuilds even when file size and mtime match');
-  assert.deepEqual(breakdown(state.database.queryTurns()[0]), [100, 10, 30, 60]);
-  assert.equal(state.database.findSourceFile('claude', file)!.parser_version, PARSER_VERSION);
-  await appendFile(file, '{bad}\n');
-  assert.equal((await refreshSummary(state.database, state.options)).failed, 1);
-  assert.deepEqual(breakdown(state.database.queryTurns()[0]), [100, 10, 30, 60], 'failed scans preserve the last successful breakdown');
+  assert.deepEqual(breakdown(database.queryUsage()[0]), [100, 50, 100, 300]);
+  assert.equal(database.queryUsage()[0].total_tokens, 550);
 });
 
 test('aggregate cache counts stay unknown when any included turn has not been rebuilt', async t => {
   const { database, options, root } = await fixture(t);
   await writeFile(join(root, 'session.jsonl'), jsonl([claudeUser, claudeUsage('main')]));
   await refreshSummary(database, options);
-  database.connection.exec('UPDATE turn_summary SET cache_write_input_tokens=NULL,cache_read_input_tokens=NULL');
-  const old = database.queryTurns()[0];
+  const old: TurnSummaryInput = { provider:'claude',project_key:'/project',project_name:'Project',session_id:'session',root_turn_id:'old',
+    input_tokens:190,output_tokens:10,total_tokens:200,cache_write_input_tokens:null,cache_read_input_tokens:null,
+    status:'completed',duration_quality:'missing' };
   const next: TurnSummaryInput = { ...old, root_turn_id: 'next', cache_write_input_tokens: 30, cache_read_input_tokens: 60 };
   database.replaceMemory({sessions: [{ provider: 'claude', session_id: 'session' }], files: [], summaries: [old, next] });
   const usage = database.queryUsage()[0];
@@ -146,7 +118,7 @@ test('aggregate cache counts stay unknown when any included turn has not been re
   assert.equal(database.queryUsage()[0].total_tokens, 400, 'invalid components roll back replacement');
 });
 
-test('invalid cache components are clamped per response while preserving totals and quality flags', async t => {
+test('invalid cache components are clamped per response while preserving totals', async t => {
   const { database, options, root } = await fixture(t, 'codex');
   await writeFile(join(root, 'session.jsonl'), jsonl([
     { type: 'session_meta', payload: { id: 'session', cwd: '/project' } },
@@ -154,10 +126,9 @@ test('invalid cache components are clamped per response while preserving totals 
       response_id: 'bad-components', usage: { input_tokens: 100, output_tokens: 10, cached_input_tokens: 120, cache_write_input_tokens: 20 } } },
   ]));
   assert.equal((await refreshSummary(database, options)).failed, 0);
-  const turn = database.queryTurns()[0];
+  const turn = database.queryUsage()[0];
   assert.deepEqual(breakdown(turn), [0, 10, 0, 100]);
   assert.equal(turn.total_tokens, 110);
-  assert.match(turn.quality_flags!, /component-clamped/);
 });
 
 test('all dashboard groups render four named token columns with unknown and zero values distinguished', () => {
@@ -183,14 +154,14 @@ test('all dashboard groups render four named token columns with unknown and zero
   assert.ok(receive);
   const row = { provider: 'claude', project_name: 'Project', root_turn_id: 'turn', session_id: 'session',
     input_tokens: 1000, output_tokens: 50, cache_write_input_tokens: 300, cache_read_input_tokens: 600, total_tokens: 1050 };
-  for (const groupBy of ['day', 'month', 'project', 'session', 'turn', 'all']) {
+  for (const groupBy of ['day', 'month', 'project', 'session', 'all']) {
     receive({ data: { type: 'usage', result: { groupBy, total: 3,
       rows: [row, { ...row, cache_write_input_tokens: 0, cache_read_input_tokens: 0 },
         { ...row, cache_write_input_tokens: null, cache_read_input_tokens: null }],
       coverage: { files: 1, done: 1, error: 0, interrupted: 0, stale_summaries: 0 },
     } } });
     const table = getElement('usage-table').children[0];
-    const start = groupBy === 'turn' ? 3 : 2;
+    const start = 2;
     const headers = table.children[0].children[0].children.slice(start, start + 4);
     assert.deepEqual(headers.map(cell => cell.children[0].children[0].textContent), ['Input', 'Output', 'Cache Write', 'Cache Read']);
     assert.ok(headers.every(cell => cell.title.length > 0));

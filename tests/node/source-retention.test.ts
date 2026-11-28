@@ -6,7 +6,6 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { zstdCompressSync } from 'node:zlib';
 import { SummaryDatabase } from '../../src/summary/db';
-import { ageLogFixtures } from '../fixtures/summary-mtime';
 import { SummaryClient } from '../../src/summary/client';
 import { refreshSummary } from '../../src/summary/scanner';
 import type { SummaryOptions } from '../../src/summary/types';
@@ -27,80 +26,25 @@ async function fixture(run: (db: SummaryDatabase, options: SummaryOptions, root:
   finally { db.close();await rm(base,{recursive:true,force:true}); }
 }
 
-test('deleted sources retain known positive usage despite warnings, failed/running status and reparse errors',async()=>fixture(async(db,options,root)=>{
-  const path=join(root,'session.jsonl');
-  const rows=[user('warned'),response('warned'),user('failed'),response('failed'),
-    {type:'assistant',promptId:'failed',isApiErrorMessage:true,error:'rate_limit',timestamp:'2026-10-01T00:00:03Z',message:{usage:{input_tokens:0,output_tokens:0}}},
-    user('running'),response('running',20,'claude-sonnet-4-6','running',false),
-    user('unknown'),response('unknown',30,''),user('empty'),response('empty',0)];
-  await writeFile(path,jsonl(rows));assert.equal((await refreshSummary(db,options)).failed,0);
-  assert.equal(db.queryTurns().find(row=>row.root_turn_id==='failed')?.status,'failed');
-  assert.equal(db.queryTurns().find(row=>row.root_turn_id==='running')?.status,'in_progress');
-  assert.match(db.queryTurns().find(row=>row.root_turn_id==='warned')!.quality_flags!,/duration-approximate/);
-  db.setSessionBilling('claude','session','api');
-  const warned=db.queryTurns().find(row=>row.root_turn_id==='warned')!;
-  db.connection.prepare('INSERT INTO turn_capability_usage VALUES (?,?,?,?)').run(warned.id,'skill','fixture-skill',3);
-  db.queryUsage({},'day','UTC'); // Warm rollups before retention changes the stored facts.
-  await appendFile(path,'{broken}\n');assert.equal((await refreshSummary(db,options)).failed,1);
-  const before=db.queryTurns({includeCosts:true}).filter(row=>['warned','failed','running'].includes(row.root_turn_id));
-  assert.ok(before.every(row=>row.last_error==='parse-error'));
-  await unlink(path);assert.equal((await refreshSummary(db,options)).failed,0);
-  assert.deepEqual(db.queryTurns({includeCosts:true}),before);
-  assert.equal(db.queryCapabilities({},'skill').totalUses,3);
-  assert.equal(db.queryUsage({},'day','UTC')[0].total_tokens,46);
-  assert.equal(db.queryUsage({},'day','UTC',{},'model')[0].total_tokens,46);
-  assert.equal(db.findSourceFile('claude',path)?.source_missing,1);
-  assert.equal(db.sessionBilling('claude','session'),'api');
-  assert.deepEqual(db.connection.prepare('PRAGMA foreign_key_check').all(),[]);
-  const warm=await refreshSummary(db,options);assert.equal(warm.bodyBytes,0);assert.equal(warm.failed,0);
-  db.clearData();assert.equal(db.queryTurnsCount(),0);assert.equal(db.diagnostics().counts.files,0);
-}));
-
-test('partial source loss freezes existing requests, collects new requests and a restoration rebuilds without duplicates',async()=>fixture(async(db,options,root)=>{
-  const main=join(root,'session.jsonl'),child=join(root,'session','subagents','agent.jsonl');
-  await mkdir(join(root,'session','subagents'),{recursive:true});
-  await writeFile(main,jsonl([user('one'),response('one')]));
-  const childSource=jsonl([response('one',20,'claude-sonnet-4-6','child')]);await writeFile(child,childSource);
-  assert.equal((await refreshSummary(db,options)).failed,0);
-  const before=db.queryTurns()[0];assert.equal(before.total_tokens,34);
-  db.connection.prepare('INSERT INTO turn_capability_usage VALUES (?,?,?,?)').run(before.id,'skill','kept',2);
-  db.queryUsage({},'day','UTC');
-  await unlink(child);assert.equal((await refreshSummary(db,{...options,collectCapabilities:false})).failed,0);
-  assert.deepEqual(db.queryTurns()[0],before);assert.equal(db.queryCapabilities({},'skill').totalUses,2);
-  assert.equal(db.findSourceFile('claude',child)?.source_missing,1);
-  ageLogFixtures(main);
-  const warm=await refreshSummary(db,{...options,collectCapabilities:false});assert.equal(warm.parsed,0);assert.equal(warm.bodyBytes,0);
-  await appendFile(main,jsonl([response('one',5,'claude-sonnet-4-6','extra'),user('two'),response('two',30)]));
-  assert.equal((await refreshSummary(db,options)).failed,0);
-  assert.equal(db.queryTurns().find(row=>row.root_turn_id==='one')?.total_tokens,34);
-  assert.equal(db.queryTurns().find(row=>row.root_turn_id==='one')?.id,before.id);
-  assert.equal(db.queryTurns().find(row=>row.root_turn_id==='two')?.total_tokens,32);
-  assert.equal(db.queryUsage({},'day','UTC')[0].total_tokens,66);
-  await writeFile(child,childSource);assert.equal((await refreshSummary(db,options)).failed,0);
-  assert.equal(db.queryTurnsCount(),2);
-  assert.equal(db.queryTurns().find(row=>row.root_turn_id==='one')?.total_tokens,41);
-  assert.equal(db.findSourceFile('claude',child)?.source_missing,0);
-  assert.equal(db.queryUsage({},'day','UTC')[0].total_tokens,73);
-}));
-
 test('deleting the main source retains its usable request while ignoring orphan-only replacement data',async()=>fixture(async(db,options,root)=>{
   const main=join(root,'session.jsonl'),child=join(root,'session','subagents','agent.jsonl');
   await mkdir(join(root,'session','subagents'),{recursive:true});
   await writeFile(main,jsonl([user('one'),response('one')]));
   await writeFile(child,jsonl([response('one',20,'claude-sonnet-4-6','child')]));
-  await refreshSummary(db,options);const before=db.queryTurns()[0];
+  await refreshSummary(db,options);const before=db.queryUsage({}, 'session')[0];
+  assert.equal(before.total_tokens,34);
   await unlink(main);assert.equal((await refreshSummary(db,options)).failed,0);
-  assert.deepEqual(db.queryTurns()[0],before);assert.equal(db.findSourceFile('claude',main)?.source_missing,1);
+  assert.deepEqual(db.queryUsage({}, 'session')[0],before);assert.equal(db.findSourceFile('claude',main)?.source_missing,1);
 }));
 
 test('a remaining source parse failure still retains usable deleted-source history',async()=>fixture(async(db,options,root)=>{
   const main=join(root,'session.jsonl'),copy=join(root,'copy.jsonl');
   const source=jsonl([user('one'),response('one')]);await writeFile(main,source);await writeFile(copy,source);
-  await refreshSummary(db,options);const id=db.queryTurns()[0].id;
+  await refreshSummary(db,options);const before=db.queryUsage();
   await unlink(copy);await appendFile(main,'{broken}\n');
   assert.equal((await refreshSummary(db,options)).failed,1);
-  assert.equal(db.queryTurns()[0].id,id);assert.equal(db.queryTurns()[0].total_tokens,12);
-  assert.equal(db.queryTurns()[0].last_error,'parse-error');assert.equal(db.findSourceFile('claude',copy)?.source_missing,1);
+  assert.deepEqual(db.queryUsage(),before);assert.equal(db.queryUsage()[0].total_tokens,12);
+  assert.equal(db.findSourceFile('claude',main)?.last_error,'parse-error');assert.equal(db.findSourceFile('claude',copy)?.source_missing,1);
 }));
 
 test('unknown models and zero usage are removed with their last source and disabling retention removes previously retained data',async()=>fixture(async(db,options,root)=>{
@@ -123,11 +67,11 @@ test('compressed Codex usage survives deletion and reopening with its model, ses
   ])));
   const config={...options,roots:[{provider:'codex' as const,path:root}]};
   await writeFile(path,source);assert.equal((await refreshSummary(db,config)).failed,0);
-  const before=db.queryTurns()[0];assert.equal(before.duration_quality,'missing');assert.equal(before.session_id,'codex-session');
-  await unlink(path);assert.equal((await refreshSummary(db,config)).failed,0);assert.deepEqual(db.queryTurns()[0],before);
+  const before=db.queryUsage({}, 'session')[0];assert.equal(before.avg_duration_ms,null);assert.equal(before.session_id,'codex-session');
+  await unlink(path);assert.equal((await refreshSummary(db,config)).failed,0);assert.deepEqual(db.queryUsage({}, 'session')[0],before);
   const reopened=new SummaryDatabase(options.dbPath);
   try {
-    assert.deepEqual(reopened.queryTurns()[0],before);
+    assert.deepEqual(reopened.queryUsage({}, 'session')[0],before);
     assert.equal(reopened.findSourceFile('codex',path)?.source_missing,1);
     assert.equal(reopened.queryUsagePage({},'total','UTC',{},'model').rows[0].model,'gpt-6.1-sol');
     assert.equal((await refreshSummary(reopened,config)).bodyBytes,0);
@@ -136,12 +80,12 @@ test('compressed Codex usage survives deletion and reopening with its model, ses
   } finally { reopened.close(); }
 }));
 
-test('positive output alone is retainable but a zero-token named model cannot qualify unknown positive usage',async()=>fixture(async(db,options,root)=>{
+test('a named model with positive output keeps the full daily summary when the source disappears',async()=>fixture(async(db,options,root)=>{
   const path=join(root,'session.jsonl');
   const outputOnly=response('output',0);outputOnly.message.usage.output_tokens=5;
   await writeFile(path,jsonl([user('output'),outputOnly,user('mixed'),response('mixed',0),response('mixed',10,'','unknown')]));
   await refreshSummary(db,options);await unlink(path);assert.equal((await refreshSummary(db,options)).failed,0);
-  assert.equal(db.queryTurnsCount(),1);assert.equal(db.queryTurns()[0].root_turn_id,'output');assert.equal(db.queryTurns()[0].total_tokens,5);
+  assert.equal(db.queryTurnsCount(),2);assert.equal(db.queryUsage()[0].total_tokens,17);
 }));
 
 test('the worker applies retention changes on the next explicit refresh and clear removes retained history',async()=>fixture(async(_db,options,root)=>{
@@ -156,4 +100,23 @@ test('the worker applies retention changes on the next explicit refresh and clea
     assert.equal((await client.query({groupBy:'turn'})).total,1);
     await client.clearData();assert.equal((await client.query({groupBy:'turn'})).total,0);
   } finally { await client.dispose(); }
+}));
+
+test('retaining a missing source preserves its day while later activity is collected separately', async () => fixture(async (db, options, root) => {
+  const old = join(root, 'old.jsonl');
+  await writeFile(old, jsonl([user('old'), response('old')]));
+  await refreshSummary(db, options);
+  db.setSessionBilling('claude', 'session', 'api');
+  const firstDay = db.queryUsage({includeCosts:true}, 'day')[0];
+  assert.equal(firstDay.total_tokens, 12);
+  await unlink(old);
+  const next = [user('next'), response('next', 30)].map(row => ({...row, timestamp: row.timestamp.replace('10-01','10-02'), ...('sessionId' in row ? {sessionId:'next-session'} : {})}));
+  await writeFile(join(root, 'next.jsonl'), jsonl(next));
+  assert.equal((await refreshSummary(db, options)).failed, 0);
+  const daily = db.queryUsage({includeCosts:true}, 'day');
+  assert.deepEqual(daily.map(row => [row.period,row.total_tokens]), [['2026-10-01',12],['2026-10-02',32]]);
+  assert.deepEqual(daily[0],firstDay);
+  assert.equal(db.findSourceFile('claude',old)?.source_missing,1);
+  assert.equal(db.sessionBilling('claude','session'),'api');
+  assert.equal((await refreshSummary(db, options)).bodyBytes,0);
 }));

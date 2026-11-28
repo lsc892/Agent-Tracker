@@ -60,12 +60,17 @@ export async function run(): Promise<void> {
   let currentTooltip: vscode.MarkdownString | undefined;
   const originalRefresh = summaryModule.SummaryClient.prototype.refresh;
   let onReport: ((message: SmokeReport) => void) | undefined;
+  let smokePhase = 'opening statistics';
   let expectedTheme = 'vscode-dark';
   let expectTimezoneWarning = false;
   let scanCount = 0;
   const isReport = (raw: unknown): raw is SmokeReport => Boolean(raw && typeof raw === 'object' && (raw as { type?: string }).type === 'smoke-report');
   protocol.parseDashboardMessage = (raw: unknown) => {
     if (isReport(raw)) { onReport?.(raw); return null; }
+    if (raw && typeof raw === 'object' && 'type' in raw && raw.type === 'smoke-phase') {
+      if ('phase' in raw && typeof raw.phase === 'string') smokePhase = raw.phase;
+      return null;
+    }
     if (raw && typeof raw==='object' && (raw as {type?:string}).type==='smoke-skill-switch') {
       const enabled=(raw as {enabled?:unknown}).enabled;
       if (typeof enabled==='boolean') void vscode.workspace.getConfiguration('agentTracker').update('usage.skillsEnabled',enabled,vscode.ConfigurationTarget.Global);
@@ -163,6 +168,7 @@ export async function run(): Promise<void> {
         };
         window.addEventListener('error', event => report(false,event.message));
         window.addEventListener('message', event => {
+          const previousPhase = phase;
           try {
             const message = event.data;
             if (message.type === 'diagnostics') receivedDiagnostics = true;
@@ -251,14 +257,14 @@ export async function run(): Promise<void> {
               const option = document.querySelectorAll('#session-list .name-option')[1];
               check(option.textContent.includes('통계 화면 검증') && option.textContent.includes('Claude') && option.textContent.includes('project'),'session choice shows title and disambiguating context');
               check(option.title.includes('ui-session'),'session tooltip keeps exact identity');
-              phase = 'turn'; document.getElementById('group').value = 'turn'; option.click();
-            } else if (phase === 'turn' && message.type === 'usage' && message.result.groupBy === 'turn') {
-              check(message.result.rows.length === 1 && message.result.rows[0].root_turn_id === 'ui-turn','request group and session filter are applied');
-              check(document.querySelector('#usage-table .name-filter').title.includes('ui-turn'),'request identity is available in the name tooltip');
+              phase = 'session'; document.getElementById('group').value = 'session'; option.click();
+            } else if (phase === 'session' && message.type === 'usage' && message.result.groupBy === 'session') {
+              check(message.result.rows.length === 1 && message.result.rows[0].session_id === 'ui-session','session grouping and filter are applied');
+              check(document.querySelector('#usage-table .name-filter').title.includes('ui-session'),'session identity is available in the name tooltip');
               check(document.getElementById('usage-table').textContent.includes('통계 화면 검증'),'session title is rendered');
-              check(message.result.chart.mode === 'turn' && document.querySelectorAll('#usage-chart .chart-segment').length === 4,'request chart uses token composition');
+              check(message.result.chart.mode === 'ranking' && document.querySelectorAll('#usage-chart .chart-segment').length === 4,'session chart uses token composition');
               checkSegmentHover();
-              check(document.getElementById('chart-metric').querySelector('[value="requests"]').disabled,'request chart disables aggregate metrics');
+              check(!document.getElementById('chart-metric').querySelector('[value="requests"]').disabled,'session chart supports aggregate metrics');
               check(document.getElementById('session-name').textContent === '통계 화면 검증' && document.getElementById('session-options').hidden,'session selection applies immediately and closes the popup');
               phase = 'costs-on'; window.dispatchEvent(new CustomEvent('tracker-smoke-report',{detail:{type:'smoke-cost-switch',enabled:true}}));
             } else if (phase === 'costs-on' && message.type === 'usage') {
@@ -268,7 +274,7 @@ export async function run(): Promise<void> {
             } else if (phase === 'models' && message.type === 'usage' && message.result.chart.by === 'model') {
               check(message.result.chart.rows[0].model === 'claude-sonnet-4-6' && message.result.chart.rows[0].total_tokens === 150,'model chart retains all tokens');
               check(document.getElementById('chart-detail').textContent.includes('sonnet4.6'),'compact model name renders in chart details');
-              check(message.result.by === 'model' && document.querySelector('#usage-table th').textContent === '모델 / 프로젝트','request table switches its provider column to model');
+              check(message.result.by === 'model' && document.querySelector('#usage-table th').textContent === '모델','session table switches its provider column to model');
               check(document.getElementById('usage-table').textContent.includes('sonnet4.6'),'table displays the model name');
               for (const id of ['usage-chart','usage-table']) {
                 const marker = document.querySelector('#'+id+' .provider-marker');
@@ -358,7 +364,10 @@ export async function run(): Promise<void> {
               link.focus(); check(document.activeElement === link,'diagnostic hyperlink accepts keyboard focus');
               phase = 'complete'; link.click();
             } else if (message.type === 'error') { phase='failed'; report(false,message.message); }
-          } catch(error) { phase='failed'; report(false,error.message); }
+          } catch(error) { phase='failed'; report(false,previousPhase+': '+error.message); }
+          finally {
+            if (phase !== previousPhase) window.dispatchEvent(new CustomEvent('tracker-smoke-report',{detail:{type:'smoke-phase',phase}}));
+          }
         });
       })();`;
     return inlineScript(originalHtml(...args), 'dashboard.js', args[3], driver);
@@ -381,7 +390,7 @@ export async function run(): Promise<void> {
             } else if (phase === 'initial' && message.type === 'diagnostics') {
               check(message.result.counts.files === 1,'diagnostics returns the fixture source');
               check(document.getElementById('diagnostic-files').textContent.includes('session.jsonl'),'separate webview renders the source log');
-              check(document.getElementById('diagnostic-summaries'),'separate webview retains the request warnings table');
+              check(message.result.counts.error === 0,'diagnostics reports no failed sources');
               phase = 'reload'; document.getElementById('refresh-diagnostics').click();
             } else if (phase === 'reload' && message.type === 'diagnostics') {
               check(message.offset === 0,'diagnostic reload reads the current page');
@@ -467,8 +476,9 @@ export async function run(): Promise<void> {
       await vscode.commands.executeCommand('workbench.action.closePanel');
       await vscode.workspace.getConfiguration('agentTracker').update('usage.timezone', expectTimezoneWarning ? 'Not/A_Timezone' : 'Asia/Seoul', vscode.ConfigurationTarget.Global);
       await applyTheme(theme);
+      smokePhase = 'opening statistics';
       const completed = new Promise<void>((resolveReport, reject) => {
-        const timeout = setTimeout(() => reject(new Error(`Webview smoke timed out (${theme.css})`)), 30_000);
+        const timeout = setTimeout(() => reject(new Error(`Webview smoke timed out (${theme.css}, ${smokePhase})`)), 30_000);
         onReport = message => {
           try {
             assert.ok(message.ok, message.detail);
@@ -531,7 +541,9 @@ export async function run(): Promise<void> {
     await vscode.commands.executeCommand(settingsLink[1]);
     await vscode.commands.executeCommand('agentTracker.clearUsageData');
     assert.equal(countFiles(), 0, 'the command deletes source records');
-    assert.equal((database.prepare('SELECT count(*) n FROM turn_summary').get() as {n: number}).n, 0);
+    for (const table of ['usage_request_daily', 'usage_model_daily', 'usage_capability_daily']) {
+      assert.equal(database.prepare(`SELECT count(*) n FROM ${table}`).get()?.n, 0, `${table} is cleared`);
+    }
     assert.equal(readFileSync(sourcePath, 'utf8'), originalSource, 'original transcript survives deletion');
     assert.equal(scanCount, scansBeforeSettings, 'deletion does not trigger a rebuild');
     await config.update('claude.enabled', false, vscode.ConfigurationTarget.Global);

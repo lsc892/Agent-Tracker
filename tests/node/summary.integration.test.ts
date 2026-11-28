@@ -19,7 +19,7 @@ const response = (tokens = 100, root = 'prompt-one', id = 'response-one', reques
 async function fixture(run: (database: SummaryDatabase, options: SummaryOptions, root: string, base: string) => Promise<void>): Promise<void> {
   const base = await mkdtemp(join(tmpdir(),'agent-tracker-summary-'));
   const root = join(base,'projects');await mkdir(root);
-  const options: SummaryOptions = {dbPath:join(base,'summary.sqlite'),roots:[{provider:'claude',path:root}]};
+  const options: SummaryOptions = {dbPath:join(base,'summary.sqlite'),roots:[{provider:'claude',path:root}],retainDeletedSourceUsage:false};
   const database = new SummaryDatabase(options.dbPath);
   try { await run(database,options,root,base); }
   finally { database.close();await rm(base,{recursive:true,force:true}); }
@@ -41,13 +41,12 @@ test('Claude Stop summaries measure the root elapsed time and explicit durations
     response(20,'prompt-one','child-response','child-request'),stopHook('2026-10-01T00:01:00Z'),
   ]));
   assert.equal((await refreshSummary(database,options)).failed,0);
-  let turn = database.queryTurns()[0];
-  assert.equal(turn.duration_ms,16000);assert.equal(turn.duration_quality,'derived');
-  assert.equal(turn.completed_at_ms,Date.parse('2026-10-01T00:00:16Z'));
-  assert.equal(turn.total_tokens,320);
+  let usage = database.queryUsage()[0];
+  assert.equal(usage.avg_duration_ms,16000);assert.equal(usage.derived_duration_turns,1);
+  assert.equal(usage.total_tokens,320);
   await appendFile(main,jsonl([{type:'system',subtype:'turn_duration',durationMs:15000,timestamp:'2026-10-01T00:00:16Z'}]));
-  await refreshSummary(database,options);turn = database.queryTurns()[0];
-  assert.equal(turn.duration_ms,15000);assert.equal(turn.duration_quality,'exact');
+  await refreshSummary(database,options);usage = database.queryUsage()[0];
+  assert.equal(usage.avg_duration_ms,15000);assert.equal(usage.exact_duration_turns,1);
 }));
 
 test('a blocked Claude Stop reopens the request until its continuation finishes',async () => fixture(async (database,options,root) => {
@@ -55,14 +54,14 @@ test('a blocked Claude Stop reopens the request until its continuation finishes'
   await writeFile(main,jsonl([user(),response(),stopHook('2026-10-01T00:00:06Z',true),
     {type:'system',subtype:'turn_duration',durationMs:6000,timestamp:'2026-10-01T00:00:06Z'}]));
   await refreshSummary(database,options);
-  let turn = database.queryTurns()[0];
-  assert.equal(turn.status,'in_progress');assert.equal(turn.duration_ms,null);assert.equal(turn.completed_at_ms,null);
-  assert.equal(database.queryUsage()[0].turns_with_duration,0);
+  let usage = database.queryUsage()[0];
+  assert.equal(usage.turn_count,1);assert.equal(usage.completed_turns,0);
+  assert.equal(usage.avg_duration_ms,null);assert.equal(usage.turns_with_duration,0);
   await appendFile(main,jsonl([
     {...response(20,'prompt-one','continued-response','continued-request'),timestamp:'2026-10-01T00:00:10Z'},stopHook(),
   ]));
-  await refreshSummary(database,options);turn = database.queryTurns()[0];
-  assert.equal(turn.status,'completed');assert.equal(turn.duration_ms,16000);assert.equal(turn.duration_quality,'derived');
+  await refreshSummary(database,options);usage = database.queryUsage()[0];
+  assert.equal(usage.completed_turns,1);assert.equal(usage.avg_duration_ms,16000);assert.equal(usage.derived_duration_turns,1);
 }));
 
 test('Claude Stop records without an explicit continuation outcome retain message timestamp fallback',async () => fixture(async (database,options,root) => {
@@ -70,8 +69,8 @@ test('Claude Stop records without an explicit continuation outcome retain messag
   for (const preventedContinuation of [undefined,null,'false']) {
     await writeFile(main,jsonl([user(),response(),{...stopHook(),preventedContinuation}]));
     assert.equal((await refreshSummary(database,options)).failed,0);
-    const turn = database.queryTurns()[0];
-    assert.equal(turn.status,'completed');assert.equal(turn.duration_ms,3000);assert.equal(turn.duration_quality,'approximate');
+    const usage = database.queryUsage()[0];
+    assert.equal(usage.completed_turns,1);assert.equal(usage.avg_duration_ms,3000);assert.equal(usage.approximate_duration_turns,1);
   }
 }));
 
@@ -82,8 +81,6 @@ test('Claude API failures stay out of completed averages while retaining tokens 
     user('success'),response(50,'success','success-response','success-request'),
   ]));
   assert.equal((await refreshSummary(database,options)).failed,0);
-  const failure = database.queryTurns().find(row=>row.root_turn_id==='prompt-one')!;
-  assert.equal(failure.status,'failed');assert.equal(failure.total_tokens,200);assert.match(failure.quality_flags!,/api-error/);
   const usage = database.queryUsage()[0];
   assert.equal(usage.turn_count,2);assert.equal(usage.completed_turns,1);assert.equal(usage.total_tokens,350);
   assert.equal(usage.avg_tokens_per_turn,150);assert.equal(usage.avg_duration_ms,3000);assert.equal(usage.turns_with_duration,1);
@@ -92,12 +89,12 @@ test('Claude API failures stay out of completed averages while retaining tokens 
 test('a Claude error after an earlier end_turn overrides completion and a later successful retry restores it',async () => fixture(async (database,options,root) => {
   const main = join(root,'session-one.jsonl');
   await writeFile(main,jsonl([user(),response(),apiError()]));await refreshSummary(database,options);
-  assert.equal(database.queryTurns()[0].status,'failed');assert.equal(database.queryUsage()[0].avg_duration_ms,null);
+  assert.equal(database.queryUsage()[0].completed_turns,0);assert.equal(database.queryUsage()[0].avg_duration_ms,null);
   await appendFile(main,jsonl([
     {...response(30,'prompt-one','retry-response','retry-request'),timestamp:'2026-10-01T00:00:12Z'},stopHook(),
   ]));
   await refreshSummary(database,options);
-  assert.equal(database.queryTurns()[0].status,'completed');assert.equal(database.queryTurns()[0].duration_ms,16000);
+  assert.equal(database.queryUsage()[0].avg_duration_ms,16000);
   assert.equal(database.queryUsage()[0].completed_turns,1);assert.equal(database.queryUsage()[0].total_tokens,330);
 }));
 
@@ -109,22 +106,20 @@ test('Claude completion without a usage vector still ends the request and subage
   ]));
   await writeFile(join(root,'session-one','subagents','agent-error.jsonl'),jsonl([apiError('2026-10-01T00:00:30Z')]));
   assert.equal((await refreshSummary(database,options)).failed,0);
-  const turn = database.queryTurns()[0];
-  assert.equal(turn.status,'completed');assert.equal(turn.duration_ms,16000);assert.equal(turn.total_tokens,200);
+  const usage = database.queryUsage()[0];
+  assert.equal(usage.completed_turns,1);assert.equal(usage.avg_duration_ms,16000);assert.equal(usage.total_tokens,200);
 }));
 
 test('Claude duplicate sources use the latest outcome timestamp rather than file parse order',async () => fixture(async (database,options,root) => {
   await writeFile(join(root,'a-success.jsonl'),jsonl([user(),response(),stopHook()]));
   await writeFile(join(root,'z-old-error.jsonl'),jsonl([user(),apiError()]));
   assert.equal((await refreshSummary(database,options)).failed,0);
-  assert.equal(database.queryTurns()[0].status,'completed');assert.equal(database.queryTurns()[0].duration_ms,16000);
+  assert.equal(database.queryUsage()[0].completed_turns,1);assert.equal(database.queryUsage()[0].avg_duration_ms,16000);
 }));
 
 test('a Claude API failure without a timestamp still supersedes earlier completion in its source',async () => fixture(async (database,options,root) => {
   await writeFile(join(root,'session-one.jsonl'),jsonl([user(),response(),{...apiError(),timestamp:undefined}]));
   assert.equal((await refreshSummary(database,options)).failed,0);
-  const turn = database.queryTurns()[0];
-  assert.equal(turn.status,'failed');assert.equal(turn.completed_at_ms,null);assert.equal(turn.duration_ms,null);
   assert.equal(database.queryUsage()[0].completed_turns,0);assert.equal(database.queryUsage()[0].avg_duration_ms,null);
 }));
 
@@ -133,10 +128,8 @@ test('Claude parser version repairs cached durations and API error averages with
   await writeFile(main,jsonl([user(),response(),stopHook(),user('error'),apiError('2026-10-01T00:00:05Z','error')]));
   ageLogFixtures(main);
   await refreshSummary(database,options);
-  database.connection.exec(`UPDATE source_file SET parser_version=3;
-    UPDATE summary_refresh SET scope='v3';
-    UPDATE turn_summary SET status='completed',duration_ms=3000,duration_quality='approximate'`);
-  assert.equal(database.queryUsage()[0].completed_turns,2);
+  database.connection.exec('UPDATE source_file SET parser_version=3; DELETE FROM usage_request_daily');
+  assert.equal(database.queryUsage().length,0);
   const refreshed = await refreshSummary(database,options);
   assert.equal(refreshed.failed,0);assert.equal(refreshed.parsed,1);assert.ok(refreshed.bodyBytes>0);
   const usage = database.queryUsage()[0];
@@ -155,8 +148,8 @@ test('session rebuild deduplicates full vectors, includes subagent tokens, and r
   ageLogFixtures(join(root,'session-one.jsonl'),join(root,'session-one','subagents','agent-a.jsonl'));
   const first = await refreshSummary(database,options);
   assert.equal(first.failed,0);assert.equal(first.parsed,2);
-  const rows = database.queryTurns();assert.equal(rows.length,1);
-  assert.equal(rows[0].total_tokens,330);assert.equal(rows[0].duration_ms,1000);
+  const rows = database.queryUsage();assert.equal(rows[0].turn_count,1);
+  assert.equal(rows[0].total_tokens,330);assert.equal(rows[0].avg_duration_ms,1000);
   const unchanged = await refreshSummary(database,options);
   assert.equal(unchanged.bodyBytes,0);assert.equal(unchanged.reused,2);
 }));
@@ -165,54 +158,55 @@ test('append, truncated rewrite, winner deletion and fresh rebuild agree',async 
   const main = join(root,'session-one.jsonl');const clone = join(root,'clone.jsonl');
   await writeFile(main,jsonl([user(),response(100)]));
   await writeFile(clone,jsonl([user(),response(200)]));
-  await refreshSummary(database,options);assert.equal(database.queryTurns()[0].total_tokens,300);
+  await refreshSummary(database,options);assert.equal(database.queryUsage()[0].total_tokens,300);
   await unlink(clone);
-  await refreshSummary(database,options);assert.equal(database.queryTurns()[0].total_tokens,200);
+  await refreshSummary(database,options);assert.equal(database.queryUsage()[0].total_tokens,200);
   await appendFile(main,jsonl([response(80,'prompt-one','response-two','req-two')]));
-  await refreshSummary(database,options);assert.equal(database.queryTurns()[0].total_tokens,380);
+  await refreshSummary(database,options);assert.equal(database.queryUsage()[0].total_tokens,380);
   await writeFile(main,jsonl([user(),response(20)]));
-  await refreshSummary(database,options);assert.equal(database.queryTurns()[0].total_tokens,120);
+  await refreshSummary(database,options);assert.equal(database.queryUsage()[0].total_tokens,120);
   const fresh = new SummaryDatabase(join(base,'fresh.sqlite'));
   try {
     await refreshSummary(fresh,{...options,dbPath:join(base,'fresh.sqlite')});
-    assert.equal(fresh.queryTurns()[0].total_tokens,database.queryTurns()[0].total_tokens);
+    assert.equal(fresh.queryUsage()[0].total_tokens,database.queryUsage()[0].total_tokens);
   } finally {fresh.close();}
   await unlink(main);await refreshSummary(database,options);
-  assert.equal(database.queryTurns().length,0);assert.equal(database.diagnostics().counts.files,0);
+  assert.equal(database.queryTurnsCount(),0);assert.equal(database.diagnostics().counts.files,0);
 }));
 
 test('parse failure preserves accepted metadata and summary; later user refresh retries',async () => fixture(async (database,options,root) => {
   const main = join(root,'session-one.jsonl');
   await writeFile(main,jsonl([user(),response()]));await refreshSummary(database,options);
-  const before = database.queryTurns()[0];const source_file = database.findSourceFile('claude',main)!;
+  const before = database.queryUsage()[0];const source = database.findSourceFile('claude',main)!;
   await appendFile(main,'{bad}\n');
   const result = await refreshSummary(database,options);assert.equal(result.failed,1);
-  const stale = database.queryTurns()[0];assert.equal(stale.total_tokens,before.total_tokens);assert.equal(stale.updated_at,before.updated_at);
-  assert.equal(stale.last_error,'parse-error');assert.equal(database.findSourceFile('claude',main)!.size_bytes,source_file.size_bytes);
+  assert.deepEqual(database.queryUsage()[0],before);
+  const stale = database.findSourceFile('claude',main)!;
+  assert.equal(stale.last_error,'parse-error');assert.equal(stale.mtime_ms,source.mtime_ms);
   await writeFile(main,jsonl([user(),response(50)]));
-  await refreshSummary(database,options);assert.equal(database.queryTurns()[0].total_tokens,150);assert.equal(database.queryTurns()[0].last_error,null);
+  await refreshSummary(database,options);assert.equal(database.queryUsage()[0].total_tokens,150);assert.equal(database.findSourceFile('claude',main)?.last_error,null);
 }));
 
 test('partial final lines are deferred without a parse error',async () => fixture(async (database,options,root) => {
   const main = join(root,'session-one.jsonl');
   await writeFile(main,jsonl([user()]) + JSON.stringify(response()));
   const result = await refreshSummary(database,options);assert.equal(result.failed,0);
-  const turn = database.queryTurns()[0];assert.equal(turn.total_tokens,0);assert.equal(turn.status,'in_progress');assert.match(turn.quality_flags ?? '',/partial-line/);
-  await appendFile(main,'\n');await refreshSummary(database,options);assert.equal(database.queryTurns()[0].total_tokens,200);
+  const usage = database.queryUsage()[0];assert.equal(usage.total_tokens,0);assert.equal(usage.completed_turns,0);
+  await appendFile(main,'\n');await refreshSummary(database,options);assert.equal(database.queryUsage()[0].total_tokens,200);
 }));
 
 test('session reassignment replaces old and new sessions atomically',async () => fixture(async (database,options,root) => {
   const main = join(root,'main.jsonl');await writeFile(main,jsonl([user(),response()]));await refreshSummary(database,options);
   await writeFile(main,jsonl([user('prompt-two','session-two'),response(75,'prompt-two')]));await refreshSummary(database,options);
-  assert.equal(database.queryTurns().length,1);assert.equal(database.queryTurns()[0].session_id,'session-two');
+  assert.equal(database.queryTurnsCount(),1);assert.equal(database.queryUsage({},'session')[0].session_id,'session-two');
 }));
 
 test('missing formerly indexed root prevents absence deletion; brand new missing root is empty',async () => fixture(async (database,options,root,base) => {
   await writeFile(join(root,'session-one.jsonl'),jsonl([user(),response()]));await refreshSummary(database,options);
   await rm(root,{recursive:true});const failed = await refreshSummary(database,options);
-  assert.equal(failed.interrupted,true);assert.equal(database.queryTurns().length,1);
+  assert.equal(failed.interrupted,true);assert.equal(database.queryTurnsCount(),1);
   const empty = await refreshSummary(database,{...options,roots:[{provider:'codex',path:join(base,'missing')}]});
-  assert.equal(empty.interrupted,false);assert.equal(database.queryTurns().length,1);
+  assert.equal(empty.interrupted,false);assert.equal(database.queryTurnsCount(),1);
 }));
 
 test('worker initialization creates only schema; refresh is lazy and requests are single flight',async () => {
@@ -244,10 +238,10 @@ test('session sources outside selected roots survive a shared-session rebuild',a
   await writeFile(main,jsonl([user(),response(100)]));
   await writeFile(join(other,'copy.jsonl'),jsonl([user(),response(50,'prompt-one','response-two','req-two')]));
   await refreshSummary(database,{...options,roots:[...options.roots,{provider:'claude',path:other}]});
-  assert.equal(database.queryTurns()[0].total_tokens,350);
+  assert.equal(database.queryUsage()[0].total_tokens,350);
   await appendFile(main,jsonl([response(10,'prompt-one','response-three','req-three')]));
   const result = await refreshSummary(database,options);
-  assert.equal(result.failed,0);assert.equal(database.queryTurns()[0].total_tokens,460);
+  assert.equal(result.failed,0);assert.equal(database.queryUsage()[0].total_tokens,460);
   assert.ok(database.findSourceFile('claude',join(other,'copy.jsonl')));
 }));
 
@@ -271,14 +265,12 @@ test('Codex compression transitions and simultaneous copies preserve totals and 
   await writeFile(compressed,encoded);
   const overlap=await refreshSummary(database,codexOptions);
   assert.equal(overlap.failed,0);assert.equal(overlap.discovered,2);
-  assert.equal(database.queryTurns().length,1);assert.equal(database.queryTurns()[0].total_tokens,100);
+  assert.equal(database.queryTurnsCount(),1);assert.equal(database.queryUsage()[0].total_tokens,100);
   await unlink(plain);
   const transition=await refreshSummary(database,codexOptions);
   assert.equal(transition.failed,0);assert.equal(transition.discovered,1);
-  assert.equal(database.queryTurns()[0].total_tokens,100);
+  assert.equal(database.queryUsage()[0].total_tokens,100);
   assert.equal(database.findSourceFile('codex',plain),undefined);
-  assert.equal(database.findSourceFile('codex',compressed)?.size_bytes,encoded.length);
-  ageLogFixtures(compressed);
   const warm=await refreshSummary(database,codexOptions);
   assert.equal(warm.parsed,0);assert.equal(warm.reused,1);assert.equal(warm.bodyBytes,0);
   assert.deepEqual(await readFile(compressed),encoded);
@@ -295,11 +287,11 @@ test('compressed Codex parents rebuild with new descendants and corrupt refreshe
   const childSource=jsonl([codexMeta('child','main'),codexStart('child-turn','root'),currentUsage('child','child-turn','root',40)]);
   await writeFile(join(root,'child.jsonl'),childSource);
   const expanded=await refreshSummary(database,codexOptions);
-  assert.equal(expanded.failed,0);assert.equal(database.queryTurns()[0].total_tokens,140);
+  assert.equal(expanded.failed,0);assert.equal(database.queryUsage()[0].total_tokens,140);
   assert.equal(expanded.parsed,2);assert.equal(expanded.bodyBytes,encoded.length+Buffer.byteLength(childSource));
   await writeFile(parent,encoded.subarray(0,encoded.length-1));
   const broken=await refreshSummary(database,codexOptions);
-  assert.ok(broken.failed>0);assert.equal(database.queryTurns()[0].total_tokens,140);
+  assert.ok(broken.failed>0);assert.equal(database.queryUsage()[0].total_tokens,140);
   assert.equal(database.findSourceFile('codex',parent)?.last_error,'decompression-error');
 }));
 
@@ -314,8 +306,6 @@ test('aborted Codex roots and descendants leave no request summary while later c
     currentUsage('child','child-turn','aborted',40),
     {type:'event_msg',payload:{type:'task_complete',turn_id:'child-turn',root_turn_id:'aborted',duration_ms:500}}]));
   assert.equal((await refreshSummary(database,codexOptions)).failed,0);
-  const turns=database.queryTurns();assert.equal(turns.length,1);
-  assert.equal(turns[0].root_turn_id,'next');assert.equal(turns[0].total_tokens,50);
   const usage=database.queryUsage()[0];assert.equal(usage.turn_count,1);assert.equal(usage.total_tokens,50);
   assert.equal(usage.avg_tokens_per_turn,50);assert.equal(database.diagnostics().summaries.length,0);
 }));
@@ -325,14 +315,14 @@ test('a Codex abort removes an accepted summary and a later completed retry can 
   const path=join(root,'main.jsonl');
   await writeFile(path,jsonl([codexMeta('main'),codexStart('request'),legacyUsage(100),
     {type:'event_msg',timestamp:'2026-10-01T00:00:01Z',payload:{type:'task_complete',turn_id:'request',duration_ms:1000}}]));
-  await refreshSummary(database,codexOptions);assert.equal(database.queryTurns().length,1);
+  await refreshSummary(database,codexOptions);assert.equal(database.queryTurnsCount(),1);
   await appendFile(path,jsonl([{type:'event_msg',timestamp:'2026-10-01T00:00:02Z',payload:{type:'turn_aborted',turn_id:'request'}}]));
-  assert.equal((await refreshSummary(database,codexOptions)).failed,0);assert.equal(database.queryTurns().length,0);
+  assert.equal((await refreshSummary(database,codexOptions)).failed,0);assert.equal(database.queryTurnsCount(),0);
   assert.equal(database.findSourceFile('codex',path)!.processing_status,'done');
   await appendFile(path,jsonl([{...codexStart('request'),timestamp:'2026-10-01T00:00:03Z'},
     {type:'event_msg',timestamp:'2026-10-01T00:00:04Z',payload:{type:'task_complete',turn_id:'request',duration_ms:1000}}]));
   assert.equal((await refreshSummary(database,codexOptions)).failed,0);
-  assert.equal(database.queryTurns()[0].status,'completed');assert.equal(database.queryTurns()[0].total_tokens,100);
+  assert.equal(database.queryUsage()[0].completed_turns,1);assert.equal(database.queryUsage()[0].total_tokens,100);
 }));
 
 test('an aborted subagent does not discard its successfully completed main request',async () => fixture(async (database,options,root) => {
@@ -342,7 +332,7 @@ test('an aborted subagent does not discard its successfully completed main reque
   await writeFile(join(root,'child.jsonl'),jsonl([codexMeta('child','main'),codexStart('child-turn','request'),currentUsage('child','child-turn','request',40),
     {type:'event_msg',timestamp:'2026-10-01T00:00:02Z',payload:{type:'turn_aborted',turn_id:'child-turn',root_turn_id:'request'}}]));
   assert.equal((await refreshSummary(database,codexOptions)).failed,0);
-  const turns=database.queryTurns();assert.equal(turns.length,1);assert.equal(turns[0].status,'completed');assert.equal(turns[0].total_tokens,140);
+  const usage=database.queryUsage()[0];assert.equal(usage.turn_count,1);assert.equal(usage.completed_turns,1);assert.equal(usage.total_tokens,140);
 }));
 
 test('copied parent metadata preserves child lineage and spawn binding excludes verified inherited usage',async () => fixture(async (database,options,root) => {
@@ -355,15 +345,14 @@ test('copied parent metadata preserves child lineage and spawn binding excludes 
     rootlessStart('own'),{type:'event_msg',payload:{type:'token_count',info:{total_token_usage:{input_tokens:140,output_tokens:0},last_token_usage:{input_tokens:40,output_tokens:0}}}},
     {type:'event_msg',payload:{type:'task_complete',turn_id:'own',duration_ms:500}}]));
   assert.equal((await refreshSummary(database,codexOptions)).failed,0);
-  const turns=database.queryTurns();assert.equal(turns.length,1);
-  assert.equal(turns[0].session_id,'main');assert.equal(turns[0].root_turn_id,'inherited');
-  assert.equal(turns[0].total_tokens,140);assert.equal(turns[0].duration_ms,1000);
+  const sessions=database.queryUsage({},'session');assert.equal(sessions.length,1);
+  assert.equal(sessions[0].session_id,'main');assert.equal(sessions[0].turn_count,1);
+  assert.equal(sessions[0].total_tokens,140);assert.equal(sessions[0].avg_duration_ms,1000);
   assert.equal(database.findSourceFile('codex',child)!.session_id,'main');
-  assert.ok(turns.every(row=>!row.quality_flags?.includes('missing-parent')));
 }));
 
 test('Codex lifecycle seconds produce correct calendar groups, date filters and derived durations',async () => fixture(async (database,options,root) => {
-  const codexOptions={...options,roots:[{provider:'codex' as const,path:root}]};
+  const codexOptions={...options,timezone:'Asia/Seoul',roots:[{provider:'codex' as const,path:root}]};
   const started=Date.parse('2026-09-30T14:59:59Z');const completed=started+3000;
   const rows: unknown[]=[codexMeta('main')];
   for (const [turn,duration,input] of [['exact',2750,100],['derived',undefined,200]] as const) {
@@ -376,21 +365,18 @@ test('Codex lifecycle seconds produce correct calendar groups, date filters and 
   }
   await writeFile(join(root,'main.jsonl'),jsonl(rows));
   assert.equal((await refreshSummary(database,codexOptions)).failed,0);
-  const turns=database.queryTurns();assert.equal(turns.length,2);
-  assert.ok(turns.every(row=>row.started_at_ms===started && row.completed_at_ms===completed));
-  const exact=turns.find(row=>row.root_turn_id==='exact')!;const derived=turns.find(row=>row.root_turn_id==='derived')!;
-  assert.equal(exact.duration_ms,2750);assert.equal(exact.duration_quality,'exact');
-  assert.equal(derived.duration_ms,3000);assert.equal(derived.duration_quality,'derived');
   const filter={fromMs:Date.parse('2026-09-29T15:00:00Z'),toMs:Date.parse('2026-09-30T15:00:00Z')};
-  assert.equal(database.queryTurns(filter).length,2);
+  assert.equal(database.queryTurnsCount(filter),2);
   const days=database.queryUsage(filter,'day','Asia/Seoul');assert.equal(days.length,1);
   assert.equal(days[0].period,'2026-09-30');assert.equal(days[0].total_tokens,300);
+  assert.equal(days[0].avg_duration_ms,2875);
+  assert.equal(days[0].exact_duration_turns,1);assert.equal(days[0].derived_duration_turns,1);
   assert.equal(database.queryUsage({},'month','Asia/Seoul')[0].period,'2026-09');
-  assert.equal(database.queryTurns({fromMs:filter.toMs}).length,0);
+  assert.equal(database.queryTurnsCount({fromMs:filter.toMs}),0);
 }));
 
 test('Codex parser version rebuilds cached seconds timestamps without changes to source files',async () => fixture(async (database,options,root) => {
-  const codexOptions={...options,roots:[{provider:'codex' as const,path:root}]};
+  const codexOptions={...options,timezone:'Asia/Seoul',roots:[{provider:'codex' as const,path:root}]};
   const main=join(root,'main.jsonl');
   await writeFile(main,jsonl([codexMeta('main'),
     {type:'event_msg',timestamp:'2026-08-16T05:28:27.439Z',payload:{type:'task_started',turn_id:'t',started_at:1786858107}},
@@ -398,19 +384,16 @@ test('Codex parser version rebuilds cached seconds timestamps without changes to
     {type:'event_msg',timestamp:'2026-08-16T05:49:14.489Z',payload:{type:'task_complete',turn_id:'t',completed_at:1786859354,duration_ms:1247169}},
   ]));
   await refreshSummary(database,codexOptions);
-  // Recreate the accepted v2 cache; source size, mtime and identity stay unchanged.
+  // Simulate an earlier parser assigning the same usage to the wrong date.
   database.connection.exec(`UPDATE source_file SET parser_version=2;
-    UPDATE summary_refresh SET scope='v2';
-    UPDATE turn_summary SET started_at_ms=1786858107,completed_at_ms=1786859354`);
+    UPDATE usage_request_daily SET local_day='1970-01-21'`);
   assert.equal(database.queryUsage({},'month','Asia/Seoul')[0].period,'1970-01');
   const refreshed=await refreshSummary(database,codexOptions);
   assert.equal(refreshed.failed,0);assert.equal(refreshed.parsed,1);assert.ok(refreshed.bodyBytes>0);
-  const turns=database.queryTurns();assert.equal(turns.length,1);
-  assert.equal(turns[0].started_at_ms,1786858107000);assert.equal(turns[0].completed_at_ms,1786859354000);
-  assert.equal(turns[0].total_tokens,100);assert.equal(turns[0].duration_ms,1247169);
+  const usage=database.queryUsage()[0];assert.equal(usage.turn_count,1);
+  assert.equal(usage.total_tokens,100);assert.equal(usage.avg_duration_ms,1247169);
   assert.equal(database.queryUsage({},'month','Asia/Seoul')[0].period,'2026-08');
   assert.equal(database.findSourceFile('codex',main)!.parser_version,PARSER_VERSION);
-  ageLogFixtures(main);
   const unchanged=await refreshSummary(database,codexOptions);
   assert.equal(unchanged.failed,0);assert.equal(unchanged.reused,1);assert.equal(unchanged.bodyBytes,0);
 }));
@@ -426,25 +409,23 @@ test('rootless legacy subagents merge into the spawn request without counting ve
     {type:'event_msg',payload:{type:'task_complete',turn_id:'child-turn',duration_ms:700}}]));
   const result=await refreshSummary(database,codexOptions);
   assert.equal(result.failed,0);
-  const turns=database.queryTurns();assert.equal(turns.length,1);
-  const parentTurn=turns[0];
-  assert.equal(parentTurn.session_id,'main');assert.equal(parentTurn.root_turn_id,'inherited');
-  assert.equal(parentTurn.total_tokens,140);assert.equal(parentTurn.duration_ms,500);
-  assert.ok(!parentTurn.quality_flags?.includes('standalone-subagent'));assert.equal(parentTurn.last_error,null);
+  const sessions=database.queryUsage({},'session');assert.equal(sessions.length,1);
+  const parent=sessions[0];
+  assert.equal(parent.session_id,'main');assert.equal(parent.turn_count,1);
+  assert.equal(parent.total_tokens,140);assert.equal(parent.avg_duration_ms,500);
   assert.equal(database.findSourceFile('codex',child)!.session_id,'main');
-  ageLogFixtures(main,child);
   const unchanged=await refreshSummary(database,codexOptions);
   assert.equal(unchanged.failed,0);assert.equal(unchanged.reused,2);assert.equal(unchanged.bodyBytes,0);
   await appendFile(child,jsonl([rootlessStart('next-child-turn'),
     {type:'event_msg',payload:{type:'token_count',info:{total_token_usage:{input_tokens:160,output_tokens:0},last_token_usage:{input_tokens:20,output_tokens:0}}}}]));
   assert.equal((await refreshSummary(database,codexOptions)).failed,0);
-  assert.equal(database.queryTurns().reduce((sum,row)=>sum+row.total_tokens,0),160);
+  assert.equal(database.queryUsage()[0].total_tokens,160);
   await appendFile(child,'{bad}\n');
   assert.equal((await refreshSummary(database,codexOptions)).failed,1);
-  assert.equal(database.queryTurns()[0].total_tokens,160);
-  assert.equal(database.queryTurns()[0].last_error,'parse-error');
+  assert.equal(database.queryUsage()[0].total_tokens,160);
+  assert.equal(database.findSourceFile('codex',child)?.last_error,'parse-error');
   await unlink(child);assert.equal((await refreshSummary(database,codexOptions)).failed,0);
-  assert.equal(database.queryTurns().length,1);assert.equal(database.queryTurns()[0].total_tokens,100);
+  assert.equal(database.queryTurnsCount(),1);assert.equal(database.queryUsage()[0].total_tokens,100);
 }));
 
 test('rootless usage-only subagents without a parent binding retain source diagnostics and await resolution',async () => fixture(async (database,options,root) => {
@@ -468,9 +449,8 @@ test('rooted current subagents stay attached after a rootless inherited legacy p
     codexStart('c','root'),currentUsage('child','c','root',40),
     {type:'event_msg',payload:{type:'task_complete',turn_id:'c',root_turn_id:'root',duration_ms:700}}]));
   assert.equal((await refreshSummary(database,codexOptions)).failed,0);
-  const turns=database.queryTurns();assert.equal(turns.length,1);
-  assert.equal(turns[0].session_id,'main');assert.equal(turns[0].total_tokens,140);assert.equal(turns[0].duration_ms,500);
-  assert.ok(!turns[0].quality_flags?.includes('standalone-subagent'));
+  const sessions=database.queryUsage({},'session');assert.equal(sessions.length,1);
+  assert.equal(sessions[0].session_id,'main');assert.equal(sessions[0].total_tokens,140);assert.equal(sessions[0].avg_duration_ms,500);
 }));
 
 test('a subagent losing its explicit root preserves accepted totals until its spawn binding is available',async () => fixture(async (database,options,root) => {
@@ -478,16 +458,17 @@ test('a subagent losing its explicit root preserves accepted totals until its sp
   const child=join(root,'child.jsonl');
   await writeFile(join(root,'main.jsonl'),jsonl([codexMeta('main'),codexStart('root'),currentUsage('main','root','root',100)]));
   await writeFile(child,jsonl([codexMeta('child','main'),codexStart('c','root'),currentUsage('child','c','root',40)]));
-  assert.equal((await refreshSummary(database,codexOptions)).failed,0);assert.equal(database.queryTurns()[0].total_tokens,140);
+  assert.equal((await refreshSummary(database,codexOptions)).failed,0);assert.equal(database.queryUsage()[0].total_tokens,140);
   await writeFile(child,jsonl([codexMeta('child','main'),rootlessStart('c'),legacyUsage(40)]));
   assert.equal((await refreshSummary(database,codexOptions)).failed,1);
-  const retained=database.queryTurns();assert.equal(retained.length,1);
+  const retained=database.queryUsage({},'session');assert.equal(retained.length,1);
   assert.equal(retained[0].session_id,'main');assert.equal(retained[0].total_tokens,140);
-  assert.equal(retained[0].last_error,'missing-root-turn');
+  assert.equal(database.findSourceFile('codex',child)?.last_error,'missing-root-turn');
   await appendFile(join(root,'main.jsonl'),jsonl(codexSpawn('child')));
   assert.equal((await refreshSummary(database,codexOptions)).failed,0);
-  const restored=database.queryTurns();assert.equal(restored.length,1);
-  assert.equal(restored[0].session_id,'main');assert.equal(restored[0].total_tokens,140);assert.equal(restored[0].last_error,null);
+  const restored=database.queryUsage({},'session');assert.equal(restored.length,1);
+  assert.equal(restored[0].session_id,'main');assert.equal(restored[0].total_tokens,140);
+  assert.equal(database.findSourceFile('codex',child)?.last_error,null);
 }));
 
 test('nested Codex descendants resolve to the root and current records supersede legacy snapshots',async () => fixture(async (database,options,root) => {
@@ -497,8 +478,8 @@ test('nested Codex descendants resolve to the root and current records supersede
   await writeFile(join(root,'child.jsonl'),jsonl([codexMeta('child','main'),codexStart('c','root'),currentUsage('child','c','root',40)]));
   await writeFile(join(root,'grandchild.jsonl'),jsonl([codexMeta('grandchild','child'),codexStart('g','root'),currentUsage('grandchild','g','root',20)]));
   const result = await refreshSummary(database,codexOptions);
-  assert.equal(result.failed,0);const turns = database.queryTurns();
-  assert.equal(turns.length,1);assert.equal(turns[0].session_id,'main');assert.equal(turns[0].total_tokens,160);assert.equal(turns[0].duration_ms,500);
+  assert.equal(result.failed,0);const sessions = database.queryUsage({},'session');
+  assert.equal(sessions.length,1);assert.equal(sessions[0].session_id,'main');assert.equal(sessions[0].total_tokens,160);assert.equal(sessions[0].avg_duration_ms,500);
 }));
 
 test('verified legacy fork prefix is excluded while new fork usage remains',async () => fixture(async (database,options,root) => {
@@ -506,9 +487,8 @@ test('verified legacy fork prefix is excluded while new fork usage remains',asyn
   await writeFile(join(root,'parent.jsonl'),jsonl([codexMeta('parent'),codexStart('old'),legacyUsage(100)]));
   await writeFile(join(root,'fork.jsonl'),jsonl([codexMeta('fork',undefined,'parent'),codexStart('old'),legacyUsage(100),codexStart('new'),legacyUsage(120)]));
   const result = await refreshSummary(database,codexOptions);
-  assert.equal(result.failed,0);const turns = database.queryTurns();
-  assert.equal(turns.length,2);assert.equal(turns.reduce((sum,row)=>sum+row.total_tokens,0),220);
-  assert.deepEqual(turns.map(row=>row.root_turn_id).sort(),['new','old']);
+  assert.equal(result.failed,0);const usage = database.queryUsage()[0];
+  assert.equal(usage.turn_count,2);assert.equal(usage.total_tokens,220);
 }));
 
 test('cancellation before commit preserves earlier summaries and supports a new explicit refresh',async () => fixture(async (database,options,root) => {
@@ -516,20 +496,20 @@ test('cancellation before commit preserves earlier summaries and supports a new 
   await appendFile(main,jsonl([response(200,'prompt-one','second','second')]));
   const controller = new AbortController();
   const result = await refreshSummary(database,options,controller.signal,progress=>{if(progress.phase==='committing')controller.abort();});
-  assert.equal(result.interrupted,true);assert.equal(database.queryTurns()[0].total_tokens,200);
-  const retried = await refreshSummary(database,options);assert.equal(retried.failed,0);assert.equal(database.queryTurns()[0].total_tokens,500);
+  assert.equal(result.interrupted,true);assert.equal(database.queryUsage()[0].total_tokens,200);
+  const retried = await refreshSummary(database,options);assert.equal(retried.failed,0);assert.equal(database.queryUsage()[0].total_tokens,500);
 }));
 
 test('empty and first partial-only files are deferred without parse errors',async () => fixture(async (database,options,root) => {
   const empty = join(root,'empty.jsonl');const partial = join(root,'partial.jsonl');
   await writeFile(empty,'');await writeFile(partial,JSON.stringify(user()));
   const result = await refreshSummary(database,options);
-  assert.equal(result.failed,0);assert.equal(database.queryTurns().length,0);
+  assert.equal(result.failed,0);assert.equal(database.queryTurnsCount(),0);
   assert.equal(database.findSourceFile('claude',partial)?.last_error,null);
   assert.equal(database.findSourceFile('claude',empty)?.processing_status,'done');
   await appendFile(partial,'\n' + jsonl([response()]));
   assert.equal((await refreshSummary(database,options)).failed,0);
-  assert.equal(database.queryTurns()[0].total_tokens,200);
+  assert.equal(database.queryUsage()[0].total_tokens,200);
 }));
 
 test('new Codex grandchild resolves an unchanged parent using a verified filename candidate',async () => fixture(async (database,options,root) => {
@@ -539,7 +519,7 @@ test('new Codex grandchild resolves an unchanged parent using a verified filenam
   assert.equal((await refreshSummary(database,codexOptions)).failed,0);
   await writeFile(join(root,'rollout-grandchild.jsonl'),jsonl([codexMeta('grandchild','child'),codexStart('g','root'),currentUsage('grandchild','g','root',20)]));
   assert.equal((await refreshSummary(database,codexOptions)).failed,0);
-  const turns = database.queryTurns();assert.equal(turns.length,1);assert.equal(turns[0].total_tokens,160);
+  const usage = database.queryUsage()[0];assert.equal(usage.turn_count,1);assert.equal(usage.total_tokens,160);
 }));
 
 test('worker cancellation before startup and while waiting for another writer releases cleanly',async () => {
@@ -654,7 +634,7 @@ test('line byte budget failure preserves prior summary and exposes the exact sou
   const path=join(root,'main.jsonl');await writeFile(path,jsonl([user(),response()]));await refreshSummary(database,options);
   await appendFile(path,JSON.stringify({type:'assistant',text:'x'.repeat(1000)})+'\n');
   const result=await refreshSummary(database,{...options,maxLineBytes:512});
-  assert.equal(result.failed,1);assert.equal(database.queryTurns()[0].total_tokens,200);
+  assert.equal(result.failed,1);assert.equal(database.queryUsage()[0].total_tokens,200);
   const file=database.findSourceFile('claude',path)!;
   assert.equal(file.last_error,'line-byte-budget-exceeded');assert.match(file.processing_position!,/byte=[1-9]/);
 }));
@@ -666,7 +646,7 @@ test('a new malformed subagent preserves the entire previously accepted session'
   const agents=join(root,'session-one','subagents');await mkdir(agents,{recursive:true});
   await writeFile(join(agents,'agent-new.jsonl'),jsonl([response(30,'prompt-one','child','child-request')])+'{bad}\n');
   const result=await refreshSummary(database,options);
-  assert.equal(result.failed,1);assert.equal(database.queryTurns()[0].total_tokens,200);
+  assert.equal(result.failed,1);assert.equal(database.queryUsage()[0].total_tokens,200);
   assert.equal(database.findSourceFile('claude',main)!.processing_status,'error');
 }));
 
@@ -678,10 +658,11 @@ test('a malformed reassigned file preserves both the old and newly identified se
   await writeFile(a,jsonl([user('prompt-b','session-b'),response(200,'prompt-b')])+'{bad}\n');
   await writeFile(b,jsonl([user('prompt-b','session-b'),response(100,'prompt-b')]));
   const result=await refreshSummary(database,options);assert.equal(result.failed,1);
-  const rows=database.queryTurns();
+  const rows=database.queryUsage({},'session');
   assert.equal(rows.find(row=>row.session_id==='session-a')!.total_tokens,200);
   assert.equal(rows.find(row=>row.session_id==='session-b')!.total_tokens,150);
-  assert.ok(rows.every(row=>row.last_error==='parse-error'));
+  assert.equal(database.findSourceFile('claude',a)?.last_error,'parse-error');
+  assert.equal(database.diagnosticCounts().stale_summaries,2);
 }));
 
 test('a malformed new Codex descendant keeps the accepted root-session summary',async () => fixture(async(database,options,root)=>{
@@ -692,11 +673,11 @@ test('a malformed new Codex descendant keeps the accepted root-session summary',
   await writeFile(main,jsonl([codexMeta('main'),codexStart('root'),currentUsage('main','root','root',200)]));
   await writeFile(join(root,'child.jsonl'),jsonl([codexMeta('child','main'),codexStart('c','root')])+'{bad}\n');
   const result=await refreshSummary(database,codexOptions);
-  assert.equal(result.failed,1);assert.equal(database.queryTurns()[0].total_tokens,100);
-  assert.equal(database.queryTurns()[0].last_error,'parse-error');
+  assert.equal(result.failed,1);assert.equal(database.queryUsage()[0].total_tokens,100);
+  assert.equal(database.findSourceFile('codex',join(root,'child.jsonl'))?.last_error,'parse-error');
 }));
 
-test('cancelling an affected session also marks its unchanged source interrupted',async () => fixture(async(database,options,root)=>{
+test('cancelling before commit marks the changed source and preserves the accepted session',async () => fixture(async(database,options,root)=>{
   const main=join(root,'session-one.jsonl');
   const agents=join(root,'session-one','subagents');await mkdir(agents,{recursive:true});
   const child=join(agents,'agent-child.jsonl');
@@ -709,9 +690,9 @@ test('cancelling an affected session also marks its unchanged source interrupted
   const controller=new AbortController();
   const result=await refreshSummary(database,options,controller.signal,progress=>{if(progress.phase==='committing')controller.abort();});
   assert.equal(result.interrupted,true);
-  assert.equal(database.findSourceFile('claude',main)!.processing_status,'interrupted');
+  assert.equal(database.findSourceFile('claude',main)!.processing_status,'done');
   assert.equal(database.findSourceFile('claude',child)!.processing_status,'interrupted');
-  assert.equal(database.queryTurns()[0].total_tokens,330);
+  assert.equal(database.queryUsage()[0].total_tokens,330);
 }));
 
 test('cancellation after a batch commits preserves settled sessions and interrupts the pending batch',async () => fixture(async(database,options,root)=>{
@@ -731,28 +712,27 @@ test('cancellation after a batch commits preserves settled sessions and interrup
   };
   const result=await refreshSummary(database,options,controller.signal);
   assert.equal(result.interrupted,true);
-  const rows=database.queryTurns();
+  const rows=database.queryUsage({},'session');
   for (const source of sources.slice(0,16)) {
     assert.equal(database.findSourceFile('claude',source.path)!.processing_status,'done');
     const row=rows.find(row=>row.session_id===source.session)!;
-    assert.equal(row.total_tokens,300);assert.equal(row.last_error,null);
+    assert.equal(row.total_tokens,300);
   }
   const pending=sources[16];
   assert.equal(rows.find(row=>row.session_id===pending.session)!.total_tokens,200);
   assert.equal(database.findSourceFile('claude',pending.path)!.processing_status,'interrupted');
 }));
 
-test('a later batch orphan does not prevent an earlier healthy component from committing',async () => fixture(async(database,options,root)=>{
+test('a later malformed source does not prevent an earlier healthy component from committing',async () => fixture(async(database,options,root)=>{
   const codexOptions={...options,roots:[{provider:'codex' as const,path:root}]};
   const valid=join(root,'a.jsonl'),orphan=join(root,'z.jsonl');
   await writeFile(valid,jsonl([codexMeta('a'),codexStart('request'),currentUsage('a','request','request',100)]));
-  await writeFile(orphan,jsonl([codexMeta('z','missing'),codexStart('child','missing-request'),
-    currentUsage('z','child','missing-request',50)]));
+  await writeFile(orphan,jsonl([codexMeta('z','missing'),codexStart('child','missing-request')])+'{bad}\n');
   const result=await refreshSummary(database,codexOptions);
   assert.equal(result.failed,1);assert.equal(result.interrupted,false);
   assert.equal(database.findSourceFile('codex',valid)!.processing_status,'done');
-  assert.equal(database.findSourceFile('codex',orphan)!.last_error,'missing-root-turn');
-  assert.equal(database.queryTurns().length,1);assert.equal(database.queryTurns()[0].total_tokens,100);
+  assert.equal(database.findSourceFile('codex',orphan)!.last_error,'parse-error');
+  assert.equal(database.queryTurnsCount(),1);assert.equal(database.queryUsage()[0].total_tokens,100);
 }));
 
 test('a middle batch commit failure preserves its old snapshot and still commits the later component',async () => fixture(async(database,options,root)=>{
@@ -761,13 +741,13 @@ test('a middle batch commit failure preserves its old snapshot and still commits
   await refreshSummary(database,options);database.queryUsage();
   // 같은 길이의 토큰 값 교체가 stat 비교에서 빠지지 않도록 빈 줄을 더한다.
   for (const source of sources) await writeFile(source.path,jsonl([user('same-request',source.session),response(200,'same-request')])+'\n');
-  database.connection.exec(`CREATE TEMP TRIGGER reject_middle BEFORE INSERT ON main.turn_summary
+  database.connection.exec(`CREATE TEMP TRIGGER reject_middle BEFORE INSERT ON main.usage_request_daily
     WHEN NEW.session_id='session-b' BEGIN SELECT RAISE(ABORT,'reject middle'); END;
-    CREATE TEMP TRIGGER reject_middle_update BEFORE UPDATE ON main.turn_summary
+    CREATE TEMP TRIGGER reject_middle_update BEFORE UPDATE ON main.usage_request_daily
     WHEN NEW.session_id='session-b' AND NEW.input_tokens<>OLD.input_tokens BEGIN SELECT RAISE(ABORT,'reject middle'); END;`);
   const result=await refreshSummary(database,options);
   assert.equal(result.failed,1);assert.equal(result.interrupted,false);
-  const rows=database.queryTurns();
+  const rows=database.queryUsage({},'session');
   for (const source of sources) {
     assert.equal(rows.find(row=>row.session_id===source.session)!.total_tokens,source.name==='b'?200:300);
     assert.equal(database.findSourceFile('claude',source.path)!.processing_status,source.name==='b'?'error':'done');
