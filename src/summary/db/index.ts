@@ -105,8 +105,12 @@ export class SummaryDatabase {
     return [];
   }
 
-  setSessionBilling(provider: Provider, sessionId: string, mode: BillingMode): void {
+  setSessionBilling(provider: Provider, sessionId: string, mode: BillingMode | null): void {
     return this.billing.setSessionBilling(provider, sessionId, mode);
+  }
+
+  sessionBillingOverride(provider: Provider, sessionId: string): BillingMode | null {
+    return this.billing.sessionBillingOverride(provider, sessionId);
   }
 
   sessionBilling(provider: Provider, sessionId: string): BillingMode {

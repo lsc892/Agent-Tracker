@@ -675,9 +675,9 @@
       return;
     }
     renderChart(result);
-    // [결제 정책] 선택 세션의 결제 값이 응답에 포함된 경우에만 변경 입력을 활성화한다.
-    if (result.billing && selectedSession && showCosts) {
-      $('billing-mode').value = result.billing;
+    // [결제 정책] 세션의 직접 지정값을 표시하고 미지정이면 전체를 선택한다.
+    if (result.billing !== undefined && selectedSession && showCosts) {
+      $('billing-mode').value = result.billing ?? 'all';
       $('billing-mode').disabled = false;
     }
     const model = result.by === 'model';
@@ -835,8 +835,9 @@
   $('billing-mode').addEventListener('change', () => {
     // [결제 정책] 제공자와 세션이 선택된 경우에만 저장을 보내고 후속 응답까지 변경을 잠근다.
     if (!selectedSession || !$('provider').value) return;
-    $('billing-mode').disabled = true;
-    send({ type: 'setSessionBilling', provider: $('provider').value, sessionId: selectedSession, mode: $('billing-mode').value });
+    const select = $('billing-mode');
+    select.disabled = true;
+    send({ type: 'setSessionBilling', provider: $('provider').value, sessionId: selectedSession, mode: select.value === 'all' ? null : select.value });
   });
   for (const by of ['provider', 'model']) $(`chart-${by}`).addEventListener('click', () => {
     chartBy = by; offset = 0; query();

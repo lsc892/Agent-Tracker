@@ -54,7 +54,7 @@ export class SummaryClient {
     return this.transport.request('names', query);
   }
 
-  async setSessionBilling(provider: Provider, sessionId: string, mode: BillingMode): Promise<void> {
+  async setSessionBilling(provider: Provider, sessionId: string, mode: BillingMode | null): Promise<void> {
     // [설정 정책] 삭제와 결제 유형 변경이 겹치면 삭제 완료 후 변경을 요청한다.
     await this.refreshController.waitForClear();
     return this.transport.request('setBilling', { provider, sessionId, mode });

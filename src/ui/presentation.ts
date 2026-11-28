@@ -20,7 +20,7 @@ export type DashboardMessage =
   | { type: 'settings' }
   | { type: 'cancelUsage' }
   | { type: 'retryUsage' }
-  | { type: 'setSessionBilling'; provider: 'claude' | 'codex'; sessionId: string; mode: BillingMode }
+  | { type: 'setSessionBilling'; provider: 'claude' | 'codex'; sessionId: string; mode: BillingMode | null }
   | { type: 'queryUsage'; query: UsageQuery; fromDay?: string; toDay?: string; recentDays?: 7 | 30 | 90 }
   | { type: 'queryNames'; query: NameQuery; requestId: number }
   | { type: 'diagnostics'; offset: number };
@@ -49,8 +49,9 @@ function parseSessionBillingMessage(value: Record<string, unknown>): DashboardMe
   if (value.provider !== 'claude' && value.provider !== 'codex') return null;
   if (typeof value.sessionId !== 'string') return null;
   if (!value.sessionId || value.sessionId.length > MAX_ID_LENGTH) return null;
-  if (!['subscription', 'api', 'unknown'].includes(String(value.mode))) return null;
-  return { type: 'setSessionBilling', provider: value.provider, sessionId: value.sessionId, mode: value.mode as BillingMode };
+  const { mode } = value;
+  if (mode !== null && mode !== 'subscription' && mode !== 'api' && mode !== 'unknown') return null;
+  return { type: 'setSessionBilling', provider: value.provider, sessionId: value.sessionId, mode };
 }
 
 function parseNamesMessage(value: Record<string, unknown>): DashboardMessage | null {

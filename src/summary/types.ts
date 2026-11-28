@@ -76,7 +76,8 @@ export interface UsageResult {
   by?: 'provider' | 'model';
   capabilitiesEnabled?: boolean;
   capabilities?: Record<import('./db/types').CapabilityCategory, import('./db/types').CapabilityPage>;
-  billing?: import('./db/types').BillingMode;
+  /** 선택한 세션의 결제 지정값이며, 미지정은 null이다. */
+  billing?: import('./db/types').BillingMode | null;
   rows: import('./db/types').UsageRow[] | import('./db/types').TurnSummaryRow[];
   total: number;
   coverage: import('./db/types').DiagnosticsPage['counts'];
