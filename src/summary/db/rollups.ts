@@ -13,24 +13,38 @@ const SESSION_SET_FILTER = `(provider, session_id) IN (
 const MISSING_SESSIONS = `SELECT DISTINCT f.provider, f.session_id FROM json_each(?) AS s
   CROSS JOIN source_file f ON f.provider=json_extract(s.value, '$[0]') AND f.session_id=json_extract(s.value, '$[1]')
   WHERE f.source_missing=1`;
-const REPLACE_MISSING_DAYS = `AND (NOT (${SESSION_SET_FILTER}) OR (provider, session_id, local_day) IN (
+const REPLACE_MISSING_DAYS = `${SESSION_SET_FILTER} AND (NOT (${SESSION_SET_FILTER}) OR (provider, session_id, local_day) IN (
   SELECT json_extract(value, '$[0]'), json_extract(value, '$[1]'), json_extract(value, '$[2]') FROM json_each(?)
 ))`;
 
-function dailyUpsert(by: keyof typeof ROLLUP_TABLES): string {
+function dailyStatements(by: keyof typeof ROLLUP_TABLES, insertStage: StorageStage, deleteStage: StorageStage) {
   // [저장 정책] 집계 기준별 키로 일별 행을 UPSERT하고 NULL까지 포함해 실제로 값이 달라진 행만 갱신한다.
   const table = ROLLUP_TABLES[by];
+  const keys = dailyKeyColumns(by).join(', ');
   const states = [...rollupStates(by), ...DAILY_COST_STATES].map(state => state.name);
   const fields = by === 'model' ? ['model', ...states] : states;
   const incoming = fields.map(field => `excluded.${field}`);
-  return `INSERT INTO ${table}
+  const upsert = `INSERT INTO ${table}
     SELECT * FROM (${aggregateUsageSource(by, DAILY_FACTS_SOURCE, 'local_day')}) WHERE true
-    ON CONFLICT(${dailyKeyColumns(by).join(', ')}) DO UPDATE SET
+    ON CONFLICT(${keys}) DO UPDATE SET
       (${fields.join(', ')}) = (${incoming.join(', ')})
     WHERE (${fields.map(field => `${table}.${field}`).join(', ')}) IS NOT (${incoming.join(', ')})`;
+
+  // [저장 정책] 보존 조건이 다른 두 삭제 문이 같은 일별 키 목록을 사용한다.
+  const incomingKeys = dailyKeySource(by);
+  const deleteAbsent = (filter: string) => `DELETE FROM ${table} WHERE (${keys}) IN (
+    SELECT ${keys} FROM ${table} WHERE ${filter}
+    EXCEPT
+    ${incomingKeys}
+  )`;
+  return { upsert, insertStage, deleteStage, remove: deleteAbsent(SESSION_SET_FILTER),
+    removeWithMissing: deleteAbsent(REPLACE_MISSING_DAYS) };
 }
 
-const DAILY_UPSERTS = { provider: dailyUpsert('provider'), model: dailyUpsert('model') };
+const DAILY_STATEMENTS = {
+  provider: dailyStatements('provider', 'rollupRequestInsert', 'rollupRequestDelete'),
+  model: dailyStatements('model', 'rollupModelInsert', 'rollupModelDelete'),
+};
 
 export class UsageRollupStore {
   constructor(private readonly database: SqliteSession) {}
@@ -62,7 +76,6 @@ export class UsageRollupStore {
     const timezone = this.dailyTimezone();
     const scope = JSON.stringify(sessions.map(row => [row.provider, row.session_id]));
     const missing = retain ? this.database.statement(MISSING_SESSIONS).all(scope).map(row => [row.provider, row.session_id]) : [];
-    const where = `WHERE ${SESSION_SET_FILTER} ${missing.length ? REPLACE_MISSING_DAYS : ''}`;
     const params = [scope];
     if (missing.length) {
       const missingSessions = new Set(missing.map(session => JSON.stringify(session)));
@@ -79,17 +92,13 @@ export class UsageRollupStore {
     // [SQL 트랜잭션 정책] 일별 제공자·모델 합계를 UPSERT하고 새 집계에서 사라진 키는 EXCEPT로 찾아 삭제한다.
     const facts = dailyFacts(summaries, timezone);
     for (const by of ['provider', 'model'] as const) {
-      const table = ROLLUP_TABLES[by];
-      profile.measure(by === 'provider' ? 'rollupRequestInsert' : 'rollupModelInsert', () => {
-        this.database.statement(DAILY_UPSERTS[by]).run(facts[by]);
+      const { upsert, insertStage, deleteStage, remove, removeWithMissing } = DAILY_STATEMENTS[by];
+      profile.measure(insertStage, () => {
+        this.database.statement(upsert).run(facts[by]);
       });
-      const keys = dailyKeyColumns(by).join(', ');
-      profile.measure(by === 'provider' ? 'rollupRequestDelete' : 'rollupModelDelete', () => {
-        this.database.statement(`DELETE FROM ${table} WHERE (${keys}) IN (
-          SELECT ${keys} FROM ${table} ${where}
-          EXCEPT
-          ${dailyKeySource(by)}
-        )`).run(...params, by === 'provider' ? facts.requestKeys : facts.modelKeys);
+      profile.measure(deleteStage, () => {
+        this.database.statement(missing.length ? removeWithMissing : remove)
+          .run(...params, by === 'provider' ? facts.requestKeys : facts.modelKeys);
       });
     }
     if (preserveCapabilities) {
@@ -104,7 +113,8 @@ export class UsageRollupStore {
             use.category, use.name, use.usage_count]);
         }
       }
-      this.database.statement(`DELETE FROM usage_capability_daily ${where}`).run(...params);
+      const filter = missing.length ? REPLACE_MISSING_DAYS : SESSION_SET_FILTER;
+      this.database.statement(`DELETE FROM usage_capability_daily WHERE ${filter}`).run(...params);
       if (capabilities.length) this.database.statement(`INSERT INTO usage_capability_daily
         SELECT json_extract(value,'$[0]'), json_extract(value,'$[1]'), json_extract(value,'$[2]'),
           coalesce(agent_tracker_period(json_extract(value,'$[3]'), ?, 'day'),''),

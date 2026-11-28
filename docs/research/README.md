@@ -4,7 +4,7 @@ UI·다국어·JSONL 파싱·저장소 갱신과 조회의 조사 결과와 구�
 
 파일명이나 본문에 적힌 조사·작업일을 기준으로 분류한다. 날짜가 없는 `Localization.md`는 최초 추가 커밋의 날짜(2026-10-09, Asia/Seoul)를 사용한다.
 
-- [2026-11-27 턴 누계 검사 갱신과 보정 정리](2026-11-27/TurnCheckAccumulation-Minimization.md)
+- 2026-11-27에는 턴 누계 검사 갱신과 일별 삭제 SQL 구성을 정리했다. [턴 누계 검산](2026-11-27/TurnCheckAccumulation-Minimization.md) · [일별 삭제 대조](2026-11-27/DailyDeleteKeys-Minimization.md)
 - [2026-11-27 현재 통계 집계의 작업·저장 공간 절감 후보](2026-11-27/SummaryReduction-2026-11-27.md) — 응답 비교 도달 횟수, SQL 전달량과 SQLite 저장 크기를 관측했다.
 - [2026-11-27 Codex 응답 병합](2026-11-27/CodexThreadMerge-Minimization.md) · [일별 SQL 입력](2026-11-27/SqlDailyHandoff-Review.md) — 복사본 병합의 응답 키 관리와 일별 집계 전달을 단순화했다.
 - [2026-11-26 코드 프리징 정리](2026-11-26/README.md) — 현재 기능의 수집·quota 경로 단순화와 구간 주석, 벤치마크 채택 이력.

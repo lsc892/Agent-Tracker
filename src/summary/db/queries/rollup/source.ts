@@ -66,10 +66,11 @@ export function buildDailyUsageFilter(filter: SummaryFilter, timezone: string): 
 /** 소실된 행을 정리할 때 새 집계와 같은 날짜·모델 키를 사용한다. */
 export function dailyKeySource(by: UsageBasis): string {
   // [SQL 조회 정책] 미리 계산한 일자와 원래 모델명을 받고 모델 키는 삽입과 같은 식으로 계산한다.
-  const columns = dailyKeyColumns(by).map((key, index) =>
+  const columns = dailyKeyColumns(by);
+  const extract = columns.map((key, index) =>
     `json_extract(value, '$[${index}]') AS ${key === 'model_key' ? 'model' : key}`);
-  const keys = dailyKeyColumns(by).map(key => key === 'model_key' ? MODEL_KEY : key);
-  return `SELECT ${keys.join(', ')} FROM (SELECT ${columns.join(', ')} FROM json_each(?))`;
+  const keys = columns.map(key => key === 'model_key' ? MODEL_KEY : key);
+  return `SELECT ${keys.join(', ')} FROM (SELECT ${extract.join(', ')} FROM json_each(?))`;
 }
 
 /** 스레드 합계를 현지 날짜와 모델별로 묶어 합계와 평균 표본 수를 계산한다. */
