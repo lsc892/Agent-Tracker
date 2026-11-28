@@ -4,6 +4,7 @@ import { escapeHtml } from './presentation';
 import { settingDefinitions } from '../configuration/schema';
 
 function pageSizeInput(id: string): string {
+  // [페이지 정책] 각 페이지 크기 입력은 1~1000의 정수와 기본값 100으로 초기화한다.
   return `<label class="page-size"><span data-i18n="dashboard.rowsPerPage">${escapeHtml(t('dashboard.rowsPerPage'))}</span><input id="${id}" type="number" min="1" max="1000" step="1" value="100" required inputmode="numeric" data-i18n-title="dashboard.pageSizeHelp" title="${escapeHtml(t('dashboard.pageSizeHelp'))}"></label>`;
 }
 
@@ -12,6 +13,7 @@ function pageSizeInput(id: string): string {
  * 알고리즘: 공통 기본 색상·번역 문구를 escape해 폼에 넣고 CSP와 nonce로 연결된 로컬 스크립트만 실행하게 한다.
  */
 export function colorSettingsHtml(scriptUri:string,styleUri:string,cspSource:string,nonce:string):string {
+  // [Webview 정책] 공통 색상 기본값과 번역을 폼에 넣고 nonce가 붙은 스크립트만 허용한다.
   return `<!DOCTYPE html><html lang="${escapeHtml(getLocale())}"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${escapeHtml(cspSource)}; script-src 'nonce-${escapeHtml(nonce)}';">
 <title data-i18n="color.title">${escapeHtml(t('color.title'))}</title><link rel="stylesheet" href="${escapeHtml(styleUri)}"></head>
@@ -33,21 +35,24 @@ export function colorSettingsHtml(scriptUri:string,styleUri:string,cspSource:str
  * 알고리즘: 번역·외부 속성 값을 HTML escape하고 CSP로 자원을 차단한 뒤 nonce를 가진 로컬 스크립트와 스타일만 연결한다.
  */
 export function dashboardHtml(scriptUri: string, styleUri: string, cspSource: string, nonce: string): string {
+  // [초기화 정책] 필터를 비활성 상태로 만들고 통계 조회가 준비되면 화면 스크립트에서 연다.
   return `<!DOCTYPE html>
 <html lang="${escapeHtml(getLocale())}"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${escapeHtml(cspSource)}; script-src 'nonce-${escapeHtml(nonce)}';">
 <title>Agent Tracker</title><link rel="stylesheet" href="${escapeHtml(styleUri)}"></head>
 <body><header><div><p class="eyebrow">AGENT TRACKER</p><h1><span data-i18n="dashboard.heading">${escapeHtml(t('dashboard.heading'))}</span></h1><p class="muted"><span data-i18n="dashboard.description">${escapeHtml(t('dashboard.description'))}</span></p></div><button id="settings"><span data-i18n="common.settings">${escapeHtml(t('common.settings'))}</span></button></header>
 <main><p id="configuration-warning" class="stale" role="status" hidden></p><p id="error" class="error" role="alert" hidden></p>
-<section id="usage" data-i18n-aria-label="dashboard.usageStatistics" aria-label="${escapeHtml(t('dashboard.usageStatistics'))}"><div class="section-title"><div><h2><span data-i18n="dashboard.usageStatistics">${escapeHtml(t('dashboard.usageStatistics'))}</span></h2></div><div class="actions"><button id="cancel-usage" hidden><span data-i18n="common.cancel">${escapeHtml(t('common.cancel'))}</span></button></div></div>
+<section id="usage" data-i18n-aria-label="dashboard.usageStatistics" aria-label="${escapeHtml(t('dashboard.usageStatistics'))}"><div class="section-title"><div><h2><span data-i18n="dashboard.usageStatistics">${escapeHtml(t('dashboard.usageStatistics'))}</span></h2></div><div class="actions"><button id="cancel-usage" hidden><span data-i18n="common.cancel">${escapeHtml(t('common.cancel'))}</span></button><button id="retry-usage" hidden><span data-i18n="diagnostics.reload">${escapeHtml(t('diagnostics.reload'))}</span></button></div></div>
 <p id="usage-progress" role="status" aria-live="polite"></p>
+<fieldset id="usage-controls" disabled hidden data-i18n-aria-label="dashboard.usageStatistics" aria-label="${escapeHtml(t('dashboard.usageStatistics'))}">
 <div class="segmented statistics-sections" role="group" data-i18n-aria-label="dashboard.statisticsSections" aria-label="${escapeHtml(t('dashboard.statisticsSections'))}"><button id="section-tokens" type="button" aria-pressed="true" aria-controls="token-section"><span data-i18n="common.tokens">${escapeHtml(t('common.tokens'))}</span></button><button id="section-skills" type="button" aria-pressed="false" aria-controls="skill-section"><span data-i18n="common.skillSection">${escapeHtml(t('common.skillSection'))}</span></button></div>
 <form id="usage-filters" class="filters">
-<label id="group-control"><span data-i18n="dashboard.queryUnit">${escapeHtml(t('dashboard.queryUnit'))}</span><select id="group"><option value="day" data-i18n="dashboard.daily">${escapeHtml(t('dashboard.daily'))}</option><option value="month" data-i18n="dashboard.monthly">${escapeHtml(t('dashboard.monthly'))}</option><option value="project" data-i18n="dashboard.byProject">${escapeHtml(t('dashboard.byProject'))}</option><option value="session" data-i18n="dashboard.bySession">${escapeHtml(t('dashboard.bySession'))}</option><option value="turn" data-i18n="dashboard.byRequest">${escapeHtml(t('dashboard.byRequest'))}</option><option value="all" data-i18n="common.all">${escapeHtml(t('common.all'))}</option></select></label>
+<label id="group-control"><span data-i18n="dashboard.queryUnit">${escapeHtml(t('dashboard.queryUnit'))}</span><select id="group"><option value="day" data-i18n="dashboard.daily">${escapeHtml(t('dashboard.daily'))}</option><option value="month" data-i18n="dashboard.monthly">${escapeHtml(t('dashboard.monthly'))}</option><option value="project" data-i18n="dashboard.byProject">${escapeHtml(t('dashboard.byProject'))}</option><option value="session" data-i18n="dashboard.bySession">${escapeHtml(t('dashboard.bySession'))}</option><option value="all" data-i18n="common.all">${escapeHtml(t('common.all'))}</option></select></label>
 <label><span data-i18n="common.provider">${escapeHtml(t('common.provider'))}</span><select id="provider"><option value="" data-i18n="common.all">${escapeHtml(t('common.all'))}</option><option value="claude">Claude</option><option value="codex">Codex</option></select></label>
 <div id="chart-by-control" class="filter-toggle"><span><span data-i18n="dashboard.grouping">${escapeHtml(t('dashboard.grouping'))}</span></span><div class="segmented" role="group" data-i18n-aria-label="dashboard.grouping" aria-label="${escapeHtml(t('dashboard.grouping'))}"><button id="chart-provider" type="button" aria-pressed="true"><span data-i18n="dashboard.byProvider">${escapeHtml(t('dashboard.byProvider'))}</span></button><button id="chart-model" type="button" aria-pressed="false"><span data-i18n="dashboard.byModel">${escapeHtml(t('dashboard.byModel'))}</span></button></div></div>
-<label><span data-i18n="dashboard.dateRange">${escapeHtml(t('dashboard.dateRange'))}</span><select id="date-range" aria-controls="from-date-control to-date-control"><option value="7" data-i18n="dashboard.last7Days">${escapeHtml(t('dashboard.last7Days'))}</option><option value="30" data-i18n="dashboard.last30Days">${escapeHtml(t('dashboard.last30Days'))}</option><option value="90" data-i18n="dashboard.last90Days">${escapeHtml(t('dashboard.last90Days'))}</option><option value="all" data-i18n="dashboard.allTime">${escapeHtml(t('dashboard.allTime'))}</option><option value="custom" data-i18n="dashboard.customDateRange">${escapeHtml(t('dashboard.customDateRange'))}</option></select></label>
+<label><span data-i18n="dashboard.dateRange">${escapeHtml(t('dashboard.dateRange'))}</span><select id="date-range" aria-controls="from-date-control to-date-control"><option value="7" data-i18n="dashboard.last7Days">${escapeHtml(t('dashboard.last7Days'))}</option><option value="30" selected data-i18n="dashboard.last30Days">${escapeHtml(t('dashboard.last30Days'))}</option><option value="90" data-i18n="dashboard.last90Days">${escapeHtml(t('dashboard.last90Days'))}</option><option value="all" data-i18n="dashboard.allTime">${escapeHtml(t('dashboard.allTime'))}</option><option value="custom" data-i18n="dashboard.customDateRange">${escapeHtml(t('dashboard.customDateRange'))}</option></select></label>
 ${(['from', 'to'] as const).map(bound => {
+    // [기간 정책] 양쪽 경계에 키보드용 문자열 입력과 달력 선택기를 한 쌍으로 구성한다.
     const caption = bound === 'from' ? 'dashboard.fromDate' : 'dashboard.toDate';
     return `<div id="${bound}-date-control" class="date-filter" hidden><label for="${bound}-day" data-i18n="${caption}">${escapeHtml(t(caption))}</label><div class="date-input"><input id="${bound}-day" type="text" placeholder="year-month-day" inputmode="numeric" pattern="[0-9]{4}-[0-9]{2}-[0-9]{2}" maxlength="10" autocomplete="off" spellcheck="false" disabled><input id="${bound}-day-picker" type="date" data-i18n-aria-label="${caption}" aria-label="${escapeHtml(t(caption))}" disabled></div></div>`;
   }).join('')}
@@ -70,7 +75,7 @@ ${(['skill','subagent','plugin','model'] as const).map(category=>`<section class
 <p class="muted note"><span data-i18n="dashboard.aiCallsNote">${escapeHtml(t('dashboard.aiCallsNote'))}</span></p>
 <p class="muted note"><span data-i18n="dashboard.capabilityRatioNote">${escapeHtml(t('dashboard.capabilityRatioNote'))}</span></p>
 <p class="muted note"><span data-i18n="dashboard.capabilityNote">${escapeHtml(t('dashboard.capabilityNote'))}</span></p>
-</div></div></section>
+</div></div></fieldset></section>
 <footer class="dashboard-footer"><a id="open-diagnostics" href="#"><span data-i18n="diagnostics.heading">${escapeHtml(t('diagnostics.heading'))}</span></a></footer>
 </main>${localizationScripts(scriptUri, nonce)}<script nonce="${escapeHtml(nonce)}" src="${escapeHtml(scriptUri)}"></script></body></html>`;
 }
@@ -80,12 +85,13 @@ ${(['skill','subagent','plugin','model'] as const).map(category=>`<section class
  * 알고리즘: 진단 표·페이지 조작 영역과 번역을 조립하고 속성 escape·CSP·nonce를 적용해 로컬 자원만 연결한다.
  */
 export function diagnosticsHtml(scriptUri: string, styleUri: string, cspSource: string, nonce: string): string {
+  // [Webview 정책] 파일 진단 표의 초기 틀을 만들고 스타일 출처와 실행 가능한 스크립트를 제한한다.
   return `<!DOCTYPE html>
 <html lang="${escapeHtml(getLocale())}"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${escapeHtml(cspSource)}; script-src 'nonce-${escapeHtml(nonce)}';">
 <title data-i18n="diagnostics.title">${escapeHtml(t('diagnostics.title'))}</title><link rel="stylesheet" href="${escapeHtml(styleUri)}"></head>
 <body><header><div><p class="eyebrow">AGENT TRACKER</p><h1><span data-i18n="diagnostics.heading">${escapeHtml(t('diagnostics.heading'))}</span></h1><p class="muted"><span data-i18n="diagnostics.description">${escapeHtml(t('diagnostics.description'))}</span></p></div><button id="settings"><span data-i18n="common.settings">${escapeHtml(t('common.settings'))}</span></button></header>
 <main><p id="configuration-warning" class="stale" role="status" hidden></p><p id="error" class="error" role="alert" hidden></p>
-<section id="diagnostics" data-i18n-aria-label="diagnostics.heading" aria-label="${escapeHtml(t('diagnostics.heading'))}"><div class="section-title"><h2><span data-i18n="diagnostics.fileStatus">${escapeHtml(t('diagnostics.fileStatus'))}</span></h2><button id="refresh-diagnostics" data-i18n-title="diagnostics.reloadHelp" title="${escapeHtml(t('diagnostics.reloadHelp'))}"><span data-i18n="diagnostics.reload">${escapeHtml(t('diagnostics.reload'))}</span></button></div><p id="diagnostic-counts"></p><div id="diagnostic-files" class="table-wrap"></div><div class="pagination"><button id="diagnostic-previous"><span data-i18n="common.previous">${escapeHtml(t('common.previous'))}</span></button><span id="diagnostic-page"></span><button id="diagnostic-next"><span data-i18n="common.next">${escapeHtml(t('common.next'))}</span></button></div><h3><span data-i18n="diagnostics.requestsToCheck">${escapeHtml(t('diagnostics.requestsToCheck'))}</span></h3><p class="muted note"><span data-i18n="diagnostics.qualityNote">${escapeHtml(t('diagnostics.qualityNote'))}</span></p><div id="diagnostic-summaries" class="table-wrap"></div></section>
+<section id="diagnostics" data-i18n-aria-label="diagnostics.heading" aria-label="${escapeHtml(t('diagnostics.heading'))}"><div class="section-title"><h2><span data-i18n="diagnostics.fileStatus">${escapeHtml(t('diagnostics.fileStatus'))}</span></h2><button id="refresh-diagnostics" data-i18n-title="diagnostics.reloadHelp" title="${escapeHtml(t('diagnostics.reloadHelp'))}"><span data-i18n="diagnostics.reload">${escapeHtml(t('diagnostics.reload'))}</span></button></div><p id="diagnostic-counts"></p><div id="diagnostic-files" class="table-wrap"></div><div class="pagination"><button id="diagnostic-previous"><span data-i18n="common.previous">${escapeHtml(t('common.previous'))}</span></button><span id="diagnostic-page"></span><button id="diagnostic-next"><span data-i18n="common.next">${escapeHtml(t('common.next'))}</span></button></div></section>
 </main>${localizationScripts(scriptUri, nonce)}<script nonce="${escapeHtml(nonce)}" src="${escapeHtml(scriptUri)}"></script></body></html>`;
 }

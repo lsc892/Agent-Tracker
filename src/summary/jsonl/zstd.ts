@@ -21,6 +21,7 @@ class ZstdFrames {
    * 알고리즘: 현재 청크에서 필요한 부분만 subarray로 yield하고 부족하면 다음 청크를 읽으며 허용된 경계 종료 외의 EOF는 잘림으로 거부한다.
    */
   async *take(size: number, allowEnd = false): AsyncGenerator<Buffer> {
+    // [압축 해제 정책] 현재 청크를 잘라 정확한 길이를 넘기고 프레임 시작에서 허용한 EOF만 정상 종료로 본다.
     let remaining = size;
     while (remaining) {
       if (this.offset === this.chunk.length) {
@@ -56,6 +57,7 @@ class ZstdFrames {
    */
   async *frame(magic: Buffer): AsyncGenerator<Buffer> {
     yield magic;
+    // [압축 해제 정책] 플래그로 창 크기·사전 ID·콘텐츠 크기의 필드 길이를 계산한다.
     const descriptor = await this.read(1);
     const flags = descriptor[0];
     if (flags & 8) throw new ZstdError();
@@ -65,6 +67,7 @@ class ZstdFrames {
     const sizeBytes = sizeFlag ? 1 << sizeFlag : Number(single);
     const headerBytes = Number(!single) + [0, 1, 2, 4][flags & 3] + sizeBytes;
     if (headerBytes) yield await this.read(headerBytes);
+    // [압축 해제 정책] 마지막 블록까지 헤더와 길이를 검증하고 반복 블록은 압축 바이트 하나만 전달한다.
     let last = false;
     while (!last) {
       const header = await this.read(3);
@@ -92,6 +95,7 @@ async function* decodeFrame(chunks: AsyncIterable<Buffer>): AsyncGenerator<Buffe
     try { yield* chunks; }
     catch (error) { sourceError = error; throw error; }
   };
+  // [메모리 정책] 입력은 64KiB 단위로 연결하고 압축 해제 창 크기에도 상한을 둔다.
   const source = Readable.from(input(), { objectMode: false, highWaterMark: 64 * 1024 });
   const decoder = createZstdDecompress({ chunkSize: 64 * 1024,
     params: { [constants.ZSTD_d_windowLogMax]: 27 } });
@@ -122,6 +126,7 @@ export async function* zstdChunks(chunks: AsyncIterable<Buffer>): AsyncGenerator
     for (let magic = await frames.read(4, true); magic; magic = await frames.read(4, true)) {
       seen = true;
       const value = magic.readUInt32LE();
+      // [압축 해제 정책] 구분값으로 건너뛸 프레임과 해제할 프레임을 나누고 그 밖의 입력은 거부한다.
       if (value >= 0x184d2a50 && value <= 0x184d2a5f) {
         const size = (await frames.read(4)).readUInt32LE();
         for await (const part of frames.take(size)) void part;

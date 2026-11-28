@@ -154,6 +154,7 @@ export function isSettingDefinition(node: SettingDefinition | SettingTree): node
  */
 export function mapSettings<T extends SettingTree, Value>(tree: T,
   map: (definition: SettingDefinition, key: string) => Value, prefix = ''): object {
+  // [설정 정책] 점으로 연결한 키는 말단 변환에 쓰고 반환 객체에는 트리 구조를 유지한다.
   return Object.fromEntries(Object.entries(tree).map(([name, node]) => {
     const key = prefix ? `${prefix}.${name}` : name;
     return [name, isSettingDefinition(node) ? map(node, key) : mapSettings(node, map, key)];

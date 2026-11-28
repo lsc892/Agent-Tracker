@@ -12,6 +12,7 @@ export class SummaryClient {
   private readonly refreshController: RefreshController;
 
   constructor(options: SummaryOptions) {
+    // [설정 정책] 호출자의 설정을 복사하고 Worker를 생성할 때 그 사본을 사용한다.
     this.options = { ...options };
     this.transport = new WorkerTransport(this.options);
     this.refreshController = new RefreshController(this.transport);
@@ -22,6 +23,7 @@ export class SummaryClient {
   }
 
   async setCapabilityCollectionEnabled(enabled: boolean): Promise<void> {
+    // [설정 정책] 갱신 취소와 삭제가 끝나면 이미 실행 중인 Worker에도 도구 수집 설정을 전한다.
     this.options.collectCapabilities = enabled;
     await this.refreshController.cancelRefresh();
     await this.refreshController.waitForClear();
@@ -29,6 +31,7 @@ export class SummaryClient {
   }
 
   async setDeletedSourceRetentionEnabled(enabled: boolean): Promise<void> {
+    // [설정 정책] 갱신 취소와 삭제가 끝나면 이미 실행 중인 Worker에도 원본 소실 보존 설정을 전한다.
     this.options.retainDeletedSourceUsage = enabled;
     await this.refreshController.cancelRefresh();
     await this.refreshController.waitForClear();
@@ -40,21 +43,25 @@ export class SummaryClient {
   }
 
   async query(query: UsageQuery = {}): Promise<UsageResult> {
+    // [조회 정책] 진행 중인 삭제가 끝난 뒤 사용량 조회를 요청한다.
     await this.refreshController.waitForClear();
     return this.transport.request('query', query);
   }
 
   async queryNames(query: NameQuery): Promise<NameResult> {
+    // [조회 정책] 진행 중인 삭제가 끝난 뒤 그 시점의 세션·프로젝트 이름을 조회한다.
     await this.refreshController.waitForClear();
     return this.transport.request('names', query);
   }
 
   async setSessionBilling(provider: Provider, sessionId: string, mode: BillingMode): Promise<void> {
+    // [설정 정책] 삭제와 결제 유형 변경이 겹치면 삭제 완료 후 변경을 요청한다.
     await this.refreshController.waitForClear();
     return this.transport.request('setBilling', { provider, sessionId, mode });
   }
 
   async diagnostics(page: { limit?: number; offset?: number; afterId?: number; providers?: SourceRoot['provider'][] } = {}): Promise<DiagnosticsResult> {
+    // [조회 정책] 진행 중인 삭제가 끝난 뒤 원본 진단 페이지를 요청한다.
     await this.refreshController.waitForClear();
     return this.transport.request('diagnostics', page);
   }

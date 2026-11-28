@@ -1,5 +1,5 @@
 {
-  "manifest.description": "Claude と Codex のサブスクリプション使用率とローカルのユーザーリクエスト別トークン統計",
+  "manifest.description": "Claude と Codex のサブスクリプション使用量と会話別ローカルトークン統計",
   "manifest.openDashboard": "Agent Tracker：ダッシュボードを開く",
   "manifest.openUsage": "Agent Tracker：使用統計を開く",
   "status.refreshName": "Agent Tracker：現在の使用量を更新",
@@ -41,7 +41,7 @@
   "manifest.showResetCredits": "使用量カードに Codex のリセット利用可能回数と次の期限を表示します。サーバーが情報を提供する場合のみ表示します。",
   "dashboard.usageStatistics": "使用統計",
   "manifest.usageEnabled": "使用統計を有効にします。オフにすると収集を停止し統計画面を閉じます。サブスクリプション使用量の取得には影響しません。\n\n[統計計算データを削除](command:agentTracker.clearUsageData)：保存されたファイル処理情報と集計結果を削除します。元の会話ログは保持し、次に統計を開くと再計算します。",
-  "manifest.skillsEnabled": "Skill 統計のスキル・サブエージェント・プラグイン・モデルの使用回数を集計し、AI による呼び出しもデフォルトで含めます。オフでは新規集計と表示を停止し、既存データは保持します。トークン・API 費用・サブスクリプション使用量には影響しません。再度有効にすると開いている統計画面で再計算し、閉じていれば次に開くとき元のログから復元します。",
+  "manifest.skillsEnabled": "スキル、サブエージェント、プラグイン、モデルの使用回数を集計します。",
   "manifest.showApiCosts": "トークン統計表に API 推定費用（USD）を表示します。サブスクリプションは0で、支払い方法・モデル単価・トークン内訳が未確認の費用は別表示します。設定変更は保存された統計のみ取得します。",
   "manifest.excludeEmpty": "モデル不明でトークン使用量もないリクエストをチャートと平均から除外します。表には表示し続けます。既知モデルの0トークン記録とモデル不明の実使用量は含めます。",
   "manifest.timezone": "日・月統計の IANA タイムゾーンです。空欄ではシステムのタイムゾーンを使います。",

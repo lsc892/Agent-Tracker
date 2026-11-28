@@ -18,6 +18,7 @@
     { get label() { return t('common.cacheRead'); }, get title() { return t('dashboard.cacheReadHelp'); } },
   ];
   const tokenSortKeys = ['input', 'output', 'cacheWrite', 'cacheRead', 'tokens'];
+  // [표시 정책] 입력에서 캐시 읽기·쓰기를 빼고 구성 값이 미상이면 순수 입력도 미상으로 표시한다.
   const tokenValues = row => [
     number(row.input_tokens == null || row.cache_write_input_tokens == null || row.cache_read_input_tokens == null
       ? null : Math.max(0, row.input_tokens - row.cache_write_input_tokens - row.cache_read_input_tokens)),
@@ -45,8 +46,9 @@
   let openNameKind;
   let nameRequestId = 0;
   const namePages = { project: { loaded: 0, total: 0 }, session: { loaded: 0, total: 0 } };
+  // [상태 복원 정책] 이전 화면에서 저장한 집계·기간·페이지 옵션 중 지원하는 값만 복원한다.
   const saved = vscode.getState();
-  if (saved && ['day', 'month', 'project', 'session', 'turn', 'all'].includes(saved.group)) $('group').value = saved.group;
+  if (saved && ['day', 'month', 'project', 'session', 'all'].includes(saved.group)) $('group').value = saved.group;
   if (saved && Object.hasOwn(chartMetrics, saved.chartMetric)) $('chart-metric').value = saved.chartMetric;
   if (saved?.chartBy === 'model') chartBy = 'model';
   if (saved?.section === 'skills') section = 'skills';
@@ -71,11 +73,13 @@
    * 알고리즘: 직접 입력한 날짜를 date picker로 교차 검증하고 구역별 페이지 조건과 선택 ID를 모아 전송한 뒤 화면 상태를 저장한다.
    */
   function query(resetCapabilities = true) {
+    // [조회 정책] 날짜가 유효할 때만 조회하고 새 조건에서는 도구별 페이지를 처음으로 돌린다.
     if (!validateDateFilters()) return;
     if (resetCapabilities) for (const category of capabilityCategories) capabilityOffsets[category] = 0;
     updateSectionControls();
     const request = usageRequest();
     send({ type: 'queryUsage', query: request });
+    // [화면 상태 정책] 조회 조건을 보관하고 결제 방식은 새 응답에서 세션 값을 받을 때까지 잠근다.
     saveState();
     updateCostControls();
     $('billing-mode').disabled = true;
@@ -83,6 +87,7 @@
   }
   function validateDateFilters() {
     if ($('date-range').value !== 'custom') return true;
+    // [기간 정책] 문자열 형식과 달력 입력의 유효성을 함께 검사하고 잘못된 경계로 포커스를 옮긴다.
     for (const id of ['from-day', 'to-day']) {
       const input = $(id);
       const picker = $(`${id}-picker`);
@@ -111,17 +116,17 @@
     for (const name of ['tokens', 'skills']) $(`section-${name}`).setAttribute('aria-pressed', String(section === name));
   }
   function usageRequest() {
+    // [DTO 정책] 공통 페이지·정렬 상태에 도구 구역의 개별 페이지 옵션을 추가한다.
     const request = { section, groupBy: $('group').value, limit: pageSize, offset, chartBy, tableSort: { ...tableSort } };
     if (section === 'skills') {
       request.capabilityOffsets = { ...capabilityOffsets };
       request.capabilityLimits = { ...capabilityPageSizes };
     }
-    const metric = $('chart-metric').value || 'tokens';
-    request.chartMetric = request.groupBy === 'turn' && metric !== 'averageDuration' ? 'tokens' : metric;
-    $('chart-metric').value = request.chartMetric;
+    request.chartMetric = $('chart-metric').value || 'tokens';
     if ($('provider').value) request.provider = $('provider').value;
     if (selectedProject) request.projectKey = selectedProject;
     if (selectedSession) request.sessionId = selectedSession;
+    // [기간 정책] 직접 지정한 경계와 최근 일수는 별도로 보내고 전체 기간에는 날짜 조건을 보내지 않는다.
     if ($('date-range').value === 'custom') {
       if ($('from-day').value) request.fromDay = $('from-day').value;
       if ($('to-day').value) request.toDay = $('to-day').value;
@@ -173,6 +178,7 @@
     $(`${kind}-name`).title = title;
   }
   function closeNames(focus = false) {
+    // [선택 정책] 목록을 닫으면 대기 요청을 무효화하고 필요하면 마지막 버튼으로 포커스를 돌린다.
     const previous = openNameKind;
     openNameKind = undefined;
     for (const kind of ['project', 'session']) {
@@ -184,6 +190,7 @@
     if (focus && previous) $(`${previous}-name`).focus();
   }
   function chooseProject(row) {
+    // [선택 정책] 프로젝트가 바뀌면 종속된 세션 선택을 지우고 첫 페이지를 조회한다.
     selectedProject = row?.project_key;
     selectedSession = undefined;
     nameCaption('project', row ? row.project_name || t('dashboard.unnamedProject') : '', row?.project_key);
@@ -191,6 +198,7 @@
     closeNames(true); offset = 0; query();
   }
   function chooseSession(row) {
+    // [선택 정책] 세션을 고를 때 그 세션의 프로젝트와 제공자도 함께 맞춘다.
     selectedSession = row?.session_id;
     if (row) {
       selectedProject = row.project_key;
@@ -205,6 +213,7 @@
    * 알고리즘: 열린 목록의 pending 상태를 검사하고 현재 제공자·프로젝트와 loaded offset에 증가하는 request ID를 붙여 조회한다.
    */
   function loadNames(kind) {
+    // [요청 정책] 열린 목록에 대기 중인 요청이 없을 때만 현재 범위의 다음 페이지를 요청한다.
     const page = namePages[kind];
     if (openNameKind !== kind || page.pending !== undefined) return;
     const request = { kind, offset: page.loaded };
@@ -242,11 +251,16 @@
   function toggleNames(kind) {
     if (openNameKind === kind) { closeNames(); return; }
     closeNames(); openNameKind = kind;
-    namePages[kind] = { loaded: 0, total: 0 };
     $(`${kind}-options`).hidden = false;
     $(`${kind}-options`).scrollTop = 0;
     $(`${kind}-name`).setAttribute('aria-expanded', 'true');
-    $(`${kind}-list`).append(nameOption(kind));
+    reloadNames();
+  }
+  function reloadNames() {
+    const kind = openNameKind;
+    if (!kind) return;
+    namePages[kind] = { loaded: 0, total: 0 };
+    $(`${kind}-list`).replaceChildren(nameOption(kind));
     loadNames(kind);
   }
   /**
@@ -254,6 +268,7 @@
    * 알고리즘: 열린 목록·pending ID를 대조해 오래된 응답을 버리고 loaded·total을 갱신하며 표시 공간이 남으면 다음 페이지를 요청한다.
    */
   function renderNames(message) {
+    // [응답 정책] 열린 목록과 요청 ID가 일치하는 응답만 이어 붙인다.
     const kind = message.kind;
     const page = namePages[kind];
     if (openNameKind !== kind || !page || page.pending !== message.requestId) return;
@@ -263,6 +278,7 @@
     page.loaded += message.result.rows.length;
     page.total = message.result.total;
     $(`${kind}-list-status`).textContent = page.total ? t('dashboard.nameCount', { value0: number(page.loaded), value1: number(page.total), value2: page.loaded < page.total ? t('dashboard.scrollMore') : '' }) : t('dashboard.noNames');
+    // [페이지 정책] 항목이 남았는데 목록에 스크롤이 생기지 않으면 다음 페이지를 즉시 읽는다.
     const list = $(`${kind}-options`);
     if (message.result.rows.length && page.loaded < page.total && list.scrollHeight <= list.clientHeight) loadNames(kind);
   }
@@ -271,6 +287,7 @@
    * 알고리즘: 문자열은 textContent로 넣고 정렬 가능한 헤더에만 방향·접근성 속성을 붙이며 클릭 시 첫 페이지부터 호스트에 다시 조회한다.
    */
   function table(target, headers, rows, sortKeys = []) {
+    // [표시 정책] 빈 결과는 안내하고 정렬 키에 해당하는 헤더에 정렬을 제공한다.
     target.replaceChildren();
     if (!rows.length) { target.append(element('p', t('common.noRecords'), 'empty')); return; }
     const node = element('table');
@@ -293,6 +310,7 @@
     target.append(node);
   }
   function tableHeader(header, label, key) {
+    // [접근성 정책] 정렬 가능한 열에만 버튼을 만들고 활성 열의 방향을 ARIA에 반영한다.
     const cell = element('th', key ? undefined : label);
     cell.setAttribute('scope', 'col');
     if (typeof header !== 'string') cell.title = header.title;
@@ -311,6 +329,7 @@
       button.append(indicator);
     }
     button.addEventListener('click', () => {
+      // [정렬 정책] 같은 내림차순 열을 다시 누르면 오름차순으로 바꾸고 첫 페이지부터 조회한다.
       tableSort = { key, direction: tableSort.key === key && tableSort.direction === 'desc' ? 'asc' : 'desc' };
       offset = 0;
       query();
@@ -319,6 +338,7 @@
     return cell;
   }
   function tableRow(values) {
+    // [표시 정책] 생성된 노드는 셀에 붙이고 단순 값은 텍스트로 표시한다.
     const row = element('tr');
     for (const value of values) {
       const cell = element('td');
@@ -333,7 +353,6 @@
     node.title = String(text);
     return node;
   }
-  const requestLabel = row => row.request_title || row.session_name || t('dashboard.untitled');
   function projectLabel(row) {
     const name = row.project_name || t('dashboard.unnamedProject');
     const node = element('button', undefined, 'name-filter');
@@ -343,12 +362,12 @@
     node.addEventListener('click', () => chooseProject(row));
     return node;
   }
-  function sessionLabel(row, request = false) {
-    const label = tableLabel(request ? requestLabel(row) : `${row.project_name || t('dashboard.unnamedProject')} / ${row.session_name || t('dashboard.unnamedSession')}`);
+  function sessionLabel(row) {
+    const label = tableLabel(`${row.project_name || t('dashboard.unnamedProject')} / ${row.session_name || t('dashboard.unnamedSession')}`);
     const node = element('button', undefined, 'name-filter');
     node.type = 'button';
-    node.title = t('dashboard.sessionDetails', { value0: label.textContent, value1: row.session_name || '', value2: row.project_key || '', value3: row.session_id, value4: request ? t('dashboard.requestIdLine', { value0: row.root_turn_id }) : '' });
-    label.append(element('span', request ? row.session_name || t('dashboard.unnamedSession') : date(row.session_started_at_ms), 'muted session-start'));
+    node.title = t('dashboard.sessionDetails', { value0: label.textContent, value1: row.session_name || '', value2: row.project_key || '', value3: row.session_id, value4: '' });
+    label.append(element('span', date(row.session_started_at_ms), 'muted session-start'));
     node.append(label);
     node.addEventListener('click', () => chooseSession(row));
     return node;
@@ -361,35 +380,32 @@
   }
   const providerLabel = provider => provider === 'claude' ? 'Claude' : 'Codex';
   const providerClass = provider => `chart-provider-${provider}`;
-  const modelLabel = row => row.other_models ? t('dashboard.otherModels', { value0: providerLabel(row.provider) })
-    : (row.model || t('dashboard.unknownModel')).replace(/^claude-(opus|sonnet|haiku)-(\d+)-(\d+)(?:-\d{8})?$/, '$1$2.$3');
+  const modelLabel = row => (row.model || t('dashboard.unknownModel')).replace(/^claude-(opus|sonnet|haiku)-(\d+)-(\d+)(?:-\d{8})?$/, '$1$2.$3');
   const seriesLabel = row => row.model !== undefined ? modelLabel(row) : providerLabel(row.provider);
   function providerMarker(provider, attributes = {}) {
     return svgElement('rect', { width: 8, height: 8, class: `provider-marker ${providerClass(provider)}`, 'aria-hidden': 'true', ...attributes });
   }
-  function seriesName(row, model, suffix = '') {
+  function seriesName(row, model) {
     const node = element('span', undefined, 'series-name');
     const label = model ? modelLabel(row) : providerLabel(row.provider);
     node.title = providerLabel(row.provider);
     const marker = svgElement('svg', { width: 8, height: 8, role: 'img', 'aria-label': providerLabel(row.provider) });
     marker.append(providerMarker(row.provider));
-    node.append(marker, suffix ? tableLabel(`${label}${suffix}`) : element('span', label));
+    node.append(marker, element('span', label));
     return node;
   }
   const compact = value => value == null ? '—' : new Intl.NumberFormat(globalThis.agentTrackerI18n.language, { notation: 'compact', maximumFractionDigits: 1 }).format(value);
   const compactDuration = value => value == null || value < 1000 ? duration(value) : t('dashboard.seconds', { value0: compact(value / 1000) });
-  function chartValue(row, metric, turn) {
-    if (turn) return metric === 'averageDuration' ? row.duration_ms : row.total_tokens;
-    return row[({ tokens: 'total_tokens', requests: 'turn_count', averageTokens: 'avg_tokens_per_turn', averageDuration: 'avg_duration_ms' })[metric]];
+  function chartValue(row, metric) {
+    return row[({ tokens: 'total_tokens', requests: 'completed_turns', averageTokens: 'avg_tokens_per_turn', averageDuration: 'avg_duration_ms' })[metric]];
   }
   function unknownPriority(row, mode) {
     const model = row.model !== undefined && !row.model;
-    const time = mode === 'calendar' ? row.period == null : mode === 'turn' && row.started_at_ms == null;
+    const time = mode === 'calendar' && row.period == null;
     return Number(model) + 2 * Number(time);
   }
   function chartLabel(row, mode) {
     const provider = seriesLabel(row);
-    if (mode === 'turn') return `${provider} · ${date(row.started_at_ms)} · ${row.session_name || t('dashboard.unnamedSession')} · ${requestLabel(row)} (${row.root_turn_id})`;
     if (mode === 'calendar') return `${row.period || t('dashboard.unknownTime')} · ${provider}`;
     if (mode === 'total') return provider;
     return `${provider} · ${row.project_name || t('dashboard.unnamedProject')}${row.session_id ? ` / ${row.session_name || t('dashboard.unnamedSession')}` : ''}`;
@@ -399,6 +415,7 @@
    * 알고리즘: 입력에서 캐시 읽기·쓰기를 뺀 뒤 출력·캐시를 별도 성분으로 만들고 캐시가 미상이면 총량 한 구간으로 표시한다.
    */
   function chartSegments(row, metric) {
+    // [차트 정책] 합계 또는 평균 토큰을 캐시와 겹치지 않게 나누고 캐시가 미상이면 총량만 표시한다.
     const average = metric === 'averageTokens';
     const input = average ? row.avg_input_tokens : row.input_tokens;
     const output = average ? row.avg_output_tokens : row.output_tokens;
@@ -414,19 +431,16 @@
    * 알고리즘: 도표 모드와 지표에 맞는 값·구성을 선택하고 완료 횟수·시간 표본·모델 시간 중복 안내를 필요한 경우 덧붙인다.
    */
   function chartDescription(row, chart) {
-    const turn = chart.mode === 'turn';
-    const value = chartValue(row, chart.metric, turn);
+    // [접근성 정책] 막대 값에 토큰 구성이나 소요 시간 표본 수를 지표별로 덧붙인다.
+    const value = chartValue(row, chart.metric);
     let detail = `${chartLabel(row, chart.mode)} · ${chartMetricValue(value, chart)}`;
     if (['tokens', 'averageTokens'].includes(chart.metric) && value != null) {
       const segments = chartSegments(row, chart.metric);
       detail += segments[0].className === 'chart-unknown' ? t('dashboard.unknownBreakdownSuffix')
         : ` · ${segments.map(segment => `${segment.label} ${number(segment.value)}`).join(' / ')}`;
     }
-    if (chart.metric === 'requests') detail += t('dashboard.completedCountSuffix', { value0: number(row.completed_turns) });
-    if (chart.metric === 'averageDuration' && !turn) detail += t('dashboard.timeSampleSuffix', { value0: number(row.turns_with_duration) });
-    if (chart.metric === 'averageTokens') detail += t('dashboard.completedRequestsSuffix', { value0: number(row.completed_turns) });
+    if (chart.metric === 'averageDuration') detail += t('dashboard.timeSampleSuffix', { value0: number(row.turns_with_duration) });
     if (chart.mode === 'ranking' && row.session_id) detail += t('dashboard.sessionIdSuffix', { value0: row.session_id });
-    if (turn) detail += ` · ${requestStatus(row)} · ${row.duration_quality}`;
     if (chart.by === 'model' && chart.metric === 'averageDuration') detail += t('dashboard.modelTimeSuffix');
     return detail;
   }
@@ -435,10 +449,11 @@
     return `${number(value)} ${chart.metric === 'requests' ? t('dashboard.items') : t('common.tokens')}`;
   }
   /**
-   * 책임: 현재 표 페이지의 통계를 기간·요청·비교 도표로 그린다.
+   * 책임: 현재 표 페이지의 통계를 기간·순위·비교 도표로 그린다.
    * 알고리즘: 분류별 peer와 축 최댓값으로 SVG 좌표를 계산하고 토큰 성분을 누적 배치하며, 각 구간에 키보드 접근과 상세 설명을 연결한다.
    */
   function renderChart(result) {
+    // [렌더링 정책] 새 응답을 표시하기 전에 이전 도표·범례·상세 설명을 초기화한다.
     const chart = result.chart;
     const plot = $('usage-chart');
     const legend = $('chart-legend');
@@ -447,14 +462,11 @@
     legend.hidden = true;
     $('chart-detail').textContent = '';
     if (!chart) return;
-    const turn = chart.mode === 'turn';
+
+    // [차트 정책] 모델·기간 미상을 뒤로 보내고 현재 표 페이지의 범위를 표시한다.
     const metric = chart.metric;
     $('chart-metric').value = metric;
-    for (const option of $('chart-metric').options) {
-      option.disabled = turn && ['requests', 'averageTokens'].includes(option.value);
-      if (option.value === 'averageDuration') option.textContent = turn ? t('dashboard.duration') : t('dashboard.averageTime');
-    }
-    const title = turn && metric === 'averageDuration' ? t('dashboard.requestDuration') : chartMetrics[metric];
+    const title = chartMetrics[metric];
     $('chart-title').textContent = title;
     const rows = [...chart.rows].sort((a, b) => unknownPriority(a, chart.mode) - unknownPriority(b, chart.mode));
     const pageRange = result.rows.length ? t('dashboard.pageRange', { value0: number(offset + 1), value1: number(offset + result.rows.length), value2: number(result.total) }) : t('dashboard.zeroItems');
@@ -462,7 +474,9 @@
     if (rows.length < result.rows.length) $('chart-scope').textContent += t('dashboard.emptyExcludedSuffix', { value0: number(result.rows.length - rows.length) });
     if (chart.by === 'model') $('chart-scope').textContent += t('dashboard.modelScopeSuffix');
     if (!rows.length) { plot.append(element('p', t('common.noRecords'), 'empty')); return; }
-    renderChartLegend(legend, rows, metric, turn);
+
+    // [배치 정책] 같은 좌표계로 축·범주·막대를 그리고 첫 막대의 상세 설명을 표시한다.
+    renderChartLegend(legend, rows, metric);
     const layout = calculateChartLayout(chart, rows, result.groupBy, plot);
     const { width, height } = layout;
     const svg = svgElement('svg', { viewBox: `0 0 ${width} ${height}`, width, height, class: 'chart-svg', role: 'group', 'aria-label': `${title} · ${$('chart-scope').textContent}` });
@@ -474,10 +488,11 @@
     $('chart-detail').textContent = chartDescription(rows[0], chart);
   }
 
-  function renderChartLegend(legend, rows, metric, turn) {
+  function renderChartLegend(legend, rows, metric) {
+    // [차트 정책] 토큰 지표에만 범례를 표시하고 구성 미상 구간이 실제로 있을 때만 항목을 추가한다.
     if (!['tokens', 'averageTokens'].includes(metric)) return;
     const entries = tokenHeaders.map((header, index) => ({ ...header, className: `chart-series-${index}` }));
-    if (rows.some(row => chartValue(row, metric, turn) != null && chartSegments(row, metric)[0].className === 'chart-unknown')) {
+    if (rows.some(row => chartValue(row, metric) != null && chartSegments(row, metric)[0].className === 'chart-unknown')) {
       entries.push({ label: t('dashboard.unknownBreakdown'), get title() { return t('dashboard.unknownBreakdownHelp'); }, className: 'chart-unknown' });
     }
     for (const entry of entries) {
@@ -492,28 +507,30 @@
   }
 
   function calculateChartLayout(chart, rows, groupBy, plot) {
-    const turn = chart.mode === 'turn';
+    // [차트 정책] 기간·프로젝트·세션별 차트는 범주별 세로 막대를 사용하고 전체 합계는 가로로 배치한다.
     const metric = chart.metric;
     const sessions = chart.mode === 'ranking' && groupBy === 'session';
     const projects = chart.mode === 'ranking' && groupBy === 'project';
-    const vertical = chart.mode === 'calendar' || turn || sessions || projects;
-    const categoryKey = (row, index) => turn ? String(index) : sessions ? `${row.provider}/${row.project_key}/${row.session_id}` : projects ? `${row.provider}/${row.project_key}` : row.period;
+    const vertical = chart.mode === 'calendar' || sessions || projects;
+    const categoryKey = row => sessions ? `${row.provider}/${row.project_key}/${row.session_id}` : projects ? `${row.provider}/${row.project_key}` : row.period;
     const categories = vertical ? [...new Set(rows.map(categoryKey))] : [];
     if (chart.mode === 'calendar') categories.sort((a, b) => Number(a == null) - Number(b == null));
-    const maxPeers = vertical && !turn ? Math.max(1, ...categories.map(category => rows.filter((row, index) => categoryKey(row, index) === category).length)) : 1;
+    // [배치 정책] 범주에 가장 많은 막대가 들어갈 수 있게 폭을 정하고 축 최대치는 자릿수 단위로 올림한다.
+    const maxPeers = vertical ? Math.max(1, ...categories.map(category => rows.filter(row => categoryKey(row) === category).length)) : 1;
     const peerWidth = chart.by === 'model' ? 46 : 60;
-    const categoryWidth = Math.max(turn || sessions || projects ? 164 : 128, maxPeers * peerWidth + 36);
+    const categoryWidth = Math.max(sessions || projects ? 164 : 128, maxPeers * peerWidth + 36);
     const width = Math.max(plot.clientWidth || 736, 736, vertical ? 86 + categories.length * categoryWidth : 0);
     const height = vertical ? chart.by === 'model' ? 414 : 372 : 62 + rows.length * 62;
-    const max = Math.max(1, ...rows.map(row => chartValue(row, metric, turn) ?? 0));
+    const max = Math.max(1, ...rows.map(row => chartValue(row, metric) ?? 0));
     const maximum = max === 1 ? 1 : Math.ceil(max / (10 ** Math.floor(Math.log10(max)))) * (10 ** Math.floor(Math.log10(max)));
     const left = vertical ? 70 : 0;
     const top = vertical ? 28 : 26;
     const length = vertical ? 224 : width - 96;
-    return { turn, sessions, projects, vertical, categoryKey, categories, peerWidth, width, height, maximum, left, top, length };
+    return { sessions, projects, vertical, categoryKey, categories, peerWidth, width, height, maximum, left, top, length };
   }
 
   function appendChartAxes(svg, metric, layout) {
+    // [배치 정책] 축을 네 등분하고 소요 시간은 시간 형식, 나머지는 축약 숫자로 표시한다.
     const { vertical, maximum, left, top, length, width, height } = layout;
     const tick = value => metric === 'averageDuration' ? compactDuration(value) : compact(value);
     svg.append(svgElement('text', { x: left, y: 14, class: 'chart-axis-label' }, metric === 'averageDuration' ? t('dashboard.time') : metric === 'requests' ? t('dashboard.requestCountAxis') : t('common.tokens')));
@@ -532,44 +549,42 @@
   }
 
   function appendChartCategories(svg, chart, rows, layout) {
-    const { turn, sessions, projects, vertical, categoryKey, categories, left, width } = layout;
+    const { sessions, projects, vertical, categoryKey, categories, left, width } = layout;
     if (!vertical) return;
+    // [배치 정책] 세로 차트의 범주 아래에 기간 또는 축약 이름을 놓고 세션에는 프로젝트명도 붙인다.
     categories.forEach((category, index) => {
       const x = left + (width - left - 16) * (index + .5) / categories.length;
-      const row = rows.find((row, rowIndex) => categoryKey(row, rowIndex) === category);
+      const row = rows.find(row => categoryKey(row) === category);
       const shortened = text => text.length > 16 ? `${text.slice(0, 15)}…` : text;
-      const label = turn ? shortened(requestLabel(row)) : sessions ? shortened(row.session_name || t('dashboard.unnamedSession')) : projects ? shortened(row.project_name || t('dashboard.unnamedProject')) : category || t('dashboard.unknownTime');
-      const parts = turn ? [label] : label.split(' ~ ');
+      const label = sessions ? shortened(row.session_name || t('dashboard.unnamedSession')) : projects ? shortened(row.project_name || t('dashboard.unnamedProject')) : category || t('dashboard.unknownTime');
+      const parts = label.split(' ~ ');
       const labelY = chart.by === 'model' ? 352 : 292;
-      const caption = svgElement('text', { x, y: labelY, 'text-anchor': 'middle', class: 'chart-axis-label' }, parts[0]);
-      if (turn) caption.append(svgElement('title', {}, requestLabel(row)));
-      svg.append(caption);
+      svg.append(svgElement('text', { x, y: labelY, 'text-anchor': 'middle', class: 'chart-axis-label' }, parts[0]));
       if (parts[1]) svg.append(svgElement('text', { x, y: labelY + 16, 'text-anchor': 'middle', class: 'chart-axis-label' }, `~ ${parts[1]}`));
-      if (turn) {
-        svg.append(svgElement('text', { x, y: labelY + 16, 'text-anchor': 'middle', class: 'chart-axis-label' }, row.started_at_ms == null ? t('dashboard.unknownTime')
-          : new Intl.DateTimeFormat(globalThis.agentTrackerI18n.language, { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: timezone }).format(new Date(row.started_at_ms))));
-      }
       if (sessions) svg.append(svgElement('text', { x, y: labelY + 16, 'text-anchor': 'middle', class: 'chart-axis-label' }, shortened(row.project_name || t('dashboard.unnamedProject'))));
     });
   }
 
   function appendChartBars(svg, chart, rows, layout) {
-    const { turn, vertical, categoryKey, categories, peerWidth, width, maximum, left, top, length } = layout;
+    const { vertical, categoryKey, categories, peerWidth, width, maximum, left, top, length } = layout;
     const metric = chart.metric;
     const tokenMetric = ['tokens', 'averageTokens'].includes(metric);
     rows.forEach((row, index) => {
-      const value = chartValue(row, metric, turn);
+      // [배치 정책] 세로 차트에서 같은 범주의 막대를 중앙 기준으로 나란히 놓고 조작 영역을 만든다.
+      const value = chartValue(row, metric);
       const description = chartDescription(row, chart);
       const group = svgElement('g', { class: 'chart-bar', tabindex: 0, role: 'img', 'aria-label': row.model === undefined ? description : `${providerLabel(row.provider)} · ${description}` });
       group.append(svgElement('title', {}, description));
-      const peers = vertical && !turn ? rows.filter((peer, peerIndex) => categoryKey(peer, peerIndex) === categoryKey(row, index)) : [row];
-      const categoryIndex = categories.indexOf(categoryKey(row, index));
+      const peers = vertical ? rows.filter(peer => categoryKey(peer) === categoryKey(row)) : [row];
+      const categoryIndex = categories.indexOf(categoryKey(row));
       const center = left + (width - left - 16) * (categoryIndex + .5) / Math.max(1, categories.length);
       const x = vertical ? center + (peers.indexOf(row) - (peers.length - 1) / 2) * peerWidth - 18 : left;
       const y = vertical ? top + length : 58 + index * 62;
       const barSize = vertical ? 36 : 22;
       group.append(svgElement('rect', { x: vertical ? x - 4 : x, y: vertical ? top : y - 20,
         width: vertical ? barSize + 8 : width, height: vertical ? length + 32 : 52, class: 'chart-hit' }));
+
+      // [배치 정책] 누적 막대의 끝에 값을 놓고 사용량이 0이면 기준선만 표시한다.
       const bar = { x, y, barSize, vertical, maximum, length, value, metric, tokenMetric, description };
       const consumed = appendChartSegments(group, row, chart, bar);
       if (value === 0) group.append(svgElement('line', { x1: x, x2: x + (vertical ? barSize : 2), y1: y, y2: y + (vertical ? 0 : barSize), class: 'chart-grid' }));
@@ -577,6 +592,8 @@
       group.append(svgElement('text', { x: vertical ? x + barSize / 2 : x + consumed + 8,
         y: vertical ? y - consumed - 8 : y + 16, 'text-anchor': vertical ? 'middle' : 'start', class: 'chart-value' }, displayValue));
       appendChartBarLabel(group, row, chart, bar);
+
+      // [접근성 정책] 마우스 진입·키보드 포커스·클릭에서 같은 막대 상세를 표시한다.
       const showDetail = () => { $('chart-detail').textContent = description; };
       group.addEventListener('mouseenter', showDetail);
       group.addEventListener('focus', showDetail);
@@ -586,6 +603,7 @@
   }
 
   function appendChartSegments(group, row, chart, bar) {
+    // [차트 정책] 양수 값만 축 길이에 비례해 그리고 토큰 구성 막대를 차례대로 누적한다.
     const { x, y, barSize, vertical, maximum, length, value, metric, tokenMetric, description } = bar;
     const segments = tokenMetric ? chartSegments(row, metric) : [{ value, className: 'chart-measure' }];
     let consumed = 0;
@@ -608,6 +626,7 @@
   }
 
   function appendChartBarLabel(group, row, chart, bar) {
+    // [배치 정책] 가로는 행 이름을, 세로는 제공자 또는 회전한 모델 이름을 표시한다.
     const { x, y, barSize, vertical } = bar;
     if (!vertical) {
       const label = chartLabel(row, chart.mode);
@@ -631,6 +650,7 @@
    * 알고리즘: 창과 표·도표의 스크롤 위치를 저장하고 DOM 갱신 후 finally에서 가로 스크롤과 창 위치를 복원한다.
    */
   function renderUsage(result) {
+    // [화면 상태 정책] 다시 그리기 전의 스크롤 위치를 보관해 완료 후 복원한다.
     const left = window.scrollX, top = window.scrollY;
     const tableLeft = $('usage-table').scrollLeft, chartLeft = $('usage-chart').scrollLeft;
     try { updateUsage(result); }
@@ -646,6 +666,7 @@
    * 알고리즘: 구역에 맞춰 행·전체 개수·지표를 렌더링하고 Skill은 전체 범위 최댓값·비율을 사용하며 토큰 표는 같은 결과로 도표를 갱신한다.
    */
   function updateUsage(result) {
+    // [표시 정책] 도구 결과는 분류별 표에 표시하고 토큰 결과는 표와 차트에 함께 반영한다.
     latestUsage = result;
     if (result.capabilitiesEnabled !== undefined) setCapabilitiesEnabled(result.capabilitiesEnabled);
     if (section === 'skills' && !capabilitiesEnabled) return;
@@ -654,21 +675,21 @@
       return;
     }
     renderChart(result);
+    // [결제 정책] 선택 세션의 결제 값이 응답에 포함된 경우에만 변경 입력을 활성화한다.
     if (result.billing && selectedSession && showCosts) {
       $('billing-mode').value = result.billing;
       $('billing-mode').disabled = false;
     }
-    const turn = result.groupBy === 'turn';
     const model = result.by === 'model';
     $('model-note').hidden = !model;
     const rows = result.rows;
-    if (turn) renderTurnTable(rows, model);
-    else renderAggregateTable(rows, model, result.groupBy);
+    renderAggregateTable(rows, model, result.groupBy);
     updateUsagePagination(rows, result.total);
-    updateUsageCoverage(result.coverage, rows, turn);
+    updateUsageCoverage(result.coverage, rows);
   }
 
   function renderCapabilityTables(pages) {
+    // [페이지 정책] 각 분류의 전체 합계와 최대값을 쓰고 분류마다 독립적으로 이동 가능 여부를 표시한다.
     for (const category of capabilityCategories) {
       const page = pages[category];
       const maximum = Math.max(1, page.maxUses);
@@ -681,19 +702,11 @@
     }
   }
 
-  function renderTurnTable(rows, model) {
-    const costHeaders = showCosts ? [t('dashboard.estimatedApiCost')] : [];
-    const costSortKeys = showCosts ? ['cost'] : [];
-    table($('usage-table'), [t('dashboard.projectHeader', { value0: model ? t('common.model') : t('common.provider') }), t('dashboard.requestSessionHeader'), t('dashboard.startTime'), ...tokenHeaders, t('dashboard.totalTokens'), t('dashboard.duration'), t('dashboard.statusQuality'), ...costHeaders], rows.map(row => [
-      seriesName(row, model, ` / ${row.project_name}`), sessionLabel(row, true), date(row.started_at_ms), ...tokenValues(row), number(row.total_tokens), duration(row.duration_ms), requestStatusQuality(row), ...costValues(row),
-    ]), ['model', undefined, 'period', ...tokenSortKeys, 'averageDuration', undefined, ...costSortKeys]);
-  }
-
   function renderAggregateTable(rows, model, groupBy) {
     const costHeaders = showCosts ? [t('dashboard.estimatedApiCost')] : [];
     const costSortKeys = showCosts ? ['cost'] : [];
     table($('usage-table'), [model ? t('common.model') : t('common.provider'), t('dashboard.periodProjectSession'), ...tokenHeaders, t('dashboard.totalTokens'), t('dashboard.completedTotal'), t('dashboard.averageTokens'), t('dashboard.averageTimeSamples'), ...costHeaders], rows.map(row => [
-      seriesName(row, model), usageScopeLabel(row, groupBy), ...tokenValues(row), number(row.total_tokens), `${number(row.completed_turns)} / ${number(row.turn_count)}`, number(row.avg_tokens_per_turn), t('dashboard.timeSamples', { value0: duration(row.avg_duration_ms), value1: number(row.turns_with_duration) }), ...costValues(row),
+      seriesName(row, model), usageScopeLabel(row, groupBy), ...tokenValues(row), number(row.total_tokens), number(row.completed_turns), number(row.avg_tokens_per_turn), t('dashboard.timeSamples', { value0: duration(row.avg_duration_ms), value1: number(row.turns_with_duration) }), ...costValues(row),
     ]), ['model', 'period', ...tokenSortKeys, 'requests', 'averageTokens', 'averageDuration', ...costSortKeys]);
   }
 
@@ -704,23 +717,10 @@
   }
 
   function estimatedCost(row) {
+    // [결제 정책] 구독 비용과 미상을 구분하고 계산된 API 비용은 USD로 표시한다.
     if (row.billing_mode === 'subscription') return t('dashboard.subscriptionZero');
     if (row.cost_usd == null) return '—';
     return new Intl.NumberFormat(globalThis.agentTrackerI18n.language, { style: 'currency', currency: 'USD', minimumFractionDigits: 4, maximumFractionDigits: 6 }).format(row.cost_usd);
-  }
-
-  function requestStatus(row) {
-    if (row.status === 'completed') return t('common.completed');
-    if (row.status === 'failed') return t('common.failed');
-    return t('common.inProgress');
-  }
-
-  function requestStatusQuality(row) {
-    const status = requestStatus(row);
-    let quality = `${status} · ${row.duration_quality}`;
-    if (row.quality_flags) quality += ` · ${row.quality_flags}`;
-    if (row.last_error) quality += t('dashboard.previousValueSuffix', { value0: row.last_error });
-    return quality;
   }
 
   function usageScopeLabel(row, groupBy) {
@@ -731,6 +731,7 @@
   }
 
   function updateUsagePagination(rows, total) {
+    // [페이지 정책] 차트와 표에 같은 결과 범위와 이전·다음 이동 상태를 적용한다.
     for (const prefix of ['', 'chart-']) {
       $(`${prefix}previous`).disabled = offset === 0;
       $(`${prefix}next`).disabled = offset + rows.length >= total;
@@ -738,8 +739,9 @@
     }
   }
 
-  function updateUsageCoverage(coverage, rows, turn) {
-    const durationCoverage = turn ? '' : t('dashboard.timeQualitySuffix', { value0: number(rows.reduce((n, r) => n + (r.exact_duration_turns ?? 0), 0)), value1: number(rows.reduce((n, r) => n + (r.derived_duration_turns ?? 0), 0)), value2: number(rows.reduce((n, r) => n + (r.approximate_duration_turns ?? 0), 0)), value3: number(rows.reduce((n, r) => n + (r.missing_duration_turns ?? 0), 0)) });
+  function updateUsageCoverage(coverage, rows) {
+    // [진단 정책] 전체 파일 처리 상태에 현재 페이지의 소요 시간 품질별 개수를 덧붙인다.
+    const durationCoverage = t('dashboard.timeQualitySuffix', { value0: number(rows.reduce((n, r) => n + (r.exact_duration_turns ?? 0), 0)), value1: number(rows.reduce((n, r) => n + (r.derived_duration_turns ?? 0), 0)), value2: number(rows.reduce((n, r) => n + (r.approximate_duration_turns ?? 0), 0)), value3: number(rows.reduce((n, r) => n + (r.missing_duration_turns ?? 0), 0)) });
     $('coverage').textContent = t('dashboard.coverage', { value0: number(coverage.files), value1: number(coverage.done), value2: number(coverage.error), value3: number(coverage.interrupted), value4: number(coverage.stale_summaries), value5: durationCoverage });
   }
   function setCapabilitiesEnabled(enabled) {
@@ -756,6 +758,7 @@
    * 알고리즘: 막대 길이는 분류 최다 횟수 대비로 계산하고 텍스트 비율은 서버가 전체 합계로 계산한 값을 사용한다.
    */
   function capabilityRatio(row, maximum, totalUses) {
+    // [차트 정책] 막대 폭은 최다 횟수 대비로, 표시 비율은 전체 횟수 대비로 계산한다.
     const node = element('div', undefined, 'capability-ratio');
     const detail = t('dashboard.ratioDetail', { value0: number(row.percentage), value1: number(totalUses), value2: number(row.usage_count), value3: number(row.usage_count / maximum * 100) });
     const bar = svgElement('svg', { viewBox: '0 0 160 12', width: 160, height: 12, role: 'img', 'aria-label': detail });
@@ -766,6 +769,7 @@
     return node;
   }
   function renderProgress() {
+    // [갱신 정책] 최종 결과를 우선하고 없으면 스캔 진행률 또는 갱신 중 안내를 표시한다.
     if (latestRefreshResult) {
       const r = latestRefreshResult;
       $('usage-progress').textContent = t('dashboard.refreshResult', { value0: refreshStatus(r), value1: number(r.discovered), value2: number(r.parsed), value3: number(r.reused), value4: number(r.failed), value5: number(r.bodyBytes), value6: r.error ? t('dashboard.reasonSuffix', { value0: r.error }) : '' });
@@ -787,6 +791,7 @@
   $('open-diagnostics').addEventListener('click', event => { event.preventDefault(); send({ type: 'openDiagnostics' }); });
   $('settings').addEventListener('click', () => send({ type: 'settings' }));
   $('cancel-usage').addEventListener('click', () => send({ type: 'cancelUsage' }));
+  $('retry-usage').addEventListener('click', () => send({ type: 'retryUsage' }));
   $('usage-filters').addEventListener('submit', event => { event.preventDefault(); offset = 0; query(); });
   $('date-range').addEventListener('change', () => {
     updateDateControls();
@@ -802,9 +807,10 @@
     $(`${id}-picker`).addEventListener('change', () => { $(id).value = $(`${id}-picker`).value; });
   }
   $('reset-filters').addEventListener('click', () => {
+    // [초기화 정책] 이름·기간·페이지·정렬을 기본값으로 되돌리고 첫 페이지를 읽는다.
     closeNames(); selectedProject = undefined; selectedSession = undefined;
     for (const id of ['provider', 'from-day', 'to-day', 'from-day-picker', 'to-day-picker']) $(id).value = '';
-    $('date-range').value = '7';
+    $('date-range').value = '30';
     updateDateControls();
     $('group').value = 'day'; $('chart-metric').value = 'tokens';
     pageSize = 100;
@@ -817,6 +823,7 @@
   for (const name of ['tokens', 'skills']) $(`section-${name}`).addEventListener('click', () => {
     section = name; closeNames(); query();
   });
+  // [페이지 정책] 도구 페이지를 이동하거나 크기를 바꿔도 다른 분류의 현재 페이지를 유지한다.
   for (const category of capabilityCategories) {
     bindPageSize(`${category}-page-size`, value => {
       if (value === capabilityPageSizes[category]) return;
@@ -826,6 +833,7 @@
     $(`${category}-next`).addEventListener('click', () => { capabilityOffsets[category] += capabilityPageSizes[category]; query(false); });
   }
   $('billing-mode').addEventListener('change', () => {
+    // [결제 정책] 제공자와 세션이 선택된 경우에만 저장을 보내고 후속 응답까지 변경을 잠근다.
     if (!selectedSession || !$('provider').value) return;
     $('billing-mode').disabled = true;
     send({ type: 'setSessionBilling', provider: $('provider').value, sessionId: selectedSession, mode: $('billing-mode').value });
@@ -833,6 +841,7 @@
   for (const by of ['provider', 'model']) $(`chart-${by}`).addEventListener('click', () => {
     chartBy = by; offset = 0; query();
   });
+  // [페이지 정책] 이름 목록의 아랫부분에 가까워지면 아직 남은 항목을 다음 페이지에서 읽는다.
   for (const kind of ['project', 'session']) {
     $(`${kind}-name`).addEventListener('click', () => toggleNames(kind));
     $(`${kind}-options`).addEventListener('scroll', () => {
@@ -862,6 +871,7 @@
     $(`${prefix}next`).addEventListener('click', () => { offset += pageSize; query(); });
   }
   function applyState(message) {
+    // [화면 상태 정책] 호스트 설정과 언어를 반영한 뒤 마지막 결과와 진행률을 다시 표시한다.
     updateLocaleCaptions(message);
     if (typeof message.showApiCosts === 'boolean') { showCosts = message.showApiCosts; updateCostControls(); }
     updateCapabilities(message);
@@ -884,6 +894,7 @@
     setCapabilitiesEnabled(message.capabilitiesEnabled);
   }
   function updateProviders(message) {
+    // [선택 정책] 선택된 제공자가 비활성화되면 세션 필터를 지우고 첫 페이지부터 다시 조회한다.
     if (!Array.isArray(message.providers)) return;
     for (const option of $('provider').options) option.disabled = Boolean(option.value) && !message.providers.includes(option.value);
     closeNames();
@@ -894,20 +905,43 @@
     offset = 0;
     query();
   }
+  function showUsage(result) {
+    $('usage-controls').hidden = false;
+    $('error').hidden = true;
+    updateSectionControls();
+    renderUsage(result);
+  }
+  function updateBusy(value) {
+    // [갱신 정책] 스캔이 시작되면 기존 결과와 필터를 잠그고 잠금이 남은 종료 상태에서는 재시도를 안내한다.
+    busy = value;
+    $('cancel-usage').hidden = !busy;
+    const controls = $('usage-controls');
+    if (busy) {
+      latestProgress = undefined;
+      latestRefreshResult = undefined;
+      latestUsage = undefined;
+      controls.disabled = true;
+      controls.hidden = true;
+      closeNames();
+    }
+    $('retry-usage').hidden = busy || !controls.disabled;
+    renderProgress();
+  }
   window.addEventListener('message', event => {
     const message = event.data;
     if (!message || typeof message !== 'object') return;
     switch (message.type) {
       case 'state': applyState(message); break;
-      case 'usage': $('error').hidden = true; renderUsage(message.result); break;
+      case 'usage': showUsage(message.result); break;
+      case 'filtersReady': $('usage-controls').disabled = false; $('retry-usage').hidden = true; break;
       case 'names': renderNames(message); break;
-      case 'busy': busy = message.busy; $('cancel-usage').hidden = !busy; if (busy) { latestProgress = undefined; latestRefreshResult = undefined; } renderProgress(); break;
+      case 'busy': updateBusy(message.busy); break;
       case 'progress': latestProgress = message.progress; latestRefreshResult = undefined; renderProgress(); break;
-      case 'refreshResult': closeNames(); latestRefreshResult = message.result; renderProgress(); break;
+      case 'refreshResult': latestRefreshResult = message.result; renderProgress(); break;
       case 'error': $('error').textContent = message.message; $('error').hidden = false; $('billing-mode').disabled = !selectedSession; break;
     }
   });
-  // Restore the query before ready so the initial scan returns the selected group.
+  // [초기화 정책] 첫 갱신 후 사용할 조회 조건을 준비 신호보다 먼저 보낸다.
   query();
   send({ type: 'ready' });
 })();

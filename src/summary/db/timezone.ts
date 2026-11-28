@@ -2,6 +2,7 @@
 const formatters = new Map<string, Intl.DateTimeFormat>();
 
 function formatter(timezone: string): Intl.DateTimeFormat {
+  // [시간대 정책] 시간대별 포매터를 재사용하고 등록 순서가 가장 오래된 항목부터 제거해 16개로 제한한다.
   const cached = formatters.get(timezone);
   if (cached) return cached;
   const value = new Intl.DateTimeFormat('en-CA', {
@@ -10,7 +11,6 @@ function formatter(timezone: string): Intl.DateTimeFormat {
     month: '2-digit',
     day: '2-digit',
   });
-  // Bound this cache even when callers repeatedly change arbitrary timezones.
   if (formatters.size >= 16) formatters.delete(formatters.keys().next().value!);
   formatters.set(timezone, value);
   return value;
@@ -21,6 +21,7 @@ function formatter(timezone: string): Intl.DateTimeFormat {
  * 알고리즘: 최대 16개로 제한한 Intl formatter cache에서 날짜 요소를 얻어 연·월·일 문자열을 조합한다.
  */
 export function calendarPeriod(timestamp: number, timezone: string, unit: 'day' | 'month'): string {
+  // [시간대 정책] 지정 시간대의 달력에서 연·월·일을 추출하고 월 단위에서는 일을 생략한다.
   const parts = formatter(timezone).formatToParts(new Date(timestamp));
   const part = (name: Intl.DateTimeFormatPartTypes): string => parts.find(item => item.type === name)!.value;
   const month = `${part('year')}-${part('month')}`;
@@ -33,6 +34,7 @@ export function calendarPeriod(timestamp: number, timezone: string, unit: 'day' 
  */
 export function periodBounds(period: string, timezone: string): { fromMs: number; toMs: number } {
   formatter(timezone); // Validate even if there are no rows to query.
+  // [시간대 정책] 달력 입력을 검증하고 다음 날 또는 월의 시작일을 정한다.
   const match = /^(\d{4})-(\d{2})(?:-(\d{2}))?$/.exec(period);
   if (!match) throw new RangeError('Expected YYYY-MM or YYYY-MM-DD');
   const year = Number(match[1]);
@@ -49,8 +51,7 @@ export function periodBounds(period: string, timezone: string): { fromMs: number
   else end.setUTCMonth(end.getUTCMonth() + 1);
   const boundary = (date: Date): number => {
     const localDate = date.toISOString().slice(0, 10);
-    // Search for the first instant of the local date. This also handles zones
-    // whose offset changes at midnight, where local 00:00 may not exist.
+    // [시간대 정책] UTC 자정 전후 36시간을 이진 탐색해 현지 자정이 건너뛰어진 날도 첫 밀리초를 찾는다.
     let lower = date.getTime() - 36 * 60 * 60 * 1000;
     let upper = date.getTime() + 36 * 60 * 60 * 1000;
     while (lower < upper) {

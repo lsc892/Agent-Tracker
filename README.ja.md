@@ -49,6 +49,7 @@ npx agent-tracker-vscode@latest
 ```
 
 完了したら、VS Code のコマンドパレットで **Developer: Reload Window** を実行してください。
+Agent Tracker に使用量カードのクリック動作の更新が表示されたら、VS Code を完全に終了し、少し待ってから開き直してください。対応する Windows・Linux のローカル環境では、終了時にパッチが適用されます。
 
 <details>
 <summary>追加オプション：グローバルインストール・プロファイル指定・macOS設定</summary>
@@ -146,6 +147,37 @@ npm パッケージと VS Code 拡張機能はそれぞれアンインストー�
 
 </details>
 
-<br><br>
+## 使用量統計の収集方法
 
-[利用・開発リファレンス（韓国語）](docs/refrences/Development.ko.md)
+プロジェクトは作業フォルダーです。セッションは、同じチャットで続く会話のまとまりです。ユーザーのメッセージからメインエージェントの返信までを一つの会話とし、親が確認できるサブエージェントの使用量も含めます。通常の JSONL と Codex の Zstd 圧縮ログを読み込みます。
+
+### ログから読み取るフィールド
+
+| 用途 | Claude | Codex |
+| --- | --- | --- |
+| セッションとスレッド | メインログの `sessionId` を使い、省略されている場合はファイル名を使います。サブエージェントのログは、所属するセッションのフォルダーとファイル名で識別します。 | `session_meta` の `payload.id` または `token_usage_record` の `payload.thread_id` でスレッドを識別します。`payload.session_id` がなければ、スレッド ID をセッション ID として使います。 |
+| モデルと応答 | `assistant` 行の `message.model`、`message.id`、`requestId` を読み取ります。`isApiErrorMessage` は、トークン数がゼロのエラー応答を除外するために使います。 | 使用量の行、またはセッションやターンのコンテキストから `payload.model` を読み取ります。`payload.turn_id` と `payload.response_id` で応答を識別します。 |
+| 入力・出力・キャッシュのトークン数 | `message.usage` の `input_tokens`、`output_tokens`、`cache_read_input_tokens`、`cache_creation_input_tokens` を読み取ります。 | `payload.usage` の `input_tokens` と `output_tokens` を読み取ります。キャッシュのトークン数は `cached_input_tokens` と `cache_write_input_tokens`、または `input_tokens_details.cached_tokens` と `input_tokens_details.cache_write_tokens` から取得します。 |
+| 累計値と親スレッドへの参照 | — | `payload.thread_token_usage`、`payload.turn_token_usage`、旧形式の `token_count` イベントにある `payload.info.total_token_usage` と `payload.info.last_token_usage` を読み取ります。`session_meta` では `forked_from_id` や直接または入れ子になった `parent_thread_id` を確認します。 |
+| 時刻 | 行の `timestamp` を読み取ります。 | 行の `timestamp` または `payload.timestamp` と、イベントの `payload.started_at`、`payload.completed_at` を読み取ります。 |
+
+### ログの解析と日別集計
+
+1. JSONL を1行ずつ処理し、あらかじめ指定されたパスのフィールドを抽出します。1行が読み込みブロックをまたぐ場合は、JSON の解析状態と抽出済みの値を引き継ぎます。画像の Base64 データは読み込み時にスキップします。
+2. Claude は同じセッション内の `(message.id, requestId)`、Codex は同じスレッド内の `(turn_id, response_id)` で重複を判定します。Claude で同じメッセージに確認できるリクエスト ID が1種類だけなら、ID が欠けている記録も比較します。重複した場合は、入力・出力トークン数の合計が最も大きい記録を1件だけ集計します。Claude は通常の入力にキャッシュの読み取り・書き込み分を加え、Codex はログに記録された入力トークンの総数を使います。
+3. Codex の旧形式の記録は親スレッドと照合し、コピーされた履歴を除いて、残りの累計値から確認できた増分を合算します。スレッドの累計に応答の合計だけでは説明できない増分がある場合は、ターンの累計や旧形式の記録で確認してから加算します。
+4. 会話の開始日を統計のタイムゾーンで求め、日別に集計します。完了した会話を数え、所要時間が確認できる会話の平均時間を求めます。
+
+### SQLite のテーブル
+
+| テーブル | 保存する内容 |
+| --- | --- |
+| `source_file` | ログのパス、セッションとスレッドの ID、更新時刻、パーサーのバージョン、処理状況、元のファイルの欠落状況。 |
+| `usage_request_daily` | プロバイダー、セッション、プロジェクト、現地の日付をキーとするトークン数・所要時間・費用の合計とサンプル数。 |
+| `usage_model_daily` | 同じ日別集計キーにモデルキーを加えた、モデル別の合計とサンプル数。 |
+| `projects`、`sessions` | プロジェクトとセッションの表示名。 |
+| `session_billing` | プロバイダーとセッションごとにユーザーが指定した課金方式。 |
+| `usage_rollup_meta` | 日別集計に使うタイムゾーンと形式のバージョン。 |
+| `usage_capability_daily` | スキル、サブエージェント、プラグイン、モデルの日別使用回数。 |
+
+統計画面では、選択した期間で日別データを絞り込み、プロバイダー別またはモデル別の行を指定されたグループごとに集計します。平均値は、保存した合計と対応するサンプル数から計算します。

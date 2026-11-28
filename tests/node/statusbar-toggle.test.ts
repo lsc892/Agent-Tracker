@@ -14,8 +14,9 @@ const patcher = require('../../../tools/vscode/statusbar-toggle.cjs') as {
   operate(options: { appRoot: string; check?: boolean; restore?: boolean }): { status: string };
 };
 const source = `const nativeToggle={id:"statusBar.entry.toggleTooltip",title:""};
-class Item{constructor(container=new EventTarget()){this.label={};this.container=container;this.disposables=[]}_register(value){this.disposables.push(value);return value}update(e){if(this.label.showProgress=e.showProgress??false){}this.commandPointerListener=e.command;this.entry=e}
-show(){return this.hoverService.getStickyHover(this.container)}}
+class HoverService{_hoverStack=[];getStickyHover(e){return this._hoverStack.find(({options})=>options.sticky&&options.target===e)?.hover}}
+class Item{constructor(container=new EventTarget()){this.label={};this.container=container;this.labelContainer=container;this.hoverService=new HoverService;this.disposables=[]}_register(value){this.disposables.push(value);return value}update(e){if(this.label.showProgress=e.showProgress??false){}this.commandPointerListener=e.command;this.entry=e}
+executeCommand(command,close){return {command,close,sticky:this.hoverService.getStickyHover(this.container)}}}
 globalThis.Item=Item;globalThis.nativeToggle=nativeToggle;`;
 
 function rendererContext(): Record<string, any> {
@@ -26,7 +27,11 @@ function rendererContext(): Record<string, any> {
     head: { appendChild: (style: { id?: string; textContent?: string }) => styles.push(style) },
   };
   /** 상태바 패치 검증용 이벤트 컨테이너에 가짜 문서를 연결한다. */
-  class Container extends EventTarget { readonly ownerDocument = document; }
+  class Container extends EventTarget {
+    readonly ownerDocument = document;
+    readonly nodeType = 1;
+    contains(target: unknown) { return target === this; }
+  }
   return { EventTarget: Container, styles };
 }
 
@@ -62,80 +67,73 @@ test('native toggle mapping preserves object identity and is limited to the Agen
   assert.throws(() => patcher.patchSource(source + source), /유일하게/);
 });
 
-test('hover and click share the Markdown card, and pinned cards suppress automatic hover', () => {
+test('quota mousedown keeps the visible card for the native click to pin or close', () => {
   const context = rendererContext();
   runInNewContext(patcher.patchSource(source).patched, context);
   const target = new context.EventTarget();
   const item = new context.Item(target);
-  let pinned = false;
-  const shown: { content: unknown; focus?: boolean }[] = [];
-  const delegate = { delay: 100, placement: 'element', showHover: (options: { content: unknown }, focus?: boolean) => { shown.push({ content: options.content, focus }); } };
-  item.hoverDelegate = delegate;
-  item.hoverService = { getStickyHover: () => pinned ? {} : undefined };
-  const entry = { extensionId: 'AgentTracker.agent-tracker', command: { id: patcher.command }, ariaLabel: 'Claude: 조회 불가\nCodex: 5시간 - 83% 남음, 재설정까지 3h 10m\n클릭하여 열기/닫기' };
+  const nativeExecuteCommand = item.executeCommand;
+  const { nativeToggle } = context;
+  const entry = { extensionId: 'AgentTracker.agent-tracker', command: { id: patcher.command } };
   item.update(entry); item.update(entry);
-  assert.equal(item.disposables.length, 1, 'updates do not register duplicate capture filters');
-  assert.notEqual(item.hoverDelegate, delegate, 'the shared delegate is not modified');
-  assert.equal(item.hoverDelegate.delay, 100);
-  delegate.delay = 500;
-  assert.equal(item.hoverDelegate.delay, 500, 'configuration changes remain observable');
-  const card = { value: '### 사용량' };
-  item.hoverDelegate.showHover({ content: card }, false);
-  assert.deepEqual(shown.at(-1), { content: card, focus: false });
-  item.hoverDelegate.showHover({ content: card }, true);
-  assert.deepEqual(shown.at(-1), { content: card, focus: true });
-  pinned = true;
-  const count = shown.length;
-  item.hoverDelegate.showHover({ content: card }, false);
-  assert.equal(shown.length, count, 'a pending hover cannot replace a pinned card');
-  const events: string[] = [];
-  for (const type of ['mouseover', 'focus', 'click', 'pointerdown', 'keydown']) {
-    target.addEventListener(type, () => events.push(type), true);
-    target.dispatchEvent(new Event(type));
-  }
-  assert.deepEqual(events, ['click', 'pointerdown', 'keydown']);
-  pinned = false;
+  assert.equal(item.disposables.length, 1);
+  const pointerDown = (button: number) => target.dispatchEvent(Object.assign(new Event('mousedown'), { button }));
+  let passedThrough = 0;
+  target.addEventListener('mousedown', () => { passedThrough++; });
+  target.addEventListener('mouseover', () => { passedThrough++; });
+
+  const hover = { isDisposed: false };
+  const options = { target: { targetElements: [new context.EventTarget()] } };
+  item.hoverService._hoverStack.push({ hover, options });
+  pointerDown(0);
+  assert.equal(passedThrough, 1, 'another item’s hover does not affect the quota click');
+  assert.equal(item.executeCommand(nativeToggle, false).close, false);
+
+  options.target.targetElements = [target];
+  pointerDown(0);
+  assert.equal(passedThrough, 1, 'primary mousedown leaves the visible quota card for the click');
+  assert.equal(item.executeCommand, nativeExecuteCommand, 'the built-in command keeps control of pinning and focus');
+  assert.equal(item.executeCommand(nativeToggle, false).close, false, 'a temporary hover does not count as pinned');
+  pointerDown(2);
+  assert.equal(passedThrough, 2, 'right-click keeps ordinary handling');
+
+  hover.isDisposed = true;
+  assert.equal(item.executeCommand(nativeToggle, false).close, false, 'the next click opens the card');
+  assert.equal(item.executeCommand(nativeToggle, true).close, true, 'preserve the native pointer snapshot for sticky cards');
+  target.dispatchEvent(Object.assign(new Event('mouseover'), { relatedTarget: target }));
+  assert.equal(passedThrough, 2, 'moving within the item does not restart hover');
   target.dispatchEvent(new Event('mouseover'));
-  assert.equal(events.at(-1), 'mouseover', 'closed cards allow ordinary card hover');
-  item.update({ ...entry, ariaLabel: 'updated preview' });
-  item.hoverDelegate.showHover({ content: card }, false);
-  assert.equal(shown.at(-1)?.content, card, 'accessibility updates do not replace the Markdown hover');
-  const updatedCard = { value: '### Updated usage' };
-  item.hoverDelegate.showHover({ content: updatedCard }, false);
-  assert.equal(shown.at(-1)?.content, updatedCard, 'hover uses the current Markdown after quota updates');
-  item.hoverDelegate.showHover({ content: card }, true);
-  assert.equal(shown.at(-1)?.content, card, 'refresh of a pinned card keeps full content');
+  assert.equal(passedThrough, 3, 'entering from outside starts hover');
+
   item.update({ ...entry, command: { id: 'another.command' } });
-  pinned = true;
-  target.dispatchEvent(new Event('mouseover'));
-  assert.equal(events.at(-1), 'mouseover', 'a different command retains ordinary hover');
-  item.hoverDelegate.showHover({ content: card }, false);
-  assert.equal(shown.at(-1)?.content, card, 'another command retains its own tooltip');
+  hover.isDisposed = false;
+  pointerDown(0);
+  assert.equal(passedThrough, 4, 'another command retains ordinary mousedown');
+  assert.equal(item.executeCommand(item.entry.command).close, undefined);
   item.update(entry);
   for (const disposable of item.disposables) disposable.dispose();
-  target.dispatchEvent(new Event('focus'));
-  assert.equal(events.at(-1), 'focus', 'disposing removes the capture filter');
-  const other = new context.Item();
-  other.update({ ...entry, extensionId: 'another.extension' });
-  assert.equal(other.disposables.length, 0, 'another extension receives no capture filter');
+  pointerDown(0);
+  assert.equal(passedThrough, 5, 'disposing removes the capture filter');
   assert.equal(context.styles.length, 1, 'quota updates install only one divider stylesheet per document');
 });
 
 const historicalPatches = ['AgentTracker.agent-tracker', 'agent-tracker.agent-tracker']
-  .flatMap(publisher => [1, 2, 3, 4].map(version => ({ publisher, version })));
+  .flatMap(publisher => [1, 2, 3, 4, 5, 6].map(version => ({ publisher, version })));
 for (const { publisher, version } of historicalPatches) test(`${publisher} v${version} upgrades while retaining the original restore backups`, () => {
   const files = fixture();
   try {
     const anchor = 'update(e){';
     // Exact historical v2 payload: automatic activation was always suppressed.
     const clickOnly = version === 1 ? '' : `if(!this._agentTrackerClickOnly){this._agentTrackerClickOnly=true;const stop=event=>{if(this.entry?.extensionId===${JSON.stringify(publisher)}&&this.entry?.command===nativeToggle)event.stopImmediatePropagation();};for(const type of ["mouseover","focus"])this.container.addEventListener(type,stop,{capture:true});this._register({dispose:()=>{for(const type of ["mouseover","focus"])this.container.removeEventListener(type,stop,{capture:true});}});}`;
-    const historical = readFileSync(join(__dirname, '../../../tests/fixtures/statusbar-toggle-v4.txt'), 'utf8')
+    const historical = readFileSync(join(__dirname, `../../../tests/fixtures/statusbar-toggle-v${Math.max(4, version)}.txt`), 'utf8')
       .replace(/\r\n/g, '\n')
       .replaceAll('"AgentTracker.agent-tracker"', JSON.stringify(publisher));
-    const old = version === 4 ? historical : version === 3
-      ? historical.replace(':statusbar-toggle:v4*/', ':statusbar-toggle:v3*/')
+    const preview = historical.match(/\/\*agent-tracker:statusbar-toggle:v4\*\/[\s\S]*?\/\*agent-tracker:statusbar-toggle:end\*\//)?.[0];
+    const injection = version >= 5 ? historical : version === 4 ? preview! : version === 3
+      ? preview!.replace(':statusbar-toggle:v4*/', ':statusbar-toggle:v3*/')
         .replace(/\(function configureQuotaDividers\(item\) \{[\s\S]*?\}\)\(this\);/, '')
-      : source.replace(anchor, `${anchor}/*agent-tracker:statusbar-toggle:v${version}*/if(e.extensionId===${JSON.stringify(publisher)}&&e.command?.id==="${patcher.command}"){e={...e,command:nativeToggle};${clickOnly}}/*agent-tracker:statusbar-toggle:end*/`);
+      : `/*agent-tracker:statusbar-toggle:v${version}*/if(e.extensionId===${JSON.stringify(publisher)}&&e.command?.id==="${patcher.command}"){e={...e,command:nativeToggle};${clickOnly}}/*agent-tracker:statusbar-toggle:end*/`;
+    const old = source.replace(anchor, anchor + injection);
     const oldProduct = JSON.stringify({ checksums: { 'vs/workbench/workbench.desktop.main.js': patcher.checksum(old), unrelated: 'unchanged' } });
     writeFileSync(`${files.target}.agent-tracker-toggle.bak`, source);
     writeFileSync(`${files.productPath}.agent-tracker-toggle.bak`, files.product);

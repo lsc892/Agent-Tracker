@@ -5,6 +5,7 @@ import { mkdtemp, mkdir, writeFile, readFile, appendFile, unlink, rm } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SummaryDatabase } from '../../src/summary/db';
+import { ageLogFixtures } from '../fixtures/summary-mtime';
 import { PARSER_VERSION, refreshSummary } from '../../src/summary/scanner';
 import { SummaryClient } from '../../src/summary/client';
 import type { SummaryOptions } from '../../src/summary/types';
@@ -130,15 +131,17 @@ test('a Claude API failure without a timestamp still supersedes earlier completi
 test('Claude parser version repairs cached durations and API error averages without source changes',async () => fixture(async (database,options,root) => {
   const main = join(root,'session-one.jsonl');
   await writeFile(main,jsonl([user(),response(),stopHook(),user('error'),apiError('2026-10-01T00:00:05Z','error')]));
+  ageLogFixtures(main);
   await refreshSummary(database,options);
-  database.connection.exec(`UPDATE manifest SET parser_version=3;
+  database.connection.exec(`UPDATE source_file SET parser_version=3;
+    UPDATE summary_refresh SET scope='v3';
     UPDATE turn_summary SET status='completed',duration_ms=3000,duration_quality='approximate'`);
   assert.equal(database.queryUsage()[0].completed_turns,2);
   const refreshed = await refreshSummary(database,options);
   assert.equal(refreshed.failed,0);assert.equal(refreshed.parsed,1);assert.ok(refreshed.bodyBytes>0);
   const usage = database.queryUsage()[0];
   assert.equal(usage.completed_turns,1);assert.equal(usage.avg_duration_ms,16000);
-  assert.equal(database.findManifest('claude',main)!.parser_version,PARSER_VERSION);
+  assert.equal(database.findSourceFile('claude',main)!.parser_version,PARSER_VERSION);
   const unchanged = await refreshSummary(database,options);
   assert.equal(unchanged.reused,1);assert.equal(unchanged.bodyBytes,0);
 }));
@@ -149,6 +152,7 @@ test('session rebuild deduplicates full vectors, includes subagent tokens, and r
     {type:'system',subtype:'turn_duration',promptId:'prompt-one',durationMs:1000,timestamp:'2026-10-01T00:00:03Z'}]));
   await writeFile(join(root,'session-one','subagents','agent-a.jsonl'),jsonl([response(30,'prompt-one','sub-response','sub-request'),
     {type:'system',subtype:'turn_duration',promptId:'prompt-one',durationMs:8000}]));
+  ageLogFixtures(join(root,'session-one.jsonl'),join(root,'session-one','subagents','agent-a.jsonl'));
   const first = await refreshSummary(database,options);
   assert.equal(first.failed,0);assert.equal(first.parsed,2);
   const rows = database.queryTurns();assert.equal(rows.length,1);
@@ -180,11 +184,11 @@ test('append, truncated rewrite, winner deletion and fresh rebuild agree',async 
 test('parse failure preserves accepted metadata and summary; later user refresh retries',async () => fixture(async (database,options,root) => {
   const main = join(root,'session-one.jsonl');
   await writeFile(main,jsonl([user(),response()]));await refreshSummary(database,options);
-  const before = database.queryTurns()[0];const manifest = database.findManifest('claude',main)!;
+  const before = database.queryTurns()[0];const source_file = database.findSourceFile('claude',main)!;
   await appendFile(main,'{bad}\n');
   const result = await refreshSummary(database,options);assert.equal(result.failed,1);
   const stale = database.queryTurns()[0];assert.equal(stale.total_tokens,before.total_tokens);assert.equal(stale.updated_at,before.updated_at);
-  assert.equal(stale.last_error,'parse-error');assert.equal(database.findManifest('claude',main)!.size_bytes,manifest.size_bytes);
+  assert.equal(stale.last_error,'parse-error');assert.equal(database.findSourceFile('claude',main)!.size_bytes,source_file.size_bytes);
   await writeFile(main,jsonl([user(),response(50)]));
   await refreshSummary(database,options);assert.equal(database.queryTurns()[0].total_tokens,150);assert.equal(database.queryTurns()[0].last_error,null);
 }));
@@ -244,7 +248,7 @@ test('session sources outside selected roots survive a shared-session rebuild',a
   await appendFile(main,jsonl([response(10,'prompt-one','response-three','req-three')]));
   const result = await refreshSummary(database,options);
   assert.equal(result.failed,0);assert.equal(database.queryTurns()[0].total_tokens,460);
-  assert.ok(database.findManifest('claude',join(other,'copy.jsonl')));
+  assert.ok(database.findSourceFile('claude',join(other,'copy.jsonl')));
 }));
 
 const codexMeta = (id:string,parent?:string,fork?:string) => ({type:'session_meta',payload:{id,parent_thread_id:parent,forked_from_id:fork,cwd:'/fixture/project'}});
@@ -272,26 +276,31 @@ test('Codex compression transitions and simultaneous copies preserve totals and 
   const transition=await refreshSummary(database,codexOptions);
   assert.equal(transition.failed,0);assert.equal(transition.discovered,1);
   assert.equal(database.queryTurns()[0].total_tokens,100);
-  assert.equal(database.findManifest('codex',plain),undefined);
-  assert.equal(database.findManifest('codex',compressed)?.size_bytes,encoded.length);
+  assert.equal(database.findSourceFile('codex',plain),undefined);
+  assert.equal(database.findSourceFile('codex',compressed)?.size_bytes,encoded.length);
+  ageLogFixtures(compressed);
   const warm=await refreshSummary(database,codexOptions);
   assert.equal(warm.parsed,0);assert.equal(warm.reused,1);assert.equal(warm.bodyBytes,0);
   assert.deepEqual(await readFile(compressed),encoded);
 }));
 
-test('compressed Codex parents are reread for new descendants and corrupt refreshes preserve accepted usage',async () => fixture(async (database,options,root) => {
+test('compressed Codex parents rebuild with new descendants and corrupt refreshes preserve accepted usage',async () => fixture(async (database,options,root) => {
   const codexOptions={...options,roots:[{provider:'codex' as const,path:root}]};
   const parent=join(root,'main.jsonl.zst');
   const encoded=zstdCompressSync(Buffer.from(jsonl([codexMeta('main'),codexStart('root'),currentUsage('main','root','root',100)])),
     {params:{[constants.ZSTD_c_checksumFlag]:1}});
-  await writeFile(parent,encoded);await refreshSummary(database,codexOptions);
-  await writeFile(join(root,'child.jsonl'),jsonl([codexMeta('child','main'),codexStart('child-turn','root'),currentUsage('child','child-turn','root',40)]));
+  await writeFile(parent,encoded);
+  ageLogFixtures(parent);
+  await refreshSummary(database,codexOptions);
+  const childSource=jsonl([codexMeta('child','main'),codexStart('child-turn','root'),currentUsage('child','child-turn','root',40)]);
+  await writeFile(join(root,'child.jsonl'),childSource);
   const expanded=await refreshSummary(database,codexOptions);
   assert.equal(expanded.failed,0);assert.equal(database.queryTurns()[0].total_tokens,140);
+  assert.equal(expanded.parsed,2);assert.equal(expanded.bodyBytes,encoded.length+Buffer.byteLength(childSource));
   await writeFile(parent,encoded.subarray(0,encoded.length-1));
   const broken=await refreshSummary(database,codexOptions);
   assert.ok(broken.failed>0);assert.equal(database.queryTurns()[0].total_tokens,140);
-  assert.equal(database.findManifest('codex',parent)?.last_error,'decompression-error');
+  assert.equal(database.findSourceFile('codex',parent)?.last_error,'decompression-error');
 }));
 
 test('aborted Codex roots and descendants leave no request summary while later cumulative deltas stay correct',async () => fixture(async (database,options,root) => {
@@ -319,7 +328,7 @@ test('a Codex abort removes an accepted summary and a later completed retry can 
   await refreshSummary(database,codexOptions);assert.equal(database.queryTurns().length,1);
   await appendFile(path,jsonl([{type:'event_msg',timestamp:'2026-10-01T00:00:02Z',payload:{type:'turn_aborted',turn_id:'request'}}]));
   assert.equal((await refreshSummary(database,codexOptions)).failed,0);assert.equal(database.queryTurns().length,0);
-  assert.equal(database.findManifest('codex',path)!.processing_status,'done');
+  assert.equal(database.findSourceFile('codex',path)!.processing_status,'done');
   await appendFile(path,jsonl([{...codexStart('request'),timestamp:'2026-10-01T00:00:03Z'},
     {type:'event_msg',timestamp:'2026-10-01T00:00:04Z',payload:{type:'task_complete',turn_id:'request',duration_ms:1000}}]));
   assert.equal((await refreshSummary(database,codexOptions)).failed,0);
@@ -349,7 +358,7 @@ test('copied parent metadata preserves child lineage and spawn binding excludes 
   const turns=database.queryTurns();assert.equal(turns.length,1);
   assert.equal(turns[0].session_id,'main');assert.equal(turns[0].root_turn_id,'inherited');
   assert.equal(turns[0].total_tokens,140);assert.equal(turns[0].duration_ms,1000);
-  assert.equal(database.findManifest('codex',child)!.session_id,'main');
+  assert.equal(database.findSourceFile('codex',child)!.session_id,'main');
   assert.ok(turns.every(row=>!row.quality_flags?.includes('missing-parent')));
 }));
 
@@ -390,7 +399,8 @@ test('Codex parser version rebuilds cached seconds timestamps without changes to
   ]));
   await refreshSummary(database,codexOptions);
   // Recreate the accepted v2 cache; source size, mtime and identity stay unchanged.
-  database.connection.exec(`UPDATE manifest SET parser_version=2;
+  database.connection.exec(`UPDATE source_file SET parser_version=2;
+    UPDATE summary_refresh SET scope='v2';
     UPDATE turn_summary SET started_at_ms=1786858107,completed_at_ms=1786859354`);
   assert.equal(database.queryUsage({},'month','Asia/Seoul')[0].period,'1970-01');
   const refreshed=await refreshSummary(database,codexOptions);
@@ -399,7 +409,8 @@ test('Codex parser version rebuilds cached seconds timestamps without changes to
   assert.equal(turns[0].started_at_ms,1786858107000);assert.equal(turns[0].completed_at_ms,1786859354000);
   assert.equal(turns[0].total_tokens,100);assert.equal(turns[0].duration_ms,1247169);
   assert.equal(database.queryUsage({},'month','Asia/Seoul')[0].period,'2026-08');
-  assert.equal(database.findManifest('codex',main)!.parser_version,PARSER_VERSION);
+  assert.equal(database.findSourceFile('codex',main)!.parser_version,PARSER_VERSION);
+  ageLogFixtures(main);
   const unchanged=await refreshSummary(database,codexOptions);
   assert.equal(unchanged.failed,0);assert.equal(unchanged.reused,1);assert.equal(unchanged.bodyBytes,0);
 }));
@@ -420,7 +431,8 @@ test('rootless legacy subagents merge into the spawn request without counting ve
   assert.equal(parentTurn.session_id,'main');assert.equal(parentTurn.root_turn_id,'inherited');
   assert.equal(parentTurn.total_tokens,140);assert.equal(parentTurn.duration_ms,500);
   assert.ok(!parentTurn.quality_flags?.includes('standalone-subagent'));assert.equal(parentTurn.last_error,null);
-  assert.equal(database.findManifest('codex',child)!.session_id,'main');
+  assert.equal(database.findSourceFile('codex',child)!.session_id,'main');
+  ageLogFixtures(main,child);
   const unchanged=await refreshSummary(database,codexOptions);
   assert.equal(unchanged.failed,0);assert.equal(unchanged.reused,2);assert.equal(unchanged.bodyBytes,0);
   await appendFile(child,jsonl([rootlessStart('next-child-turn'),
@@ -443,7 +455,7 @@ test('rootless usage-only subagents without a parent binding retain source diagn
   assert.equal((await refreshSummary(database,codexOptions)).failed,2);
   assert.equal(database.queryTurnsCount(),0);
   for (const id of ['child-one','child-two']) {
-    const file=database.findManifest('codex',join(root,`${id}.jsonl`))!;
+    const file=database.findSourceFile('codex',join(root,`${id}.jsonl`))!;
     assert.equal(file.processing_status,'error');assert.equal(file.last_error,'missing-root-turn');
   }
 }));
@@ -513,8 +525,8 @@ test('empty and first partial-only files are deferred without parse errors',asyn
   await writeFile(empty,'');await writeFile(partial,JSON.stringify(user()));
   const result = await refreshSummary(database,options);
   assert.equal(result.failed,0);assert.equal(database.queryTurns().length,0);
-  assert.equal(database.findManifest('claude',partial)?.last_error,null);
-  assert.equal(database.findManifest('claude',empty)?.processing_status,'done');
+  assert.equal(database.findSourceFile('claude',partial)?.last_error,null);
+  assert.equal(database.findSourceFile('claude',empty)?.processing_status,'done');
   await appendFile(partial,'\n' + jsonl([response()]));
   assert.equal((await refreshSummary(database,options)).failed,0);
   assert.equal(database.queryTurns()[0].total_tokens,200);
@@ -592,6 +604,7 @@ test('two workers sharing a DB serialize refreshes and preserve unchanged reads'
   const first=new SummaryClient(options);const second=new SummaryClient(options);
   try {
     await first.initialize();await second.initialize();
+    ageLogFixtures(join(root,'main.jsonl'));
     const [a,b]=await Promise.all([first.refresh(),second.refresh()]);
     assert.equal(a.failed+b.failed,0);assert.equal(a.parsed+b.parsed,1);assert.equal(a.reused+b.reused,1);
     assert.equal((await first.query({groupBy:'all'})).rows[0].total_tokens,200);
@@ -642,7 +655,7 @@ test('line byte budget failure preserves prior summary and exposes the exact sou
   await appendFile(path,JSON.stringify({type:'assistant',text:'x'.repeat(1000)})+'\n');
   const result=await refreshSummary(database,{...options,maxLineBytes:512});
   assert.equal(result.failed,1);assert.equal(database.queryTurns()[0].total_tokens,200);
-  const file=database.findManifest('claude',path)!;
+  const file=database.findSourceFile('claude',path)!;
   assert.equal(file.last_error,'line-byte-budget-exceeded');assert.match(file.processing_position!,/byte=[1-9]/);
 }));
 
@@ -654,7 +667,7 @@ test('a new malformed subagent preserves the entire previously accepted session'
   await writeFile(join(agents,'agent-new.jsonl'),jsonl([response(30,'prompt-one','child','child-request')])+'{bad}\n');
   const result=await refreshSummary(database,options);
   assert.equal(result.failed,1);assert.equal(database.queryTurns()[0].total_tokens,200);
-  assert.equal(database.findManifest('claude',main)!.processing_status,'error');
+  assert.equal(database.findSourceFile('claude',main)!.processing_status,'error');
 }));
 
 test('a malformed reassigned file preserves both the old and newly identified session',async () => fixture(async(database,options,root)=>{
@@ -683,20 +696,21 @@ test('a malformed new Codex descendant keeps the accepted root-session summary',
   assert.equal(database.queryTurns()[0].last_error,'parse-error');
 }));
 
-test('cancelling an affected session also marks its reread unchanged source interrupted',async () => fixture(async(database,options,root)=>{
+test('cancelling an affected session also marks its unchanged source interrupted',async () => fixture(async(database,options,root)=>{
   const main=join(root,'session-one.jsonl');
   const agents=join(root,'session-one','subagents');await mkdir(agents,{recursive:true});
   const child=join(agents,'agent-child.jsonl');
   await writeFile(main,jsonl([user(),response()]));
   await writeFile(child,jsonl([response(30,'prompt-one','child','child-request')]));
+  ageLogFixtures(main,child);
   await refreshSummary(database,options);
   // 30→60의 같은 길이 재작성도 변경 감지가 확실하도록 크기를 바꾼다.
   await writeFile(child,jsonl([response(60,'prompt-one','child','child-request')])+'\n');
   const controller=new AbortController();
   const result=await refreshSummary(database,options,controller.signal,progress=>{if(progress.phase==='committing')controller.abort();});
   assert.equal(result.interrupted,true);
-  assert.equal(database.findManifest('claude',main)!.processing_status,'interrupted');
-  assert.equal(database.findManifest('claude',child)!.processing_status,'interrupted');
+  assert.equal(database.findSourceFile('claude',main)!.processing_status,'interrupted');
+  assert.equal(database.findSourceFile('claude',child)!.processing_status,'interrupted');
   assert.equal(database.queryTurns()[0].total_tokens,330);
 }));
 
@@ -719,13 +733,13 @@ test('cancellation after a batch commits preserves settled sessions and interrup
   assert.equal(result.interrupted,true);
   const rows=database.queryTurns();
   for (const source of sources.slice(0,16)) {
-    assert.equal(database.findManifest('claude',source.path)!.processing_status,'done');
+    assert.equal(database.findSourceFile('claude',source.path)!.processing_status,'done');
     const row=rows.find(row=>row.session_id===source.session)!;
     assert.equal(row.total_tokens,300);assert.equal(row.last_error,null);
   }
   const pending=sources[16];
   assert.equal(rows.find(row=>row.session_id===pending.session)!.total_tokens,200);
-  assert.equal(database.findManifest('claude',pending.path)!.processing_status,'interrupted');
+  assert.equal(database.findSourceFile('claude',pending.path)!.processing_status,'interrupted');
 }));
 
 test('a later batch orphan does not prevent an earlier healthy component from committing',async () => fixture(async(database,options,root)=>{
@@ -736,8 +750,8 @@ test('a later batch orphan does not prevent an earlier healthy component from co
     currentUsage('z','child','missing-request',50)]));
   const result=await refreshSummary(database,codexOptions);
   assert.equal(result.failed,1);assert.equal(result.interrupted,false);
-  assert.equal(database.findManifest('codex',valid)!.processing_status,'done');
-  assert.equal(database.findManifest('codex',orphan)!.last_error,'missing-root-turn');
+  assert.equal(database.findSourceFile('codex',valid)!.processing_status,'done');
+  assert.equal(database.findSourceFile('codex',orphan)!.last_error,'missing-root-turn');
   assert.equal(database.queryTurns().length,1);assert.equal(database.queryTurns()[0].total_tokens,100);
 }));
 
@@ -756,7 +770,7 @@ test('a middle batch commit failure preserves its old snapshot and still commits
   const rows=database.queryTurns();
   for (const source of sources) {
     assert.equal(rows.find(row=>row.session_id===source.session)!.total_tokens,source.name==='b'?200:300);
-    assert.equal(database.findManifest('claude',source.path)!.processing_status,source.name==='b'?'error':'done');
+    assert.equal(database.findSourceFile('claude',source.path)!.processing_status,source.name==='b'?'error':'done');
   }
   assert.equal(database.queryUsage()[0].total_tokens,800);
   assert.deepEqual(database.connection.prepare('PRAGMA foreign_key_check').all(),[]);

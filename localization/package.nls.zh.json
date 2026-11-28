@@ -1,5 +1,5 @@
 {
-  "manifest.description": "Claude 和 Codex 订阅使用量及本地用户请求 token 统计",
+  "manifest.description": "Claude 和 Codex 订阅使用率及本地会话 token 统计",
   "manifest.openDashboard": "Agent Tracker：打开仪表板",
   "manifest.openUsage": "Agent Tracker：打开使用统计",
   "status.refreshName": "Agent Tracker：刷新当前使用量",
@@ -41,7 +41,7 @@
   "manifest.showResetCredits": "在卡片中显示 Codex 可用重置次数和下次到期时间，仅在服务器提供信息时显示。",
   "dashboard.usageStatistics": "使用统计",
   "manifest.usageEnabled": "启用使用统计。关闭后取消收集并关闭统计视图，不影响订阅使用量查询。\n\n[删除统计数据](command:agentTracker.clearUsageData)：删除已保存的文件处理信息和汇总结果。原始对话日志保留，重新打开统计时重新计算。",
-  "manifest.skillsEnabled": "统计 Skill 中的技能、子智能体、插件和模型使用次数，默认包含 AI 自主调用。关闭后停止新计数并隐藏 Skill 统计，保留现有数据。不影响 token、API 费用和订阅使用量。重新启用后在已打开的统计视图重新计算；未打开时，下次打开从原始日志恢复。",
+  "manifest.skillsEnabled": "统计技能、子代理、插件和模型的使用次数。",
   "manifest.showApiCosts": "在 token 统计表中显示 API 估算费用（USD）。订阅费用为0；计费方式、模型单价或 token 构成未确认的费用单独显示。更改设置仅查询已保存的统计。",
   "manifest.excludeEmpty": "从图表和平均值中排除没有已知模型且无 token 使用量的请求，仍在表格中显示。包含已知模型的0 token 记录及未知模型的实际 token 使用量。",
   "manifest.timezone": "日/月统计的 IANA 时区。留空使用系统时区。",

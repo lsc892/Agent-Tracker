@@ -1,4 +1,6 @@
 // 통계 DB의 저장 입력·조회 필터·페이지·집계·진단 타입을 정의한다.
+import type { ParsedIdentity } from '../types';
+
 export type Provider = 'claude' | 'codex';
 export type ProcessingStatus = 'processing' | 'done' | 'error' | 'interrupted';
 export type DurationQuality = 'exact' | 'derived' | 'approximate' | 'missing';
@@ -13,29 +15,51 @@ export interface CostFields {
   billing_mode?: BillingMode;
 }
 
+interface LegacySourceRelation {
+  threadUsage?: never;
+  identity: Pick<ParsedIdentity, 'sessionId' | 'threadId' | 'parentThreadId' | 'isMain' | 'agentPath'
+    | 'rootlessSubagent' | 'forkedFromId'>;
+  childRequests: ReadonlyMap<string, string | null>;
+}
+
+export type SourceRelationMetadata = LegacySourceRelation | {
+  threadUsage: true;
+  identity: Pick<ParsedIdentity, 'threadId'>;
+};
+
+export interface StoredSourceRelation {
+  identity: Pick<ParsedIdentity, 'threadId'>;
+  threadUsage?: true;
+}
+
 export interface FileMetadata {
   provider: Provider;
   source_root: string;
   path: string;
   session_id: string | null;
-  size_bytes: number;
   mtime_ms: number;
-  dev: string | null;
-  inode: string | null;
   parser_version: number;
-  /** Parsed source thread/role and SHA-256 of the accepted raw file snapshot. */
-  source_identity?: string | null;
-  content_hash?: string | null;
-  /** 0 when Skill counts were skipped; re-enable rebuilds these sources. */
+  /** Parsed identity for retaining usage when the source disappears. */
+  relations?: SourceRelationMetadata | null;
+  /** @deprecated Accepted in old callers' input. File size is observed when the file is read. */
+  size_bytes?: number;
+  /** Whether the last successful scan included capability usage. */
   capabilities_collected?: 0 | 1;
+  /** @deprecated Accepted in old callers' input. Schema v24 does not store it. */
+  dev?: string | null;
+  /** @deprecated Accepted in old callers' input. Schema v24 does not store it. */
+  inode?: string | null;
 }
 
-export interface ManifestRow extends FileMetadata {
+export interface SourceFileRow extends FileMetadata {
   id: number;
-  source_identity: string | null;
-  content_hash: string | null;
+  thread_id: string | null;
+  thread_usage: 0 | 1;
+  /** @deprecated Present in v23 rows of historical callers only. */
+  source_identity?: string | null;
+  /** @deprecated Present in v23 rows of historical callers only. */
+  content_hash?: string | null;
   source_missing: 0 | 1;
-  last_seen_scan_id: string | null;
   processing_status: ProcessingStatus;
   processing_position: string | null;
   recorded_at: string;
@@ -179,7 +203,7 @@ export interface UsageRow extends CostFields {
 }
 
 export interface DiagnosticsPage {
-  files: ManifestRow[];
+  files: SourceFileRow[];
   summaries: TurnSummaryRow[];
   counts: {
     files: number;

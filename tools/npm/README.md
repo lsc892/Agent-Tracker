@@ -12,6 +12,9 @@ npx agent-tracker-vscode@latest
 The installer includes the VSIX, installs it with the VS Code CLI, and verifies
 the installed extension ID and version. Reload an open VS Code window with
 **Developer: Reload Window**, then run **Agent Tracker: Open Dashboard**.
+If Agent Tracker asks you to update the usage card's click behavior, fully quit
+VS Code, wait a moment, and reopen it. The patch applies on exit on supported
+local Windows and Linux installations.
 
 Run the same command with `@latest` to update. Install a specific version with
 `npx agent-tracker-vscode@0.3.1`.

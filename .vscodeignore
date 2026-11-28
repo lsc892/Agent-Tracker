@@ -13,6 +13,11 @@ benchmark-results/**
 coverage/**
 AGENTS.md
 tools/**
+!tools/vscode/statusbar-toggle.cjs
+!tools/vscode/statusbar-toggle-auto.cjs
+!tools/vscode/statusbar-toggle-behavior.cjs
+!tools/vscode/statusbar-toggle-history.cjs
+!tools/vscode/statusbar-toggle-view.cjs
 artifacts/**
 dist/tests/**
 dist/.localization-manifest.json

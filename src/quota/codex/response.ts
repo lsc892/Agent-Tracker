@@ -17,6 +17,7 @@ export function parseCodexQuota(value: unknown, fetchedAt: number): QuotaSnapsho
   const result = asRecord(value);
   if (!result) throw protocolError();
 
+  // [DTO 정책] 사용할 한도 창이 있을 때만 반환하고 크레딧 요약은 유효한 경우에 붙인다.
   const windows = parseQuotaWindows(result);
   if (windows.length === 0) throw new QuotaError('unavailable', { key: 'quota.codexUnavailable' });
   const rateLimitResetCredits = parseResetCredits(result.rateLimitResetCredits);
@@ -26,7 +27,7 @@ export function parseCodexQuota(value: unknown, fetchedAt: number): QuotaSnapsho
 function parseQuotaWindows(result: Record<string, unknown>): QuotaWindow[] {
   const byLimit = asRecord(result.rateLimitsByLimitId);
   if (result.rateLimitsByLimitId != null && !byLimit) throw protocolError();
-  // An explicitly present empty map is authoritative, not a reason to use stale fallback data.
+  // [파싱 정책] 한도 맵이 명시되면 비어 있어도 우선하고 없을 때만 단일 값을 읽는다.
   const buckets = byLimit ? Object.entries(byLimit) : [['codex', result.rateLimits] as const];
   const windows: QuotaWindow[] = [];
   for (const [key, raw] of buckets) {
@@ -36,6 +37,7 @@ function parseQuotaWindows(result: Record<string, unknown>): QuotaWindow[] {
 }
 
 function appendLimitWindows(windows: QuotaWindow[], key: string, value: unknown, isSingleLimit: boolean): void {
+  // [파싱 정책] 버킷의 한도 ID가 없으면 맵 키를 쓰고 각 한도의 주·보조 창을 읽는다.
   const bucket = asRecord(value);
   if (!bucket) throw protocolError();
   const limitId = typeof bucket.limitId === 'string' ? bucket.limitId.slice(0, 100) : key.slice(0, 100);
@@ -48,6 +50,7 @@ function appendLimitWindows(windows: QuotaWindow[], key: string, value: unknown,
 function appendLimitWindow(windows: QuotaWindow[], limit: CodexLimit, windowId: 'primary' | 'secondary'): void {
   const window = parseCodexQuotaWindow(limit.source[windowId], windowId);
   if (!window) return;
+  // [DTO 정책] 한도 ID를 창 ID에 넣고 여러 한도 중 기본 한도가 아닌 창은 라벨에 한도 이름을 붙인다.
   windows.push({ ...window, id: `${limit.id}:${windowId}`, limitId: limit.id,
     ...(limit.name ? { limitName: limit.name } : {}),
     label: limit.usesWindowLabel ? window.label : `${limit.name || limit.id} ${window.label}`,
@@ -57,6 +60,7 @@ function appendLimitWindow(windows: QuotaWindow[], limit: CodexLimit, windowId: 
 
 /** 창 하나의 사용률·기간·초기화 초를 검증하고 공통 quota 창으로 변환한다. */
 function parseCodexQuotaWindow(value: unknown, windowId: string): QuotaWindow | null {
+  // [파싱 정책] 사용률과 기간의 범위를 확인한 뒤 초기화 시각을 초에서 밀리초로 바꾼다.
   if (value == null) return null;
   const window = asRecord(value);
   if (!window || typeof window.usedPercent !== 'number' || !Number.isFinite(window.usedPercent) || window.usedPercent < 0) throw protocolError();
@@ -77,9 +81,10 @@ function parseCodexQuotaWindow(value: unknown, windowId: string): QuotaWindow | 
 function parseResetCredits(value: unknown): QuotaSnapshot['rateLimitResetCredits'] {
   const summary = asRecord(value);
   const count = summary?.availableCount;
-  // The backend may cap detail rows; their length is never the available reset count.
+  // [DTO 정책] 상세 행은 일부만 올 수 있으므로 사용 가능한 개수는 서버의 집계 필드에서 읽는다.
   if (typeof count !== 'number' || !Number.isSafeInteger(count) || count < 0) return undefined;
   if (count === 0 || !Array.isArray(summary?.credits)) return { availableCount: count, nextExpiresAt: null };
+  // [파싱 정책] 사용 가능한 Codex 크레딧의 유효한 만료 시각 중 가장 이른 값을 고른다.
   let nextExpiresAt: number | null = null;
   for (const raw of summary.credits) {
     const credit = asRecord(raw);

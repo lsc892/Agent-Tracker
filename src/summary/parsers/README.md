@@ -7,3 +7,8 @@ Claude·Codex 로그를 공통 식별 정보와 요청·사용량·도구 이벤
 - [codex.ts](codex.ts) — `CodexCurrentParserAdapter`가 현재·이전 로그를 한 파서에서 해석한다.
 - [common.ts](common.ts) — 값·경로·제목·토큰·결제 분류의 공통 정규화를 제공한다.
 - [index.ts](index.ts) — Claude·Codex 파서와 제공자별 토큰 변환 함수를 공개한다.
+
+## 관련 문서
+
+- [LogParsingFields](../../../docs/refrences/LogParsingFields.md) — Claude·Codex JSONL 필드와 해석 규칙.
+- [winner 정책](../../../docs/refrences/WinnerPolicy.md) — 응답 비교 키와 동점 처리, Codex 누계 검산.

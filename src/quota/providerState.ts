@@ -22,11 +22,13 @@ export class ProviderQuotaState {
   get nextAllowedAt(): number { return this.retryAllowedAt; }
 
   get expiresAt(): number {
+    // [보존 정책] 조회에 실패하면 마지막 성공 시각에 오류 유형별 보존 기간을 더해 만료 시각을 계산한다.
     if (!this.snapshot || !this.error || this.lastSuccessAt === null) return Infinity;
     return this.lastSuccessAt + snapshotRetentionMs(this.error.code);
   }
 
   acceptSnapshot(snapshot: QuotaSnapshot): void {
+    // [상태 정책] 성공 결과를 복사해 보관하고 누적 오류와 재시도 제한을 초기화한다.
     this.snapshot = structuredClone(snapshot);
     this.lastSuccessAt = snapshot.fetchedAt;
     this.error = null;
@@ -36,10 +38,13 @@ export class ProviderQuotaState {
 
   /** 지수 지연과 Retry-After를 적용하고 계정 변경·보존 기한에 따라 이전 값을 비운다. */
   recordFailure(error: unknown): void {
+    // [재시도 정책] 연속 실패의 지수 지연과 서버 안내 중 더 긴 시간을 적용한다.
     this.error = error instanceof QuotaError ? error : new QuotaError('unavailable', { key: 'quota.lookupFailed' });
     this.failures += 1;
     const retryDelayMs = Math.min(MAX_RETRY_DELAY_MS, INITIAL_RETRY_DELAY_MS * 2 ** Math.min(MAX_RETRY_EXPONENT, this.failures - 1));
     this.retryAllowedAt = this.now() + Math.max(retryDelayMs, this.error.retryAfterMs ?? 0);
+
+    // [보존 정책] 지원하지 않는 계정으로 바뀌면 이전 결과와 성공 시각을 즉시 비운다.
     if (this.error.code === 'unsupported-account') {
       this.snapshot = null;
       this.lastSuccessAt = null;
@@ -49,6 +54,7 @@ export class ProviderQuotaState {
 
   /** 일반 오류는 30분, 요청 제한 오류는 24시간 뒤 성공 시각을 남기고 스냅샷만 만료시킨다. */
   expire(): boolean {
+    // [보존 정책] 마지막 성공 시각이 오류별 보존 기한을 넘으면 결과만 비운다.
     if (!this.snapshot || !this.error || this.lastSuccessAt === null) return false;
     const retentionMs = snapshotRetentionMs(this.error.code);
     if (this.now() - this.lastSuccessAt < retentionMs) return false;
@@ -57,10 +63,12 @@ export class ProviderQuotaState {
   }
 
   shouldRefreshOnFocus(now: number): boolean {
+    // [갱신 정책] 포커스가 돌아오면 미조회·오류·5분 이상 지난 결과를 갱신 대상으로 본다.
     return this.lastSuccessAt === null || this.error !== null || now - this.lastSuccessAt >= FOCUS_REFRESH_AGE_MS;
   }
 
   getState(provider: QuotaProviderId, refreshing: boolean): QuotaState {
+    // [DTO 정책] 결과 유무와 조회·오류 상태를 조합해 화면 표시 상태를 만든다.
     const snapshot = this.snapshot ? structuredClone(this.snapshot) : null;
     return { provider, snapshot, refreshing,
       status: snapshot ? (this.error ? 'stale' : 'ready') : (refreshing ? 'loading' : 'unavailable'),

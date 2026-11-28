@@ -8,6 +8,7 @@ import { SummaryDatabase } from '../../src/summary/db';
 import { refreshSummary } from '../../src/summary/scanner';
 import { project } from '../../src/summary/parsers/common';
 import type { SummaryOptions } from '../../src/summary/types';
+import { ageLogFixtures } from '../fixtures/summary-mtime';
 
 const jsonl = (rows: unknown[]): string => rows.map(row => JSON.stringify(row)).join('\n') + '\n';
 const user = (root = 'one', session = 'session') => ({
@@ -39,7 +40,7 @@ async function fixture(run: (value: Fixture) => Promise<void>): Promise<void> {
 }
 
 const metadata = (db: SummaryDatabase) => db.connection.prepare(
-  'SELECT id,source_identity,content_hash FROM manifest ORDER BY id').all();
+  'SELECT id,source_identity,content_hash FROM source_file ORDER BY id').all();
 
 test('a full reread with unchanged statistics preserves request identities across database reopen',async () => fixture(async value => {
   const {root,options} = value,path = join(root,'session.jsonl');
@@ -107,15 +108,22 @@ test('late Claude request IDs regroup every candidate of the affected response',
 
 test('a shared response winner moving between roots invalidates both request summaries',async () => fixture(async ({db,root,options}) => {
   const path = join(root,'session.jsonl');
+  const applied = () => db.connection.prepare(`SELECT summary.root_turn_id,response.response_key,response.input_tokens
+    FROM applied_response AS response JOIN turn_summary AS summary ON summary.id=response.turn_id
+    ORDER BY response.response_key`).all().map(row => [row.root_turn_id, row.response_key, row.input_tokens]);
+  const sharedKey = JSON.stringify(['shared', 'request-a']);
   await writeFile(path,jsonl([user(),response(100,'one','shared',null),user('two'),response(80,'two','shared','request-a')]));
   assert.equal((await refreshSummary(db,options)).failed,0);
   assert.equal(db.queryTurns().find(row=>row.root_turn_id==='one')?.total_tokens,102);
   assert.equal(db.queryTurns().find(row=>row.root_turn_id==='two')?.total_tokens,0);
+  assert.deepEqual(applied(), [['one', sharedKey, 100]]);
   await writeFile(path,jsonl([user(),response(100,'one','shared',null),user('two'),response(150,'two','shared','request-a')]));
   assert.equal((await refreshSummary(db,options)).failed,0);
   assert.equal(db.queryTurns().find(row=>row.root_turn_id==='one')?.total_tokens,0);
   assert.equal(db.queryTurns().find(row=>row.root_turn_id==='two')?.total_tokens,152);
   assert.equal(db.queryUsage()[0].total_tokens,152);
+  assert.deepEqual(applied(), [['two', sharedKey, 150]]);
+  assert.deepEqual(db.connection.prepare('PRAGMA foreign_key_check').all(), []);
 }));
 
 test('equal-score shared responses follow the current cross-root source parse order',async () => fixture(async ({db,root,options}) => {
@@ -126,14 +134,16 @@ test('equal-score shared responses follow the current cross-root source parse or
   for (const source of sources) await writeFile(source.path,jsonl([
     user(source.root),response(100,source.root,'shared','same-request',source.model),
   ]));
+  ageLogFixtures(...sources.map(source=>source.path));
   assert.equal((await refreshSummary(db,options)).failed,0);
   const winner = db.queryTurns().find(row=>row.total_tokens===102)!;
   const touched = sources.find(source=>source.root===winner.root_turn_id)!;
   const other = sources.find(source=>source!==touched)!;
   await appendFile(touched.path,jsonl([{type:'progress',detail:'Same normalized turn events'}]));
-  assert.equal((await refreshSummary(db,options)).failed,0);
+  const refreshed=await refreshSummary(db,options);
+  assert.equal(refreshed.failed,0);assert.equal(refreshed.parsed,2);
   assert.equal(db.queryTurns().find(row=>row.root_turn_id===touched.root)?.total_tokens,0,
-    'the changed source is parsed before the unchanged affected source');
+    'the changed candidate precedes the unchanged candidate in an equal-score comparison');
   assert.equal(db.queryTurns().find(row=>row.root_turn_id===other.root)?.total_tokens,102);
   assert.equal(db.queryTurns({}, {},'model').find(row=>row.root_turn_id===other.root)?.model,other.model);
 }));
@@ -166,7 +176,7 @@ test('changed main-source project metadata updates roots recorded only in anothe
   await writeFile(second,jsonl([user('two'),response(40,'two','response-two','request-two')]));
   assert.equal((await refreshSummary(db,options)).failed,0);
   assert.ok(db.queryTurns().every(row=>row.project_key===project('/synthetic/project').projectKey));
-  const selected = db.findManifest('claude',first)!.id < db.findManifest('claude',second)!.id ? first : second;
+  const selected = db.findSourceFile('claude',first)!.id < db.findSourceFile('claude',second)!.id ? first : second;
   const selectedRoot = selected===first?'one':'two';
   await writeFile(selected,jsonl([{...user(selectedRoot),cwd:'/synthetic/renamed-project'},
     selected===first?response():response(40,'two','response-two','request-two')]));
@@ -216,7 +226,7 @@ test('clearing statistics removes source state and all derived facts',async () =
   await writeFile(join(root,'session.jsonl'),jsonl([user(),response()]));
   assert.equal((await refreshSummary(db,options)).failed,0);assert.equal(metadata(db).length,1);
   db.clearData();assert.equal(db.queryTurnsCount(),0);
-  for (const table of ['manifest','turn_summary','turn_model_usage','turn_capability_usage','turn_costs','sessions','projects']) {
+  for (const table of ['source_file','turn_summary','turn_model_usage','turn_capability_usage','turn_costs','sessions','projects']) {
     assert.equal(db.connection.prepare(`SELECT count(*) AS n FROM ${table}`).get()?.n,0);
   }
   assert.deepEqual(db.connection.prepare('PRAGMA foreign_key_check').all(),[]);
@@ -252,5 +262,5 @@ test('disabling source retention revalidates a previously suppressed orphan calc
   const result = await refreshSummary(db,options);
   assert.equal(result.failed,1);
   assert.equal(db.queryTurns()[0].total_tokens,124);
-  assert.equal(db.findManifest('claude',child)?.last_error,'missing-root-turn');
+  assert.equal(db.findSourceFile('claude',child)?.last_error,'missing-root-turn');
 }));

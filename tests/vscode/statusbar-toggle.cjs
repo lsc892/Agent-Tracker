@@ -157,11 +157,11 @@ async function verifyStatusLocalization(cdp, settingsPath, root, editor) {
     await cdp.click(point);
     await cdp.call('Input.dispatchMouseEvent', { type: 'mouseMoved', ...editor });
     await sleep(500);
-    assert.ok(await cardText(), `${locale}: click pins the hovered card`);
+    assert.ok(await cardText(), `${locale}: clicking the hovered card pins it`);
     await cdp.click(point);
     for (let attempt = 0; attempt < 5; attempt++) {
       await sleep(100);
-      assert.equal(await cardText(), null, `${locale}: second click keeps the card closed`);
+      assert.equal(await cardText(), null, `${locale}: closing click keeps the card closed`);
     }
     await cdp.click(point);
     await until(cardText, `${locale}: click reopens the card`);
@@ -243,7 +243,7 @@ async function main() {
     const button = await until(() => cdp.evaluate(`(() => {
       const element = [...document.querySelectorAll('.statusbar-item')].find(node => node.id.endsWith('agentTracker.quota'))?.querySelector('.statusbar-item-label');
       if (!element) return null; const rect = element.getBoundingClientRect(); return rect.width ? {x:rect.x+rect.width/2,y:rect.y+rect.height/2,top:rect.top} : null;
-    })()`), 'quota status item');
+    })()`), 'quota status item', 35000);
     if (statusColors) {
       if (quotaFixture) await until(()=>existsSync(environment.AGENT_TRACKER_QUOTA_FIXTURE_READY),'quota fixture finishes its initial settings updates');
       const observations=await verifyStatusColors(cdp,join(userData,'User','settings.json'),resultDirectory,appRoot);
@@ -254,7 +254,7 @@ async function main() {
     const editor = await cdp.evaluate(`(() => { const rect=document.querySelector('.part.editor').getBoundingClientRect();return {x:rect.x+rect.width/3,y:rect.y+100}; })()`);
     const visible = () => cdp.evaluate(`(() => {
       const card=[...document.querySelectorAll('.monaco-hover')].find(node => node.querySelector('a[data-href="command:agentTracker.openSettings"]'));
-      if(!card)return null;const rect=card.getBoundingClientRect();return rect.width&&rect.height ? {top:rect.top,bottom:rect.bottom} : null;
+      if(!card)return null;const rect=card.getBoundingClientRect();return rect.width&&rect.height ? {top:rect.top,bottom:rect.bottom,focused:card.contains(document.activeElement)} : null;
     })()`);
     if (baseline) {
       await cdp.click(button);
@@ -289,13 +289,22 @@ async function main() {
     await until(async () => !await visible(), 'leaving closes the unpinned card');
     outcomes.push('hover opens the full quota card and moving away dismisses it');
     await cdp.call('Input.dispatchMouseEvent', { type: 'mouseMoved', x: button.x, y: button.y });
-    await until(visible, 'hover opens the card again before pinning');
-    await cdp.click(button);
-    const card = await until(visible, 'first click pins quota card');
+    const preview = await until(visible, 'hover opens the card again before clicking');
+    assert.equal(preview.focused, false, 'hover does not steal focus');
+    const clickPoint = { x: button.x, y: button.y, button: 'left', clickCount: 1 };
+    await cdp.call('Input.dispatchMouseEvent', { type: 'mousePressed', ...clickPoint });
+    await sleep(150);
+    assert.ok(await visible(), 'pressing the status item keeps the card visible until click');
+    await cdp.call('Input.dispatchMouseEvent', { type: 'mouseReleased', ...clickPoint });
+    const card = await until(async () => {
+      const current = await visible();
+      return current?.focused && current;
+    }, 'click focuses the hovered card');
+    assert.equal(card.bottom, preview.bottom, 'click keeps the card at its previous anchor');
     assert.ok(card.bottom <= button.top + 8, 'card is anchored above the status bar');
     await cdp.call('Input.dispatchMouseEvent', { type: 'mouseMoved', x: editor.x, y: editor.y });
     await sleep(500); assert.ok(await visible(), 'card remains pinned after the mouse leaves');
-    outcomes.push('first click pins the hovered card above the status bar');
+    outcomes.push('clicking the hovered card focuses it in place and keeps it open after the pointer leaves');
     await cdp.call('Input.dispatchMouseEvent', { type: 'mouseMoved', x: button.x, y: button.y });
     for (let attempt = 0; attempt < 15; attempt++) {
       await sleep(100);
@@ -396,15 +405,16 @@ async function main() {
     const screenshot = await cdp.call('Page.captureScreenshot', { format: 'png' });
     await writeFile(join(resultDirectory, 'statusbar-toggle.png'), Buffer.from(screenshot.data, 'base64'));
     await cdp.click(button);
-    await until(async () => !await visible(), 'second click closes quota card');
-    await assertStaysClosed('the card stays closed while the mouse remains over the button');
+    await until(async () => !await visible(), 'click closes the pinned quota card');
+    await cdp.call('Input.dispatchMouseEvent', { type: 'mouseMoved', x: button.x + 8, y: button.y });
+    await assertStaysClosed('the card stays closed while the pointer moves within the button');
     await cdp.call('Input.dispatchMouseEvent', { type: 'mouseMoved', x: editor.x, y: editor.y });
     await cdp.call('Input.dispatchMouseEvent', { type: 'mouseMoved', x: button.x, y: button.y });
     await until(visible, 'hover opens an unpinned card again after closing');
     await cdp.call('Input.dispatchMouseEvent', { type: 'mouseMoved', ...editor });
     await until(async () => !await visible(), 'leaving closes the card after mouse reentry');
     await assertStaysClosed('an unpinned card stays closed after moving away');
-    outcomes.push('second click closes the pinned card');
+    outcomes.push('click closes the pinned card');
     outcomes.push('mouse reentry restores temporary hover after toggling the pinned card closed');
     for (let attempt = 0; attempt < 3; attempt++) {
       await cdp.click(button); await until(visible, 'repeated click opens');

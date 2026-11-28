@@ -32,14 +32,16 @@ const COST_SUMS = `
  * 알고리즘: 그룹·시간대를 검증하고 일·월 조회의 미상 시간 포함 규칙을 적용한 뒤 제공자·모델·프로젝트·세션·기간 차원을 조립한다.
  */
 function usageScope(filter: SummaryFilter, groupBy: UsageGrouping, timezone: string, by: UsageBasis): UsageScope {
+  // [기간 정책] 허용된 그룹만 받고 일·월 집계에는 요청한 시간대를 검증한다.
   if (!['total', 'project', 'session', 'day', 'month'].includes(groupBy)) throw new RangeError('Unknown usage grouping');
   const calendar = groupBy === 'day' || groupBy === 'month';
   if (calendar) calendarPeriod(0, timezone, groupBy);
 
-  // Calendar queries retain undated requests in a separate NULL-period group, even with a date range.
+  // [기간 정책] 일·월 조회는 별도 옵션이 없으면 날짜가 없는 요청을 미상 그룹으로 유지한다.
   const effectiveFilter: SummaryFilter = calendar && filter.unknownTime === undefined
     ? { ...filter, unknownTime: 'include' } : filter;
   const where = buildQueryFilter(effectiveFilter);
+  // [집계 정책] 제공자를 기본으로 모델·프로젝트·세션·기간 키를 활성 그룹에 맞춰 더한다.
   const project = groupBy === 'project' || groupBy === 'session';
   const session = groupBy === 'session';
   const groups = by === 'model' ? ['provider', 'model'] : ['provider'];
@@ -62,8 +64,9 @@ function usageScope(filter: SummaryFilter, groupBy: UsageGrouping, timezone: str
  * 알고리즘: 완료 표본의 평균과 캐시 미상 규칙을 적용하고, 도표에 필요한 경우에만 토큰 구성별 평균을 계산한다.
  */
 function usageSums(excludeEmptyUsage = false, includeComponentAverages = true): string {
-  // Totals include every status; averages use completed requests and optionally recorded usage only.
+  // [집계 정책] 총합은 모든 요청을 포함하고 평균 표본은 완료 요청 또는 기록이 있는 완료 요청으로 제한한다.
   const completed = `status = 'completed'${excludeEmptyUsage ? ` AND ${RECORDED_USAGE}` : ''}`;
+  // [집계 정책] 구성별 평균은 필요한 경우만 계산하고 캐시 값이 빠진 표본이 있으면 해당 평균을 비운다.
   const averageCache = (column: string): string => `CASE
     WHEN COUNT(CASE WHEN ${completed} THEN ${column} END) = SUM(${completed})
     THEN AVG(CASE WHEN ${completed} THEN ${column} END)
@@ -106,6 +109,7 @@ function usageSums(excludeEmptyUsage = false, includeComponentAverages = true): 
  * 알고리즘: 활성 차원만 projection에 포함하고 이름은 저장 metadata로 조회하며 세션 시작은 현재 날짜 필터와 독립적인 최소 요청 시각으로 구한다.
  */
 function usageDimensions(scope: UsageScope, by: UsageBasis): string[] {
+  // [DTO 정책] 활성 차원의 이름을 저장 메타데이터로 조회하고 비활성 차원은 NULL 열로 둔다.
   const dimensions = ['provider'];
   if (by === 'model') dimensions.push('model');
   dimensions.push(scope.project ? 'project_key' : 'NULL AS project_key');
@@ -124,7 +128,7 @@ function usageDimensions(scope: UsageScope, by: UsageBasis): string[] {
         WHERE s.provider = turn_summary.provider AND s.session_id = turn_summary.session_id
       ) AS session_name`
     : 'NULL AS session_name');
-  // Session start is its earliest stored request, independently of the current date filter.
+  // [기간 정책] 세션 시작 시각은 현재 조회 범위와 무관하게 전체 세션의 가장 이른 요청에서 찾는다.
   dimensions.push(scope.session
     ? `(
         SELECT MIN(t.started_at_ms)
@@ -146,6 +150,7 @@ function usageDimensions(scope: UsageScope, by: UsageBasis): string[] {
  */
 export function buildUsageQuery(filter: SummaryFilter, groupBy: UsageGrouping, timezone: string,
   by: UsageBasis, sortBy?: ChartMetric, tableSort?: UsageSort, withTotal = false): QuerySql {
+  // [집계 정책] 원본을 공통 차원으로 묶고 옵션에 따라 구성별 평균·비용·전체 개수를 함께 계산한다.
   const scope = usageScope(filter, groupBy, timezone, by);
   const groups = scope.groups.join(', ');
   const metrics = {
@@ -165,6 +170,8 @@ export function buildUsageQuery(filter: SummaryFilter, groupBy: UsageGrouping, t
     FROM ${usageTurns(filter.includeCosts, by)} AS turn_summary
     WHERE ${scope.where}
     GROUP BY ${groups}`;
+
+  // [페이지 정책] 표 정렬 또는 차트 지표 순서를 전체 그룹에 적용한 뒤 페이지를 자른다.
   const orderedSource = tableSort ? `SELECT * FROM (\n${aggregateSql}\n    )` : aggregateSql;
   const order = tableSort
     ? usageTableOrder(tableSort, groupBy, by === 'model', filter.includeCosts)
@@ -179,6 +186,7 @@ export function buildUsageQuery(filter: SummaryFilter, groupBy: UsageGrouping, t
 }
 
 export function buildUsageCountQuery(filter: SummaryFilter, groupBy: UsageGrouping, timezone: string, by: UsageBasis): QuerySql {
+  // [페이지 정책] 행 조회와 같은 필터와 그룹 키를 사용해 페이지 적용 전 그룹 수를 센다.
   const scope = usageScope(filter, groupBy, timezone, by);
   return {
     sql: `SELECT COUNT(*) AS count

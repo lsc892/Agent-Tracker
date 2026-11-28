@@ -1,14 +1,18 @@
 # scanner
 
-원본 파일을 한 번 읽는 동안 그룹 winner DTO를 갱신하고 패자의 숫자 벡터를 버린다. 남은 원본별 winner를 최종 세션·요청 그룹으로 병합해 저장한다. 변경 없는 스캔은 본문을 읽지 않으며 사용량 후보 DTO를 다음 갱신까지 캐시하지 않는다.
+파일별 마지막 정상 반영 수정 시각과 현재 수정 시각을 비교한다. 새 경로와 수정 시각이 다른 원본, 영향 세션의 관련 원본은 처음부터 파싱한다. 저장된 계보 메타는 파일명에 스레드 ID가 없는 부모 후보도 찾는 데 사용한다. 관련 원본의 winner를 비교해 스레드 사용량을 계산하고 영향 세션의 일별 집계를 갱신한다.
 
 - [index.ts](index.ts) — 기존 `refreshSummary`·`PARSER_VERSION` 공개 API를 노출한다.
 - [refresh/](refresh/README.md) — 갱신 조율·상태·탐색·준비·관계·집계·저장 책임을 같은 상위 폴더 아래에 모은다.
 - [worklist.ts](worklist.ts) — 관계별 멤버 색인과 파일 ID 우선 작업 큐, 입력 순서를 보존하는 성분 멤버 조회를 제공한다.
-- [sourceReader.ts](sourceReader.ts) — 고정 byte 경계까지 이벤트를 읽고 파일 식별자·변경 여부·SHA-256을 검증한다.
-- [sourcePool.ts](sourcePool.ts) — 갱신 중 최대 4개의 파일 준비 Worker와 8개의 선행 작업을 관리하고 논리 순서대로 결과를 전달한다.
-- [sourcePreparation.ts](sourcePreparation.ts) — 파일 하나의 읽기·파싱·해시·원본별 winner 선택과 부분 식별 정보가 있는 실패 결과를 구성한다.
-- [sourceWorker.ts](sourceWorker.ts) — DB에 접근하지 않고 파일 준비를 실행하며 처리 바이트와 준비 결과를 전달한다.
+- [sourceReader.ts](sourceReader.ts) — 관측한 크기까지 처음부터 파싱하고 읽는 중 축소나 같은 크기의 재작성을 검출한다.
+- [sourcePool.ts](sourcePool.ts) — 최대 4개의 파일 준비 Worker와 8개의 선행 작업을 관리하고 논리 순서대로 준비 결과를 반환한다.
+- [sourcePreparation.ts](sourcePreparation.ts) — 파일을 읽으며 응답별 winner와 귀속 근거를 모은다. 실패하면 읽기 중 확보한 세션 ID와 오류를 반환한다.
+- [sourceWorker.ts](sourceWorker.ts) — 읽기 경계와 원본 식별 정보를 받아 파싱하고 진행량과 준비 결과를 반환한다.
 - [names.ts](names.ts) — 제공자별 제목 metadata를 읽어 표시 이름의 우선순위를 정한다.
 - [lock.ts](lock.ts) — SQLite 잠금으로 여러 VS Code 창의 갱신 쓰기를 직렬화한다.
-- [sourceFingerprint.ts](sourceFingerprint.ts) — 원본 식별자·내용 해시로 이동한 로그가 이전 snapshot을 포함하는지 검증한다.
+
+## 관련 문서
+
+- [LogParsingFields](../../../docs/refrences/LogParsingFields.md) — Claude·Codex JSONL 필드와 해석 규칙.
+- [winner 정책](../../../docs/refrences/WinnerPolicy.md) — 응답 비교 키와 동점 처리, Codex 누계 검산.

@@ -25,7 +25,7 @@ description: Agent Tracker의 성능 개선 가정과 후보를 정하고 실제
 
 ## Markdown 기록
 
-날짜는 Asia/Seoul 기준으로 잡고 `docs/benchmarks/YYYY-MM-DD/<주제>AB-YYYY-MM-DD.md`와 같은 이름의 원시 `.json`을 저장한다. 해당 날짜와 상위 벤치마크 README에서 연결한다. 프롬프트·응답 본문, credential, 개인 식별 정보는 남기지 않는다.
+날짜는 Asia/Seoul 기준으로 잡는다. 제품에 채택한 결과는 `docs/benchmarks/success/YYYY-MM-DD/`에, 미채택이나 철회한 후보는 `docs/benchmarks/failure/YYYY-MM-DD/`에 보관한다. `<주제>AB-YYYY-MM-DD.md`와 같은 이름의 원시 `.json`을 저장하고 해당 날짜와 상위 벤치마크 README에서 연결한다. 프롬프트·응답 본문, credential, 개인 식별 정보는 남기지 않는다.
 
 보고서는 아래 형식으로 짧게 작성한다. 추가 지표는 가정의 판정에 필요한 것만 넣는다.
 

@@ -1,0 +1,1870 @@
+{
+  "revision": "247e712b0306fc6d9ec7925cf50e2d84be300dfa",
+  "source": {
+    "before": {
+      "extension": "83f281a35eea493155bcaecbe088c7ab0e5741a94fa09183ed10d6e51699d67c",
+      "webview": "ca565a1b57ad4efbd3a75212db7e8dafe474353587b551b213760149bc6e2927",
+      "build": "206fe3d969cc3ba63327e57e7ebed062f09673e7918b0be448b07200a3bbf6f4"
+    },
+    "after": {
+      "extension": "ddf06dda5f937346418f20015f7bdae41c3aedc3dcff84273aaa88bd0eabdc83",
+      "webview": "ef46b8d5cd675e7958b5d20e16e0124f2e739fac1f9cf26581d04d14e375bb7b",
+      "build": "341a1a50bd93375739a599e50dcb7ad513d464c4aed1e7708d4d9a6eeb16f38c"
+    }
+  },
+  "timezone": "Asia/Seoul",
+  "today": "2026-11-21",
+  "bounds": {
+    "fromMs": 1792681200000,
+    "toMs": 1795273200000
+  },
+  "scenarios": [
+    "warm"
+  ],
+  "warmRollupPrepared": true,
+  "warmups": 3,
+  "pairs": 10,
+  "platform": "win32",
+  "cpu": "Intel(R) Core(TM) i5-8250U CPU @ 1.60GHz",
+  "cores": 8,
+  "vscode": "1.147.0",
+  "electron": "43.8.9",
+  "extensionHostNode": "v24.22.1",
+  "datasets": [
+    {
+      "name": "synthetic-100",
+      "inputSha256": "e7e53a93dd8e129a2ee352cdff27062f95943b39b873136ca9e250402d183309",
+      "inventory": [
+        {
+          "provider": "claude",
+          "files": 10,
+          "recentFiles": 1,
+          "perFile": 10
+        }
+      ],
+      "counts": {
+        "requests": 100,
+        "recentRequests": 10,
+        "tokens": 11000,
+        "recentTokens": 1100
+      },
+      "parserFailures": 0,
+      "cold": [],
+      "warm": [
+        {
+          "order": [
+            "before",
+            "after",
+            "cached"
+          ],
+          "before": {
+            "shellMs": 83.567138671875,
+            "first": {
+              "ms": 143.8671875,
+              "requests": 11,
+              "tokens": 1210,
+              "rows": 1,
+              "source": "committed"
+            },
+            "final": {
+              "ms": 143.8671875,
+              "requests": 11,
+              "tokens": 1210,
+              "rows": 1,
+              "source": "committed"
+            }
+          },
+          "after": {
+            "shellMs": 116.08837890625,
+            "first": {
+              "ms": 158.6884765625,
+              "requests": 11,
+              "tokens": 1210,
+              "rows": 1,
+              "source": "memory"
+            },
+            "final": {
+              "ms": 180.388427734375,
+              "requests": 11,
+              "tokens": 1210,
+              "rows": 1,
+              "source": "committed"
+            }
+          },
+          "cached": {
+            "shellMs": 81.384765625,
+            "first": {
+              "ms": 115.884765625,
+              "requests": 10,
+              "tokens": 1100,
+              "rows": 1,
+              "source": "cached"
+            },
+            "final": {
+              "ms": 153.184814453125,
+              "requests": 11,
+              "tokens": 1210,
+              "rows": 1,
+              "source": "committed"
+            }
+          }
+        },
+        {
+          "order": [
+            "after",
+            "before",
+            "cached"
+          ],
+          "after": {
+            "shellMs": 80.76318359375,
+            "first": {
+              "ms": 141.26318359375,
+              "requests": 11,
+              "tokens": 1210,
+              "rows": 1,
+              "source": "memory"
+            },
+            "final": {
+              "ms": 174.46337890625,
+              "requests": 11,
+              "tokens": 1210,
+              "rows": 1,
+              "source": "committed"
+            }
+          },
+          "before": {
+            "shellMs": 73.43505859375,
+            "first": {
+              "ms": 126.3349609375,
+              "requests": 11,
+              "tokens": 1210,
+              "rows": 1,
+              "source": "committed"
+            },
+            "final": {
+              "ms": 126.3349609375,
+              "requests": 11,
+              "tokens": 1210,
+              "rows": 1,
+              "source": "committed"
+            }
+          },
+          "cached": {
+            "shellMs": 79.083251953125,
+            "first": {
+              "ms": 116.283447265625,
+              "requests": 10,
+              "tokens": 1100,
+              "rows": 1,
+              "source": "cached"
+            },
+            "final": {
+              "ms": 147.683349609375,
+              "requests": 11,
+              "tokens": 1210,
+              "rows": 1,
+              "source": "committed"
+            }
+          }
+        },
+        {
+          "order": [
+            "before",
+            "after",
+            "cached"
+          ],
+          "before": {
+            "shellMs": 82.47900390625,
+            "first": {
+              "ms": 127.97900390625,
+              "requests": 11,
+              "tokens": 1210,
+              "rows": 1,
+              "source": "committed"
+            },
+            "final": {
+              "ms": 127.97900390625,
+              "requests": 11,
+              "tokens": 1210,
+              "rows": 1,
+              "source": "committed"
+            }
+          },
+          "after": {
+            "shellMs": 93.875,
+            "first": {
+              "ms": 141.375,
+              "requests": 11,
+              "tokens": 1210,
+              "rows": 1,
+              "source": "memory"
+            },
+            "final": {
+              "ms": 171.97509765625,
+              "requests": 11,
+              "tokens": 1210,
+              "rows": 1,
+              "source": "committed"
+            }
+          },
+          "cached": {
+            "shellMs": 75.959716796875,
+            "first": {
+              "ms": 98.0595703125,
+              "requests": 10,
+              "tokens": 1100,
+              "rows": 1,
+              "source": "cached"
+            },
+            "final": {
+              "ms": 126.859619140625,
+              "requests": 11,
+              "tokens": 1210,
+              "rows": 1,
+              "source": "committed"
+            }
+          }
+        },
+        {
+          "order": [
+            "after",
+            "before",
+            "cached"
+          ],
+          "after": {
+            "shellMs": 78.732421875,
+            "first": {
+              "ms": 126.33251953125,
+              "requests": 11,
+              "tokens": 1210,
+              "rows": 1,
+              "source": "memory"
+            },
+            "final": {
+              "ms": 157.732421875,
+              "requests": 11,
+              "tokens": 1210,
+              "rows": 1,
+              "source": "committed"
+            }
+          },
+          "before": {
+            "shellMs": 86.88720703125,
+            "first": {
+              "ms": 146.287109375,
+              "requests": 11,
+              "tokens": 1210,
+              "rows": 1,
+              "source": "committed"
+            },
+            "final": {
+              "ms": 146.287109375,
+              "requests": 11,
+              "tokens": 1210,
+              "rows": 1,
+              "source": "committed"
+            }
+          },
+          "cached": {
+            "shellMs": 79.89013671875,
+            "first": {
+              "ms": 120.190185546875,
+              "requests": 10,
+              "tokens": 1100,
+              "rows": 1,
+              "source": "cached"
+            },
+            "final": {
+              "ms": 143.290283203125,
+              "requests": 11,
+              "tokens": 1210,
+              "rows": 1,
+              "source": "committed"
+            }
+          }
+        },
+        {
+          "order": [
+            "before",
+            "after",
+            "cached"
+          ],
+          "before": {
+            "shellMs": 76.94775390625,
+            "first": {
+              "ms": 123.247802734375,
+              "requests": 11,
+              "tokens": 1210,
+              "rows": 1,
+              "source": "committed"
+            },
+            "final": {
+              "ms": 123.247802734375,
+              "requests": 11,
+              "tokens": 1210,
+              "rows": 1,
+              "source": "committed"
+            }
+          },
+          "after": {
+            "shellMs": 81.4990234375,
+            "first": {
+              "ms": 130.59912109375,
+              "requests": 11,
+              "tokens": 1210,
+              "rows": 1,
+              "source": "memory"
+            },
+            "final": {
+              "ms": 164.9990234375,
+              "requests": 11,
+              "tokens": 1210,
+              "rows": 1,
+              "source": "committed"
+            }
+          },
+          "cached": {
+            "shellMs": 82.397216796875,
+            "first": {
+              "ms": 118.497314453125,
+              "requests": 10,
+              "tokens": 1100,
+              "rows": 1,
+              "source": "cached"
+            },
+            "final": {
+              "ms": 156.997314453125,
+              "requests": 11,
+              "tokens": 1210,
+              "rows": 1,
+              "source": "committed"
+            }
+          }
+        },
+        {
+          "order": [
+            "after",
+            "before",
+            "cached"
+          ],
+          "after": {
+            "shellMs": 80.897705078125,
+            "first": {
+              "ms": 133.297607421875,
+              "requests": 11,
+              "tokens": 1210,
+              "rows": 1,
+              "source": "memory"
+            },
+            "final": {
+              "ms": 164.99755859375,
+              "requests": 11,
+              "tokens": 1210,
+              "rows": 1,
+              "source": "committed"
+            }
+          },
+          "before": {
+            "shellMs": 113.358642578125,
+            "first": {
+              "ms": 154.158447265625,
+              "requests": 11,
+              "tokens": 1210,
+              "rows": 1,
+              "source": "committed"
+            },
+            "final": {
+              "ms": 154.158447265625,
+              "requests": 11,
+              "tokens": 1210,
+              "rows": 1,
+              "source": "committed"
+            }
+          },
+          "cached": {
+            "shellMs": 73.314697265625,
+            "first": {
+              "ms": 92.11474609375,
+              "requests": 10,
+              "tokens": 1100,
+              "rows": 1,
+              "source": "cached"
+            },
+            "final": {
+              "ms": 136.314697265625,
+              "requests": 11,
+              "tokens": 1210,
+              "rows": 1,
+              "source": "committed"
+            }
+          }
+        },
+        {
+          "order": [
+            "before",
+            "after",
+            "cached"
+          ],
+          "before": {
+            "shellMs": 80.7490234375,
+            "first": {
+              "ms": 155.848876953125,
+              "requests": 11,
+              "tokens": 1210,
+              "rows": 1,
+              "source": "committed"
+            },
+            "final": {
+              "ms": 155.848876953125,
+              "requests": 11,
+              "tokens": 1210,
+              "rows": 1,
+              "source": "committed"
+            }
+          },
+          "after": {
+            "shellMs": 80.09912109375,
+            "first": {
+              "ms": 132.4990234375,
+              "requests": 11,
+              "tokens": 1210,
+              "rows": 1,
+              "source": "memory"
+            },
+            "final": {
+              "ms": 162.19921875,
+              "requests": 11,
+              "tokens": 1210,
+              "rows": 1,
+              "source": "committed"
+            }
+          },
+          "cached": {
+            "shellMs": 98.83056640625,
+            "first": {
+              "ms": 156.63037109375,
+              "requests": 10,
+              "tokens": 1100,
+              "rows": 1,
+              "source": "cached"
+            },
+            "final": {
+              "ms": 200.13037109375,
+              "requests": 11,
+              "tokens": 1210,
+              "rows": 1,
+              "source": "committed"
+            }
+          }
+        },
+        {
+          "order": [
+            "after",
+            "before",
+            "cached"
+          ],
+          "after": {
+            "shellMs": 80.27392578125,
+            "first": {
+              "ms": 127.673828125,
+              "requests": 11,
+              "tokens": 1210,
+              "rows": 1,
+              "source": "memory"
+            },
+            "final": {
+              "ms": 154.27392578125,
+              "requests": 11,
+              "tokens": 1210,
+              "rows": 1,
+              "source": "committed"
+            }
+          },
+          "before": {
+            "shellMs": 86.693359375,
+            "first": {
+              "ms": 144.59326171875,
+              "requests": 11,
+              "tokens": 1210,
+              "rows": 1,
+              "source": "committed"
+            },
+            "final": {
+              "ms": 144.59326171875,
+              "requests": 11,
+              "tokens": 1210,
+              "rows": 1,
+              "source": "committed"
+            }
+          },
+          "cached": {
+            "shellMs": 89.109375,
+            "first": {
+              "ms": 124.909423828125,
+              "requests": 10,
+              "tokens": 1100,
+              "rows": 1,
+              "source": "cached"
+            },
+            "final": {
+              "ms": 160.109375,
+              "requests": 11,
+              "tokens": 1210,
+              "rows": 1,
+              "source": "committed"
+            }
+          }
+        },
+        {
+          "order": [
+            "before",
+            "after",
+            "cached"
+          ],
+          "before": {
+            "shellMs": 83.829833984375,
+            "first": {
+              "ms": 148.52978515625,
+              "requests": 11,
+              "tokens": 1210,
+              "rows": 1,
+              "source": "committed"
+            },
+            "final": {
+              "ms": 148.52978515625,
+              "requests": 11,
+              "tokens": 1210,
+              "rows": 1,
+              "source": "committed"
+            }
+          },
+          "after": {
+            "shellMs": 81.509521484375,
+            "first": {
+              "ms": 136.409423828125,
+              "requests": 11,
+              "tokens": 1210,
+              "rows": 1,
+              "source": "memory"
+            },
+            "final": {
+              "ms": 168.8095703125,
+              "requests": 11,
+              "tokens": 1210,
+              "rows": 1,
+              "source": "committed"
+            }
+          },
+          "cached": {
+            "shellMs": 115.0498046875,
+            "first": {
+              "ms": 151.14990234375,
+              "requests": 10,
+              "tokens": 1100,
+              "rows": 1,
+              "source": "cached"
+            },
+            "final": {
+              "ms": 183.849853515625,
+              "requests": 11,
+              "tokens": 1210,
+              "rows": 1,
+              "source": "committed"
+            }
+          }
+        },
+        {
+          "order": [
+            "after",
+            "before",
+            "cached"
+          ],
+          "after": {
+            "shellMs": 83.4462890625,
+            "first": {
+              "ms": 130.146240234375,
+              "requests": 11,
+              "tokens": 1210,
+              "rows": 1,
+              "source": "memory"
+            },
+            "final": {
+              "ms": 157.84619140625,
+              "requests": 11,
+              "tokens": 1210,
+              "rows": 1,
+              "source": "committed"
+            }
+          },
+          "before": {
+            "shellMs": 97.7333984375,
+            "first": {
+              "ms": 165.033447265625,
+              "requests": 11,
+              "tokens": 1210,
+              "rows": 1,
+              "source": "committed"
+            },
+            "final": {
+              "ms": 165.033447265625,
+              "requests": 11,
+              "tokens": 1210,
+              "rows": 1,
+              "source": "committed"
+            }
+          },
+          "cached": {
+            "shellMs": 80.0439453125,
+            "first": {
+              "ms": 127.14404296875,
+              "requests": 10,
+              "tokens": 1100,
+              "rows": 1,
+              "source": "cached"
+            },
+            "final": {
+              "ms": 127.14404296875,
+              "requests": 11,
+              "tokens": 1210,
+              "rows": 1,
+              "source": "committed"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "synthetic-10000",
+      "inputSha256": "d05158c061c5f422cea36158db9c08ecbcf2615778c932e53b8b9617ceeb3bdd",
+      "inventory": [
+        {
+          "provider": "claude",
+          "files": 500,
+          "recentFiles": 10,
+          "perFile": 20
+        }
+      ],
+      "counts": {
+        "requests": 10000,
+        "recentRequests": 200,
+        "tokens": 1100000,
+        "recentTokens": 22000
+      },
+      "parserFailures": 0,
+      "cold": [],
+      "warm": [
+        {
+          "order": [
+            "before",
+            "after",
+            "cached"
+          ],
+          "before": {
+            "shellMs": 88.389404296875,
+            "first": {
+              "ms": 206.78955078125,
+              "requests": 201,
+              "tokens": 22110,
+              "rows": 1,
+              "source": "committed"
+            },
+            "final": {
+              "ms": 206.78955078125,
+              "requests": 201,
+              "tokens": 22110,
+              "rows": 1,
+              "source": "committed"
+            }
+          },
+          "after": {
+            "shellMs": 78.093505859375,
+            "first": {
+              "ms": 226.993408203125,
+              "requests": 201,
+              "tokens": 22110,
+              "rows": 1,
+              "source": "memory"
+            },
+            "final": {
+              "ms": 255.993408203125,
+              "requests": 201,
+              "tokens": 22110,
+              "rows": 1,
+              "source": "committed"
+            }
+          },
+          "cached": {
+            "shellMs": 81.165771484375,
+            "first": {
+              "ms": 127.365966796875,
+              "requests": 200,
+              "tokens": 22000,
+              "rows": 1,
+              "source": "cached"
+            },
+            "final": {
+              "ms": 220.56591796875,
+              "requests": 201,
+              "tokens": 22110,
+              "rows": 1,
+              "source": "committed"
+            }
+          }
+        },
+        {
+          "order": [
+            "after",
+            "before",
+            "cached"
+          ],
+          "after": {
+            "shellMs": 76.987060546875,
+            "first": {
+              "ms": 266.987060546875,
+              "requests": 201,
+              "tokens": 22110,
+              "rows": 1,
+              "source": "memory"
+            },
+            "final": {
+              "ms": 299.987060546875,
+              "requests": 201,
+              "tokens": 22110,
+              "rows": 1,
+              "source": "committed"
+            }
+          },
+          "before": {
+            "shellMs": 75.140380859375,
+            "first": {
+              "ms": 200.4404296875,
+              "requests": 201,
+              "tokens": 22110,
+              "rows": 1,
+              "source": "committed"
+            },
+            "final": {
+              "ms": 200.4404296875,
+              "requests": 201,
+              "tokens": 22110,
+              "rows": 1,
+              "source": "committed"
+            }
+          },
+          "cached": {
+            "shellMs": 87.741943359375,
+            "first": {
+              "ms": 124.842041015625,
+              "requests": 200,
+              "tokens": 22000,
+              "rows": 1,
+              "source": "cached"
+            },
+            "final": {
+              "ms": 224.5419921875,
+              "requests": 201,
+              "tokens": 22110,
+              "rows": 1,
+              "source": "committed"
+            }
+          }
+        },
+        {
+          "order": [
+            "before",
+            "after",
+            "cached"
+          ],
+          "before": {
+            "shellMs": 81.92822265625,
+            "first": {
+              "ms": 223.42822265625,
+              "requests": 201,
+              "tokens": 22110,
+              "rows": 1,
+              "source": "committed"
+            },
+            "final": {
+              "ms": 223.42822265625,
+              "requests": 201,
+              "tokens": 22110,
+              "rows": 1,
+              "source": "committed"
+            }
+          },
+          "after": {
+            "shellMs": 81.0595703125,
+            "first": {
+              "ms": 223.0595703125,
+              "requests": 201,
+              "tokens": 22110,
+              "rows": 1,
+              "source": "memory"
+            },
+            "final": {
+              "ms": 257.459716796875,
+              "requests": 201,
+              "tokens": 22110,
+              "rows": 1,
+              "source": "committed"
+            }
+          },
+          "cached": {
+            "shellMs": 109.81787109375,
+            "first": {
+              "ms": 139.017822265625,
+              "requests": 200,
+              "tokens": 22000,
+              "rows": 1,
+              "source": "cached"
+            },
+            "final": {
+              "ms": 247.718017578125,
+              "requests": 201,
+              "tokens": 22110,
+              "rows": 1,
+              "source": "committed"
+            }
+          }
+        },
+        {
+          "order": [
+            "after",
+            "before",
+            "cached"
+          ],
+          "after": {
+            "shellMs": 79.546630859375,
+            "first": {
+              "ms": 222.8466796875,
+              "requests": 201,
+              "tokens": 22110,
+              "rows": 1,
+              "source": "memory"
+            },
+            "final": {
+              "ms": 253.74658203125,
+              "requests": 201,
+              "tokens": 22110,
+              "rows": 1,
+              "source": "committed"
+            }
+          },
+          "before": {
+            "shellMs": 86.4423828125,
+            "first": {
+              "ms": 213.54248046875,
+              "requests": 201,
+              "tokens": 22110,
+              "rows": 1,
+              "source": "committed"
+            },
+            "final": {
+              "ms": 213.54248046875,
+              "requests": 201,
+              "tokens": 22110,
+              "rows": 1,
+              "source": "committed"
+            }
+          },
+          "cached": {
+            "shellMs": 109.166015625,
+            "first": {
+              "ms": 134.966064453125,
+              "requests": 200,
+              "tokens": 22000,
+              "rows": 1,
+              "source": "cached"
+            },
+            "final": {
+              "ms": 255.566162109375,
+              "requests": 201,
+              "tokens": 22110,
+              "rows": 1,
+              "source": "committed"
+            }
+          }
+        },
+        {
+          "order": [
+            "before",
+            "after",
+            "cached"
+          ],
+          "before": {
+            "shellMs": 79.573974609375,
+            "first": {
+              "ms": 206.77392578125,
+              "requests": 201,
+              "tokens": 22110,
+              "rows": 1,
+              "source": "committed"
+            },
+            "final": {
+              "ms": 206.77392578125,
+              "requests": 201,
+              "tokens": 22110,
+              "rows": 1,
+              "source": "committed"
+            }
+          },
+          "after": {
+            "shellMs": 75.29052734375,
+            "first": {
+              "ms": 220.390625,
+              "requests": 201,
+              "tokens": 22110,
+              "rows": 1,
+              "source": "memory"
+            },
+            "final": {
+              "ms": 253.99072265625,
+              "requests": 201,
+              "tokens": 22110,
+              "rows": 1,
+              "source": "committed"
+            }
+          },
+          "cached": {
+            "shellMs": 115.76025390625,
+            "first": {
+              "ms": 195.160400390625,
+              "requests": 200,
+              "tokens": 22000,
+              "rows": 1,
+              "source": "cached"
+            },
+            "final": {
+              "ms": 284.060302734375,
+              "requests": 201,
+              "tokens": 22110,
+              "rows": 1,
+              "source": "committed"
+            }
+          }
+        },
+        {
+          "order": [
+            "after",
+            "before",
+            "cached"
+          ],
+          "after": {
+            "shellMs": 80.124755859375,
+            "first": {
+              "ms": 240.624755859375,
+              "requests": 201,
+              "tokens": 22110,
+              "rows": 1,
+              "source": "memory"
+            },
+            "final": {
+              "ms": 274.824951171875,
+              "requests": 201,
+              "tokens": 22110,
+              "rows": 1,
+              "source": "committed"
+            }
+          },
+          "before": {
+            "shellMs": 88.91455078125,
+            "first": {
+              "ms": 211.114501953125,
+              "requests": 201,
+              "tokens": 22110,
+              "rows": 1,
+              "source": "committed"
+            },
+            "final": {
+              "ms": 211.114501953125,
+              "requests": 201,
+              "tokens": 22110,
+              "rows": 1,
+              "source": "committed"
+            }
+          },
+          "cached": {
+            "shellMs": 74.549072265625,
+            "first": {
+              "ms": 103.348876953125,
+              "requests": 200,
+              "tokens": 22000,
+              "rows": 1,
+              "source": "cached"
+            },
+            "final": {
+              "ms": 265.64892578125,
+              "requests": 201,
+              "tokens": 22110,
+              "rows": 1,
+              "source": "committed"
+            }
+          }
+        },
+        {
+          "order": [
+            "before",
+            "after",
+            "cached"
+          ],
+          "before": {
+            "shellMs": 85.276611328125,
+            "first": {
+              "ms": 211.776611328125,
+              "requests": 201,
+              "tokens": 22110,
+              "rows": 1,
+              "source": "committed"
+            },
+            "final": {
+              "ms": 211.776611328125,
+              "requests": 201,
+              "tokens": 22110,
+              "rows": 1,
+              "source": "committed"
+            }
+          },
+          "after": {
+            "shellMs": 79.86376953125,
+            "first": {
+              "ms": 235.163818359375,
+              "requests": 201,
+              "tokens": 22110,
+              "rows": 1,
+              "source": "memory"
+            },
+            "final": {
+              "ms": 265.4638671875,
+              "requests": 201,
+              "tokens": 22110,
+              "rows": 1,
+              "source": "committed"
+            }
+          },
+          "cached": {
+            "shellMs": 80.147216796875,
+            "first": {
+              "ms": 121.947021484375,
+              "requests": 200,
+              "tokens": 22000,
+              "rows": 1,
+              "source": "cached"
+            },
+            "final": {
+              "ms": 217.447021484375,
+              "requests": 201,
+              "tokens": 22110,
+              "rows": 1,
+              "source": "committed"
+            }
+          }
+        },
+        {
+          "order": [
+            "after",
+            "before",
+            "cached"
+          ],
+          "after": {
+            "shellMs": 79.13818359375,
+            "first": {
+              "ms": 241.63818359375,
+              "requests": 201,
+              "tokens": 22110,
+              "rows": 1,
+              "source": "memory"
+            },
+            "final": {
+              "ms": 273.338134765625,
+              "requests": 201,
+              "tokens": 22110,
+              "rows": 1,
+              "source": "committed"
+            }
+          },
+          "before": {
+            "shellMs": 83.939208984375,
+            "first": {
+              "ms": 213.13916015625,
+              "requests": 201,
+              "tokens": 22110,
+              "rows": 1,
+              "source": "committed"
+            },
+            "final": {
+              "ms": 213.13916015625,
+              "requests": 201,
+              "tokens": 22110,
+              "rows": 1,
+              "source": "committed"
+            }
+          },
+          "cached": {
+            "shellMs": 106.292724609375,
+            "first": {
+              "ms": 143.69287109375,
+              "requests": 200,
+              "tokens": 22000,
+              "rows": 1,
+              "source": "cached"
+            },
+            "final": {
+              "ms": 262.69287109375,
+              "requests": 201,
+              "tokens": 22110,
+              "rows": 1,
+              "source": "committed"
+            }
+          }
+        },
+        {
+          "order": [
+            "before",
+            "after",
+            "cached"
+          ],
+          "before": {
+            "shellMs": 82.612060546875,
+            "first": {
+              "ms": 242.612060546875,
+              "requests": 201,
+              "tokens": 22110,
+              "rows": 1,
+              "source": "committed"
+            },
+            "final": {
+              "ms": 242.612060546875,
+              "requests": 201,
+              "tokens": 22110,
+              "rows": 1,
+              "source": "committed"
+            }
+          },
+          "after": {
+            "shellMs": 86.552734375,
+            "first": {
+              "ms": 226.65283203125,
+              "requests": 201,
+              "tokens": 22110,
+              "rows": 1,
+              "source": "memory"
+            },
+            "final": {
+              "ms": 261.7529296875,
+              "requests": 201,
+              "tokens": 22110,
+              "rows": 1,
+              "source": "committed"
+            }
+          },
+          "cached": {
+            "shellMs": 76.98583984375,
+            "first": {
+              "ms": 119.5859375,
+              "requests": 200,
+              "tokens": 22000,
+              "rows": 1,
+              "source": "cached"
+            },
+            "final": {
+              "ms": 233.785888671875,
+              "requests": 201,
+              "tokens": 22110,
+              "rows": 1,
+              "source": "committed"
+            }
+          }
+        },
+        {
+          "order": [
+            "after",
+            "before",
+            "cached"
+          ],
+          "after": {
+            "shellMs": 83.87109375,
+            "first": {
+              "ms": 225.970947265625,
+              "requests": 201,
+              "tokens": 22110,
+              "rows": 1,
+              "source": "memory"
+            },
+            "final": {
+              "ms": 286.37109375,
+              "requests": 201,
+              "tokens": 22110,
+              "rows": 1,
+              "source": "committed"
+            }
+          },
+          "before": {
+            "shellMs": 87.7412109375,
+            "first": {
+              "ms": 237.34130859375,
+              "requests": 201,
+              "tokens": 22110,
+              "rows": 1,
+              "source": "committed"
+            },
+            "final": {
+              "ms": 237.34130859375,
+              "requests": 201,
+              "tokens": 22110,
+              "rows": 1,
+              "source": "committed"
+            }
+          },
+          "cached": {
+            "shellMs": 82.897705078125,
+            "first": {
+              "ms": 125.397705078125,
+              "requests": 200,
+              "tokens": 22000,
+              "rows": 1,
+              "source": "cached"
+            },
+            "final": {
+              "ms": 219.09765625,
+              "requests": 201,
+              "tokens": 22110,
+              "rows": 1,
+              "source": "committed"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "current",
+      "inputSha256": "4e46a9d871010fca4d39e73303f71ebd631bd16351aba1e2d2ca175b61aac795",
+      "inventory": [
+        {
+          "provider": "claude",
+          "rootOrdinal": 0,
+          "files": 30,
+          "bytes": 142845572,
+          "compressed": 0
+        },
+        {
+          "provider": "codex",
+          "rootOrdinal": 1,
+          "files": 371,
+          "bytes": 456108717,
+          "compressed": 0,
+          "metadata": {
+            "indexBytes": 26171,
+            "threads": 371
+          }
+        },
+        {
+          "provider": "codex",
+          "rootOrdinal": 2,
+          "files": 0,
+          "bytes": 0,
+          "compressed": 0,
+          "metadata": {
+            "indexBytes": 26171,
+            "threads": 371
+          }
+        },
+        {
+          "provider": "claude",
+          "files": 1,
+          "recentFiles": 1,
+          "perFile": 1
+        }
+      ],
+      "counts": {
+        "requests": 883,
+        "recentRequests": 248,
+        "tokens": 1773417314,
+        "recentTokens": 763047159
+      },
+      "parserFailures": 0,
+      "cold": [],
+      "warm": [
+        {
+          "order": [
+            "before",
+            "after",
+            "cached"
+          ],
+          "before": {
+            "shellMs": 81.87841796875,
+            "first": {
+              "ms": 241.478515625,
+              "requests": 249,
+              "tokens": 763047269,
+              "rows": 11,
+              "source": "committed"
+            },
+            "final": {
+              "ms": 241.478515625,
+              "requests": 249,
+              "tokens": 763047269,
+              "rows": 11,
+              "source": "committed"
+            }
+          },
+          "after": {
+            "shellMs": 113.924560546875,
+            "first": {
+              "ms": 295.024658203125,
+              "requests": 249,
+              "tokens": 763047269,
+              "rows": 11,
+              "source": "memory"
+            },
+            "final": {
+              "ms": 327.12451171875,
+              "requests": 249,
+              "tokens": 763047269,
+              "rows": 11,
+              "source": "committed"
+            }
+          },
+          "cached": {
+            "shellMs": 83.4638671875,
+            "first": {
+              "ms": 128.6640625,
+              "requests": 248,
+              "tokens": 763047159,
+              "rows": 11,
+              "source": "cached"
+            },
+            "final": {
+              "ms": 277.364013671875,
+              "requests": 249,
+              "tokens": 763047269,
+              "rows": 11,
+              "source": "committed"
+            }
+          }
+        },
+        {
+          "order": [
+            "after",
+            "before",
+            "cached"
+          ],
+          "after": {
+            "shellMs": 82.106201171875,
+            "first": {
+              "ms": 263.106201171875,
+              "requests": 249,
+              "tokens": 763047269,
+              "rows": 11,
+              "source": "memory"
+            },
+            "final": {
+              "ms": 296.406005859375,
+              "requests": 249,
+              "tokens": 763047269,
+              "rows": 11,
+              "source": "committed"
+            }
+          },
+          "before": {
+            "shellMs": 111.916015625,
+            "first": {
+              "ms": 261.916015625,
+              "requests": 249,
+              "tokens": 763047269,
+              "rows": 11,
+              "source": "committed"
+            },
+            "final": {
+              "ms": 261.916015625,
+              "requests": 249,
+              "tokens": 763047269,
+              "rows": 11,
+              "source": "committed"
+            }
+          },
+          "cached": {
+            "shellMs": 86.994140625,
+            "first": {
+              "ms": 125.39404296875,
+              "requests": 248,
+              "tokens": 763047159,
+              "rows": 11,
+              "source": "cached"
+            },
+            "final": {
+              "ms": 257.89404296875,
+              "requests": 249,
+              "tokens": 763047269,
+              "rows": 11,
+              "source": "committed"
+            }
+          }
+        },
+        {
+          "order": [
+            "before",
+            "after",
+            "cached"
+          ],
+          "before": {
+            "shellMs": 83.4873046875,
+            "first": {
+              "ms": 230.9873046875,
+              "requests": 249,
+              "tokens": 763047269,
+              "rows": 11,
+              "source": "committed"
+            },
+            "final": {
+              "ms": 230.9873046875,
+              "requests": 249,
+              "tokens": 763047269,
+              "rows": 11,
+              "source": "committed"
+            }
+          },
+          "after": {
+            "shellMs": 82.7080078125,
+            "first": {
+              "ms": 254.7080078125,
+              "requests": 249,
+              "tokens": 763047269,
+              "rows": 11,
+              "source": "memory"
+            },
+            "final": {
+              "ms": 301.108154296875,
+              "requests": 249,
+              "tokens": 763047269,
+              "rows": 11,
+              "source": "committed"
+            }
+          },
+          "cached": {
+            "shellMs": 81.538330078125,
+            "first": {
+              "ms": 119.538330078125,
+              "requests": 248,
+              "tokens": 763047159,
+              "rows": 11,
+              "source": "cached"
+            },
+            "final": {
+              "ms": 239.13818359375,
+              "requests": 249,
+              "tokens": 763047269,
+              "rows": 11,
+              "source": "committed"
+            }
+          }
+        },
+        {
+          "order": [
+            "after",
+            "before",
+            "cached"
+          ],
+          "after": {
+            "shellMs": 115.904296875,
+            "first": {
+              "ms": 292.404296875,
+              "requests": 249,
+              "tokens": 763047269,
+              "rows": 11,
+              "source": "memory"
+            },
+            "final": {
+              "ms": 326.204345703125,
+              "requests": 249,
+              "tokens": 763047269,
+              "rows": 11,
+              "source": "committed"
+            }
+          },
+          "before": {
+            "shellMs": 91.60302734375,
+            "first": {
+              "ms": 244.203125,
+              "requests": 249,
+              "tokens": 763047269,
+              "rows": 11,
+              "source": "committed"
+            },
+            "final": {
+              "ms": 244.203125,
+              "requests": 249,
+              "tokens": 763047269,
+              "rows": 11,
+              "source": "committed"
+            }
+          },
+          "cached": {
+            "shellMs": 79.785400390625,
+            "first": {
+              "ms": 131.285400390625,
+              "requests": 248,
+              "tokens": 763047159,
+              "rows": 11,
+              "source": "cached"
+            },
+            "final": {
+              "ms": 247.785400390625,
+              "requests": 249,
+              "tokens": 763047269,
+              "rows": 11,
+              "source": "committed"
+            }
+          }
+        },
+        {
+          "order": [
+            "before",
+            "after",
+            "cached"
+          ],
+          "before": {
+            "shellMs": 89.817626953125,
+            "first": {
+              "ms": 240.717529296875,
+              "requests": 249,
+              "tokens": 763047269,
+              "rows": 11,
+              "source": "committed"
+            },
+            "final": {
+              "ms": 240.717529296875,
+              "requests": 249,
+              "tokens": 763047269,
+              "rows": 11,
+              "source": "committed"
+            }
+          },
+          "after": {
+            "shellMs": 80.90966796875,
+            "first": {
+              "ms": 262.40966796875,
+              "requests": 249,
+              "tokens": 763047269,
+              "rows": 11,
+              "source": "memory"
+            },
+            "final": {
+              "ms": 293.40966796875,
+              "requests": 249,
+              "tokens": 763047269,
+              "rows": 11,
+              "source": "committed"
+            }
+          },
+          "cached": {
+            "shellMs": 259.497314453125,
+            "first": {
+              "ms": 298.997314453125,
+              "requests": 248,
+              "tokens": 763047159,
+              "rows": 11,
+              "source": "cached"
+            },
+            "final": {
+              "ms": 417.29736328125,
+              "requests": 249,
+              "tokens": 763047269,
+              "rows": 11,
+              "source": "committed"
+            }
+          }
+        },
+        {
+          "order": [
+            "after",
+            "before",
+            "cached"
+          ],
+          "after": {
+            "shellMs": 113.6865234375,
+            "first": {
+              "ms": 298.486572265625,
+              "requests": 249,
+              "tokens": 763047269,
+              "rows": 11,
+              "source": "memory"
+            },
+            "final": {
+              "ms": 330.78662109375,
+              "requests": 249,
+              "tokens": 763047269,
+              "rows": 11,
+              "source": "committed"
+            }
+          },
+          "before": {
+            "shellMs": 83.8466796875,
+            "first": {
+              "ms": 234.946533203125,
+              "requests": 249,
+              "tokens": 763047269,
+              "rows": 11,
+              "source": "committed"
+            },
+            "final": {
+              "ms": 234.946533203125,
+              "requests": 249,
+              "tokens": 763047269,
+              "rows": 11,
+              "source": "committed"
+            }
+          },
+          "cached": {
+            "shellMs": 87.02392578125,
+            "first": {
+              "ms": 132.223876953125,
+              "requests": 248,
+              "tokens": 763047159,
+              "rows": 11,
+              "source": "cached"
+            },
+            "final": {
+              "ms": 260.02392578125,
+              "requests": 249,
+              "tokens": 763047269,
+              "rows": 11,
+              "source": "committed"
+            }
+          }
+        },
+        {
+          "order": [
+            "before",
+            "after",
+            "cached"
+          ],
+          "before": {
+            "shellMs": 121.893310546875,
+            "first": {
+              "ms": 274.193115234375,
+              "requests": 249,
+              "tokens": 763047269,
+              "rows": 11,
+              "source": "committed"
+            },
+            "final": {
+              "ms": 274.193115234375,
+              "requests": 249,
+              "tokens": 763047269,
+              "rows": 11,
+              "source": "committed"
+            }
+          },
+          "after": {
+            "shellMs": 121.590576171875,
+            "first": {
+              "ms": 317.29052734375,
+              "requests": 249,
+              "tokens": 763047269,
+              "rows": 11,
+              "source": "memory"
+            },
+            "final": {
+              "ms": 352.390625,
+              "requests": 249,
+              "tokens": 763047269,
+              "rows": 11,
+              "source": "committed"
+            }
+          },
+          "cached": {
+            "shellMs": 105.292236328125,
+            "first": {
+              "ms": 146.792236328125,
+              "requests": 248,
+              "tokens": 763047159,
+              "rows": 11,
+              "source": "cached"
+            },
+            "final": {
+              "ms": 286.9921875,
+              "requests": 249,
+              "tokens": 763047269,
+              "rows": 11,
+              "source": "committed"
+            }
+          }
+        },
+        {
+          "order": [
+            "after",
+            "before",
+            "cached"
+          ],
+          "after": {
+            "shellMs": 86.495361328125,
+            "first": {
+              "ms": 265.1953125,
+              "requests": 249,
+              "tokens": 763047269,
+              "rows": 11,
+              "source": "memory"
+            },
+            "final": {
+              "ms": 293.895263671875,
+              "requests": 249,
+              "tokens": 763047269,
+              "rows": 11,
+              "source": "committed"
+            }
+          },
+          "before": {
+            "shellMs": 80.895751953125,
+            "first": {
+              "ms": 226.49560546875,
+              "requests": 249,
+              "tokens": 763047269,
+              "rows": 11,
+              "source": "committed"
+            },
+            "final": {
+              "ms": 226.49560546875,
+              "requests": 249,
+              "tokens": 763047269,
+              "rows": 11,
+              "source": "committed"
+            }
+          },
+          "cached": {
+            "shellMs": 92.7646484375,
+            "first": {
+              "ms": 151.7646484375,
+              "requests": 248,
+              "tokens": 763047159,
+              "rows": 11,
+              "source": "cached"
+            },
+            "final": {
+              "ms": 248.664794921875,
+              "requests": 249,
+              "tokens": 763047269,
+              "rows": 11,
+              "source": "committed"
+            }
+          }
+        },
+        {
+          "order": [
+            "before",
+            "after",
+            "cached"
+          ],
+          "before": {
+            "shellMs": 115.18994140625,
+            "first": {
+              "ms": 267.989990234375,
+              "requests": 249,
+              "tokens": 763047269,
+              "rows": 11,
+              "source": "committed"
+            },
+            "final": {
+              "ms": 267.989990234375,
+              "requests": 249,
+              "tokens": 763047269,
+              "rows": 11,
+              "source": "committed"
+            }
+          },
+          "after": {
+            "shellMs": 71.6357421875,
+            "first": {
+              "ms": 243.735595703125,
+              "requests": 249,
+              "tokens": 763047269,
+              "rows": 11,
+              "source": "memory"
+            },
+            "final": {
+              "ms": 277.735595703125,
+              "requests": 249,
+              "tokens": 763047269,
+              "rows": 11,
+              "source": "committed"
+            }
+          },
+          "cached": {
+            "shellMs": 88.22607421875,
+            "first": {
+              "ms": 129.926025390625,
+              "requests": 248,
+              "tokens": 763047159,
+              "rows": 11,
+              "source": "cached"
+            },
+            "final": {
+              "ms": 264.52587890625,
+              "requests": 249,
+              "tokens": 763047269,
+              "rows": 11,
+              "source": "committed"
+            }
+          }
+        },
+        {
+          "order": [
+            "after",
+            "before",
+            "cached"
+          ],
+          "after": {
+            "shellMs": 123.103759765625,
+            "first": {
+              "ms": 298.003662109375,
+              "requests": 249,
+              "tokens": 763047269,
+              "rows": 11,
+              "source": "memory"
+            },
+            "final": {
+              "ms": 331.40380859375,
+              "requests": 249,
+              "tokens": 763047269,
+              "rows": 11,
+              "source": "committed"
+            }
+          },
+          "before": {
+            "shellMs": 96.844970703125,
+            "first": {
+              "ms": 259.044921875,
+              "requests": 249,
+              "tokens": 763047269,
+              "rows": 11,
+              "source": "committed"
+            },
+            "final": {
+              "ms": 259.044921875,
+              "requests": 249,
+              "tokens": 763047269,
+              "rows": 11,
+              "source": "committed"
+            }
+          },
+          "cached": {
+            "shellMs": 101.5908203125,
+            "first": {
+              "ms": 133.990966796875,
+              "requests": 248,
+              "tokens": 763047159,
+              "rows": 11,
+              "source": "cached"
+            },
+            "final": {
+              "ms": 280.890869140625,
+              "requests": 249,
+              "tokens": 763047269,
+              "rows": 11,
+              "source": "committed"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

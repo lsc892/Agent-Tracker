@@ -1,12 +1,15 @@
 // 도구 호출과 정적인 중첩 호출에서 스킬·서브에이전트·플러그인 사용을 추출한다.
 import type { CapabilityEvent } from '../types';
+import { projectJson } from '../jsonl/projection';
 import { displayName, object, string } from './common';
+import { capabilityArguments } from './logFields';
 
 type Use = Pick<CapabilityEvent, 'category' | 'name'>;
 
 function argumentsObject(value: unknown): Record<string, unknown> {
+  // [파싱 정책] 문자열 인자는 필요한 필드만 해석하고 올바르지 않은 JSON은 빈 인자로 취급한다.
   if (typeof value !== 'string') return object(value);
-  try { return object(JSON.parse(value)); } catch { return {}; }
+  try { return object(projectJson(value, capabilityArguments)); } catch { return {}; }
 }
 
 /**
@@ -33,13 +36,14 @@ function stringEnd(code: string, start: number): number {
  * 책임: exec 래퍼에 포함된 정적인 tools 호출을 식별한다.
  * 알고리즘: 주석·문자열을 건너뛰며 tools.method와 괄호 깊이를 찾고 지원하는 인자 필드의 고정 문자열만 추출한다.
  */
-function *nestedCalls(code: string): Generator<{name:string;args:Record<string,unknown>}> {
+function *nestedCalls(code: string): Generator<{ name: string; input: string }> {
   for (let i=0;i<code.length;) {
     if ('\'"`'.includes(code[i])) { i=stringEnd(code,i); continue; }
     if (code.startsWith('//',i)) { const end=code.indexOf('\n',i);i=end<0 ? code.length : end+1;continue; }
     if (code.startsWith('/*',i)) { const end=code.indexOf('*/',i+2);i=end<0 ? code.length : end+2;continue; }
     const match = code.startsWith('tools.',i) ? /^tools\.([\w]+)\s*\(/.exec(code.slice(i)) : null;
     if (!match || i>0 && /[\w.]/.test(code[i-1])) { i++;continue; }
+    // [파싱 정책] 문자열 안의 괄호를 무시하며 깊이가 0이 될 때까지 중첩 호출 인자를 찾는다.
     const start=i+match[0].length;
     let depth=1,end=start;
     for (;end<code.length && depth;end++) {
@@ -47,25 +51,29 @@ function *nestedCalls(code: string): Generator<{name:string;args:Record<string,u
       if (code[end] === '(') depth++;
       if (code[end] === ')') depth--;
     }
-    const raw=code.slice(start,end-1);
-    const args=argumentsObject(raw);
-    // Object literals often have unquoted keys. Extract only supported scalar fields.
-    const fields=/(?:^|[,{]\s*)["']?(cmd|command|file_path|path|skill|subagent_type|agent_type)["']?\s*:\s*/g;
-    const seen=new Set<string>();
-    for (const field of raw.matchAll(fields)) {
-      const key=field[1];
-      if (seen.has(key)) continue;
-      seen.add(key);
-      const position=field.index+field[0].length;
-      if (!'\'"`'.includes(raw[position] ?? ' ')) continue;
-      const end=stringEnd(raw,position);
-      const value=raw.slice(position,end);
-      if (raw[position] === '`' && value.includes('${') || !/^\s*(?:[,}]|$)/.test(raw.slice(end))) continue;
-      args[key]=literal(value);
-    }
-    yield {name:match[1],args};
+    yield { name: match[1], input: code.slice(start,end-1) };
     i=end;
   }
+}
+
+function nestedArgumentsObject(raw: string): Record<string, unknown> {
+  const args = argumentsObject(raw);
+  // Object literals often have unquoted keys. Extract only supported scalar fields.
+  const fields = /(?:^|[,{]\s*)["']?(cmd|command|file_path|path|skill|subagent_type|agent_type)["']?\s*:\s*/g;
+  // [파싱 정책] 지원 필드의 첫 출현만 검사하고 보간이나 이어 붙이기가 있는 값은 추출하지 않는다.
+  const seen = new Set<string>();
+  for (const field of raw.matchAll(fields)) {
+    const key = field[1];
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const position = field.index + field[0].length;
+    if (!'\'"`'.includes(raw[position] ?? ' ')) continue;
+    const end = stringEnd(raw, position);
+    const value = raw.slice(position, end);
+    if (raw[position] === '`' && value.includes('${') || !/^\s*(?:[,}]|$)/.test(raw.slice(end))) continue;
+    Object.defineProperty(args, key, { value: literal(value), enumerable: true, writable: true, configurable: true });
+  }
+  return args;
 }
 
 /**
@@ -87,6 +95,7 @@ function skillPaths(value: string): Use[] {
 }
 
 function readsFile(command: string): boolean {
+  // [검증 정책] 인용된 부분을 건너뛰어 실제 토큰 경계의 파일 읽기 명령만 찾는다.
   for (let i=0;i<command.length;) {
     if ('\'"`'.includes(command[i])) { i=stringEnd(command,i);continue; }
     if ((i===0 || /[\s;|(&]/.test(command[i-1])) && /^(?:Get-Content|cat|type|head|tail|sed|read_file)\b/i.test(command.slice(i))) return true;
@@ -111,18 +120,37 @@ function addShellSkillUses(args: Record<string,unknown>, uses: Use[]): void {
  * 책임: 실제 도구 호출을 Skill·subagent·plugin 사용으로 분류한다.
  * 알고리즘: 호출명과 명시 인자를 기준으로 분류하고 파일 읽기 명령의 SKILL 경로를 추출한 뒤 같은 분류·이름을 중복 제거한다.
  */
-function directUses(name: string, args: Record<string,unknown>): Use[] {
-  name=name.split('.').at(-1)!;
-  const uses: Use[]=[];
-  const lower=name.toLowerCase();
-  if (lower === 'skill') addSkillUse(args,uses);
-  if (['spawn_agent','task','agent'].includes(lower)) {
-    uses.push({category:'subagent',name:displayName(args.subagent_type ?? args.agent_type) ?? 'default'});
+function directUses<Input>(name: string, input: Input, readArguments: (input: Input) => Record<string, unknown>): Use[] {
+  const uses: Use[] = [];
+  switch (name.toLowerCase()) {
+    case 'skill':
+      addSkillUse(readArguments(input), uses);
+      break;
+    case 'spawn_agent':
+    case 'task':
+    case 'agent': {
+      const args = readArguments(input);
+      uses.push({ category: 'subagent', name: displayName(args.subagent_type ?? args.agent_type) ?? 'default' });
+      break;
+    }
+    case 'read':
+    case 'read_file': {
+      const args = readArguments(input);
+      uses.push(...skillPaths(string(args.file_path ?? args.path) ?? ''));
+      break;
+    }
+    case 'exec_command':
+    case 'bash':
+    case 'powershell':
+    case 'shell_command':
+    case 'shell':
+      addShellSkillUses(readArguments(input), uses);
+      break;
   }
+  // [집계 정책] MCP 이름에서 플러그인을 보완하고 분류·정규화한 이름별로 중복을 없앤다.
   const plugin=/^mcp__(.+?)__/.exec(name)?.[1];
   if (plugin) uses.push({category:'plugin',name:displayName(plugin)!});
-  if (['read','read_file'].includes(lower)) uses.push(...skillPaths(string(args.file_path ?? args.path) ?? ''));
-  if (['exec_command','bash','powershell','shell_command','shell'].includes(lower)) addShellSkillUses(args,uses);
+  if (!uses.length) return uses;
   const unique: Use[]=[];
   const seen=new Set<string>();
   for (const use of uses) {
@@ -136,16 +164,23 @@ function directUses(name: string, args: Record<string,unknown>): Use[] {
   return unique;
 }
 
-/**
- * 책임: 직접 호출과 exec 내부 호출에 같은 사용 횟수 추출 규칙을 적용한다.
- * 알고리즘: exec 문자열은 정적으로 분해하고 나머지는 단일 호출로 취급해 분류 결과에 원래 호출 순번을 붙여 yield한다.
- */
-export function *toolCapabilities(name: string, input: unknown): Generator<Use & {index:number}> {
-  const calls=name.split('.').at(-1) === 'exec' && typeof input === 'string'
-    ? nestedCalls(input) : [{name,args:argumentsObject(input)}];
-  let index=0;
-  for (const call of calls) {
-    for (const use of directUses(call.name,call.args)) yield {...use,index};
+export function toolCapabilities(name: string, input: unknown): Generator<Use & {index:number}> {
+  return readToolCapabilities(name, () => input);
+}
+
+/** Reads an argument value only when the tool's classification needs it. */
+export function *readToolCapabilities(name: string, readInput: () => unknown): Generator<Use & {index:number}> {
+  const toolName = name.slice(name.lastIndexOf('.') + 1);
+  if (toolName !== 'exec') {
+    for (const use of directUses(toolName, readInput, read => argumentsObject(read()))) yield { ...use, index: 0 };
+    return;
+  }
+  // [집계 정책] exec 문자열의 정적 호출을 순회하고 같은 호출에서 파생된 사용량에는 순번을 공유한다.
+  const input = readInput();
+  if (typeof input !== 'string') return;
+  let index = 0;
+  for (const call of nestedCalls(input)) {
+    for (const use of directUses(call.name, call.input, nestedArgumentsObject)) yield { ...use, index };
     index++;
   }
 }

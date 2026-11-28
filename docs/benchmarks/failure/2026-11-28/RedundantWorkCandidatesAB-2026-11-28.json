@@ -1,0 +1,4742 @@
+{
+  "environment": {
+    "platform": "win32",
+    "release": "10.0.19045",
+    "arch": "x64",
+    "node": "v24.14.1",
+    "v8": "13.6.233.17-node.44",
+    "sqlite": "3.51.2",
+    "cpu": "AMD Ryzen 5 7500F 6-Core Processor             ",
+    "logicalCpus": 12
+  },
+  "usage": {
+    "startedAt": "2026-11-28T14:01:52.918Z",
+    "completedAt": "2026-11-28T14:08:46.918Z",
+    "protocol": {
+      "pairs": 20,
+      "warmups": 3,
+      "order": "shared baseline first or last, rotating candidates, sequential",
+      "sourceWorkers": 4,
+      "sampleIntervalMs": 5,
+      "timezone": "Asia/Seoul",
+      "queryIterations": 16,
+      "memory": "Collector V8 heap peak samples at 5ms and phase boundaries; Worker heap at replies; process peak RSS before validation",
+      "workflow": "refresh through COMMIT/return plus one session picker request and nine actual Worker queries, Worker startup excluded",
+      "scripts": {
+        "runner": "452cf0bbb0f31814acee4334ab4f9dba1dbf3d6ddad43c100489892458b2a750",
+        "reads": "02c1ae4dc6f5957ccce469803e28e10de27dd272a9e86afa92c5b086bb5f1dfc"
+      }
+    },
+    "builds": {
+      "A": {
+        "revision": "b26187e1c7a28edd9a4a04404e277a5f1d29c2e5",
+        "source": "6f46df6a2ad5ed2410918f8fa566a4abe7d66d85595556e5e585db95599f9abf",
+        "media": "b4f614c4680f71824ac5178974cf1337d34bcb8cbcba16afb3b28c0be5e5659e",
+        "build": "bf711384db5603771b44d089e12cfa561ecde08fe8d8601fe5b25939b06df216"
+      },
+      "four-empty-names": {
+        "revision": "b26187e1c7a28edd9a4a04404e277a5f1d29c2e5",
+        "source": "49f8db746dcfe6e9203a12fd84b9b0102e40fa2bb6acd36cd2bca8eccc58d5d1",
+        "media": "b4f614c4680f71824ac5178974cf1337d34bcb8cbcba16afb3b28c0be5e5659e",
+        "build": "0e3ced07480d793cc9751494a59ed348ad4b3ddffa27fc9b62ee8808dbffacbc"
+      },
+      "four-session-scope": {
+        "revision": "b26187e1c7a28edd9a4a04404e277a5f1d29c2e5",
+        "source": "2b9ca3af8270a06a3aa4c7ce41a11b33a31371b64b5cd1f7742d608baa53a275",
+        "media": "b4f614c4680f71824ac5178974cf1337d34bcb8cbcba16afb3b28c0be5e5659e",
+        "build": "ece7f5d631067030a7ed0ba8a254f7d9dc812e429ca303b36cda4a9f6efa2042"
+      },
+      "four-skip-orphan-dto": {
+        "revision": "b26187e1c7a28edd9a4a04404e277a5f1d29c2e5",
+        "source": "78c4109d34df7eda097d999f4dfd9e92bc66b08c5516efa4417b8dd71c00b4f5",
+        "media": "b4f614c4680f71824ac5178974cf1337d34bcb8cbcba16afb3b28c0be5e5659e",
+        "build": "6329a817ea3d6e9c0062d15f4b09945b9eb14cd6f8c36de0a566032494835a67"
+      }
+    },
+    "command": [
+      "node",
+      "--no-warnings",
+      "tests/.cache/sqlite-audit-ab-20261128/runner.cjs",
+      "--variants=four-empty-names,four-session-scope,four-skip-orphan-dto",
+      "--pairs=20",
+      "--warmups=3",
+      "--unchanged=true",
+      "--input-workspace=tests/.cache/sqlite-audit-ab-20261128/run-Qqwlvb",
+      "--output=tests/.cache/sqlite-audit-ab-20261128/four-usage-reductions-results.json"
+    ],
+    "inputs": {
+      "100": {
+        "inventory": [
+          {
+            "provider": "claude",
+            "rootOrdinal": 0,
+            "files": 10,
+            "bytes": 22870,
+            "compressed": 0
+          },
+          {
+            "provider": "codex",
+            "rootOrdinal": 1,
+            "files": 10,
+            "bytes": 33275,
+            "compressed": 0,
+            "metadata": {
+              "indexBytes": 0,
+              "threads": 0
+            }
+          }
+        ],
+        "inputSha256": "776f035313dcd931d408937da1a71359186090430c2978a2b566061a3a79e0d1",
+        "fixture": {
+          "requests": 100,
+          "tokens": 18400,
+          "sessions": 20,
+          "turnsPerSession": 5
+        },
+        "baselineTotals": [
+          {
+            "provider": "claude",
+            "threads": 50,
+            "input": 7350,
+            "output": 1600,
+            "tokens": 8950
+          },
+          {
+            "provider": "codex",
+            "threads": 50,
+            "input": 7600,
+            "output": 1850,
+            "tokens": 9450
+          }
+        ],
+        "expectedAppend": [
+          1,
+          123,
+          7
+        ],
+        "mismatches": [],
+        "samples": {
+          "unchanged": [
+            {
+              "order": [
+                "A",
+                "four-empty-names",
+                "four-session-scope",
+                "four-skip-orphan-dto"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 34.02450000000002,
+                  "rssBytes": 139358208,
+                  "heapBytes": 8375928,
+                  "dbBytes": 98304
+                },
+                "four-empty-names": {
+                  "totalMs": 37.92090000000002,
+                  "rssBytes": 139300864,
+                  "heapBytes": 8377632,
+                  "dbBytes": 98304
+                },
+                "four-session-scope": {
+                  "totalMs": 35.82279999999999,
+                  "rssBytes": 139968512,
+                  "heapBytes": 8379264,
+                  "dbBytes": 98304
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 33.794000000000025,
+                  "rssBytes": 139550720,
+                  "heapBytes": 8385104,
+                  "dbBytes": 98304
+                }
+              }
+            },
+            {
+              "order": [
+                "four-empty-names",
+                "four-skip-orphan-dto",
+                "four-session-scope",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 31.92950000000002,
+                  "rssBytes": 139862016,
+                  "heapBytes": 8374064,
+                  "dbBytes": 98304
+                },
+                "four-empty-names": {
+                  "totalMs": 36.1636,
+                  "rssBytes": 139673600,
+                  "heapBytes": 8375872,
+                  "dbBytes": 98304
+                },
+                "four-session-scope": {
+                  "totalMs": 32.92460000000001,
+                  "rssBytes": 139481088,
+                  "heapBytes": 8380976,
+                  "dbBytes": 98304
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 35.31239999999997,
+                  "rssBytes": 139218944,
+                  "heapBytes": 8384160,
+                  "dbBytes": 98304
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-skip-orphan-dto",
+                "four-empty-names",
+                "four-session-scope"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 36.67539999999997,
+                  "rssBytes": 139898880,
+                  "heapBytes": 8376464,
+                  "dbBytes": 98304
+                },
+                "four-empty-names": {
+                  "totalMs": 37.505000000000024,
+                  "rssBytes": 139038720,
+                  "heapBytes": 8376240,
+                  "dbBytes": 98304
+                },
+                "four-session-scope": {
+                  "totalMs": 41.18100000000004,
+                  "rssBytes": 139423744,
+                  "heapBytes": 8384440,
+                  "dbBytes": 98304
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 38.04420000000003,
+                  "rssBytes": 139276288,
+                  "heapBytes": 8380776,
+                  "dbBytes": 98304
+                }
+              }
+            },
+            {
+              "order": [
+                "four-skip-orphan-dto",
+                "four-session-scope",
+                "four-empty-names",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 34.46200000000006,
+                  "rssBytes": 139202560,
+                  "heapBytes": 8378208,
+                  "dbBytes": 98304
+                },
+                "four-empty-names": {
+                  "totalMs": 39.596299999999985,
+                  "rssBytes": 138977280,
+                  "heapBytes": 8378280,
+                  "dbBytes": 98304
+                },
+                "four-session-scope": {
+                  "totalMs": 37.144000000000034,
+                  "rssBytes": 139689984,
+                  "heapBytes": 8383640,
+                  "dbBytes": 98304
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 41.851099999999974,
+                  "rssBytes": 139567104,
+                  "heapBytes": 8382768,
+                  "dbBytes": 98304
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-session-scope",
+                "four-skip-orphan-dto",
+                "four-empty-names"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 34.7676,
+                  "rssBytes": 139632640,
+                  "heapBytes": 8374080,
+                  "dbBytes": 98304
+                },
+                "four-empty-names": {
+                  "totalMs": 32.08069999999999,
+                  "rssBytes": 138870784,
+                  "heapBytes": 8377568,
+                  "dbBytes": 98304
+                },
+                "four-session-scope": {
+                  "totalMs": 51.679299999999984,
+                  "rssBytes": 139821056,
+                  "heapBytes": 8372656,
+                  "dbBytes": 98304
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 34.55479999999997,
+                  "rssBytes": 139563008,
+                  "heapBytes": 8380256,
+                  "dbBytes": 98304
+                }
+              }
+            },
+            {
+              "order": [
+                "four-session-scope",
+                "four-empty-names",
+                "four-skip-orphan-dto",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 31.148600000000016,
+                  "rssBytes": 139259904,
+                  "heapBytes": 8375840,
+                  "dbBytes": 98304
+                },
+                "four-empty-names": {
+                  "totalMs": 33.92220000000002,
+                  "rssBytes": 139493376,
+                  "heapBytes": 8375872,
+                  "dbBytes": 98304
+                },
+                "four-session-scope": {
+                  "totalMs": 35.69860000000001,
+                  "rssBytes": 139689984,
+                  "heapBytes": 8381296,
+                  "dbBytes": 98304
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 32.41090000000003,
+                  "rssBytes": 139423744,
+                  "heapBytes": 8382272,
+                  "dbBytes": 98304
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-empty-names",
+                "four-session-scope",
+                "four-skip-orphan-dto"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 32.03030000000001,
+                  "rssBytes": 139386880,
+                  "heapBytes": 8378168,
+                  "dbBytes": 98304
+                },
+                "four-empty-names": {
+                  "totalMs": 31.378800000000012,
+                  "rssBytes": 139243520,
+                  "heapBytes": 8370728,
+                  "dbBytes": 98304
+                },
+                "four-session-scope": {
+                  "totalMs": 32.40739999999998,
+                  "rssBytes": 139776000,
+                  "heapBytes": 8383600,
+                  "dbBytes": 98304
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 35.7475,
+                  "rssBytes": 139759616,
+                  "heapBytes": 8380944,
+                  "dbBytes": 98304
+                }
+              }
+            },
+            {
+              "order": [
+                "four-empty-names",
+                "four-skip-orphan-dto",
+                "four-session-scope",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 35.96669999999999,
+                  "rssBytes": 139182080,
+                  "heapBytes": 8374144,
+                  "dbBytes": 98304
+                },
+                "four-empty-names": {
+                  "totalMs": 34.85319999999997,
+                  "rssBytes": 139595776,
+                  "heapBytes": 8377728,
+                  "dbBytes": 98304
+                },
+                "four-session-scope": {
+                  "totalMs": 33.320499999999996,
+                  "rssBytes": 139542528,
+                  "heapBytes": 8379312,
+                  "dbBytes": 98304
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 36.49730000000001,
+                  "rssBytes": 139386880,
+                  "heapBytes": 8382048,
+                  "dbBytes": 98304
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-skip-orphan-dto",
+                "four-empty-names",
+                "four-session-scope"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 38.13940000000001,
+                  "rssBytes": 139374592,
+                  "heapBytes": 8376416,
+                  "dbBytes": 98304
+                },
+                "four-empty-names": {
+                  "totalMs": 34.014300000000006,
+                  "rssBytes": 139440128,
+                  "heapBytes": 8379208,
+                  "dbBytes": 98304
+                },
+                "four-session-scope": {
+                  "totalMs": 34.14180000000002,
+                  "rssBytes": 139202560,
+                  "heapBytes": 8383168,
+                  "dbBytes": 98304
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 38.34070000000004,
+                  "rssBytes": 139309056,
+                  "heapBytes": 8380184,
+                  "dbBytes": 98304
+                }
+              }
+            },
+            {
+              "order": [
+                "four-skip-orphan-dto",
+                "four-session-scope",
+                "four-empty-names",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 34.694199999999995,
+                  "rssBytes": 139350016,
+                  "heapBytes": 8377240,
+                  "dbBytes": 98304
+                },
+                "four-empty-names": {
+                  "totalMs": 33.85949999999997,
+                  "rssBytes": 139399168,
+                  "heapBytes": 8379728,
+                  "dbBytes": 98304
+                },
+                "four-session-scope": {
+                  "totalMs": 33.62019999999998,
+                  "rssBytes": 139550720,
+                  "heapBytes": 8381592,
+                  "dbBytes": 98304
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 33.55310000000003,
+                  "rssBytes": 139821056,
+                  "heapBytes": 8380408,
+                  "dbBytes": 98304
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-session-scope",
+                "four-skip-orphan-dto",
+                "four-empty-names"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 31.605500000000006,
+                  "rssBytes": 139264000,
+                  "heapBytes": 8378280,
+                  "dbBytes": 98304
+                },
+                "four-empty-names": {
+                  "totalMs": 36.8592,
+                  "rssBytes": 139395072,
+                  "heapBytes": 8378184,
+                  "dbBytes": 98304
+                },
+                "four-session-scope": {
+                  "totalMs": 29.903300000000016,
+                  "rssBytes": 139997184,
+                  "heapBytes": 8383440,
+                  "dbBytes": 98304
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 35.107099999999974,
+                  "rssBytes": 139620352,
+                  "heapBytes": 8382152,
+                  "dbBytes": 98304
+                }
+              }
+            },
+            {
+              "order": [
+                "four-session-scope",
+                "four-empty-names",
+                "four-skip-orphan-dto",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 35.71379999999999,
+                  "rssBytes": 139513856,
+                  "heapBytes": 8374912,
+                  "dbBytes": 98304
+                },
+                "four-empty-names": {
+                  "totalMs": 34.42400000000002,
+                  "rssBytes": 139882496,
+                  "heapBytes": 8375880,
+                  "dbBytes": 98304
+                },
+                "four-session-scope": {
+                  "totalMs": 33.38410000000002,
+                  "rssBytes": 139636736,
+                  "heapBytes": 8383496,
+                  "dbBytes": 98304
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 33.30020000000002,
+                  "rssBytes": 139345920,
+                  "heapBytes": 8380248,
+                  "dbBytes": 98304
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-empty-names",
+                "four-session-scope",
+                "four-skip-orphan-dto"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 34.3112,
+                  "rssBytes": 139599872,
+                  "heapBytes": 8378168,
+                  "dbBytes": 98304
+                },
+                "four-empty-names": {
+                  "totalMs": 33.20800000000003,
+                  "rssBytes": 139264000,
+                  "heapBytes": 8379280,
+                  "dbBytes": 98304
+                },
+                "four-session-scope": {
+                  "totalMs": 35.0839,
+                  "rssBytes": 140079104,
+                  "heapBytes": 8383320,
+                  "dbBytes": 98304
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 35.21419999999999,
+                  "rssBytes": 139563008,
+                  "heapBytes": 8382688,
+                  "dbBytes": 98304
+                }
+              }
+            },
+            {
+              "order": [
+                "four-empty-names",
+                "four-skip-orphan-dto",
+                "four-session-scope",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 33.1913,
+                  "rssBytes": 139206656,
+                  "heapBytes": 8373856,
+                  "dbBytes": 98304
+                },
+                "four-empty-names": {
+                  "totalMs": 33.747399999999985,
+                  "rssBytes": 139403264,
+                  "heapBytes": 8375920,
+                  "dbBytes": 98304
+                },
+                "four-session-scope": {
+                  "totalMs": 34.134099999999975,
+                  "rssBytes": 139374592,
+                  "heapBytes": 8384160,
+                  "dbBytes": 98304
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 34.3357,
+                  "rssBytes": 139821056,
+                  "heapBytes": 8384528,
+                  "dbBytes": 98304
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-skip-orphan-dto",
+                "four-empty-names",
+                "four-session-scope"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 32.970500000000015,
+                  "rssBytes": 139259904,
+                  "heapBytes": 8376400,
+                  "dbBytes": 98304
+                },
+                "four-empty-names": {
+                  "totalMs": 31.59010000000002,
+                  "rssBytes": 139403264,
+                  "heapBytes": 8375752,
+                  "dbBytes": 98304
+                },
+                "four-session-scope": {
+                  "totalMs": 31.251699999999985,
+                  "rssBytes": 139341824,
+                  "heapBytes": 8381904,
+                  "dbBytes": 98304
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 30.994199999999978,
+                  "rssBytes": 139771904,
+                  "heapBytes": 8384912,
+                  "dbBytes": 98304
+                }
+              }
+            },
+            {
+              "order": [
+                "four-skip-orphan-dto",
+                "four-session-scope",
+                "four-empty-names",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 32.98019999999998,
+                  "rssBytes": 139804672,
+                  "heapBytes": 8376328,
+                  "dbBytes": 98304
+                },
+                "four-empty-names": {
+                  "totalMs": 32.134400000000014,
+                  "rssBytes": 139501568,
+                  "heapBytes": 8375928,
+                  "dbBytes": 98304
+                },
+                "four-session-scope": {
+                  "totalMs": 32.79299999999999,
+                  "rssBytes": 139640832,
+                  "heapBytes": 8381848,
+                  "dbBytes": 98304
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 31.3142,
+                  "rssBytes": 139251712,
+                  "heapBytes": 8381992,
+                  "dbBytes": 98304
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-session-scope",
+                "four-skip-orphan-dto",
+                "four-empty-names"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 37.64970000000001,
+                  "rssBytes": 138952704,
+                  "heapBytes": 8379992,
+                  "dbBytes": 98304
+                },
+                "four-empty-names": {
+                  "totalMs": 37.161400000000015,
+                  "rssBytes": 139079680,
+                  "heapBytes": 8377640,
+                  "dbBytes": 98304
+                },
+                "four-session-scope": {
+                  "totalMs": 30.402299999999983,
+                  "rssBytes": 139096064,
+                  "heapBytes": 8381136,
+                  "dbBytes": 98304
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 34.79739999999997,
+                  "rssBytes": 138928128,
+                  "heapBytes": 8382936,
+                  "dbBytes": 98304
+                }
+              }
+            },
+            {
+              "order": [
+                "four-session-scope",
+                "four-empty-names",
+                "four-skip-orphan-dto",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 61.494099999999975,
+                  "rssBytes": 139366400,
+                  "heapBytes": 8380136,
+                  "dbBytes": 98304
+                },
+                "four-empty-names": {
+                  "totalMs": 35.50499999999998,
+                  "rssBytes": 139456512,
+                  "heapBytes": 8380440,
+                  "dbBytes": 98304
+                },
+                "four-session-scope": {
+                  "totalMs": 38.89919999999998,
+                  "rssBytes": 140046336,
+                  "heapBytes": 8384536,
+                  "dbBytes": 98304
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 40.5158,
+                  "rssBytes": 139591680,
+                  "heapBytes": 8380176,
+                  "dbBytes": 98304
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-empty-names",
+                "four-session-scope",
+                "four-skip-orphan-dto"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 32.8177,
+                  "rssBytes": 139644928,
+                  "heapBytes": 8373872,
+                  "dbBytes": 98304
+                },
+                "four-empty-names": {
+                  "totalMs": 31.993800000000007,
+                  "rssBytes": 139407360,
+                  "heapBytes": 8377576,
+                  "dbBytes": 98304
+                },
+                "four-session-scope": {
+                  "totalMs": 39.49260000000004,
+                  "rssBytes": 139419648,
+                  "heapBytes": 8385192,
+                  "dbBytes": 98304
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 45.088899999999995,
+                  "rssBytes": 139968512,
+                  "heapBytes": 8383424,
+                  "dbBytes": 98304
+                }
+              }
+            },
+            {
+              "order": [
+                "four-empty-names",
+                "four-skip-orphan-dto",
+                "four-session-scope",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 32.0343,
+                  "rssBytes": 139649024,
+                  "heapBytes": 8373992,
+                  "dbBytes": 98304
+                },
+                "four-empty-names": {
+                  "totalMs": 36.36089999999999,
+                  "rssBytes": 139411456,
+                  "heapBytes": 8378024,
+                  "dbBytes": 98304
+                },
+                "four-session-scope": {
+                  "totalMs": 51.3194,
+                  "rssBytes": 139784192,
+                  "heapBytes": 8386656,
+                  "dbBytes": 98304
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 32.774799999999985,
+                  "rssBytes": 139243520,
+                  "heapBytes": 8374904,
+                  "dbBytes": 98304
+                }
+              }
+            }
+          ],
+          "append": [
+            {
+              "order": [
+                "A",
+                "four-empty-names",
+                "four-session-scope",
+                "four-skip-orphan-dto"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 45.296099999999996,
+                  "rssBytes": 139792384,
+                  "heapBytes": 8672512,
+                  "dbBytes": 98304
+                },
+                "four-empty-names": {
+                  "totalMs": 46.041499999999985,
+                  "rssBytes": 139870208,
+                  "heapBytes": 8677272,
+                  "dbBytes": 98304
+                },
+                "four-session-scope": {
+                  "totalMs": 47.36460000000001,
+                  "rssBytes": 139952128,
+                  "heapBytes": 8690616,
+                  "dbBytes": 98304
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 46.3826,
+                  "rssBytes": 139550720,
+                  "heapBytes": 8689080,
+                  "dbBytes": 98304
+                }
+              }
+            },
+            {
+              "order": [
+                "four-empty-names",
+                "four-skip-orphan-dto",
+                "four-session-scope",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 50.57149999999997,
+                  "rssBytes": 140787712,
+                  "heapBytes": 8686720,
+                  "dbBytes": 98304
+                },
+                "four-empty-names": {
+                  "totalMs": 44.489200000000025,
+                  "rssBytes": 140296192,
+                  "heapBytes": 8678008,
+                  "dbBytes": 98304
+                },
+                "four-session-scope": {
+                  "totalMs": 51.04559999999999,
+                  "rssBytes": 140234752,
+                  "heapBytes": 8687360,
+                  "dbBytes": 98304
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 45.72109999999999,
+                  "rssBytes": 140439552,
+                  "heapBytes": 8705544,
+                  "dbBytes": 98304
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-skip-orphan-dto",
+                "four-empty-names",
+                "four-session-scope"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 47.779799999999994,
+                  "rssBytes": 139792384,
+                  "heapBytes": 8692712,
+                  "dbBytes": 98304
+                },
+                "four-empty-names": {
+                  "totalMs": 44.55990000000003,
+                  "rssBytes": 140152832,
+                  "heapBytes": 8896680,
+                  "dbBytes": 98304
+                },
+                "four-session-scope": {
+                  "totalMs": 46.63429999999995,
+                  "rssBytes": 140103680,
+                  "heapBytes": 8700872,
+                  "dbBytes": 98304
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 48.971199999999996,
+                  "rssBytes": 140509184,
+                  "heapBytes": 8694880,
+                  "dbBytes": 98304
+                }
+              }
+            },
+            {
+              "order": [
+                "four-skip-orphan-dto",
+                "four-session-scope",
+                "four-empty-names",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 44.50519999999999,
+                  "rssBytes": 139907072,
+                  "heapBytes": 8687064,
+                  "dbBytes": 98304
+                },
+                "four-empty-names": {
+                  "totalMs": 46.611900000000034,
+                  "rssBytes": 140312576,
+                  "heapBytes": 8685288,
+                  "dbBytes": 98304
+                },
+                "four-session-scope": {
+                  "totalMs": 47.03550000000001,
+                  "rssBytes": 140427264,
+                  "heapBytes": 8706696,
+                  "dbBytes": 98304
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 48.37240000000003,
+                  "rssBytes": 140398592,
+                  "heapBytes": 8679464,
+                  "dbBytes": 98304
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-session-scope",
+                "four-skip-orphan-dto",
+                "four-empty-names"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 45.79499999999997,
+                  "rssBytes": 140410880,
+                  "heapBytes": 8680080,
+                  "dbBytes": 98304
+                },
+                "four-empty-names": {
+                  "totalMs": 54.079999999999984,
+                  "rssBytes": 140439552,
+                  "heapBytes": 8688464,
+                  "dbBytes": 98304
+                },
+                "four-session-scope": {
+                  "totalMs": 58.456199999999995,
+                  "rssBytes": 139866112,
+                  "heapBytes": 9376280,
+                  "dbBytes": 98304
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 49.93199999999996,
+                  "rssBytes": 140378112,
+                  "heapBytes": 8691040,
+                  "dbBytes": 98304
+                }
+              }
+            },
+            {
+              "order": [
+                "four-session-scope",
+                "four-empty-names",
+                "four-skip-orphan-dto",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 52.020399999999995,
+                  "rssBytes": 140087296,
+                  "heapBytes": 8945792,
+                  "dbBytes": 98304
+                },
+                "four-empty-names": {
+                  "totalMs": 50.64939999999994,
+                  "rssBytes": 140226560,
+                  "heapBytes": 8683208,
+                  "dbBytes": 98304
+                },
+                "four-session-scope": {
+                  "totalMs": 50.16559999999997,
+                  "rssBytes": 140038144,
+                  "heapBytes": 8673560,
+                  "dbBytes": 98304
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 52.428999999999974,
+                  "rssBytes": 140316672,
+                  "heapBytes": 8829944,
+                  "dbBytes": 98304
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-empty-names",
+                "four-session-scope",
+                "four-skip-orphan-dto"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 54.10440000000003,
+                  "rssBytes": 140464128,
+                  "heapBytes": 8695136,
+                  "dbBytes": 98304
+                },
+                "four-empty-names": {
+                  "totalMs": 52.61039999999993,
+                  "rssBytes": 140312576,
+                  "heapBytes": 8811232,
+                  "dbBytes": 98304
+                },
+                "four-session-scope": {
+                  "totalMs": 53.95539999999998,
+                  "rssBytes": 140152832,
+                  "heapBytes": 8814272,
+                  "dbBytes": 98304
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 53.99800000000002,
+                  "rssBytes": 140492800,
+                  "heapBytes": 8683480,
+                  "dbBytes": 98304
+                }
+              }
+            },
+            {
+              "order": [
+                "four-empty-names",
+                "four-skip-orphan-dto",
+                "four-session-scope",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 70.76769999999999,
+                  "rssBytes": 140304384,
+                  "heapBytes": 8693072,
+                  "dbBytes": 98304
+                },
+                "four-empty-names": {
+                  "totalMs": 53.387300000000025,
+                  "rssBytes": 140283904,
+                  "heapBytes": 8697088,
+                  "dbBytes": 98304
+                },
+                "four-session-scope": {
+                  "totalMs": 61.10989999999998,
+                  "rssBytes": 140169216,
+                  "heapBytes": 9369216,
+                  "dbBytes": 98304
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 53.52589999999995,
+                  "rssBytes": 140234752,
+                  "heapBytes": 8817064,
+                  "dbBytes": 98304
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-skip-orphan-dto",
+                "four-empty-names",
+                "four-session-scope"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 65.36309999999997,
+                  "rssBytes": 140595200,
+                  "heapBytes": 9360128,
+                  "dbBytes": 98304
+                },
+                "four-empty-names": {
+                  "totalMs": 55.45389999999999,
+                  "rssBytes": 140087296,
+                  "heapBytes": 8697816,
+                  "dbBytes": 98304
+                },
+                "four-session-scope": {
+                  "totalMs": 56.59039999999999,
+                  "rssBytes": 140128256,
+                  "heapBytes": 8699720,
+                  "dbBytes": 98304
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 53.628,
+                  "rssBytes": 139923456,
+                  "heapBytes": 8688848,
+                  "dbBytes": 98304
+                }
+              }
+            },
+            {
+              "order": [
+                "four-skip-orphan-dto",
+                "four-session-scope",
+                "four-empty-names",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 74.20250000000004,
+                  "rssBytes": 140210176,
+                  "heapBytes": 8819880,
+                  "dbBytes": 98304
+                },
+                "four-empty-names": {
+                  "totalMs": 46.85080000000001,
+                  "rssBytes": 140279808,
+                  "heapBytes": 8702816,
+                  "dbBytes": 98304
+                },
+                "four-session-scope": {
+                  "totalMs": 57.576499999999996,
+                  "rssBytes": 140189696,
+                  "heapBytes": 8700288,
+                  "dbBytes": 98304
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 70.48220000000003,
+                  "rssBytes": 140312576,
+                  "heapBytes": 9373192,
+                  "dbBytes": 98304
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-session-scope",
+                "four-skip-orphan-dto",
+                "four-empty-names"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 59.0629,
+                  "rssBytes": 140021760,
+                  "heapBytes": 8696688,
+                  "dbBytes": 98304
+                },
+                "four-empty-names": {
+                  "totalMs": 49.452499999999986,
+                  "rssBytes": 140562432,
+                  "heapBytes": 8896864,
+                  "dbBytes": 98304
+                },
+                "four-session-scope": {
+                  "totalMs": 56.356600000000014,
+                  "rssBytes": 139845632,
+                  "heapBytes": 8685008,
+                  "dbBytes": 98304
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 56.080699999999965,
+                  "rssBytes": 140042240,
+                  "heapBytes": 8692160,
+                  "dbBytes": 98304
+                }
+              }
+            },
+            {
+              "order": [
+                "four-session-scope",
+                "four-empty-names",
+                "four-skip-orphan-dto",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 51.27609999999997,
+                  "rssBytes": 140099584,
+                  "heapBytes": 9362720,
+                  "dbBytes": 98304
+                },
+                "four-empty-names": {
+                  "totalMs": 54.4055,
+                  "rssBytes": 139526144,
+                  "heapBytes": 8700168,
+                  "dbBytes": 98304
+                },
+                "four-session-scope": {
+                  "totalMs": 45.89089999999999,
+                  "rssBytes": 140042240,
+                  "heapBytes": 8705632,
+                  "dbBytes": 98304
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 50.54579999999996,
+                  "rssBytes": 140255232,
+                  "heapBytes": 9365616,
+                  "dbBytes": 98304
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-empty-names",
+                "four-session-scope",
+                "four-skip-orphan-dto"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 49.038099999999986,
+                  "rssBytes": 140087296,
+                  "heapBytes": 8742888,
+                  "dbBytes": 98304
+                },
+                "four-empty-names": {
+                  "totalMs": 51.77919999999999,
+                  "rssBytes": 140488704,
+                  "heapBytes": 8695160,
+                  "dbBytes": 98304
+                },
+                "four-session-scope": {
+                  "totalMs": 53.609900000000025,
+                  "rssBytes": 140378112,
+                  "heapBytes": 8689184,
+                  "dbBytes": 98304
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 53.12179999999999,
+                  "rssBytes": 140382208,
+                  "heapBytes": 9369736,
+                  "dbBytes": 98304
+                }
+              }
+            },
+            {
+              "order": [
+                "four-empty-names",
+                "four-skip-orphan-dto",
+                "four-session-scope",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 51.62229999999997,
+                  "rssBytes": 139886592,
+                  "heapBytes": 8678376,
+                  "dbBytes": 98304
+                },
+                "four-empty-names": {
+                  "totalMs": 53.85480000000004,
+                  "rssBytes": 140103680,
+                  "heapBytes": 8687168,
+                  "dbBytes": 98304
+                },
+                "four-session-scope": {
+                  "totalMs": 51.21870000000001,
+                  "rssBytes": 140185600,
+                  "heapBytes": 8686416,
+                  "dbBytes": 98304
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 50.502099999999956,
+                  "rssBytes": 140353536,
+                  "heapBytes": 8845440,
+                  "dbBytes": 98304
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-skip-orphan-dto",
+                "four-empty-names",
+                "four-session-scope"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 52.9067,
+                  "rssBytes": 140189696,
+                  "heapBytes": 8682120,
+                  "dbBytes": 98304
+                },
+                "four-empty-names": {
+                  "totalMs": 63.4375,
+                  "rssBytes": 139902976,
+                  "heapBytes": 8687328,
+                  "dbBytes": 98304
+                },
+                "four-session-scope": {
+                  "totalMs": 53.88150000000002,
+                  "rssBytes": 140308480,
+                  "heapBytes": 8699264,
+                  "dbBytes": 98304
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 54.62880000000003,
+                  "rssBytes": 140152832,
+                  "heapBytes": 8692816,
+                  "dbBytes": 98304
+                }
+              }
+            },
+            {
+              "order": [
+                "four-skip-orphan-dto",
+                "four-session-scope",
+                "four-empty-names",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 53.34960000000005,
+                  "rssBytes": 140472320,
+                  "heapBytes": 8691344,
+                  "dbBytes": 98304
+                },
+                "four-empty-names": {
+                  "totalMs": 50.07340000000001,
+                  "rssBytes": 140087296,
+                  "heapBytes": 8691432,
+                  "dbBytes": 98304
+                },
+                "four-session-scope": {
+                  "totalMs": 56.2863,
+                  "rssBytes": 140734464,
+                  "heapBytes": 8701952,
+                  "dbBytes": 98304
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 54.56699999999999,
+                  "rssBytes": 139890688,
+                  "heapBytes": 9368984,
+                  "dbBytes": 98304
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-session-scope",
+                "four-skip-orphan-dto",
+                "four-empty-names"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 53.342300000000066,
+                  "rssBytes": 139956224,
+                  "heapBytes": 8682280,
+                  "dbBytes": 98304
+                },
+                "four-empty-names": {
+                  "totalMs": 54.94220000000004,
+                  "rssBytes": 140283904,
+                  "heapBytes": 9366456,
+                  "dbBytes": 98304
+                },
+                "four-session-scope": {
+                  "totalMs": 50.4859,
+                  "rssBytes": 140038144,
+                  "heapBytes": 8910752,
+                  "dbBytes": 98304
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 52.000999999999976,
+                  "rssBytes": 140288000,
+                  "heapBytes": 8703072,
+                  "dbBytes": 98304
+                }
+              }
+            },
+            {
+              "order": [
+                "four-session-scope",
+                "four-empty-names",
+                "four-skip-orphan-dto",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 53.31220000000002,
+                  "rssBytes": 139894784,
+                  "heapBytes": 9361256,
+                  "dbBytes": 98304
+                },
+                "four-empty-names": {
+                  "totalMs": 54.09009999999995,
+                  "rssBytes": 139808768,
+                  "heapBytes": 9366656,
+                  "dbBytes": 98304
+                },
+                "four-session-scope": {
+                  "totalMs": 49.508699999999976,
+                  "rssBytes": 140214272,
+                  "heapBytes": 8832456,
+                  "dbBytes": 98304
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 52.80709999999998,
+                  "rssBytes": 140423168,
+                  "heapBytes": 9367616,
+                  "dbBytes": 98304
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-empty-names",
+                "four-session-scope",
+                "four-skip-orphan-dto"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 52.36250000000001,
+                  "rssBytes": 140214272,
+                  "heapBytes": 8684032,
+                  "dbBytes": 98304
+                },
+                "four-empty-names": {
+                  "totalMs": 56.48680000000002,
+                  "rssBytes": 140484608,
+                  "heapBytes": 8695800,
+                  "dbBytes": 98304
+                },
+                "four-session-scope": {
+                  "totalMs": 56.82190000000003,
+                  "rssBytes": 140226560,
+                  "heapBytes": 8700432,
+                  "dbBytes": 98304
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 56.61659999999998,
+                  "rssBytes": 139948032,
+                  "heapBytes": 9369840,
+                  "dbBytes": 98304
+                }
+              }
+            },
+            {
+              "order": [
+                "four-empty-names",
+                "four-skip-orphan-dto",
+                "four-session-scope",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 53.70230000000001,
+                  "rssBytes": 140283904,
+                  "heapBytes": 8678232,
+                  "dbBytes": 98304
+                },
+                "four-empty-names": {
+                  "totalMs": 56.80069999999998,
+                  "rssBytes": 140120064,
+                  "heapBytes": 8691048,
+                  "dbBytes": 98304
+                },
+                "four-session-scope": {
+                  "totalMs": 54.8703,
+                  "rssBytes": 140144640,
+                  "heapBytes": 8699824,
+                  "dbBytes": 98304
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 54.172299999999936,
+                  "rssBytes": 140120064,
+                  "heapBytes": 9365560,
+                  "dbBytes": 98304
+                }
+              }
+            }
+          ]
+        }
+      },
+      "10000": {
+        "inventory": [
+          {
+            "provider": "claude",
+            "rootOrdinal": 0,
+            "files": 100,
+            "bytes": 2328260,
+            "compressed": 0
+          },
+          {
+            "provider": "codex",
+            "rootOrdinal": 1,
+            "files": 100,
+            "bytes": 3313450,
+            "compressed": 0,
+            "metadata": {
+              "indexBytes": 0,
+              "threads": 0
+            }
+          }
+        ],
+        "inputSha256": "41c63e61babca594b2c427db7c36fad86664ac2b92b94ec4ccf1cf5a08f6fead",
+        "fixture": {
+          "requests": 10000,
+          "tokens": 6340000,
+          "sessions": 200,
+          "turnsPerSession": 50
+        },
+        "baselineTotals": [
+          {
+            "provider": "claude",
+            "threads": 5000,
+            "input": 2872500,
+            "output": 172500,
+            "tokens": 3045000
+          },
+          {
+            "provider": "codex",
+            "threads": 5000,
+            "input": 3122500,
+            "output": 172500,
+            "tokens": 3295000
+          }
+        ],
+        "expectedAppend": [
+          1,
+          123,
+          7
+        ],
+        "mismatches": [],
+        "samples": {
+          "unchanged": [
+            {
+              "order": [
+                "A",
+                "four-empty-names",
+                "four-session-scope",
+                "four-skip-orphan-dto"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 124.85889999999995,
+                  "rssBytes": 147456000,
+                  "heapBytes": 9861472,
+                  "dbBytes": 3600384
+                },
+                "four-empty-names": {
+                  "totalMs": 125.26179999999998,
+                  "rssBytes": 147210240,
+                  "heapBytes": 9869568,
+                  "dbBytes": 3600384
+                },
+                "four-session-scope": {
+                  "totalMs": 135.99419999999998,
+                  "rssBytes": 146632704,
+                  "heapBytes": 9901968,
+                  "dbBytes": 3600384
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 127.52389999999995,
+                  "rssBytes": 146989056,
+                  "heapBytes": 9915120,
+                  "dbBytes": 3600384
+                }
+              }
+            },
+            {
+              "order": [
+                "four-empty-names",
+                "four-skip-orphan-dto",
+                "four-session-scope",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 120.79050000000002,
+                  "rssBytes": 147464192,
+                  "heapBytes": 9858272,
+                  "dbBytes": 3600384
+                },
+                "four-empty-names": {
+                  "totalMs": 123.11929999999997,
+                  "rssBytes": 146505728,
+                  "heapBytes": 9869528,
+                  "dbBytes": 3600384
+                },
+                "four-session-scope": {
+                  "totalMs": 136.1759,
+                  "rssBytes": 146448384,
+                  "heapBytes": 9874064,
+                  "dbBytes": 3600384
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 136.76289999999995,
+                  "rssBytes": 147673088,
+                  "heapBytes": 9897640,
+                  "dbBytes": 3600384
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-skip-orphan-dto",
+                "four-empty-names",
+                "four-session-scope"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 121.1087,
+                  "rssBytes": 147374080,
+                  "heapBytes": 9868728,
+                  "dbBytes": 3600384
+                },
+                "four-empty-names": {
+                  "totalMs": 120.12299999999996,
+                  "rssBytes": 147169280,
+                  "heapBytes": 9876560,
+                  "dbBytes": 3600384
+                },
+                "four-session-scope": {
+                  "totalMs": 125.27080000000004,
+                  "rssBytes": 147349504,
+                  "heapBytes": 9891184,
+                  "dbBytes": 3600384
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 126.1748,
+                  "rssBytes": 147243008,
+                  "heapBytes": 9867816,
+                  "dbBytes": 3600384
+                }
+              }
+            },
+            {
+              "order": [
+                "four-skip-orphan-dto",
+                "four-session-scope",
+                "four-empty-names",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 142.67990000000003,
+                  "rssBytes": 146751488,
+                  "heapBytes": 9883448,
+                  "dbBytes": 3600384
+                },
+                "four-empty-names": {
+                  "totalMs": 129.25940000000003,
+                  "rssBytes": 146669568,
+                  "heapBytes": 9905792,
+                  "dbBytes": 3600384
+                },
+                "four-session-scope": {
+                  "totalMs": 128.25959999999998,
+                  "rssBytes": 146747392,
+                  "heapBytes": 9902840,
+                  "dbBytes": 3600384
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 118.44460000000002,
+                  "rssBytes": 148230144,
+                  "heapBytes": 9874944,
+                  "dbBytes": 3600384
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-session-scope",
+                "four-skip-orphan-dto",
+                "four-empty-names"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 136.73930000000001,
+                  "rssBytes": 147107840,
+                  "heapBytes": 9863344,
+                  "dbBytes": 3600384
+                },
+                "four-empty-names": {
+                  "totalMs": 162.73940000000002,
+                  "rssBytes": 147066880,
+                  "heapBytes": 9871552,
+                  "dbBytes": 3600384
+                },
+                "four-session-scope": {
+                  "totalMs": 146.31159999999997,
+                  "rssBytes": 147243008,
+                  "heapBytes": 9898760,
+                  "dbBytes": 3600384
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 131.64079999999998,
+                  "rssBytes": 146788352,
+                  "heapBytes": 9894504,
+                  "dbBytes": 3600384
+                }
+              }
+            },
+            {
+              "order": [
+                "four-session-scope",
+                "four-empty-names",
+                "four-skip-orphan-dto",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 146.5751,
+                  "rssBytes": 147054592,
+                  "heapBytes": 9870672,
+                  "dbBytes": 3600384
+                },
+                "four-empty-names": {
+                  "totalMs": 135.96730000000002,
+                  "rssBytes": 147243008,
+                  "heapBytes": 9878264,
+                  "dbBytes": 3600384
+                },
+                "four-session-scope": {
+                  "totalMs": 138.24699999999999,
+                  "rssBytes": 147099648,
+                  "heapBytes": 9875512,
+                  "dbBytes": 3600384
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 142.81310000000002,
+                  "rssBytes": 147206144,
+                  "heapBytes": 9880520,
+                  "dbBytes": 3600384
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-empty-names",
+                "four-session-scope",
+                "four-skip-orphan-dto"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 176.71359999999999,
+                  "rssBytes": 147021824,
+                  "heapBytes": 9886584,
+                  "dbBytes": 3600384
+                },
+                "four-empty-names": {
+                  "totalMs": 149.5865,
+                  "rssBytes": 146817024,
+                  "heapBytes": 9873152,
+                  "dbBytes": 3600384
+                },
+                "four-session-scope": {
+                  "totalMs": 153.2328,
+                  "rssBytes": 147214336,
+                  "heapBytes": 9868864,
+                  "dbBytes": 3600384
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 146.4169,
+                  "rssBytes": 147189760,
+                  "heapBytes": 9902712,
+                  "dbBytes": 3600384
+                }
+              }
+            },
+            {
+              "order": [
+                "four-empty-names",
+                "four-skip-orphan-dto",
+                "four-session-scope",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 149.4027,
+                  "rssBytes": 147124224,
+                  "heapBytes": 9866896,
+                  "dbBytes": 3600384
+                },
+                "four-empty-names": {
+                  "totalMs": 138.33280000000002,
+                  "rssBytes": 147558400,
+                  "heapBytes": 9865736,
+                  "dbBytes": 3600384
+                },
+                "four-session-scope": {
+                  "totalMs": 149.7619,
+                  "rssBytes": 146956288,
+                  "heapBytes": 9888864,
+                  "dbBytes": 3600384
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 172.967,
+                  "rssBytes": 147234816,
+                  "heapBytes": 9887024,
+                  "dbBytes": 3600384
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-skip-orphan-dto",
+                "four-empty-names",
+                "four-session-scope"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 142.9783,
+                  "rssBytes": 147640320,
+                  "heapBytes": 9867840,
+                  "dbBytes": 3600384
+                },
+                "four-empty-names": {
+                  "totalMs": 137.3505,
+                  "rssBytes": 147611648,
+                  "heapBytes": 9882272,
+                  "dbBytes": 3600384
+                },
+                "four-session-scope": {
+                  "totalMs": 152.92520000000002,
+                  "rssBytes": 147623936,
+                  "heapBytes": 9857832,
+                  "dbBytes": 3600384
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 152.99230000000003,
+                  "rssBytes": 146960384,
+                  "heapBytes": 9869528,
+                  "dbBytes": 3600384
+                }
+              }
+            },
+            {
+              "order": [
+                "four-skip-orphan-dto",
+                "four-session-scope",
+                "four-empty-names",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 142.0161,
+                  "rssBytes": 147693568,
+                  "heapBytes": 9880232,
+                  "dbBytes": 3600384
+                },
+                "four-empty-names": {
+                  "totalMs": 140.44870000000003,
+                  "rssBytes": 147021824,
+                  "heapBytes": 9862008,
+                  "dbBytes": 3600384
+                },
+                "four-session-scope": {
+                  "totalMs": 144.93609999999995,
+                  "rssBytes": 147087360,
+                  "heapBytes": 9887200,
+                  "dbBytes": 3600384
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 147.47349999999997,
+                  "rssBytes": 147742720,
+                  "heapBytes": 9912504,
+                  "dbBytes": 3600384
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-session-scope",
+                "four-skip-orphan-dto",
+                "four-empty-names"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 153.1988,
+                  "rssBytes": 147648512,
+                  "heapBytes": 9869248,
+                  "dbBytes": 3600384
+                },
+                "four-empty-names": {
+                  "totalMs": 139.24850000000004,
+                  "rssBytes": 147181568,
+                  "heapBytes": 9884104,
+                  "dbBytes": 3600384
+                },
+                "four-session-scope": {
+                  "totalMs": 140.3427,
+                  "rssBytes": 147959808,
+                  "heapBytes": 9896648,
+                  "dbBytes": 3600384
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 139.1071,
+                  "rssBytes": 146423808,
+                  "heapBytes": 9891936,
+                  "dbBytes": 3600384
+                }
+              }
+            },
+            {
+              "order": [
+                "four-session-scope",
+                "four-empty-names",
+                "four-skip-orphan-dto",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 149.05610000000001,
+                  "rssBytes": 147214336,
+                  "heapBytes": 9877640,
+                  "dbBytes": 3600384
+                },
+                "four-empty-names": {
+                  "totalMs": 136.94830000000002,
+                  "rssBytes": 147046400,
+                  "heapBytes": 9871304,
+                  "dbBytes": 3600384
+                },
+                "four-session-scope": {
+                  "totalMs": 148.87350000000006,
+                  "rssBytes": 146624512,
+                  "heapBytes": 9874672,
+                  "dbBytes": 3600384
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 213.33200000000008,
+                  "rssBytes": 146571264,
+                  "heapBytes": 9899632,
+                  "dbBytes": 3600384
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-empty-names",
+                "four-session-scope",
+                "four-skip-orphan-dto"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 140.13690000000003,
+                  "rssBytes": 147533824,
+                  "heapBytes": 9903200,
+                  "dbBytes": 3600384
+                },
+                "four-empty-names": {
+                  "totalMs": 148.2373,
+                  "rssBytes": 147804160,
+                  "heapBytes": 9871800,
+                  "dbBytes": 3600384
+                },
+                "four-session-scope": {
+                  "totalMs": 141.9406,
+                  "rssBytes": 147120128,
+                  "heapBytes": 9885648,
+                  "dbBytes": 3600384
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 170.59519999999998,
+                  "rssBytes": 147398656,
+                  "heapBytes": 9893072,
+                  "dbBytes": 3600384
+                }
+              }
+            },
+            {
+              "order": [
+                "four-empty-names",
+                "four-skip-orphan-dto",
+                "four-session-scope",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 133.5511,
+                  "rssBytes": 146382848,
+                  "heapBytes": 9914288,
+                  "dbBytes": 3600384
+                },
+                "four-empty-names": {
+                  "totalMs": 146.34319999999997,
+                  "rssBytes": 146874368,
+                  "heapBytes": 9865672,
+                  "dbBytes": 3600384
+                },
+                "four-session-scope": {
+                  "totalMs": 136.7181,
+                  "rssBytes": 147705856,
+                  "heapBytes": 9869248,
+                  "dbBytes": 3600384
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 137.7611,
+                  "rssBytes": 147181568,
+                  "heapBytes": 9875056,
+                  "dbBytes": 3600384
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-skip-orphan-dto",
+                "four-empty-names",
+                "four-session-scope"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 136.49919999999995,
+                  "rssBytes": 147673088,
+                  "heapBytes": 9874224,
+                  "dbBytes": 3600384
+                },
+                "four-empty-names": {
+                  "totalMs": 135.9043,
+                  "rssBytes": 146751488,
+                  "heapBytes": 9865200,
+                  "dbBytes": 3600384
+                },
+                "four-session-scope": {
+                  "totalMs": 133.0485,
+                  "rssBytes": 147218432,
+                  "heapBytes": 9885648,
+                  "dbBytes": 3600384
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 133.13009999999997,
+                  "rssBytes": 147128320,
+                  "heapBytes": 9880376,
+                  "dbBytes": 3600384
+                }
+              }
+            },
+            {
+              "order": [
+                "four-skip-orphan-dto",
+                "four-session-scope",
+                "four-empty-names",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 136.15079999999998,
+                  "rssBytes": 146653184,
+                  "heapBytes": 9885800,
+                  "dbBytes": 3600384
+                },
+                "four-empty-names": {
+                  "totalMs": 142.73160000000001,
+                  "rssBytes": 147255296,
+                  "heapBytes": 9877392,
+                  "dbBytes": 3600384
+                },
+                "four-session-scope": {
+                  "totalMs": 136.7425,
+                  "rssBytes": 146784256,
+                  "heapBytes": 9869112,
+                  "dbBytes": 3600384
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 137.333,
+                  "rssBytes": 147046400,
+                  "heapBytes": 9873976,
+                  "dbBytes": 3600384
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-session-scope",
+                "four-skip-orphan-dto",
+                "four-empty-names"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 136.84730000000002,
+                  "rssBytes": 147128320,
+                  "heapBytes": 9856336,
+                  "dbBytes": 3600384
+                },
+                "four-empty-names": {
+                  "totalMs": 142.86120000000003,
+                  "rssBytes": 147423232,
+                  "heapBytes": 9910888,
+                  "dbBytes": 3600384
+                },
+                "four-session-scope": {
+                  "totalMs": 128.32950000000002,
+                  "rssBytes": 147169280,
+                  "heapBytes": 9874944,
+                  "dbBytes": 3600384
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 136.25320000000002,
+                  "rssBytes": 146714624,
+                  "heapBytes": 9875064,
+                  "dbBytes": 3600384
+                }
+              }
+            },
+            {
+              "order": [
+                "four-session-scope",
+                "four-empty-names",
+                "four-skip-orphan-dto",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 127.08270000000003,
+                  "rssBytes": 147046400,
+                  "heapBytes": 9899496,
+                  "dbBytes": 3600384
+                },
+                "four-empty-names": {
+                  "totalMs": 122.99010000000001,
+                  "rssBytes": 147734528,
+                  "heapBytes": 9882208,
+                  "dbBytes": 3600384
+                },
+                "four-session-scope": {
+                  "totalMs": 135.97709999999998,
+                  "rssBytes": 147050496,
+                  "heapBytes": 9877104,
+                  "dbBytes": 3600384
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 124.59840000000001,
+                  "rssBytes": 147529728,
+                  "heapBytes": 9870904,
+                  "dbBytes": 3600384
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-empty-names",
+                "four-session-scope",
+                "four-skip-orphan-dto"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 118.42979999999993,
+                  "rssBytes": 147013632,
+                  "heapBytes": 9900464,
+                  "dbBytes": 3600384
+                },
+                "four-empty-names": {
+                  "totalMs": 123.9137,
+                  "rssBytes": 147009536,
+                  "heapBytes": 9874448,
+                  "dbBytes": 3600384
+                },
+                "four-session-scope": {
+                  "totalMs": 123.35469999999998,
+                  "rssBytes": 147677184,
+                  "heapBytes": 9869768,
+                  "dbBytes": 3600384
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 119.68870000000001,
+                  "rssBytes": 146976768,
+                  "heapBytes": 9877440,
+                  "dbBytes": 3600384
+                }
+              }
+            },
+            {
+              "order": [
+                "four-empty-names",
+                "four-skip-orphan-dto",
+                "four-session-scope",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 123.01070000000001,
+                  "rssBytes": 146808832,
+                  "heapBytes": 9899880,
+                  "dbBytes": 3600384
+                },
+                "four-empty-names": {
+                  "totalMs": 138.56269999999998,
+                  "rssBytes": 146866176,
+                  "heapBytes": 9884944,
+                  "dbBytes": 3600384
+                },
+                "four-session-scope": {
+                  "totalMs": 128.2806,
+                  "rssBytes": 146747392,
+                  "heapBytes": 9904976,
+                  "dbBytes": 3600384
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 126.59549999999999,
+                  "rssBytes": 147595264,
+                  "heapBytes": 9875488,
+                  "dbBytes": 3600384
+                }
+              }
+            }
+          ],
+          "append": [
+            {
+              "order": [
+                "A",
+                "four-empty-names",
+                "four-session-scope",
+                "four-skip-orphan-dto"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 140.55339999999995,
+                  "rssBytes": 149741568,
+                  "heapBytes": 11138176,
+                  "dbBytes": 3600384
+                },
+                "four-empty-names": {
+                  "totalMs": 151.7695,
+                  "rssBytes": 149123072,
+                  "heapBytes": 11150904,
+                  "dbBytes": 3600384
+                },
+                "four-session-scope": {
+                  "totalMs": 148.02730000000008,
+                  "rssBytes": 149508096,
+                  "heapBytes": 11150320,
+                  "dbBytes": 3600384
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 152.66310000000001,
+                  "rssBytes": 149532672,
+                  "heapBytes": 11198920,
+                  "dbBytes": 3600384
+                }
+              }
+            },
+            {
+              "order": [
+                "four-empty-names",
+                "four-skip-orphan-dto",
+                "four-session-scope",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 153.35479999999998,
+                  "rssBytes": 149688320,
+                  "heapBytes": 11066680,
+                  "dbBytes": 3600384
+                },
+                "four-empty-names": {
+                  "totalMs": 144.89420000000007,
+                  "rssBytes": 149405696,
+                  "heapBytes": 11118728,
+                  "dbBytes": 3600384
+                },
+                "four-session-scope": {
+                  "totalMs": 153.8909,
+                  "rssBytes": 149680128,
+                  "heapBytes": 11114128,
+                  "dbBytes": 3600384
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 143.36510000000004,
+                  "rssBytes": 149520384,
+                  "heapBytes": 11150600,
+                  "dbBytes": 3600384
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-skip-orphan-dto",
+                "four-empty-names",
+                "four-session-scope"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 148.4268,
+                  "rssBytes": 149180416,
+                  "heapBytes": 11146448,
+                  "dbBytes": 3600384
+                },
+                "four-empty-names": {
+                  "totalMs": 146.3329,
+                  "rssBytes": 150077440,
+                  "heapBytes": 11102976,
+                  "dbBytes": 3600384
+                },
+                "four-session-scope": {
+                  "totalMs": 189.53520000000003,
+                  "rssBytes": 150212608,
+                  "heapBytes": 11147872,
+                  "dbBytes": 3600384
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 134.6246,
+                  "rssBytes": 149020672,
+                  "heapBytes": 11146696,
+                  "dbBytes": 3600384
+                }
+              }
+            },
+            {
+              "order": [
+                "four-skip-orphan-dto",
+                "four-session-scope",
+                "four-empty-names",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 147.08859999999999,
+                  "rssBytes": 149626880,
+                  "heapBytes": 11132552,
+                  "dbBytes": 3600384
+                },
+                "four-empty-names": {
+                  "totalMs": 144.0398,
+                  "rssBytes": 149143552,
+                  "heapBytes": 11094760,
+                  "dbBytes": 3600384
+                },
+                "four-session-scope": {
+                  "totalMs": 200.3506,
+                  "rssBytes": 149028864,
+                  "heapBytes": 11154392,
+                  "dbBytes": 3600384
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 168.22639999999998,
+                  "rssBytes": 149118976,
+                  "heapBytes": 11168384,
+                  "dbBytes": 3600384
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-session-scope",
+                "four-skip-orphan-dto",
+                "four-empty-names"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 175.60130000000004,
+                  "rssBytes": 149319680,
+                  "heapBytes": 11110160,
+                  "dbBytes": 3600384
+                },
+                "four-empty-names": {
+                  "totalMs": 144.91129999999998,
+                  "rssBytes": 149676032,
+                  "heapBytes": 11173920,
+                  "dbBytes": 3600384
+                },
+                "four-session-scope": {
+                  "totalMs": 171.10229999999999,
+                  "rssBytes": 149000192,
+                  "heapBytes": 11398944,
+                  "dbBytes": 3600384
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 153.68900000000002,
+                  "rssBytes": 149733376,
+                  "heapBytes": 11206824,
+                  "dbBytes": 3600384
+                }
+              }
+            },
+            {
+              "order": [
+                "four-session-scope",
+                "four-empty-names",
+                "four-skip-orphan-dto",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 150.62450000000004,
+                  "rssBytes": 149536768,
+                  "heapBytes": 11109648,
+                  "dbBytes": 3600384
+                },
+                "four-empty-names": {
+                  "totalMs": 151.9195,
+                  "rssBytes": 149028864,
+                  "heapBytes": 11503216,
+                  "dbBytes": 3600384
+                },
+                "four-session-scope": {
+                  "totalMs": 151.93930000000003,
+                  "rssBytes": 149319680,
+                  "heapBytes": 11143456,
+                  "dbBytes": 3600384
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 154.52589999999998,
+                  "rssBytes": 149471232,
+                  "heapBytes": 11163184,
+                  "dbBytes": 3600384
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-empty-names",
+                "four-session-scope",
+                "four-skip-orphan-dto"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 150.7799,
+                  "rssBytes": 150016000,
+                  "heapBytes": 11122416,
+                  "dbBytes": 3600384
+                },
+                "four-empty-names": {
+                  "totalMs": 142.61870000000005,
+                  "rssBytes": 149151744,
+                  "heapBytes": 11124608,
+                  "dbBytes": 3600384
+                },
+                "four-session-scope": {
+                  "totalMs": 144.2577,
+                  "rssBytes": 150278144,
+                  "heapBytes": 11177208,
+                  "dbBytes": 3600384
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 145.9132,
+                  "rssBytes": 149725184,
+                  "heapBytes": 11126848,
+                  "dbBytes": 3600384
+                }
+              }
+            },
+            {
+              "order": [
+                "four-empty-names",
+                "four-skip-orphan-dto",
+                "four-session-scope",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 153.09989999999996,
+                  "rssBytes": 149516288,
+                  "heapBytes": 11149584,
+                  "dbBytes": 3600384
+                },
+                "four-empty-names": {
+                  "totalMs": 160.41930000000002,
+                  "rssBytes": 149192704,
+                  "heapBytes": 11154536,
+                  "dbBytes": 3600384
+                },
+                "four-session-scope": {
+                  "totalMs": 148.62980000000005,
+                  "rssBytes": 149381120,
+                  "heapBytes": 11097688,
+                  "dbBytes": 3600384
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 145.59590000000003,
+                  "rssBytes": 149790720,
+                  "heapBytes": 11085808,
+                  "dbBytes": 3600384
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-skip-orphan-dto",
+                "four-empty-names",
+                "four-session-scope"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 150.941,
+                  "rssBytes": 149123072,
+                  "heapBytes": 11079672,
+                  "dbBytes": 3600384
+                },
+                "four-empty-names": {
+                  "totalMs": 142.3625,
+                  "rssBytes": 149786624,
+                  "heapBytes": 11149360,
+                  "dbBytes": 3600384
+                },
+                "four-session-scope": {
+                  "totalMs": 147.68109999999996,
+                  "rssBytes": 149757952,
+                  "heapBytes": 11160512,
+                  "dbBytes": 3600384
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 180.46099999999998,
+                  "rssBytes": 150409216,
+                  "heapBytes": 11404416,
+                  "dbBytes": 3600384
+                }
+              }
+            },
+            {
+              "order": [
+                "four-skip-orphan-dto",
+                "four-session-scope",
+                "four-empty-names",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 158.80090000000004,
+                  "rssBytes": 149004288,
+                  "heapBytes": 11119656,
+                  "dbBytes": 3600384
+                },
+                "four-empty-names": {
+                  "totalMs": 150.95639999999997,
+                  "rssBytes": 149180416,
+                  "heapBytes": 11134152,
+                  "dbBytes": 3600384
+                },
+                "four-session-scope": {
+                  "totalMs": 138.22760000000005,
+                  "rssBytes": 150077440,
+                  "heapBytes": 11109544,
+                  "dbBytes": 3600384
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 184.7326,
+                  "rssBytes": 149053440,
+                  "heapBytes": 11388584,
+                  "dbBytes": 3600384
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-session-scope",
+                "four-skip-orphan-dto",
+                "four-empty-names"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 144.35339999999997,
+                  "rssBytes": 149536768,
+                  "heapBytes": 11158752,
+                  "dbBytes": 3600384
+                },
+                "four-empty-names": {
+                  "totalMs": 133.01080000000002,
+                  "rssBytes": 149073920,
+                  "heapBytes": 11431560,
+                  "dbBytes": 3600384
+                },
+                "four-session-scope": {
+                  "totalMs": 134.12680000000003,
+                  "rssBytes": 149045248,
+                  "heapBytes": 11115552,
+                  "dbBytes": 3600384
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 139.2339,
+                  "rssBytes": 149323776,
+                  "heapBytes": 11082896,
+                  "dbBytes": 3600384
+                }
+              }
+            },
+            {
+              "order": [
+                "four-session-scope",
+                "four-empty-names",
+                "four-skip-orphan-dto",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 145.13039999999995,
+                  "rssBytes": 149606400,
+                  "heapBytes": 11111240,
+                  "dbBytes": 3600384
+                },
+                "four-empty-names": {
+                  "totalMs": 138.7317,
+                  "rssBytes": 149622784,
+                  "heapBytes": 11115088,
+                  "dbBytes": 3600384
+                },
+                "four-session-scope": {
+                  "totalMs": 141.17529999999996,
+                  "rssBytes": 149569536,
+                  "heapBytes": 11135928,
+                  "dbBytes": 3600384
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 135.9413,
+                  "rssBytes": 149573632,
+                  "heapBytes": 11118840,
+                  "dbBytes": 3600384
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-empty-names",
+                "four-session-scope",
+                "four-skip-orphan-dto"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 147.02380000000002,
+                  "rssBytes": 149372928,
+                  "heapBytes": 11168768,
+                  "dbBytes": 3600384
+                },
+                "four-empty-names": {
+                  "totalMs": 140.54889999999997,
+                  "rssBytes": 149278720,
+                  "heapBytes": 11117744,
+                  "dbBytes": 3600384
+                },
+                "four-session-scope": {
+                  "totalMs": 143.44310000000002,
+                  "rssBytes": 149438464,
+                  "heapBytes": 11138552,
+                  "dbBytes": 3600384
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 137.8112,
+                  "rssBytes": 149762048,
+                  "heapBytes": 11091736,
+                  "dbBytes": 3600384
+                }
+              }
+            },
+            {
+              "order": [
+                "four-empty-names",
+                "four-skip-orphan-dto",
+                "four-session-scope",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 144.2034,
+                  "rssBytes": 149766144,
+                  "heapBytes": 11118488,
+                  "dbBytes": 3600384
+                },
+                "four-empty-names": {
+                  "totalMs": 140.84860000000003,
+                  "rssBytes": 149151744,
+                  "heapBytes": 11145568,
+                  "dbBytes": 3600384
+                },
+                "four-session-scope": {
+                  "totalMs": 137.72920000000005,
+                  "rssBytes": 149643264,
+                  "heapBytes": 11112840,
+                  "dbBytes": 3600384
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 141.84799999999998,
+                  "rssBytes": 149491712,
+                  "heapBytes": 11110880,
+                  "dbBytes": 3600384
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-skip-orphan-dto",
+                "four-empty-names",
+                "four-session-scope"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 142.45570000000004,
+                  "rssBytes": 149749760,
+                  "heapBytes": 11162336,
+                  "dbBytes": 3600384
+                },
+                "four-empty-names": {
+                  "totalMs": 140.67030000000003,
+                  "rssBytes": 149966848,
+                  "heapBytes": 11152352,
+                  "dbBytes": 3600384
+                },
+                "four-session-scope": {
+                  "totalMs": 131.49269999999996,
+                  "rssBytes": 149479424,
+                  "heapBytes": 11148040,
+                  "dbBytes": 3600384
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 150.8196,
+                  "rssBytes": 149286912,
+                  "heapBytes": 11141608,
+                  "dbBytes": 3600384
+                }
+              }
+            },
+            {
+              "order": [
+                "four-skip-orphan-dto",
+                "four-session-scope",
+                "four-empty-names",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 137.95319999999998,
+                  "rssBytes": 149458944,
+                  "heapBytes": 11120392,
+                  "dbBytes": 3600384
+                },
+                "four-empty-names": {
+                  "totalMs": 144.97470000000004,
+                  "rssBytes": 149356544,
+                  "heapBytes": 11136680,
+                  "dbBytes": 3600384
+                },
+                "four-session-scope": {
+                  "totalMs": 152.9698,
+                  "rssBytes": 149393408,
+                  "heapBytes": 11070136,
+                  "dbBytes": 3600384
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 137.78960000000006,
+                  "rssBytes": 149065728,
+                  "heapBytes": 11119096,
+                  "dbBytes": 3600384
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-session-scope",
+                "four-skip-orphan-dto",
+                "four-empty-names"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 144.38389999999995,
+                  "rssBytes": 149471232,
+                  "heapBytes": 11095584,
+                  "dbBytes": 3600384
+                },
+                "four-empty-names": {
+                  "totalMs": 139.2206,
+                  "rssBytes": 149524480,
+                  "heapBytes": 11403264,
+                  "dbBytes": 3600384
+                },
+                "four-session-scope": {
+                  "totalMs": 144.67220000000003,
+                  "rssBytes": 149049344,
+                  "heapBytes": 11119048,
+                  "dbBytes": 3600384
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 138.12299999999996,
+                  "rssBytes": 149569536,
+                  "heapBytes": 11143168,
+                  "dbBytes": 3600384
+                }
+              }
+            },
+            {
+              "order": [
+                "four-session-scope",
+                "four-empty-names",
+                "four-skip-orphan-dto",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 149.9955,
+                  "rssBytes": 149049344,
+                  "heapBytes": 11159456,
+                  "dbBytes": 3600384
+                },
+                "four-empty-names": {
+                  "totalMs": 145.7317,
+                  "rssBytes": 149430272,
+                  "heapBytes": 11154504,
+                  "dbBytes": 3600384
+                },
+                "four-session-scope": {
+                  "totalMs": 155.5995,
+                  "rssBytes": 149229568,
+                  "heapBytes": 11083856,
+                  "dbBytes": 3600384
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 141.7962,
+                  "rssBytes": 149557248,
+                  "heapBytes": 11123624,
+                  "dbBytes": 3600384
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-empty-names",
+                "four-session-scope",
+                "four-skip-orphan-dto"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 136.77850000000004,
+                  "rssBytes": 149557248,
+                  "heapBytes": 11084048,
+                  "dbBytes": 3600384
+                },
+                "four-empty-names": {
+                  "totalMs": 135.54699999999997,
+                  "rssBytes": 149540864,
+                  "heapBytes": 11113104,
+                  "dbBytes": 3600384
+                },
+                "four-session-scope": {
+                  "totalMs": 141.27159999999998,
+                  "rssBytes": 149590016,
+                  "heapBytes": 11161328,
+                  "dbBytes": 3600384
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 133.2524,
+                  "rssBytes": 149762048,
+                  "heapBytes": 11152776,
+                  "dbBytes": 3600384
+                }
+              }
+            },
+            {
+              "order": [
+                "four-empty-names",
+                "four-skip-orphan-dto",
+                "four-session-scope",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 149.23889999999997,
+                  "rssBytes": 149028864,
+                  "heapBytes": 11453784,
+                  "dbBytes": 3600384
+                },
+                "four-empty-names": {
+                  "totalMs": 129.93590000000003,
+                  "rssBytes": 149839872,
+                  "heapBytes": 11150712,
+                  "dbBytes": 3600384
+                },
+                "four-session-scope": {
+                  "totalMs": 139.49520000000004,
+                  "rssBytes": 149303296,
+                  "heapBytes": 11133992,
+                  "dbBytes": 3600384
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 145.06230000000005,
+                  "rssBytes": 149389312,
+                  "heapBytes": 11121880,
+                  "dbBytes": 3600384
+                }
+              }
+            }
+          ]
+        }
+      },
+      "real": {
+        "inventory": [
+          {
+            "provider": "claude",
+            "rootOrdinal": 0,
+            "files": 12,
+            "bytes": 11486533,
+            "compressed": 0
+          },
+          {
+            "provider": "codex",
+            "rootOrdinal": 1,
+            "files": 775,
+            "bytes": 538977191,
+            "compressed": 667,
+            "metadata": {
+              "indexBytes": 60598,
+              "threads": 776
+            }
+          },
+          {
+            "provider": "codex",
+            "rootOrdinal": 2,
+            "files": 2,
+            "bytes": 3075020,
+            "compressed": 2,
+            "metadata": {
+              "indexBytes": 60598,
+              "threads": 776
+            }
+          }
+        ],
+        "inputSha256": "f54e6bbd7921ed5ea5a1bd76ef85fba3ee8c29772679587f709448496501c62d",
+        "baselineTotals": [
+          {
+            "provider": "claude",
+            "threads": 15,
+            "input": 9994511,
+            "output": 247006,
+            "tokens": 10241517
+          },
+          {
+            "provider": "codex",
+            "threads": 1859,
+            "input": 3874562265,
+            "output": 17297605,
+            "tokens": 3891859870
+          }
+        ],
+        "expectedAppend": [
+          1,
+          123,
+          7
+        ],
+        "mismatches": [],
+        "samples": {
+          "unchanged": [
+            {
+              "order": [
+                "A",
+                "four-empty-names",
+                "four-session-scope",
+                "four-skip-orphan-dto"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 184.50829999999996,
+                  "rssBytes": 86556672,
+                  "heapBytes": 12780312,
+                  "dbBytes": 1077248
+                },
+                "four-empty-names": {
+                  "totalMs": 190.74620000000004,
+                  "rssBytes": 86638592,
+                  "heapBytes": 12797288,
+                  "dbBytes": 1077248
+                },
+                "four-session-scope": {
+                  "totalMs": 185.20189999999997,
+                  "rssBytes": 87670784,
+                  "heapBytes": 12774896,
+                  "dbBytes": 1077248
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 187.50069999999997,
+                  "rssBytes": 87412736,
+                  "heapBytes": 12747248,
+                  "dbBytes": 1077248
+                }
+              }
+            },
+            {
+              "order": [
+                "four-empty-names",
+                "four-skip-orphan-dto",
+                "four-session-scope",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 203.62720000000004,
+                  "rssBytes": 86544384,
+                  "heapBytes": 12785256,
+                  "dbBytes": 1077248
+                },
+                "four-empty-names": {
+                  "totalMs": 232.20250000000004,
+                  "rssBytes": 87257088,
+                  "heapBytes": 12670408,
+                  "dbBytes": 1077248
+                },
+                "four-session-scope": {
+                  "totalMs": 193.00560000000004,
+                  "rssBytes": 86786048,
+                  "heapBytes": 12804088,
+                  "dbBytes": 1077248
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 205.49130000000002,
+                  "rssBytes": 86962176,
+                  "heapBytes": 12819024,
+                  "dbBytes": 1077248
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-skip-orphan-dto",
+                "four-empty-names",
+                "four-session-scope"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 178.25270000000006,
+                  "rssBytes": 86880256,
+                  "heapBytes": 12833512,
+                  "dbBytes": 1077248
+                },
+                "four-empty-names": {
+                  "totalMs": 198.90730000000005,
+                  "rssBytes": 86274048,
+                  "heapBytes": 12813504,
+                  "dbBytes": 1077248
+                },
+                "four-session-scope": {
+                  "totalMs": 200.71579999999994,
+                  "rssBytes": 86810624,
+                  "heapBytes": 12745872,
+                  "dbBytes": 1077248
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 196.52769999999998,
+                  "rssBytes": 86790144,
+                  "heapBytes": 12807040,
+                  "dbBytes": 1077248
+                }
+              }
+            },
+            {
+              "order": [
+                "four-skip-orphan-dto",
+                "four-session-scope",
+                "four-empty-names",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 190.77949999999998,
+                  "rssBytes": 86364160,
+                  "heapBytes": 12802176,
+                  "dbBytes": 1077248
+                },
+                "four-empty-names": {
+                  "totalMs": 185.86299999999997,
+                  "rssBytes": 87187456,
+                  "heapBytes": 12730120,
+                  "dbBytes": 1077248
+                },
+                "four-session-scope": {
+                  "totalMs": 195.3438,
+                  "rssBytes": 86331392,
+                  "heapBytes": 12839704,
+                  "dbBytes": 1077248
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 191.65809999999996,
+                  "rssBytes": 86614016,
+                  "heapBytes": 12807848,
+                  "dbBytes": 1077248
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-session-scope",
+                "four-skip-orphan-dto",
+                "four-empty-names"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 185.91920000000002,
+                  "rssBytes": 86491136,
+                  "heapBytes": 12828880,
+                  "dbBytes": 1077248
+                },
+                "four-empty-names": {
+                  "totalMs": 196.6323,
+                  "rssBytes": 87244800,
+                  "heapBytes": 12978568,
+                  "dbBytes": 1077248
+                },
+                "four-session-scope": {
+                  "totalMs": 185.76850000000002,
+                  "rssBytes": 86388736,
+                  "heapBytes": 12782128,
+                  "dbBytes": 1077248
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 223.91040000000007,
+                  "rssBytes": 86663168,
+                  "heapBytes": 12700000,
+                  "dbBytes": 1077248
+                }
+              }
+            },
+            {
+              "order": [
+                "four-session-scope",
+                "four-empty-names",
+                "four-skip-orphan-dto",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 199.5335,
+                  "rssBytes": 86532096,
+                  "heapBytes": 12777288,
+                  "dbBytes": 1077248
+                },
+                "four-empty-names": {
+                  "totalMs": 196.31650000000002,
+                  "rssBytes": 86454272,
+                  "heapBytes": 12797160,
+                  "dbBytes": 1077248
+                },
+                "four-session-scope": {
+                  "totalMs": 186.94449999999998,
+                  "rssBytes": 86986752,
+                  "heapBytes": 12804904,
+                  "dbBytes": 1077248
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 185.31910000000005,
+                  "rssBytes": 86564864,
+                  "heapBytes": 12802192,
+                  "dbBytes": 1077248
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-empty-names",
+                "four-session-scope",
+                "four-skip-orphan-dto"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 183.01049999999998,
+                  "rssBytes": 87138304,
+                  "heapBytes": 12801656,
+                  "dbBytes": 1077248
+                },
+                "four-empty-names": {
+                  "totalMs": 199.3118,
+                  "rssBytes": 86843392,
+                  "heapBytes": 12801656,
+                  "dbBytes": 1077248
+                },
+                "four-session-scope": {
+                  "totalMs": 185.039,
+                  "rssBytes": 86863872,
+                  "heapBytes": 12750656,
+                  "dbBytes": 1077248
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 194.8649,
+                  "rssBytes": 87318528,
+                  "heapBytes": 12773424,
+                  "dbBytes": 1077248
+                }
+              }
+            },
+            {
+              "order": [
+                "four-empty-names",
+                "four-skip-orphan-dto",
+                "four-session-scope",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 216.93239999999997,
+                  "rssBytes": 86310912,
+                  "heapBytes": 13059504,
+                  "dbBytes": 1077248
+                },
+                "four-empty-names": {
+                  "totalMs": 200.48110000000003,
+                  "rssBytes": 87199744,
+                  "heapBytes": 12774656,
+                  "dbBytes": 1077248
+                },
+                "four-session-scope": {
+                  "totalMs": 186.85129999999998,
+                  "rssBytes": 86368256,
+                  "heapBytes": 12781400,
+                  "dbBytes": 1077248
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 188.95479999999995,
+                  "rssBytes": 87240704,
+                  "heapBytes": 12736024,
+                  "dbBytes": 1077248
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-skip-orphan-dto",
+                "four-empty-names",
+                "four-session-scope"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 184.15199999999993,
+                  "rssBytes": 87044096,
+                  "heapBytes": 12815248,
+                  "dbBytes": 1077248
+                },
+                "four-empty-names": {
+                  "totalMs": 183.30440000000004,
+                  "rssBytes": 86601728,
+                  "heapBytes": 12854856,
+                  "dbBytes": 1077248
+                },
+                "four-session-scope": {
+                  "totalMs": 177.35940000000005,
+                  "rssBytes": 86749184,
+                  "heapBytes": 12795224,
+                  "dbBytes": 1077248
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 184.0127,
+                  "rssBytes": 87572480,
+                  "heapBytes": 12752080,
+                  "dbBytes": 1077248
+                }
+              }
+            },
+            {
+              "order": [
+                "four-skip-orphan-dto",
+                "four-session-scope",
+                "four-empty-names",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 245.20199999999994,
+                  "rssBytes": 86482944,
+                  "heapBytes": 12804968,
+                  "dbBytes": 1077248
+                },
+                "four-empty-names": {
+                  "totalMs": 180.67959999999997,
+                  "rssBytes": 86790144,
+                  "heapBytes": 13187680,
+                  "dbBytes": 1077248
+                },
+                "four-session-scope": {
+                  "totalMs": 208.45800000000003,
+                  "rssBytes": 86450176,
+                  "heapBytes": 12843304,
+                  "dbBytes": 1077248
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 193.69249999999994,
+                  "rssBytes": 86650880,
+                  "heapBytes": 12771560,
+                  "dbBytes": 1077248
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-session-scope",
+                "four-skip-orphan-dto",
+                "four-empty-names"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 190.525,
+                  "rssBytes": 87334912,
+                  "heapBytes": 12792648,
+                  "dbBytes": 1077248
+                },
+                "four-empty-names": {
+                  "totalMs": 192.8548,
+                  "rssBytes": 87068672,
+                  "heapBytes": 12773280,
+                  "dbBytes": 1077248
+                },
+                "four-session-scope": {
+                  "totalMs": 189.9406,
+                  "rssBytes": 87138304,
+                  "heapBytes": 12787912,
+                  "dbBytes": 1077248
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 194.79680000000002,
+                  "rssBytes": 86605824,
+                  "heapBytes": 12812552,
+                  "dbBytes": 1077248
+                }
+              }
+            },
+            {
+              "order": [
+                "four-session-scope",
+                "four-empty-names",
+                "four-skip-orphan-dto",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 191.27540000000005,
+                  "rssBytes": 86609920,
+                  "heapBytes": 12787312,
+                  "dbBytes": 1077248
+                },
+                "four-empty-names": {
+                  "totalMs": 203.03429999999997,
+                  "rssBytes": 86323200,
+                  "heapBytes": 12794312,
+                  "dbBytes": 1077248
+                },
+                "four-session-scope": {
+                  "totalMs": 209.84709999999998,
+                  "rssBytes": 87527424,
+                  "heapBytes": 12735688,
+                  "dbBytes": 1077248
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 186.8845,
+                  "rssBytes": 86605824,
+                  "heapBytes": 12810624,
+                  "dbBytes": 1077248
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-empty-names",
+                "four-session-scope",
+                "four-skip-orphan-dto"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 186.82160000000005,
+                  "rssBytes": 86724608,
+                  "heapBytes": 12790656,
+                  "dbBytes": 1077248
+                },
+                "four-empty-names": {
+                  "totalMs": 194.35220000000007,
+                  "rssBytes": 87093248,
+                  "heapBytes": 12730592,
+                  "dbBytes": 1077248
+                },
+                "four-session-scope": {
+                  "totalMs": 183.2641,
+                  "rssBytes": 87121920,
+                  "heapBytes": 12839776,
+                  "dbBytes": 1077248
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 182.91310000000004,
+                  "rssBytes": 87789568,
+                  "heapBytes": 12778888,
+                  "dbBytes": 1077248
+                }
+              }
+            },
+            {
+              "order": [
+                "four-empty-names",
+                "four-skip-orphan-dto",
+                "four-session-scope",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 196.555,
+                  "rssBytes": 86622208,
+                  "heapBytes": 13102024,
+                  "dbBytes": 1077248
+                },
+                "four-empty-names": {
+                  "totalMs": 196.258,
+                  "rssBytes": 86315008,
+                  "heapBytes": 12798088,
+                  "dbBytes": 1077248
+                },
+                "four-session-scope": {
+                  "totalMs": 194.96459999999996,
+                  "rssBytes": 86392832,
+                  "heapBytes": 12795736,
+                  "dbBytes": 1077248
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 198.9965,
+                  "rssBytes": 86581248,
+                  "heapBytes": 13041928,
+                  "dbBytes": 1077248
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-skip-orphan-dto",
+                "four-empty-names",
+                "four-session-scope"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 191.67190000000005,
+                  "rssBytes": 86212608,
+                  "heapBytes": 12800816,
+                  "dbBytes": 1077248
+                },
+                "four-empty-names": {
+                  "totalMs": 191.58490000000003,
+                  "rssBytes": 87007232,
+                  "heapBytes": 12806440,
+                  "dbBytes": 1077248
+                },
+                "four-session-scope": {
+                  "totalMs": 216.37439999999998,
+                  "rssBytes": 86368256,
+                  "heapBytes": 12773816,
+                  "dbBytes": 1077248
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 181.45979999999992,
+                  "rssBytes": 86315008,
+                  "heapBytes": 12779504,
+                  "dbBytes": 1077248
+                }
+              }
+            },
+            {
+              "order": [
+                "four-skip-orphan-dto",
+                "four-session-scope",
+                "four-empty-names",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 196.2101,
+                  "rssBytes": 86798336,
+                  "heapBytes": 13128016,
+                  "dbBytes": 1077248
+                },
+                "four-empty-names": {
+                  "totalMs": 206.00279999999998,
+                  "rssBytes": 86585344,
+                  "heapBytes": 12801984,
+                  "dbBytes": 1077248
+                },
+                "four-session-scope": {
+                  "totalMs": 209.2939,
+                  "rssBytes": 86290432,
+                  "heapBytes": 13517912,
+                  "dbBytes": 1077248
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 186.49090000000007,
+                  "rssBytes": 86892544,
+                  "heapBytes": 12785504,
+                  "dbBytes": 1077248
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-session-scope",
+                "four-skip-orphan-dto",
+                "four-empty-names"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 191.20510000000002,
+                  "rssBytes": 86851584,
+                  "heapBytes": 12800864,
+                  "dbBytes": 1077248
+                },
+                "four-empty-names": {
+                  "totalMs": 203.63219999999998,
+                  "rssBytes": 86585344,
+                  "heapBytes": 13193696,
+                  "dbBytes": 1077248
+                },
+                "four-session-scope": {
+                  "totalMs": 197.8001,
+                  "rssBytes": 86880256,
+                  "heapBytes": 13068008,
+                  "dbBytes": 1077248
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 226.05730000000003,
+                  "rssBytes": 86339584,
+                  "heapBytes": 12780200,
+                  "dbBytes": 1077248
+                }
+              }
+            },
+            {
+              "order": [
+                "four-session-scope",
+                "four-empty-names",
+                "four-skip-orphan-dto",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 184.99159999999992,
+                  "rssBytes": 86540288,
+                  "heapBytes": 12812808,
+                  "dbBytes": 1077248
+                },
+                "four-empty-names": {
+                  "totalMs": 198.06289999999996,
+                  "rssBytes": 86687744,
+                  "heapBytes": 12801992,
+                  "dbBytes": 1077248
+                },
+                "four-session-scope": {
+                  "totalMs": 184.40460000000002,
+                  "rssBytes": 86765568,
+                  "heapBytes": 12786016,
+                  "dbBytes": 1077248
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 193.46870000000007,
+                  "rssBytes": 86634496,
+                  "heapBytes": 12783552,
+                  "dbBytes": 1077248
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-empty-names",
+                "four-session-scope",
+                "four-skip-orphan-dto"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 186.03060000000005,
+                  "rssBytes": 86511616,
+                  "heapBytes": 12796024,
+                  "dbBytes": 1077248
+                },
+                "four-empty-names": {
+                  "totalMs": 189.4178,
+                  "rssBytes": 87203840,
+                  "heapBytes": 12781944,
+                  "dbBytes": 1077248
+                },
+                "four-session-scope": {
+                  "totalMs": 186.12850000000003,
+                  "rssBytes": 86630400,
+                  "heapBytes": 12791384,
+                  "dbBytes": 1077248
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 184.25290000000007,
+                  "rssBytes": 86528000,
+                  "heapBytes": 12845544,
+                  "dbBytes": 1077248
+                }
+              }
+            },
+            {
+              "order": [
+                "four-empty-names",
+                "four-skip-orphan-dto",
+                "four-session-scope",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 197.30110000000005,
+                  "rssBytes": 87126016,
+                  "heapBytes": 12779808,
+                  "dbBytes": 1077248
+                },
+                "four-empty-names": {
+                  "totalMs": 187.65660000000005,
+                  "rssBytes": 87150592,
+                  "heapBytes": 13046104,
+                  "dbBytes": 1077248
+                },
+                "four-session-scope": {
+                  "totalMs": 181.11269999999996,
+                  "rssBytes": 86687744,
+                  "heapBytes": 12823192,
+                  "dbBytes": 1077248
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 200.02230000000003,
+                  "rssBytes": 87564288,
+                  "heapBytes": 12794568,
+                  "dbBytes": 1077248
+                }
+              }
+            }
+          ],
+          "append": [
+            {
+              "order": [
+                "A",
+                "four-empty-names",
+                "four-session-scope",
+                "four-skip-orphan-dto"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 329.55820000000006,
+                  "rssBytes": 103591936,
+                  "heapBytes": 18480000,
+                  "dbBytes": 1077248
+                },
+                "four-empty-names": {
+                  "totalMs": 316.08259999999996,
+                  "rssBytes": 93208576,
+                  "heapBytes": 16533184,
+                  "dbBytes": 1077248
+                },
+                "four-session-scope": {
+                  "totalMs": 314.5463000000001,
+                  "rssBytes": 93528064,
+                  "heapBytes": 16631040,
+                  "dbBytes": 1077248
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 333.08040000000005,
+                  "rssBytes": 93503488,
+                  "heapBytes": 16531128,
+                  "dbBytes": 1077248
+                }
+              }
+            },
+            {
+              "order": [
+                "four-empty-names",
+                "four-skip-orphan-dto",
+                "four-session-scope",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 337.1641999999999,
+                  "rssBytes": 94687232,
+                  "heapBytes": 16631160,
+                  "dbBytes": 1077248
+                },
+                "four-empty-names": {
+                  "totalMs": 319.79560000000004,
+                  "rssBytes": 94187520,
+                  "heapBytes": 16525536,
+                  "dbBytes": 1077248
+                },
+                "four-session-scope": {
+                  "totalMs": 320.73660000000007,
+                  "rssBytes": 93663232,
+                  "heapBytes": 16639760,
+                  "dbBytes": 1077248
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 330.7499,
+                  "rssBytes": 101941248,
+                  "heapBytes": 18327072,
+                  "dbBytes": 1077248
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-skip-orphan-dto",
+                "four-empty-names",
+                "four-session-scope"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 325.07550000000003,
+                  "rssBytes": 103989248,
+                  "heapBytes": 18508896,
+                  "dbBytes": 1077248
+                },
+                "four-empty-names": {
+                  "totalMs": 351.1613999999999,
+                  "rssBytes": 92786688,
+                  "heapBytes": 16524760,
+                  "dbBytes": 1077248
+                },
+                "four-session-scope": {
+                  "totalMs": 351.4365000000001,
+                  "rssBytes": 94031872,
+                  "heapBytes": 16536304,
+                  "dbBytes": 1077248
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 326.921,
+                  "rssBytes": 93519872,
+                  "heapBytes": 16533472,
+                  "dbBytes": 1077248
+                }
+              }
+            },
+            {
+              "order": [
+                "four-skip-orphan-dto",
+                "four-session-scope",
+                "four-empty-names",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 341.43230000000005,
+                  "rssBytes": 93212672,
+                  "heapBytes": 16627000,
+                  "dbBytes": 1077248
+                },
+                "four-empty-names": {
+                  "totalMs": 342.13019999999995,
+                  "rssBytes": 94015488,
+                  "heapBytes": 16529728,
+                  "dbBytes": 1077248
+                },
+                "four-session-scope": {
+                  "totalMs": 412.2476000000001,
+                  "rssBytes": 93679616,
+                  "heapBytes": 16431424,
+                  "dbBytes": 1077248
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 326.19460000000004,
+                  "rssBytes": 101859328,
+                  "heapBytes": 16468464,
+                  "dbBytes": 1077248
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-session-scope",
+                "four-skip-orphan-dto",
+                "four-empty-names"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 366.9907,
+                  "rssBytes": 93347840,
+                  "heapBytes": 16520984,
+                  "dbBytes": 1077248
+                },
+                "four-empty-names": {
+                  "totalMs": 335.4291999999999,
+                  "rssBytes": 93007872,
+                  "heapBytes": 16400576,
+                  "dbBytes": 1077248
+                },
+                "four-session-scope": {
+                  "totalMs": 345.5449,
+                  "rssBytes": 93388800,
+                  "heapBytes": 16531168,
+                  "dbBytes": 1077248
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 320.855,
+                  "rssBytes": 93114368,
+                  "heapBytes": 16519792,
+                  "dbBytes": 1077248
+                }
+              }
+            },
+            {
+              "order": [
+                "four-session-scope",
+                "four-empty-names",
+                "four-skip-orphan-dto",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 321.96680000000003,
+                  "rssBytes": 152907776,
+                  "heapBytes": 15676984,
+                  "dbBytes": 1077248
+                },
+                "four-empty-names": {
+                  "totalMs": 323.41949999999997,
+                  "rssBytes": 93978624,
+                  "heapBytes": 16631376,
+                  "dbBytes": 1077248
+                },
+                "four-session-scope": {
+                  "totalMs": 346.65060000000005,
+                  "rssBytes": 93302784,
+                  "heapBytes": 16636336,
+                  "dbBytes": 1077248
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 329.1239000000001,
+                  "rssBytes": 163143680,
+                  "heapBytes": 16760072,
+                  "dbBytes": 1077248
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-empty-names",
+                "four-session-scope",
+                "four-skip-orphan-dto"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 333.4611999999999,
+                  "rssBytes": 162512896,
+                  "heapBytes": 16699360,
+                  "dbBytes": 1077248
+                },
+                "four-empty-names": {
+                  "totalMs": 336.81409999999994,
+                  "rssBytes": 153772032,
+                  "heapBytes": 16690104,
+                  "dbBytes": 1077248
+                },
+                "four-session-scope": {
+                  "totalMs": 330.1998,
+                  "rssBytes": 152403968,
+                  "heapBytes": 15716792,
+                  "dbBytes": 1077248
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 323.34829999999994,
+                  "rssBytes": 155869184,
+                  "heapBytes": 16532360,
+                  "dbBytes": 1077248
+                }
+              }
+            },
+            {
+              "order": [
+                "four-empty-names",
+                "four-skip-orphan-dto",
+                "four-session-scope",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 330.86629999999997,
+                  "rssBytes": 155430912,
+                  "heapBytes": 16518808,
+                  "dbBytes": 1077248
+                },
+                "four-empty-names": {
+                  "totalMs": 310.718,
+                  "rssBytes": 155308032,
+                  "heapBytes": 16526072,
+                  "dbBytes": 1077248
+                },
+                "four-session-scope": {
+                  "totalMs": 316.52860000000004,
+                  "rssBytes": 154963968,
+                  "heapBytes": 16399928,
+                  "dbBytes": 1077248
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 332.75769999999994,
+                  "rssBytes": 152317952,
+                  "heapBytes": 15702528,
+                  "dbBytes": 1077248
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-skip-orphan-dto",
+                "four-empty-names",
+                "four-session-scope"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 324.9142,
+                  "rssBytes": 152457216,
+                  "heapBytes": 15696672,
+                  "dbBytes": 1077248
+                },
+                "four-empty-names": {
+                  "totalMs": 389.3799000000001,
+                  "rssBytes": 156278784,
+                  "heapBytes": 16636976,
+                  "dbBytes": 1077248
+                },
+                "four-session-scope": {
+                  "totalMs": 320.36209999999994,
+                  "rssBytes": 156090368,
+                  "heapBytes": 16636632,
+                  "dbBytes": 1077248
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 340.94929999999994,
+                  "rssBytes": 155176960,
+                  "heapBytes": 16634968,
+                  "dbBytes": 1077248
+                }
+              }
+            },
+            {
+              "order": [
+                "four-skip-orphan-dto",
+                "four-session-scope",
+                "four-empty-names",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 348.3778000000001,
+                  "rssBytes": 156561408,
+                  "heapBytes": 16394288,
+                  "dbBytes": 1077248
+                },
+                "four-empty-names": {
+                  "totalMs": 330.39230000000003,
+                  "rssBytes": 155340800,
+                  "heapBytes": 16633776,
+                  "dbBytes": 1077248
+                },
+                "four-session-scope": {
+                  "totalMs": 333.3031000000001,
+                  "rssBytes": 155791360,
+                  "heapBytes": 16528264,
+                  "dbBytes": 1077248
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 360.56910000000005,
+                  "rssBytes": 155262976,
+                  "heapBytes": 16538304,
+                  "dbBytes": 1077248
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-session-scope",
+                "four-skip-orphan-dto",
+                "four-empty-names"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 339.3487999999999,
+                  "rssBytes": 163938304,
+                  "heapBytes": 18293312,
+                  "dbBytes": 1077248
+                },
+                "four-empty-names": {
+                  "totalMs": 350.0702999999999,
+                  "rssBytes": 156446720,
+                  "heapBytes": 16528384,
+                  "dbBytes": 1077248
+                },
+                "four-session-scope": {
+                  "totalMs": 340.95219999999995,
+                  "rssBytes": 163901440,
+                  "heapBytes": 16758528,
+                  "dbBytes": 1077248
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 325.1923,
+                  "rssBytes": 155480064,
+                  "heapBytes": 16516808,
+                  "dbBytes": 1077248
+                }
+              }
+            },
+            {
+              "order": [
+                "four-session-scope",
+                "four-empty-names",
+                "four-skip-orphan-dto",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 375.9088000000001,
+                  "rssBytes": 162648064,
+                  "heapBytes": 16487824,
+                  "dbBytes": 1077248
+                },
+                "four-empty-names": {
+                  "totalMs": 316.86740000000003,
+                  "rssBytes": 155557888,
+                  "heapBytes": 16630104,
+                  "dbBytes": 1077248
+                },
+                "four-session-scope": {
+                  "totalMs": 315.6328000000001,
+                  "rssBytes": 155426816,
+                  "heapBytes": 16634048,
+                  "dbBytes": 1077248
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 339.2659999999999,
+                  "rssBytes": 156098560,
+                  "heapBytes": 16636552,
+                  "dbBytes": 1077248
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-empty-names",
+                "four-session-scope",
+                "four-skip-orphan-dto"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 367.7656,
+                  "rssBytes": 165666816,
+                  "heapBytes": 16434224,
+                  "dbBytes": 1077248
+                },
+                "four-empty-names": {
+                  "totalMs": 368.3621,
+                  "rssBytes": 156319744,
+                  "heapBytes": 16635712,
+                  "dbBytes": 1077248
+                },
+                "four-session-scope": {
+                  "totalMs": 343.5407000000001,
+                  "rssBytes": 157511680,
+                  "heapBytes": 17632584,
+                  "dbBytes": 1077248
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 319.7911999999999,
+                  "rssBytes": 156372992,
+                  "heapBytes": 16403312,
+                  "dbBytes": 1077248
+                }
+              }
+            },
+            {
+              "order": [
+                "four-empty-names",
+                "four-skip-orphan-dto",
+                "four-session-scope",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 328.4906,
+                  "rssBytes": 155455488,
+                  "heapBytes": 16513968,
+                  "dbBytes": 1077248
+                },
+                "four-empty-names": {
+                  "totalMs": 347.2994,
+                  "rssBytes": 155541504,
+                  "heapBytes": 16523056,
+                  "dbBytes": 1077248
+                },
+                "four-session-scope": {
+                  "totalMs": 330.64340000000004,
+                  "rssBytes": 163631104,
+                  "heapBytes": 18287912,
+                  "dbBytes": 1077248
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 323.26199999999994,
+                  "rssBytes": 166223872,
+                  "heapBytes": 16584904,
+                  "dbBytes": 1077248
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-skip-orphan-dto",
+                "four-empty-names",
+                "four-session-scope"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 323.1571,
+                  "rssBytes": 155799552,
+                  "heapBytes": 16624104,
+                  "dbBytes": 1077248
+                },
+                "four-empty-names": {
+                  "totalMs": 331.43240000000003,
+                  "rssBytes": 155738112,
+                  "heapBytes": 16438456,
+                  "dbBytes": 1077248
+                },
+                "four-session-scope": {
+                  "totalMs": 328.46810000000005,
+                  "rssBytes": 152666112,
+                  "heapBytes": 16713072,
+                  "dbBytes": 1077248
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 373.73070000000007,
+                  "rssBytes": 155598848,
+                  "heapBytes": 16633512,
+                  "dbBytes": 1077248
+                }
+              }
+            },
+            {
+              "order": [
+                "four-skip-orphan-dto",
+                "four-session-scope",
+                "four-empty-names",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 349.4044999999999,
+                  "rssBytes": 155291648,
+                  "heapBytes": 16514024,
+                  "dbBytes": 1077248
+                },
+                "four-empty-names": {
+                  "totalMs": 324.8421,
+                  "rssBytes": 156041216,
+                  "heapBytes": 16529592,
+                  "dbBytes": 1077248
+                },
+                "four-session-scope": {
+                  "totalMs": 326.96579999999994,
+                  "rssBytes": 155656192,
+                  "heapBytes": 16531480,
+                  "dbBytes": 1077248
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 337.00120000000004,
+                  "rssBytes": 155566080,
+                  "heapBytes": 16535072,
+                  "dbBytes": 1077248
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-session-scope",
+                "four-skip-orphan-dto",
+                "four-empty-names"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 333.0486,
+                  "rssBytes": 155963392,
+                  "heapBytes": 16522896,
+                  "dbBytes": 1077248
+                },
+                "four-empty-names": {
+                  "totalMs": 330.7755,
+                  "rssBytes": 156602368,
+                  "heapBytes": 17613136,
+                  "dbBytes": 1077248
+                },
+                "four-session-scope": {
+                  "totalMs": 318.0493,
+                  "rssBytes": 155344896,
+                  "heapBytes": 16631368,
+                  "dbBytes": 1077248
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 327.0789,
+                  "rssBytes": 154968064,
+                  "heapBytes": 16533064,
+                  "dbBytes": 1077248
+                }
+              }
+            },
+            {
+              "order": [
+                "four-session-scope",
+                "four-empty-names",
+                "four-skip-orphan-dto",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 338.9179000000001,
+                  "rssBytes": 164843520,
+                  "heapBytes": 18342184,
+                  "dbBytes": 1077248
+                },
+                "four-empty-names": {
+                  "totalMs": 342.9887999999999,
+                  "rssBytes": 164356096,
+                  "heapBytes": 18326376,
+                  "dbBytes": 1077248
+                },
+                "four-session-scope": {
+                  "totalMs": 351.7507,
+                  "rssBytes": 156925952,
+                  "heapBytes": 17615176,
+                  "dbBytes": 1077248
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 322.386,
+                  "rssBytes": 164642816,
+                  "heapBytes": 18361536,
+                  "dbBytes": 1077248
+                }
+              }
+            },
+            {
+              "order": [
+                "A",
+                "four-empty-names",
+                "four-session-scope",
+                "four-skip-orphan-dto"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 325.94040000000007,
+                  "rssBytes": 166866944,
+                  "heapBytes": 16568624,
+                  "dbBytes": 1077248
+                },
+                "four-empty-names": {
+                  "totalMs": 330.41020000000003,
+                  "rssBytes": 155283456,
+                  "heapBytes": 16524752,
+                  "dbBytes": 1077248
+                },
+                "four-session-scope": {
+                  "totalMs": 320.9627999999999,
+                  "rssBytes": 166346752,
+                  "heapBytes": 18639552,
+                  "dbBytes": 1077248
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 329.6473000000001,
+                  "rssBytes": 155811840,
+                  "heapBytes": 16639368,
+                  "dbBytes": 1077248
+                }
+              }
+            },
+            {
+              "order": [
+                "four-empty-names",
+                "four-skip-orphan-dto",
+                "four-session-scope",
+                "A"
+              ],
+              "variants": {
+                "A": {
+                  "totalMs": 336.13359999999994,
+                  "rssBytes": 163942400,
+                  "heapBytes": 18279344,
+                  "dbBytes": 1077248
+                },
+                "four-empty-names": {
+                  "totalMs": 325.2951000000001,
+                  "rssBytes": 165777408,
+                  "heapBytes": 18511432,
+                  "dbBytes": 1077248
+                },
+                "four-session-scope": {
+                  "totalMs": 329.6225,
+                  "rssBytes": 157081600,
+                  "heapBytes": 16634416,
+                  "dbBytes": 1077248
+                },
+                "four-skip-orphan-dto": {
+                  "totalMs": 353.59839999999997,
+                  "rssBytes": 156069888,
+                  "heapBytes": 16533528,
+                  "dbBytes": 1077248
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "quota": {
+    "startedAt": "2026-11-28T23:09:12.6015512+09:00",
+    "completedAt": "2026-11-28T23:09:18.3009306+09:00",
+    "warmups": 3,
+    "repeats": 30,
+    "pairs": [
+      {
+        "iteration": 0,
+        "order": [
+          "A",
+          "B"
+        ],
+        "A": {
+          "totalMs": 12.6859,
+          "rssBytes": 43401216,
+          "heapBytes": 8557872,
+          "dbBytes": null
+        },
+        "B": {
+          "totalMs": 12.2543,
+          "rssBytes": 43646976,
+          "heapBytes": 8256008,
+          "dbBytes": null
+        }
+      },
+      {
+        "iteration": 1,
+        "order": [
+          "B",
+          "A"
+        ],
+        "B": {
+          "totalMs": 12.8322,
+          "rssBytes": 43491328,
+          "heapBytes": 8255528,
+          "dbBytes": null
+        },
+        "A": {
+          "totalMs": 13.5336,
+          "rssBytes": 43425792,
+          "heapBytes": 8256488,
+          "dbBytes": null
+        }
+      },
+      {
+        "iteration": 2,
+        "order": [
+          "A",
+          "B"
+        ],
+        "A": {
+          "totalMs": 12.1634,
+          "rssBytes": 43405312,
+          "heapBytes": 8253592,
+          "dbBytes": null
+        },
+        "B": {
+          "totalMs": 12.8219,
+          "rssBytes": 43585536,
+          "heapBytes": 8255464,
+          "dbBytes": null
+        }
+      },
+      {
+        "iteration": 3,
+        "order": [
+          "B",
+          "A"
+        ],
+        "B": {
+          "totalMs": 12.4705,
+          "rssBytes": 43487232,
+          "heapBytes": 8255504,
+          "dbBytes": null
+        },
+        "A": {
+          "totalMs": 12.2576,
+          "rssBytes": 43663360,
+          "heapBytes": 8256672,
+          "dbBytes": null
+        }
+      },
+      {
+        "iteration": 4,
+        "order": [
+          "A",
+          "B"
+        ],
+        "A": {
+          "totalMs": 12.001,
+          "rssBytes": 43429888,
+          "heapBytes": 8256944,
+          "dbBytes": null
+        },
+        "B": {
+          "totalMs": 12.4585,
+          "rssBytes": 43397120,
+          "heapBytes": 8255896,
+          "dbBytes": null
+        }
+      },
+      {
+        "iteration": 5,
+        "order": [
+          "B",
+          "A"
+        ],
+        "B": {
+          "totalMs": 11.6885,
+          "rssBytes": 43679744,
+          "heapBytes": 8713160,
+          "dbBytes": null
+        },
+        "A": {
+          "totalMs": 12.2079,
+          "rssBytes": 43429888,
+          "heapBytes": 8257032,
+          "dbBytes": null
+        }
+      },
+      {
+        "iteration": 6,
+        "order": [
+          "A",
+          "B"
+        ],
+        "A": {
+          "totalMs": 12.6204,
+          "rssBytes": 43417600,
+          "heapBytes": 8256656,
+          "dbBytes": null
+        },
+        "B": {
+          "totalMs": 13.7507,
+          "rssBytes": 43589632,
+          "heapBytes": 8446536,
+          "dbBytes": null
+        }
+      },
+      {
+        "iteration": 7,
+        "order": [
+          "B",
+          "A"
+        ],
+        "B": {
+          "totalMs": 12.2717,
+          "rssBytes": 43479040,
+          "heapBytes": 8255760,
+          "dbBytes": null
+        },
+        "A": {
+          "totalMs": 12.6002,
+          "rssBytes": 43487232,
+          "heapBytes": 8639616,
+          "dbBytes": null
+        }
+      },
+      {
+        "iteration": 8,
+        "order": [
+          "A",
+          "B"
+        ],
+        "A": {
+          "totalMs": 12.1557,
+          "rssBytes": 43458560,
+          "heapBytes": 8256424,
+          "dbBytes": null
+        },
+        "B": {
+          "totalMs": 10.424,
+          "rssBytes": 43429888,
+          "heapBytes": 8252368,
+          "dbBytes": null
+        }
+      },
+      {
+        "iteration": 9,
+        "order": [
+          "B",
+          "A"
+        ],
+        "B": {
+          "totalMs": 12.1876,
+          "rssBytes": 43319296,
+          "heapBytes": 8255728,
+          "dbBytes": null
+        },
+        "A": {
+          "totalMs": 10.6798,
+          "rssBytes": 43712512,
+          "heapBytes": 8257264,
+          "dbBytes": null
+        }
+      },
+      {
+        "iteration": 10,
+        "order": [
+          "A",
+          "B"
+        ],
+        "A": {
+          "totalMs": 11.4605,
+          "rssBytes": 43495424,
+          "heapBytes": 8526856,
+          "dbBytes": null
+        },
+        "B": {
+          "totalMs": 11.2631,
+          "rssBytes": 43560960,
+          "heapBytes": 8252072,
+          "dbBytes": null
+        }
+      },
+      {
+        "iteration": 11,
+        "order": [
+          "B",
+          "A"
+        ],
+        "B": {
+          "totalMs": 12.2909,
+          "rssBytes": 43462656,
+          "heapBytes": 8256080,
+          "dbBytes": null
+        },
+        "A": {
+          "totalMs": 11.9962,
+          "rssBytes": 43360256,
+          "heapBytes": 8441720,
+          "dbBytes": null
+        }
+      },
+      {
+        "iteration": 12,
+        "order": [
+          "A",
+          "B"
+        ],
+        "A": {
+          "totalMs": 11.5169,
+          "rssBytes": 43872256,
+          "heapBytes": 8599320,
+          "dbBytes": null
+        },
+        "B": {
+          "totalMs": 12.7068,
+          "rssBytes": 43393024,
+          "heapBytes": 8374640,
+          "dbBytes": null
+        }
+      },
+      {
+        "iteration": 13,
+        "order": [
+          "B",
+          "A"
+        ],
+        "B": {
+          "totalMs": 13.9515,
+          "rssBytes": 43245568,
+          "heapBytes": 8975400,
+          "dbBytes": null
+        },
+        "A": {
+          "totalMs": 12.709,
+          "rssBytes": 43216896,
+          "heapBytes": 8256896,
+          "dbBytes": null
+        }
+      },
+      {
+        "iteration": 14,
+        "order": [
+          "A",
+          "B"
+        ],
+        "A": {
+          "totalMs": 11.0448,
+          "rssBytes": 43446272,
+          "heapBytes": 8256792,
+          "dbBytes": null
+        },
+        "B": {
+          "totalMs": 12.8469,
+          "rssBytes": 43356160,
+          "heapBytes": 8252248,
+          "dbBytes": null
+        }
+      },
+      {
+        "iteration": 15,
+        "order": [
+          "B",
+          "A"
+        ],
+        "B": {
+          "totalMs": 12.8511,
+          "rssBytes": 43741184,
+          "heapBytes": 8255864,
+          "dbBytes": null
+        },
+        "A": {
+          "totalMs": 12.1277,
+          "rssBytes": 43323392,
+          "heapBytes": 8253120,
+          "dbBytes": null
+        }
+      },
+      {
+        "iteration": 16,
+        "order": [
+          "A",
+          "B"
+        ],
+        "A": {
+          "totalMs": 13.261,
+          "rssBytes": 43302912,
+          "heapBytes": 8256664,
+          "dbBytes": null
+        },
+        "B": {
+          "totalMs": 14.3273,
+          "rssBytes": 43143168,
+          "heapBytes": 8255744,
+          "dbBytes": null
+        }
+      },
+      {
+        "iteration": 17,
+        "order": [
+          "B",
+          "A"
+        ],
+        "B": {
+          "totalMs": 11.8803,
+          "rssBytes": 43175936,
+          "heapBytes": 8255528,
+          "dbBytes": null
+        },
+        "A": {
+          "totalMs": 12.3893,
+          "rssBytes": 43700224,
+          "heapBytes": 8252984,
+          "dbBytes": null
+        }
+      },
+      {
+        "iteration": 18,
+        "order": [
+          "A",
+          "B"
+        ],
+        "A": {
+          "totalMs": 13.4741,
+          "rssBytes": 43761664,
+          "heapBytes": 8256792,
+          "dbBytes": null
+        },
+        "B": {
+          "totalMs": 11.5765,
+          "rssBytes": 43339776,
+          "heapBytes": 8255688,
+          "dbBytes": null
+        }
+      },
+      {
+        "iteration": 19,
+        "order": [
+          "B",
+          "A"
+        ],
+        "B": {
+          "totalMs": 11.0384,
+          "rssBytes": 43511808,
+          "heapBytes": 8255640,
+          "dbBytes": null
+        },
+        "A": {
+          "totalMs": 14.9838,
+          "rssBytes": 43294720,
+          "heapBytes": 8256376,
+          "dbBytes": null
+        }
+      }
+    ],
+    "scriptSha256": "493fa3811e5878591becd109f20aced34f0dc4c857689764c7e35a36713b4bfd",
+    "builds": {
+      "A": {
+        "revision": "b26187e1c7a28edd9a4a04404e277a5f1d29c2e5",
+        "source": "6f46df6a2ad5ed2410918f8fa566a4abe7d66d85595556e5e585db95599f9abf",
+        "media": "b4f614c4680f71824ac5178974cf1337d34bcb8cbcba16afb3b28c0be5e5659e",
+        "build": "bf711384db5603771b44d089e12cfa561ecde08fe8d8601fe5b25939b06df216"
+      },
+      "B": {
+        "revision": "b26187e1c7a28edd9a4a04404e277a5f1d29c2e5",
+        "source": "47131be5664ae36d84a608af152fb9fd0edbc2a9d9468c874ce192e4e84a0318",
+        "build": "b930966b875284b6b6132ad718b703cc056ebb821eaa6b8585ab2ced4dfee18c"
+      }
+    },
+    "command": [
+      "node",
+      "--expose-gc",
+      "--no-warnings",
+      "tools/diagnostics/summary-heap-profile.cjs",
+      "--quota"
+    ],
+    "protocol": {
+      "mode": "timeline",
+      "time": "beforeExit.ms minus initializedAfterGc.ms",
+      "rss": "Maximum of initializedAfterGc, repeatedAfterGc, beforeExit and peak-heap quota sample RSS",
+      "heap": "Sampled quota-phase heap maximum",
+      "db": "Not applicable"
+    }
+  }
+}

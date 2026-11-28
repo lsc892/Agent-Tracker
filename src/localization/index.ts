@@ -18,11 +18,14 @@ export interface LocalizationBundle { locale: string; messages: Record<string, s
  * 알고리즘: 명시 설정을 우선해 표기를 정규화하고 전체 locale·언어 코드 순으로 찾으며 미지원 언어는 영어로 대체한다.
  */
 export function resolveLocale(setting: unknown, editorLanguage: string): string {
+  // [언어 정책] 명시한 언어 또는 편집기 언어를 표준 표기로 바꿔 정확히 일치하는 사전을 먼저 찾는다.
   const candidate = typeof setting === 'string' && setting !== 'auto' ? setting : editorLanguage;
   const normalized = candidate.trim().toLowerCase().replaceAll('_', '-');
-  // Regional variants share a catalog. Chinese UI is the simplified catalog.
-  return languages.find(language => language.locale === normalized)?.locale
-    ?? languages.find(language => language.locale === normalized.split('-')[0])?.locale ?? 'en';
+  const exact = languages.find(language => language.locale === normalized);
+  if (exact) return exact.locale;
+  // [언어 정책] 지역별 사전이 없으면 언어 코드로 찾고 영어를 최종 대체 언어로 쓴다.
+  const [languageCode] = normalized.split('-', 1);
+  return languages.find(language => language.locale === languageCode)?.locale ?? 'en';
 }
 
 /**
@@ -30,9 +33,11 @@ export function resolveLocale(setting: unknown, editorLanguage: string): string 
  * 알고리즘: 선택 언어 사전과 한국어 원문을 동기 등록하고 점이 포함된 키와 중괄호 치환 규칙을 사용한다.
  */
 export function createTranslator(locale: string, override?: Record<string, string>): i18n {
+  // [번역 정책] 전달된 사전을 우선하고 없으면 선택 언어의 사전을 읽는다.
   const resolved = resolveLocale(locale, 'ko');
   const messages = override ?? (resolved === 'ko' ? korean
     : JSON.parse(readFileSync(join(__dirname, '../../localization/locales', `${resolved}.json`), 'utf8')) as Record<string, string>);
+  // [번역 정책] 동기 초기화로 바로 쓸 수 있게 만들고 누락된 키는 한국어 사전에서 찾는다.
   const instance = engine.createInstance();
   void instance.init({
     initAsync: false, lng: resolved, fallbackLng: 'ko', keySeparator: false,
@@ -44,6 +49,7 @@ export function createTranslator(locale: string, override?: Record<string, strin
 
 let current = createTranslator('ko');
 export function setLocale(locale: string): void {
+  // [언어 정책] 정규화한 언어가 바뀔 때만 번역기를 교체한다.
   const resolved = resolveLocale(locale, 'ko');
   if (resolved !== current.language) current = createTranslator(resolved);
 }
@@ -52,6 +58,7 @@ export function t(key: TranslationKey, values?: TranslationValues): string {
   return String(current.t(key, values));
 }
 export function localizationBundle(): LocalizationBundle {
+  // [DTO 정책] 한국어 기본 사전 위에 현재 언어의 메시지를 덮어 Webview에 전달한다.
   return { locale: getLocale(), messages: { ...korean, ...current.getResourceBundle(getLocale(), 'translation') } };
 }
 
@@ -60,8 +67,10 @@ export function localizationBundle(): LocalizationBundle {
  * 알고리즘: JSON의 script 종료·구분 문자를 이스케이프하고 HTML 속성을 인코딩한 nonce·경로로 스크립트를 조립한다.
  */
 export function localizationScripts(scriptUri: string, nonce: string, bundle = localizationBundle()): string {
+  // [직렬화 정책] 인라인 JSON에서 HTML과 스크립트 구문에 영향을 줄 문자를 치환한다.
   const serialized = JSON.stringify(bundle).replaceAll('<', '\\u003c').replaceAll('>', '\\u003e')
     .replaceAll('&', '\\u0026').replaceAll('\u2028', '\\u2028').replaceAll('\u2029', '\\u2029');
+  // [출력 정책] nonce와 경로를 HTML 속성으로 이스케이프하고 같은 디렉터리에서 번역 스크립트를 읽는다.
   const escape = (value: string): string => value.replace(/[&<>"']/g, character =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]!);
   const directory = scriptUri.slice(0, scriptUri.lastIndexOf('/') + 1);

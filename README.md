@@ -49,6 +49,7 @@ npx agent-tracker-vscode@latest
 ```
 
 When it finishes, run **Developer: Reload Window** from the VS Code Command Palette.
+If Agent Tracker prompts you to update the usage card's click behavior, fully quit VS Code, wait a moment, and reopen it. Agent Tracker applies the patch on exit on supported local Windows and Linux installations.
 
 <details>
 <summary>More options: global install · profiles · macOS setup</summary>
@@ -146,8 +147,37 @@ Use **Agent Tracker: Delete Statistics Data** to clear aggregated statistics. Or
 
 </details>
 
-<br><br>
+## How usage statistics are collected
 
-[Usage and development reference (Korean)](https://github.com/lsc892/Agent-Tracker/blob/main/docs/refrences/Development.ko.md)
+A project is a working folder. A session is one chat containing a series of conversations. One conversation runs from a user message to the main agent’s reply and includes usage from subagents linked to it. Agent Tracker reads JSONL logs, including Zstd-compressed Codex logs.
 
-[Code responsibilities (Korean)](https://github.com/lsc892/Agent-Tracker/blob/main/src/README.md) · [Tools](https://github.com/lsc892/Agent-Tracker/blob/main/tools/README.md) · [Tests](https://github.com/lsc892/Agent-Tracker/blob/main/tests/README.md) · [Webview](https://github.com/lsc892/Agent-Tracker/blob/main/media/README.md) · [Localization](https://github.com/lsc892/Agent-Tracker/blob/main/localization/README.md) · [Resources](https://github.com/lsc892/Agent-Tracker/blob/main/resource/README.md) · [Documents](https://github.com/lsc892/Agent-Tracker/blob/main/docs/README.md)
+### Log fields
+
+| Purpose | Claude | Codex |
+| --- | --- | --- |
+| Session and thread | `sessionId` in the main log, with the filename as a fallback. Subagent logs use their parent session folder and filename. | `payload.id` in `session_meta` or `payload.thread_id` in `token_usage_record`. If `payload.session_id` is missing, use the thread ID as the session ID. |
+| Model and response | `message.model`, `message.id`, and `requestId` on `assistant` rows. `isApiErrorMessage` helps filter zero-token errors. | `payload.model` on usage rows or in session or turn context. `payload.turn_id` and `payload.response_id` identify the response. |
+| Input, output, and cache | `message.usage` provides `input_tokens`, `output_tokens`, `cache_read_input_tokens`, and `cache_creation_input_tokens`. | `payload.usage` provides `input_tokens` and `output_tokens`. Cache counts come from `cached_input_tokens` and `cache_write_input_tokens` or from `input_tokens_details.cached_tokens` and `input_tokens_details.cache_write_tokens`. |
+| Cumulative counters and parent references | — | `payload.thread_token_usage`, `payload.turn_token_usage`, and the legacy `payload.info.total_token_usage` and `payload.info.last_token_usage` on `token_count` events. `session_meta` provides `forked_from_id` or `parent_thread_id`, including nested parent references. |
+| Time | Row `timestamp`. | Row or `payload.timestamp`, plus `payload.started_at` and `payload.completed_at` on events. |
+
+### From log rows to daily totals
+
+1. Select known field paths line by line. For lines spanning read chunks, keep the selected fields and JSON syntax state across chunk boundaries. Skip image Base64 while reading.
+2. Count each response once. Claude matches `(message.id, requestId)` within a session, while Codex matches `(turn_id, response_id)` within a thread. If a Claude message has only one known request ID, also compare records missing that ID. For duplicates, use the record with the highest input-plus-output token count. Claude adds cache reads and writes to its input count, while Codex uses the logged input total.
+3. For Codex, compare legacy records with the parent thread to skip copied history and sum verified increases in the remaining counters. Use turn counters or legacy records to verify any extra usage suggested by a thread counter before adding it.
+4. Group usage by the conversation start date in the statistics time zone. Count completed conversations and calculate average duration from the ones with a recorded duration.
+
+### SQLite tables
+
+| Table | What it stores |
+| --- | --- |
+| `source_file` | Log paths, session and thread IDs, modification times, parser versions, and processing or missing-file status. |
+| `usage_request_daily` | Token, time, and cost totals and sample counts keyed by provider, session, project, and local date. |
+| `usage_model_daily` | The daily totals and sample counts with a model key added. |
+| `projects`, `sessions` | Display names for project and session keys. |
+| `session_billing` | The billing mode selected for each provider and session. |
+| `usage_rollup_meta` | The time zone and format version used for daily aggregation. |
+| `usage_capability_daily` | Daily usage counts for skills, subagents, plugins, and models. |
+
+The statistics view filters and groups the daily provider or model rows for the selected period. It uses the stored totals and sample counts to calculate averages.

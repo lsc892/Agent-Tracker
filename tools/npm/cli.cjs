@@ -11,6 +11,7 @@ const { delimiter, dirname, extname, isAbsolute, join, resolve } = require('node
  * 알고리즘: 인자를 한 번 순회하며 허용된 flag·값 쌍만 저장하고 누락·NUL·알 수 없는 옵션은 즉시 거부한다.
  */
 function parseArguments(args) {
+  // [설치 옵션 정책] 지원 플래그와 값만 받고 값이 생략되거나 NUL이 포함되면 거부한다.
   const options = { code: 'code' };
   const values = new Map([
     ['--code', 'code'], ['--profile', 'profile'],
@@ -35,6 +36,7 @@ function parseArguments(args) {
  * 알고리즘: 명시 경로를 먼저 확인하고 그 외에는 플랫폼별 PATH·확장자 후보를 순서대로 검사해 실제 파일을 반환한다.
  */
 function resolveCli(command, platform = process.platform, env = process.env) {
+  // [설치 경로 정책] 명시 경로를 우선하고 명령 이름은 플랫폼별 PATH와 실행 확장자로 찾는다.
   if (isAbsolute(command) || /[\\/]/.test(command)) {
     const target = resolve(command);
     if (existsSync(target) && statSync(target).isFile()) return target;
@@ -59,6 +61,7 @@ function cliInvocation(cli, platform = process.platform, env = process.env) {
   if (platform !== 'win32' || !/\.(cmd|bat)$/i.test(cli)) return { file: cli, prefix: [], env };
   // Run the bundled Electron CLI directly. Profile names and paths never enter cmd.exe.
   // Read both paths from the launcher to support VS Code's versioned installation directories.
+  // [실행 정책] Windows 배치 런처에서 Electron 실행 파일과 cli.js 경로를 읽어 직접 실행한다.
   const launcher = readFileSync(cli, 'utf8');
   const match = launcher.match(/"%~dp0([^"\r\n]+\.exe)"\s+"%~dp0([^"\r\n]+[\\/]out[\\/]cli\.js)"/i);
   if (!match) throw new Error('Unsupported VS Code launcher. Pass --code with the official VS Code CLI path.');
@@ -71,6 +74,7 @@ function cliInvocation(cli, platform = process.platform, env = process.env) {
 }
 
 function minimumVersion(range) {
+  // [버전 정책] 설치 검증은 숫자 세 부분으로 표현할 수 있는 최소 버전만 받는다.
   const match = /^(?:>=|\^)?(\d+)\.(\d+)\.(\d+)$/.exec(range);
   if (!match) throw new Error(`Unsupported VS Code version range: ${range}.`);
   return match.slice(1).map(Number);
@@ -79,6 +83,7 @@ function minimumVersion(range) {
 function checkVersion(output, range) {
   const match = /^(\d+)\.(\d+)\.(\d+)(?:-[\w.-]+)?\s*$/m.exec(output);
   if (!match) throw new Error('Could not read the VS Code version.');
+  // [버전 정책] 메이저·마이너·패치 순서로 비교해 최소 버전을 충족하는지 판정한다.
   const actual = match.slice(1).map(Number);
   const minimum = minimumVersion(range);
   for (let index = 0; index < minimum.length; index++) {
@@ -88,6 +93,7 @@ function checkVersion(output, range) {
 }
 
 function readVerifiedBundle(packageRoot, version) {
+  // [검증 정책] 동봉 확장의 ID와 버전을 검사하고 VSIX SHA-256을 배포 메타데이터와 대조한다.
   const metadata = JSON.parse(readFileSync(join(packageRoot, 'extension.json'), 'utf8'));
   if (metadata.id !== 'AgentTracker.agent-tracker' || metadata.version !== version) throw new Error('The bundled extension identity or version does not match the installer.');
   const vsix = join(packageRoot, 'extension.vsix');
@@ -97,6 +103,7 @@ function readVerifiedBundle(packageRoot, version) {
 }
 
 function invokeCli(invocation, commandArgs, inherit, spawn) {
+  // [실행 정책] CLI 인자를 배열로 넘기고 실패 시 종료 코드와 오류 출력을 전달한다.
   const result = spawn(invocation.file, [...invocation.prefix, ...commandArgs], {
     env: invocation.env, windowsHide: true,
     encoding: 'utf8', stdio: inherit ? 'inherit' : 'pipe',
@@ -134,6 +141,7 @@ Install the bundled Agent Tracker VSIX into VS Code.
   }
   if (options.version) { log(manifest.version); return; }
 
+  // [설치 정책] 동봉 파일을 검증하고 프로필·확장 경로·사용자 데이터 경로를 공통 인자로 준비한다.
   const { metadata, vsix } = readVerifiedBundle(packageRoot, manifest.version);
   const invocation = cliInvocation(resolveCli(options.code, platform, env), platform, env);
   const selection = [];
@@ -145,6 +153,7 @@ Install the bundled Agent Tracker VSIX into VS Code.
   log(`Installing ${metadata.id}@${metadata.version}...`);
   invoke(['--install-extension', vsix, '--force', ...selection], true);
   const expected = `${metadata.id}@${metadata.version}`;
+  // [검증 정책] 설치에 사용한 대상과 같은 목록에서 기대 ID와 버전을 대소문자 구분 없이 찾는다.
   const installed = invoke(['--list-extensions', '--show-versions', ...selection]);
   if (!installed.split(/\r?\n/).some(line => line.trim().toLowerCase() === expected.toLowerCase())) throw new Error(`VS Code did not report the expected installed extension: ${expected}.`);
   log(`Installed and verified: ${expected}`);

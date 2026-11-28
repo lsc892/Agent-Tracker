@@ -24,7 +24,7 @@ export class QuotaStatusBar implements vscode.Disposable {
     this.refresh.command = 'agentTracker.refreshQuota';
     this.refresh.tooltip = t('status.refreshTooltip');
     this.refresh.accessibilityInformation = { label: t('status.refreshAccessible'), role: 'button' };
-    // Relative reset times advance without starting provider reads or summary scans.
+    // [갱신 정책] 1분마다 마지막 상태를 다시 표시해 조회 없이 초기화까지 남은 시간을 갱신한다.
     this.clock = setInterval(() => {
       if (this.latest) this.update(this.latest.states, this.latest.settings);
     }, 60_000);
@@ -44,6 +44,7 @@ export class QuotaStatusBar implements vscode.Disposable {
     const color = statusForeground(settings.display.colorMode, settings.display.customColor);
     this.quota.color = color;
     this.refresh.color = color;
+    // [표시 정책] 켜진 제공자만 Claude·Codex 순으로 표시한다.
     const tracked = ['claude', 'codex'].flatMap(provider => states.filter(state => state.provider === provider && settings[state.provider].enabled));
     const now = Date.now();
     const views = tracked.map(state => statusBarPresentation(state, settings.display.percentage, settings.display.detail, now));
@@ -52,6 +53,7 @@ export class QuotaStatusBar implements vscode.Disposable {
     // Mouse hover and the native click toggle share the Markdown card above.
     // Keep the plain-text quota summary available to screen readers.
     this.quota.accessibilityInformation = { label: quotaHoverSummary(tracked, now), role: 'button' };
+    // [표시 정책] 갱신 중인 제공자가 있으면 회전 아이콘을 쓰고 추적 대상이 없으면 두 항목을 숨긴다.
     this.refresh.text = tracked.some(state => state.refreshing) ? '$(sync~spin)' : '$(refresh)';
     if (tracked.length) {
       this.quota.show();

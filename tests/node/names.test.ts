@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { SummaryDatabase, type TurnSummaryInput } from '../../src/summary/db';
+import { ageLogFixtures } from '../fixtures/summary-mtime';
 import { refreshSummary } from '../../src/summary/scanner';
 import type { SummaryOptions } from '../../src/summary/types';
 
@@ -99,6 +100,7 @@ test('Codex index renames update unchanged transcripts, survive missing metadata
   const {db,options,root,base} = fixture(t,'codex');
   const log = jsonl(codex('one'));
   writeFileSync(join(root,'one.jsonl'),log);
+  ageLogFixtures(join(root,'one.jsonl'));
   const index = join(base,'session_index.jsonl');
   writeFileSync(index,jsonl([{id:'one',thread_name:'원래 이름'}]));
   assert.equal((await refreshSummary(db,options)).failed,0);
@@ -119,6 +121,7 @@ test('Codex state DB names override index titles, support duplicate titles, and 
   const {db,options,root,base} = fixture(t,'codex');
   writeFileSync(join(root,'one.jsonl'),jsonl(codex('one')));
   writeFileSync(join(root,'two.jsonl'),jsonl(codex('two')));
+  ageLogFixtures(join(root,'one.jsonl'),join(root,'two.jsonl'));
   writeFileSync(join(base,'session_index.jsonl'),jsonl([{id:'one',thread_name:'오래된 이름'}]));
   const source = new DatabaseSync(join(base,'state_5.sqlite'));
   try {
@@ -139,7 +142,7 @@ test('names are stored once, filters escape wildcard characters, and failed repl
   const row: TurnSummaryInput = {provider:'claude',project_key:'/project',project_name:'100%_project',
     session_id:'one',session_name:'100%_session',root_turn_id:'first',
     duration_quality:'missing',input_tokens:10,output_tokens:2,total_tokens:12,status:'in_progress'};
-  const replace = (summaries: TurnSummaryInput[]): void => { db.replaceMemory({scanId: 'test',sessions:[{provider:'claude',session_id:'one'}],files:[],summaries}); };
+  const replace = (summaries: TurnSummaryInput[]): void => { db.replaceMemory({sessions:[{provider:'claude',session_id:'one'}],files:[],summaries}); };
   replace([row,{...row,root_turn_id:'second'}]);
   assert.equal(db.connection.prepare('SELECT count(*) n FROM projects').get()?.n,1);
   assert.equal(db.connection.prepare('SELECT count(*) n FROM sessions').get()?.n,1);
@@ -167,8 +170,8 @@ test('normal batches collect final names once per key and keep request-specific 
     yield memoryRow('fourth', 'same', { session_name: null, billing: 'api' });
   }
   const saved = db.replaceMemoryBatch([
-    { scanId: 'batch', sessions: [{ provider: 'claude', session_id: 'same' }], files: [], summaries: rows() },
-    { scanId: 'batch', sessions: [{ provider: 'codex', session_id: 'same' }], files: [],
+    { sessions: [{ provider: 'claude', session_id: 'same' }], files: [], summaries: rows() },
+    { sessions: [{ provider: 'codex', session_id: 'same' }], files: [],
       summaries: [memoryRow('other-provider', 'same', { provider: 'codex', project_name: 'Last project', session_name: 'Codex' })] },
   ]);
   assert.equal(iterations, 1);
@@ -185,10 +188,10 @@ test('normal batches collect final names once per key and keep request-specific 
 test('billing override is read once per session and empty names preserve accepted metadata', t => {
   const db = new SummaryDatabase(':memory:'); t.after(() => db.close());
   const calls = metadataCalls(db);
-  db.replaceMemory({ scanId: 'initial', sessions: [{ provider: 'claude', session_id: 'one' }], files: [], summaries: [memoryRow('old')] });
+  db.replaceMemory({ sessions: [{ provider: 'claude', session_id: 'one' }], files: [], summaries: [memoryRow('old')] });
   db.setSessionBilling('claude', 'one', 'subscription');
   calls.reset();
-  const saved = db.replaceMemory({ scanId: 'changed', sessions: [{ provider: 'claude', session_id: 'one' }], files: [],
+  const saved = db.replaceMemory({ sessions: [{ provider: 'claude', session_id: 'one' }], files: [],
     summaries: [memoryRow('first', 'one', { session_name: null, billing: 'api' }), memoryRow('second', 'one', { session_name: ' ', billing: 'unknown' })] });
   assert.deepEqual([calls.projects, calls.sessions, calls.billing], [1, 1, 1]);
   assert.equal(saved.size, 0, 'Unknown preserved names are not reported as newly applied names');
@@ -199,7 +202,7 @@ test('failed metadata batches roll back names and retry with a fresh transaction
   const db = new SummaryDatabase(':memory:'); t.after(() => db.close());
   db.connection.exec(`CREATE TRIGGER metadata_failure BEFORE INSERT ON turn_summary WHEN NEW.root_turn_id='bad'
     BEGIN SELECT RAISE(ABORT,'metadata-failure'); END`);
-  const replacements = ['one', 'two'].map((session, index) => ({ scanId: 'batch',
+  const replacements = ['one', 'two'].map((session, index) => ({
     sessions: [{ provider: 'claude' as const, session_id: session }], files: [],
     summaries: [memoryRow(index ? 'bad' : 'good', session, { session_name: session })] }));
   assert.throws(() => db.replaceMemoryBatch(replacements), /metadata-failure/);
@@ -214,11 +217,11 @@ test('failed metadata batches roll back names and retry with a fresh transaction
 test('repeated-session snapshots retain deletion billing cascades and do not report pruned names', t => {
   const db = new SummaryDatabase(':memory:'); t.after(() => db.close());
   const session = { provider: 'claude' as const, session_id: 'one' };
-  db.replaceMemory({ scanId: 'initial', sessions: [session], files: [], summaries: [memoryRow('old')] });
+  db.replaceMemory({ sessions: [session], files: [], summaries: [memoryRow('old')] });
   db.setSessionBilling('claude', 'one', 'subscription');
   const saved = db.replaceMemoryBatch([
-    { scanId: 'delete', sessions: [session], files: [], summaries: [] },
-    { scanId: 'recreate', sessions: [session], files: [], summaries: [memoryRow('new', 'one', { session_name: null, billing: 'api' })] },
+    { sessions: [session], files: [], summaries: [] },
+    { sessions: [session], files: [], summaries: [memoryRow('new', 'one', { session_name: null, billing: 'api' })] },
   ]);
   assert.equal(saved.size, 0);
   assert.equal(db.connection.prepare('SELECT count(*) n FROM session_billing').get()?.n, 0);
@@ -230,13 +233,13 @@ test('retained requests do not contribute replacement names or billing metadata'
   const db = new SummaryDatabase(':memory:'); t.after(() => db.close());
   const calls = metadataCalls(db);
   const file = db.observeFile({ provider: 'claude', source_root: '/logs', path: '/logs/one.jsonl', session_id: 'one',
-    size_bytes: 100, mtime_ms: 10, dev: '1', inode: '1', parser_version: 1 }, 'initial');
+    size_bytes: 100, mtime_ms: 10, dev: '1', inode: '1', parser_version: 1 });
   const row = memoryRow('retained', 'one', { model_usage: [{ model: 'model', input_tokens: 10, output_tokens: 2,
     cache_write_input_tokens: 0, cache_read_input_tokens: 0 }] });
   const sessions = [{ provider: 'claude' as const, session_id: 'one' }];
-  db.replaceMemory({ scanId: 'initial', sessions, files: [{ ...file, session_id: 'one' }], summaries: [row] });
+  db.replaceMemory({ sessions, files: [{ ...file, session_id: 'one' }], summaries: [row] });
   calls.reset();
-  const saved = db.replaceMemory({ scanId: 'removed', sessions, files: [], removedFileIds: [file.id], retainDeletedSourceUsage: true,
+  const saved = db.replaceMemory({ sessions, files: [], removedFileIds: [file.id], retainDeletedSourceUsage: true,
     summaries: [{ ...row, project_key: '/discarded', project_name: 'Discarded', session_name: 'Discarded' }] });
   assert.deepEqual([calls.projects, calls.sessions, calls.billing, saved.size], [0, 0, 0, 0]);
   assert.equal(db.queryTurns()[0].session_name, 'Session');
@@ -246,6 +249,7 @@ test('retained requests do not contribute replacement names or billing metadata'
 test('scanner skips committed names but still applies metadata-only title changes', async t => {
   const { db, options, root, base } = fixture(t, 'codex');
   writeFileSync(join(root, 'one.jsonl'), jsonl(codex('one')));
+  ageLogFixtures(join(root, 'one.jsonl'));
   const index = join(base, 'session_index.jsonl');
   writeFileSync(index, jsonl([{ id: 'one', thread_name: 'First' }]));
   const calls = metadataCalls(db);
@@ -286,7 +290,7 @@ test('name choices page through every stored identity with stable ordering and p
     started_at_ms:index,duration_quality:'missing',input_tokens:10,output_tokens:2,total_tokens:12,status:'in_progress',
   }));
   summaries.push({...summaries[0],provider:'claude'});
-  db.replaceMemory({scanId: 'test',sessions:summaries.map(row=>({provider:row.provider,session_id:row.session_id})),files:[],summaries});
+  db.replaceMemory({sessions:summaries.map(row=>({provider:row.provider,session_id:row.session_id})),files:[],summaries});
   const projects = db.queryNames({kind:'project'});
   assert.equal(projects.total,125);assert.equal(projects.rows.length,100);
   const projectTail = db.queryNames({kind:'project',offset:100});

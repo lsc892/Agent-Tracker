@@ -5,6 +5,7 @@ import { mkdtemp, mkdir, writeFile, appendFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, normalize } from 'node:path';
 import { SummaryDatabase, type TurnSummaryInput } from '../../src/summary/db';
+import { ageLogFixtures } from '../fixtures/summary-mtime';
 import { SummaryClient } from '../../src/summary/client';
 import { refreshSummary } from '../../src/summary/scanner';
 import { toolCapabilities } from '../../src/summary/parsers/capabilities';
@@ -29,7 +30,11 @@ test('capability parsers recognize explicit invocations and static wrappers with
     await Promise.all([tools.exec_command({cmd: "Get-Content -LiteralPath 'C:/my skills/commit/SKILL.md'"}),
       tools.exec_command({cmd: "rg --files -g SKILL.md"}),tools.mcp__docs__search({q:'x'})]);
     await tools.spawn_agent({agent_type:'explorer'});`;
-  assert.deepEqual(uses('exec',code),[{category:'skill',name:'commit'},{category:'plugin',name:'docs'},{category:'subagent',name:'explorer'}]);
+  assert.deepEqual([...toolCapabilities('exec', code)], [
+    { category: 'skill', name: 'commit', index: 0 },
+    { category: 'plugin', name: 'docs', index: 2 },
+    { category: 'subagent', name: 'explorer', index: 3 },
+  ]);
   assert.deepEqual(uses('apply_patch','Read /skills/commit/SKILL.md'),[]);
   assert.deepEqual(uses('exec_command',{cmd:"rg 'cat /skills/commit/SKILL.md' src"}),[]);
   assert.deepEqual(uses('exec_command',{cmd:"echo 'cat /skills/commit/SKILL.md'"}),[]);
@@ -60,8 +65,9 @@ test('Claude counts deduplicate tool identities and model responses, survive rep
   for (const filter of [{projectKey:'/other'},{providers:['codex' as const]},{sessionId:'other'},{toMs:Date.parse('2026-10-03T15:00:00Z')}]) {
     assert.equal(db.queryCapabilities(filter,'skill').totalUses,0);
   }
+  ageLogFixtures(file);
   assert.equal((await refreshSummary(db,options)).reused,1);
-  db.connection.exec('DELETE FROM turn_capability_usage; UPDATE manifest SET parser_version=10;');
+  db.connection.exec("DELETE FROM turn_capability_usage; UPDATE source_file SET parser_version=10; UPDATE summary_refresh SET scope='v10';");
   assert.equal((await refreshSummary(db,options)).parsed,1,'previous parser versions rebuild unchanged sources');
   assert.equal(db.queryCapabilities({},'skill').totalUses,2);
   await appendFile(file,text([{type:'custom-title',customTitle:'new'}]));
@@ -146,13 +152,13 @@ test('capability ratios combine enabled providers within each category and recom
   const db=new SummaryDatabase(':memory:');
   try {
     const codex=summary('shared','/project',2);
-    db.replaceMemory({scanId: 'test',sessions:[{provider:'codex',session_id:'s'},{provider:'claude',session_id:'s'}],files:[],
+    db.replaceMemory({sessions:[{provider:'codex',session_id:'s'},{provider:'claude',session_id:'s'}],files:[],
       summaries:[codex,{...summary('shared'),provider:'claude'}]});
     const page=db.queryCapabilities({},'skill');assert.equal(page.totalUses,3);
     assert.ok(Math.abs(page.rows[0].percentage-200/3)<1e-10);
     assert.equal(db.queryCapabilities({providers:['claude']},'skill').rows[0].percentage,100);
     assert.equal(db.queryCapabilities({providers:[]},'skill').totalUses,0);
-    db.replaceMemory({scanId: 'test',sessions:[{provider:'codex',session_id:'s'}],files:[],summaries:[]});
+    db.replaceMemory({sessions:[{provider:'codex',session_id:'s'}],files:[],summaries:[]});
     assert.equal(db.queryCapabilities({},'skill').totalUses,1,'session deletion cascades usage counts');
   } finally {db.close();}
 });
@@ -161,7 +167,7 @@ test('capability pagination uses the full denominator, date filters exclude unkn
   const directory=await mkdtemp(join(tmpdir(),'tracker-capabilities-migration-'));
   const file=join(directory,'db.sqlite');let db=new SummaryDatabase(file);
   t.after(async()=>{db.close();await rm(directory,{recursive:true,force:true});});
-  db.replaceMemory({scanId: 'test',sessions:[{provider:'codex',session_id:'s'}],files:[],summaries:Array.from({length:105},(_,i)=>summary(`skill-${i}`))});
+  db.replaceMemory({sessions:[{provider:'codex',session_id:'s'}],files:[],summaries:Array.from({length:105},(_,i)=>summary(`skill-${i}`))});
   const first=db.queryCapabilities({},'skill'),second=db.queryCapabilities({},'skill',100);
   assert.equal(first.totalUses,105);assert.equal(second.totalUses,105);assert.equal(first.rows.length,100);assert.equal(second.rows.length,5);
   assert.equal(first.maxUses,1);assert.equal(second.maxUses,1);
@@ -176,7 +182,7 @@ test('capability pagination uses the full denominator, date filters exclude unkn
   assert.equal(db.queryCapabilities({fromMs:0},'skill').totalUses,0);
   assert.deepEqual(db.queryCapabilities({fromMs:0},'skill').rows,[]);
   const before=db.queryTurns();
-  assert.throws(()=>db.replaceMemory({scanId: 'test',sessions:[{provider:'codex',session_id:'s'}],files:[],summaries:[summary('bad','/other',0)]}));
+  assert.throws(()=>db.replaceMemory({sessions:[{provider:'codex',session_id:'s'}],files:[],summaries:[summary('bad','/other',0)]}));
   assert.equal(db.queryCapabilities({},'skill').totalUses,105);
   db.connection.exec('DROP TABLE turn_capability_usage; PRAGMA user_version=5;');
   db.close();db=new SummaryDatabase(file);
@@ -189,7 +195,7 @@ test('worker applies independent Skill page sizes and preserves totals across cu
   const dbPath=join(directory,'db.sqlite');
   const db=new SummaryDatabase(dbPath);
   try {
-    db.replaceMemory({scanId: 'test',sessions:[{provider:'codex',session_id:'s'}],files:[],summaries:Array.from({length:105},(_,i)=>({
+    db.replaceMemory({sessions:[{provider:'codex',session_id:'s'}],files:[],summaries:Array.from({length:105},(_,i)=>({
       ...summary(`entry-${i}`),capability_usage:(['skill','subagent','plugin'] as const).map(category=>({category,name:`entry-${i}`,usage_count:1})),
     }))});
   } finally {db.close();}
@@ -210,7 +216,7 @@ test('capability pages retain filtered maxima and the denominator of omitted ent
   const db=new SummaryDatabase(':memory:');
   try {
     const startedAt=Date.parse('2026-10-07T00:00:00Z');
-    db.replaceMemory({scanId: 'test',sessions:[{provider:'codex',session_id:'s'},{provider:'claude',session_id:'other'}],files:[],summaries:[
+    db.replaceMemory({sessions:[{provider:'codex',session_id:'s'},{provider:'claude',session_id:'other'}],files:[],summaries:[
       ...Array.from({length:25},(_,i)=>({...summary(`rank-${i}`,'/project',25-i),started_at_ms:startedAt})),
       {...summary('outside','/other',1000),provider:'claude',session_id:'other',started_at_ms:startedAt-86_400_000},
     ]});
@@ -260,8 +266,9 @@ test('default collection includes autonomous AI calls; disabling freezes counts 
   try {
     assert.equal(db.queryCapabilities({},'skill').totalUses,1,'off preserves previous counts through a token rebuild');
     assert.equal(db.queryCapabilities({},'model').totalUses,1,'off does not accumulate model response counts');
-    assert.equal(db.findManifest('claude',file)?.capabilities_collected,0);
+    assert.equal(db.findSourceFile('claude',file)?.capabilities_collected,0);
   } finally {db.close();}
+  ageLogFixtures(file);
   assert.equal((await client.refresh()).reused,1,'off does not repeatedly reparse an unchanged source');
   await client.dispose();client=new SummaryClient({...options,collectCapabilities:false});
   assert.equal((await client.query({section:'skills'})).capabilitiesEnabled,false,'off persists after worker restart');
@@ -276,10 +283,10 @@ test('default collection includes autonomous AI calls; disabling freezes counts 
   db=new SummaryDatabase(dbPath);
   try {
     const before=db.queryTurns();
-    db.connection.exec('ALTER TABLE manifest DROP COLUMN capabilities_collected; PRAGMA user_version=6;');
+    db.connection.exec('ALTER TABLE source_file DROP COLUMN capabilities_collected; PRAGMA user_version=6;');
     db.close();db=new SummaryDatabase(dbPath);
     assert.deepEqual(db.queryTurns(),before,'v6 migration preserves tokens and request identities');
     assert.equal(db.queryCapabilities({},'skill').totalUses,2,'v6 migration preserves historical counts');
-    assert.equal(db.findManifest('claude',file)?.capabilities_collected,0,'legacy coverage is rebuilt on the next enabled scan');
+    assert.equal(db.findSourceFile('claude',file)?.capabilities_collected,0,'legacy coverage is rebuilt on the next enabled scan');
   } finally {db.close();}
 });

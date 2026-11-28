@@ -35,6 +35,7 @@ export class QuotaError extends Error {
     message: string | LocalizedMessage,
     public readonly retryAfterMs?: number,
   ) {
+    // [DTO 정책] 즉시 표시할 설명을 만들고 번역 정보도 남겨 이후 언어 변경에 대응한다.
     super(typeof message === 'string' ? message : t(message.key, message.values));
     if (typeof message !== 'string') this.translation = message;
     this.name = 'QuotaError';
@@ -68,6 +69,7 @@ export function asRecord(value: unknown): Record<string, unknown> | null {
 }
 
 export function durationLabel(minutes: number | null, fallback: string): string {
+  // [표시 정책] 기간이 유효할 때 나누어떨어지는 가장 큰 단위로 표시한다.
   if (minutes === null || !Number.isFinite(minutes) || minutes <= 0) return fallback;
   if (minutes % 1440 === 0) return `${minutes / 1440}d`;
   if (minutes % 60 === 0) return `${minutes / 60}h`;

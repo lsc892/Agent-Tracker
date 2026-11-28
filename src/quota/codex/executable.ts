@@ -9,12 +9,14 @@ import { QuotaError } from '../types';
  */
 export async function resolveCodexExecutable(command: string, env: NodeJS.ProcessEnv = process.env): Promise<string> {
   if (process.platform !== 'win32') return command;
+  // [실행 정책] Windows에서는 지정 경로를 우선하고 이름만 주어지면 PATH 순서로 실행 파일 후보를 방문한다.
   const hasDirectory = isAbsolute(command) || command.includes('/') || command.includes('\\');
   const paths = hasDirectory ? [command] : (env.PATH ?? env.Path ?? '').split(delimiter).filter(Boolean)
     .flatMap(dir => /\.(exe|cmd|ps1)$/i.test(command) ? [join(dir, command)] : [join(dir, `${command}.exe`), join(dir, `${command}.cmd`), join(dir, command)]);
   for (const candidate of paths) {
     if (!(await exists(candidate))) continue;
     if (!/\.(cmd|ps1)$/i.test(candidate)) return candidate;
+    // [실행 정책] Codex shim만 실제 실행 파일로 해석하고 다른 스크립트는 거부한다.
     if (!/^codex\.(cmd|ps1)$/i.test(basename(candidate))) {
       throw new QuotaError('process', { key: 'quota.codexExeRequired' });
     }
@@ -25,6 +27,7 @@ export async function resolveCodexExecutable(command: string, env: NodeJS.Proces
 }
 
 function npmNativeCandidates(bin: string): string[] {
+  // [실행 정책] 현재 아키텍처에 맞춰 중첩 설치, 상위 설치, 내장 배포 순으로 후보 경로를 구성한다.
   const arch = process.arch === 'arm64' ? 'arm64' : 'x64';
   const triple = arch === 'arm64' ? 'aarch64-pc-windows-msvc' : 'x86_64-pc-windows-msvc';
   const packageRoot = join(bin, 'node_modules', '@openai', 'codex');

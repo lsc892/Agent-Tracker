@@ -49,6 +49,7 @@ npx agent-tracker-vscode@latest
 ```
 
 완료되면 VS Code 명령 팔레트에서 **Developer: Reload Window**를 실행하세요.
+Agent Tracker에 사용량 카드 클릭 동작 업데이트 안내가 표시되면 VS Code를 완전히 종료하고 잠시 후 다시 여세요. 지원되는 로컬 Windows·Linux 설치에서는 종료 후 패치가 자동으로 적용됩니다.
 
 <details>
 <summary>추가 옵션: 전역 설치 · 프로필 지정 · macOS 설정</summary>
@@ -146,8 +147,37 @@ npm 패키지 삭제와 VS Code 확장 삭제는 별도입니다.
 
 </details>
 
-<br><br>
+## 사용량 통계 수집 방식
 
-[사용 및 개발 참고](docs/refrences/Development.ko.md)
+프로젝트는 작업 폴더입니다. 세션은 같은 채팅에서 이어진 대화의 묶음입니다. 대화는 사용자 메시지 한 번부터 메인 에이전트의 답변까지이며, 부모가 확인된 서브에이전트의 사용량을 포함합니다. Agent Tracker는 일반 JSONL과 Codex의 Zstd 압축 JSONL을 읽습니다.
 
-[코드별 책임](src/README.md) · [개발 도구](tools/README.md) · [테스트](tests/README.md) · [Webview](media/README.md) · [다국어](localization/README.md) · [리소스](resource/README.md) · [문서](docs/README.md)
+### 로그에서 읽는 필드
+
+| 용도 | Claude | Codex |
+| --- | --- | --- |
+| 세션·스레드 식별 | 메인 로그의 `sessionId`를 사용하며, 값이 없으면 파일명을 사용합니다. 서브에이전트는 상위 세션 폴더와 파일명으로 구분합니다. | `session_meta`의 `payload.id` 또는 `token_usage_record`의 `payload.thread_id`로 스레드를 식별합니다. `payload.session_id`가 없으면 스레드 ID를 세션 ID로 사용합니다. |
+| 모델·응답 식별 | `assistant` 행의 `message.model`, `message.id`, `requestId`를 읽습니다. `isApiErrorMessage`는 토큰이 0인 오류 응답을 거르는 데 사용합니다. | 사용량 행 또는 세션·턴 문맥의 `payload.model`을 읽습니다. `payload.turn_id`와 `payload.response_id`로 응답을 식별합니다. |
+| 입력·출력·캐시 토큰 | `message.usage`의 `input_tokens`, `output_tokens`, `cache_read_input_tokens`, `cache_creation_input_tokens`를 읽습니다. | `payload.usage`의 `input_tokens`와 `output_tokens`를 읽습니다. 캐시는 `cached_input_tokens`와 `cache_write_input_tokens`, 또는 `input_tokens_details.cached_tokens`와 `input_tokens_details.cache_write_tokens`에서 읽습니다. |
+| 누계·부모 참조 | — | `payload.thread_token_usage`, `payload.turn_token_usage`, 구형 `token_count` 이벤트의 `payload.info.total_token_usage`와 `payload.info.last_token_usage`를 읽습니다. `session_meta`에서 `forked_from_id` 또는 직접·중첩 `parent_thread_id`를 확인합니다. |
+| 시각 | 행의 `timestamp`를 읽습니다. | 행의 `timestamp` 또는 `payload.timestamp`와 이벤트의 `payload.started_at`, `payload.completed_at`을 읽습니다. |
+
+### 파싱과 일별 집계
+
+1. JSONL을 줄 단위로 처리해 정해진 필드 경로의 값만 골라냅니다. 한 줄이 여러 청크에 걸치면 JSON 문법 상태와 선택한 값을 이어서 처리합니다. 이미지 Base64는 읽는 중에 건너뜁니다.
+2. Claude는 같은 세션의 `(message.id, requestId)`, Codex는 같은 스레드의 `(turn_id, response_id)`로 중복을 확인합니다. Claude의 같은 메시지에 확인된 요청 ID가 한 종류면 요청 ID가 빠진 기록도 함께 비교합니다. 중복된 응답은 입력과 출력 토큰의 합이 가장 큰 기록을 한 번 반영합니다. Claude는 일반 입력에 캐시 읽기·쓰기를 더하고 Codex는 기록된 입력 총량을 사용합니다.
+3. 구형 Codex 로그는 부모 스레드와 대조해 복사된 앞부분을 제외하고, 남은 누계에서 확인된 증가분을 더합니다. 스레드 누계에 응답 합계로 설명되지 않는 증가분이 있으면 턴 누계나 구형 기록으로 확인한 뒤 합산합니다.
+4. 대화 시작 시각을 통계 시간대의 날짜로 바꿔 일별로 합칩니다. 완료된 대화를 세고, 평균 시간은 소요 시간이 확인된 완료 대화에서 계산합니다.
+
+### SQLite에 저장하는 테이블
+
+| 테이블 | 저장 내용 |
+| --- | --- |
+| `source_file` | 원본 경로, 세션·스레드 ID, 수정 시각, 파서 버전, 처리 상태와 원본 소실 여부를 기록합니다. |
+| `usage_request_daily` | 제공자·세션·프로젝트·현지 날짜별 토큰·시간·비용 합계와 표본 수를 저장합니다. |
+| `usage_model_daily` | 같은 일별 키에 모델을 추가해 모델별 합계와 표본 수를 저장합니다. |
+| `projects`, `sessions` | 프로젝트와 세션의 표시 이름을 저장합니다. |
+| `session_billing` | 제공자와 세션별로 사용자가 지정한 결제 유형을 저장합니다. |
+| `usage_rollup_meta` | 일별 집계에 적용한 시간대와 형식 버전을 저장합니다. |
+| `usage_capability_daily` | 스킬·서브에이전트·플러그인·모델의 일별 사용 횟수를 저장합니다. |
+
+통계 화면은 선택한 기간과 그룹에 맞게 제공자 또는 모델의 일별 행을 합칩니다. 평균은 저장된 합계와 집계에 해당하는 표본 수로 계산합니다.

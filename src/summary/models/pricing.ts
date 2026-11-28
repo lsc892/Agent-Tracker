@@ -32,11 +32,13 @@ const codex: Record<string, Rate> = {
  * 알고리즘: snapshot·latest 접미사를 제거해 단가를 찾고 입력·출력·캐시 쓰기·읽기를 분리 곱셈하며 미지원 단가·미상 캐시는 null로 유지한다.
  */
 export function estimateCost(provider: Provider, usage: ModelUsageInput): number | null {
+  // [비용 정책] 날짜·latest를 뗀 모델명으로 제공자별 단가를 찾고 캐시 성분이 불명확하면 비용을 알 수 없음으로 남긴다.
   const id = usage.model.replace(/-\d{4}-\d{2}-\d{2}$|-\d{8}$|-latest$/,'');
   const rates = provider === 'claude' ? claude : codex;
   const rate = Object.hasOwn(rates,id) ? rates[id] : undefined;
   const write = usage.cache_write_input_tokens, read = usage.cache_read_input_tokens;
   if (!rate || write === null || read === null || write > 0 && rate[2] === null) return null;
+  // [비용 정책] 입력 총량에서 캐시 성분을 빼고 입력·출력·캐시별 단가를 적용한다.
   const input = usage.input_tokens - write - read;
   if (input < 0) return null;
   return (input * rate[0] + usage.output_tokens * rate[1] + write * (rate[2] ?? 0) + read * rate[3]) / 1_000_000;

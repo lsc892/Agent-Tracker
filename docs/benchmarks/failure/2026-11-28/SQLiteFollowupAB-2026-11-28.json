@@ -1,0 +1,4497 @@
+{
+  "startedAt": "2026-11-28T10:37:19.686Z",
+  "completedAt": "2026-11-28T10:40:31.465Z",
+  "branches": {
+    "diagnostics": "perf/sql-explain-diagnostics",
+    "count": "perf/sql-explain-count",
+    "missing-source": "perf/sql-explain-missing-source"
+  },
+  "builds": {
+    "A": {
+      "revision": "e7cba6704e98055bc157a17e73100427baf1ddf4",
+      "source": "4d09dd1592e0752ef644bc1bbdc00ab5656a1886a6cdcc2ff991e1481ae4d0a6",
+      "build": "1058ac2ce3c00ae22e6db1f09e3ac690e44d2531a038d3301e2a2b7aeaec50b3"
+    },
+    "diagnostics": {
+      "revision": "e7cba6704e98055bc157a17e73100427baf1ddf4",
+      "source": "e96e9102625202143400f99fc7fe68c9c017c004c33174fb2ba73a8be3dfb5f8",
+      "build": "d274372b42ce9daef0adcac4777df4b8884e0c33c429736755a131e0cc78e1c4"
+    },
+    "count": {
+      "revision": "e7cba6704e98055bc157a17e73100427baf1ddf4",
+      "source": "a5985e9a9ac68d4ffad8873957170dbc99aa5dafcca1d0e8c62bfba7f3e458d1",
+      "build": "97d479f93f8ad69c0e10eb97966c64af8b46c129fd1030a288a9a5fa5af2b00c"
+    },
+    "missing-source": {
+      "revision": "e7cba6704e98055bc157a17e73100427baf1ddf4",
+      "source": "6bc52801ad411d24a1cccccb3d5cf00e8ec86822eda7c2ac321ca8670b481abe",
+      "build": "c077d9fe14da4a773741f93f078ebf16344514a1b2651c4e2c2185f164c17eeb"
+    }
+  },
+  "environment": {
+    "platform": "win32",
+    "release": "10.0.19045",
+    "arch": "x64",
+    "node": "v24.14.1",
+    "v8": "13.6.233.17-node.44",
+    "sqlite": "3.51.2",
+    "cpu": "AMD Ryzen 5 7500F 6-Core Processor             ",
+    "logicalCpus": 12
+  },
+  "protocol": {
+    "pairs": 20,
+    "warmups": 3,
+    "order": "shared baseline first or last, rotating candidates, sequential",
+    "sourceWorkers": 4,
+    "sampleIntervalMs": 5,
+    "timezone": "Asia/Seoul",
+    "queryIterations": 16
+  },
+  "checks": {
+    "blocks": 60,
+    "baselineCandidateComparisons": 180,
+    "warmupBlocks": 9,
+    "syntheticFullTokens": "matched",
+    "independentAppendDelta": "matched",
+    "edgeFixtures": "passed for A and all candidates",
+    "verification": [
+      {
+        "label": "A",
+        "diagGuard": false,
+        "billingPlan": [
+          "CO-ROUTINE (subquery-2)",
+          "SEARCH usage USING PRIMARY KEY (provider=?)",
+          "SEARCH billing USING PRIMARY KEY (provider=? AND session_id=?) LEFT-JOIN",
+          "USE TEMP B-TREE FOR GROUP BY",
+          "SCAN (subquery-2)"
+        ],
+        "missingPlan": [
+          "SCAN s VIRTUAL TABLE INDEX 1:",
+          "BLOOM FILTER ON f (source_missing=? AND session_id=?)",
+          "SEARCH f USING AUTOMATIC PARTIAL COVERING INDEX (source_missing=? AND session_id=?)",
+          "USE TEMP B-TREE FOR DISTINCT"
+        ]
+      },
+      {
+        "label": "diagnostics",
+        "diagGuard": true,
+        "billingPlan": [
+          "CO-ROUTINE (subquery-2)",
+          "SEARCH usage USING PRIMARY KEY (provider=?)",
+          "SEARCH billing USING PRIMARY KEY (provider=? AND session_id=?) LEFT-JOIN",
+          "USE TEMP B-TREE FOR GROUP BY",
+          "SCAN (subquery-2)"
+        ],
+        "missingPlan": [
+          "SCAN s VIRTUAL TABLE INDEX 1:",
+          "BLOOM FILTER ON f (source_missing=? AND session_id=?)",
+          "SEARCH f USING AUTOMATIC PARTIAL COVERING INDEX (source_missing=? AND session_id=?)",
+          "USE TEMP B-TREE FOR DISTINCT"
+        ]
+      },
+      {
+        "label": "count",
+        "diagGuard": false,
+        "billingPlan": [
+          "CO-ROUTINE (subquery-2)",
+          "SEARCH usage USING PRIMARY KEY (provider=?)",
+          "USE TEMP B-TREE FOR GROUP BY",
+          "SCAN (subquery-2)"
+        ],
+        "missingPlan": [
+          "SCAN s VIRTUAL TABLE INDEX 1:",
+          "BLOOM FILTER ON f (source_missing=? AND session_id=?)",
+          "SEARCH f USING AUTOMATIC PARTIAL COVERING INDEX (source_missing=? AND session_id=?)",
+          "USE TEMP B-TREE FOR DISTINCT"
+        ]
+      },
+      {
+        "label": "missing-source",
+        "diagGuard": false,
+        "billingPlan": [
+          "CO-ROUTINE (subquery-2)",
+          "SEARCH usage USING PRIMARY KEY (provider=?)",
+          "SEARCH billing USING PRIMARY KEY (provider=? AND session_id=?) LEFT-JOIN",
+          "USE TEMP B-TREE FOR GROUP BY",
+          "SCAN (subquery-2)"
+        ],
+        "missingPlan": [
+          "SEARCH source_file USING INDEX sqlite_autoindex_source_file_1 (provider=?)",
+          "LIST SUBQUERY 4",
+          "MATERIALIZE affected_sessions",
+          "SCAN json_each VIRTUAL TABLE INDEX 1:",
+          "SCAN affected_sessions",
+          "CREATE BLOOM FILTER",
+          "LIST SUBQUERY 2",
+          "SCAN affected_sessions",
+          "CREATE BLOOM FILTER",
+          "USE TEMP B-TREE FOR DISTINCT"
+        ]
+      }
+    ]
+  },
+  "data": {
+    "100": {
+      "requests": 100,
+      "inputSha256": "776f035313dcd931d408937da1a71359186090430c2978a2b566061a3a79e0d1",
+      "append": {
+        "parsedFiles": 1,
+        "bytes": 4043,
+        "expectedInput": 123,
+        "expectedOutput": 7
+      },
+      "storageDigests": {
+        "usage_request_daily": "54c89ebac4bb004155e51eb3b147ebc5524d54616fed49bbb419521349e1a3ba",
+        "usage_model_daily": "ecac405384d475e1b287fab08cc96e3e0241388935442528579e3eeef100b381",
+        "usage_capability_daily": "74df6e45d65d4ad7348bea3bc67543fcd9b7419759c6068b0976b9422f8a6dc5",
+        "usage_rollup_meta": "b032255c5ddb50cfc10cc540113803190edebbdbeb88efc36f5abec60f105dae",
+        "projects": "b47e3317c065d27c2bad0853550e050062814b6969b4885a53d5eebea862bc1f",
+        "sessions": "a7eca6930b75326584d2441b5a4a2c1d295a4b6ba55666f82df7d23e5488adf8",
+        "session_billing": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "source_file": "4ecaaad5b811b955b0f9e84583c6e4fc9a165b488f3afbcf1a9b0a46ba6b8453"
+      },
+      "queryDigests": {
+        "day": "27a8b1bcb2d9624dd9b5f2e6f93ae39a84f63799ff0e3d19c62a60be6f783b28",
+        "month": "0f8dfbb8800ad12de3c3e091ef11170dbdfdbb1023e6e782be954258c4e5a6d5",
+        "session": "d3c57c48d784766b063a139c90a4c74ac1340755f63a37f13c1c47a2ded4a8a0",
+        "project": "7cca1055cd8450874f7af6813b7bfdcd2e35fdbcbe402074d0ca07e255bcff05"
+      },
+      "focusedDigests": {
+        "diagnostics": "68c09891ee0907f90a0143a0cd39e6ccfe4d4420e7d1160168b171160145f3c0",
+        "providerCount": "e7f6c011776e8db7cd330b54174fd76f7d0216b612387a5ffcfb81e6f0919683",
+        "modelCount": "4fc82b26aecb47d2868c4efbe3581732a3e7cbcc6c2efb32062c08170a05eeb8",
+        "modelFallback": "0d09bf0e9531d7421ad7d5925264b6cd0ed1d7e7a2784320c0af978a78de25c2",
+        "missing1": "da38ecc0287c5507d461f0fe3f9bb77791298c1d0c515a495622f973f115a072",
+        "missing16": "7d1f64b9d1a4d70a1dada891758b8cc24b4c7242c116e3b3384e5af59fa3628b"
+      },
+      "pairedSamples": [
+        {
+          "order": [
+            "A",
+            "diagnostics",
+            "count",
+            "missing-source"
+          ],
+          "A": {
+            "append": 34.5394,
+            "day": 0.9373000000000218,
+            "month": 0.4008000000000038,
+            "session": 0.491800000000012,
+            "project": 0.4234000000000151,
+            "diagnostics": 0.04613750000000039,
+            "providerCount": 0.40468124999999944,
+            "modelCount": 0.35847499999999854,
+            "modelFallback": 0.7676437500000013,
+            "missing1": 0.004675000000000651,
+            "missing16": 0.029056250000000006
+          },
+          "diagnostics": {
+            "append": 33.2833,
+            "day": 0.940899999999985,
+            "month": 0.3937999999999988,
+            "session": 0.5070999999999799,
+            "project": 0.42840000000001055,
+            "diagnostics": 0.039312500000001194,
+            "providerCount": 0.35200624999999874,
+            "modelCount": 0.3680625000000006,
+            "modelFallback": 0.8335749999999997,
+            "missing1": 0.007550000000000168,
+            "missing16": 0.03345624999999863
+          },
+          "count": {
+            "append": 34.29299999999999,
+            "day": 0.9170000000000016,
+            "month": 0.3768000000000029,
+            "session": 0.45839999999998327,
+            "project": 0.4146000000000072,
+            "diagnostics": 0.06502500000000033,
+            "providerCount": 0.3249874999999989,
+            "modelCount": 0.3162187500000009,
+            "modelFallback": 0.73560625,
+            "missing1": 0.0057125000000013415,
+            "missing16": 0.03741250000000029
+          },
+          "missing-source": {
+            "append": 38.80660000000002,
+            "day": 1.183099999999996,
+            "month": 0.48400000000000887,
+            "session": 0.49799999999999045,
+            "project": 0.45880000000002497,
+            "diagnostics": 0.05405625000000036,
+            "providerCount": 0.42348750000000024,
+            "modelCount": 0.3556499999999989,
+            "modelFallback": 0.8116749999999993,
+            "missing1": 0.007012500000000088,
+            "missing16": 0.018262500000000514
+          }
+        },
+        {
+          "order": [
+            "diagnostics",
+            "missing-source",
+            "count",
+            "A"
+          ],
+          "A": {
+            "append": 32.568,
+            "day": 1.425200000000018,
+            "month": 0.49219999999999686,
+            "session": 0.5940999999999974,
+            "project": 0.594600000000014,
+            "diagnostics": 0.04875625000000028,
+            "providerCount": 0.36738749999999953,
+            "modelCount": 0.3661374999999989,
+            "modelFallback": 0.846425,
+            "missing1": 0.004837500000000716,
+            "missing16": 0.02893124999999941
+          },
+          "diagnostics": {
+            "append": 32.4542,
+            "day": 0.9316000000000031,
+            "month": 0.40209999999999013,
+            "session": 0.487700000000018,
+            "project": 0.4164000000000101,
+            "diagnostics": 0.039318749999999625,
+            "providerCount": 0.4176125000000006,
+            "modelCount": 0.37410624999999875,
+            "modelFallback": 0.828949999999999,
+            "missing1": 0.007406250000000725,
+            "missing16": 0.03744999999999976
+          },
+          "count": {
+            "append": 35.1292,
+            "day": 1.1071000000000026,
+            "month": 0.4072999999999922,
+            "session": 0.45870000000002165,
+            "project": 0.4116999999999962,
+            "diagnostics": 0.06253124999999926,
+            "providerCount": 0.34298124999999935,
+            "modelCount": 0.3185249999999993,
+            "modelFallback": 0.7473812500000001,
+            "missing1": 0.008243750000000105,
+            "missing16": 0.036362500000000963
+          },
+          "missing-source": {
+            "append": 32.502700000000004,
+            "day": 0.9159999999999968,
+            "month": 0.39279999999999404,
+            "session": 0.45889999999999986,
+            "project": 0.4435000000000002,
+            "diagnostics": 0.04829999999999934,
+            "providerCount": 0.3500437500000011,
+            "modelCount": 0.3591250000000006,
+            "modelFallback": 0.8346562500000001,
+            "missing1": 0.00856874999999846,
+            "missing16": 0.016531249999999886
+          }
+        },
+        {
+          "order": [
+            "A",
+            "missing-source",
+            "diagnostics",
+            "count"
+          ],
+          "A": {
+            "append": 33.00619999999999,
+            "day": 0.9916000000000054,
+            "month": 0.38220000000001164,
+            "session": 0.46299999999999386,
+            "project": 0.40740000000002397,
+            "diagnostics": 0.050675000000000026,
+            "providerCount": 0.37861249999999913,
+            "modelCount": 0.3613374999999994,
+            "modelFallback": 0.8026937499999995,
+            "missing1": 0.004812499999999886,
+            "missing16": 0.0279437499999986
+          },
+          "diagnostics": {
+            "append": 32.1339,
+            "day": 1.145700000000005,
+            "month": 0.38809999999999434,
+            "session": 0.4521000000000015,
+            "project": 0.40099999999999625,
+            "diagnostics": 0.03816875000000053,
+            "providerCount": 0.35941249999999947,
+            "modelCount": 0.37558124999999976,
+            "modelFallback": 0.8401187500000002,
+            "missing1": 0.005868749999999423,
+            "missing16": 0.03908125000000062
+          },
+          "count": {
+            "append": 31.89479999999999,
+            "day": 0.9206999999999965,
+            "month": 0.3907999999999987,
+            "session": 0.4650000000000034,
+            "project": 0.41559999999999775,
+            "diagnostics": 0.04633749999999992,
+            "providerCount": 0.31797500000000056,
+            "modelCount": 0.31434999999999924,
+            "modelFallback": 0.7746062499999997,
+            "missing1": 0.004612500000000352,
+            "missing16": 0.027749999999999275
+          },
+          "missing-source": {
+            "append": 32.51910000000001,
+            "day": 1.0986000000000047,
+            "month": 0.5571000000000197,
+            "session": 0.6940999999999917,
+            "project": 0.509699999999981,
+            "diagnostics": 0.048449999999998994,
+            "providerCount": 0.37966875000000044,
+            "modelCount": 0.3770249999999997,
+            "modelFallback": 0.7614625000000004,
+            "missing1": 0.006656250000000696,
+            "missing16": 0.01648750000000021
+          }
+        },
+        {
+          "order": [
+            "missing-source",
+            "count",
+            "diagnostics",
+            "A"
+          ],
+          "A": {
+            "append": 32.9152,
+            "day": 1.372099999999989,
+            "month": 0.583200000000005,
+            "session": 0.6927000000000021,
+            "project": 0.5851999999999862,
+            "diagnostics": 0.07390000000000008,
+            "providerCount": 0.4379187499999997,
+            "modelCount": 0.4549187500000009,
+            "modelFallback": 0.8237874999999999,
+            "missing1": 0.004956249999999329,
+            "missing16": 0.028400000000001313
+          },
+          "diagnostics": {
+            "append": 30.87429999999999,
+            "day": 1.0622000000000043,
+            "month": 0.38900000000001,
+            "session": 0.4490000000000123,
+            "project": 0.40049999999999386,
+            "diagnostics": 0.04928750000000015,
+            "providerCount": 0.38283750000000083,
+            "modelCount": 0.4032,
+            "modelFallback": 0.8676124999999999,
+            "missing1": 0.011968750000001194,
+            "missing16": 0.028406249999999744
+          },
+          "count": {
+            "append": 32.7612,
+            "day": 1.2321000000000026,
+            "month": 0.495199999999997,
+            "session": 0.5602000000000089,
+            "project": 0.4239000000000033,
+            "diagnostics": 0.04604374999999905,
+            "providerCount": 0.38284999999999947,
+            "modelCount": 0.3287937499999991,
+            "modelFallback": 0.8335124999999994,
+            "missing1": 0.005593750000000952,
+            "missing16": 0.034399999999999764
+          },
+          "missing-source": {
+            "append": 32.17529999999999,
+            "day": 0.9281000000000006,
+            "month": 0.38700000000000045,
+            "session": 0.6012000000000057,
+            "project": 0.5630999999999915,
+            "diagnostics": 0.04878749999999954,
+            "providerCount": 0.3624187499999998,
+            "modelCount": 0.3731124999999995,
+            "modelFallback": 0.8092375,
+            "missing1": 0.006643749999998505,
+            "missing16": 0.01637500000000003
+          }
+        },
+        {
+          "order": [
+            "A",
+            "count",
+            "missing-source",
+            "diagnostics"
+          ],
+          "A": {
+            "append": 32.10850000000001,
+            "day": 1.0715000000000146,
+            "month": 0.5121000000000038,
+            "session": 0.5183000000000106,
+            "project": 0.41320000000001755,
+            "diagnostics": 0.06506875000000001,
+            "providerCount": 0.35818124999999945,
+            "modelCount": 0.3618749999999995,
+            "modelFallback": 0.8447687500000001,
+            "missing1": 0.00464375000000139,
+            "missing16": 0.0283250000000006
+          },
+          "diagnostics": {
+            "append": 30.884699999999995,
+            "day": 1.177899999999994,
+            "month": 0.4263000000000261,
+            "session": 0.46160000000000423,
+            "project": 0.4140000000000157,
+            "diagnostics": 0.04014375000000037,
+            "providerCount": 0.4384250000000005,
+            "modelCount": 0.3563375000000004,
+            "modelFallback": 0.8095937500000012,
+            "missing1": 0.004881249999998616,
+            "missing16": 0.03282500000000077
+          },
+          "count": {
+            "append": 32.185500000000005,
+            "day": 0.8982999999999777,
+            "month": 0.3766999999999996,
+            "session": 0.4496000000000038,
+            "project": 0.39050000000000296,
+            "diagnostics": 0.06238749999999982,
+            "providerCount": 0.31508124999999865,
+            "modelCount": 0.3088437499999994,
+            "modelFallback": 0.74989375,
+            "missing1": 0.0046874999999992895,
+            "missing16": 0.02880625000000059
+          },
+          "missing-source": {
+            "append": 33.3454,
+            "day": 1.0116999999999905,
+            "month": 0.3907000000000096,
+            "session": 0.46649999999999636,
+            "project": 0.42499999999998295,
+            "diagnostics": 0.044212499999998656,
+            "providerCount": 0.35306250000000006,
+            "modelCount": 0.3513874999999995,
+            "modelFallback": 0.8201750000000008,
+            "missing1": 0.006287499999999113,
+            "missing16": 0.01570625000000092
+          }
+        },
+        {
+          "order": [
+            "count",
+            "diagnostics",
+            "missing-source",
+            "A"
+          ],
+          "A": {
+            "append": 31.041700000000006,
+            "day": 1.2413999999999987,
+            "month": 0.3965000000000032,
+            "session": 0.4835999999999956,
+            "project": 0.41089999999999804,
+            "diagnostics": 0.04776875000000125,
+            "providerCount": 0.36416875000000104,
+            "modelCount": 0.36951874999999923,
+            "modelFallback": 0.7979749999999992,
+            "missing1": 0.004831250000000509,
+            "missing16": 0.027981249999999847
+          },
+          "diagnostics": {
+            "append": 30.941900000000004,
+            "day": 0.919399999999996,
+            "month": 0.3850999999999942,
+            "session": 0.47400000000000375,
+            "project": 0.5335000000000036,
+            "diagnostics": 0.038243749999999466,
+            "providerCount": 0.38278749999999917,
+            "modelCount": 0.35568750000000016,
+            "modelFallback": 0.8119000000000014,
+            "missing1": 0.004762500000000003,
+            "missing16": 0.02915000000000134
+          },
+          "count": {
+            "append": 31.383799999999994,
+            "day": 1.1107999999999976,
+            "month": 0.5216999999999956,
+            "session": 0.6234999999999928,
+            "project": 0.45770000000001687,
+            "diagnostics": 0.048712499999998826,
+            "providerCount": 0.3739562499999991,
+            "modelCount": 0.34489375000000067,
+            "modelFallback": 0.8356375000000007,
+            "missing1": 0.00501249999999942,
+            "missing16": 0.028443749999999213
+          },
+          "missing-source": {
+            "append": 33.681799999999996,
+            "day": 0.9106000000000023,
+            "month": 0.3877999999999986,
+            "session": 0.4690999999999974,
+            "project": 0.4077000000000055,
+            "diagnostics": 0.048531249999999915,
+            "providerCount": 0.35891875000000084,
+            "modelCount": 0.35781249999999964,
+            "modelFallback": 0.8548624999999994,
+            "missing1": 0.006449999999999179,
+            "missing16": 0.018018749999999528
+          }
+        },
+        {
+          "order": [
+            "A",
+            "diagnostics",
+            "count",
+            "missing-source"
+          ],
+          "A": {
+            "append": 31.564399999999992,
+            "day": 1.0506000000000029,
+            "month": 0.3965000000000032,
+            "session": 0.46769999999999357,
+            "project": 0.3995000000000033,
+            "diagnostics": 0.04568749999999966,
+            "providerCount": 0.4139937499999995,
+            "modelCount": 0.3518000000000008,
+            "modelFallback": 0.8623499999999993,
+            "missing1": 0.004649999999999821,
+            "missing16": 0.028693750000000406
+          },
+          "diagnostics": {
+            "append": 32.51379999999999,
+            "day": 0.9122999999999877,
+            "month": 0.42439999999999145,
+            "session": 0.46280000000001564,
+            "project": 0.405399999999986,
+            "diagnostics": 0.05523749999999872,
+            "providerCount": 0.37698750000000025,
+            "modelCount": 0.40323749999999947,
+            "modelFallback": 0.84995625,
+            "missing1": 0.004912499999999653,
+            "missing16": 0.038600000000000634
+          },
+          "count": {
+            "append": 33.71300000000001,
+            "day": 0.9331999999999994,
+            "month": 0.3920999999999992,
+            "session": 0.4586999999999932,
+            "project": 0.40389999999999304,
+            "diagnostics": 0.04679374999999908,
+            "providerCount": 0.3463750000000001,
+            "modelCount": 0.3078187500000009,
+            "modelFallback": 0.8382187499999993,
+            "missing1": 0.004806250000001455,
+            "missing16": 0.028731249999999875
+          },
+          "missing-source": {
+            "append": 42.518699999999995,
+            "day": 1.3138000000000147,
+            "month": 0.5643000000000029,
+            "session": 0.4884999999999877,
+            "project": 0.6537000000000148,
+            "diagnostics": 0.0598749999999999,
+            "providerCount": 0.468512500000001,
+            "modelCount": 0.39262500000000067,
+            "modelFallback": 0.8091562499999991,
+            "missing1": 0.006643750000000281,
+            "missing16": 0.016468749999999588
+          }
+        },
+        {
+          "order": [
+            "diagnostics",
+            "missing-source",
+            "count",
+            "A"
+          ],
+          "A": {
+            "append": 31.201499999999996,
+            "day": 0.9254999999999995,
+            "month": 0.39910000000000423,
+            "session": 0.47110000000000696,
+            "project": 0.4007000000000005,
+            "diagnostics": 0.050887499999999974,
+            "providerCount": 0.36728749999999977,
+            "modelCount": 0.36421874999999915,
+            "modelFallback": 0.8395875000000004,
+            "missing1": 0.00476875000000021,
+            "missing16": 0.028081249999999613
+          },
+          "diagnostics": {
+            "append": 32.658699999999996,
+            "day": 0.9199999999999875,
+            "month": 0.3984000000000094,
+            "session": 0.4574000000000069,
+            "project": 0.4075000000000273,
+            "diagnostics": 0.03873124999999966,
+            "providerCount": 0.39143749999999855,
+            "modelCount": 0.3522250000000007,
+            "modelFallback": 0.8086000000000002,
+            "missing1": 0.004537499999999639,
+            "missing16": 0.02841875000000016
+          },
+          "count": {
+            "append": 43.125699999999995,
+            "day": 0.941299999999984,
+            "month": 0.4017000000000053,
+            "session": 0.47649999999998727,
+            "project": 0.42840000000001055,
+            "diagnostics": 0.04878124999999933,
+            "providerCount": 0.36256874999999944,
+            "modelCount": 0.36673124999999906,
+            "modelFallback": 0.7890625,
+            "missing1": 0.004637499999999406,
+            "missing16": 0.02782499999999999
+          },
+          "missing-source": {
+            "append": 33.185100000000006,
+            "day": 0.9363999999999919,
+            "month": 0.3913000000000011,
+            "session": 0.4616999999999791,
+            "project": 0.393100000000004,
+            "diagnostics": 0.04947499999999927,
+            "providerCount": 0.40946875000000027,
+            "modelCount": 0.3787374999999997,
+            "modelFallback": 0.7992937500000004,
+            "missing1": 0.006481250000000216,
+            "missing16": 0.01627500000000026
+          }
+        },
+        {
+          "order": [
+            "A",
+            "missing-source",
+            "diagnostics",
+            "count"
+          ],
+          "A": {
+            "append": 31.908200000000008,
+            "day": 0.9179999999999922,
+            "month": 0.42029999999999745,
+            "session": 0.4514999999999816,
+            "project": 0.4064999999999941,
+            "diagnostics": 0.04744374999999934,
+            "providerCount": 0.35959375000000016,
+            "modelCount": 0.39346250000000005,
+            "modelFallback": 0.8889750000000003,
+            "missing1": 0.008131249999999923,
+            "missing16": 0.027737500000000637
+          },
+          "diagnostics": {
+            "append": 31.637,
+            "day": 1.0319999999999823,
+            "month": 0.39979999999999905,
+            "session": 0.540300000000002,
+            "project": 0.4194999999999993,
+            "diagnostics": 0.03941875000000117,
+            "providerCount": 0.39638749999999945,
+            "modelCount": 0.36996249999999975,
+            "modelFallback": 0.803325000000001,
+            "missing1": 0.005774999999999864,
+            "missing16": 0.03785625000000081
+          },
+          "count": {
+            "append": 32.10310000000001,
+            "day": 1.1319999999999908,
+            "month": 0.4035999999999973,
+            "session": 0.4724000000000075,
+            "project": 0.42319999999998004,
+            "diagnostics": 0.04881875000000058,
+            "providerCount": 0.3246437499999999,
+            "modelCount": 0.32381874999999916,
+            "modelFallback": 0.7660125000000004,
+            "missing1": 0.004868749999999977,
+            "missing16": 0.02801875000000109
+          },
+          "missing-source": {
+            "append": 35.62249999999999,
+            "day": 0.954199999999986,
+            "month": 0.5295999999999879,
+            "session": 0.47219999999998663,
+            "project": 0.4018999999999835,
+            "diagnostics": 0.051418749999999847,
+            "providerCount": 0.3738312500000003,
+            "modelCount": 0.3712250000000008,
+            "modelFallback": 0.8957875000000008,
+            "missing1": 0.00864375000000095,
+            "missing16": 0.032756250000000264
+          }
+        },
+        {
+          "order": [
+            "missing-source",
+            "count",
+            "diagnostics",
+            "A"
+          ],
+          "A": {
+            "append": 31.660700000000006,
+            "day": 0.9350999999999914,
+            "month": 0.39930000000001087,
+            "session": 0.4630000000000223,
+            "project": 0.41200000000000614,
+            "diagnostics": 0.049368749999999295,
+            "providerCount": 0.3583312500000009,
+            "modelCount": 0.35776249999999976,
+            "modelFallback": 0.8584250000000004,
+            "missing1": 0.0058312499999999545,
+            "missing16": 0.03504374999999982
+          },
+          "diagnostics": {
+            "append": 34.328900000000004,
+            "day": 0.9798000000000116,
+            "month": 0.39160000000001105,
+            "session": 0.4656999999999982,
+            "project": 0.4241999999999848,
+            "diagnostics": 0.040387499999999577,
+            "providerCount": 0.35959375000000016,
+            "modelCount": 0.3731562499999992,
+            "modelFallback": 0.8074812499999986,
+            "missing1": 0.00557500000000033,
+            "missing16": 0.02776249999999969
+          },
+          "count": {
+            "append": 30.561400000000006,
+            "day": 0.9256000000000029,
+            "month": 0.39050000000000296,
+            "session": 0.4694999999999965,
+            "project": 0.41629999999997835,
+            "diagnostics": 0.05646875000000051,
+            "providerCount": 0.39223750000000024,
+            "modelCount": 0.33005625000000016,
+            "modelFallback": 0.7555250000000004,
+            "missing1": 0.00569999999999915,
+            "missing16": 0.032312499999999744
+          },
+          "missing-source": {
+            "append": 35.7153,
+            "day": 1.2453999999999894,
+            "month": 0.3930000000000007,
+            "session": 0.4642999999999802,
+            "project": 0.4041999999999746,
+            "diagnostics": 0.04786874999999924,
+            "providerCount": 0.359,
+            "modelCount": 0.35220625000000005,
+            "modelFallback": 0.79965625,
+            "missing1": 0.006399999999999295,
+            "missing16": 0.016187499999999133
+          }
+        },
+        {
+          "order": [
+            "A",
+            "count",
+            "missing-source",
+            "diagnostics"
+          ],
+          "A": {
+            "append": 33.07390000000001,
+            "day": 0.9444999999999908,
+            "month": 0.3836000000000013,
+            "session": 0.4709000000000003,
+            "project": 0.3984000000000094,
+            "diagnostics": 0.046968750000001336,
+            "providerCount": 0.36147499999999866,
+            "modelCount": 0.36880000000000024,
+            "modelFallback": 0.7750250000000012,
+            "missing1": 0.004624999999998991,
+            "missing16": 0.028400000000001313
+          },
+          "diagnostics": {
+            "append": 31.9726,
+            "day": 1.0552999999999884,
+            "month": 0.48040000000000305,
+            "session": 0.5326000000000022,
+            "project": 0.39579999999997995,
+            "diagnostics": 0.03990000000000116,
+            "providerCount": 0.35916875000000026,
+            "modelCount": 0.3525437500000006,
+            "modelFallback": 1.1290062499999998,
+            "missing1": 0.007256250000001074,
+            "missing16": 0.048893749999999514
+          },
+          "count": {
+            "append": 31.4649,
+            "day": 0.9073999999999955,
+            "month": 0.37760000000000105,
+            "session": 0.6105000000000018,
+            "project": 0.4124000000000052,
+            "diagnostics": 0.04604374999999905,
+            "providerCount": 0.34267499999999984,
+            "modelCount": 0.31094374999999985,
+            "modelFallback": 0.7648624999999996,
+            "missing1": 0.004649999999999821,
+            "missing16": 0.02766875000000013
+          },
+          "missing-source": {
+            "append": 31.235,
+            "day": 0.9135999999999882,
+            "month": 0.3894999999999982,
+            "session": 0.4783999999999935,
+            "project": 0.39859999999998763,
+            "diagnostics": 0.05683125000000011,
+            "providerCount": 0.48988750000000003,
+            "modelCount": 0.35413125,
+            "modelFallback": 0.7644312500000012,
+            "missing1": 0.006512500000001253,
+            "missing16": 0.016293749999999108
+          }
+        },
+        {
+          "order": [
+            "count",
+            "diagnostics",
+            "missing-source",
+            "A"
+          ],
+          "A": {
+            "append": 32.82300000000001,
+            "day": 1.0328000000000088,
+            "month": 0.40510000000000446,
+            "session": 0.48629999999999995,
+            "project": 0.4314999999999998,
+            "diagnostics": 0.05605624999999925,
+            "providerCount": 0.4063250000000007,
+            "modelCount": 0.3887312499999993,
+            "modelFallback": 0.8230874999999997,
+            "missing1": 0.004712500000000119,
+            "missing16": 0.029049999999999798
+          },
+          "diagnostics": {
+            "append": 42.576499999999996,
+            "day": 1.7132000000000005,
+            "month": 0.6865999999999985,
+            "session": 0.8996999999999957,
+            "project": 0.5917999999999779,
+            "diagnostics": 0.06891249999999971,
+            "providerCount": 0.3943500000000011,
+            "modelCount": 0.4159000000000006,
+            "modelFallback": 0.7921562500000014,
+            "missing1": 0.008374999999999133,
+            "missing16": 0.027906249999999133
+          },
+          "count": {
+            "append": 37.424099999999996,
+            "day": 0.9587999999999965,
+            "month": 0.39740000000000464,
+            "session": 0.5227999999999895,
+            "project": 0.5407999999999902,
+            "diagnostics": 0.048262499999999875,
+            "providerCount": 0.37240625000000094,
+            "modelCount": 0.45188125000000134,
+            "modelFallback": 0.8988999999999994,
+            "missing1": 0.004956249999999329,
+            "missing16": 0.030575000000000685
+          },
+          "missing-source": {
+            "append": 35.564899999999994,
+            "day": 1.1428999999999974,
+            "month": 0.4673000000000229,
+            "session": 0.4603000000000179,
+            "project": 0.42379999999999995,
+            "diagnostics": 0.047518750000000054,
+            "providerCount": 0.4736374999999988,
+            "modelCount": 0.6074437499999998,
+            "modelFallback": 0.8606874999999992,
+            "missing1": 0.006462499999999594,
+            "missing16": 0.026506249999998843
+          }
+        },
+        {
+          "order": [
+            "A",
+            "diagnostics",
+            "count",
+            "missing-source"
+          ],
+          "A": {
+            "append": 31.64540000000001,
+            "day": 0.9218999999999937,
+            "month": 0.38179999999999836,
+            "session": 0.47759999999999536,
+            "project": 0.405399999999986,
+            "diagnostics": 0.04713749999999983,
+            "providerCount": 0.3849062500000002,
+            "modelCount": 0.37942499999999946,
+            "modelFallback": 0.8269812500000011,
+            "missing1": 0.004662500000000236,
+            "missing16": 0.028106249999998667
+          },
+          "diagnostics": {
+            "append": 31.74029999999999,
+            "day": 0.9277000000000015,
+            "month": 0.3897000000000048,
+            "session": 0.4672999999999945,
+            "project": 0.40389999999999304,
+            "diagnostics": 0.03994375000000083,
+            "providerCount": 0.4327249999999996,
+            "modelCount": 0.35313750000000077,
+            "modelFallback": 0.8339937500000012,
+            "missing1": 0.00483749999999894,
+            "missing16": 0.029143750000001134
+          },
+          "count": {
+            "append": 33.99720000000001,
+            "day": 1.0276000000000067,
+            "month": 0.3966999999999814,
+            "session": 0.46940000000000737,
+            "project": 0.41089999999999804,
+            "diagnostics": 0.049125000000000085,
+            "providerCount": 0.3784687499999997,
+            "modelCount": 0.3514187499999988,
+            "modelFallback": 0.7701000000000011,
+            "missing1": 0.004737499999999173,
+            "missing16": 0.02853125000000034
+          },
+          "missing-source": {
+            "append": 33.28110000000001,
+            "day": 0.9555000000000007,
+            "month": 0.39689999999998804,
+            "session": 0.4601999999999862,
+            "project": 0.4151999999999987,
+            "diagnostics": 0.06870624999999997,
+            "providerCount": 0.43332499999999996,
+            "modelCount": 0.35738749999999975,
+            "modelFallback": 0.7777312500000004,
+            "missing1": 0.006524999999999892,
+            "missing16": 0.01603125000000105
+          }
+        },
+        {
+          "order": [
+            "diagnostics",
+            "missing-source",
+            "count",
+            "A"
+          ],
+          "A": {
+            "append": 32.4567,
+            "day": 1.2032000000000096,
+            "month": 0.7631000000000085,
+            "session": 0.6740999999999815,
+            "project": 0.4269999999999925,
+            "diagnostics": 0.0482812500000005,
+            "providerCount": 0.40781875000000056,
+            "modelCount": 0.35117499999999957,
+            "modelFallback": 0.7960687499999999,
+            "missing1": 0.0046187499999987836,
+            "missing16": 0.028731249999999875
+          },
+          "diagnostics": {
+            "append": 32.078100000000006,
+            "day": 0.9839000000000055,
+            "month": 0.393100000000004,
+            "session": 0.47359999999997626,
+            "project": 0.44290000000000873,
+            "diagnostics": 0.040274999999999395,
+            "providerCount": 0.39131249999999973,
+            "modelCount": 0.3843437499999993,
+            "modelFallback": 0.7700250000000004,
+            "missing1": 0.004518750000000793,
+            "missing16": 0.028024999999999523
+          },
+          "count": {
+            "append": 33.9654,
+            "day": 0.9716000000000236,
+            "month": 0.38700000000000045,
+            "session": 0.47049999999998704,
+            "project": 0.4011999999999887,
+            "diagnostics": 0.05385625000000083,
+            "providerCount": 0.34634999999999927,
+            "modelCount": 0.32278750000000045,
+            "modelFallback": 0.7943625000000001,
+            "missing1": 0.0059187499999993065,
+            "missing16": 0.028575000000000017
+          },
+          "missing-source": {
+            "append": 30.893599999999992,
+            "day": 1.3824999999999932,
+            "month": 0.4177999999999997,
+            "session": 0.47330000000002315,
+            "project": 0.6259000000000015,
+            "diagnostics": 0.047068749999999326,
+            "providerCount": 0.4061937499999999,
+            "modelCount": 0.3550312499999997,
+            "modelFallback": 0.8163,
+            "missing1": 0.006362500000001603,
+            "missing16": 0.016381250000000236
+          }
+        },
+        {
+          "order": [
+            "A",
+            "missing-source",
+            "diagnostics",
+            "count"
+          ],
+          "A": {
+            "append": 31.04010000000001,
+            "day": 0.9103999999999957,
+            "month": 0.41160000000000707,
+            "session": 0.46300000000000807,
+            "project": 0.4813999999999794,
+            "diagnostics": 0.05086875000000113,
+            "providerCount": 0.39279375000000094,
+            "modelCount": 0.3801375,
+            "modelFallback": 0.8716062499999992,
+            "missing1": 0.0046874999999992895,
+            "missing16": 0.02901250000000033
+          },
+          "diagnostics": {
+            "append": 31.668599999999998,
+            "day": 0.9252999999999929,
+            "month": 0.5133999999999901,
+            "session": 0.47450000000000614,
+            "project": 0.40639999999999077,
+            "diagnostics": 0.06020000000000003,
+            "providerCount": 0.413450000000001,
+            "modelCount": 0.3569999999999993,
+            "modelFallback": 0.8611625000000007,
+            "missing1": 0.004843750000000924,
+            "missing16": 0.029049999999999798
+          },
+          "count": {
+            "append": 33.024,
+            "day": 0.9331999999999994,
+            "month": 0.4018000000000086,
+            "session": 0.4532000000000096,
+            "project": 0.4194000000000244,
+            "diagnostics": 0.06876875000000027,
+            "providerCount": 0.3181875000000005,
+            "modelCount": 0.3131062500000006,
+            "modelFallback": 0.8063125000000007,
+            "missing1": 0.004600000000001714,
+            "missing16": 0.044475000000000264
+          },
+          "missing-source": {
+            "append": 33.4011,
+            "day": 0.9350000000000023,
+            "month": 0.38700000000000045,
+            "session": 0.46580000000000155,
+            "project": 0.4287999999999954,
+            "diagnostics": 0.048768750000000693,
+            "providerCount": 0.39808749999999904,
+            "modelCount": 0.3536937499999997,
+            "modelFallback": 0.7794750000000015,
+            "missing1": 0.007318749999999596,
+            "missing16": 0.01658124999999977
+          }
+        },
+        {
+          "order": [
+            "missing-source",
+            "count",
+            "diagnostics",
+            "A"
+          ],
+          "A": {
+            "append": 39.612300000000005,
+            "day": 1.0614999999999952,
+            "month": 0.39759999999998286,
+            "session": 0.458500000000015,
+            "project": 0.41319999999998913,
+            "diagnostics": 0.06841250000000088,
+            "providerCount": 0.4384125000000001,
+            "modelCount": 0.37339374999999997,
+            "modelFallback": 0.7861812500000003,
+            "missing1": 0.004687500000001066,
+            "missing16": 0.02874375000000029
+          },
+          "diagnostics": {
+            "append": 31.567800000000005,
+            "day": 0.9076999999999913,
+            "month": 0.39050000000000296,
+            "session": 0.47520000000000095,
+            "project": 0.39939999999998577,
+            "diagnostics": 0.039975000000000094,
+            "providerCount": 0.4334124999999993,
+            "modelCount": 0.35647499999999965,
+            "modelFallback": 0.829806249999999,
+            "missing1": 0.004656250000000028,
+            "missing16": 0.028143749999999912
+          },
+          "count": {
+            "append": 31.496800000000007,
+            "day": 0.931200000000004,
+            "month": 0.4205000000000041,
+            "session": 0.4591000000000065,
+            "project": 0.44839999999999236,
+            "diagnostics": 0.04870000000000019,
+            "providerCount": 0.3126437500000012,
+            "modelCount": 0.31874374999999944,
+            "modelFallback": 0.7996375000000011,
+            "missing1": 0.004787500000000833,
+            "missing16": 0.030543749999999648
+          },
+          "missing-source": {
+            "append": 31.371499999999997,
+            "day": 0.9846000000000004,
+            "month": 0.38289999999999225,
+            "session": 0.4724000000000075,
+            "project": 0.41039999999999566,
+            "diagnostics": 0.050149999999998585,
+            "providerCount": 0.38973124999999875,
+            "modelCount": 0.3861187499999996,
+            "modelFallback": 0.7996937499999994,
+            "missing1": 0.0066624999999991275,
+            "missing16": 0.02052499999999924
+          }
+        },
+        {
+          "order": [
+            "A",
+            "count",
+            "missing-source",
+            "diagnostics"
+          ],
+          "A": {
+            "append": 32.821600000000004,
+            "day": 1.2017999999999915,
+            "month": 0.3984999999999843,
+            "session": 0.537399999999991,
+            "project": 0.43159999999997467,
+            "diagnostics": 0.04910624999999946,
+            "providerCount": 0.36570625000000057,
+            "modelCount": 0.35989374999999946,
+            "modelFallback": 0.8645999999999994,
+            "missing1": 0.004675000000000651,
+            "missing16": 0.027737500000000637
+          },
+          "diagnostics": {
+            "append": 31.653099999999995,
+            "day": 0.9180000000000064,
+            "month": 0.3889000000000067,
+            "session": 0.6210000000000093,
+            "project": 0.4251999999999896,
+            "diagnostics": 0.03968749999999943,
+            "providerCount": 0.39673749999999863,
+            "modelCount": 0.38523750000000057,
+            "modelFallback": 0.7762874999999987,
+            "missing1": 0.0047312499999989654,
+            "missing16": 0.02788125000000008
+          },
+          "count": {
+            "append": 37.63890000000001,
+            "day": 0.9157000000000153,
+            "month": 0.37469999999999004,
+            "session": 0.4662000000000148,
+            "project": 0.4212999999999738,
+            "diagnostics": 0.049637499999999335,
+            "providerCount": 0.3551687500000007,
+            "modelCount": 0.31888750000000066,
+            "modelFallback": 0.7462874999999993,
+            "missing1": 0.0045874999999995225,
+            "missing16": 0.02773125000000043
+          },
+          "missing-source": {
+            "append": 31.908299999999997,
+            "day": 0.9483000000000033,
+            "month": 0.3918999999999926,
+            "session": 0.4567000000000121,
+            "project": 0.6454999999999984,
+            "diagnostics": 0.09504375000000032,
+            "providerCount": 0.41763750000000144,
+            "modelCount": 0.42404374999999916,
+            "modelFallback": 0.8608250000000002,
+            "missing1": 0.009137499999999577,
+            "missing16": 0.016868750000000432
+          }
+        },
+        {
+          "order": [
+            "count",
+            "diagnostics",
+            "missing-source",
+            "A"
+          ],
+          "A": {
+            "append": 32.81100000000001,
+            "day": 0.9052999999999969,
+            "month": 0.38870000000000005,
+            "session": 0.47930000000000916,
+            "project": 0.41689999999999827,
+            "diagnostics": 0.055862499999999926,
+            "providerCount": 0.3534562499999989,
+            "modelCount": 0.35606250000000017,
+            "modelFallback": 0.8304625000000012,
+            "missing1": 0.004749999999999588,
+            "missing16": 0.02833749999999924
+          },
+          "diagnostics": {
+            "append": 32.032700000000006,
+            "day": 0.9432999999999936,
+            "month": 0.38119999999999266,
+            "session": 0.53479999999999,
+            "project": 0.48340000000001737,
+            "diagnostics": 0.04118124999999928,
+            "providerCount": 0.3579062499999992,
+            "modelCount": 0.35904374999999966,
+            "modelFallback": 0.8099687500000012,
+            "missing1": 0.0047312499999989654,
+            "missing16": 0.02776249999999969
+          },
+          "count": {
+            "append": 33.17920000000001,
+            "day": 0.90949999999998,
+            "month": 0.3836000000000013,
+            "session": 0.46129999999999427,
+            "project": 0.4094000000000051,
+            "diagnostics": 0.04680000000000106,
+            "providerCount": 0.35738749999999975,
+            "modelCount": 0.3304437500000006,
+            "modelFallback": 0.7716624999999997,
+            "missing1": 0.004743750000001157,
+            "missing16": 0.0343
+          },
+          "missing-source": {
+            "append": 35.3601,
+            "day": 0.9161000000000001,
+            "month": 0.48730000000000473,
+            "session": 0.46870000000001255,
+            "project": 0.4065999999999974,
+            "diagnostics": 0.043856249999999264,
+            "providerCount": 0.3917937499999997,
+            "modelCount": 0.35330625000000104,
+            "modelFallback": 0.7731625000000015,
+            "missing1": 0.006893750000001475,
+            "missing16": 0.01750625000000028
+          }
+        },
+        {
+          "order": [
+            "A",
+            "diagnostics",
+            "count",
+            "missing-source"
+          ],
+          "A": {
+            "append": 36.63929999999999,
+            "day": 0.9239999999999782,
+            "month": 0.3894000000000233,
+            "session": 0.4779000000000053,
+            "project": 0.411200000000008,
+            "diagnostics": 0.059081250000000196,
+            "providerCount": 0.3508187500000002,
+            "modelCount": 0.35179375000000057,
+            "modelFallback": 0.7681187499999993,
+            "missing1": 0.007181249999998585,
+            "missing16": 0.05167499999999947
+          },
+          "diagnostics": {
+            "append": 34.62140000000001,
+            "day": 0.9480000000000075,
+            "month": 0.39449999999999363,
+            "session": 0.4555999999999756,
+            "project": 0.45130000000000337,
+            "diagnostics": 0.041581250000000125,
+            "providerCount": 0.4128437500000004,
+            "modelCount": 0.35323125000000033,
+            "modelFallback": 0.8531875000000007,
+            "missing1": 0.004725000000000534,
+            "missing16": 0.030893750000000608
+          },
+          "count": {
+            "append": 42.7671,
+            "day": 1.2360999999999933,
+            "month": 0.401299999999992,
+            "session": 0.49739999999999895,
+            "project": 0.4265000000000043,
+            "diagnostics": 0.06564999999999976,
+            "providerCount": 0.4597124999999984,
+            "modelCount": 0.32681250000000084,
+            "modelFallback": 0.8374562500000007,
+            "missing1": 0.004693749999999497,
+            "missing16": 0.027843749999998835
+          },
+          "missing-source": {
+            "append": 31.7397,
+            "day": 0.9082000000000079,
+            "month": 0.4005999999999972,
+            "session": 0.4498999999999853,
+            "project": 0.5284000000000049,
+            "diagnostics": 0.04771874999999959,
+            "providerCount": 0.37601875000000007,
+            "modelCount": 0.38003124999999827,
+            "modelFallback": 1.0005249999999997,
+            "missing1": 0.006812499999998778,
+            "missing16": 0.016087499999999366
+          }
+        },
+        {
+          "order": [
+            "diagnostics",
+            "missing-source",
+            "count",
+            "A"
+          ],
+          "A": {
+            "append": 30.959699999999998,
+            "day": 0.9124999999999943,
+            "month": 0.37940000000000396,
+            "session": 0.4497000000000071,
+            "project": 0.4057999999999993,
+            "diagnostics": 0.04812500000000064,
+            "providerCount": 0.3945875000000001,
+            "modelCount": 0.4023500000000002,
+            "modelFallback": 0.8522749999999988,
+            "missing1": 0.004799999999999471,
+            "missing16": 0.029306249999999423
+          },
+          "diagnostics": {
+            "append": 31.600700000000003,
+            "day": 0.9588999999999999,
+            "month": 0.37930000000000064,
+            "session": 0.4744000000000028,
+            "project": 0.4008000000000038,
+            "diagnostics": 0.040724999999998346,
+            "providerCount": 0.38582500000000053,
+            "modelCount": 0.3524312500000004,
+            "modelFallback": 0.8512749999999993,
+            "missing1": 0.00479375000000104,
+            "missing16": 0.02815000000000012
+          },
+          "count": {
+            "append": 32.7504,
+            "day": 0.9390999999999963,
+            "month": 0.4036999999999864,
+            "session": 0.4689000000000192,
+            "project": 0.41380000000000905,
+            "diagnostics": 0.052343750000000355,
+            "providerCount": 0.36758749999999907,
+            "modelCount": 0.35713750000000033,
+            "modelFallback": 0.7415562500000004,
+            "missing1": 0.0046437499999996135,
+            "missing16": 0.028281249999999147
+          },
+          "missing-source": {
+            "append": 32.3802,
+            "day": 1.0510000000000161,
+            "month": 0.4157999999999902,
+            "session": 0.46760000000000446,
+            "project": 0.43549999999999045,
+            "diagnostics": 0.048199999999999577,
+            "providerCount": 0.36091874999999973,
+            "modelCount": 0.4098437500000003,
+            "modelFallback": 0.8221437500000004,
+            "missing1": 0.006381250000000449,
+            "missing16": 0.015712499999999352
+          }
+        }
+      ],
+      "timings": {
+        "diagnostics": {
+          "append": {
+            "a": 32.51235,
+            "b": 32.00265,
+            "reductionPercent": 1.5677119617622077,
+            "fasterPairs": 13,
+            "pairedDeltaIqr": [
+              -1.1823250000000094,
+              0.6316249999999926
+            ]
+          },
+          "day": {
+            "a": 0.9680499999999981,
+            "b": 0.9456500000000005,
+            "reductionPercent": 2.3139300655955353,
+            "fasterPairs": 8,
+            "pairedDeltaIqr": [
+              -0.17017500000000396,
+              0.06139999999999901
+            ]
+          },
+          "month": {
+            "a": 0.39879999999999427,
+            "b": 0.3934500000000014,
+            "reductionPercent": 1.3415245737193926,
+            "fasterPairs": 13,
+            "pairedDeltaIqr": [
+              -0.013675000000006321,
+              0.006399999999988637
+            ]
+          },
+          "session": {
+            "a": 0.47775000000000034,
+            "b": 0.4742000000000033,
+            "reductionPercent": 0.7430664573515547,
+            "fasterPairs": 10,
+            "pairedDeltaIqr": [
+              -0.01585000000000747,
+              0.03239999999999199
+            ]
+          },
+          "project": {
+            "a": 0.41259999999999764,
+            "b": 0.4152000000000129,
+            "reductionPercent": -0.6301502666057373,
+            "fasterPairs": 9,
+            "pairedDeltaIqr": [
+              -0.006399999999995742,
+              0.01372500000000798
+            ]
+          },
+          "diagnostics": {
+            "a": 0.04923749999999938,
+            "b": 0.04005937500000023,
+            "reductionPercent": 18.640517897942146,
+            "fasterPairs": 17,
+            "pairedDeltaIqr": [
+              -0.013049999999999784,
+              -0.007162499999999294
+            ]
+          }
+        },
+        "count": {
+          "append": {
+            "a": 32.51235,
+            "b": 33.101600000000005,
+            "reductionPercent": -1.8123882155550337,
+            "fasterPairs": 6,
+            "pairedDeltaIqr": [
+              -0.17709999999999937,
+              2.404149999999998
+            ]
+          },
+          "day": {
+            "a": 0.9680499999999981,
+            "b": 0.9361499999999978,
+            "reductionPercent": 3.2952843344868885,
+            "fasterPairs": 13,
+            "pairedDeltaIqr": [
+              -0.13294999999999746,
+              0.017549999999989296
+            ]
+          },
+          "month": {
+            "a": 0.39879999999999427,
+            "b": 0.397049999999993,
+            "reductionPercent": 0.438816449348364,
+            "fasterPairs": 13,
+            "pairedDeltaIqr": [
+              -0.02384999999999593,
+              0.009424999999982475
+            ]
+          },
+          "session": {
+            "a": 0.47775000000000034,
+            "b": 0.4691500000000133,
+            "reductionPercent": 1.800104657244805,
+            "fasterPairs": 10,
+            "pairedDeltaIqr": [
+              -0.04222500000002327,
+              0.01927500000000748
+            ]
+          },
+          "project": {
+            "a": 0.41259999999999764,
+            "b": 0.41594999999998805,
+            "reductionPercent": -0.8119243819656896,
+            "fasterPairs": 8,
+            "pairedDeltaIqr": [
+              -0.013400000000004297,
+              0.015649999999993724
+            ]
+          },
+          "providerCount": {
+            "a": 0.37299999999999933,
+            "b": 0.3507718750000004,
+            "reductionPercent": 5.95928284182278,
+            "fasterPairs": 16,
+            "pairedDeltaIqr": [
+              -0.06084531249999925,
+              -0.006007812500000487
+            ]
+          },
+          "modelCount": {
+            "a": 0.365178124999999,
+            "b": 0.3233031249999998,
+            "reductionPercent": 11.46700668338207,
+            "fasterPairs": 18,
+            "pairedDeltaIqr": [
+              -0.0534359375000002,
+              -0.027184374999999594
+            ]
+          },
+          "modelFallback": {
+            "a": 0.8287218750000012,
+            "b": 0.7731343749999997,
+            "reductionPercent": 6.707618282671901,
+            "fasterPairs": 15,
+            "pairedDeltaIqr": [
+              -0.0959171875,
+              0.0011515625000000362
+            ]
+          }
+        },
+        "missing-source": {
+          "append": {
+            "a": 32.51235,
+            "b": 33.23310000000001,
+            "reductionPercent": -2.2168499047285404,
+            "fasterPairs": 8,
+            "pairedDeltaIqr": [
+              -0.783250000000006,
+              2.665549999999989
+            ]
+          },
+          "day": {
+            "a": 0.9680499999999981,
+            "b": 0.9548499999999933,
+            "reductionPercent": 1.363565931512297,
+            "fasterPairs": 8,
+            "pairedDeltaIqr": [
+              -0.06407500000001676,
+              0.11719999999999686
+            ]
+          },
+          "month": {
+            "a": 0.39879999999999427,
+            "b": 0.39494999999999436,
+            "reductionPercent": 0.9653961885656882,
+            "fasterPairs": 10,
+            "pairedDeltaIqr": [
+              -0.01717499999999461,
+              0.06745000000001511
+            ]
+          },
+          "session": {
+            "a": 0.47775000000000034,
+            "b": 0.4681500000000085,
+            "reductionPercent": 2.0094191522745852,
+            "fasterPairs": 11,
+            "pairedDeltaIqr": [
+              -0.033950000000018576,
+              0.009099999999993003
+            ]
+          },
+          "project": {
+            "a": 0.41259999999999764,
+            "b": 0.4268999999999892,
+            "reductionPercent": -3.465826466309167,
+            "fasterPairs": 10,
+            "pairedDeltaIqr": [
+              -0.0077250000000077534,
+              0.052124999999996646
+            ]
+          },
+          "missing1": {
+            "a": 0.004731249999999854,
+            "b": 0.006643749999999393,
+            "reductionPercent": -40.42272126815533,
+            "fasterPairs": 1,
+            "pairedDeltaIqr": [
+              0.00163749999999796,
+              0.002031250000000817
+            ]
+          },
+          "missing16": {
+            "a": 0.02854687500000086,
+            "b": 0.0164781249999999,
+            "reductionPercent": 42.27695675971747,
+            "fasterPairs": 19,
+            "pairedDeltaIqr": [
+              -0.012407812499999782,
+              -0.010821874999999093
+            ]
+          }
+        }
+      }
+    },
+    "10000": {
+      "requests": 10000,
+      "inputSha256": "41c63e61babca594b2c427db7c36fad86664ac2b92b94ec4ccf1cf5a08f6fead",
+      "append": {
+        "parsedFiles": 1,
+        "bytes": 33930,
+        "expectedInput": 123,
+        "expectedOutput": 7
+      },
+      "storageDigests": {
+        "usage_request_daily": "2cee17c7e5f51f83da49a3bbbee5d72c99ef6d4f59a07e1d1bad7887ee5402d3",
+        "usage_model_daily": "da0e09d9c6539c6ca2641394e62d59f443e5d223274d2f28f08206f6d28c3a23",
+        "usage_capability_daily": "ff11a9720f63cb9e79c22312a600c7991d921a72eac0471716f1236b71199d78",
+        "usage_rollup_meta": "b032255c5ddb50cfc10cc540113803190edebbdbeb88efc36f5abec60f105dae",
+        "projects": "b47e3317c065d27c2bad0853550e050062814b6969b4885a53d5eebea862bc1f",
+        "sessions": "329f6e06095fbb1414c92d9015088601aaf0bb8a1bc92b6a3968b39dd4b0026c",
+        "session_billing": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "source_file": "787d0980837135def85efcc1cebb0f9c649aba51b8ff83de099a3b37fb78c5c5"
+      },
+      "queryDigests": {
+        "day": "f24819c8417034979d4df497df3412b3e874697ba760e65c1f7b04f7bdd433bd",
+        "month": "b481877f8f8731f0f77a923a38f3f540feef8de16d2fd6e37de2f03dbadd4b18",
+        "session": "c6d3040011703684f08c950dac9060d33a987ec22d251c6f46222b7adb4e8774",
+        "project": "213666c31a4f21882c8f44cff0f104e1ddd6964e175e208f47d2ff4bb1160c32"
+      },
+      "focusedDigests": {
+        "diagnostics": "995c489a3dee97607069edcb8121a8e7c1d983e206cd95d4bd1086003d8327c6",
+        "providerCount": "1a6562590ef19d1045d06c4055742d38288e9e6dcd71ccde5cee80f1d5a774eb",
+        "modelCount": "ad57366865126e55649ecb23ae1d48887544976efea46a48eb5d85a6eeb4d306",
+        "modelFallback": "dc607b288943721f53b0de08d2ca72732565654fabcaf0e863786eae5acb3954",
+        "missing1": "da38ecc0287c5507d461f0fe3f9bb77791298c1d0c515a495622f973f115a072",
+        "missing16": "f78d120263296c93c89aba1c4edd2bd62d8d06dbea97f1464a55b639e0bdcc0d"
+      },
+      "pairedSamples": [
+        {
+          "order": [
+            "A",
+            "diagnostics",
+            "count",
+            "missing-source"
+          ],
+          "A": {
+            "append": 70.63180000000003,
+            "day": 5.162800000000004,
+            "month": 4.406400000000019,
+            "session": 4.188699999999983,
+            "project": 4.210100000000011,
+            "diagnostics": 0.08552499999999696,
+            "providerCount": 3.1350312500000044,
+            "modelCount": 6.996674999999996,
+            "modelFallback": 21.943925000000007,
+            "missing1": 0.010950000000008231,
+            "missing16": 0.019806250000002024
+          },
+          "diagnostics": {
+            "append": 59.166399999999996,
+            "day": 5.457300000000032,
+            "month": 4.14549999999997,
+            "session": 3.7128000000000156,
+            "project": 4.58420000000001,
+            "diagnostics": 0.06507500000000022,
+            "providerCount": 3.0698812500000017,
+            "modelCount": 7.345556250000001,
+            "modelFallback": 22.573700000000002,
+            "missing1": 0.011231249999994475,
+            "missing16": 0.025406249999988972
+          },
+          "count": {
+            "append": 60.31399999999999,
+            "day": 5.473900000000015,
+            "month": 4.319099999999992,
+            "session": 3.733000000000004,
+            "project": 4.1107000000000085,
+            "diagnostics": 0.09297499999999914,
+            "providerCount": 2.3693375000000003,
+            "modelCount": 5.671043750000003,
+            "modelFallback": 19.820949999999996,
+            "missing1": 0.011756249999997692,
+            "missing16": 0.019643750000000182
+          },
+          "missing-source": {
+            "append": 58.614300000000014,
+            "day": 5.240299999999991,
+            "month": 4.239599999999996,
+            "session": 3.6363000000000056,
+            "project": 4.166699999999992,
+            "diagnostics": 0.1106812500000025,
+            "providerCount": 3.1606249999999996,
+            "modelCount": 7.1996875,
+            "modelFallback": 21.512068749999997,
+            "missing1": 0.013249999999999318,
+            "missing16": 0.02394375000000082
+          }
+        },
+        {
+          "order": [
+            "diagnostics",
+            "missing-source",
+            "count",
+            "A"
+          ],
+          "A": {
+            "append": 71.43920000000001,
+            "day": 7.346000000000004,
+            "month": 5.967399999999998,
+            "session": 5.374900000000025,
+            "project": 5.796099999999967,
+            "diagnostics": 0.08724374999999895,
+            "providerCount": 3.7966750000000005,
+            "modelCount": 10.072787500000004,
+            "modelFallback": 25.8239875,
+            "missing1": 0.011812500000004889,
+            "missing16": 0.024450000000001637
+          },
+          "diagnostics": {
+            "append": 58.3142,
+            "day": 5.285600000000045,
+            "month": 4.4751999999999725,
+            "session": 3.598700000000008,
+            "project": 4.216300000000047,
+            "diagnostics": 0.061618750000000944,
+            "providerCount": 3.1343812500000006,
+            "modelCount": 7.107587500000001,
+            "modelFallback": 22.099456250000003,
+            "missing1": 0.010975000000001955,
+            "missing16": 0.020150000000001
+          },
+          "count": {
+            "append": 68.30210000000001,
+            "day": 6.419900000000041,
+            "month": 4.768400000000042,
+            "session": 4.881399999999985,
+            "project": 4.5417999999999665,
+            "diagnostics": 0.08317500000000067,
+            "providerCount": 2.3351500000000023,
+            "modelCount": 6.536106249999996,
+            "modelFallback": 23.385593750000005,
+            "missing1": 0.013787500000006503,
+            "missing16": 0.024650000000008276
+          },
+          "missing-source": {
+            "append": 63.80969999999999,
+            "day": 5.97829999999999,
+            "month": 4.524500000000046,
+            "session": 4.818399999999997,
+            "project": 4.904999999999973,
+            "diagnostics": 0.12331874999999926,
+            "providerCount": 3.3090999999999973,
+            "modelCount": 9.596625000000003,
+            "modelFallback": 23.75046875000001,
+            "missing1": 0.013787500000006503,
+            "missing16": 0.029687500000008527
+          }
+        },
+        {
+          "order": [
+            "A",
+            "missing-source",
+            "diagnostics",
+            "count"
+          ],
+          "A": {
+            "append": 69.12599999999999,
+            "day": 6.47180000000003,
+            "month": 6.398799999999994,
+            "session": 4.6632999999999925,
+            "project": 6.048299999999983,
+            "diagnostics": 0.18204374999999828,
+            "providerCount": 4.074768749999997,
+            "modelCount": 9.819193749999997,
+            "modelFallback": 31.479768750000005,
+            "missing1": 0.011056250000009982,
+            "missing16": 0.02178750000000207
+          },
+          "diagnostics": {
+            "append": 86.10090000000001,
+            "day": 9.16459999999995,
+            "month": 5.611499999999978,
+            "session": 6.463999999999942,
+            "project": 6.7287000000000035,
+            "diagnostics": 0.10821874999999892,
+            "providerCount": 4.192531250000002,
+            "modelCount": 10.491587499999994,
+            "modelFallback": 28.818600000000004,
+            "missing1": 0.06550000000000011,
+            "missing16": 0.07033749999999372
+          },
+          "count": {
+            "append": 75.19470000000001,
+            "day": 6.471000000000004,
+            "month": 6.75079999999997,
+            "session": 5.880600000000015,
+            "project": 6.453100000000063,
+            "diagnostics": 0.14443124999999668,
+            "providerCount": 2.7476812499999994,
+            "modelCount": 7.194099999999999,
+            "modelFallback": 25.694924999999998,
+            "missing1": 0.016981250000000614,
+            "missing16": 0.0320249999999902
+          },
+          "missing-source": {
+            "append": 75.67920000000001,
+            "day": 7.465599999999995,
+            "month": 6.285799999999995,
+            "session": 5.463499999999954,
+            "project": 5.936900000000037,
+            "diagnostics": 0.11074374999999748,
+            "providerCount": 4.310912500000001,
+            "modelCount": 10.242287500000003,
+            "modelFallback": 29.833799999999997,
+            "missing1": 0.04557499999999948,
+            "missing16": 0.10708124999999313
+          }
+        },
+        {
+          "order": [
+            "missing-source",
+            "count",
+            "diagnostics",
+            "A"
+          ],
+          "A": {
+            "append": 72.97820000000002,
+            "day": 6.886199999999974,
+            "month": 5.6381000000000085,
+            "session": 4.689799999999991,
+            "project": 10.899399999999957,
+            "diagnostics": 0.09953125000000185,
+            "providerCount": 3.4912124999999996,
+            "modelCount": 9.662087499999998,
+            "modelFallback": 26.678274999999992,
+            "missing1": 0.013643749999999955,
+            "missing16": 0.027587499999995657
+          },
+          "diagnostics": {
+            "append": 69.54120000000002,
+            "day": 7.090300000000013,
+            "month": 5.5996000000000095,
+            "session": 4.453800000000001,
+            "project": 4.2257999999999925,
+            "diagnostics": 0.06984374999999687,
+            "providerCount": 3.387212500000004,
+            "modelCount": 7.8615125000000035,
+            "modelFallback": 25.369037499999997,
+            "missing1": 0.016275000000007367,
+            "missing16": 0.019931249999999068
+          },
+          "count": {
+            "append": 94.1497,
+            "day": 5.990199999999959,
+            "month": 5.277500000000032,
+            "session": 6.316699999999969,
+            "project": 5.332200000000057,
+            "diagnostics": 0.10483750000000214,
+            "providerCount": 2.8877875000000017,
+            "modelCount": 8.805543749999998,
+            "modelFallback": 24.566462500000007,
+            "missing1": 0.011137500000003797,
+            "missing16": 0.022081249999999386
+          },
+          "missing-source": {
+            "append": 74.3793,
+            "day": 8.726400000000012,
+            "month": 6.555600000000027,
+            "session": 4.3596,
+            "project": 6.774300000000039,
+            "diagnostics": 0.1635437499999952,
+            "providerCount": 4.282668749999999,
+            "modelCount": 10.894000000000005,
+            "modelFallback": 27.80035,
+            "missing1": 0.022087499999997817,
+            "missing16": 0.031281249999992156
+          }
+        },
+        {
+          "order": [
+            "A",
+            "count",
+            "missing-source",
+            "diagnostics"
+          ],
+          "A": {
+            "append": 64.2734,
+            "day": 7.0902999999999565,
+            "month": 5.061399999999992,
+            "session": 4.701399999999978,
+            "project": 5.258899999999983,
+            "diagnostics": 0.18838124999999906,
+            "providerCount": 4.302406250000001,
+            "modelCount": 8.589606250000003,
+            "modelFallback": 23.226268750000003,
+            "missing1": 0.013843750000006594,
+            "missing16": 0.04183125000000132
+          },
+          "diagnostics": {
+            "append": 64.0768,
+            "day": 5.703399999999988,
+            "month": 4.78309999999999,
+            "session": 4.885500000000036,
+            "project": 4.514599999999973,
+            "diagnostics": 0.06509375000000261,
+            "providerCount": 3.4931937499999997,
+            "modelCount": 7.7102437499999965,
+            "modelFallback": 22.593674999999998,
+            "missing1": 0.011631249999993543,
+            "missing16": 0.020800000000008367
+          },
+          "count": {
+            "append": 86.8721,
+            "day": 6.20659999999998,
+            "month": 5.457100000000025,
+            "session": 4.6936000000000035,
+            "project": 4.891599999999983,
+            "diagnostics": 0.09547500000000042,
+            "providerCount": 2.7877187500000034,
+            "modelCount": 6.979681250000006,
+            "modelFallback": 20.16503124999999,
+            "missing1": 0.011081250000003706,
+            "missing16": 0.024456250000000068
+          },
+          "missing-source": {
+            "append": 60.73699999999998,
+            "day": 5.4506000000000085,
+            "month": 5.193500000000029,
+            "session": 3.7525999999999726,
+            "project": 4.84190000000001,
+            "diagnostics": 0.081075000000002,
+            "providerCount": 3.0796124999999996,
+            "modelCount": 7.478406250000006,
+            "modelFallback": 22.382825000000004,
+            "missing1": 0.014274999999997817,
+            "missing16": 0.024550000000004957
+          }
+        },
+        {
+          "order": [
+            "count",
+            "diagnostics",
+            "missing-source",
+            "A"
+          ],
+          "A": {
+            "append": 64.53560000000002,
+            "day": 5.604600000000005,
+            "month": 4.929399999999987,
+            "session": 4.1422000000000025,
+            "project": 4.47890000000001,
+            "diagnostics": 0.1038250000000005,
+            "providerCount": 3.6367937500000025,
+            "modelCount": 8.479087499999999,
+            "modelFallback": 21.556087500000004,
+            "missing1": 0.011118750000008504,
+            "missing16": 0.02164375000000973
+          },
+          "diagnostics": {
+            "append": 80.40679999999998,
+            "day": 5.354399999999998,
+            "month": 4.379799999999989,
+            "session": 3.7149,
+            "project": 4.206000000000017,
+            "diagnostics": 0.06196249999999992,
+            "providerCount": 3.0548,
+            "modelCount": 7.400275000000001,
+            "modelFallback": 21.503287500000006,
+            "missing1": 0.011087500000002137,
+            "missing16": 0.02075625000000514
+          },
+          "count": {
+            "append": 86.25900000000001,
+            "day": 5.677999999999997,
+            "month": 5.143600000000049,
+            "session": 4.776099999999985,
+            "project": 5.007000000000005,
+            "diagnostics": 0.08865624999999966,
+            "providerCount": 2.4863999999999997,
+            "modelCount": 6.314274999999995,
+            "modelFallback": 21.557699999999997,
+            "missing1": 0.011187500000005457,
+            "missing16": 0.0199374999999975
+          },
+          "missing-source": {
+            "append": 58.86340000000001,
+            "day": 5.296600000000012,
+            "month": 4.733599999999967,
+            "session": 3.7712999999999965,
+            "project": 4.351100000000031,
+            "diagnostics": 0.09104999999999919,
+            "providerCount": 3.14720625,
+            "modelCount": 7.495531249999999,
+            "modelFallback": 22.940650000000005,
+            "missing1": 0.016562500000006253,
+            "missing16": 0.03073124999998811
+          }
+        },
+        {
+          "order": [
+            "A",
+            "diagnostics",
+            "count",
+            "missing-source"
+          ],
+          "A": {
+            "append": 56.97699999999999,
+            "day": 5.322200000000009,
+            "month": 4.529599999999959,
+            "session": 3.9741000000000213,
+            "project": 4.5009000000000015,
+            "diagnostics": 0.10293749999999946,
+            "providerCount": 3.0689749999999982,
+            "modelCount": 7.1850249999999996,
+            "modelFallback": 21.100925000000004,
+            "missing1": 0.010837500000000944,
+            "missing16": 0.019812500000000455
+          },
+          "diagnostics": {
+            "append": 60.61760000000001,
+            "day": 5.222100000000012,
+            "month": 4.399100000000033,
+            "session": 3.690999999999974,
+            "project": 4.063199999999995,
+            "diagnostics": 0.06706875000000068,
+            "providerCount": 3.0590812499999984,
+            "modelCount": 7.2206624999999995,
+            "modelFallback": 20.461125000000003,
+            "missing1": 0.010925000000000296,
+            "missing16": 0.019899999999999807
+          },
+          "count": {
+            "append": 57.54539999999999,
+            "day": 5.296800000000019,
+            "month": 4.266399999999976,
+            "session": 3.5621999999999616,
+            "project": 4.074700000000007,
+            "diagnostics": 0.08185000000000286,
+            "providerCount": 2.39955625,
+            "modelCount": 5.768587499999999,
+            "modelFallback": 19.259918749999997,
+            "missing1": 0.010981250000000387,
+            "missing16": 0.019700000000000273
+          },
+          "missing-source": {
+            "append": 59.75450000000001,
+            "day": 5.25139999999999,
+            "month": 4.4587999999999965,
+            "session": 3.5272999999999683,
+            "project": 4.203900000000033,
+            "diagnostics": 0.08598125000000323,
+            "providerCount": 3.058193750000001,
+            "modelCount": 7.219112499999998,
+            "modelFallback": 20.884025,
+            "missing1": 0.013631250000003092,
+            "missing16": 0.023218749999998067
+          }
+        },
+        {
+          "order": [
+            "diagnostics",
+            "missing-source",
+            "count",
+            "A"
+          ],
+          "A": {
+            "append": 58.6271,
+            "day": 5.489599999999996,
+            "month": 4.276999999999987,
+            "session": 3.6736000000000217,
+            "project": 4.194000000000017,
+            "diagnostics": 0.08193749999999866,
+            "providerCount": 2.9989375000000003,
+            "modelCount": 7.038756249999999,
+            "modelFallback": 21.591543749999992,
+            "missing1": 0.011943750000000364,
+            "missing16": 0.01968125000000498
+          },
+          "diagnostics": {
+            "append": 60.68870000000001,
+            "day": 5.1679999999999495,
+            "month": 4.3670999999999935,
+            "session": 4.316199999999981,
+            "project": 4.601299999999981,
+            "diagnostics": 0.06346249999999998,
+            "providerCount": 3.0571875000000013,
+            "modelCount": 7.278125000000003,
+            "modelFallback": 20.53436875,
+            "missing1": 0.011018749999998079,
+            "missing16": 0.020612500000005696
+          },
+          "count": {
+            "append": 58.592500000000015,
+            "day": 5.7432999999999765,
+            "month": 5.025700000000029,
+            "session": 4.046500000000037,
+            "project": 4.835699999999974,
+            "diagnostics": 0.08164375000000135,
+            "providerCount": 2.3523625000000017,
+            "modelCount": 6.028043750000002,
+            "modelFallback": 19.537,
+            "missing1": 0.013668750000000784,
+            "missing16": 0.02553749999999866
+          },
+          "missing-source": {
+            "append": 57.69309999999999,
+            "day": 5.23090000000002,
+            "month": 4.157999999999959,
+            "session": 3.5634999999999764,
+            "project": 4.201199999999972,
+            "diagnostics": 0.08317500000000067,
+            "providerCount": 3.1176375000000007,
+            "modelCount": 6.980537499999997,
+            "modelFallback": 20.845425,
+            "missing1": 0.012943750000005139,
+            "missing16": 0.023118749999994748
+          }
+        },
+        {
+          "order": [
+            "A",
+            "missing-source",
+            "diagnostics",
+            "count"
+          ],
+          "A": {
+            "append": 64.20949999999999,
+            "day": 5.75690000000003,
+            "month": 4.43610000000001,
+            "session": 4.313199999999995,
+            "project": 4.369100000000003,
+            "diagnostics": 0.08068750000000335,
+            "providerCount": 3.4968562500000004,
+            "modelCount": 7.408150000000006,
+            "modelFallback": 20.761106249999997,
+            "missing1": 0.011750000000006366,
+            "missing16": 0.019981250000000728
+          },
+          "diagnostics": {
+            "append": 59.8929,
+            "day": 5.280499999999961,
+            "month": 4.256000000000029,
+            "session": 3.941599999999994,
+            "project": 4.1875,
+            "diagnostics": 0.08948750000000061,
+            "providerCount": 3.0198687500000005,
+            "modelCount": 7.218293749999997,
+            "modelFallback": 21.023899999999998,
+            "missing1": 0.011012499999999648,
+            "missing16": 0.020981249999998397
+          },
+          "count": {
+            "append": 57.26480000000001,
+            "day": 5.280799999999999,
+            "month": 4.182299999999998,
+            "session": 3.5404000000000337,
+            "project": 4.876900000000035,
+            "diagnostics": 0.08107499999999845,
+            "providerCount": 2.400512499999998,
+            "modelCount": 5.689250000000001,
+            "modelFallback": 19.174075000000002,
+            "missing1": 0.011087500000002137,
+            "missing16": 0.02113124999999627
+          },
+          "missing-source": {
+            "append": 57.80539999999999,
+            "day": 5.45150000000001,
+            "month": 4.295099999999991,
+            "session": 3.872099999999989,
+            "project": 4.298000000000002,
+            "diagnostics": 0.08611875000000069,
+            "providerCount": 3.052218749999998,
+            "modelCount": 7.1368875,
+            "modelFallback": 20.965812500000006,
+            "missing1": 0.016743750000003388,
+            "missing16": 0.024768749999999784
+          }
+        },
+        {
+          "order": [
+            "missing-source",
+            "count",
+            "diagnostics",
+            "A"
+          ],
+          "A": {
+            "append": 57.91239999999999,
+            "day": 5.8718000000000075,
+            "month": 4.267599999999959,
+            "session": 3.600900000000024,
+            "project": 4.185599999999965,
+            "diagnostics": 0.09471875000000196,
+            "providerCount": 3.045424999999998,
+            "modelCount": 7.28033125,
+            "modelFallback": 21.1498875,
+            "missing1": 0.010850000000004911,
+            "missing16": 0.01984999999999104
+          },
+          "diagnostics": {
+            "append": 75.1312,
+            "day": 5.859499999999969,
+            "month": 4.434100000000001,
+            "session": 3.878599999999949,
+            "project": 4.192700000000002,
+            "diagnostics": 0.06303750000000008,
+            "providerCount": 3.086756250000004,
+            "modelCount": 6.823643750000002,
+            "modelFallback": 20.881381249999997,
+            "missing1": 0.011181250000007026,
+            "missing16": 0.02420625000000598
+          },
+          "count": {
+            "append": 59.17490000000001,
+            "day": 6.661200000000008,
+            "month": 4.538000000000011,
+            "session": 3.9125000000000227,
+            "project": 4.3776000000000295,
+            "diagnostics": 0.08194999999999908,
+            "providerCount": 2.3997437500000025,
+            "modelCount": 5.664168749999998,
+            "modelFallback": 20.674431249999998,
+            "missing1": 0.012662499999997578,
+            "missing16": 0.0335125000000005
+          },
+          "missing-source": {
+            "append": 58.11409999999999,
+            "day": 5.5388000000000375,
+            "month": 4.352299999999957,
+            "session": 4.463700000000017,
+            "project": 4.175200000000018,
+            "diagnostics": 0.08069374999999823,
+            "providerCount": 3.0412437499999996,
+            "modelCount": 6.98046875,
+            "modelFallback": 21.106562499999995,
+            "missing1": 0.015693749999996953,
+            "missing16": 0.02364375000000507
+          }
+        },
+        {
+          "order": [
+            "A",
+            "count",
+            "missing-source",
+            "diagnostics"
+          ],
+          "A": {
+            "append": 58.361599999999996,
+            "day": 5.935900000000004,
+            "month": 4.304499999999962,
+            "session": 3.775299999999959,
+            "project": 4.4243000000000166,
+            "diagnostics": 0.08745000000000047,
+            "providerCount": 2.97211875,
+            "modelCount": 6.91668125,
+            "modelFallback": 21.405468749999997,
+            "missing1": 0.010962499999997988,
+            "missing16": 0.021037499999998488
+          },
+          "diagnostics": {
+            "append": 59.19080000000001,
+            "day": 5.344499999999982,
+            "month": 4.319500000000005,
+            "session": 3.7274999999999636,
+            "project": 4.3553,
+            "diagnostics": 0.06299999999999883,
+            "providerCount": 3.0701375000000013,
+            "modelCount": 7.213012500000001,
+            "modelFallback": 21.265625,
+            "missing1": 0.010931250000005832,
+            "missing16": 0.019925000000000637
+          },
+          "count": {
+            "append": 59.028499999999994,
+            "day": 5.350399999999979,
+            "month": 4.290200000000027,
+            "session": 3.557199999999966,
+            "project": 4.572200000000009,
+            "diagnostics": 0.08054999999999879,
+            "providerCount": 2.298506249999999,
+            "modelCount": 5.639643749999998,
+            "modelFallback": 19.693406250000002,
+            "missing1": 0.010993750000004354,
+            "missing16": 0.019674999999999443
+          },
+          "missing-source": {
+            "append": 59.49289999999999,
+            "day": 5.233699999999999,
+            "month": 4.203100000000006,
+            "session": 3.5015000000000214,
+            "project": 4.289499999999975,
+            "diagnostics": 0.09002500000000069,
+            "providerCount": 3.0886250000000004,
+            "modelCount": 6.950450000000004,
+            "modelFallback": 20.877331249999997,
+            "missing1": 0.013037499999995816,
+            "missing16": 0.027806250000004695
+          }
+        },
+        {
+          "order": [
+            "count",
+            "diagnostics",
+            "missing-source",
+            "A"
+          ],
+          "A": {
+            "append": 57.453199999999995,
+            "day": 5.387299999999982,
+            "month": 4.184500000000014,
+            "session": 3.7562999999999533,
+            "project": 5.135399999999947,
+            "diagnostics": 0.08180624999999964,
+            "providerCount": 2.9988687499999997,
+            "modelCount": 6.928043750000004,
+            "modelFallback": 20.878375,
+            "missing1": 0.010831250000002512,
+            "missing16": 0.019762499999998795
+          },
+          "diagnostics": {
+            "append": 58.81099999999999,
+            "day": 5.399600000000021,
+            "month": 4.495900000000006,
+            "session": 3.7384999999999877,
+            "project": 4.044099999999958,
+            "diagnostics": 0.08416250000000147,
+            "providerCount": 3.05838125,
+            "modelCount": 7.125987500000001,
+            "modelFallback": 21.114031250000004,
+            "missing1": 0.010800000000003251,
+            "missing16": 0.019775000000002763
+          },
+          "count": {
+            "append": 58.814200000000014,
+            "day": 5.173599999999965,
+            "month": 4.380200000000002,
+            "session": 3.8543999999999983,
+            "project": 4.086900000000014,
+            "diagnostics": 0.08414375000000263,
+            "providerCount": 2.323125000000001,
+            "modelCount": 5.650618749999996,
+            "modelFallback": 19.3175125,
+            "missing1": 0.010812500000000114,
+            "missing16": 0.020368749999995828
+          },
+          "missing-source": {
+            "append": 58.85279999999999,
+            "day": 5.227100000000007,
+            "month": 4.168700000000001,
+            "session": 3.517099999999971,
+            "project": 4.2298999999999864,
+            "diagnostics": 0.08121249999999947,
+            "providerCount": 3.2620875,
+            "modelCount": 7.457487500000003,
+            "modelFallback": 21.118187499999998,
+            "missing1": 0.013374999999996362,
+            "missing16": 0.024081250000008936
+          }
+        },
+        {
+          "order": [
+            "A",
+            "diagnostics",
+            "count",
+            "missing-source"
+          ],
+          "A": {
+            "append": 57.372600000000006,
+            "day": 5.2490999999999985,
+            "month": 4.267100000000028,
+            "session": 3.521600000000035,
+            "project": 4.095299999999952,
+            "diagnostics": 0.08606874999999903,
+            "providerCount": 3.0692625000000007,
+            "modelCount": 7.050049999999999,
+            "modelFallback": 20.95975,
+            "missing1": 0.011325000000006469,
+            "missing16": 0.019568750000004798
+          },
+          "diagnostics": {
+            "append": 57.68129999999999,
+            "day": 5.2072,
+            "month": 4.261300000000006,
+            "session": 4.1601,
+            "project": 4.018899999999974,
+            "diagnostics": 0.0629937500000004,
+            "providerCount": 3.025656250000001,
+            "modelCount": 7.281300000000002,
+            "modelFallback": 20.9666875,
+            "missing1": 0.010775000000002422,
+            "missing16": 0.020075000000005616
+          },
+          "count": {
+            "append": 57.00710000000001,
+            "day": 5.406400000000019,
+            "month": 4.4512000000000285,
+            "session": 3.7719000000000165,
+            "project": 3.8921999999999457,
+            "diagnostics": 0.09199999999999875,
+            "providerCount": 2.3299062500000005,
+            "modelCount": 5.627268749999995,
+            "modelFallback": 19.87236875,
+            "missing1": 0.011274999999997704,
+            "missing16": 0.020624999999995453
+          },
+          "missing-source": {
+            "append": 56.9477,
+            "day": 5.6678,
+            "month": 4.252999999999986,
+            "session": 3.69459999999998,
+            "project": 4.166300000000035,
+            "diagnostics": 0.08936250000000001,
+            "providerCount": 3.1190125,
+            "modelCount": 7.209993750000002,
+            "modelFallback": 20.948981249999996,
+            "missing1": 0.014425000000002797,
+            "missing16": 0.023712500000002024
+          }
+        },
+        {
+          "order": [
+            "diagnostics",
+            "missing-source",
+            "count",
+            "A"
+          ],
+          "A": {
+            "append": 57.83139999999999,
+            "day": 5.205800000000011,
+            "month": 4.475999999999999,
+            "session": 3.578800000000001,
+            "project": 4.132800000000032,
+            "diagnostics": 0.08256875000000008,
+            "providerCount": 3.0294500000000006,
+            "modelCount": 7.118331250000001,
+            "modelFallback": 20.885025,
+            "missing1": 0.010968750000003524,
+            "missing16": 0.02580000000000382
+          },
+          "diagnostics": {
+            "append": 60.3494,
+            "day": 5.230200000000025,
+            "month": 4.172399999999982,
+            "session": 3.5529999999999973,
+            "project": 4.085000000000036,
+            "diagnostics": 0.07096250000000026,
+            "providerCount": 2.9951374999999985,
+            "modelCount": 7.596293750000001,
+            "modelFallback": 21.104268749999996,
+            "missing1": 0.011324999999999363,
+            "missing16": 0.020118749999994634
+          },
+          "count": {
+            "append": 58.71179999999998,
+            "day": 5.24490000000003,
+            "month": 4.554300000000012,
+            "session": 3.8535999999999717,
+            "project": 4.130999999999972,
+            "diagnostics": 0.09209375000000009,
+            "providerCount": 2.263725000000001,
+            "modelCount": 5.728181250000002,
+            "modelFallback": 19.129112499999998,
+            "missing1": 0.011050000000004445,
+            "missing16": 0.019593749999998522
+          },
+          "missing-source": {
+            "append": 58.8515,
+            "day": 5.25569999999999,
+            "month": 4.179100000000005,
+            "session": 3.527500000000032,
+            "project": 4.166299999999978,
+            "diagnostics": 0.08019999999999783,
+            "providerCount": 2.9498125,
+            "modelCount": 7.086556250000001,
+            "modelFallback": 21.092487499999997,
+            "missing1": 0.024068750000004968,
+            "missing16": 0.023531249999997783
+          }
+        },
+        {
+          "order": [
+            "A",
+            "missing-source",
+            "diagnostics",
+            "count"
+          ],
+          "A": {
+            "append": 58.0921,
+            "day": 5.149499999999989,
+            "month": 4.264099999999985,
+            "session": 3.9045000000000414,
+            "project": 4.109399999999994,
+            "diagnostics": 0.10843125000000242,
+            "providerCount": 2.9916312499999975,
+            "modelCount": 7.275787499999996,
+            "modelFallback": 20.68014375,
+            "missing1": 0.01161249999999825,
+            "missing16": 0.019806250000002024
+          },
+          "diagnostics": {
+            "append": 58.6361,
+            "day": 5.268000000000029,
+            "month": 4.568899999999985,
+            "session": 3.9753000000000043,
+            "project": 6.8945999999999685,
+            "diagnostics": 0.06121874999999832,
+            "providerCount": 2.9790499999999973,
+            "modelCount": 7.183262499999998,
+            "modelFallback": 21.38031875,
+            "missing1": 0.011018750000005184,
+            "missing16": 0.02098124999999129
+          },
+          "count": {
+            "append": 59.04310000000001,
+            "day": 5.22120000000001,
+            "month": 4.28309999999999,
+            "session": 3.603499999999997,
+            "project": 4.2368999999999915,
+            "diagnostics": 0.08204999999999885,
+            "providerCount": 2.2409687500000004,
+            "modelCount": 5.563931250000003,
+            "modelFallback": 19.373506250000005,
+            "missing1": 0.011531249999997328,
+            "missing16": 0.019731249999999534
+          },
+          "missing-source": {
+            "append": 57.8301,
+            "day": 5.20089999999999,
+            "month": 4.2742000000000075,
+            "session": 3.4962000000000444,
+            "project": 4.053899999999999,
+            "diagnostics": 0.10281875000000085,
+            "providerCount": 3.191056249999999,
+            "modelCount": 7.132999999999996,
+            "modelFallback": 20.819706250000003,
+            "missing1": 0.013243750000000887,
+            "missing16": 0.025743749999996624
+          }
+        },
+        {
+          "order": [
+            "missing-source",
+            "count",
+            "diagnostics",
+            "A"
+          ],
+          "A": {
+            "append": 58.6755,
+            "day": 5.528500000000008,
+            "month": 4.40440000000001,
+            "session": 3.7819000000000074,
+            "project": 4.109000000000037,
+            "diagnostics": 0.08090624999999818,
+            "providerCount": 3.1210062500000006,
+            "modelCount": 7.051337499999999,
+            "modelFallback": 21.38023125,
+            "missing1": 0.010950000000001125,
+            "missing16": 0.019950000000001467
+          },
+          "diagnostics": {
+            "append": 57.7158,
+            "day": 5.2577,
+            "month": 4.559599999999989,
+            "session": 3.7006999999999834,
+            "project": 4.0504999999999995,
+            "diagnostics": 0.07430624999999935,
+            "providerCount": 3.0814562500000022,
+            "modelCount": 7.022937500000001,
+            "modelFallback": 21.211406249999996,
+            "missing1": 0.01876874999999245,
+            "missing16": 0.023612500000012915
+          },
+          "count": {
+            "append": 57.962900000000005,
+            "day": 5.725300000000004,
+            "month": 4.459000000000003,
+            "session": 3.5745999999999754,
+            "project": 4.1836999999999875,
+            "diagnostics": 0.09057500000000118,
+            "providerCount": 2.228568750000001,
+            "modelCount": 5.610381250000003,
+            "modelFallback": 19.70108125,
+            "missing1": 0.012781249999996191,
+            "missing16": 0.019700000000000273
+          },
+          "missing-source": {
+            "append": 58.73780000000001,
+            "day": 5.300000000000011,
+            "month": 4.3629999999999995,
+            "session": 3.6298999999999637,
+            "project": 4.0545999999999935,
+            "diagnostics": 0.0794875000000026,
+            "providerCount": 3.0881250000000016,
+            "modelCount": 7.005481249999999,
+            "modelFallback": 20.783806249999998,
+            "missing1": 0.013012500000002092,
+            "missing16": 0.022700000000000387
+          }
+        },
+        {
+          "order": [
+            "A",
+            "count",
+            "missing-source",
+            "diagnostics"
+          ],
+          "A": {
+            "append": 57.4962,
+            "day": 5.2509000000000015,
+            "month": 4.25120000000004,
+            "session": 3.67349999999999,
+            "project": 4.256599999999992,
+            "diagnostics": 0.08513750000000186,
+            "providerCount": 3.082306250000002,
+            "modelCount": 7.144956249999996,
+            "modelFallback": 21.741962500000007,
+            "missing1": 0.010806250000001683,
+            "missing16": 0.020787499999997294
+          },
+          "diagnostics": {
+            "append": 64.95139999999999,
+            "day": 5.372500000000002,
+            "month": 4.7047999999999774,
+            "session": 4.0031999999999925,
+            "project": 4.155799999999999,
+            "diagnostics": 0.08000000000000185,
+            "providerCount": 3.4298375000000014,
+            "modelCount": 8.199031250000004,
+            "modelFallback": 22.189806249999997,
+            "missing1": 0.011525000000006003,
+            "missing16": 0.020768750000002
+          },
+          "count": {
+            "append": 58.60520000000001,
+            "day": 5.22339999999997,
+            "month": 4.899999999999977,
+            "session": 3.658999999999992,
+            "project": 4.183499999999981,
+            "diagnostics": 0.08097499999999869,
+            "providerCount": 2.328174999999998,
+            "modelCount": 5.689812499999999,
+            "modelFallback": 19.894849999999998,
+            "missing1": 0.011250000000003979,
+            "missing16": 0.01997499999999519
+          },
+          "missing-source": {
+            "append": 69.9846,
+            "day": 6.634899999999959,
+            "month": 4.31699999999995,
+            "session": 4.192900000000009,
+            "project": 4.443399999999997,
+            "diagnostics": 0.08474375000000123,
+            "providerCount": 3.049599999999998,
+            "modelCount": 7.142262500000001,
+            "modelFallback": 21.570206250000005,
+            "missing1": 0.013118750000003843,
+            "missing16": 0.03423124999999061
+          }
+        },
+        {
+          "order": [
+            "count",
+            "diagnostics",
+            "missing-source",
+            "A"
+          ],
+          "A": {
+            "append": 58.17330000000001,
+            "day": 5.649400000000014,
+            "month": 4.319700000000012,
+            "session": 4.033900000000017,
+            "project": 4.37360000000001,
+            "diagnostics": 0.08241249999999667,
+            "providerCount": 3.1405562499999995,
+            "modelCount": 7.540275000000001,
+            "modelFallback": 21.731099999999998,
+            "missing1": 0.010987499999998818,
+            "missing16": 0.028412500000001728
+          },
+          "diagnostics": {
+            "append": 59.80199999999999,
+            "day": 7.180499999999995,
+            "month": 4.629300000000001,
+            "session": 3.8566999999999894,
+            "project": 4.151200000000017,
+            "diagnostics": 0.06388124999999789,
+            "providerCount": 4.364418750000002,
+            "modelCount": 7.289662499999999,
+            "modelFallback": 21.732693749999996,
+            "missing1": 0.010756250000000023,
+            "missing16": 0.020000000000010232
+          },
+          "count": {
+            "append": 59.75919999999999,
+            "day": 5.260599999999954,
+            "month": 4.64670000000001,
+            "session": 5.113299999999981,
+            "project": 4.555000000000007,
+            "diagnostics": 0.0875812499999995,
+            "providerCount": 2.3963125000000005,
+            "modelCount": 5.72521875,
+            "modelFallback": 20.470924999999994,
+            "missing1": 0.02246250000000316,
+            "missing16": 0.03742500000000604
+          },
+          "missing-source": {
+            "append": 59.0801,
+            "day": 5.259500000000003,
+            "month": 4.510100000000023,
+            "session": 4.083700000000022,
+            "project": 4.119599999999991,
+            "diagnostics": 0.08045000000000258,
+            "providerCount": 2.9546124999999996,
+            "modelCount": 7.060062499999997,
+            "modelFallback": 22.706675000000004,
+            "missing1": 0.024068750000012074,
+            "missing16": 0.029168749999996635
+          }
+        },
+        {
+          "order": [
+            "A",
+            "diagnostics",
+            "count",
+            "missing-source"
+          ],
+          "A": {
+            "append": 62.0185,
+            "day": 5.236199999999997,
+            "month": 4.197800000000029,
+            "session": 3.9014999999999986,
+            "project": 4.081799999999987,
+            "diagnostics": 0.08339999999999748,
+            "providerCount": 2.9700999999999986,
+            "modelCount": 7.380643750000001,
+            "modelFallback": 22.514862499999992,
+            "missing1": 0.01223749999999768,
+            "missing16": 0.020643750000004957
+          },
+          "diagnostics": {
+            "append": 57.855900000000005,
+            "day": 5.2099999999999795,
+            "month": 5.204900000000009,
+            "session": 4.084299999999985,
+            "project": 4.1720000000000255,
+            "diagnostics": 0.0617750000000008,
+            "providerCount": 3.083068749999999,
+            "modelCount": 7.470725000000002,
+            "modelFallback": 21.429037500000007,
+            "missing1": 0.011112499999995862,
+            "missing16": 0.01994999999999436
+          },
+          "count": {
+            "append": 57.191799999999986,
+            "day": 5.236999999999966,
+            "month": 4.513599999999997,
+            "session": 3.7601000000000226,
+            "project": 4.086200000000019,
+            "diagnostics": 0.08624999999999972,
+            "providerCount": 2.32689375,
+            "modelCount": 5.803168750000001,
+            "modelFallback": 20.372925000000002,
+            "missing1": 0.011137500000003797,
+            "missing16": 0.01971250000000424
+          },
+          "missing-source": {
+            "append": 58.734899999999996,
+            "day": 5.204200000000014,
+            "month": 4.51320000000004,
+            "session": 4.0516999999999825,
+            "project": 4.093400000000031,
+            "diagnostics": 0.07943750000000094,
+            "providerCount": 3.0541062500000002,
+            "modelCount": 7.5380312499999995,
+            "modelFallback": 21.77295625,
+            "missing1": 0.013562500000006139,
+            "missing16": 0.02328750000000923
+          }
+        },
+        {
+          "order": [
+            "diagnostics",
+            "missing-source",
+            "count",
+            "A"
+          ],
+          "A": {
+            "append": 69.05120000000001,
+            "day": 5.471900000000005,
+            "month": 4.206800000000044,
+            "session": 3.8115999999999985,
+            "project": 4.408800000000042,
+            "diagnostics": 0.11829374999999942,
+            "providerCount": 2.957618749999998,
+            "modelCount": 7.5908687499999985,
+            "modelFallback": 22.628700000000002,
+            "missing1": 0.011043749999998909,
+            "missing16": 0.02050624999999684
+          },
+          "diagnostics": {
+            "append": 57.19749999999999,
+            "day": 5.223700000000008,
+            "month": 4.252799999999979,
+            "session": 3.5749000000000137,
+            "project": 4.102899999999977,
+            "diagnostics": 0.06666874999999806,
+            "providerCount": 2.9899625000000007,
+            "modelCount": 7.506743749999998,
+            "modelFallback": 21.532218750000006,
+            "missing1": 0.010824999999996976,
+            "missing16": 0.019768749999997226
+          },
+          "count": {
+            "append": 57.89069999999998,
+            "day": 5.17410000000001,
+            "month": 4.317000000000007,
+            "session": 3.9687999999999874,
+            "project": 4.348900000000015,
+            "diagnostics": 0.08114374999999896,
+            "providerCount": 2.3589499999999965,
+            "modelCount": 5.9328875,
+            "modelFallback": 20.4232375,
+            "missing1": 0.010843749999999375,
+            "missing16": 0.019643750000000182
+          },
+          "missing-source": {
+            "append": 58.67429999999999,
+            "day": 5.266900000000021,
+            "month": 4.689400000000035,
+            "session": 3.5494000000000483,
+            "project": 4.078800000000001,
+            "diagnostics": 0.08286250000000095,
+            "providerCount": 2.990381250000002,
+            "modelCount": 7.160574999999998,
+            "modelFallback": 21.000018750000002,
+            "missing1": 0.013112499999998306,
+            "missing16": 0.022831250000002967
+          }
+        }
+      ],
+      "timings": {
+        "diagnostics": {
+          "append": {
+            "a": 58.6513,
+            "b": 59.847449999999995,
+            "reductionPercent": -2.0394262360766016,
+            "fasterPairs": 8,
+            "pairedDeltaIqr": [
+              -3.6183999999999976,
+              2.7986500000000163
+            ]
+          },
+          "day": {
+            "a": 5.509050000000002,
+            "b": 5.315050000000014,
+            "reductionPercent": 3.5214782948056076,
+            "fasterPairs": 12,
+            "pairedDeltaIqr": [
+              -0.28350000000001785,
+              0.11927500000003022
+            ]
+          },
+          "month": {
+            "a": 4.362050000000011,
+            "b": 4.454649999999987,
+            "reductionPercent": -2.1228550796065107,
+            "fasterPairs": 10,
+            "pairedDeltaIqr": [
+              -0.2652500000000373,
+              0.20107500000003142
+            ]
+          },
+          "session": {
+            "a": 3.90300000000002,
+            "b": 3.867649999999969,
+            "reductionPercent": 0.9057135536779569,
+            "fasterPairs": 12,
+            "pairedDeltaIqr": [
+              -0.2483000000000004,
+              0.20750000000002444
+            ]
+          },
+          "project": {
+            "a": 4.371350000000007,
+            "b": 4.190100000000001,
+            "reductionPercent": 4.146316355359452,
+            "fasterPairs": 14,
+            "pairedDeltaIqr": [
+              -0.3388500000000505,
+              0.027875000000037176
+            ]
+          },
+          "diagnostics": {
+            "a": 0.08665624999999899,
+            "b": 0.06508437500000142,
+            "reductionPercent": 24.89361702127409,
+            "fasterPairs": 18,
+            "pairedDeltaIqr": [
+              -0.03736718749999923,
+              -0.01675781249999897
+            ]
+          }
+        },
+        "count": {
+          "append": {
+            "a": 58.6513,
+            "b": 58.921350000000004,
+            "reductionPercent": -0.460433102079587,
+            "fasterPairs": 8,
+            "pairedDeltaIqr": [
+              -1.318724999999997,
+              1.417225000000009
+            ]
+          },
+          "day": {
+            "a": 5.509050000000002,
+            "b": 5.378399999999999,
+            "reductionPercent": 2.3715522640020104,
+            "fasterPairs": 11,
+            "pairedDeltaIqr": [
+              -0.41062500000005286,
+              0.09437499999999943
+            ]
+          },
+          "month": {
+            "a": 4.362050000000011,
+            "b": 4.525800000000004,
+            "reductionPercent": -3.7539688907736677,
+            "fasterPairs": 6,
+            "pairedDeltaIqr": [
+              -0.03254999999995789,
+              0.3185999999999751
+            ]
+          },
+          "session": {
+            "a": 3.90300000000002,
+            "b": 3.853999999999985,
+            "reductionPercent": 1.2554445298497248,
+            "fasterPairs": 10,
+            "pairedDeltaIqr": [
+              -0.23882500000000562,
+              0.3269250000000028
+            ]
+          },
+          "project": {
+            "a": 4.371350000000007,
+            "b": 4.363250000000022,
+            "reductionPercent": 0.18529744815639707,
+            "fasterPairs": 10,
+            "pairedDeltaIqr": [
+              -0.24415000000000475,
+              0.18405000000001337
+            ]
+          },
+          "providerCount": {
+            "a": 3.0757843750000013,
+            "b": 2.355656249999999,
+            "reductionPercent": 23.41282863822344,
+            "fasterPairs": 20,
+            "pairedDeltaIqr": [
+              -0.9434140625000005,
+              -0.6637078124999984
+            ]
+          },
+          "modelCount": {
+            "a": 7.278059374999998,
+            "b": 5.726700000000001,
+            "reductionPercent": 21.315563601045746,
+            "fasterPairs": 20,
+            "pairedDeltaIqr": [
+              -1.7136171874999961,
+              -1.3740203124999972
+            ]
+          },
+          "modelFallback": {
+            "a": 21.573815624999998,
+            "b": 19.883609375,
+            "reductionPercent": 7.834526258031834,
+            "fasterPairs": 19,
+            "pairedDeltaIqr": [
+              -2.1277156250000058,
+              -1.4973062499999976
+            ]
+          }
+        },
+        "missing-source": {
+          "append": {
+            "a": 58.6513,
+            "b": 58.852149999999995,
+            "reductionPercent": -0.34244765248169357,
+            "fasterPairs": 10,
+            "pairedDeltaIqr": [
+              -4.070350000000012,
+              1.198374999999995
+            ]
+          },
+          "day": {
+            "a": 5.509050000000002,
+            "b": 5.281750000000017,
+            "reductionPercent": 4.1259382289139745,
+            "fasterPairs": 13,
+            "pairedDeltaIqr": [
+              -0.31424999999998704,
+              0.05792499999999734
+            ]
+          },
+          "month": {
+            "a": 4.362050000000011,
+            "b": 4.357649999999978,
+            "reductionPercent": 0.10087000378336718,
+            "fasterPairs": 12,
+            "pairedDeltaIqr": [
+              -0.12450000000002603,
+              0.09655000000000769
+            ]
+          },
+          "session": {
+            "a": 3.90300000000002,
+            "b": 3.7235999999999763,
+            "reductionPercent": 4.596464258263972,
+            "fasterPairs": 14,
+            "pairedDeltaIqr": [
+              -0.4164999999999992,
+              0.07489999999999952
+            ]
+          },
+          "project": {
+            "a": 4.371350000000007,
+            "b": 4.202550000000002,
+            "reductionPercent": 3.8615073146740535,
+            "fasterPairs": 15,
+            "pairedDeltaIqr": [
+              -0.3052499999999867,
+              -0.005999999999971806
+            ]
+          },
+          "missing1": {
+            "a": 0.011050000000004445,
+            "b": 0.013709375000004798,
+            "reductionPercent": -24.066742081441472,
+            "fasterPairs": 0,
+            "pairedDeltaIqr": [
+              0.0020406250000011283,
+              0.005106249999997203
+            ]
+          },
+          "missing16": {
+            "a": 0.020575000000000898,
+            "b": 0.024315625000006946,
+            "reductionPercent": -18.180437424086925,
+            "fasterPairs": 2,
+            "pairedDeltaIqr": [
+              0.0027234375000002586,
+              0.005412500000003817
+            ]
+          }
+        }
+      }
+    },
+    "real": {
+      "requests": 1825,
+      "inputSha256": "2eb1f06224f554eff22f4e35a80963aec0645c42d79ba7794de8d6477f2ab49b",
+      "append": {
+        "parsedFiles": 1,
+        "bytes": 11753151,
+        "expectedInput": 123,
+        "expectedOutput": 7
+      },
+      "storageDigests": {
+        "usage_request_daily": "ce56ec22329d09ad6723580ea7dde8a1f641c02854f001c648c89738bbf09868",
+        "usage_model_daily": "7f8304f78b5ba5e2c6a63b128718f70b6a4cb94e12c78745d75d75bee186ce3a",
+        "usage_capability_daily": "915d80700118dc7b6574d7a50fa9d9eca1ad33a0a70366155b27692a5e3f1e95",
+        "usage_rollup_meta": "b032255c5ddb50cfc10cc540113803190edebbdbeb88efc36f5abec60f105dae",
+        "projects": "ec1bb75302897713b3c55852279229ccb0c365d270d7070d78d20dd7aa07b40c",
+        "sessions": "9d6e9306c047c087e57acc5b335e988b2369d037bbc551ab6a9c08f2382480f0",
+        "session_billing": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "source_file": "57c5e2186f0e9f76cbc4e7c1b94789a2dfbbe828c3ac216db73e9b4578427c12"
+      },
+      "queryDigests": {
+        "day": "6866c394b970726053ee068bc8c09081ad09f485128f4b1aa936f99cef4ed149",
+        "month": "98bccb6e5a4f8643a3d7ba882d07a958bcaab0b81c8a383e1f6a3c3e16a8b3f7",
+        "session": "67cc3e0c74b592ec958f866b825ec97eb4c234d95cc67b0d3108fed53cbde7a8",
+        "project": "05354c836c216297c5598dacebcecbff583847583a2266b48292fd5c107e3f28"
+      },
+      "focusedDigests": {
+        "diagnostics": "218cc41e10417eacb7fe5a80f2896368594c35b060bb8597fc3340391f9268f1",
+        "providerCount": "670671cd97404156226e507973f2ab8330d3022ca96e0c93bdbdb320c41adcaf",
+        "modelCount": "76a50887d8f1c2e9301755428990ad81479ee21c25b43215cf524541e0503269",
+        "modelFallback": "a4326b3a57d5e2130ddc06f8084c229309656fdab3a551f193a02d5515840247",
+        "missing1": "8925e8819b3f8afc090f4cf06a1f7d0dd0994dd6c29b65ddc55f9e33f6878bc9",
+        "missing16": "08ecdf158bbe60edcefe6843b0d80a39c2ad68f376c04e5d46f7aa14f69ce1e2"
+      },
+      "pairedSamples": [
+        {
+          "order": [
+            "A",
+            "diagnostics",
+            "count",
+            "missing-source"
+          ],
+          "A": {
+            "append": 255.23889999999997,
+            "day": 1.828300000000013,
+            "month": 0.8653999999999655,
+            "session": 3.845700000000022,
+            "project": 0.8774999999999977,
+            "diagnostics": 0.2038499999999992,
+            "providerCount": 0.43192499999999967,
+            "modelCount": 0.4833437499999995,
+            "modelFallback": 1.1682124999999992,
+            "missing1": 0.026125000000000398,
+            "missing16": 0.03589374999999961
+          },
+          "diagnostics": {
+            "append": 247.8154,
+            "day": 1.772800000000018,
+            "month": 0.8091000000000008,
+            "session": 3.856300000000033,
+            "project": 1.0074000000000183,
+            "diagnostics": 0.14494374999999948,
+            "providerCount": 0.4484812500000004,
+            "modelCount": 0.4359125000000006,
+            "modelFallback": 1.1761437500000014,
+            "missing1": 0.027300000000000324,
+            "missing16": 0.042337499999998585
+          },
+          "count": {
+            "append": 249.6146,
+            "day": 1.9046000000000163,
+            "month": 0.7931999999999562,
+            "session": 3.4949000000000296,
+            "project": 0.9817999999999643,
+            "diagnostics": 0.20230624999999947,
+            "providerCount": 0.3661500000000011,
+            "modelCount": 0.3698062499999999,
+            "modelFallback": 1.0997000000000021,
+            "missing1": 0.026987500000000608,
+            "missing16": 0.03604999999999947
+          },
+          "missing-source": {
+            "append": 251.1098,
+            "day": 1.82650000000001,
+            "month": 0.8112999999999602,
+            "session": 3.8314000000000306,
+            "project": 0.9605999999999995,
+            "diagnostics": 0.2094124999999991,
+            "providerCount": 0.4595249999999993,
+            "modelCount": 0.4408374999999971,
+            "modelFallback": 1.1840687500000016,
+            "missing1": 0.050637499999997004,
+            "missing16": 0.06669374999999889
+          }
+        },
+        {
+          "order": [
+            "diagnostics",
+            "missing-source",
+            "count",
+            "A"
+          ],
+          "A": {
+            "append": 248.51180000000002,
+            "day": 1.797999999999945,
+            "month": 1.2398000000000025,
+            "session": 3.5996999999999844,
+            "project": 0.9612999999999943,
+            "diagnostics": 0.21287500000000037,
+            "providerCount": 0.45424999999999827,
+            "modelCount": 0.45363749999999925,
+            "modelFallback": 1.1703374999999987,
+            "missing1": 0.028212500000002194,
+            "missing16": 0.03547499999999815
+          },
+          "diagnostics": {
+            "append": 254.64780000000002,
+            "day": 2.20270000000005,
+            "month": 0.8299000000000092,
+            "session": 3.4611000000000445,
+            "project": 0.8919999999999959,
+            "diagnostics": 0.14347500000000224,
+            "providerCount": 0.4921437500000003,
+            "modelCount": 0.430781249999999,
+            "modelFallback": 1.1570750000000025,
+            "missing1": 0.026849999999999596,
+            "missing16": 0.036568750000000705
+          },
+          "count": {
+            "append": 250.2106,
+            "day": 1.7864000000000146,
+            "month": 0.8273999999999546,
+            "session": 3.467199999999991,
+            "project": 0.9359000000000037,
+            "diagnostics": 0.2152624999999979,
+            "providerCount": 0.36699999999999733,
+            "modelCount": 0.3857312499999992,
+            "modelFallback": 1.105875000000001,
+            "missing1": 0.02699999999999747,
+            "missing16": 0.03744374999999778
+          },
+          "missing-source": {
+            "append": 254.69080000000002,
+            "day": 1.7556000000000154,
+            "month": 0.8532999999999902,
+            "session": 3.734700000000032,
+            "project": 1.204400000000021,
+            "diagnostics": 0.28433749999999947,
+            "providerCount": 0.46504374999999953,
+            "modelCount": 0.4572312500000031,
+            "modelFallback": 1.180356249999999,
+            "missing1": 0.0526187500000006,
+            "missing16": 0.06137499999999818
+          }
+        },
+        {
+          "order": [
+            "A",
+            "missing-source",
+            "diagnostics",
+            "count"
+          ],
+          "A": {
+            "append": 250.32639999999998,
+            "day": 1.8795000000000073,
+            "month": 0.8174999999999955,
+            "session": 4.104600000000005,
+            "project": 0.984800000000007,
+            "diagnostics": 0.21096250000000083,
+            "providerCount": 0.44441875000000053,
+            "modelCount": 0.43191249999999926,
+            "modelFallback": 1.3627937500000016,
+            "missing1": 0.043462500000000404,
+            "missing16": 0.05872500000000258
+          },
+          "diagnostics": {
+            "append": 253.23179999999996,
+            "day": 1.8232000000000426,
+            "month": 0.8191000000000486,
+            "session": 4.216399999999965,
+            "project": 0.9102000000000317,
+            "diagnostics": 0.14701875000000086,
+            "providerCount": 0.44571249999999907,
+            "modelCount": 0.44376250000000184,
+            "modelFallback": 1.1995562500000005,
+            "missing1": 0.026493750000000205,
+            "missing16": 0.03862499999999969
+          },
+          "count": {
+            "append": 256.3706,
+            "day": 1.7699999999999818,
+            "month": 0.9850000000000136,
+            "session": 3.7384999999999877,
+            "project": 0.9934000000000083,
+            "diagnostics": 0.20289999999999964,
+            "providerCount": 0.3692812500000002,
+            "modelCount": 0.3988187500000002,
+            "modelFallback": 1.0999187500000005,
+            "missing1": 0.02682500000000232,
+            "missing16": 0.03614999999999924
+          },
+          "missing-source": {
+            "append": 245.8281,
+            "day": 1.7726999999999862,
+            "month": 0.8708000000000311,
+            "session": 3.336999999999989,
+            "project": 0.9145000000000323,
+            "diagnostics": 0.2052062499999998,
+            "providerCount": 0.49105624999999975,
+            "modelCount": 0.4291499999999999,
+            "modelFallback": 1.2353624999999973,
+            "missing1": 0.0515250000000016,
+            "missing16": 0.06341249999999832
+          }
+        },
+        {
+          "order": [
+            "missing-source",
+            "count",
+            "diagnostics",
+            "A"
+          ],
+          "A": {
+            "append": 259.4853,
+            "day": 1.873899999999992,
+            "month": 0.8407000000000266,
+            "session": 3.417100000000005,
+            "project": 1.178200000000004,
+            "diagnostics": 0.207175000000003,
+            "providerCount": 0.4430624999999999,
+            "modelCount": 0.49587499999999807,
+            "modelFallback": 1.162156249999999,
+            "missing1": 0.0276437499999993,
+            "missing16": 0.03862500000000324
+          },
+          "diagnostics": {
+            "append": 252.68259999999998,
+            "day": 2.2462999999999624,
+            "month": 0.8308999999999855,
+            "session": 4.1813999999999965,
+            "project": 1.133100000000013,
+            "diagnostics": 0.15010625000000033,
+            "providerCount": 0.48215000000000074,
+            "modelCount": 0.7011749999999992,
+            "modelFallback": 1.4550000000000018,
+            "missing1": 0.026368749999999608,
+            "missing16": 0.04570625000000206
+          },
+          "count": {
+            "append": 249.258,
+            "day": 1.8137000000000398,
+            "month": 0.821200000000033,
+            "session": 3.4096999999999866,
+            "project": 0.8905000000000314,
+            "diagnostics": 0.20390000000000086,
+            "providerCount": 0.3678499999999971,
+            "modelCount": 0.3566812499999976,
+            "modelFallback": 1.1127937500000016,
+            "missing1": 0.02656250000000071,
+            "missing16": 0.0352812500000006
+          },
+          "missing-source": {
+            "append": 251.7353,
+            "day": 1.8308000000000106,
+            "month": 0.8134000000000015,
+            "session": 3.4084000000000287,
+            "project": 1.1071000000000026,
+            "diagnostics": 0.20768125000000026,
+            "providerCount": 0.44981875000000215,
+            "modelCount": 0.42939374999999913,
+            "modelFallback": 1.1831375000000008,
+            "missing1": 0.05105624999999847,
+            "missing16": 0.06013124999999775
+          }
+        },
+        {
+          "order": [
+            "A",
+            "count",
+            "missing-source",
+            "diagnostics"
+          ],
+          "A": {
+            "append": 255.39049999999997,
+            "day": 1.9440999999999917,
+            "month": 0.9304000000000201,
+            "session": 3.444500000000005,
+            "project": 0.9415000000000191,
+            "diagnostics": 0.21218749999999886,
+            "providerCount": 0.4281437499999967,
+            "modelCount": 0.4523375000000023,
+            "modelFallback": 1.2070937499999985,
+            "missing1": 0.026256249999999426,
+            "missing16": 0.03602499999999864
+          },
+          "diagnostics": {
+            "append": 287.4678,
+            "day": 1.804899999999975,
+            "month": 0.9562999999999988,
+            "session": 3.7042999999999893,
+            "project": 1.321300000000008,
+            "diagnostics": 0.14212500000000006,
+            "providerCount": 0.44425000000000026,
+            "modelCount": 0.6086874999999985,
+            "modelFallback": 1.1683875000000015,
+            "missing1": 0.02707499999999996,
+            "missing16": 0.04460000000000264
+          },
+          "count": {
+            "append": 257.8187,
+            "day": 1.8903000000000247,
+            "month": 0.8716000000000008,
+            "session": 3.8057000000000016,
+            "project": 1.054900000000032,
+            "diagnostics": 0.2275874999999985,
+            "providerCount": 0.35536249999999825,
+            "modelCount": 0.36668750000000117,
+            "modelFallback": 1.1341,
+            "missing1": 0.0280687499999992,
+            "missing16": 0.036037499999999056
+          },
+          "missing-source": {
+            "append": 262.1556,
+            "day": 1.7578999999999496,
+            "month": 0.8109999999999786,
+            "session": 3.8426999999999794,
+            "project": 1.018100000000004,
+            "diagnostics": 0.3183562500000008,
+            "providerCount": 0.43831875000000053,
+            "modelCount": 0.502818750000003,
+            "modelFallback": 1.2229187500000016,
+            "missing1": 0.0532375000000016,
+            "missing16": 0.07146875000000108
+          }
+        },
+        {
+          "order": [
+            "count",
+            "diagnostics",
+            "missing-source",
+            "A"
+          ],
+          "A": {
+            "append": 251.39559999999997,
+            "day": 1.7864000000000146,
+            "month": 0.8768999999999778,
+            "session": 3.7171000000000163,
+            "project": 0.8937000000000239,
+            "diagnostics": 0.21181250000000063,
+            "providerCount": 0.4665875000000028,
+            "modelCount": 0.436887500000001,
+            "modelFallback": 1.1629749999999994,
+            "missing1": 0.03329374999999857,
+            "missing16": 0.03568750000000165
+          },
+          "diagnostics": {
+            "append": 252.37650000000002,
+            "day": 1.713799999999992,
+            "month": 0.7982000000000085,
+            "session": 3.342300000000023,
+            "project": 0.9775999999999954,
+            "diagnostics": 0.14583125000000052,
+            "providerCount": 0.4437749999999987,
+            "modelCount": 0.44479374999999877,
+            "modelFallback": 1.202593750000002,
+            "missing1": 0.029643750000001745,
+            "missing16": 0.042087500000000944
+          },
+          "count": {
+            "append": 253.7304,
+            "day": 1.9938000000000216,
+            "month": 0.8383999999999787,
+            "session": 3.482399999999984,
+            "project": 0.974899999999991,
+            "diagnostics": 0.2130187499999998,
+            "providerCount": 0.39635624999999663,
+            "modelCount": 0.3825687500000008,
+            "modelFallback": 1.187368750000001,
+            "missing1": 0.026612499999998818,
+            "missing16": 0.036193749999998914
+          },
+          "missing-source": {
+            "append": 259.6272,
+            "day": 1.802500000000009,
+            "month": 0.8462000000000103,
+            "session": 3.7654999999999745,
+            "project": 0.9436000000000035,
+            "diagnostics": 0.23313124999999957,
+            "providerCount": 0.44620624999999947,
+            "modelCount": 0.4519062500000004,
+            "modelFallback": 1.2112499999999997,
+            "missing1": 0.05370625000000118,
+            "missing16": 0.06364374999999711
+          }
+        },
+        {
+          "order": [
+            "A",
+            "diagnostics",
+            "count",
+            "missing-source"
+          ],
+          "A": {
+            "append": 252.34110000000004,
+            "day": 1.8455999999999904,
+            "month": 0.7814999999999941,
+            "session": 4.201800000000048,
+            "project": 0.992999999999995,
+            "diagnostics": 0.2573562499999973,
+            "providerCount": 0.46330000000000027,
+            "modelCount": 0.49281249999999943,
+            "modelFallback": 1.1788874999999983,
+            "missing1": 0.026143749999999244,
+            "missing16": 0.03549999999999898
+          },
+          "diagnostics": {
+            "append": 265.38620000000003,
+            "day": 1.8051999999999566,
+            "month": 0.8298999999999523,
+            "session": 3.446899999999971,
+            "project": 0.9331000000000245,
+            "diagnostics": 0.14106874999999874,
+            "providerCount": 0.6046624999999999,
+            "modelCount": 0.43472500000000025,
+            "modelFallback": 1.1825937499999988,
+            "missing1": 0.0276625000000017,
+            "missing16": 0.037681249999998556
+          },
+          "count": {
+            "append": 250.397,
+            "day": 1.8856000000000108,
+            "month": 1.141300000000001,
+            "session": 3.567099999999982,
+            "project": 1.141399999999976,
+            "diagnostics": 0.2543937499999984,
+            "providerCount": 0.36627499999999813,
+            "modelCount": 0.4110124999999982,
+            "modelFallback": 1.1001062499999996,
+            "missing1": 0.026606249999996834,
+            "missing16": 0.04024375000000191
+          },
+          "missing-source": {
+            "append": 262.06759999999997,
+            "day": 1.7472000000000207,
+            "month": 0.8665000000000305,
+            "session": 3.777999999999963,
+            "project": 1.0091000000000463,
+            "diagnostics": 0.20883124999999936,
+            "providerCount": 0.42733124999999816,
+            "modelCount": 0.42288124999999965,
+            "modelFallback": 1.18113125,
+            "missing1": 0.05237500000000139,
+            "missing16": 0.06386875000000103
+          }
+        },
+        {
+          "order": [
+            "diagnostics",
+            "missing-source",
+            "count",
+            "A"
+          ],
+          "A": {
+            "append": 249.21370000000002,
+            "day": 2.235299999999995,
+            "month": 1.016999999999996,
+            "session": 3.544900000000041,
+            "project": 0.8971000000000231,
+            "diagnostics": 0.19740625000000023,
+            "providerCount": 0.4736937499999989,
+            "modelCount": 0.46700625000000073,
+            "modelFallback": 1.208187500000001,
+            "missing1": 0.03202500000000086,
+            "missing16": 0.03707500000000152
+          },
+          "diagnostics": {
+            "append": 258.3293,
+            "day": 1.8100000000000023,
+            "month": 1.2191000000000258,
+            "session": 3.616299999999967,
+            "project": 0.9187000000000012,
+            "diagnostics": 0.1532499999999999,
+            "providerCount": 0.43657500000000127,
+            "modelCount": 0.4615687500000014,
+            "modelFallback": 1.210250000000002,
+            "missing1": 0.026437500000000114,
+            "missing16": 0.03868124999999978
+          },
+          "count": {
+            "append": 255.26440000000002,
+            "day": 1.832400000000007,
+            "month": 0.8186000000000035,
+            "session": 3.859700000000032,
+            "project": 0.9036000000000399,
+            "diagnostics": 0.20966874999999874,
+            "providerCount": 0.3615124999999999,
+            "modelCount": 0.36223125000000067,
+            "modelFallback": 1.1201187499999996,
+            "missing1": 0.028556249999997618,
+            "missing16": 0.041149999999998244
+          },
+          "missing-source": {
+            "append": 255.22269999999997,
+            "day": 2.0354999999999563,
+            "month": 0.8603999999999701,
+            "session": 3.348600000000033,
+            "project": 1.158800000000042,
+            "diagnostics": 0.2134625000000021,
+            "providerCount": 0.4282125000000008,
+            "modelCount": 0.4218500000000027,
+            "modelFallback": 1.1676937500000015,
+            "missing1": 0.05000624999999914,
+            "missing16": 0.06109375000000128
+          }
+        },
+        {
+          "order": [
+            "A",
+            "missing-source",
+            "diagnostics",
+            "count"
+          ],
+          "A": {
+            "append": 271.4332,
+            "day": 1.9028000000000134,
+            "month": 1.0633000000000266,
+            "session": 4.28449999999998,
+            "project": 1.0340999999999667,
+            "diagnostics": 0.23775625000000034,
+            "providerCount": 0.43336874999999964,
+            "modelCount": 0.46893750000000267,
+            "modelFallback": 1.1908874999999988,
+            "missing1": 0.026681249999999324,
+            "missing16": 0.036893750000000836
+          },
+          "diagnostics": {
+            "append": 259.5002,
+            "day": 1.7411000000000172,
+            "month": 0.9907999999999788,
+            "session": 3.4309000000000083,
+            "project": 1.106999999999971,
+            "diagnostics": 0.14960624999999794,
+            "providerCount": 0.4369000000000014,
+            "modelCount": 0.45438125000000085,
+            "modelFallback": 1.2305062500000012,
+            "missing1": 0.028575000000000017,
+            "missing16": 0.036281249999998266
+          },
+          "count": {
+            "append": 247.12800000000001,
+            "day": 1.8856000000000108,
+            "month": 0.8052999999999884,
+            "session": 3.3893000000000484,
+            "project": 0.8935000000000173,
+            "diagnostics": 0.2189312500000007,
+            "providerCount": 0.3642812500000012,
+            "modelCount": 0.37721249999999884,
+            "modelFallback": 1.1386624999999988,
+            "missing1": 0.02635000000000076,
+            "missing16": 0.03601875000000021
+          },
+          "missing-source": {
+            "append": 259.1614,
+            "day": 1.7618999999999687,
+            "month": 0.9536000000000513,
+            "session": 3.5927999999999543,
+            "project": 1.0124000000000137,
+            "diagnostics": 0.22421875000000213,
+            "providerCount": 0.44553750000000036,
+            "modelCount": 0.45974999999999966,
+            "modelFallback": 1.2082124999999984,
+            "missing1": 0.05010000000000048,
+            "missing16": 0.07574999999999932
+          }
+        },
+        {
+          "order": [
+            "missing-source",
+            "count",
+            "diagnostics",
+            "A"
+          ],
+          "A": {
+            "append": 264.5568,
+            "day": 1.8204000000000065,
+            "month": 1.001100000000008,
+            "session": 3.5172000000000025,
+            "project": 1.1811999999999898,
+            "diagnostics": 0.20179999999999865,
+            "providerCount": 0.4801062499999986,
+            "modelCount": 0.5202062500000011,
+            "modelFallback": 1.2728687500000007,
+            "missing1": 0.027237500000001802,
+            "missing16": 0.03755624999999796
+          },
+          "diagnostics": {
+            "append": 327.58259999999996,
+            "day": 2.2140999999999735,
+            "month": 0.8499999999999659,
+            "session": 3.7479000000000156,
+            "project": 1.109299999999962,
+            "diagnostics": 0.141099999999998,
+            "providerCount": 0.6767562500000004,
+            "modelCount": 0.6135875000000013,
+            "modelFallback": 1.5005687499999993,
+            "missing1": 0.033106250000003,
+            "missing16": 0.04194999999999993
+          },
+          "count": {
+            "append": 249.28209999999999,
+            "day": 1.733000000000004,
+            "month": 0.8007000000000062,
+            "session": 3.7887999999999806,
+            "project": 0.9907999999999788,
+            "diagnostics": 0.2043812499999973,
+            "providerCount": 0.3723187500000016,
+            "modelCount": 0.3570750000000018,
+            "modelFallback": 1.1090437500000014,
+            "missing1": 0.026337500000000347,
+            "missing16": 0.03595625000000169
+          },
+          "missing-source": {
+            "append": 253.7302,
+            "day": 2.7169999999999845,
+            "month": 1.2287000000000035,
+            "session": 5.20169999999996,
+            "project": 1.3024000000000342,
+            "diagnostics": 0.222037499999999,
+            "providerCount": 0.46280624999999986,
+            "modelCount": 0.4461624999999998,
+            "modelFallback": 1.2021875000000009,
+            "missing1": 0.051493750000002336,
+            "missing16": 0.0683000000000007
+          }
+        },
+        {
+          "order": [
+            "A",
+            "count",
+            "missing-source",
+            "diagnostics"
+          ],
+          "A": {
+            "append": 254.99290000000002,
+            "day": 1.7660999999999945,
+            "month": 1.0097000000000094,
+            "session": 3.6288999999999874,
+            "project": 0.9716999999999985,
+            "diagnostics": 0.21644999999999825,
+            "providerCount": 0.4496312499999995,
+            "modelCount": 0.49409374999999756,
+            "modelFallback": 1.2982812500000023,
+            "missing1": 0.026443750000002098,
+            "missing16": 0.035868749999998784
+          },
+          "diagnostics": {
+            "append": 276.41810000000004,
+            "day": 1.8151999999999475,
+            "month": 0.8256999999999834,
+            "session": 3.4180000000000064,
+            "project": 0.9648000000000252,
+            "diagnostics": 0.13631249999999895,
+            "providerCount": 0.42689999999999984,
+            "modelCount": 0.42965625000000074,
+            "modelFallback": 1.2339062500000004,
+            "missing1": 0.026737499999999415,
+            "missing16": 0.04056874999999849
+          },
+          "count": {
+            "append": 251.8817,
+            "day": 1.7738999999999692,
+            "month": 0.8056000000000267,
+            "session": 3.642600000000016,
+            "project": 1.019900000000007,
+            "diagnostics": 0.20983125000000058,
+            "providerCount": 0.40054375000000064,
+            "modelCount": 0.3679187500000012,
+            "modelFallback": 1.1132187500000015,
+            "missing1": 0.03501250000000056,
+            "missing16": 0.037593749999999204
+          },
+          "missing-source": {
+            "append": 259.35519999999997,
+            "day": 1.7550999999999704,
+            "month": 1.0919000000000096,
+            "session": 3.574700000000007,
+            "project": 0.9812000000000012,
+            "diagnostics": 0.20132500000000064,
+            "providerCount": 0.48323749999999777,
+            "modelCount": 0.45345000000000013,
+            "modelFallback": 1.2382937500000004,
+            "missing1": 0.05008124999999808,
+            "missing16": 0.06280625000000128
+          }
+        },
+        {
+          "order": [
+            "count",
+            "diagnostics",
+            "missing-source",
+            "A"
+          ],
+          "A": {
+            "append": 274.3352,
+            "day": 2.3673,
+            "month": 0.8507999999999925,
+            "session": 3.3582999999999856,
+            "project": 1.3850999999999658,
+            "diagnostics": 0.2538000000000018,
+            "providerCount": 0.4686562500000022,
+            "modelCount": 0.5621624999999995,
+            "modelFallback": 1.3312375000000003,
+            "missing1": 0.02645000000000053,
+            "missing16": 0.03652500000000103
+          },
+          "diagnostics": {
+            "append": 287.9978,
+            "day": 1.8700999999999794,
+            "month": 0.815400000000011,
+            "session": 3.296600000000012,
+            "project": 1.001199999999983,
+            "diagnostics": 0.14284375000000082,
+            "providerCount": 0.43650625000000076,
+            "modelCount": 0.4437125000000002,
+            "modelFallback": 1.1949499999999986,
+            "missing1": 0.02626874999999984,
+            "missing16": 0.035568750000003035
+          },
+          "count": {
+            "append": 249.53009999999998,
+            "day": 1.75649999999996,
+            "month": 0.8075000000000045,
+            "session": 3.7490000000000236,
+            "project": 0.9855999999999767,
+            "diagnostics": 0.20804374999999808,
+            "providerCount": 0.3671312499999999,
+            "modelCount": 0.3767125,
+            "modelFallback": 1.1662937499999977,
+            "missing1": 0.03375624999999971,
+            "missing16": 0.03621250000000131
+          },
+          "missing-source": {
+            "append": 280.7703,
+            "day": 1.7490000000000236,
+            "month": 0.9847000000000321,
+            "session": 4.008000000000038,
+            "project": 1.1079000000000292,
+            "diagnostics": 0.286593749999998,
+            "providerCount": 0.44358125000000115,
+            "modelCount": 0.4947562500000018,
+            "modelFallback": 1.3710249999999995,
+            "missing1": 0.05346250000000197,
+            "missing16": 0.06434374999999903
+          }
+        },
+        {
+          "order": [
+            "A",
+            "diagnostics",
+            "count",
+            "missing-source"
+          ],
+          "A": {
+            "append": 283.3653,
+            "day": 1.7504000000000133,
+            "month": 0.8888999999999783,
+            "session": 3.3491000000000213,
+            "project": 1.404800000000023,
+            "diagnostics": 0.26248125000000044,
+            "providerCount": 0.49199375000000245,
+            "modelCount": 0.4775562500000028,
+            "modelFallback": 1.2555750000000003,
+            "missing1": 0.02696874999999821,
+            "missing16": 0.037137500000000045
+          },
+          "diagnostics": {
+            "append": 256.9825,
+            "day": 1.79140000000001,
+            "month": 0.8160000000000309,
+            "session": 3.3584000000000174,
+            "project": 0.9224000000000387,
+            "diagnostics": 0.14284999999999926,
+            "providerCount": 0.44066874999999683,
+            "modelCount": 0.5102437500000008,
+            "modelFallback": 1.2493250000000025,
+            "missing1": 0.026324999999999932,
+            "missing16": 0.08756250000000065
+          },
+          "count": {
+            "append": 278.581,
+            "day": 1.7975000000000136,
+            "month": 0.9466999999999643,
+            "session": 4.19459999999998,
+            "project": 1.0442000000000462,
+            "diagnostics": 0.2171062500000005,
+            "providerCount": 0.41489375000000095,
+            "modelCount": 0.4395437500000021,
+            "modelFallback": 1.2765500000000003,
+            "missing1": 0.03121875000000074,
+            "missing16": 0.036625000000000796
+          },
+          "missing-source": {
+            "append": 270.3015,
+            "day": 1.8179000000000087,
+            "month": 0.8034999999999854,
+            "session": 3.7654999999999745,
+            "project": 1.0476999999999634,
+            "diagnostics": 0.20478749999999835,
+            "providerCount": 0.5019437500000024,
+            "modelCount": 0.4864999999999995,
+            "modelFallback": 1.2632437500000009,
+            "missing1": 0.061631249999997806,
+            "missing16": 0.06713750000000118
+          }
+        },
+        {
+          "order": [
+            "diagnostics",
+            "missing-source",
+            "count",
+            "A"
+          ],
+          "A": {
+            "append": 264.1524,
+            "day": 2.098000000000013,
+            "month": 1.1862999999999602,
+            "session": 4.287899999999979,
+            "project": 1.301499999999976,
+            "diagnostics": 0.22800000000000153,
+            "providerCount": 0.4372812500000016,
+            "modelCount": 0.5150749999999995,
+            "modelFallback": 1.2651812500000013,
+            "missing1": 0.028112499999998875,
+            "missing16": 0.036618750000002365
+          },
+          "diagnostics": {
+            "append": 275.6144,
+            "day": 1.7239999999999895,
+            "month": 1.2685000000000173,
+            "session": 3.753500000000031,
+            "project": 1.1539000000000215,
+            "diagnostics": 0.16836250000000064,
+            "providerCount": 0.4930000000000021,
+            "modelCount": 0.5594125000000005,
+            "modelFallback": 1.4413875000000012,
+            "missing1": 0.027012500000001438,
+            "missing16": 0.04073125000000033
+          },
+          "count": {
+            "append": 319.2483,
+            "day": 2.212599999999952,
+            "month": 0.9560999999999922,
+            "session": 3.529800000000023,
+            "project": 1.5376999999999725,
+            "diagnostics": 0.25262499999999477,
+            "providerCount": 0.38382500000000164,
+            "modelCount": 0.41784375000000296,
+            "modelFallback": 1.186662499999997,
+            "missing1": 0.03812500000000085,
+            "missing16": 0.04141874999999828
+          },
+          "missing-source": {
+            "append": 411.3105,
+            "day": 2.9728999999999814,
+            "month": 1.0842000000000098,
+            "session": 5.216599999999971,
+            "project": 1.2297999999999547,
+            "diagnostics": 0.30834999999999724,
+            "providerCount": 0.5889624999999938,
+            "modelCount": 0.45810625000000016,
+            "modelFallback": 1.8274937500000021,
+            "missing1": 0.06953749999999559,
+            "missing16": 0.10981874999999519
+          }
+        },
+        {
+          "order": [
+            "A",
+            "missing-source",
+            "diagnostics",
+            "count"
+          ],
+          "A": {
+            "append": 252.69520000000003,
+            "day": 1.7805000000000177,
+            "month": 0.8406999999999698,
+            "session": 3.983799999999974,
+            "project": 1.169300000000021,
+            "diagnostics": 0.20444374999999937,
+            "providerCount": 0.4228750000000012,
+            "modelCount": 0.5106375000000014,
+            "modelFallback": 1.2179874999999996,
+            "missing1": 0.026893749999999272,
+            "missing16": 0.040500000000001535
+          },
+          "diagnostics": {
+            "append": 251.2997,
+            "day": 1.7597000000000094,
+            "month": 0.7894000000000005,
+            "session": 3.7175999999999476,
+            "project": 1.0219999999999914,
+            "diagnostics": 0.142956250000001,
+            "providerCount": 0.4697375000000008,
+            "modelCount": 0.4255500000000012,
+            "modelFallback": 1.1697124999999993,
+            "missing1": 0.03622500000000173,
+            "missing16": 0.04703124999999986
+          },
+          "count": {
+            "append": 247.44809999999998,
+            "day": 1.974899999999991,
+            "month": 0.8740999999999985,
+            "session": 3.441000000000031,
+            "project": 1.0921999999999912,
+            "diagnostics": 0.20724374999999995,
+            "providerCount": 0.3552062499999984,
+            "modelCount": 0.38032499999999914,
+            "modelFallback": 1.2555062499999998,
+            "missing1": 0.02656250000000071,
+            "missing16": 0.03601875000000021
+          },
+          "missing-source": {
+            "append": 246.30599999999998,
+            "day": 2.0325000000000273,
+            "month": 0.7948999999999842,
+            "session": 3.5329999999999586,
+            "project": 0.9014000000000237,
+            "diagnostics": 0.2528812500000015,
+            "providerCount": 0.4246187500000005,
+            "modelCount": 0.42592499999999944,
+            "modelFallback": 1.2084375000000023,
+            "missing1": 0.051143750000001376,
+            "missing16": 0.06975625000000107
+          }
+        },
+        {
+          "order": [
+            "missing-source",
+            "count",
+            "diagnostics",
+            "A"
+          ],
+          "A": {
+            "append": 251.19619999999998,
+            "day": 1.8353999999999928,
+            "month": 0.7811000000000377,
+            "session": 3.423000000000002,
+            "project": 0.9014999999999986,
+            "diagnostics": 0.22798750000000112,
+            "providerCount": 0.43685624999999817,
+            "modelCount": 0.4761500000000005,
+            "modelFallback": 1.2324937499999997,
+            "missing1": 0.026331250000001916,
+            "missing16": 0.03799374999999827
+          },
+          "diagnostics": {
+            "append": 255.08290000000002,
+            "day": 1.845700000000022,
+            "month": 0.8567999999999643,
+            "session": 3.681100000000015,
+            "project": 0.9316000000000031,
+            "diagnostics": 0.14480624999999847,
+            "providerCount": 0.44004375000000095,
+            "modelCount": 0.4402312500000001,
+            "modelFallback": 1.2143187500000003,
+            "missing1": 0.026818749999996783,
+            "missing16": 0.03621250000000131
+          },
+          "count": {
+            "append": 249.3474,
+            "day": 1.828800000000001,
+            "month": 0.8872000000000071,
+            "session": 3.738800000000026,
+            "project": 0.9362999999999602,
+            "diagnostics": 0.228275,
+            "providerCount": 0.3568125000000002,
+            "modelCount": 0.368624999999998,
+            "modelFallback": 1.09551875,
+            "missing1": 0.02713125000000005,
+            "missing16": 0.03640624999999886
+          },
+          "missing-source": {
+            "append": 251.7674,
+            "day": 1.7133999999999787,
+            "month": 0.8360000000000127,
+            "session": 4.435299999999984,
+            "project": 0.997099999999989,
+            "diagnostics": 0.22085625000000064,
+            "providerCount": 0.4229625000000006,
+            "modelCount": 0.4494812500000016,
+            "modelFallback": 1.1948062499999992,
+            "missing1": 0.05039999999999978,
+            "missing16": 0.06086874999999736
+          }
+        },
+        {
+          "order": [
+            "A",
+            "count",
+            "missing-source",
+            "diagnostics"
+          ],
+          "A": {
+            "append": 265.0323,
+            "day": 1.7764999999999986,
+            "month": 1.2962999999999738,
+            "session": 4.200500000000034,
+            "project": 0.9496000000000322,
+            "diagnostics": 0.2077750000000016,
+            "providerCount": 0.5584812500000034,
+            "modelCount": 0.46040624999999835,
+            "modelFallback": 1.3191937500000002,
+            "missing1": 0.028562499999999602,
+            "missing16": 0.036568750000000705
+          },
+          "diagnostics": {
+            "append": 319.8211,
+            "day": 2.0581000000000245,
+            "month": 0.9993999999999801,
+            "session": 6.197400000000016,
+            "project": 1.5258000000000038,
+            "diagnostics": 0.23355624999999947,
+            "providerCount": 0.5865000000000009,
+            "modelCount": 0.6047125000000015,
+            "modelFallback": 2.557024999999996,
+            "missing1": 0.06692499999999768,
+            "missing16": 0.09078124999999915
+          },
+          "count": {
+            "append": 255.304,
+            "day": 1.84639999999996,
+            "month": 0.8359000000000378,
+            "session": 3.3278999999999996,
+            "project": 1.081700000000012,
+            "diagnostics": 0.24099375000000123,
+            "providerCount": 0.3533562499999974,
+            "modelCount": 0.3921437499999989,
+            "modelFallback": 1.1469500000000004,
+            "missing1": 0.02648124999999979,
+            "missing16": 0.04628124999999983
+          },
+          "missing-source": {
+            "append": 254.1431,
+            "day": 1.745300000000043,
+            "month": 0.8060999999999581,
+            "session": 3.45799999999997,
+            "project": 1.0044000000000324,
+            "diagnostics": 0.20543125000000018,
+            "providerCount": 0.4380375000000001,
+            "modelCount": 0.6239812499999999,
+            "modelFallback": 1.4172249999999984,
+            "missing1": 0.06726250000000178,
+            "missing16": 0.061262499999998
+          }
+        },
+        {
+          "order": [
+            "count",
+            "diagnostics",
+            "missing-source",
+            "A"
+          ],
+          "A": {
+            "append": 276.9718,
+            "day": 2.2016000000000417,
+            "month": 0.8926999999999907,
+            "session": 4.155400000000043,
+            "project": 0.9091000000000236,
+            "diagnostics": 0.21006875000000136,
+            "providerCount": 0.4759999999999991,
+            "modelCount": 0.4972687499999999,
+            "modelFallback": 1.3410875000000004,
+            "missing1": 0.03341250000000073,
+            "missing16": 0.05232499999999973
+          },
+          "diagnostics": {
+            "append": 255.6477,
+            "day": 1.8505999999999858,
+            "month": 0.7982000000000085,
+            "session": 4.090199999999982,
+            "project": 0.8951999999999884,
+            "diagnostics": 0.1363999999999983,
+            "providerCount": 0.43738124999999783,
+            "modelCount": 0.45691249999999783,
+            "modelFallback": 1.2168062500000012,
+            "missing1": 0.02637499999999804,
+            "missing16": 0.03581249999999869
+          },
+          "count": {
+            "append": 315.0907,
+            "day": 1.910000000000025,
+            "month": 0.9712999999999852,
+            "session": 3.6346999999999525,
+            "project": 1.037300000000016,
+            "diagnostics": 0.3120562499999977,
+            "providerCount": 0.40732500000000016,
+            "modelCount": 0.36710000000000065,
+            "modelFallback": 1.1965624999999989,
+            "missing1": 0.026906249999996135,
+            "missing16": 0.049925000000001774
+          },
+          "missing-source": {
+            "append": 262.60440000000006,
+            "day": 1.852800000000002,
+            "month": 0.8025000000000091,
+            "session": 3.3643000000000143,
+            "project": 0.8973000000000297,
+            "diagnostics": 0.21341250000000045,
+            "providerCount": 0.43266250000000284,
+            "modelCount": 0.43150625000000176,
+            "modelFallback": 1.1578937499999995,
+            "missing1": 0.05143125000000026,
+            "missing16": 0.06156250000000085
+          }
+        },
+        {
+          "order": [
+            "A",
+            "diagnostics",
+            "count",
+            "missing-source"
+          ],
+          "A": {
+            "append": 254.86019999999996,
+            "day": 2.0242999999999824,
+            "month": 0.9565000000000055,
+            "session": 3.6872000000000185,
+            "project": 0.9039000000000215,
+            "diagnostics": 0.2259750000000018,
+            "providerCount": 0.4406125000000003,
+            "modelCount": 0.4581374999999994,
+            "modelFallback": 1.2768374999999992,
+            "missing1": 0.02639999999999887,
+            "missing16": 0.03604374999999749
+          },
+          "diagnostics": {
+            "append": 255.80470000000003,
+            "day": 1.912300000000016,
+            "month": 0.8453000000000088,
+            "session": 3.675700000000006,
+            "project": 1.236500000000035,
+            "diagnostics": 0.1513750000000016,
+            "providerCount": 0.45222499999999854,
+            "modelCount": 0.4683437500000025,
+            "modelFallback": 1.2168749999999982,
+            "missing1": 0.026606250000000387,
+            "missing16": 0.03572499999999934
+          },
+          "count": {
+            "append": 251.6989,
+            "day": 1.7450999999999794,
+            "month": 0.8170999999999822,
+            "session": 3.4487000000000307,
+            "project": 0.9005999999999972,
+            "diagnostics": 0.2072812500000012,
+            "providerCount": 0.3491250000000008,
+            "modelCount": 0.356562499999999,
+            "modelFallback": 1.0977312500000025,
+            "missing1": 0.030512500000000387,
+            "missing16": 0.03940624999999898
+          },
+          "missing-source": {
+            "append": 250.1907,
+            "day": 1.80559999999997,
+            "month": 0.7938000000000329,
+            "session": 3.9548000000000343,
+            "project": 0.9978000000000407,
+            "diagnostics": 0.2228874999999988,
+            "providerCount": 0.4457562500000023,
+            "modelCount": 0.46290624999999963,
+            "modelFallback": 1.2319937499999973,
+            "missing1": 0.05063750000000056,
+            "missing16": 0.06406875000000056
+          }
+        },
+        {
+          "order": [
+            "diagnostics",
+            "missing-source",
+            "count",
+            "A"
+          ],
+          "A": {
+            "append": 255.1676,
+            "day": 1.7742999999999824,
+            "month": 0.8129999999999882,
+            "session": 3.3313999999999737,
+            "project": 0.9764999999999873,
+            "diagnostics": 0.21999999999999886,
+            "providerCount": 0.48470000000000013,
+            "modelCount": 0.4440249999999999,
+            "modelFallback": 1.1893874999999987,
+            "missing1": 0.02639999999999887,
+            "missing16": 0.035818750000000676
+          },
+          "diagnostics": {
+            "append": 255.09239999999997,
+            "day": 1.716799999999978,
+            "month": 0.800899999999956,
+            "session": 3.928299999999979,
+            "project": 1.0509999999999877,
+            "diagnostics": 0.15672500000000156,
+            "providerCount": 0.4306625000000004,
+            "modelCount": 0.4537875000000007,
+            "modelFallback": 1.1498625000000011,
+            "missing1": 0.02699374999999904,
+            "missing16": 0.03640000000000043
+          },
+          "count": {
+            "append": 259.1087,
+            "day": 1.8071999999999662,
+            "month": 0.8347999999999729,
+            "session": 4.11869999999999,
+            "project": 0.8929999999999723,
+            "diagnostics": 0.20493125000000134,
+            "providerCount": 0.35823124999999933,
+            "modelCount": 0.3507937500000011,
+            "modelFallback": 1.1316562500000025,
+            "missing1": 0.02713125000000005,
+            "missing16": 0.036243750000000574
+          },
+          "missing-source": {
+            "append": 250.3494,
+            "day": 2.0196000000000254,
+            "month": 0.8049000000000319,
+            "session": 3.419599999999946,
+            "project": 0.9679999999999609,
+            "diagnostics": 0.2334875000000025,
+            "providerCount": 0.5414562499999995,
+            "modelCount": 0.4940875000000027,
+            "modelFallback": 1.2599187500000006,
+            "missing1": 0.05542499999999961,
+            "missing16": 0.06356249999999974
+          }
+        }
+      ],
+      "timings": {
+        "diagnostics": {
+          "append": {
+            "a": 255.20324999999997,
+            "b": 256.3936,
+            "reductionPercent": -0.46643214770972696,
+            "fasterPairs": 7,
+            "pairedDeltaIqr": [
+              -2.747300000000024,
+              13.199474999999993
+            ]
+          },
+          "day": {
+            "a": 1.8404999999999916,
+            "b": 1.812599999999975,
+            "reductionPercent": 1.515892420538811,
+            "fasterPairs": 13,
+            "pairedDeltaIqr": [
+              -0.14482500000001153,
+              0.04302499999998588
+            ]
+          },
+          "month": {
+            "a": 0.8907999999999845,
+            "b": 0.8298999999999808,
+            "reductionPercent": 6.836551414459451,
+            "fasterPairs": 14,
+            "pairedDeltaIqr": [
+              -0.09867499999998586,
+              0.007675000000034515
+            ]
+          },
+          "session": {
+            "a": 3.658050000000003,
+            "b": 3.692700000000002,
+            "reductionPercent": -0.9472259810554573,
+            "fasterPairs": 10,
+            "pairedDeltaIqr": [
+              -0.2247249999999923,
+              0.23755000000001303
+            ]
+          },
+          "project": {
+            "a": 0.9740999999999929,
+            "b": 1.0043000000000006,
+            "reductionPercent": -3.1002977107081406,
+            "fasterPairs": 11,
+            "pairedDeltaIqr": [
+              -0.07257500000001471,
+              0.0768499999999932
+            ]
+          },
+          "diagnostics": {
+            "a": 0.21253124999999962,
+            "b": 0.14487499999999898,
+            "reductionPercent": 31.833553889134308,
+            "fasterPairs": 19,
+            "pairedDeltaIqr": [
+              -0.08089843750000014,
+              -0.060434375000000706
+            ]
+          }
+        },
+        "count": {
+          "append": {
+            "a": 255.20324999999997,
+            "b": 251.7903,
+            "reductionPercent": 1.3373458214187974,
+            "fasterPairs": 12,
+            "pairedDeltaIqr": [
+              -6.650299999999987,
+              2.8064250000000044
+            ]
+          },
+          "day": {
+            "a": 1.8404999999999916,
+            "b": 1.830600000000004,
+            "reductionPercent": 0.5378973105127753,
+            "fasterPairs": 11,
+            "pairedDeltaIqr": [
+              -0.09292500000000814,
+              0.05279999999999063
+            ]
+          },
+          "month": {
+            "a": 0.8907999999999845,
+            "b": 0.8353500000000054,
+            "reductionPercent": 6.22474180511676,
+            "fasterPairs": 13,
+            "pairedDeltaIqr": [
+              -0.2013249999999971,
+              0.039500000000018076
+            ]
+          },
+          "session": {
+            "a": 3.658050000000003,
+            "b": 3.6008999999999673,
+            "reductionPercent": 1.5623077869366333,
+            "fasterPairs": 12,
+            "pairedDeltaIqr": [
+              -0.5262250000000535,
+              0.3150499999999994
+            ]
+          },
+          "project": {
+            "a": 0.9740999999999929,
+            "b": 0.9881999999999778,
+            "reductionPercent": -1.447489990759163,
+            "fasterPairs": 9,
+            "pairedDeltaIqr": [
+              -0.09777499999999861,
+              0.1065749999999781
+            ]
+          },
+          "providerCount": {
+            "a": 0.4519406249999989,
+            "b": 0.36663749999999773,
+            "reductionPercent": 18.874852199888284,
+            "fasterPairs": 20,
+            "pairedDeltaIqr": [
+              -0.09815000000000218,
+              -0.06898437499999854
+            ]
+          },
+          "modelCount": {
+            "a": 0.47685312500000165,
+            "b": 0.37325937499999995,
+            "reductionPercent": 21.724456560917233,
+            "fasterPairs": 20,
+            "pairedDeltaIqr": [
+              -0.1271734374999971,
+              -0.07841562500000077
+            ]
+          },
+          "modelFallback": {
+            "a": 1.2252406249999996,
+            "b": 1.125887500000001,
+            "reductionPercent": 8.108866370636267,
+            "fasterPairs": 17,
+            "pairedDeltaIqr": [
+              -0.16410468750000007,
+              -0.05635468749999717
+            ]
+          }
+        },
+        "missing-source": {
+          "append": {
+            "a": 255.20324999999997,
+            "b": 254.95675,
+            "reductionPercent": 0.09658967901073717,
+            "fasterPairs": 11,
+            "pairedDeltaIqr": [
+              -8.519150000000003,
+              6.24302500000001
+            ]
+          },
+          "day": {
+            "a": 1.8404999999999916,
+            "b": 1.8040499999999895,
+            "reductionPercent": 1.9804400977996337,
+            "fasterPairs": 14,
+            "pairedDeltaIqr": [
+              -0.15222500000004402,
+              0.028949999999994702
+            ]
+          },
+          "month": {
+            "a": 0.8907999999999845,
+            "b": 0.8411000000000115,
+            "reductionPercent": 5.579254602601465,
+            "fasterPairs": 14,
+            "pairedDeltaIqr": [
+              -0.11212499999999181,
+              0.05370000000002051
+            ]
+          },
+          "session": {
+            "a": 3.658050000000003,
+            "b": 3.7501000000000033,
+            "reductionPercent": -2.5163680102787094,
+            "fasterPairs": 10,
+            "pairedDeltaIqr": [
+              -0.4305500000000677,
+              0.4027499999999691
+            ]
+          },
+          "project": {
+            "a": 0.9740999999999929,
+            "b": 1.0067500000000393,
+            "reductionPercent": -3.3518119289648616,
+            "fasterPairs": 9,
+            "pairedDeltaIqr": [
+              -0.07049999999998136,
+              0.0858000000000061
+            ]
+          },
+          "missing1": {
+            "a": 0.02693124999999874,
+            "b": 0.05150937500000197,
+            "reductionPercent": -91.2624738918705,
+            "fasterPairs": 0,
+            "pairedDeltaIqr": [
+              0.023417187500000658,
+              0.026989062500001992
+            ]
+          },
+          "missing16": {
+            "a": 0.036593750000001535,
+            "b": 0.06375624999999907,
+            "reductionPercent": -74.22715627667674,
+            "fasterPairs": 0,
+            "pairedDeltaIqr": [
+              0.02452499999999791,
+              0.030185937500001536
+            ]
+          }
+        }
+      }
+    }
+  }
+}

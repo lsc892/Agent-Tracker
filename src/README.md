@@ -12,3 +12,7 @@
 - [quota/](quota/README.md): 제공자별 구독 quota를 조회하고 최신 상태와 갱신 주기를 관리한다.
 - [summary/](summary/README.md): 로컬 대화 로그를 수집·집계하고 SQLite 통계를 조회한다.
 - [ui/](ui/README.md): 상태바와 통계·진단·색상 설정 화면을 관리한다.
+
+## 관련 문서
+
+- [설계 명세](../docs/refrences/AgentTracker.md) — 기능의 설계 기준과 정책.

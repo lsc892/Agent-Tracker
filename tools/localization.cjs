@@ -12,6 +12,7 @@ const base = read('localization/locales/ko.json');
 const placeholders = value => [...new Set(value.match(/\{\w+\}/g) ?? [])].sort().join(',');
 const localePattern = /^[a-z]{2,3}(?:-[a-z0-9]+)*$/;
 function write(file, value) {
+  // [생성 정책] 확인 모드에서는 줄바꿈을 정규화해 기대 내용과 비교하고 생성 모드에서는 파일에 쓴다.
   const target = path.join(root, file);
   const expected = JSON.stringify(value, null, 2) + '\n';
   if (!check) { fs.writeFileSync(target, expected); return; }
@@ -24,6 +25,7 @@ const localeIds = new Set();
  * 알고리즘: 언어 ID·별칭 중복, 원문과의 키 집합·placeholder 일치, 빈 번역·미번역 한글을 검사한 뒤 유효 사전만 등록한다.
  */
 for (const language of languages) {
+  // [검증 정책] locale 표기와 중복을 검사한 뒤 원문 키와 치환 변수 집합을 대조한다.
   if (!localePattern.test(language.locale) || localeIds.has(language.locale)
     || !Array.isArray(language.vscodeLocales) || !language.vscodeLocales.every(alias => localePattern.test(alias))) {
     throw new Error('Invalid or duplicate locale');
@@ -42,6 +44,7 @@ for (const language of languages) {
 const pkg = read('package.json');
 pkg.contributes.configuration = configurationManifest(languages);
 write('package.json', pkg);
+// [번역 정책] manifest가 참조하는 키만 골라 언어 코드와 VS Code 별칭마다 사전을 만든다.
 const manifestKeys = [...new Set(JSON.stringify(pkg).match(/%[\w.]+%/g))].map(token => token.slice(1, -1));
 for (const language of languages) {
   const catalog = catalogs.get(language.locale);
@@ -66,6 +69,7 @@ for (const file of [...files('src'), ...files('media')].filter(file => /\.(ts|js
   const source = fs.readFileSync(path.join(root, file), 'utf8');
   const tree = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
   function validateUsage(key, variables) {
+    // [검증 정책] 리터럴 키를 사전에 대조하고 정적 객체 인자는 이름 집합까지 검사한다.
     if (!Object.hasOwn(base, key)) throw new Error(`${file}: unknown translation key ${key}`);
     if (variables && !ts.isObjectLiteralExpression(variables)) return;
     const names = variables ? variables.properties.map(property => property.name?.getText(tree)).sort().join(',') : '';
@@ -73,6 +77,7 @@ for (const file of [...files('src'), ...files('media')].filter(file => /\.(ts|js
     if (names !== expected) throw new Error(`${file}: mismatched arguments for ${key}`);
   }
   function validateQuotaErrorUsage(node) {
+    // [검증 정책] 정적 QuotaError 인자의 리터럴 키와 치환값을 검사 대상으로 삼는다.
     if (!(ts.isNewExpression(node) && node.expression.getText(tree) === 'QuotaError' && node.arguments?.[1]
       && ts.isObjectLiteralExpression(node.arguments[1]))) return;
     const properties = node.arguments[1].properties;
@@ -86,6 +91,7 @@ for (const file of [...files('src'), ...files('media')].filter(file => /\.(ts|js
    * 알고리즘: AST를 재귀 순회해 문자열의 미이관 한글을 찾고 t·QuotaError의 리터럴 키와 치환 인자를 원문 사전과 대조한다.
    */
   function walk(node) {
+    // [검증 정책] AST를 재귀 순회해 코드에 남은 한글과 번역 키·치환값을 찾는다.
     if ((ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)
       || ts.isTemplateHead(node) || ts.isTemplateMiddle(node) || ts.isTemplateTail(node))
       && /[가-힣]/.test(node.text) && !file.startsWith('src/summary/db/')) {
@@ -104,6 +110,7 @@ for (const file of [...files('src'), ...files('media')].filter(file => /\.(ts|js
   }
 }
 if (!check) {
+  // [배포 정책] 생성 모드에서만 번들에 필요한 i18next와 사전 파일을 복사한다.
   const vendor = path.dirname(require.resolve('i18next/package.json'));
   fs.rmSync(path.join(root, 'dist/src/localization/locales'), { recursive: true, force: true });
   fs.rmSync(path.join(root, 'dist/src/localization/languages.json'), { force: true });

@@ -23,6 +23,7 @@ export interface UsageQuery {
   timezone?: string;
   fromMs?: number;
   toMs?: number;
+  unknownTime?: 'exclude';
   provider?: Provider;
   providers?: Provider[];
   projectKey?: string;
@@ -54,7 +55,6 @@ export interface NameOption {
 }
 export interface NameResult { rows: NameOption[]; total: number }
 export interface RefreshResult {
-  scanId: string;
   discovered: number;
   parsed: number;
   reused: number;
@@ -139,12 +139,15 @@ export interface UsageEvent {
   model?: string;
   billingMode?: import('./db/types').BillingMode;
   schema?: 'current' | 'legacy';
+  /** The first current response verified a preceding cumulative prefix. */
+  legacyPrefix?: { overlap?: string };
   flags?: string[];
   offset: number;
 }
 export interface CheckEvent {
   kind: 'check'; rootId: string; threadId: string; turnId: string;
-  tokens: TokenVector; offset: number;
+  input: number; output: number; offset: number;
+  verified?: { model?: string; cacheRead: number; cacheWrite: number };
 }
 export interface CapabilityEvent {
   kind: 'capability'; rootId: string; threadId: string; eventId: string;

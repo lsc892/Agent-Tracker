@@ -7,14 +7,14 @@ import { test, type TestContext } from 'node:test';
 import { DatabaseSync } from 'node:sqlite';
 import { SummaryDatabase, periodBounds, type FileMetadata, type TurnSummaryInput } from '../../src/summary/db';
 import { SqliteSession } from '../../src/summary/db/connection';
-import { SCHEMA_SQL, SCHEMA_VERSION, SCHEMA_MODEL_SQL, SCHEMA_CAPABILITY_SQL, SCHEMA_ROLLUP_SQL, manifestIdentityIndexSql } from '../../src/summary/db/schema';
+import { SCHEMA_SQL, SCHEMA_VERSION, SCHEMA_MODEL_SQL, SCHEMA_CAPABILITY_SQL, SCHEMA_ROLLUP_SQL, SCHEMA_APPLIED_RESPONSES_SQL } from '../../src/summary/db/schema';
 
-const v9Schema = `${SCHEMA_SQL.replace(SCHEMA_ROLLUP_SQL, '')}
+const v9Schema = `${SCHEMA_SQL.replace(SCHEMA_ROLLUP_SQL, '').replace(SCHEMA_APPLIED_RESPONSES_SQL, '').replace('  relation_meta BLOB,', '')}
 CREATE INDEX idx_summary_session ON turn_summary(provider, session_id);
-CREATE INDEX IF NOT EXISTS idx_manifest_identity ON manifest(provider, dev, inode);`;
-const summaryTables = ['manifest', 'projects', 'session_billing', 'sessions', 'turn_capability_usage',
+CREATE INDEX IF NOT EXISTS idx_source_identity ON source_file(provider, dev, inode);`;
+const summaryTables = ['source_file', 'applied_response', 'summary_refresh', 'projects', 'session_billing', 'sessions', 'turn_capability_usage',
   'turn_costs', 'turn_model_usage', 'turn_summary',
-  'usage_model_daily', 'usage_request_daily', 'usage_rollup_meta'];
+  'usage_model_daily', 'usage_request_daily', 'usage_rollup_meta'].sort();
 const v8Schema = v9Schema
   .replace('  request_title TEXT,', '  request_title TEXT,\n  turn_index INTEGER NOT NULL,')
   .replace('ON turn_summary(provider, session_id);', 'ON turn_summary(provider, session_id, turn_index);');
@@ -34,7 +34,7 @@ function database(t: TestContext): SummaryDatabase {
   return db;
 }
 
-function metadata(index = 1, session = 'session-a', sourceRoot = '/synthetic/claude'): FileMetadata {
+function metadata(index = 1, session = 'session-a', sourceRoot = '/synthetic/claude'): Omit<FileMetadata, 'relations'> {
   return {
     provider: 'claude', source_root: sourceRoot, path: `${sourceRoot}/${index}.jsonl`,
     session_id: session, size_bytes: 512, mtime_ms: 123456, dev: '10', inode: String(index), parser_version: 1,
@@ -53,20 +53,46 @@ function turn(root = 'turn-a', override: Partial<Omit<TurnSummaryInput, 'model_u
 
 function seed(db: SummaryDatabase, rows: TurnSummaryInput[] = [turn()]): number {
   const file = metadata();
-  const manifest = db.observeFile(file, 'scan-initial');
-  db.replaceMemory({scanId: 'test',
+  const source_file = db.observeFile(file);
+  db.replaceMemory({
     sessions: [{ provider: 'claude', session_id: 'session-a' }],
-    files: [{ ...file, id: manifest.id }], summaries: rows,
+    files: [{ ...file, id: source_file.id }], summaries: rows,
   });
-  return manifest.id;
+  return source_file.id;
 }
+
+test('applied responses are scoped to a session and source relations survive separately', t => {
+  const db = database(t);
+  const file = metadata();
+  const sourceId = db.observeFile(file).id;
+  const relations = { identity: { sessionId: 'session-a', threadId: 'thread', parentThreadId: 'parent', isMain: false,
+    agentPath: 'parent/thread', rootlessSubagent: true, forkedFromId: null },
+    childRequests: new Map([['child\0id', 'root\0id']]) };
+  const response = { provider: 'claude' as const, sessionId: 'session-a', responseKey: '["response","request"]', rootId: 'root\0id',
+    tokens: { input: 100, output: 10, cacheRead: 2, cacheWrite: 3 } };
+  db.replaceMemory({
+    sessions: [{ provider: 'claude', session_id: 'session-a' }],
+    files: [{ ...file, id: sourceId, relations }], summaries: [turn('root\0id')], appliedResponses: [response],
+  });
+  const [stored] = [...db.appliedResponses.loadSessions([{ provider: 'claude', session_id: 'session-a' }])];
+  assert.equal(stored?.responseKey, response.responseKey);
+  assert.equal(stored?.rootId, response.rootId);
+  assert.deepEqual(stored?.tokens, response.tokens);
+  assert.equal(db.connection.prepare('SELECT turn_id FROM applied_response').get()?.turn_id, db.queryTurns()[0].id);
+  assert.deepEqual(db.connection.prepare('PRAGMA table_info(applied_response)').all().map(row => row.name),
+    ['turn_id', 'response_key', 'input_tokens', 'output_tokens', 'cache_read', 'cache_write']);
+  assert.deepEqual([...db.appliedResponses.loadSessions([{ provider: 'claude', session_id: 'other-session' }])], []);
+  assert.deepEqual(db.sourceRelations(sourceId), relations);
+  db.clearData();
+  assert.equal(db.connection.prepare('SELECT count(*) AS n FROM applied_response').get()?.n, 0);
+});
 
 test('tracking selection filters usage, pagination counts and diagnostics without discarding cached data', t => {
   const db = database(t);
   seed(db);
   const meta = {...metadata(), provider: 'codex' as const};
-  const file = db.observeFile(meta, 'scan-codex');
-  db.replaceMemory({scanId: 'test',sessions: [{provider: 'codex', session_id: 'session-a'}], files: [{...meta, id: file.id}], summaries: [turn('codex-turn', {provider: 'codex', quality_flags: '["derived"]'})]});
+  const file = db.observeFile(meta);
+  db.replaceMemory({sessions: [{provider: 'codex', session_id: 'session-a'}], files: [{...meta, id: file.id}], summaries: [turn('codex-turn', {provider: 'codex', quality_flags: '["derived"]'})]});
   for (const provider of ['claude', 'codex'] as const) {
     const filter = {providers: [provider]};
     assert.deepEqual(db.queryTurns(filter).map(row => row.provider), [provider]);
@@ -105,7 +131,9 @@ test('schema normalizes names and bounds SQLite caches', t => {
   assert.equal(first.connection.prepare('PRAGMA cache_size').get()?.cache_size, -4096);
   assert.equal(first.connection.prepare('PRAGMA temp.cache_size').get()?.cache_size, -4096);
   assert.equal(first.connection.prepare('PRAGMA journal_mode').get()?.journal_mode, 'wal');
-  first.connection.exec(manifestIdentityIndexSql(process.platform === 'win32' ? 'linux' : 'win32'));
+  const acceptedSource = first.findSourceFile('claude', metadata().path);
+  first.connection.exec('CREATE INDEX idx_source_identity ON source_file(provider, dev, inode)');
+  assert.equal(first.connection.prepare('PRAGMA index_info(idx_source_identity)').all().length, 3);
   first.close();
   const second = new SummaryDatabase(dbPath);
   t.after(() => second.close());
@@ -114,20 +142,9 @@ test('schema normalizes names and bounds SQLite caches', t => {
   assert.equal(second.queryUsage()[0].total_tokens, 110);
   assert.ok(second.connection.prepare('PRAGMA table_info(turn_summary)').all().every(column => column.name !== 'turn_index'));
   assert.deepEqual(second.connection.prepare('PRAGMA index_info(idx_summary_session)').all(), []);
-  assert.equal(second.connection.prepare('PRAGMA index_info(idx_manifest_identity)').all().length, process.platform === 'win32' ? 0 : 3);
+  assert.deepEqual(second.connection.prepare('PRAGMA index_info(idx_source_identity)').all(), []);
+  assert.deepEqual(second.findSourceFile('claude', metadata().path), acceptedSource);
   second.close();
-});
-
-test('identity indexes follow the discovery platform without changing stored metadata', t => {
-  const db = database(t);
-  const id = seed(db);
-  const before = db.findManifest('claude', metadata().path);
-  for (const platform of ['linux', 'win32', 'darwin', 'win32'] as const) {
-    db.connection.exec(manifestIdentityIndexSql(platform));
-    assert.equal(db.connection.prepare('PRAGMA index_info(idx_manifest_identity)').all().length, platform === 'win32' ? 0 : 3);
-    assert.equal(db.findIdentity('claude', '10', '1')[0].id, id);
-    assert.deepEqual(db.findManifest('claude', metadata().path), before);
-  }
 });
 
 test('session lookup and replacement retain the UNIQUE index and id pagination', t => {
@@ -178,7 +195,7 @@ test('statistics maintenance retries failures and refreshes after a day without 
   assert.equal(db.queryUsage()[0].turn_count, 240);
 });
 
-for (const version of [1,2]) test(`v${version} migration preserves summaries, manifest references and indexes while permitting failed requests`, t => {
+for (const version of [1,2]) test(`v${version} migration preserves summaries, source_file references and indexes while permitting failed requests`, t => {
   const parent = realpathSync(tmpdir());
   const directory = mkdtempSync(join(parent,'agent-tracker-db-migration-'));
   const dbPath = join(directory,'summary.sqlite');
@@ -193,20 +210,24 @@ for (const version of [1,2]) test(`v${version} migration preserves summaries, ma
   const legacy = new DatabaseSync(dbPath);
   let beforeFiles: unknown[];let beforeTurns: unknown[];
   try {
-    legacy.exec(version===1 ? legacySchema.replace("'completed','in_progress','failed'","'completed','in_progress'") : legacySchema);
+    const schema = legacySchema.replaceAll('idx_source_', 'idx_manifest_');
+    legacy.exec(version===1 ? schema.replace("'completed','in_progress','failed'","'completed','in_progress'") : schema);
     legacy.exec(`PRAGMA user_version=${version}`);
     const file = {...metadata(),id:42,processing_status:'done',recorded_at:'2026-10-03T00:00:02.000Z'};
     const summary = {...turn(),turn_index:1,id:99,diagnostic_file_id:42,quality_flags:'duration-approximate',diagnostic_offset:12,last_error:'parse-error'};
-    for (const [table,row] of [['manifest',file],['turn_summary',summary]] as const) {
+    for (const [table,row] of [['source_file',file],['turn_summary',summary]] as const) {
       const keys = Object.keys(row);
       legacy.prepare(`INSERT INTO ${table} (${keys.join(',')}) VALUES (${keys.map(()=>'?').join(',')})`).run(...Object.values(row));
     }
-    beforeFiles = legacy.prepare('SELECT * FROM manifest').all();
+    beforeFiles = legacy.prepare('SELECT *, NULL AS relation_meta FROM source_file').all();
     beforeTurns = legacy.prepare('SELECT * FROM turn_summary').all();
     if (version===1) assert.throws(()=>legacy.exec("UPDATE turn_summary SET status='failed'"),/CHECK constraint/);
+    legacy.exec('ALTER TABLE source_file RENAME TO manifest');
   } finally {legacy.close();}
   db = new SummaryDatabase(dbPath);
-  assert.deepEqual(db.connection.prepare('SELECT * FROM manifest').all(),beforeFiles);
+  assert.deepEqual(db.connection.prepare('SELECT * FROM source_file').all(),beforeFiles);
+  assert.equal(db.connection.prepare("SELECT count(*) n FROM sqlite_master WHERE name IN ('idx_source_root_id','idx_source_session')").get()?.n, 2);
+  assert.equal(db.connection.prepare("SELECT count(*) n FROM sqlite_master WHERE name='manifest'").get()?.n, 0);
   assert.deepEqual(db.queryTurns().map(row=>({...row})),beforeTurns.map(row=>({
     ...Object.fromEntries(Object.entries(row as object).filter(([name]) => name !== 'turn_index')),
     session_name:null,cache_write_input_tokens:null,cache_read_input_tokens:null,has_recorded_usage:1,
@@ -236,7 +257,7 @@ test('v11 migration adds source presence without changing stored usage or markin
   legacy.exec(`PRAGMA user_version=11;
     INSERT INTO projects VALUES ('/synthetic/project-a','Project');
     INSERT INTO sessions VALUES ('claude','session-a','Retained session');
-    INSERT INTO manifest(id,provider,source_root,path,session_id,processing_status,recorded_at)
+    INSERT INTO source_file(id,provider,source_root,path,session_id,processing_status,recorded_at)
       VALUES (42,'claude','/synthetic/claude','/synthetic/claude/1.jsonl','session-a','done','2026-10-03T00:00:02.000Z');
     INSERT INTO turn_summary(id,provider,project_key,session_id,root_turn_id,duration_quality,input_tokens,output_tokens,
       cache_write_input_tokens,cache_read_input_tokens,total_tokens,status,quality_flags,last_error,updated_at)
@@ -247,13 +268,13 @@ test('v11 migration adds source presence without changing stored usage or markin
   try {
     assert.equal(db.connection.prepare('PRAGMA user_version').get()?.user_version,SCHEMA_VERSION);
     assert.deepEqual(db.connection.prepare('SELECT * FROM turn_summary').all(),before);
-    assert.equal(db.findManifest('claude',metadata().path)?.source_missing,0);
+    assert.equal(db.findSourceFile('claude',metadata().path)?.source_missing,0);
     const snapshot=db.queryTurns();
-    assert.throws(()=>db.replaceMemory({scanId: 'test',retainDeletedSourceUsage:true,sessions:[{provider:'claude',session_id:'session-a'}],
+    assert.throws(()=>db.replaceMemory({retainDeletedSourceUsage:true,sessions:[{provider:'claude',session_id:'session-a'}],
       files:[],removedFileIds:[42],summaries:[turn('invalid',{input_tokens:-1})]}),/nonnegative/);
-    assert.deepEqual(db.queryTurns(),snapshot);assert.equal(db.findManifest('claude',metadata().path)?.source_missing,0);
-    db.replaceMemory({scanId: 'test',retainDeletedSourceUsage:true,sessions:[{provider:'claude',session_id:'session-a'}],files:[],summaries:[],removedFileIds:[42]});
-    assert.deepEqual(db.queryTurns(),snapshot);assert.equal(db.findManifest('claude',metadata().path)?.source_missing,1);
+    assert.deepEqual(db.queryTurns(),snapshot);assert.equal(db.findSourceFile('claude',metadata().path)?.source_missing,0);
+    db.replaceMemory({retainDeletedSourceUsage:true,sessions:[{provider:'claude',session_id:'session-a'}],files:[],summaries:[],removedFileIds:[42]});
+    assert.deepEqual(db.queryTurns(),snapshot);assert.equal(db.findSourceFile('claude',metadata().path)?.source_missing,1);
     assert.deepEqual(db.connection.prepare('PRAGMA foreign_key_check').all(),[]);
   } finally { db.close(); }
 });
@@ -271,18 +292,18 @@ test('v12 migration preserves statistics and adds nullable source fingerprints w
   const initial=new SummaryDatabase(dbPath);
   const id=seed(initial);
   const before=initial.queryTurns();
-  initial.connection.exec(`DROP INDEX idx_manifest_source;
-    ALTER TABLE manifest DROP COLUMN source_identity; ALTER TABLE manifest DROP COLUMN content_hash;
+  initial.connection.exec(`DROP INDEX idx_source_source;
+    ALTER TABLE source_file DROP COLUMN source_identity; ALTER TABLE source_file DROP COLUMN content_hash;
     PRAGMA user_version=12;`);
   initial.close();
   const migrated=new SummaryDatabase(dbPath);
   try {
     assert.equal(migrated.connection.prepare('PRAGMA user_version').get()?.user_version,SCHEMA_VERSION);
     assert.deepEqual(migrated.queryTurns(),before);
-    const source=migrated.findManifest('claude',metadata().path)!;
+    const source=migrated.findSourceFile('claude',metadata().path)!;
     assert.equal(source.id,id);assert.equal(source.source_missing,0);
     assert.equal(source.source_identity,null);assert.equal(source.content_hash,null);
-    assert.deepEqual(migrated.connection.prepare('PRAGMA index_info(idx_manifest_source)').all().map(row=>row.name),['provider','source_identity','id']);
+    assert.deepEqual(migrated.connection.prepare('PRAGMA index_info(idx_source_source)').all().map(row=>row.name),['provider','source_identity','id']);
     assert.deepEqual(migrated.connection.prepare('PRAGMA foreign_key_check').all(),[]);
   } finally {migrated.close();}
 });
@@ -328,7 +349,7 @@ test('v17 upgrade drops obsolete calculation metadata and preserves every accept
     assert.deepEqual(current.queryTurns(),turns);
     assert.deepEqual(current.queryUsage({},'day','Asia/Seoul'),usage);
     assert.deepEqual(snapshot(current),before,'Lazy rollup rebuild preserves all accepted facts');
-    assert.equal(current.findManifest('claude',metadata().path)?.id,fileId);
+    assert.equal(current.findSourceFile('claude',metadata().path)?.id,fileId);
     assert.equal(current.queryTurns()[0].diagnostic_file_id,fileId);
     assert.equal(current.sessionBilling('claude','session-a'),'subscription');
     assert.equal(current.connection.prepare("SELECT count(*) AS n FROM sqlite_master WHERE name LIKE 'turn_metadata%' OR name='idx_turn_metadata_dependency'").get()?.n,0);
@@ -383,10 +404,10 @@ for (const version of [8,9]) test(`v${version} migration removes redundant index
     assert.ok(target.startsWith(`${parent}${sep}`) && target.split(sep).at(-1)?.startsWith('agent-tracker-db-ordinal-'));
     rmSync(target, { recursive: true, force: true });
   });
-  const tables = ['manifest', 'projects', 'sessions', 'turn_summary', 'turn_model_usage', 'turn_costs', 'session_billing', 'turn_capability_usage'];
+  const tables = ['source_file', 'projects', 'sessions', 'turn_summary', 'turn_model_usage', 'turn_costs', 'session_billing', 'turn_capability_usage'];
   const snapshot = (connection: DatabaseSync) => tables.map(table => ({
     table, rows: connection.prepare(`SELECT * FROM ${table} ORDER BY 1,2`).all().map(row =>
-      Object.fromEntries(Object.entries(row).filter(([name]) => name !== 'turn_index'))),
+      Object.fromEntries(Object.entries(row).filter(([name]) => name !== 'turn_index' && name !== 'relation_meta'))),
   }));
   const legacy = new DatabaseSync(dbPath);
   let before: ReturnType<typeof snapshot>;
@@ -394,7 +415,7 @@ for (const version of [8,9]) test(`v${version} migration removes redundant index
     legacy.exec(`PRAGMA foreign_keys=ON;
       ${version === 8 ? v8Schema : v9Schema}
       PRAGMA user_version=${version};
-      INSERT INTO manifest (id,provider,source_root,path,session_id,parser_version,capabilities_collected,processing_status,recorded_at)
+      INSERT INTO source_file (id,provider,source_root,path,session_id,parser_version,capabilities_collected,processing_status,recorded_at)
         VALUES (42,'claude','/synthetic','/synthetic/session.jsonl','session-a',13,1,'done','2026-10-03T00:00:02.000Z');
       INSERT INTO projects VALUES ('/synthetic/project-a','Project');
       INSERT INTO sessions VALUES ('claude','session-a','Session');
@@ -416,7 +437,7 @@ for (const version of [8,9]) test(`v${version} migration removes redundant index
   assert.equal(db.connection.prepare('PRAGMA user_version').get()?.user_version, SCHEMA_VERSION);
   assert.ok(db.connection.prepare('PRAGMA table_info(turn_summary)').all().every(column => column.name !== 'turn_index'));
   assert.deepEqual(db.connection.prepare('PRAGMA index_info(idx_summary_session)').all(), []);
-  assert.equal(db.connection.prepare('PRAGMA index_info(idx_manifest_identity)').all().length, process.platform === 'win32' ? 0 : 3);
+  assert.deepEqual(db.connection.prepare('PRAGMA index_info(idx_source_identity)').all(), []);
   assert.deepEqual(db.connection.prepare('PRAGMA foreign_key_check').all(), []);
   assert.equal(db.queryTurns({ includeCosts: true }, { limit: 1, offset: 0 }, 'model')[0].id, 99);
   assert.equal(db.queryUsage({ includeCosts: true })[0].cost_usd, 0.0002475);
@@ -473,12 +494,12 @@ test('discovery and failure preserve accepted metadata and previous successful v
   const db = database(t);
   const id = seed(db);
   const changed = { ...metadata(), size_bytes: 900, mtime_ms: 654321, session_id: 'session-b', parser_version: 2 };
-  const observed = db.observeFile(changed, 'scan-next');
+  const observed = db.observeFile(changed);
   assert.equal(observed.size_bytes, 512);
   assert.equal(observed.mtime_ms, 123456);
   assert.equal(observed.session_id, 'session-a');
-  assert.equal(observed.last_seen_scan_id, 'scan-next');
-  db.setManifestDiagnostic(id, 'error', 'parse: byte=128', 'parse-error', 128);
+  assert.equal(observed.id, id);
+  db.setSourceDiagnostic(id, 'error', 'parse: byte=128', 'parse-error', 128);
   const summary = db.queryTurns()[0];
   assert.equal(summary.total_tokens, 110);
   assert.equal(summary.updated_at, '2026-10-03T00:00:02.000Z');
@@ -487,13 +508,13 @@ test('discovery and failure preserve accepted metadata and previous successful v
   assert.equal(summary.last_error, 'parse-error');
   assert.equal(db.diagnostics().counts.stale_summaries, 1);
   seed(db);
-  assert.equal(db.findManifest('claude', metadata().path)?.last_error, null);
+  assert.equal(db.findSourceFile('claude', metadata().path)?.last_error, null);
   assert.equal(db.queryTurns()[0].last_error, null);
 });
 
 test('new files keep null normal session and zero metadata until committed', t => {
   const db = database(t);
-  const file = db.observeFile(metadata(), 'scan');
+  const file = db.observeFile(metadata());
   assert.equal(file.session_id, null);
   assert.equal(file.parser_version, 0);
   assert.equal(file.size_bytes, 0);
@@ -509,36 +530,36 @@ test('replacement rolls back summary, metadata, and deletion on a streaming row 
     yield turn('replacement', { total_tokens: 220, input_tokens: 200, output_tokens: 20 });
     throw new Error('synthetic staging failure');
   }
-  assert.throws(() => db.replaceMemory({scanId: 'test',
+  assert.throws(() => db.replaceMemory({
     sessions: [{ provider: 'claude', session_id: 'session-a' }],
     files: [{ ...metadata(), size_bytes: 1024, id }], summaries: failingRows(), removedFileIds: [id],
   }), /synthetic staging failure/);
   assert.deepEqual(db.queryTurns(), previous);
-  assert.equal(db.findManifest('claude', metadata().path)?.size_bytes, 512);
+  assert.equal(db.findSourceFile('claude', metadata().path)?.size_bytes, 512);
   function* failingDeletion(): IterableIterator<number> {
     yield id;
     throw new Error('synthetic deletion failure');
   }
-  assert.throws(() => db.replaceMemory({scanId: 'test',
+  assert.throws(() => db.replaceMemory({
     sessions: [{ provider: 'claude', session_id: 'session-a' }], files: [], summaries: [],
     removedFileIds: failingDeletion(),
   }), /synthetic deletion failure/);
   assert.deepEqual(db.queryTurns(), previous);
-  assert.ok(db.findManifest('claude', metadata().path));
+  assert.ok(db.findSourceFile('claude', metadata().path));
 });
 
 test('a failed first replacement can retry without publishing partial state', t => {
   const db = database(t);
   const file = metadata();
-  const manifest = db.observeFile(file, 'scan');
-  assert.throws(() => db.replaceMemory({scanId: 'test',
+  const source_file = db.observeFile(file);
+  assert.throws(() => db.replaceMemory({
     sessions: [{ provider: 'claude', session_id: 'session-a' }],
-    files: [{ ...file, id: manifest.id }], summaries: [turn('invalid', { total_tokens: 0 })],
+    files: [{ ...file, id: source_file.id }], summaries: [turn('invalid', { total_tokens: 0 })],
   }));
-  assert.equal(db.findManifest('claude', file.path)?.session_id, null);
-  db.replaceMemory({scanId: 'test',
+  assert.equal(db.findSourceFile('claude', file.path)?.session_id, null);
+  db.replaceMemory({
     sessions: [{ provider: 'claude', session_id: 'session-a' }],
-    files: [{ ...file, id: manifest.id }], summaries: [turn()],
+    files: [{ ...file, id: source_file.id }], summaries: [turn()],
   });
   assert.equal(db.queryUsage()[0].total_tokens, 110);
 });
@@ -546,13 +567,13 @@ test('a failed first replacement can retry without publishing partial state', t 
 test('session replacement keeps identically named sessions from the other provider untouched', t => {
   const db = database(t);
   seed(db);
-  db.replaceMemory({scanId: 'test',
+  db.replaceMemory({
     sessions: [{ provider: 'codex', session_id: 'session-a' }, { provider: 'claude', session_id: 'session-b' }],
     files: [], summaries: [turn('codex-turn', { provider: 'codex' }), turn('other-session', { session_id: 'session-b' })],
   });
   const otherProvider = db.queryTurns({ provider: 'codex' });
   const otherSession = db.queryTurns({ provider: 'claude', sessionId: 'session-b' });
-  db.replaceMemory({scanId: 'test',
+  db.replaceMemory({
     sessions: [{ provider: 'claude', session_id: 'session-a' }], files: [],
     summaries: [turn('replacement', { input_tokens: 200, total_tokens: 210 })],
   });
@@ -561,19 +582,19 @@ test('session replacement keeps identically named sessions from the other provid
   assert.equal(db.queryTurns({ provider: 'claude', sessionId: 'session-a' })[0].total_tokens, 210);
 });
 
-test('session reassignment changes both sessions atomically and preserves manifest identity on move', t => {
+test('session reassignment changes both sessions atomically and preserves source_file identity on move', t => {
   const db = database(t);
   const id = seed(db);
   const sessions = [{ provider: 'claude' as const, session_id: 'session-a' }, { provider: 'claude' as const, session_id: 'session-b' }];
   const moved = { ...metadata(), path: '/synthetic/archive/moved.jsonl', source_root: '/synthetic/archive', session_id: 'session-b', id };
-  assert.throws(() => db.replaceMemory({scanId: 'test',
+  assert.throws(() => db.replaceMemory({
     sessions, files: [moved], summaries: [turn('new', { session_id: 'session-b', total_tokens: 999 })],
   }));
-  assert.equal(db.findManifest('claude', metadata().path)?.id, id);
+  assert.equal(db.findSourceFile('claude', metadata().path)?.id, id);
   assert.equal(db.queryTurns()[0].session_id, 'session-a');
-  db.replaceMemory({scanId: 'test', sessions, files: [moved], summaries: [turn('new', { session_id: 'session-b' })] });
-  assert.equal(db.findManifest('claude', metadata().path), undefined);
-  assert.equal(db.findManifest('claude', moved.path)?.id, id);
+  db.replaceMemory({sessions, files: [moved], summaries: [turn('new', { session_id: 'session-b' })] });
+  assert.equal(db.findSourceFile('claude', metadata().path), undefined);
+  assert.equal(db.findSourceFile('claude', moved.path)?.id, id);
   assert.equal(db.queryTurns({ sessionId: 'session-a' }).length, 0);
   assert.equal(db.queryTurns({ sessionId: 'session-b' }).length, 1);
 });
@@ -584,28 +605,28 @@ test('replacement rejects file reassignment and deletion outside its atomic sess
   const before = db.queryTurns();
   const toSessionB = { ...metadata(), session_id: 'session-b', id };
   for (const included of ['session-a', 'session-b']) {
-    assert.throws(() => db.replaceMemory({scanId: 'test',
+    assert.throws(() => db.replaceMemory({
       sessions: [{ provider: 'claude', session_id: included }], files: [toSessionB], summaries: [],
     }), /outside the replacement session group/);
     assert.deepEqual(db.queryTurns(), before);
-    assert.equal(db.findManifest('claude', metadata().path)?.session_id, 'session-a');
+    assert.equal(db.findSourceFile('claude', metadata().path)?.session_id, 'session-a');
   }
-  assert.throws(() => db.replaceMemory({scanId: 'test',
+  assert.throws(() => db.replaceMemory({
     sessions: [{ provider: 'claude', session_id: 'session-b' }], files: [], summaries: [], removedFileIds: [id],
   }), /outside the replacement session group/);
-  assert.ok(db.findManifest('claude', metadata().path));
+  assert.ok(db.findSourceFile('claude', metadata().path));
   assert.deepEqual(db.queryTurns(), before);
   // An unprocessed file has no accepted session contribution to replace.
-  const newFile = db.observeFile(metadata(2), 'scan');
-  db.replaceMemory({scanId: 'test', sessions: [], files: [], summaries: [], removedFileIds: [newFile.id] });
-  assert.equal(db.findManifest('claude', metadata(2).path), undefined);
+  const newFile = db.observeFile(metadata(2));
+  db.replaceMemory({sessions: [], files: [], summaries: [], removedFileIds: [newFile.id] });
+  assert.equal(db.findSourceFile('claude', metadata(2).path), undefined);
 });
 
 test('diagnostic cursors and offsets preserve stable ordering for both file and summary pages', t => {
   const db = database(t);
   seed(db, [turn('clean'), turn('flagged', { quality_flags: 'duration-approximate' }), turn('failed', { last_error: 'parse-error' })]);
-  db.observeFile(metadata(2), 'scan');
-  db.observeFile(metadata(3), 'scan');
+  db.observeFile(metadata(2));
+  db.observeFile(metadata(3));
   const first = db.diagnostics({ limit: 1 });
   assert.equal(first.files[0].id, 1);
   assert.equal(first.summaries[0].root_turn_id, 'flagged');
@@ -627,47 +648,25 @@ test('diagnostic cursors and offsets preserve stable ordering for both file and 
   assert.throws(() => db.diagnostics({ offset: -1 }), RangeError);
 });
 
-test('keyset discovery includes null visits, limits deleted roots, and streams beyond 256 files', t => {
+test('session file lookup streams beyond 256 files in ID order', t => {
   const db = database(t);
-  for (let index = 1; index <= 300; index++) db.observeFile(metadata(index), index % 2 ? 'old' : 'current');
-  db.observeFile(metadata(301, 'session-a', '/excluded'), 'old');
-  db.connection.exec("UPDATE manifest SET last_seen_scan_id = NULL WHERE path = '/synthetic/claude/1.jsonl'");
-  let count = 0;
-  for (const row of db.unseenFiles('claude', '/synthetic/claude', 'current', 17)) {
-    count++;
-    db.markSeen(row.id, 'current');
-  }
-  assert.equal(count, 150);
-  assert.equal([...db.unseenFiles('claude', '/synthetic/claude', 'current', 17)].length, 0);
-  assert.equal([...db.unseenFiles('claude', '/excluded', 'current')].length, 1);
+  for (let index = 1; index <= 300; index++) db.observeFile(metadata(index));
+  db.observeFile(metadata(301, 'session-a', '/excluded'));
   function* files() {
     for (let index = 1; index <= 300; index++) {
       const file = metadata(index);
-      yield { ...file, id: db.findManifest('claude', file.path)!.id };
+      yield { ...file, id: db.findSourceFile('claude', file.path)!.id };
     }
   }
-  db.replaceMemory({scanId: 'test', sessions: [{ provider: 'claude', session_id: 'session-a' }], files: [...files()], summaries: [] });
-  count = 0;
+  db.replaceMemory({sessions: [{ provider: 'claude', session_id: 'session-a' }], files: [...files()], summaries: [] });
+  let count = 0;
   for (const row of db.sessionFiles('claude', 'session-a', 23)) {
     assert.equal(row.processing_status, 'done');
     count++;
+    assert.equal(row.id, count);
   }
   assert.equal(count, 300);
   assert.equal(db.diagnostics({ limit: 25, offset: 300 }).files.length, 1);
-});
-
-test('ambiguous, zero, and missing identities never become a unique move match', t => {
-  const db = database(t);
-  const first = db.observeFile(metadata(), 'scan');
-  const secondMetadata = { ...metadata(2), inode: '1' };
-  const second = db.observeFile(secondMetadata, 'scan');
-  db.replaceMemory({scanId: 'test',
-    sessions: [{ provider: 'claude', session_id: 'session-a' }], summaries: [],
-    files: [{ ...metadata(), id: first.id }, { ...secondMetadata, id: second.id }],
-  });
-  assert.equal(db.findIdentity('claude', '10', '1').length, 2);
-  assert.deepEqual(db.findIdentity('claude', '0', '1'), []);
-  assert.deepEqual(db.findIdentity('claude', '10', null), []);
 });
 
 test('aggregates include in-progress tokens but average completed turns and known durations only', t => {

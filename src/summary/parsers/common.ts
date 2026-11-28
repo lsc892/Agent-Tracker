@@ -6,6 +6,7 @@ import type { BillingMode } from '../db/types';
 
 /** Only explicit historical metadata identifies how usage was billed. */
 export function billingMode(value: unknown): BillingMode {
+  // [결제 정책] 확인된 인증·결제 표기만 구독과 API로 분류하고 그 외는 미상으로 둔다.
   if (['subscription','chatgpt','chatgptAuthTokens','claudeAi'].includes(String(value))) return 'subscription';
   if (['api','apiKey','api_key','apikey'].includes(String(value))) return 'api';
   return 'unknown';
@@ -15,11 +16,13 @@ export function object(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
 export function string(value: unknown): string | undefined { return typeof value === 'string' && value.length > 0 ? value : undefined; }
+export const sqlText = (value: string): string => /[\ud800-\udfff]/.test(value) ? Buffer.from(value).toString('utf8') : value;
 export function displayName(value: unknown): string | undefined {
   return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, 512) || undefined : undefined;
 }
 export function number(value: unknown): number { return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0; }
 export function timestamp(value: unknown): number | null {
+  // [파싱 정책] 숫자와 날짜 문자열을 밀리초로 해석하고 안전 정수와 Date 범위를 벗어나면 누락으로 본다.
   const parsed = typeof value === 'number' ? value : typeof value === 'string' ? Date.parse(value) : NaN;
   return Number.isSafeInteger(parsed) && Math.abs(parsed) <= 8.64e15 ? parsed : null;
 }
@@ -41,6 +44,7 @@ export function project(path: string): { projectKey: string; projectName: string
  */
 export function requestTitle(value: unknown): string | undefined {
   let text = typeof value === 'string' ? value : '';
+  // [제목 정책] 블록 입력은 본문에 해당하는 텍스트 유형만 이어 붙인다.
   if (Array.isArray(value)) {
     const blocks: string[] = [];
     for (const item of value) {
@@ -52,6 +56,7 @@ export function requestTitle(value: unknown): string | undefined {
   // Codex prepends editor context; prefer the explicit request when available.
   let start = 0;
   for (const match of text.matchAll(/(?:^|\n)## My request:\s*/g)) start = match.index + match[0].length;
+  // [제목 정책] 메타데이터처럼 보이는 줄을 지나 첫 유효 줄의 공백을 정리하고 80자 이내로 줄인다.
   for (const match of text.slice(start).matchAll(/[^\r\n]+/g)) {
     const first = match[0].trim();
     if (!first || first.startsWith('<') || /^#(?:\s|$)/.test(first)) continue;
@@ -72,19 +77,24 @@ export function claudeTokens(raw: Record<string, unknown>): TokenVector {
 }
 /**
  * 책임: Codex의 평면·세부 토큰 필드를 공통 벡터로 정규화한다.
- * 알고리즘: 기존 입력·출력 총량은 유지하고 평면 필드를 우선해 캐시·reasoning 성분을 읽어 이중 가산을 막는다.
+ * 알고리즘: 입력·출력 총량을 유지하고 캐시는 평면·중첩 필드에서, reasoning은 평면 필드에서 읽는다.
  */
 export function codexTokens(raw: Record<string, unknown>): TokenVector {
   validateTokens(raw);
   const details = object(raw.input_tokens_details);
   return { input: number(raw.input_tokens), output: number(raw.output_tokens),
     cacheRead: number(raw.cached_input_tokens ?? details.cached_tokens), cacheWrite: number(raw.cache_write_input_tokens ?? details.cache_write_tokens),
-    reasoning: number(raw.reasoning_output_tokens ?? object(raw.output_tokens_details).reasoning_tokens) };
+    reasoning: number(raw.reasoning_output_tokens) };
 }
 
-function validateTokens(raw: Record<string, unknown>): void {
-  for (const key of ['input_tokens','output_tokens','cache_read_input_tokens','cache_creation_input_tokens','cached_input_tokens','cache_write_input_tokens','reasoning_output_tokens']) {
-    if (raw[key] !== undefined && (typeof raw[key] !== 'number' || !Number.isSafeInteger(raw[key]) || Number(raw[key]) < 0)) throw new SummaryError('unsupported-token-schema');
+export const tokenFields = ['input_tokens', 'output_tokens', 'cache_read_input_tokens', 'cache_creation_input_tokens',
+  'cached_input_tokens', 'cache_write_input_tokens', 'reasoning_output_tokens'] as const;
+
+export function validateTokens(raw: Record<string, unknown>): void {
+  // [검증 정책] 기재된 토큰은 0 이상의 안전 정수여야 하고 입력 또는 출력 중 하나는 있어야 한다.
+  for (const key of tokenFields) {
+    const value = raw[key];
+    if (value !== undefined && (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0)) throw new SummaryError('unsupported-token-schema');
   }
   if (raw.input_tokens === undefined && raw.output_tokens === undefined) throw new SummaryError('unsupported-token-schema');
 }

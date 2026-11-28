@@ -31,6 +31,7 @@ function modelId(model: string): string {
 export function modelRelease(model: string): number | null {
   const id = modelId(model);
   if (Object.hasOwn(releases, id)) return releases[id];
+  // [정렬 정책] 등록된 출시일을 우선하고 미등록 모델은 스냅샷 날짜를 사용할 수 있다.
   const snapshot = model.match(/-(\d{4})-?(\d{2})-?(\d{2})$/);
   return snapshot ? Number(snapshot.slice(1).join('')) : null;
 }
@@ -40,5 +41,6 @@ export function modelRelease(model: string): number | null {
  * 알고리즘: 정규화한 모델명의 각 숫자 구간을 12자리로 0 채워 문자열 비교가 숫자 순서를 따르게 한다.
  */
 export function modelOrderKey(model: string): string {
+  // [정렬 정책] 각 숫자 구간을 12자리로 채워 텍스트 키에서도 버전을 숫자 순서로 비교한다.
   return modelId(model).replace(/\d+/g, value => value.padStart(12, '0'));
 }

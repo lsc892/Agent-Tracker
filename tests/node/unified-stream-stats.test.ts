@@ -32,7 +32,7 @@ test('thousands of lifecycle and check events become one request state and prese
       title: 'title-' + index, status: index % 2 ? 'in_progress' : 'completed', statusAt: 5000 - index,
       completed: index % 2 === 0, completedAt: 5000 - index, offset: index + 20 });
     events.push({ kind: 'check', rootId: 'root', threadId: 'thread', turnId: 'turn',
-      tokens: { input: 100, output: 2, cacheRead: 0, cacheWrite: 0, reasoning: 0 }, offset: index + 21 });
+      input: 100, output: 2, offset: index + 21 });
   }
   const file = source(1, events), selected = new SourceWinners('codex');
   events.forEach((event, index) => selected.add(event, index));
@@ -41,9 +41,9 @@ test('thousands of lifecycle and check events become one request state and prese
   assert.equal(selected.roots.get('root')!.checks.size, 1);
   assert.equal([...selected.values()].length, 1);
   assert.deepEqual(aggregateMemory([file]), eventOrder([file]));
-  const restored = new SourceWinners('codex', structuredClone(selected.snapshot()));
-  const aggregation = new StreamingAggregation([{ ...file, evidence: restored.evidence }]);
-  aggregation.addSource(file.id, restored);
+  const prepared = structuredClone(selected.snapshot());
+  const aggregation = new StreamingAggregation([{ ...file, evidence: prepared.evidence }]);
+  aggregation.addSource(file.id, prepared);
   assert.deepEqual(aggregation.finish(), aggregateMemory([file]));
 });
 
@@ -94,8 +94,34 @@ test('snapshot keeps exact winner scores and normalized text without modifying t
   const event = usage('root', Number.MAX_SAFE_INTEGER, { model: 'model\ud800' });
   event.tokens.output = 4;
   const selected = new SourceWinners('codex'); selected.add(event, 0);
-  const restored = new SourceWinners('codex', structuredClone(selected.snapshot()));
-  assert.equal([...restored.values()][0].score, BigInt(Number.MAX_SAFE_INTEGER) + 4n);
-  assert.equal([...restored.values()][0].event.model, 'model�');
+  const prepared = structuredClone(selected.snapshot());
+  const [winner] = prepared.winners.values();
+  assert.equal(winner.score, BigInt(Number.MAX_SAFE_INTEGER) + 4n);
+  assert.equal(winner.event.model, 'model�');
   assert.equal(event.model, 'model\ud800');
+});
+
+test('only applied winners enter the response ledger while losing roots retain their offsets', () => {
+  const fresh = source(1, [usage('fresh-root', 200, { responseId: 'shared', model: 'fresh-model' })]);
+  const stored = source(2, [
+    usage('stored-loser', 50, { responseId: 'shared', offset: 4, model: 'losing-model' }),
+    usage('stored-winner', 80, { model: 'stored-model' }),
+  ]);
+  const prepared = [fresh, stored].map(file => {
+    const selected = new SourceWinners(file.provider);
+    file.events.forEach((event, index) => selected.add(event, index));
+    return { ...file, evidence: selected.evidence, snapshot: selected.snapshot() };
+  });
+  const applied: { rootId: string; input: number }[] = [];
+  const aggregation = new StreamingAggregation(prepared, true, ({ rootId, tokens }) => {
+    applied.push({ rootId, input: tokens.input });
+  });
+  for (const file of prepared) aggregation.addSource(file.id, file.snapshot);
+  const actual = aggregation.finish();
+  assert.deepEqual(actual, eventOrder([fresh, stored]));
+  assert.equal(actual.summaries.find(row => row.root_turn_id === 'stored-loser')!.diagnostic_offset, 4);
+  assert.deepEqual(applied, [
+    { rootId: 'fresh-root', input: 200 },
+    { rootId: 'stored-winner', input: 80 },
+  ]);
 });

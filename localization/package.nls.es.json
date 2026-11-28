@@ -1,5 +1,5 @@
 {
-  "manifest.description": "Uso de suscripciones de Claude y Codex y estadísticas locales de tokens por solicitud",
+  "manifest.description": "Uso de las suscripciones de Claude y Codex y tokens locales por conversación",
   "manifest.openDashboard": "Agent Tracker: Abrir panel",
   "manifest.openUsage": "Agent Tracker: Abrir estadísticas de uso",
   "status.refreshName": "Agent Tracker: Actualizar uso actual",
@@ -41,7 +41,7 @@
   "manifest.showResetCredits": "Mostrar los restablecimientos de Codex disponibles y su próxima caducidad, solo si el servidor los proporciona.",
   "dashboard.usageStatistics": "Estadísticas de uso",
   "manifest.usageEnabled": "Activar estadísticas de uso. Desactivarlas cancela la recopilación y cierra la vista sin afectar las consultas de suscripción.\n\n[Eliminar datos estadísticos](command:agentTracker.clearUsageData): elimina información de procesamiento y resultados agregados. Se conservan los registros originales y se recalculan al reabrir las estadísticas.",
-  "manifest.skillsEnabled": "Contar habilidades, subagentes, complementos y modelos en Skill, incluidas llamadas de la IA por defecto. Desactivarlo detiene los nuevos recuentos y oculta Skill conservando los datos. No afecta tokens, costos ni suscripciones. Al reactivarlo se recalcula en la vista abierta o desde los registros al abrirla de nuevo.",
+  "manifest.skillsEnabled": "Recopila recuentos de uso de habilidades, subagentes, complementos y modelos.",
   "manifest.showApiCosts": "Mostrar costos estimados de API (USD) en la tabla de tokens. La suscripción cuesta 0; los costos sin facturación, tarifas o desglose confirmado se muestran aparte. Cambiar el ajuste solo consulta estadísticas guardadas.",
   "manifest.excludeEmpty": "Excluir de gráficos y promedios las solicitudes sin modelo identificado ni tokens; permanecen en la tabla. Se incluyen registros de cero tokens con modelo conocido y uso real con modelo desconocido.",
   "manifest.timezone": "Zona horaria IANA para estadísticas diarias y mensuales. Vacío usa la del sistema.",

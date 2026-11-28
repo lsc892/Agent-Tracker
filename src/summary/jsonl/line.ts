@@ -1,11 +1,37 @@
 // JSONL 한 행의 이미지 제거와 문자열 문법·바이트 예산 상태를 관리한다.
 import { SummaryError } from './errors';
 
+const MAX_REUSED_LINE_BYTES = 256 * 1024;
+
+/** Store retained spans contiguously and reuse bounded storage within the file reader. */
+export class JsonlLineBuffer {
+  private buffer?: Buffer;
+  private length = 0;
+
+  constructor(private readonly maxBytes: number) {}
+
+  append(source: Buffer, start: number, end: number): void {
+    const required = this.length + end - start;
+    if (!this.buffer || this.buffer.length < required) {
+      const grown = Math.max(required, this.buffer ? this.buffer.length * 2 : 1024);
+      const next = Buffer.allocUnsafe(Math.min(this.maxBytes, grown));
+      this.buffer?.copy(next, 0, 0, this.length);
+      this.buffer = next;
+    }
+    source.copy(this.buffer, this.length, start, end);
+    this.length = required;
+  }
+
+  takeText(): string {
+    const text = this.buffer?.toString('utf8', 0, this.length).trim() ?? '';
+    this.length = 0;
+    if (this.buffer && this.buffer.length > MAX_REUSED_LINE_BYTES) this.buffer = undefined;
+    return text;
+  }
+}
+
 /** 이미지 Base64 본문을 제외한 JSON 한 행을 메모리 상한 안에서 구성한다. */
 export class JsonlLine {
-  private readonly blocks: Buffer[] = [];
-  private block: Buffer;
-  private used = 0;
   private length = 0;
   private inString = false;
   private escaped = false;
@@ -14,9 +40,8 @@ export class JsonlLine {
   private image = false;
   bytes = 0;
 
-  constructor(private readonly maxBytes: number, private readonly offset: number) {
-    this.block = Buffer.allocUnsafe(Math.min(1024, maxBytes));
-  }
+  constructor(private readonly maxBytes: number, private readonly offset: number,
+    private readonly consume: (chunk: Buffer, start: number, end: number) => void) {}
 
   /**
    * 책임: 행의 일반 구간을 빠르게 복사하고 문자열 경계를 추적한다.
@@ -24,8 +49,7 @@ export class JsonlLine {
    */
   append(chunk: Buffer, start: number, end: number): void {
     this.bytes += end - start;
-    // Cache the next delimiter: searching the entire remaining chunk for an absent
-    // backslash again for every string would make quote-heavy input quadratic.
+    // [파싱 정책] 따옴표·이스케이프 위치를 재사용하고 문자열 문맥에서만 두 경계를 함께 본다.
     const search = chunk.subarray(0, end);
     const find = (byte: number, from: number): number => {
       const found = search.indexOf(byte, from);
@@ -34,54 +58,42 @@ export class JsonlLine {
     let quote = find(34, start);
     let escape = find(92, start);
     let index = start;
+    let retainedStart = start;
+    const discard = (from: number, to: number): void => {
+      if (retainedStart < from) this.consume(chunk, retainedStart, from);
+      retainedStart = to;
+    };
     while (index < end) {
       if (this.probe !== undefined || this.escaped || this.unicode) {
-        this.appendByte(chunk[index++]);
+        if (this.trackStringByte(chunk[index])) this.retain(1);
+        else discard(index, index + 1);
+        index++;
         continue;
       }
       if (quote < index) quote = find(34, index);
       if (escape < index) escape = find(92, index);
       const boundary = this.inString ? Math.min(quote, escape) : quote;
       if (boundary <= index) {
-        this.appendByte(chunk[index++]);
+        if (this.trackStringByte(chunk[index])) this.retain(1);
+        else discard(index, index + 1);
+        index++;
         continue;
       }
+      // [메모리 정책] 이미지 본문은 버리고 버려지는 구간의 제어 문자는 직접 검증한다.
       if (this.image) {
-        // Discard without retaining Base64; JSON.parse cannot check these bytes.
-        if (/[\x00-\x1f]/.test(chunk.toString('latin1', index, boundary))) throw new SummaryError('parse-error', this.offset);
-      } else this.retain(chunk, index, boundary);
+        for (let position = index; position < boundary; position++) {
+          if (chunk[position] < 32) throw new SummaryError('parse-error', this.offset);
+        }
+        discard(index, boundary);
+      } else this.retain(boundary - index);
       index = boundary;
     }
+    if (retainedStart < end) this.consume(chunk, retainedStart, end);
   }
 
-  private retain(chunk: Buffer, start: number, end: number): void {
-    if (end - start > this.maxBytes - this.length) throw new SummaryError('line-byte-budget-exceeded', this.offset);
-    while (start < end) {
-      if (this.used === this.block.length) this.nextBlock();
-      const count = Math.min(end - start, this.block.length - this.used);
-      chunk.copy(this.block, this.used, start, start + count);
-      start += count;
-      this.used += count;
-      this.length += count;
-    }
-  }
-
-  private nextBlock(): void {
-    this.blocks.push(this.block);
-    this.block = Buffer.allocUnsafe(Math.min(64 * 1024, this.maxBytes - this.length));
-    this.used = 0;
-  }
-
-  /**
-   * 책임: 버리는 이미지 문자열까지 JSON 문자열 문법을 검증한다.
-   * 알고리즘: 문자열·escape·유니코드 잔여 길이를 상태로 갱신하고, 이미지 본문은 제어 문자와 잘못된 escape를 거부하며 저장을 생략한다.
-   */
-  private appendByte(byte: number): void {
-    if (!this.trackStringByte(byte)) return;
-    if (this.length >= this.maxBytes) throw new SummaryError('line-byte-budget-exceeded', this.offset);
-    if (this.used === this.block.length) this.nextBlock();
-    this.block[this.used++] = byte;
-    this.length++;
+  private retain(bytes: number): void {
+    this.length += bytes;
+    if (this.length > this.maxBytes) throw new SummaryError('line-byte-budget-exceeded', this.offset);
   }
 
   /** Advance string state and report whether this byte belongs in the retained JSON. */
@@ -101,6 +113,7 @@ export class JsonlLine {
   }
 
   private probeImage(byte: number, probe: string): void {
+    // [파싱 정책] 문자열 앞부분만 검사하고 확인한 Base64 이미지 헤더 뒤에서 본문 제거를 시작한다.
     const next = probe + String.fromCharCode(byte);
     this.probe = next;
     const prefix = 'data:image/';
@@ -114,9 +127,7 @@ export class JsonlLine {
   }
 
   private trackImageByte(byte: number): boolean {
-    // JSON.parse cannot validate discarded bytes. Preserve its string escape/control checks here.
-    // 제어 문자 → 이전 Unicode/escape 완성 → 새 escape·종료 따옴표 순서로 해석한다.
-    // 순서를 바꾸면 이스케이프된 따옴표가 이미지 문자열을 일찍 닫을 수 있다.
+    // [파싱 정책] 버릴 이미지 문자열도 제어 문자와 이전 이스케이프를 먼저 검사한 뒤 종료 따옴표를 판별한다.
     if (byte < 32) throw new SummaryError('parse-error', this.offset);
     if (this.unicode) {
       if (!((byte >= 48 && byte <= 57) || (byte >= 65 && byte <= 70) || (byte >= 97 && byte <= 102))) {
@@ -138,8 +149,4 @@ export class JsonlLine {
     }
   }
 
-  text(): string {
-    const tail = this.block.subarray(0, this.used);
-    return (this.blocks.length ? Buffer.concat([...this.blocks, tail], this.length) : tail).toString('utf8').trim();
-  }
 }

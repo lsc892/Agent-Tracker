@@ -11,6 +11,7 @@ const { withLocalizedManifest } = require('./localization-manifest.cjs');
 async function main() {
   const root = join(__dirname, '..');
   const options = { cwd: root, stdio: 'inherit', windowsHide: true };
+  // [패키징 정책] 번역을 먼저 갱신하고 임시 manifest가 배치된 동안에만 VSIX를 생성한다.
   execFileSync(process.execPath, [join(__dirname, 'localization.cjs')], options);
   await withLocalizedManifest(root, () => execFileSync(process.execPath, [
     require.resolve('@vscode/vsce/vsce'), 'package', '--no-dependencies', '--allow-missing-repository', '--skip-license',

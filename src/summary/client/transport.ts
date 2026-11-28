@@ -33,12 +33,14 @@ export class WorkerTransport {
   }
 
   request<T>(method: string, payload?: unknown): Promise<T> {
+    // [종료 정책] 종료가 시작된 통신에서는 Worker 종료 요청만 허용한다.
     if (this.disposed && method !== 'dispose') return Promise.reject(new Error('Summary client disposed'));
     const worker = this.ensureWorker();
     return this.sendRequest(worker, method, payload);
   }
 
   notify(method: string): void {
+    // [통신 정책] 이미 실행 중인 Worker에만 응답 ID 없이 알림을 보낸다.
     this.worker?.postMessage({ method });
   }
 
@@ -48,18 +50,19 @@ export class WorkerTransport {
   }
 
   dispose(waitForRefresh: () => Promise<void>): Promise<void> {
+    // [종료 정책] 중복 종료 호출은 같은 종료 작업을 기다린다.
     this.closing ??= this.close(waitForRefresh);
     return this.closing;
   }
 
-  /**
-   * 책임: 필요한 첫 통계 작업에서만 Worker를 생성한다.
-   * 알고리즘: 설정 스냅샷으로 Worker를 한 번 만들고 메시지·오류·종료 핸들러를 연결하며 해당 인스턴스 종료 시 대기 요청을 거절한다.
-   */
+  /** 필요한 첫 통계 작업에서 Worker를 생성한다. */
   private ensureWorker(): Worker {
+    // [실행 정책] 현재 Worker를 재사용하고 없으면 그 시점의 설정을 복사해 시작한다.
     if (this.worker) return this.worker;
     const worker = new Worker(this.options.workerPath ?? join(__dirname, 'worker.js'), { workerData: this.options });
     this.worker = worker;
+
+    // [통신 정책] 진행·응답을 분배하고 실행 오류나 현재 Worker 종료 시 미완료 요청을 거절한다.
     worker.on('message', (message: WorkerMessage) => this.receive(message));
     worker.on('error', () => {
       this.rejectAll(new Error('Summary worker failed. Node.js 22.15+ with node:sqlite is required.'));
@@ -74,6 +77,7 @@ export class WorkerTransport {
   }
 
   private sendRequest<T>(worker: Worker, method: string, payload?: unknown): Promise<T> {
+    // [통신 정책] 요청 ID로 대기 중인 Promise를 등록한 뒤 보내고 전송 실패 시 등록을 지운다.
     const id = ++this.sequence;
     return new Promise<T>((resolve, reject) => {
       this.pending.set(id, { resolve: value => resolve(value as T), reject });
@@ -86,17 +90,17 @@ export class WorkerTransport {
     });
   }
 
-  /**
-   * 책임: Worker의 진행 알림과 RPC 완료를 각각의 소비자에게 전달한다.
-   * 알고리즘: 진행률은 관찰자에 분배하고 나머지는 ID로 pending을 제거한 뒤 번역된 오류 또는 결과로 Promise를 완료한다.
-   */
+  /** Worker의 진행 알림과 RPC 응답을 전달한다. */
   private receive(message: WorkerMessage): void {
+    // [통신 정책] 진행 알림은 모든 리스너에 전달하며 리스너 하나가 실패해도 분배를 계속한다.
     if (message.progress) {
       for (const listener of this.listeners) {
         try { listener(message.progress); } catch { /* Observers cannot break the worker. */ }
       }
       return;
     }
+
+    // [통신 정책] 응답 ID의 대기 항목을 지우고 요청을 결과 또는 번역한 오류로 완료한다.
     if (message.id === undefined) return;
     const pending = this.pending.get(message.id);
     this.pending.delete(message.id);
@@ -107,18 +111,16 @@ export class WorkerTransport {
     }
   }
 
-  /**
-   * 책임: 통계 작업 취소 후 제한된 시간 안에 Worker를 종료한다.
-   * 알고리즘: 갱신 취소와 dispose 요청을 최대 5초 기다린 뒤 terminate하고 리스너·타이머·미완료 요청을 정리한다.
-   */
+  /** 통계 작업을 취소하고 Worker를 종료한다. */
   private async close(waitForRefresh: () => Promise<void>): Promise<void> {
     this.disposed = true;
-    // Cancellation still runs when no worker has been created.
+    // [종료 정책] Worker 생성 여부와 관계없이 갱신 취소를 시작한다.
     const refreshSettled = waitForRefresh();
     const worker = this.worker;
     let timeout: ReturnType<typeof setTimeout> | undefined;
     try {
       if (!worker) return;
+      // [종료 정책] 갱신 취소와 Worker의 DB 정리 응답을 최대 5초 기다린 뒤 Worker를 종료한다.
       await Promise.race([
         (async () => {
           await refreshSettled;
@@ -128,6 +130,7 @@ export class WorkerTransport {
       ]);
       await worker.terminate();
     } finally {
+      // [종료 정책] 타이머와 리스너를 정리하고 남아 있는 요청은 종료 오류로 거절한다.
       if (timeout) clearTimeout(timeout);
       this.worker = undefined;
       this.listeners.clear();

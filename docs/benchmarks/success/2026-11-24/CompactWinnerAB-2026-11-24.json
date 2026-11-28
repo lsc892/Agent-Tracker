@@ -1,0 +1,438 @@
+{
+  "environment": {
+    "node": "v24.14.1",
+    "v8": "13.6.233.17-node.44",
+    "sqlite": "3.51.2",
+    "cpu": "AMD Ryzen 5 7500F 6-Core Processor             ",
+    "platform": "win32",
+    "arch": "x64"
+  },
+  "protocol": {
+    "warmups": 0,
+    "repetitions": 1,
+    "scenarios": [
+      "initial"
+    ],
+    "sourceWorkers": 4,
+    "intervalMs": 5,
+    "order": "AB",
+    "timezone": "Asia/Seoul",
+    "filter": {
+      "fromMs": 1577836800000,
+      "toMs": 2051222400000,
+      "unknownTime": "include",
+      "excludeEmptyUsage": false
+    },
+    "jsonlOnly": true
+  },
+  "builds": {
+    "A": {
+      "source": "0165fbb0e1748d6702c25099811a3b7099b5228227047417bc0a5ab222ca54d9",
+      "build": "79312138a8792b8fc5d447422baa9a524ab722cc2dda9cb1449006da426d789c"
+    },
+    "B": {
+      "source": "6caaaa17331a9f905d6c5714ccb4e02977eca52e3b0be386882e173fc56be925",
+      "build": "52568a2176fa3ba918b75d38365dedcacbb8a089637eb429a4f6eb3628facc87"
+    }
+  },
+  "datasets": [
+    {
+      "name": "current",
+      "inputSha256": "9f4602f410b71b0bb4ab64b30b9beee394ae5354965b7188b23824668bd9ce94",
+      "inventory": [
+        {
+          "provider": "claude",
+          "rootOrdinal": 0,
+          "files": 12,
+          "bytes": 11486533,
+          "compressed": 0
+        },
+        {
+          "provider": "codex",
+          "rootOrdinal": 1,
+          "files": 684,
+          "bytes": 392182809,
+          "compressed": 666
+        },
+        {
+          "provider": "codex",
+          "rootOrdinal": 2,
+          "files": 2,
+          "bytes": 3075020,
+          "compressed": 2
+        }
+      ],
+      "initial": {
+        "A": {
+          "initial": {
+            "ms": 3266.5172000000002,
+            "scan": {
+              "lock": {
+                "calls": 1,
+                "totalMs": 0.8871000000000038
+              },
+              "discover": {
+                "calls": 1,
+                "totalMs": 100.9084
+              },
+              "names": {
+                "calls": 1,
+                "totalMs": 0.4788000000000068
+              },
+              "readSources": {
+                "calls": 698,
+                "totalMs": 2823.5297
+              },
+              "parseChanged": {
+                "calls": 1,
+                "totalMs": 2838.5685
+              },
+              "expandRelated": {
+                "calls": 1,
+                "totalMs": 1.984599999999773
+              },
+              "resolveParents": {
+                "calls": 1,
+                "totalMs": 0.4329000000002452
+              },
+              "aggregate": {
+                "calls": 1,
+                "totalMs": 65.86580000000004
+              },
+              "commitComponents": {
+                "calls": 1,
+                "totalMs": 240.30560000000014
+              },
+              "finishScan": {
+                "calls": 1,
+                "totalMs": 0.850800000000163
+              },
+              "optimize": {
+                "calls": 1,
+                "totalMs": 5.220400000000154
+              },
+              "sourcePoolClose": {
+                "calls": 1,
+                "totalMs": 10.033899999999903
+              }
+            },
+            "storage": {
+              "begin": {
+                "calls": 27,
+                "totalMs": 0.3797999999997046
+              },
+              "prepare": {
+                "calls": 411,
+                "totalMs": 2.0783999999971456
+              },
+              "indexSummaries": {
+                "calls": 411,
+                "totalMs": 1.2474999999981264
+              },
+              "metadata": {
+                "calls": 27,
+                "totalMs": 2.1829000000016094
+              },
+              "source_file": {
+                "calls": 411,
+                "totalMs": 9.81629999999359
+              },
+              "deleteMissing": {
+                "calls": 411,
+                "totalMs": 0.860799999999017
+              },
+              "summaryCompare": {
+                "calls": 1523,
+                "totalMs": 12.498299999984738
+              },
+              "facts": {
+                "calls": 1523,
+                "totalMs": 19.67700000001014
+              },
+              "models": {
+                "calls": 1523,
+                "totalMs": 2.707100000020546
+              },
+              "capabilities": {
+                "calls": 1523,
+                "totalMs": 6.890000000008058
+              },
+              "costs": {
+                "calls": 1523,
+                "totalMs": 9.170000000008258
+              },
+              "summaryWrites": {
+                "calls": 1523,
+                "totalMs": 39.42959999998766
+              },
+              "summaries": {
+                "calls": 411,
+                "totalMs": 53.328999999997905
+              },
+              "removeSources": {
+                "calls": 411,
+                "totalMs": 0.20059999999830325
+              },
+              "pruneNames": {
+                "calls": 27,
+                "totalMs": 1.2061000000012427
+              },
+              "rollups": {
+                "calls": 26,
+                "totalMs": 0.27339999999912834
+              },
+              "commit": {
+                "calls": 27,
+                "totalMs": 64.72910000000093
+              },
+              "replace": {
+                "calls": 27,
+                "totalMs": 220.41710000000057
+              }
+            },
+            "parsed": 698,
+            "reused": 0,
+            "bodyBytes": 406744362,
+            "before": {
+              "heapUsed": 7001872,
+              "rss": 53755904
+            },
+            "peak": {
+              "heapUsed": 80032784,
+              "rss": 550420480
+            },
+            "retained": {
+              "heapUsed": 8588016,
+              "rss": 435752960
+            },
+            "checkpointEntries": 0
+          },
+          "base": {
+            "requests": 1523,
+            "tokens": 3147422304
+          },
+          "queries": {
+            "day": {
+              "ms": 36.31989999999996,
+              "groups": 96,
+              "requests": 1523,
+              "tokens": 3147422304,
+              "sha256": "c7eb57bc825c3b5d59dc80bd60ec968b2d68231618a30e04025d680c75b140a1"
+            },
+            "month": {
+              "ms": 2.0098000000002685,
+              "groups": 7,
+              "requests": 1523,
+              "tokens": 3147422304,
+              "sha256": "fec93fb954494b90fabf54cd917dad259a6ed204c81d66b041b1573d05cd3caf"
+            },
+            "session": {
+              "ms": 4.143600000000333,
+              "groups": 396,
+              "requests": 1523,
+              "tokens": 3147422304,
+              "sha256": "03cf690d14baab6ca67d509cfde4394bbd19534ade0eb9f283192f9cc24e8f43"
+            },
+            "project": {
+              "ms": 2.243999999999687,
+              "groups": 32,
+              "requests": 1523,
+              "tokens": 3147422304,
+              "sha256": "b0e4c3b2f490f3bc8ad5c819a13d005dc62e096413bfe09e0df3dda9444c70b5"
+            }
+          },
+          "facts": "508995707ebaa622547b68ef78351d313e70609376254dcc6a6db901cae882d8",
+          "applied": {
+            "rows": 24316,
+            "sha256": "b8a4b6f88481b24bea04ad631c58b45f7f74af39d440f5ca745fd0e7755bc520"
+          }
+        },
+        "B": {
+          "initial": {
+            "ms": 3250.2089,
+            "scan": {
+              "lock": {
+                "calls": 1,
+                "totalMs": 0.8649999999999949
+              },
+              "discover": {
+                "calls": 1,
+                "totalMs": 103.99460000000002
+              },
+              "names": {
+                "calls": 1,
+                "totalMs": 0.588499999999982
+              },
+              "readSources": {
+                "calls": 698,
+                "totalMs": 2817.0960999999975
+              },
+              "parseChanged": {
+                "calls": 1,
+                "totalMs": 2831.572
+              },
+              "expandRelated": {
+                "calls": 1,
+                "totalMs": 1.7442999999998392
+              },
+              "resolveParents": {
+                "calls": 1,
+                "totalMs": 0.4463999999998123
+              },
+              "aggregate": {
+                "calls": 1,
+                "totalMs": 69.83219999999983
+              },
+              "commitComponents": {
+                "calls": 1,
+                "totalMs": 227.0679
+              },
+              "finishScan": {
+                "calls": 1,
+                "totalMs": 0.8866000000002714
+              },
+              "optimize": {
+                "calls": 1,
+                "totalMs": 5.293800000000374
+              },
+              "sourcePoolClose": {
+                "calls": 1,
+                "totalMs": 6.975599999999758
+              }
+            },
+            "storage": {
+              "begin": {
+                "calls": 27,
+                "totalMs": 0.36569999999937863
+              },
+              "prepare": {
+                "calls": 411,
+                "totalMs": 1.7562000000057196
+              },
+              "indexSummaries": {
+                "calls": 411,
+                "totalMs": 1.1397000000029038
+              },
+              "metadata": {
+                "calls": 27,
+                "totalMs": 1.9868999999998778
+              },
+              "source_file": {
+                "calls": 411,
+                "totalMs": 9.090200000001005
+              },
+              "deleteMissing": {
+                "calls": 411,
+                "totalMs": 0.8198999999958687
+              },
+              "summaryCompare": {
+                "calls": 1523,
+                "totalMs": 11.82710000000634
+              },
+              "facts": {
+                "calls": 1523,
+                "totalMs": 17.869400000008227
+              },
+              "models": {
+                "calls": 1523,
+                "totalMs": 2.6774999999911415
+              },
+              "capabilities": {
+                "calls": 1523,
+                "totalMs": 6.517699999988054
+              },
+              "costs": {
+                "calls": 1523,
+                "totalMs": 8.46710000000121
+              },
+              "summaryWrites": {
+                "calls": 1523,
+                "totalMs": 36.470599999998285
+              },
+              "summaries": {
+                "calls": 411,
+                "totalMs": 49.615799999994124
+              },
+              "removeSources": {
+                "calls": 411,
+                "totalMs": 0.1957000000052176
+              },
+              "pruneNames": {
+                "calls": 27,
+                "totalMs": 1.2752000000009502
+              },
+              "rollups": {
+                "calls": 26,
+                "totalMs": 0.26290000000017244
+              },
+              "commit": {
+                "calls": 27,
+                "totalMs": 60.90629999999874
+              },
+              "replace": {
+                "calls": 27,
+                "totalMs": 208.37760000000026
+              }
+            },
+            "parsed": 698,
+            "reused": 0,
+            "bodyBytes": 406744362,
+            "before": {
+              "heapUsed": 7000128,
+              "rss": 57114624
+            },
+            "peak": {
+              "heapUsed": 71959416,
+              "rss": 508452864
+            },
+            "retained": {
+              "heapUsed": 8580672,
+              "rss": 434786304
+            },
+            "checkpointEntries": 0
+          },
+          "base": {
+            "requests": 1523,
+            "tokens": 3147422304
+          },
+          "queries": {
+            "day": {
+              "ms": 36.758800000000065,
+              "groups": 96,
+              "requests": 1523,
+              "tokens": 3147422304,
+              "sha256": "c7eb57bc825c3b5d59dc80bd60ec968b2d68231618a30e04025d680c75b140a1"
+            },
+            "month": {
+              "ms": 1.9460000000003674,
+              "groups": 7,
+              "requests": 1523,
+              "tokens": 3147422304,
+              "sha256": "fec93fb954494b90fabf54cd917dad259a6ed204c81d66b041b1573d05cd3caf"
+            },
+            "session": {
+              "ms": 3.9671000000003005,
+              "groups": 396,
+              "requests": 1523,
+              "tokens": 3147422304,
+              "sha256": "03cf690d14baab6ca67d509cfde4394bbd19534ade0eb9f283192f9cc24e8f43"
+            },
+            "project": {
+              "ms": 1.9936999999999898,
+              "groups": 32,
+              "requests": 1523,
+              "tokens": 3147422304,
+              "sha256": "b0e4c3b2f490f3bc8ad5c819a13d005dc62e096413bfe09e0df3dda9444c70b5"
+            }
+          },
+          "facts": "508995707ebaa622547b68ef78351d313e70609376254dcc6a6db901cae882d8",
+          "applied": {
+            "rows": 24316,
+            "sha256": "b8a4b6f88481b24bea04ad631c58b45f7f74af39d440f5ca745fd0e7755bc520"
+          }
+        }
+      },
+      "samples": []
+    }
+  ]
+}

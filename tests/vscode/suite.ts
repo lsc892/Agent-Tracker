@@ -174,9 +174,14 @@ export async function run(): Promise<void> {
               check(!document.getElementById('diagnostics') && !document.getElementById('diagnostic-files'),'diagnostic logs are absent from the statistics page');
               check(!document.getElementById('quota') && !document.querySelector('[data-tab="quota"]') && !document.getElementById('refresh-usage'),'quota and summary refresh controls are absent from statistics');
               check(document.getElementById('configuration-warning').hidden === ${JSON.stringify(!expectTimezoneWarning)},'invalid timezone warning is visible and clears after correction');
+            } else if (message.type === 'busy' && message.busy) {
+              const controls = document.getElementById('usage-controls');
+              check(controls.disabled && controls.hidden,'SQLite refresh hides and locks statistics controls');
             } else if (phase === 'usage' && message.type === 'usage') {
-              check(message.result.rows.length === 1 && message.result.rows[0].total_tokens === 150,'recent seven days include the fixture request');
-              check(document.getElementById('date-range').value === '7','statistics defaults to recent seven days');
+              const controls = document.getElementById('usage-controls');
+              check(!controls.disabled && !controls.hidden,'the committed view shows and enables statistics controls');
+              check(message.result.rows.length === 1 && message.result.rows[0].total_tokens === 150,'recent thirty days include the fixture request');
+              check(document.getElementById('date-range').value === '30','statistics defaults to recent thirty days');
               check(document.getElementById('from-date-control').hidden && document.getElementById('to-date-control').hidden,'preset periods hide custom date inputs');
               check(document.getElementById('usage-table').textContent.includes('150'),'usage table renders total');
               check(document.getElementById('usage').hidden === false,'usage stays visible in the statistics page');
@@ -344,7 +349,7 @@ export async function run(): Promise<void> {
               phase = 'reset'; document.getElementById('reset-filters').click();
             } else if (phase === 'reset' && message.type === 'usage') {
               check(message.result.groupBy === 'day' && message.result.total === 1,'reset restores daily query results');
-              check(document.getElementById('date-range').value === '7' && document.getElementById('from-date-control').hidden,'reset restores recent seven days and hides custom dates');
+              check(document.getElementById('date-range').value === '30' && document.getElementById('from-date-control').hidden,'reset restores recent thirty days and hides custom dates');
               for (const id of ['provider','from-day','to-day']) check(document.getElementById(id).value === '','reset clears '+id);
               check(document.getElementById('project-name').textContent === '전체 프로젝트' && document.getElementById('session-name').textContent === '전체 세션','reset clears selected identities');
               check(document.getElementById('chart-metric').value === 'tokens' && document.getElementById('chart-provider').getAttribute('aria-pressed')==='true','reset restores metric and provider chart');
@@ -374,7 +379,7 @@ export async function run(): Promise<void> {
               check(document.getElementById('refresh-diagnostics').title.includes('원본을 재검증하지 않고'),'diagnostics explains that reload only reads stored results');
               check(document.getElementById('configuration-warning').hidden === ${JSON.stringify(!expectTimezoneWarning)},'diagnostic timezone warning follows settings');
             } else if (phase === 'initial' && message.type === 'diagnostics') {
-              check(message.result.counts.files === 1,'diagnostics returns fixture manifest');
+              check(message.result.counts.files === 1,'diagnostics returns the fixture source');
               check(document.getElementById('diagnostic-files').textContent.includes('session.jsonl'),'separate webview renders the source log');
               check(document.getElementById('diagnostic-summaries'),'separate webview retains the request warnings table');
               phase = 'reload'; document.getElementById('refresh-diagnostics').click();
@@ -447,8 +452,8 @@ export async function run(): Promise<void> {
     database = new DatabaseSync(databasePath, { readOnly: true });
     // The file exists before the worker finishes its initial WAL/schema transaction.
     database.exec('PRAGMA busy_timeout=5000');
-    const countFiles = (): number => (database!.prepare('SELECT count(*) n FROM manifest').get() as { n: number }).n;
-    await until(() => Boolean(database!.prepare("SELECT 1 FROM sqlite_master WHERE name='manifest'").get()), 'schema creation');
+    const countFiles = (): number => (database!.prepare('SELECT count(*) n FROM source_file').get() as { n: number }).n;
+    await until(() => Boolean(database!.prepare("SELECT 1 FROM sqlite_master WHERE name='source_file'").get()), 'schema creation');
     assert.equal(countFiles(), 0, 'activation does not scan');
     assert.equal(scanCount, 0);
     await vscode.commands.executeCommand('agentTracker.refreshQuota');
@@ -481,7 +486,7 @@ export async function run(): Promise<void> {
       }
       await vscode.commands.executeCommand('agentTracker.refreshQuota');
       assert.equal(scanCount, scansBefore, 'quota refresh and display changes never scan summaries');
-      assert.equal(countFiles(), filesBefore, 'quota controls leave the summary manifest unchanged');
+      assert.equal(countFiles(), filesBefore, 'quota controls leave summary sources unchanged');
       const usageLink = currentTooltip!.value.match(/\]\(command:(agentTracker\.openUsage)\)/);
       assert.ok(usageLink, 'hover exposes a statistics command link');
       assert.ok(typeof currentTooltip!.isTrusted === 'object' && currentTooltip!.isTrusted.enabledCommands.includes(usageLink[1]));
@@ -525,7 +530,7 @@ export async function run(): Promise<void> {
     assert.ok(settingsLink, 'settings remains available with statistics off');
     await vscode.commands.executeCommand(settingsLink[1]);
     await vscode.commands.executeCommand('agentTracker.clearUsageData');
-    assert.equal(countFiles(), 0, 'the command deletes manifest records');
+    assert.equal(countFiles(), 0, 'the command deletes source records');
     assert.equal((database.prepare('SELECT count(*) n FROM turn_summary').get() as {n: number}).n, 0);
     assert.equal(readFileSync(sourcePath, 'utf8'), originalSource, 'original transcript survives deletion');
     assert.equal(scanCount, scansBeforeSettings, 'deletion does not trigger a rebuild');
@@ -557,7 +562,7 @@ export async function run(): Promise<void> {
     await config.update('claude.enabled', true, vscode.ConfigurationTarget.Global);
     await config.update('usage.enabled', true, vscode.ConfigurationTarget.Global);
     await vscode.commands.executeCommand('agentTracker.openUsage');
-    await until(() => Boolean(database!.prepare("SELECT 1 FROM manifest WHERE path=? AND processing_status='done'").get(alternateSource)), 'statistics collect only the new data home');
+    await until(() => Boolean(database!.prepare("SELECT 1 FROM source_file WHERE path=? AND processing_status='done'").get(alternateSource)), 'statistics collect only the new data home');
     assert.equal(countFiles(), 1);
     outcomes.push('one global data home supplies both providers, statistics and Claude retention; duplicate path settings are removed');
     // A fresh driver observes the production scripts during live language changes.

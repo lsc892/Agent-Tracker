@@ -10,12 +10,14 @@ const ts = require('typescript');
  * 알고리즘: tsc 실행 전 import 없는 schema만 메모리에서 변환·평가하고 공통 트리를 순회해 언어 선택지와 category별 정렬 속성을 만든다.
  */
 function configurationManifest(languages) {
+  // [설정 생성 정책] import 없는 설정 스키마를 메모리에서 변환해 컴파일 전에도 읽는다.
   const filename = path.join(__dirname, '../src/configuration/schema.ts');
   const source = fs.readFileSync(filename, 'utf8');
   const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } });
   const exports = {};
   vm.runInThisContext(`(function(exports) { ${compiled.outputText}\n})`, { filename })(exports);
   const { settingCategories, settingDefinitions, mapSettings } = exports;
+  // [설정 생성 정책] 속성을 카테고리로 묶고 언어 선택지는 현재 지원 목록에서 만든다.
   const sections = Object.fromEntries(Object.entries(settingCategories).map(([category, metadata]) =>
     [category, { id: `agentTracker.${category}`, ...metadata, properties: {} }]));
   mapSettings(settingDefinitions, (definition, key) => {
@@ -26,6 +28,7 @@ function configurationManifest(languages) {
     }
     sections[category].properties[`agentTracker.${key}`] = property;
   });
+  // [정렬 정책] manifest 속성을 order 값으로 정렬한다.
   for (const section of Object.values(sections)) {
     section.properties = Object.fromEntries(Object.entries(section.properties)
       .sort(([, left], [, right]) => (left.order ?? 0) - (right.order ?? 0)));

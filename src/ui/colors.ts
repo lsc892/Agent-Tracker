@@ -8,6 +8,7 @@ export type ColorTarget = 'user' | 'workspace';
  * 알고리즘: 메시지 종류·공통 모드 목록·user/workspace 범위·HEX 값을 검증한 뒤 정규화한 필드만 반환한다.
  */
 export function parseColorSettingsMessage(raw: unknown): {type:'ready'} | {type:'save';mode:StatusColorMode;color:string;target:ColorTarget} | null {
+  // [DTO 정책] 준비 메시지는 종류만 전달하고 저장 메시지는 모드·범위·색상을 모두 검증한다.
   if (!raw || typeof raw !== 'object') return null;
   const value=raw as Record<string,unknown>;
   if (value.type === 'ready') return {type:'ready'};
@@ -18,6 +19,7 @@ export function parseColorSettingsMessage(raw: unknown): {type:'ready'} | {type:
 }
 
 export function colorMode(value: unknown): StatusColorMode {
+  // [기본값 정책] 공통 모드 목록에 없는 값은 설정 스키마의 기본값으로 처리한다.
   return settingDefinitions.display.colorMode.enum.some(mode => mode === value)
     ? value as StatusColorMode : settingDefinitions.display.colorMode.default;
 }
@@ -27,6 +29,7 @@ export function colorMode(value: unknown): StatusColorMode {
  * 알고리즘: 공백·대소문자를 정리하고 3·4·6·8자리 HEX만 허용하며 짧은 표기는 각 자리를 두 번 반복해 확장한다.
  */
 export function normalizeHexColor(value: unknown): string | undefined {
+  // [색상 정책] 3·4자리 HEX는 각 자리를 두 번 써서 6·8자리와 같은 형식으로 맞춘다.
   if (typeof value !== 'string') return undefined;
   const color=value.trim().toLowerCase();
   if (!/^#(?:[\da-f]{3}|[\da-f]{4}|[\da-f]{6}|[\da-f]{8})$/.test(color)) return undefined;
@@ -34,6 +37,7 @@ export function normalizeHexColor(value: unknown): string | undefined {
 }
 
 export function statusForeground(mode: StatusColorMode, custom: string | undefined): string {
+  // [색상 정책] 지정한 색상이 유효하지 않거나 자동 모드이면 상태바 전경색을 상속한다.
   // VS Code writes this value to the label's inline CSS. Explicit inheritance
   // follows the status bar's normal, no-folder and debugging foreground, even
   // when a label rule (such as hover) would otherwise supply a different color.

@@ -114,7 +114,7 @@ Covering index는 해당 쿼리에 필요한 조건·출력 열을 모두 담아
 - 저장 공간은 가능할 때 `dbstat`으로 표·인덱스별 B-tree 페이지를 구분한다. 이 표에는 freelist 등의 모든 DB 페이지가 포함되지 않고 SQLite 빌드 옵션에 따라 모듈이 없을 수 있다. WAL 파일 길이를 총 쓰기 바이트로 해석하지 않는다. [SQLite DBSTAT](https://www.sqlite.org/dbstat.html)
 - 현재 연결은 열기에서 `main.optimize=0x10002`, 스캔 뒤 하루 간격·닫기에서 `main.optimize`를 호출한다. 이미 공식 장기 연결 권고에 맞는 방향이다. 매 스캔의 전체 ANALYZE로 바꿀 이유는 이번 조사에서 확인되지 않았다. [SQLite ANALYZE 권고](https://www.sqlite.org/lang_analyze.html)
 
-기존 [세션 rollup rowid 비교](../../benchmarks/2026-10-27/SqlRowid-2026-10-27.md)와 [최초·추가 적재 시제품 비교](../../benchmarks/2026-10-27/SqlRowidAppend-2026-10-27.md)는 서로 다른 당시 실행물의 기록이다. 현재 제품의 성능 수치나 이번 조사에서 실행한 결과로 재사용하지 않는다. 이전 [복합 인덱스 조사](../2026-10-29/SQLiteIndexOrder-2026-10-29.md)도 참고하되 현재 메모리 snapshot 저장 경로는 이 문서의 코드 연결을 기준으로 한다.
+기존 [세션 rollup rowid 비교](../../benchmarks/failure/2026-10-27/SqlRowid-2026-10-27.md)와 [최초·추가 적재 시제품 비교](../../benchmarks/failure/2026-10-27/SqlRowidAppend-2026-10-27.md)는 서로 다른 당시 실행물의 기록이다. 현재 제품의 성능 수치나 이번 조사에서 실행한 결과로 재사용하지 않는다. 이전 [복합 인덱스 조사](../2026-10-29/SQLiteIndexOrder-2026-10-29.md)도 참고하되 현재 메모리 snapshot 저장 경로는 이 문서의 코드 연결을 기준으로 한다.
 
 ## 7. 권고 순서와 미검증 사항
 

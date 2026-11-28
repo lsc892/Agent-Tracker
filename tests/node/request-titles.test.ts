@@ -31,7 +31,7 @@ test('v7 summaries migrate without losing tokens or session metadata', async t =
   t.after(() => rm(directory, { recursive: true, force: true }));
   const path = join(directory, 'db.sqlite');
   const previous = new SummaryDatabase(path);
-  previous.replaceMemory({scanId: 'test', files: [], sessions: [{ provider: 'claude', session_id: 's' }], summaries: [{
+  previous.replaceMemory({files: [], sessions: [{ provider: 'claude', session_id: 's' }], summaries: [{
     provider: 'claude', project_key: '/project', project_name: 'Project', session_id: 's', session_name: 'Session',
     root_turn_id: 'r', duration_quality: 'missing', input_tokens: 10, output_tokens: 5,
     total_tokens: 15, status: 'completed',
@@ -72,7 +72,7 @@ test('rebuild merges ProjectFarm model rows and persists bounded titles through 
   assert.deepEqual(queryChart(db, {}, 'turn', 'UTC', 'tokens', 'model').rows.map(row => 'request_title' in row ? row.request_title : null).sort(), ['Request a', 'Request b']);
   db.connection.prepare('INSERT INTO projects VALUES (?,?)').run('C:\\Work\\ProjectFarm', 'ProjectFarm');
   db.connection.prepare('UPDATE turn_summary SET project_key=? WHERE session_id=?').run('C:\\Work\\ProjectFarm', 'a');
-  db.connection.exec('UPDATE manifest SET parser_version=12');
+  db.connection.exec("UPDATE source_file SET parser_version=12; UPDATE summary_refresh SET scope='v12'");
   // This direct SQL fixture simulates a historical database before maintained rollups existed.
   db.connection.exec('DELETE FROM usage_rollup_meta; DELETE FROM usage_request_daily; DELETE FROM usage_model_daily;');
   assert.equal(db.queryUsage({}, 'project', 'UTC', {}, 'model').length, 2, 'old case-sensitive keys reproduce the duplicate');

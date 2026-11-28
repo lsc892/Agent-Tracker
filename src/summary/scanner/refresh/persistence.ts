@@ -1,8 +1,7 @@
-// 연결 묶음의 최종 변경분을 저장하고 소실 보존·관측·실패 진단을 마무리한다.
+// 연결 묶음의 통계·원본 수정 시각을 저장하고 진단과 이름을 마무리한다.
 import { setImmediate as yieldToWorker } from 'node:timers/promises';
-import type { MemoryAggregateResult } from '../../aggregation/memoryAggregate';
 import type { MemoryReplacement } from '../../db/memoryStore';
-import type { FileMetadata, Provider } from '../../db/types';
+import type { FileMetadata, Provider, TurnSummaryInput } from '../../db/types';
 import { SummaryError } from '../../jsonl';
 import { OrderedGroups } from '../worklist';
 import type { RefreshContext } from './context';
@@ -14,102 +13,109 @@ const MAX_COMMIT_BATCH_SUMMARIES = 1000;
 interface ComponentCommit {
   component: Set<string>;
   members: FileState[];
-  aggregated: MemoryAggregateResult;
+  summaries: TurnSummaryInput[];
 }
 
-export async function commitComponents(context: RefreshContext, aggregated: MemoryAggregateResult): Promise<void> {
-  const { state, check, report } = context;
-  const { files, affected, links } = state;
+/** 재집계한 세션을 관계로 묶고 연결된 원본 상태와 함께 저장한다. */
+export async function commitComponents(context: RefreshContext, summaries: readonly TurnSummaryInput[]): Promise<void> {
+  const { files, affected, links } = context.state;
   if (!affected.size) return;
-  const memberGroups = new OrderedGroups(files.values(), file => [sessionKey(file.provider, file.session ?? ''),
+
+  // [SQL 트랜잭션 정책] 이전·현재 세션 키를 모두 색인해 이동한 원본도 양쪽 세션과 같은 트랜잭션에서 처리한다.
+  const memberGroups = new OrderedGroups(files.values(), file => [sessionKey(file.provider, file.session_id ?? ''),
     sessionKey(file.provider, file.previous?.session_id ?? '')]);
-  const summaryGroups = new OrderedGroups(aggregated.summaries, row => [sessionKey(row.provider, row.session_id)]);
-  const orphanGroups = new OrderedGroups(aggregated.orphans, row => [sessionKey(row.provider, row.session_id)]);
-  const reconnectedIds = new Set(state.reconnections.flatMap(link => [link.old_id, link.new_id]));
-  const queued = new Set<string>();
-  let batch: ComponentCommit[] = [], batchSummaries = 0;
-  const finish = ({ component }: ComponentCommit): void => {
-    for (const value of component) affected.delete(value);
-    report();
-  };
+  const summaryGroups = new OrderedGroups(summaries, row => [sessionKey(row.provider, row.session_id)]);
+  const remaining = new Set([...affected].sort());
+  let batch: ComponentCommit[] = [];
+  let batchSummaries = 0;
+  // 대기 중인 묶음을 저장하고 다음 배치의 크기 집계를 초기화한다.
   const flush = async (): Promise<void> => {
     if (!batch.length) return;
-    const pendingBatch = batch;
+    await commitBatch(context, batch);
     batch = [];
     batchSummaries = 0;
-    queued.clear();
-    await yieldToWorker();
-    check();
-    if (pendingBatch.length === 1) {
-      const entry = pendingBatch[0];
-      commitComponent(context, entry.component, entry.members, entry.aggregated);
-      finish(entry);
-      return;
-    }
-    try {
-      const names = context.database.replaceMemoryBatch(pendingBatch.map(entry =>
-        componentReplacement(context, entry.component, entry.members, entry.aggregated)), context.storage);
-      for (const [key, name] of names) state.savedSessionNames.set(key, name);
-    } catch {
-      // Scanner summaries contain arrays, so rollback can safely retry each original component.
-      for (const entry of pendingBatch) {
-        await yieldToWorker();
-        check();
-        commitComponent(context, entry.component, entry.members, entry.aggregated);
-        finish(entry);
-      }
-      return;
-    }
-    // A failed COMMIT must leave every member unsettled for the individual retry path.
-    for (const entry of pendingBatch)
-      for (const file of entry.members) file.settled = true;
-    for (const entry of pendingBatch) finish(entry);
   };
-  for (const seed of [...affected].sort()) {
-    if (!affected.has(seed) || queued.has(seed)) continue;
+
+  // [SQL 트랜잭션 정책] 연결된 세션은 분리하지 않고 정상 묶음을 최대 16개·요약 1,000건씩 배치로 저장한다.
+  for (const seed of remaining) {
     const component = linkedComponent(seed, links);
-    const members = memberGroups.members(component);
-    const grouped = { summaries: summaryGroups.members(component), orphans: orphanGroups.members(component) };
-    const entry = { component, members, aggregated: grouped };
-    if (requiresIndividualCommit(entry, reconnectedIds)) {
+    for (const session of component) remaining.delete(session);
+    const entry = { component, members: memberGroups.members(component), summaries: summaryGroups.members(component) };
+    if (requiresIndividualCommit(entry)) {
       await flush();
-      await yieldToWorker();
-      check();
-      commitComponent(context, component, members, grouped);
-      finish(entry);
+      await commitIndividual(context, entry);
       continue;
     }
-    if (batchSummaries + grouped.summaries.length > MAX_COMMIT_BATCH_SUMMARIES) await flush();
+    const count = entry.summaries.length;
+    if (batchSummaries + count > MAX_COMMIT_BATCH_SUMMARIES) await flush();
     batch.push(entry);
-    batchSummaries += grouped.summaries.length;
-    for (const value of component) queued.add(value);
+    batchSummaries += count;
     if (batch.length === MAX_COMMIT_BATCH_COMPONENTS || batchSummaries === MAX_COMMIT_BATCH_SUMMARIES) await flush();
   }
   await flush();
 }
 
+/** 정상 세션 묶음 여러 개를 한 트랜잭션으로 저장한다. */
+async function commitBatch(context: RefreshContext, batch: readonly ComponentCommit[]): Promise<void> {
+  if (batch.length === 1) {
+    await commitIndividual(context, batch[0]);
+    return;
+  }
+  // [취소 정책] 배치를 쓰기 전에 이벤트 루프에 제어를 돌려주고 취소를 다시 검사한다.
+  await yieldToWorker();
+  context.check();
+  try {
+    const names = context.database.replaceMemoryBatch(batch.map(entry => componentReplacement(context, entry)), context.storage);
+    for (const [key, name] of names) context.state.savedSessionNames.set(key, name);
+  } catch {
+    // [SQL 트랜잭션 정책] 배치가 롤백되면 이미 만든 요약을 사용해 연결 묶음마다 다시 저장한다.
+    for (const entry of batch) await commitIndividual(context, entry);
+    return;
+  }
+  for (const entry of batch) settleFiles(entry.members);
+  for (const _ of batch) context.report();
+}
+
+/** 저장 직전에 취소 여부를 확인하고 세션 묶음 하나를 처리한다. */
+async function commitIndividual(context: RefreshContext, entry: ComponentCommit): Promise<void> {
+  // [취소 정책] 묶음마다 쓰기 전 취소를 확인하고 반영 후 진행량을 전달한다.
+  await yieldToWorker();
+  context.check();
+  commitComponent(context, entry);
+  context.report();
+}
+
+/** 원본 처리를 완료로 표시하고 메모리의 파싱 결과 참조를 해제한다. */
+function settleFiles(files: readonly FileState[]): void {
+  for (const file of files) {
+    file.settled = true;
+    file.prepared = undefined;
+  }
+}
+
 /** 연결된 세션을 기존 너비 우선 탐색 순서로 모아 하나의 원자적 저장 범위를 만든다. */
 function linkedComponent(seed: string, links: ReadonlyMap<string, ReadonlySet<string>>): Set<string> {
-  const component = new Set([seed]), pending = [seed];
-  for (let index = 0; index < pending.length; index++) {
-    for (const linked of links.get(pending[index]) ?? []) {
-      if (component.has(linked)) continue;
+  const component = new Set([seed]);
+  // [저장 정책] Set을 삽입 순서로 순회하며 새로 찾은 세션까지 방문해 연결 성분을 완성한다.
+  for (const session of component) {
+    for (const linked of links.get(session) ?? [])
       component.add(linked);
-      pending.push(linked);
-    }
   }
   return component;
 }
 
-/** 큰 성분과 보류·오류·삭제·재연결은 기존 개별 복구 경로로 처리한다. */
-function requiresIndividualCommit(entry: ComponentCommit, reconnectedIds: ReadonlySet<number>): boolean {
-  return entry.aggregated.summaries.length > MAX_COMMIT_BATCH_SUMMARIES || entry.aggregated.orphans.length > 0
-    || entry.members.some(file => file.deferred || file.error || file.removed || reconnectedIds.has(file.id));
+/** 큰 성분과 보류·오류·삭제는 개별 복구 경로로 처리한다. */
+function requiresIndividualCommit(entry: ComponentCommit): boolean {
+  return entry.summaries.length > MAX_COMMIT_BATCH_SUMMARIES
+    || entry.members.some(file => file.deferred || file.error || file.removed);
 }
 
-/** 보류 → 원본 오류 → 고아 요청 → 실제 쓰기 순으로 검사해 앞선 보존·복구 정책을 우선한다. */
-function commitComponent(context: RefreshContext, component: Set<string>, members: FileState[], aggregated: MemoryAggregateResult): void {
-  const { database, storage, state, retain } = context;
+/** 묶음의 요약을 원자적으로 교체하고 보류나 오류가 있으면 마지막 정상 집계를 보존한다. */
+function commitComponent(context: RefreshContext, entry: ComponentCommit): void {
+  const { database, storage, state } = context;
+  const { members } = entry;
+
+  // [SQL 트랜잭션 정책] 미완성 행이나 원본 오류가 있으면 묶음의 마지막 정상 집계를 보존한다.
   if (members.some(file => file.deferred)) {
     settleDeferredComponent(context, members);
     return;
@@ -122,22 +128,12 @@ function commitComponent(context: RefreshContext, component: Set<string>, member
     preserveMissingSources(context, members);
     return;
   }
-  const missing = members.some(file => file.removed);
-  const orphan = !retain || !missing ? aggregated.orphans[0] : undefined;
-  if (orphan) {
-    const file = state.files.get(orphan.fileId)!;
-    state.fail(file, new SummaryError('missing-root-turn', orphan.offset));
-    for (const sibling of members)
-      if (!sibling.error)
-        sibling.error = file.error;
-    preserveMissingSources(context, members);
-    return;
-  }
+
+  // [SQL 트랜잭션 정책] 저장이 끝난 뒤에만 파일을 완료 처리하고 쓰기 실패는 진단으로 남긴다.
   try {
-    const names = database.replaceMemory(componentReplacement(context, component, members, aggregated), storage);
+    const names = database.replaceMemory(componentReplacement(context, entry), storage);
     for (const [key, name] of names) state.savedSessionNames.set(key, name);
-    for (const file of members)
-      file.settled = true;
+    settleFiles(members);
   }
   catch (error) {
     for (const file of members)
@@ -146,86 +142,101 @@ function commitComponent(context: RefreshContext, component: Set<string>, member
   }
 }
 
-/** 성분별 보존·이동 범위를 합치지 않고 기존 snapshot 계약을 그대로 만든다. */
-function componentReplacement(
-  context: RefreshContext, component: Set<string>, members: FileState[], aggregated: MemoryAggregateResult,
-): MemoryReplacement {
-  const { state, result, collect, retain } = context;
-  const missing = members.some(file => file.removed);
-  const memberIds = new Set(members.map(file => file.id));
+/** 연결 성분의 대화 합계와 정상 반영할 파일 버전을 묶는다. */
+function componentReplacement(context: RefreshContext, { component, members, summaries }: ComponentCommit): MemoryReplacement {
+  const { retain, collect } = context;
+  // [DTO 정책] 연결된 세션 키를 풀고 대화 요약, 저장할 파일 버전, 삭제된 파일 ID를 묶는다.
   const sessions = [...component].map(value => {
     const [provider, session_id] = JSON.parse(value) as [Provider, string];
     return { provider, session_id };
   });
-  return { sessions, summaries: aggregated.summaries.filter(row => !retain || !missing || row.hasMain),
-    files: members.filter(file => !file.removed).map(finalFile),
-    removedFileIds: members.filter(file => file.removed).map(file => file.id),
-    reconnectedFiles: state.reconnections.filter(link => memberIds.has(link.old_id)),
-    preserveCapabilities: !collect, retainDeletedSourceUsage: retain, scanId: result.scanId };
+  const files = [], removedFileIds = new Set<number>();
+  for (const file of members) {
+    if (file.removed) {
+      removedFileIds.add(file.id);
+      continue;
+    }
+    files.push(finalFile(file));
+  }
+  return { sessions, summaries, files, removedFileIds, retainDeletedSourceUsage: retain, preserveCapabilities: !collect };
 }
 
+/** 보류된 원본에만 개행 대기 상태를 써서 연결된 묶음 처리를 끝낸다. */
 function settleDeferredComponent(context: RefreshContext, members: FileState[]): void {
+  // [진단 정책] 미완성 행은 기존 집계를 유지한 채 개행을 기다리는 상태만 기록한다.
   const { database } = context;
   database.transaction(() => {
-    for (const file of members) {
-      file.settled = true;
-      if (file.deferred)
-        database.connection.prepare(`UPDATE manifest SET processing_status='done',
-            processing_position='partial-line: waiting for newline',recorded_at=?,last_error=NULL WHERE id=?`)
-          .run(new Date().toISOString(), file.id);
-    }
+    const markDeferred = database.connection.prepare(`UPDATE source_file SET processing_status='done',
+      processing_position='partial-line: waiting for newline',recorded_at=?,last_error=NULL WHERE id=?`);
+    for (const file of members)
+      if (file.deferred) markDeferred.run(new Date().toISOString(), file.id);
   });
+  settleFiles(members);
 }
 
+/** 세션 교체에 포함되지 않은 원본 상태와 남은 세션 이름을 저장한다. */
 export function finishScan(context: RefreshContext, names: Map<string, string>): void {
-  const { database, result, storage, retain } = context;
-  const { files } = context.state;
-  const unsettled = [...files.values()].filter(file => file.selected && file.attempted
-    && !file.settled && !file.error && !file.removed && file.session === null);
-  if (unsettled.length)
-    database.replaceMemory({ sessions: [], summaries: [], files: unsettled.map(finalFile), scanId: result.scanId }, storage);
-  const removedEmpty = [...files.values()].filter(file => file.removed && file.previous?.session_id === null);
-  if (removedEmpty.length)
-    database.replaceMemory({ sessions: [], summaries: [], files: [], removedFileIds: removedEmpty.map(file => file.id),
-      retainDeletedSourceUsage: retain, scanId: result.scanId }, storage);
-  database.transaction(() => {
-    const update = database.connection.prepare('UPDATE sessions SET session_name=? WHERE provider=? AND session_id=? AND session_name IS NOT ?');
-    for (const [value, name] of names) {
-      if (context.state.savedSessionNames.get(value) === name) continue;
-      const [provider, session] = JSON.parse(value) as [Provider, string];
-      update.run(name, provider, session, name);
-    }
-    const seen = database.connection.prepare('UPDATE manifest SET last_seen_scan_id=? WHERE id=?');
-    for (const file of files.values())
-      if (file.selected && file.previous)
-        seen.run(result.scanId, file.id);
-  });
-  for (const file of files.values())
-    if (file.error)
-      recordFailure(context, file);
+  finishSourceRows(context);
+  context.check();
+  if (names.size) context.database.transaction(() => persistNames(context, names));
 }
 
+/** 세션이 담당하지 않는 원본 행과 실패를 반영한다. */
+function finishSourceRows(context: RefreshContext): void {
+  // [저장 정책] 세션 교체에 포함되지 않은 신규·소실 파일과 스캔 오류를 따로 수집한다.
+  const { database, state, storage, retain } = context;
+  const files = [], removedFileIds = [], failures: FileState[] = [];
+  for (const file of state.files.values()) {
+    if (file.removed) {
+      if (file.previous?.session_id === null) removedFileIds.push(file.id);
+    } else if (file.selected && file.attempted && !file.settled && !file.error && file.session_id === null) {
+      files.push(finalFile(file));
+    }
+    if (file.error) failures.push(file);
+  }
+  // [저장 정책] 새 실패 행의 ID를 SQLite가 배정하기 전에 스캔에서 할당한 원본 ID를 먼저 반영한다.
+  if (files.length) database.replaceMemory({ sessions: [], summaries: [], files }, storage);
+  if (removedFileIds.length)
+    database.replaceMemory({ sessions: [], summaries: [], files: [], removedFileIds, retainDeletedSourceUsage: retain }, storage);
+  for (const file of failures) recordFailure(context, file);
+}
+
+/** 수집한 표시 이름과 DB의 세션 이름을 맞춘다. */
+function persistNames(context: RefreshContext, names: ReadonlyMap<string, string>): void {
+  // [이름 정책] 이미 저장한 이름과 같은 재시도는 생략하고 DB에서도 값이 다른 세션만 갱신한다.
+  const update = context.database.connection.prepare('UPDATE sessions SET session_name=? WHERE provider=? AND session_id=? AND session_name IS NOT ?');
+  for (const [key, name] of names) {
+    if (context.state.savedSessionNames.get(key) === name) continue;
+    const [provider, session] = JSON.parse(key) as [Provider, string];
+    update.run(name, provider, session, name);
+  }
+}
+
+/** 원본 상태에서 DB에 반영할 경로·세션·버전·관계 정보만 뽑는다. */
 function finalFile(file: FileState): FileMetadata & { id: number } {
   return { id: file.id, provider: file.provider, source_root: file.source_root, path: file.path,
-    session_id: file.session, size_bytes: file.size_bytes, mtime_ms: file.mtime_ms, dev: file.dev, inode: file.inode,
-    parser_version: file.parser_version, capabilities_collected: file.capabilities_collected,
-    source_identity: file.prepared?.sourceIdentity ?? file.source_identity, content_hash: file.prepared?.contentHash ?? file.content_hash };
+    session_id: file.session_id, mtime_ms: file.mtime_ms, parser_version: file.parser_version,
+    capabilities_collected: file.capabilities_collected, relations: file.relations };
 }
 
+/** 원본이 실패하거나 중단된 이유와 위치를 DB에 기록한다. */
 export function recordFailure(context: RefreshContext, file: FileState): void {
-  const { database, result } = context;
-  let previous = database.findManifest(file.provider, file.path);
-  if (!previous) {
-    previous = database.observeFile(file, result.scanId);
-    file.id = previous.id;
-  }
-  database.setManifestDiagnostic(previous.id, file.error!.code === 'interrupted' ? 'interrupted' : 'error', `parse: byte=${file.error!.offset}`, file.error!.code, file.error!.offset);
+  // [진단 정책] 원본 행을 확보해 취소와 실패를 구분하고 파싱 바이트 위치를 기록한다.
+  const { database } = context;
+  const { code, offset } = file.error!;
+  const source = database.findSourceFile(file.provider, file.path) ?? database.observeFile(file);
+  database.setSourceDiagnostic(source.id, code === 'interrupted' ? 'interrupted' : 'error', `parse: byte=${offset}`, code, offset);
 }
 
+/** 보존 설정에 따라 소실된 원본을 DB에 표시한다. */
 function preserveMissingSources(context: RefreshContext, members: FileState[]): void {
-  const { database, result, storage, retain } = context;
+  // [보존 정책] 삭제 원본 보존이 켜져 있으면 기존 집계를 두고 아직 표시하지 않은 소실 상태만 기록한다.
+  const { database, retain } = context;
   const removed = members.filter(file => file.removed);
-  if (removed.length && retain)
-    database.replaceMemory({ sessions: removed.filter(file => file.session).map(file => ({ provider: file.provider, session_id: file.session! })),
-      summaries: [], files: [], removedFileIds: removed.map(file => file.id), retainDeletedSourceUsage: true, scanId: result.scanId }, storage);
+  if (!removed.length || !retain) return;
+  database.transaction(() => {
+    const markMissing = database.connection.prepare('UPDATE source_file SET source_missing=1,recorded_at=? WHERE id=? AND source_missing=0');
+    const now = new Date().toISOString();
+    for (const file of removed) markMissing.run(now, file.id);
+  });
 }

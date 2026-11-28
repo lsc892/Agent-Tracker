@@ -1,0 +1,303 @@
+{
+  "dateSeoul": "2026-11-25",
+  "environment": {
+    "node": "v24.14.1",
+    "v8": "13.6.233.17-node.44",
+    "platform": "win32",
+    "arch": "x64",
+    "cpu": "AMD Ryzen 5 7500F 6-Core Processor"
+  },
+  "protocol": {
+    "samplesPerAlgorithmAndGroup": 1,
+    "warmups": 0,
+    "order": "before then after within each group",
+    "sourceWorkers": 1,
+    "osCache": "not flushed",
+    "prepareMs": "Sum of wall times for the product prepareSource on all files in the group. Includes reading, Zstd, row parsing and file-local aggregation. Excludes input metadata preparation, SQLite and result fingerprints.",
+    "memory": "Process high-water RSS; heapUsed and arrayBuffers sampled every 5 ms and after each file.",
+    "output": "SHA-256 of JSON.stringify of each product preparation result in manifest order; file reads, row counts, errors and partial lines are recorded independently."
+  },
+  "inputSha256": "93b8f344f64e5a595ea280dcff81d7bc7fe112081c3b88bb76ed54a40b8e8f95",
+  "builds": {
+    "baseCommit": "fb60fca4fa041ff9ad72485ba6f6fec8a3bf506d",
+    "afterSource": "Working tree on baseCommit with the streaming fixed projection change",
+    "beforeModuleSha256": {
+      "index.js": "3f1553819ced4401ea63e76b0a1bae10b51ba372d47750cc69d520b719dba705",
+      "line.js": "2e1060b19de093fa98694e5d5e28e808e4b6818b0f1e642992b75fe65bfbc30a",
+      "projection.js": "7fa15683a76f6e0d8e7a6fae92b4cc0e6fabee6aa0a5c2ba3f621a5730bcc838"
+    },
+    "afterModuleSha256": {
+      "index.js": "a1bad0e34e198902022e875f3dd0dc25ffbc8af38ba50737ba9bd598f4fb8dfb",
+      "line.js": "403fa4749d8bd1f5c10797632ec6b6127f4b0a356c8111a5e3df2b9312140090",
+      "projection.js": "7fa15683a76f6e0d8e7a6fae92b4cc0e6fabee6aa0a5c2ba3f621a5730bcc838",
+      "streamProjection.js": "a97fdc1a89686d783d9e4d9e485a13e8d1202077ee4c46ba4c0099e6091f2ecc"
+    }
+  },
+  "cases": [
+    {
+      "group": "claude-plain",
+      "files": 12,
+      "before": {
+        "bodyBytes": 11486533,
+        "rows": 2460,
+        "failed": 0,
+        "errors": {},
+        "partial": 0,
+        "prepareMs": 97.35919999999997,
+        "peakRssBytes": 52617216,
+        "peakHeapUsedBytes": 9147336,
+        "peakArrayBufferBytes": 2170062,
+        "outputSha256": "1f6b44c121b8d3c96ef5cd7db5e852551f2534e851a18ec8f77accdd41dc3f3b"
+      },
+      "after": {
+        "bodyBytes": 11486533,
+        "rows": 2460,
+        "failed": 0,
+        "errors": {},
+        "partial": 0,
+        "prepareMs": 97.52859999999998,
+        "peakRssBytes": 54247424,
+        "peakHeapUsedBytes": 8346344,
+        "peakArrayBufferBytes": 855462,
+        "outputSha256": "1f6b44c121b8d3c96ef5cd7db5e852551f2534e851a18ec8f77accdd41dc3f3b"
+      },
+      "matchingOutput": true
+    },
+    {
+      "group": "codex-plain",
+      "files": 34,
+      "before": {
+        "bodyBytes": 81348631,
+        "rows": 18369,
+        "failed": 0,
+        "errors": {},
+        "partial": 0,
+        "prepareMs": 441.9755,
+        "peakRssBytes": 58830848,
+        "peakHeapUsedBytes": 11679208,
+        "peakArrayBufferBytes": 3848112,
+        "outputSha256": "3bcacd8ab0d1ace6f0da2aa94ebe4ca021c647b0ffd7e4374f664f271dc14757"
+      },
+      "after": {
+        "bodyBytes": 81348631,
+        "rows": 18369,
+        "failed": 0,
+        "errors": {},
+        "partial": 0,
+        "prepareMs": 451.4931999999999,
+        "peakRssBytes": 56909824,
+        "peakHeapUsedBytes": 11457704,
+        "peakArrayBufferBytes": 1645494,
+        "outputSha256": "3bcacd8ab0d1ace6f0da2aa94ebe4ca021c647b0ffd7e4374f664f271dc14757"
+      },
+      "matchingOutput": true
+    },
+    {
+      "group": "codex-zstd",
+      "files": 668,
+      "before": {
+        "bodyBytes": 349406760,
+        "rows": 200294,
+        "failed": 0,
+        "errors": {},
+        "partial": 0,
+        "prepareMs": 7195.549299999997,
+        "peakRssBytes": 215003136,
+        "peakHeapUsedBytes": 37805352,
+        "peakArrayBufferBytes": 40477625,
+        "outputSha256": "1a7d8b507d04e70737ed7030f50bbabe15162bdfd0f39a15b4ad67221fc9a378"
+      },
+      "after": {
+        "bodyBytes": 349406760,
+        "rows": 200294,
+        "failed": 0,
+        "errors": {},
+        "partial": 0,
+        "prepareMs": 7280.61889999999,
+        "peakRssBytes": 151343104,
+        "peakHeapUsedBytes": 36496200,
+        "peakArrayBufferBytes": 32825645,
+        "outputSha256": "1a7d8b507d04e70737ed7030f50bbabe15162bdfd0f39a15b4ad67221fc9a378"
+      },
+      "matchingOutput": true
+    }
+  ],
+  "fullRefresh": {
+    "protocol": {
+      "samplesPerAlgorithm": 1,
+      "warmups": 0,
+      "order": "before then after",
+      "sourceWorkers": 4,
+      "initialDatabase": "empty; schema initialization outside timing",
+      "osCache": "not flushed",
+      "time": "refreshSummary elapsed from start to final return, including SQLite persistence and worker shutdown",
+      "memory": "Process high-water RSS; main-isolate heapUsed sampled every 5 ms and on progress."
+    },
+    "before": {
+      "totalMs": 3079.2934,
+      "prepareMs": 2828.803,
+      "peakRssBytes": 457773056,
+      "observedRssBytes": 456806400,
+      "peakMainHeapBytes": 49536208,
+      "startRssBytes": 51224576,
+      "startMainHeapBytes": 6197680,
+      "parsed": 714,
+      "bodyBytes": 442241924,
+      "failed": 0,
+      "interrupted": false
+    },
+    "after": {
+      "totalMs": 2989.3349,
+      "prepareMs": 2745.5276,
+      "peakRssBytes": 452313088,
+      "observedRssBytes": 448659456,
+      "peakMainHeapBytes": 50372760,
+      "startRssBytes": 51277824,
+      "startMainHeapBytes": 6225144,
+      "parsed": 714,
+      "bodyBytes": 442241924,
+      "failed": 0,
+      "interrupted": false
+    },
+    "bothUsage": [
+      {
+        "provider": "claude",
+        "threads": 12,
+        "tokens": 10241517
+      },
+      {
+        "provider": "codex",
+        "threads": 683,
+        "tokens": 3561600971
+      }
+    ],
+    "matchingDailyUsageSha256": "23d669d2566421a7543f09766c6ce697c80d588b05b16ea1465f0cf648065003",
+    "runner": {
+      "arguments": [
+        "compiled output directory containing src/",
+        "private frozen input manifest",
+        "algorithm label"
+      ],
+      "stdin": [
+        "const { readFileSync, mkdtempSync } = require('node:fs');",
+        "const { createHash } = require('node:crypto');",
+        "const { tmpdir } = require('node:os');",
+        "const { join } = require('node:path');",
+        "const [directory, input, algorithm] = process.argv.slice(2);",
+        "const { SummaryDatabase } = require(join(directory, 'src/summary/db'));",
+        "const { refreshSummary } = require(join(directory, 'src/summary/scanner'));",
+        "const snapshot = JSON.parse(readFileSync(input, 'utf8'));",
+        "const dbPath = join(mkdtempSync(join(tmpdir(), 'agent-tracker-full-refresh-')), 'summary.sqlite');",
+        "const database = new SummaryDatabase(dbPath);",
+        "async function measure() {",
+        "  global.gc();",
+        "  const memory = () => {",
+        "    const { rss, heapUsed } = process.memoryUsage();",
+        "    return { rss, heapUsed };",
+        "  };",
+        "  const startMemory = memory();",
+        "  const peak = { ...startMemory };",
+        "  const sample = () => {",
+        "    const current = memory();",
+        "    peak.rss = Math.max(peak.rss, current.rss);",
+        "    peak.heapUsed = Math.max(peak.heapUsed, current.heapUsed);",
+        "  };",
+        "  const timer = setInterval(sample, 5);",
+        "  let result;",
+        "  try {",
+        "    result = await refreshSummary(database, {",
+        "      dbPath, roots: snapshot.roots, timezone: 'Asia/Seoul', sourceWorkers: 4, collectCapabilities: false,",
+        "    }, undefined, sample);",
+        "  } finally { clearInterval(timer); }",
+        "  sample();",
+        "  const peakRssBytes = process.resourceUsage().maxRSS * 1024;",
+        "  const usageTable = database.connection.prepare('SELECT * FROM usage_request_daily').all();",
+        "  const ordered = usageTable.map(row => JSON.stringify(row)).sort();",
+        "  const usageSha256 = createHash('sha256').update(JSON.stringify(ordered)).digest('hex');",
+        "  const usage = database.connection.prepare(",
+        "    'SELECT provider, SUM(turn_count) AS threads, SUM(total_tokens) AS tokens FROM usage_request_daily GROUP BY provider ORDER BY provider',",
+        "  ).all();",
+        "  const { timings, parsed, failed, bodyBytes, interrupted } = result;",
+        "  console.log(JSON.stringify({ algorithm, snapshotSha256: snapshot.sha256, peakRssBytes, observedRssBytes: peak.rss,",
+        "    peakMainHeapBytes: peak.heapUsed, startMemory, parsed, failed, bodyBytes, interrupted, timings, usageSha256, usage }));",
+        "}",
+        "measure().catch(error => { process.stderr.write(String(error.code || error.name)); process.exitCode = 1; })",
+        "  .finally(() => database.close());"
+      ]
+    }
+  },
+  "runner": {
+    "arguments": [
+      "compiled output directory containing src/",
+      "private frozen input manifest",
+      "group",
+      "algorithm label"
+    ],
+    "stdin": [
+      "const { readFileSync } = require('node:fs');",
+      "const { lstat } = require('node:fs/promises');",
+      "const { createHash } = require('node:crypto');",
+      "const { cpus } = require('node:os');",
+      "const { join, resolve, relative, isAbsolute, sep } = require('node:path');",
+      "const [directory, input, group, label] = process.argv.slice(2);",
+      "const jsonl = require(join(directory, 'src/summary/jsonl'));",
+      "const { prepareSource } = require(join(directory, 'src/summary/scanner/sourcePreparation'));",
+      "const snapshot = JSON.parse(readFileSync(input, 'utf8'));",
+      "const digest = createHash('sha256');",
+      "const files = snapshot.files.flatMap((entry, index) => {",
+      "  const path = resolve(entry.path);",
+      "  const root = snapshot.roots.find(root => {",
+      "    const remainder = relative(root.path, path);",
+      "    return remainder && !isAbsolute(remainder) && remainder !== '..' && !remainder.startsWith('..' + sep);",
+      "  });",
+      "  if (!root) throw new Error('Input outside frozen roots');",
+      "  const kind = root.provider === 'claude' ? 'claude-plain' : path.toLowerCase().endsWith('.zst') ? 'codex-zstd' : 'codex-plain';",
+      "  return group === kind ? [{ path, provider: root.provider, source_root: root.path, expectedBytes: entry.bytes, id: index + 1 }] : [];",
+      "});",
+      "async function measureFiles() {",
+      "  let bodyBytes = 0, rows = 0, failed = 0, partial = 0, prepareMs = 0;",
+      "  const errors = {};",
+      "  const read = jsonl.readJsonl;",
+      "  jsonl.readJsonl = async (...args) => {",
+      "    const result = await read(...args);",
+      "    rows += result.rows;",
+      "    return result;",
+      "  };",
+      "  const ready = await Promise.all(files.map(async ({ expectedBytes, ...entry }) => {",
+      "    const stat = await lstat(entry.path);",
+      "    if (stat.size !== expectedBytes) throw new Error('Snapshot size differs');",
+      "    return { ...entry, size_bytes: stat.size, mtime_ms: stat.mtimeMs };",
+      "  }));",
+      "  const start = process.memoryUsage();",
+      "  const peak = { heapUsed: start.heapUsed, arrayBuffers: start.arrayBuffers };",
+      "  const sample = () => {",
+      "    const memory = process.memoryUsage();",
+      "    peak.heapUsed = Math.max(peak.heapUsed, memory.heapUsed);",
+      "    peak.arrayBuffers = Math.max(peak.arrayBuffers, memory.arrayBuffers);",
+      "  };",
+      "  const timer = setInterval(sample, 5);",
+      "  try {",
+      "    const options = { cancelled: () => false, onBytes: count => { bodyBytes += count; } };",
+      "    for (const entry of ready) {",
+      "      const started = performance.now();",
+      "      const result = await prepareSource(entry, options);",
+      "      prepareMs += performance.now() - started;",
+      "      sample();",
+      "      if (!result.ok) {",
+      "        failed++;",
+      "        errors[result.error.code] = (errors[result.error.code] ?? 0) + 1;",
+      "      } else partial += Number(result.read.partialLine);",
+      "      digest.update(JSON.stringify(result));",
+      "    }",
+      "  } finally { clearInterval(timer); }",
+      "  const result = { algorithm: label, group, files: files.length, bodyBytes, rows, failed, errors, partial,",
+      "    prepareMs, peakRssBytes: process.resourceUsage().maxRSS * 1024, peakHeapUsedBytes: peak.heapUsed,",
+      "    peakArrayBufferBytes: peak.arrayBuffers, outputSha256: digest.digest('hex'),",
+      "    environment: { node: process.version, v8: process.versions.v8, platform: process.platform, arch: process.arch, cpu: cpus()[0].model },",
+      "    snapshotSha256: snapshot.sha256 };",
+      "  process.stdout.write(JSON.stringify(result) + '\\n');",
+      "}",
+      "measureFiles().catch(error => { process.stderr.write(String(error.message)); process.exitCode = 1; });"
+    ]
+  }
+}

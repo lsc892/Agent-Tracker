@@ -16,8 +16,10 @@ export class RefreshController {
   constructor(private readonly transport: WorkerTransport) {}
 
   refresh(options: RefreshOptions = {}): Promise<RefreshResult> {
+    // [갱신 정책] 삭제 중이면 완료 후 다시 갱신을 요청하고 이미 진행 중인 갱신은 Promise를 공유한다.
     if (this.clearPending) return this.clearPending.then(() => this.refresh(options));
     if (!this.refreshPending) {
+      // [취소 정책] 갱신마다 취소용 공유 버퍼를 넘기고 요청이 끝나면 Promise와 버퍼를 비운다.
       this.cancellation = new Int32Array(new SharedArrayBuffer(4));
       this.refreshPending = this.transport.request<RefreshResult>('refresh', {
         ...options,
@@ -31,16 +33,19 @@ export class RefreshController {
   }
 
   cancel(): void {
+    // [취소 정책] 공유 플래그를 원자적으로 설정하고 Worker에도 취소 메시지를 보낸다.
     if (this.cancellation) Atomics.store(this.cancellation, 0, 1);
     this.transport.notify('cancel');
   }
 
   async cancelRefresh(): Promise<void> {
+    // [취소 정책] 갱신이 끝날 때까지 기다리되 갱신 실패로 후속 작업을 막지 않는다.
     this.cancel();
     await this.refreshPending?.catch(() => undefined);
   }
 
   clearData(): Promise<void> {
+    // [삭제 정책] 중복 삭제는 하나로 합치고 갱신이 끝난 뒤 Worker에 삭제를 요청한다.
     this.clearPending ??= (async () => {
       await this.cancelRefresh();
       await this.transport.request('clearData');

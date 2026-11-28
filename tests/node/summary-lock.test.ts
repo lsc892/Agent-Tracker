@@ -87,7 +87,7 @@ test('refresh locking leaves summary writes available and ignores legacy owner f
   try {
     database.connection.exec('PRAGMA busy_timeout=0');
     database.observeFile({ provider: 'claude', source_root: directory, path: join(directory, 'fixture.jsonl'), session_id: null,
-      size_bytes: 0, mtime_ms: 0, dev: null, inode: null, parser_version: 1 }, 'test');
+      size_bytes: 0, mtime_ms: 0, dev: null, inode: null, parser_version: 1 });
     assert.equal(database.diagnostics().counts.files, 1);
     assert.equal(await readFile(`${databasePath}.lock`, 'utf8'), '');
   } finally { release(); database.close(); await rm(directory, { recursive: true, force: true }); }

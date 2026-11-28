@@ -1,18 +1,24 @@
 // 통계 DB의 테이블·인덱스·버전과 기존 스키마 변환 SQL을 정의한다.
-import { SCHEMA_ROLLUP_SQL } from './rollup-state';
+import { SCHEMA_DAILY_CAPABILITY_SQL, SCHEMA_ROLLUP_SQL } from './rollup-state';
 
 export { SCHEMA_ROLLUP_SQL } from './rollup-state';
-export const SCHEMA_VERSION = 19;
+export const SCHEMA_VERSION = 32;
+export const SESSION_BILLING_COLUMN_SQL = "billing_mode TEXT CHECK(billing_mode IN ('subscription','api','unknown'))";
 
-/**
- * 책임: 파일 이동 판정에 필요한 플랫폼별 identity 인덱스를 구성한다.
- * 알고리즘: device·inode를 이동 판정에 쓰지 않는 Windows는 인덱스를 제거하고 다른 운영체제에서는 제공자·device·inode 인덱스를 생성한다.
- */
-export function manifestIdentityIndexSql(platform: NodeJS.Platform): string {
-  return platform === 'win32' ? 'DROP INDEX IF EXISTS idx_manifest_identity;'
-    : 'CREATE INDEX IF NOT EXISTS idx_manifest_identity ON manifest(provider, dev, inode);';
-}
+// [스키마 정책] 레거시 반영 이력은 턴·응답 키로 중복을 막고 턴 삭제에 맞춰 정리한다.
+export const SCHEMA_APPLIED_RESPONSES_SQL = `
+CREATE TABLE IF NOT EXISTS applied_response (
+  turn_id INTEGER NOT NULL REFERENCES turn_summary(id) ON DELETE CASCADE,
+  response_key TEXT NOT NULL,
+  input_tokens INTEGER NOT NULL,
+  output_tokens INTEGER NOT NULL,
+  cache_read INTEGER NOT NULL,
+  cache_write INTEGER NOT NULL,
+  PRIMARY KEY (turn_id, response_key)
+) WITHOUT ROWID;
+`;
 
+// [스키마 정책] 레거시 도구 사용량은 턴·분류·이름마다 양수 횟수만 저장한다.
 export const SCHEMA_CAPABILITY_SQL = `
 CREATE TABLE IF NOT EXISTS turn_capability_usage (
   turn_id INTEGER NOT NULL REFERENCES turn_summary(id) ON DELETE CASCADE,
@@ -23,6 +29,18 @@ CREATE TABLE IF NOT EXISTS turn_capability_usage (
 ) WITHOUT ROWID;
 `;
 
+// [스키마 정책] 레거시 결제 지정값은 구형 세션과 같은 복합 키로 이관한다.
+const SESSION_BILLING_SQL = `
+CREATE TABLE IF NOT EXISTS session_billing (
+  provider TEXT NOT NULL,
+  session_id TEXT NOT NULL,
+  billing_mode TEXT NOT NULL CHECK(billing_mode IN ('subscription','api','unknown')),
+  PRIMARY KEY(provider,session_id),
+  FOREIGN KEY(provider,session_id) REFERENCES sessions(provider,session_id) ON DELETE CASCADE
+) WITHOUT ROWID;
+`;
+
+// [스키마 정책] 레거시 모델별 토큰과 턴 비용에 추정값과 가격표 버전을 보존한다.
 export const SCHEMA_MODEL_SQL = `
 CREATE TABLE IF NOT EXISTS turn_model_usage (
   turn_id INTEGER NOT NULL REFERENCES turn_summary(id) ON DELETE CASCADE,
@@ -35,13 +53,7 @@ CREATE TABLE IF NOT EXISTS turn_model_usage (
   pricing_version TEXT NOT NULL,
   PRIMARY KEY(turn_id, model)
 ) WITHOUT ROWID;
-CREATE TABLE IF NOT EXISTS session_billing (
-  provider TEXT NOT NULL,
-  session_id TEXT NOT NULL,
-  billing_mode TEXT NOT NULL CHECK(billing_mode IN ('subscription','api','unknown')),
-  PRIMARY KEY(provider,session_id),
-  FOREIGN KEY(provider,session_id) REFERENCES sessions(provider,session_id) ON DELETE CASCADE
-) WITHOUT ROWID;
+${SESSION_BILLING_SQL}
 CREATE TABLE IF NOT EXISTS turn_costs (
   turn_id INTEGER PRIMARY KEY REFERENCES turn_summary(id) ON DELETE CASCADE,
   billing_mode TEXT NOT NULL CHECK(billing_mode IN ('subscription','api','unknown')),
@@ -51,7 +63,9 @@ CREATE TABLE IF NOT EXISTS turn_costs (
 );
 `;
 
-const NAMES_SQL = `
+// [스키마 정책] 표시 이름은 프로젝트 키와 제공자·세션 키로 따로 관리한다.
+function namesSql(legacy = false): string {
+  return `
 CREATE TABLE IF NOT EXISTS projects (
   project_key TEXT PRIMARY KEY,
   project_name TEXT NOT NULL
@@ -59,11 +73,13 @@ CREATE TABLE IF NOT EXISTS projects (
 CREATE TABLE IF NOT EXISTS sessions (
   provider TEXT NOT NULL CHECK(provider IN ('claude', 'codex')),
   session_id TEXT NOT NULL,
-  session_name TEXT,
+  session_name TEXT,${legacy ? '' : `\n  ${SESSION_BILLING_COLUMN_SQL},`}
   PRIMARY KEY(provider, session_id)
 ) WITHOUT ROWID;
 `;
+}
 
+// [스키마 정책] 레거시 상세 행은 세션 내 루트 요청의 유일성과 입력·출력 토큰 합계를 제약한다.
 const TURN_SUMMARY_SQL = `
 CREATE TABLE IF NOT EXISTS turn_summary (
   id INTEGER PRIMARY KEY,
@@ -83,7 +99,7 @@ CREATE TABLE IF NOT EXISTS turn_summary (
   total_tokens INTEGER NOT NULL CHECK(total_tokens = input_tokens + output_tokens),
   status TEXT NOT NULL CHECK(status IN ('completed','in_progress','failed')),
   quality_flags TEXT,
-  diagnostic_file_id INTEGER REFERENCES manifest(id) ON DELETE SET NULL,
+  diagnostic_file_id INTEGER REFERENCES source_file(id) ON DELETE SET NULL,
   diagnostic_offset INTEGER,
   last_error TEXT,
   updated_at TEXT NOT NULL,
@@ -92,28 +108,28 @@ CREATE TABLE IF NOT EXISTS turn_summary (
 );
 `;
 
+// [조회 정책] 레거시 시간순 조회에 시각 인덱스와 제공자·프로젝트별 시각 인덱스를 사용한다.
 const TURN_SUMMARY_INDEX_SQL = `
 CREATE INDEX IF NOT EXISTS idx_summary_period ON turn_summary(started_at_ms, provider);
 CREATE INDEX IF NOT EXISTS idx_summary_project_period ON turn_summary(provider, project_key, started_at_ms);
 `;
 
-export const SCHEMA_SQL = `
-CREATE TABLE IF NOT EXISTS manifest (
+function sourceSql(legacy = false): string {
+  // [스키마 정책] 원본의 제공자·경로 유일성을 유지하고 레거시와 현재 형식의 계보 열을 구분한다.
+  const legacyColumns = legacy ? '\n  size_bytes INTEGER NOT NULL DEFAULT 0 CHECK(size_bytes >= 0),' : '';
+  return `
+CREATE TABLE IF NOT EXISTS source_file (
   id INTEGER PRIMARY KEY,
   provider TEXT NOT NULL CHECK(provider IN ('claude', 'codex')),
   source_root TEXT NOT NULL,
   path TEXT NOT NULL,
-  session_id TEXT,
-  size_bytes INTEGER NOT NULL DEFAULT 0 CHECK(size_bytes >= 0),
+  session_id TEXT,${legacyColumns}
   mtime_ms REAL NOT NULL DEFAULT 0,
-  dev TEXT,
-  inode TEXT,
   parser_version INTEGER NOT NULL DEFAULT 0,
-  source_identity TEXT,
-  content_hash TEXT,
   capabilities_collected INTEGER NOT NULL DEFAULT 0 CHECK(capabilities_collected IN (0,1)),
+  ${legacy ? 'relation_meta BLOB,' : `thread_id TEXT,
+  thread_usage INTEGER NOT NULL DEFAULT 0 CHECK(thread_usage IN (0,1)),`}
   source_missing INTEGER NOT NULL DEFAULT 0 CHECK(source_missing IN (0,1)),
-  last_seen_scan_id TEXT,
   processing_status TEXT NOT NULL DEFAULT 'processing'
     CHECK(processing_status IN ('processing','done','error','interrupted')),
   processing_position TEXT,
@@ -121,45 +137,25 @@ CREATE TABLE IF NOT EXISTS manifest (
   last_error TEXT,
   UNIQUE(provider, path)
 );
-${manifestIdentityIndexSql(process.platform)}
-CREATE INDEX IF NOT EXISTS idx_manifest_root_id ON manifest(provider, source_root, id);
-CREATE INDEX IF NOT EXISTS idx_manifest_session ON manifest(provider, session_id, id);
-CREATE INDEX IF NOT EXISTS idx_manifest_source ON manifest(provider, source_identity, id);
-${NAMES_SQL}
+`;
+}
+
+// [스키마 정책] 현재 형식은 원본·이름·결제 설정과 일별 집계 테이블로 구성한다.
+export const DAILY_SCHEMA_SQL = `
+${sourceSql()}
+${namesSql()}
+${SCHEMA_ROLLUP_SQL}
+${SCHEMA_DAILY_CAPABILITY_SQL}
+`;
+
+/** Legacy DDL used to describe the on-disk format before daily-only storage. */
+export const SCHEMA_SQL = `
+${sourceSql(true)}
+${namesSql(true)}
 ${TURN_SUMMARY_SQL}
 ${TURN_SUMMARY_INDEX_SQL}
 ${SCHEMA_MODEL_SQL}
 ${SCHEMA_CAPABILITY_SQL}
 ${SCHEMA_ROLLUP_SQL}
-`;
-
-/** Both v1 and v2 stored project names on every turn. Preserve ids, statistics and diagnostics. */
-export const SCHEMA_LEGACY_MIGRATION_SQL = `
-${NAMES_SQL}
-INSERT INTO projects SELECT project_key, MIN(project_name) FROM turn_summary GROUP BY project_key;
-INSERT INTO sessions SELECT DISTINCT provider, session_id, NULL FROM turn_summary;
-ALTER TABLE turn_summary RENAME TO turn_summary_legacy;
-${TURN_SUMMARY_SQL}
-INSERT INTO turn_summary (id, provider, project_key, session_id, root_turn_id,
-  started_at_ms, completed_at_ms, duration_ms, duration_quality,
-  input_tokens, output_tokens, total_tokens, status, quality_flags,
-  diagnostic_file_id, diagnostic_offset, last_error, updated_at)
-SELECT id, provider, project_key, session_id, root_turn_id,
-  started_at_ms, completed_at_ms, duration_ms, duration_quality,
-  input_tokens, output_tokens, total_tokens, status, quality_flags,
-  diagnostic_file_id, diagnostic_offset, last_error, updated_at FROM turn_summary_legacy;
-DROP TABLE turn_summary_legacy;
-${TURN_SUMMARY_INDEX_SQL}
-`;
-
-/** Keep totals available until the next scan reconstructs previously discarded cache components. */
-export const SCHEMA_CACHE_MIGRATION_SQL = `
-ALTER TABLE turn_summary ADD COLUMN cache_write_input_tokens INTEGER CHECK(cache_write_input_tokens >= 0);
-ALTER TABLE turn_summary ADD COLUMN cache_read_input_tokens INTEGER CHECK(cache_read_input_tokens >= 0);
-`;
-
-/** Drop only the unused ordinal; keep request ids and all referencing rows intact. */
-export const SCHEMA_TURN_INDEX_MIGRATION_SQL = `
-DROP INDEX IF EXISTS idx_summary_session;
-ALTER TABLE turn_summary DROP COLUMN turn_index;
+${SCHEMA_APPLIED_RESPONSES_SQL}
 `;
