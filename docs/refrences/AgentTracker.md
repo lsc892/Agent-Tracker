@@ -478,7 +478,7 @@ tokens       = payload.usage
 검산         = turn 마지막 Σ usage == 마지막 turn_token_usage
 ```
 
-`turn_token_usage`와 `thread_token_usage`를 response마다 합산하면 누계를 반복해서 더하게 되므로 금지한다.
+`turn_token_usage`와 `thread_token_usage`를 response마다 합산하면 누계를 반복해서 더하게 되므로 금지한다. 스레드 파서는 공통 토큰 검사를 통과한 보조 누계만 검산에 사용한다.
 
 turn 시간은 현재 `task_complete.duration_ms`를 최우선으로 사용한다. `task_started`와 `task_complete`에는 `turn_id`가 있고, `task_started`에는 `root_turn_id`도 존재한다.
 
@@ -776,7 +776,7 @@ schema v5는 기존 요청·source_file·이름을 보존하며 다음 table을 
 
 Claude는 `message.model`, Codex는 usage record의 model 또는 해당 turn_context의 model을 사용한다. Claude의 0토큰 오류 안내(`isApiErrorMessage` 또는 `<synthetic>`)는 usage 후보에서 제외하고 요청 상태는 계속 처리한다. `<synthetic>`에 예상 밖의 양수 토큰이 있으면 모델 식별자만 미상으로 두고 토큰은 보존한다. response 중복 제거 후 main/subagent의 모델별 토큰을 합산하므로 모델별 합계는 요청·제공자 총량과 같다. 모델 정보가 없는 0토큰 snapshot은 모델별 행·횟수를 만들지 않으며 실제 모델명이 있는 0토큰 응답은 유지한다. 모델을 확인할 수 없는 양수 토큰은 별도 모델 미상 그룹으로 남기고 과거 모델을 추정하지 않는다. parser version 13은 다음 통계 갱신에서 변경 없는 원본도 한 번 재파싱해 이전 오류 안내 집계를 교체한다.
 
-원본의 명시적 `billing_mode`·`auth_mode`만 결제 방식 근거로 사용하고, 현재 로그인 방식으로 과거 기록을 분류하지 않는다. 명시적 근거가 없거나 한 요청에서 서로 다른 방식이 섞이면 미확인으로 남긴다. 사용자는 통계 창에서 세션 전체의 결제 유형을 지정할 수 있다. v31은 이 값을 `sessions.billing_mode`에 보관하며, NULL은 미지정이고 `unknown`을 포함한 명시값은 원본 정보보다 우선한다. 변경은 기존 창 간 refresh lock을 사용한 Worker 트랜잭션에서 세션 행에 반영한다.
+원본의 명시적 `billing_mode`·`auth_mode`만 결제 방식 근거로 사용하고, 현재 로그인 방식으로 과거 기록을 분류하지 않는다. 명시적 근거가 없거나 한 요청에서 서로 다른 방식이 섞이면 미확인으로 남긴다. 통계 창의 ‘선택한 세션의 결제 방식’은 ‘전체’를 기본으로 표시한다. ‘전체’를 선택하면 지정값을 해제하고 원본에 기록된 방식으로 비용을 집계한다. ‘구독’, ‘충전 API’, ‘미확인’을 지정하면 세션 전체에 그 값을 적용한다. v31은 이 값을 `sessions.billing_mode`에 보관하며, NULL은 미지정이고 `unknown`을 포함한 명시값은 원본 정보보다 우선한다. 변경은 기존 창 간 refresh lock을 사용한 Worker에서 세션 행에 반영한다.
 
 요금은 로컬 대화 기록의 모델·토큰을 [Anthropic 표준 단가](https://platform.claude.com/docs/en/about-claude/pricing)와 [OpenAI 표준 단가](https://developers.openai.com/api/docs/pricing)로 계산한 추정 USD 비용이다. 단가 버전은 `2026-10-07-standard-text`다. Input에서 cache write/read를 뺀 뒤 각 component를 한 번씩 계산한다. 미지원 모델·cache 구성·cache write 단가는 NULL로 남기고 확인한 비용과 미확인 건수를 함께 표시한다. 구독은 사용자의 지시에 따라 추가 사용 비용 0원이며 구독 결제액 자체를 합산하지 않는다. 실제 청구액·충전 잔액 조회, 로컬 기록에 없는 다른 API 호출, 도구 요금·할인·빠른 처리·긴 문맥·캐시 보관 기간별 추가 요금은 포함하지 않는다.
 
@@ -966,7 +966,7 @@ SQLite 자체보다 주의할 부분은 VS Code extension 배포 방식이다.
 
 SQLite 사용 자체가 고정 메모리를 보장하지 않는다. worker의 discovery 목록·중복 검증 작업량·DB page cache도 측정하고, corpus 전체를 host에 반환하지 않도록 batch/page 경계를 지킨다.
 
-JSONL reader는 64 KiB 이하 단위로 파일을 읽는다. 고정 필드의 완성 줄은 `Buffer`에서 바로 문법을 검사한다. 정해진 접두사의 Codex `response_item`은 시각만 디코딩한다. 그 외의 완성 줄과 `JsonlLine`을 거친 경계·이미지 줄은 고정 필드 선택기가 후보 필드명과 LF까지 모은 축소 행을 디코딩한다. 진단 reader는 필터를 통과한 줄을 조립한 뒤 파싱한다. 이미지 제거와 보관 바이트 한도는 `JsonlLine`이 적용하며, 원본 byte offset은 필터링 전 줄의 길이로 계산한다.
+JSONL reader는 64 KiB 이하 단위로 파일을 읽는다. 고정 필드 검증기는 `Buffer`에서 문법을 검사하고 잘못된 줄은 LF에서 원본 바이트 위치와 함께 진단한다. 정해진 네 필드로 끝나는 Codex `response_item`은 시각만 디코딩한다. 그 외의 완성 줄과 `JsonlLine`을 거친 경계·이미지 줄은 일반 고정 필드 선택 경로에서 축소 행을 디코딩한다. 진단 reader는 필터를 통과한 줄을 조립한 뒤 파싱한다. 이미지 제거와 보관 바이트 한도는 `JsonlLine`이 적용하며, 원본 byte offset은 필터링 전 줄의 길이로 계산한다.
 
 일반 JSONL의 원본 바이트 N에 대한 파싱 시간은 O(N)이다. 압축 입력은 원본을 읽고 해제한 JSONL을 같은 파서로 처리한다. 읽기 청크 C, 가장 큰 선택 행 S, 최대 중첩 깊이 D에 대한 고정 필드 reader의 보조 공간은 O(C + S + D)다. 진단 reader는 청크와 보관한 전체 행의 크기에 비례한다. 행 객체·adapter·DB 상태와 Zstd 디코더 공간은 별도다. 파서 버전 25는 원본 토큰 집계 규칙도 변경하므로 기존 정상 파일을 다음 갱신에서 다시 읽는다. [행별 디코딩 제품 A/B](../benchmarks/success/2026-11-21/JsonlLineProductAB-2026-11-21.md) · [스레드 토큰 정합성 A/B](../benchmarks/success/2026-11-24/ResponseThreadAccountingAB-2026-11-24.md)
 

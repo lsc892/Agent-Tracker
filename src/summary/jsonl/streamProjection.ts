@@ -39,7 +39,6 @@ function keyLimit(shape: FixedJsonShape): number {
   return limit;
 }
 
-function invalidJson(): never { throw new SyntaxError('Invalid JSON'); }
 const isDigit = (byte: number): boolean => byte >= Byte.Zero && byte <= Byte.Nine;
 const isHex = (byte: number): boolean => isDigit(byte) || (byte | 32) >= Byte.A && (byte | 32) <= Byte.F;
 
@@ -159,18 +158,12 @@ export class StreamingFixedProjection {
   }
 
   append(chunk: Buffer, start: number, end: number): void {
-    if (this.invalid) return;
-    try {
-      let index = start;
-      while (index < end) {
-        if (this.string) index = this.readString(chunk, index, end, this.string);
-        else if (this.number !== undefined || this.literal) index = this.readScalar(chunk, index, end);
-        else this.readStructure(chunk[index++]);
-      }
-    } catch (error) {
-      if (!(error instanceof SyntaxError)) throw error;
-      // Record errors at LF so unfinished rows keep their original handling.
-      this.invalid = true;
+    // Leave invalid rows pending until LF so incomplete rows can still be deferred.
+    let index = start;
+    while (index < end && !this.invalid) {
+      if (this.string) index = this.readString(chunk, index, end, this.string);
+      else if (this.number !== undefined || this.literal) index = this.readScalar(chunk, index, end);
+      else this.readStructure(chunk[index++]);
     }
   }
 
@@ -178,8 +171,8 @@ export class StreamingFixedProjection {
     if (!this.isComplete()) throw new SummaryError('parse-error', this.offset);
     if (this.rootByte === undefined) return undefined;
     if (this.rootByte !== Byte.OpenObject) throw new SummaryError('unsupported-schema', this.offset);
-    try { return JSON.parse(this.compact.text()) as Record<string, unknown>; }
-    catch { throw new SummaryError('parse-error', this.offset); }
+    if (!this.shape) throw new SummaryError('parse-error', this.offset);
+    return JSON.parse(this.compact.text()) as Record<string, unknown>;
   }
 
   /** Validate a complete object without decoding it into a JavaScript value. */
@@ -196,7 +189,10 @@ export class StreamingFixedProjection {
     const frame = this.containers[this.containers.length - 1];
     if (!frame) {
       if (this.readEdgeSpace(byte)) return;
-      if (this.rootByte !== undefined) invalidJson();
+      if (this.rootByte !== undefined) {
+        this.invalid = true;
+        return;
+      }
       this.rootByte = byte;
       this.startValue(byte, byte === Byte.OpenObject ? this.shape : undefined);
       return;
@@ -205,7 +201,7 @@ export class StreamingFixedProjection {
     if (frame.position === 'after') {
       if (byte === frame.end) this.endContainer(frame);
       else if (byte === Byte.Comma) frame.position = frame.end === Byte.CloseObject ? 'key' : 'value';
-      else invalidJson();
+      else this.invalid = true;
       return;
     }
     if (frame.position === 'first' && byte === frame.end) {
@@ -213,12 +209,15 @@ export class StreamingFixedProjection {
       return;
     }
     if (frame.position === 'colon') {
-      if (byte !== Byte.Colon) invalidJson();
-      frame.position = 'value';
+      if (byte === Byte.Colon) frame.position = 'value';
+      else this.invalid = true;
       return;
     }
     if (frame.end === Byte.CloseObject && frame.position !== 'value') {
-      if (byte !== Byte.Quote) invalidJson();
+      if (byte !== Byte.Quote) {
+        this.invalid = true;
+        return;
+      }
       frame.nonempty = true;
       frame.position = 'colon';
       frame.member = undefined;
@@ -247,7 +246,7 @@ export class StreamingFixedProjection {
         || prefix === 0xe281 && byte === 0x9f
         || prefix === 0xe380 && byte === 0x80
         || prefix === 0xefbb && byte === 0xbf;
-      if (!space) invalidJson();
+      if (!space) this.invalid = true;
     }
     return true;
   }
@@ -278,7 +277,13 @@ export class StreamingFixedProjection {
     if (byte === Byte.N) this.literal = 'ull';
     else if (byte === Byte.T) this.literal = 'rue';
     else if (byte === Byte.F) this.literal = 'alse';
-    else this.number = nextNumber(NumberState.Start, byte) ?? invalidJson();
+    else {
+      this.number = nextNumber(NumberState.Start, byte);
+      if (this.number === undefined) {
+        this.invalid = true;
+        return;
+      }
+    }
     if (shape) this.compact.appendByte(byte);
   }
 
@@ -302,7 +307,10 @@ export class StreamingFixedProjection {
       while (index < end) {
         const next = nextNumber(state, bytes[index]);
         if (next === undefined) {
-          if (!endsNumber(state)) invalidJson();
+          if (!endsNumber(state)) {
+            this.invalid = true;
+            return index;
+          }
           this.number = undefined;
           break;
         }
@@ -313,7 +321,10 @@ export class StreamingFixedProjection {
     } else {
       let consumed = 0;
       while (index < end && consumed < this.literal.length) {
-        if (bytes[index++] !== this.literal.charCodeAt(consumed++)) invalidJson();
+        if (bytes[index++] !== this.literal.charCodeAt(consumed++)) {
+          this.invalid = true;
+          return index;
+        }
       }
       this.literal = this.literal.slice(consumed);
     }
@@ -338,13 +349,19 @@ export class StreamingFixedProjection {
       if (index === end) break;
       const byte = bytes[index++];
       if (token.escape > 0) {
-        if (!isHex(byte)) invalidJson();
+        if (!isHex(byte)) {
+          this.invalid = true;
+          return index;
+        }
         token.escape--;
       } else if (token.escape === -1) {
         if (byte === Byte.U) token.escape = 4;
         else if (byte === Byte.Quote || byte === Byte.Backslash || byte === Byte.Slash || byte === Byte.B
           || byte === Byte.F || byte === Byte.N || byte === Byte.R || byte === Byte.T) token.escape = 0;
-        else invalidJson();
+        else {
+          this.invalid = true;
+          return index;
+        }
       } else if (byte === Byte.Quote) {
         if (token.target === 'output') this.compact.append(bytes, start, index);
         else if (token.target === 'key') this.endKey(token, bytes, start, index - 1);
@@ -353,7 +370,8 @@ export class StreamingFixedProjection {
       } else if (byte === Byte.Backslash) {
         token.escape = -1;
       } else {
-        invalidJson();
+        this.invalid = true;
+        return index;
       }
     }
     if (token.target === 'output') this.compact.append(bytes, start, index);

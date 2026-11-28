@@ -27,7 +27,7 @@ function queryUsage(query: UsageQuery, db: SummaryDatabase): UsageResult {
 
   // [DTO 정책] 조회 페이지에서 차트를 만들고 비용을 보는 특정 세션에만 결제 유형을 붙인다.
   const chart = query.chartMetric ? usageChartFromPage(rows, total, groupBy, query.chartMetric, by, query.excludeEmptyUsage) : undefined;
-  const billing = query.includeCosts && query.provider && query.sessionId ? db.sessionBilling(query.provider,query.sessionId) : undefined;
+  const billing = query.includeCosts && query.provider && query.sessionId ? db.sessionBillingOverride(query.provider,query.sessionId) : undefined;
   return {rows,total,by,chart,billing,coverage:db.diagnosticCounts(query.providers)};
 }
 
@@ -85,7 +85,7 @@ async function run(message: WorkerMessage): Promise<void> {
       }
       case 'query': result = queryUsage((message.payload ?? {}) as UsageQuery, database); break;
       case 'setBilling': {
-        const {provider,sessionId,mode} = message.payload as {provider:Provider;sessionId:string;mode:BillingMode};
+        const {provider,sessionId,mode} = message.payload as {provider:Provider;sessionId:string;mode:BillingMode | null};
         // [잠금 정책] 다른 창의 스캔과 겹치지 않도록 같은 잠금을 얻은 뒤 결제 유형을 갱신한다.
         const release = await acquireRefreshLock(options.dbPath,AbortSignal.timeout(30_000));
         try { database.setSessionBilling(provider,sessionId,mode); } finally { release(); }

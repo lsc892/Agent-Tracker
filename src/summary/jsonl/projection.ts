@@ -30,6 +30,16 @@ export function projectJson(text: string, shape: JsonShape): unknown {
   return new JsonProjection(text).parse(shape);
 }
 
+/** Read an optional object embedded in a log string. */
+export function projectJsonObject(text: string, shape: JsonShape): Record<string, unknown> | undefined {
+  if (!/^[\t\n\r ]*\{[\t\n\r ]*["}]/.test(text)) return undefined;
+  try { return projectJson(text, shape) as Record<string, unknown>; }
+  catch (error) {
+    if (error instanceof SyntaxError) return undefined;
+    throw error;
+  }
+}
+
 function field<T>(fields: Readonly<Record<string, T>> | undefined, name: string): T | undefined {
   return fields && Object.hasOwn(fields, name) ? fields[name] : undefined;
 }

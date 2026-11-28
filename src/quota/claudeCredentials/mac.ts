@@ -12,12 +12,7 @@ export class MacClaudeCredentials implements ClaudeCredentialSource {
   }
 
   async getAccessToken(_refresh: boolean, signal: AbortSignal): Promise<string> {
-    // [인증 정책] 조회할 때마다 원본을 읽고 검증 뒤에는 로컬의 원문 참조를 지운다.
-    let serialized: string | undefined;
-    try {
-      serialized = await this.readCredentialText(signal);
-      return parseClaudeAccessToken(serialized);
-    } finally { serialized = undefined; }
+    return parseClaudeAccessToken(await this.readCredentialText(signal));
   }
 
   /** 파일을 읽었으면 검증 단계로 넘기고 기본 경로의 읽기 실패에만 Keychain을 사용한다. */

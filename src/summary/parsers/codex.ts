@@ -1,6 +1,6 @@
 // 현재·이전 Codex 로그의 식별 정보·요청·사용량·도구 호출을 공통 이벤트로 변환한다.
 import { SummaryError } from '../jsonl';
-import { projectJson } from '../jsonl/projection';
+import { projectJsonObject } from '../jsonl/projection';
 import type { CheckEvent, FileContext, ParsedIdentity, ParseSink, TokenVector, UsageEvent } from '../types';
 import { billingMode, codexTokens, displayName, number, object, project, requestTitle, string, timestamp, tokenFlags } from './common';
 import { readToolCapabilities } from './capabilities';
@@ -238,12 +238,9 @@ export class CodexCurrentParserAdapter {
     if (!root) return;
     this.spawnRequests.delete(callId);
     // [파싱 정책] 반환 문자열은 자식 식별자 필드만 읽고 해석할 수 없는 결과는 건너뛴다.
-    let output: Record<string, unknown>;
-    try {
-      const value = payload.output;
-      output = object(typeof value === 'string' ? projectJson(value, spawnOutput) : value);
-    }
-    catch { return; }
+    const value = payload.output;
+    const output = typeof value === 'string' ? projectJsonObject(value, spawnOutput) : object(value);
+    if (!output) return;
     const agent = string(output.agent_id), task = string(output.task_name);
     if (agent) this.sink.child?.(agent, root);
     if (task && task !== agent) this.sink.child?.(task, root);
