@@ -37,10 +37,7 @@ function queryCapabilities(query: UsageQuery, db: SummaryDatabase): UsageResult 
     return {rows:[],total:0,capabilitiesEnabled:false,coverage:db.diagnosticCounts(query.providers)};
   }
 
-  // [조회 정책] 분류별 오프셋과 조회 한도를 적용하고 분류별 한도가 없으면 공통 한도를 쓴다.
-  const capabilities = Object.fromEntries((['skill','subagent','plugin','model'] as const)
-    .map(category=>[category,db.queryCapabilities(query,category,query.capabilityOffsets?.[category],query.capabilityLimits?.[category] ?? query.limit)])) as
-    NonNullable<UsageResult['capabilities']>;
+  const capabilities = db.queryCapabilityPages(query);
   return {rows:[],total:0,capabilities,capabilitiesEnabled:true,coverage:db.diagnosticCounts(query.providers)};
 }
 port.on('message',(message: WorkerMessage) => {

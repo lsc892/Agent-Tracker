@@ -44,7 +44,7 @@ LIMIT ? OFFSET ?
 | 화면 요청 | 읽는 데이터 |
 | --- | --- |
 | 프로젝트·세션 이름 선택 | `usage_request_daily`에서 사용량이 있는 키를 고르고 `projects`·`sessions`에서 이름을 읽는다. 날짜나 통계 표 페이지와 독립적으로 페이지를 만든다. [이름 쿼리](../../src/summary/db/queries/rollup/names.ts) |
-| 도구 사용량 | `usage_capability_daily`의 분류별 횟수·전체 합계·최댓값을 읽는다. [도구 쿼리](../../src/summary/db/queries/rollup/capabilities.ts) |
+| 도구 사용량 | `usage_capability_daily`의 공통 필터 범위를 한 번 읽고 분류·제공자·이름으로 그룹화한다. 분류별 순위와 페이지를 정하고 빈 페이지에도 전체 개수·횟수 합계·최댓값을 반환한다. [도구 쿼리](../../src/summary/db/queries/rollup/capabilities.ts) |
 | 파일 진단 | `source_file`에서 상태와 오류를 읽고, 실패·중단 세션의 기존 집계 건수는 `usage_request_daily`에서 합산한다. [진단 쿼리](../../src/summary/db/queries/rollup/diagnostics.ts) |
 
 저장 행의 키와 버전별 이관은 [SQLite 테이블](SQLiteTables.md)에 있다. [이전 상세 조회 SQL](../../src/summary/db/queries/raw/README.md)은 이전 스키마 이관과 검증에 사용한다.

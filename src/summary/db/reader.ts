@@ -1,12 +1,12 @@
 // 필터와 페이지 조건에 맞는 통계·이름·도구 사용량·진단을 조회한다.
-import type { NameQuery, NameResult } from '../types';
+import type { NameQuery, NameResult, UsageQuery } from '../types';
 import type {
   CapabilityCategory, CapabilityPage, CapabilityRow, ChartMetric, DiagnosticsPage,
   KeysetPage, SourceFileRow, OffsetPage, Provider, SummaryFilter, UsagePage, UsageGrouping, UsageRow, UsageSort,
 } from './types';
 import type { SqliteSession } from './connection';
 import type { QuerySql, UsageBasis } from './queries/common/types';
-import { buildCapabilityQueries } from './queries/rollup/capabilities';
+import { buildCapabilityPagesQuery, buildCapabilityQueries, CAPABILITY_CATEGORIES } from './queries/rollup/capabilities';
 import { buildDiagnosticCountsQuery, buildDiagnosticQueries } from './queries/rollup/diagnostics';
 import { buildNameQueries } from './queries/rollup/names';
 import { buildRollupUsageQueries } from './queries/rollup/usage';
@@ -76,6 +76,29 @@ export class SummaryReader {
     return { ...counts, rows: rows.map(({ _total, _totalUses, _maxUses, ...row }) => ({
       ...row, percentage: counts.totalUses ? row.usage_count / counts.totalUses * 100 : 0,
     })) };
+  }
+
+  queryCapabilityPages(query: UsageQuery): Record<CapabilityCategory, CapabilityPage> {
+    const pages = CAPABILITY_CATEGORIES.map(category => [category,
+      nonnegative(query.capabilityOffsets?.[category] ?? 0, 'offset'),
+      pageLimit(query.capabilityLimits?.[category] ?? query.limit),
+    ] as const);
+    const { sql, values } = buildCapabilityPagesQuery(query, pages, this.database.rollups.dailyTimezone());
+    const rows = this.database.connection.prepare(sql).all(...values) as unknown as
+      (Omit<CapabilityRow, 'percentage'> & { _total: number; _totalUses: number; _maxUses: number; in_page: number })[];
+    const result = Object.fromEntries(CAPABILITY_CATEGORIES.map((category): [CapabilityCategory, CapabilityPage] => [category,
+      { rows: [], total: 0, totalUses: 0, maxUses: 0 },
+    ])) as Record<CapabilityCategory, CapabilityPage>;
+
+    // 페이지 끝을 넘은 분류는 전체 통계만 있는 행을 받는다.
+    for (const { _total, _totalUses, _maxUses, in_page, ...row } of rows) {
+      const page = result[row.category];
+      page.total = _total;
+      page.totalUses = _totalUses;
+      page.maxUses = _maxUses;
+      if (in_page) page.rows.push({ ...row, percentage: _totalUses ? row.usage_count / _totalUses * 100 : 0 });
+    }
+    return result;
   }
 
   queryUsageCount(filter: SummaryFilter = {}, groupBy: UsageGrouping = 'total', timezone = 'UTC', by: UsageBasis = 'provider'): number {

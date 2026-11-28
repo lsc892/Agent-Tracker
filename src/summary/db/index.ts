@@ -1,6 +1,6 @@
 // 통계 DB의 파일 관리·세션 저장·결제·조회 기능을 공통 API로 묶는다.
 import type { DatabaseSync } from 'node:sqlite';
-import type { NameQuery, NameResult } from '../types';
+import type { NameQuery, NameResult, UsageQuery } from '../types';
 import type {
   BillingMode, CapabilityCategory, CapabilityPage, ChartMetric, DiagnosticsPage, FileMetadata,
   KeysetPage, SourceFileRow, OffsetPage, ProcessingStatus, Provider, SummaryFilter,
@@ -124,6 +124,10 @@ export class SummaryDatabase {
 
   queryCapabilities(filter: SummaryFilter, category: CapabilityCategory, offset = 0, limit = 100): CapabilityPage {
     return this.reader.queryCapabilities(filter, category, offset, limit);
+  }
+
+  queryCapabilityPages(query: UsageQuery): Record<CapabilityCategory, CapabilityPage> {
+    return this.reader.queryCapabilityPages(query);
   }
 
   queryUsageCount(filter: SummaryFilter = {}, groupBy: UsageGrouping = 'total', timezone = 'UTC', by: 'provider' | 'model' = 'provider'): number {
