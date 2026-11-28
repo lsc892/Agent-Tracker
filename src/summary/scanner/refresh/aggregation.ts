@@ -26,7 +26,7 @@ export function collectWinners(context: RefreshContext, names: ReadonlyMap<strin
     if (state.affected.has(sessionKey(file.provider, file.session_id))) aggregation.addSource(file.id, file.prepared.winners);
     (file as FileState).prepared = undefined;
   }
-  return aggregation.finish(check);
+  return aggregation.finish(check, true);
 }
 
 /** 선택한 루트의 파일을 앞에 두고, 그 안에서는 변경 파일을 우선한 뒤 파일 ID 오름차순으로 정렬한다. */

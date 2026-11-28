@@ -143,7 +143,8 @@ function timing(root: Root): { status: TurnSummaryInput['status']; completedAt: 
   return { status, completedAt, duration: null, quality: 'missing' };
 }
 
-export function materialize(roots: Iterable<Root>, sessions: Map<string, SourcePlan[]>, collectCapabilities: boolean): MemoryAggregateResult {
+export function materialize(roots: Iterable<Root>, sessions: Map<string, SourcePlan[]>, collectCapabilities: boolean,
+  mainTurnsOnly = false): MemoryAggregateResult {
   const result: MemoryAggregateResult = { summaries: [], orphans: [] };
   // [DTO 정책] 세션별 메인 원본·이름·진단을 한 번 색인해 각 요청에 재사용한다.
   const details = new Map<string, { main?: StreamingAggregateFile; name: string | null;
@@ -165,9 +166,13 @@ export function materialize(roots: Iterable<Root>, sessions: Map<string, SourceP
     details.set(id, session);
   }
 
-  // [DTO 정책] 중단된 요청을 제외하고 프로젝트 정보는 세션의 메인 원본을 우선한다.
+  // [DTO 정책] 중단된 요청은 제외하고 메인 턴이 없는 요청은 원본 위치를 남긴다.
   for (const root of roots) {
     if (root.outcome?.event.status === 'aborted') continue;
+    if (!root.hasMain) {
+      result.orphans.push({ fileId: root.firstFile.id, offset: root.offset, provider: root.provider, session_id: root.session, rootId: root.rootId });
+      if (mainTurnsOnly) continue;
+    }
     const session = details.get(key(root.provider, root.session))!;
     const main = session.main ?? root.firstFile;
 
@@ -188,14 +193,11 @@ export function materialize(roots: Iterable<Root>, sessions: Map<string, SourceP
     for (const { usage } of root.models.values())
       if (usage.model !== '' || usage.input_tokens + usage.output_tokens > 0) modelUsage.push(usage);
 
-    // [진단 정책] 소요 시간의 누락·근사를 표시하고 메인 턴을 찾지 못한 요청은 원본 위치와 함께 남긴다.
+    // [진단 정책] 소요 시간의 근거와 메인 턴의 존재 여부를 표시한다.
     const { status, completedAt, duration, quality } = timing(root);
     if (quality === 'missing') flags.add('duration-missing');
     if (quality === 'approximate') flags.add('duration-approximate');
-    if (!root.hasMain) {
-      flags.add('missing-root-turn');
-      result.orphans.push({ fileId: root.firstFile.id, offset: root.offset, provider: root.provider, session_id: root.session, rootId: root.rootId });
-    }
+    if (!root.hasMain) flags.add('missing-root-turn');
 
     // [DTO 정책] 요청 정보와 정렬된 모델·도구 합계를 묶고 결제 유형이 하나일 때만 확정한다.
     result.summaries.push({ provider: root.provider, project_key: main.identity.projectKey, project_name: main.identity.projectName,

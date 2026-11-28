@@ -100,7 +100,7 @@ async function scanUnderLock(context: RefreshContext, publish: PublishProgress, 
   check();
 
   // 사용량을 집계한 뒤 메인 대화 근거가 있는 요약만 저장 대상으로 삼는다.
-  const summaries = scan.measure('aggregate', () => collectWinners(context, names).summaries.filter(row => row.hasMain));
+  const summaries = scan.measure('aggregate', () => collectWinners(context, names).summaries);
 
   // [저장 정책] 연결된 세션을 확정하고 남은 원본 상태와 이름을 저장한다.
   publish('committing');

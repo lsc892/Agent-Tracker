@@ -240,7 +240,7 @@ export class StreamingAggregation {
     return root;
   }
 
-  finish(check?: () => void): MemoryAggregateResult {
+  finish(check?: () => void, mainTurnsOnly = false): MemoryAggregateResult {
     // [Winner 정책] 세션별로 중복을 해소하고 확정된 응답만 요청 집계에 반영한다.
     for (const [id, files] of this.sessions) {
       check?.();
@@ -267,7 +267,7 @@ export class StreamingAggregation {
     }
 
     // [DTO 정책] 요청·모델·도구 집계와 메인 원본을 찾지 못한 요청의 진단을 반환한다.
-    return materialize(this.roots, this.sessions, this.collectCapabilities);
+    return materialize(this.roots, this.sessions, this.collectCapabilities, mainTurnsOnly);
   }
 
   private applyUsage({ source, root, reference, tokens, request }: ResponseCandidate): void {
