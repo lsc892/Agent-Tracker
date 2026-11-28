@@ -7,13 +7,13 @@ import type { StageProfiler, StorageStage } from '../profiling';
 import { DAILY_FACTS_SOURCE, dailyFacts } from './dailyFacts';
 import { calendarPeriod } from './timezone';
 
-const SESSION_SET_FILTER = `(provider, session_id) IN (
-  SELECT json_extract(value, '$[0]'), json_extract(value, '$[1]') FROM json_each(?)
-)`;
+const SESSION_KEYS = `SELECT json_extract(value, '$[0]'), json_extract(value, '$[1]') FROM json_each(?)`;
+const SESSION_SET_FILTER = `(provider, session_id) IN (${SESSION_KEYS})`;
+const AFFECTED_SESSION_FILTER = `(provider, session_id) IN (SELECT provider, session_id FROM affected_sessions)`;
 const MISSING_SESSIONS = `SELECT DISTINCT f.provider, f.session_id FROM json_each(?) AS s
   CROSS JOIN source_file f ON f.provider=json_extract(s.value, '$[0]') AND f.session_id=json_extract(s.value, '$[1]')
   WHERE f.source_missing=1`;
-const REPLACE_MISSING_DAYS = `${SESSION_SET_FILTER} AND (NOT (${SESSION_SET_FILTER}) OR (provider, session_id, local_day) IN (
+const MISSING_DAY_FILTER = `(NOT (${SESSION_SET_FILTER}) OR (provider, session_id, local_day) IN (
   SELECT json_extract(value, '$[0]'), json_extract(value, '$[1]'), json_extract(value, '$[2]') FROM json_each(?)
 ))`;
 
@@ -30,15 +30,16 @@ function dailyStatements(by: keyof typeof ROLLUP_TABLES, insertStage: StorageSta
       (${fields.join(', ')}) = (${incoming.join(', ')})
     WHERE (${fields.map(field => `${table}.${field}`).join(', ')}) IS NOT (${incoming.join(', ')})`;
 
-  // [저장 정책] 보존 조건이 다른 두 삭제 문이 같은 일별 키 목록을 사용한다.
+  // [저장 정책] 바깥 삭제와 키 대조가 같은 세션 목록을 사용해 영향 세션의 PK 범위만 탐색한다.
   const incomingKeys = dailyKeySource(by);
-  const deleteAbsent = (filter: string) => `DELETE FROM ${table} WHERE (${keys}) IN (
-    SELECT ${keys} FROM ${table} WHERE ${filter}
-    EXCEPT
-    ${incomingKeys}
-  )`;
-  return { upsert, insertStage, deleteStage, remove: deleteAbsent(SESSION_SET_FILTER),
-    removeWithMissing: deleteAbsent(REPLACE_MISSING_DAYS) };
+  const deleteAbsent = (extraFilter = '') => `WITH affected_sessions(provider, session_id) AS MATERIALIZED (${SESSION_KEYS})
+    DELETE FROM ${table} WHERE ${AFFECTED_SESSION_FILTER} AND (${keys}) IN (
+      SELECT ${keys} FROM ${table} WHERE ${AFFECTED_SESSION_FILTER}${extraFilter}
+      EXCEPT
+      ${incomingKeys}
+    )`;
+  return { upsert, insertStage, deleteStage, remove: deleteAbsent(),
+    removeWithMissing: deleteAbsent(` AND ${MISSING_DAY_FILTER}`) };
 }
 
 const DAILY_STATEMENTS = {
@@ -113,7 +114,7 @@ export class UsageRollupStore {
             use.category, use.name, use.usage_count]);
         }
       }
-      const filter = missing.length ? REPLACE_MISSING_DAYS : SESSION_SET_FILTER;
+      const filter = missing.length ? `${SESSION_SET_FILTER} AND ${MISSING_DAY_FILTER}` : SESSION_SET_FILTER;
       this.database.statement(`DELETE FROM usage_capability_daily WHERE ${filter}`).run(...params);
       if (capabilities.length) this.database.statement(`INSERT INTO usage_capability_daily
         SELECT json_extract(value,'$[0]'), json_extract(value,'$[1]'), json_extract(value,'$[2]'),
