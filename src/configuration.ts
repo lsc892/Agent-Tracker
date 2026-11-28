@@ -27,21 +27,18 @@ function readDisplaySettings(display: ConfigurationValues['display']) {
  */
 function readUsageSettings(usage: ConfigurationValues['usage'], locale: string) {
   // [설정 정책] 시스템 시간대를 기본으로 두고 시스템 값이 비어 있으면 UTC를 쓴다.
-  let timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-  let timezoneWarning: string | undefined;
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
   const configuredTimezone: unknown = usage.timezone;
-  if (configuredTimezone === '' || configuredTimezone === undefined) return { ...usage, timezone, timezoneWarning };
+  const selected = typeof configuredTimezone === 'string' ? configuredTimezone.trim() : undefined;
+  if (configuredTimezone === undefined || selected === '') return { ...usage, timezone, timezoneWarning: undefined };
   // [설정 정책] 공백을 제거한 설정을 Intl로 검증하고 잘못된 값은 기본값과 번역된 경고로 처리한다.
-  try {
-    if (typeof configuredTimezone !== 'string') throw new TypeError('Invalid timezone');
-    const selected = configuredTimezone.trim();
-    if (selected) {
+  if (selected !== undefined) {
+    try {
       new Intl.DateTimeFormat('en', { timeZone: selected }).format(0);
-      timezone = selected;
-    }
-  } catch {
-    timezoneWarning = String(createTranslator(locale).t('configuration.invalidTimezone', { value0: timezone }));
+      return { ...usage, timezone: selected, timezoneWarning: undefined };
+    } catch { /* Intl rejects unsupported time zones. */ }
   }
+  const timezoneWarning = String(createTranslator(locale).t('configuration.invalidTimezone', { value0: timezone }));
   return { ...usage, timezone, timezoneWarning };
 }
 
