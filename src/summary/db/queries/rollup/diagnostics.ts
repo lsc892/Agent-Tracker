@@ -37,10 +37,12 @@ function diagnosticCounts(where: QuerySql): QuerySql {
         COALESCE(SUM(processing_status = 'done'), 0) AS done,
         COALESCE(SUM(processing_status = 'error'), 0) AS error,
         COALESCE(SUM(processing_status = 'interrupted'), 0) AS interrupted,
-        (SELECT COALESCE(SUM(d.turn_count), 0)
-          FROM (SELECT DISTINCT provider, session_id FROM source_file
-            WHERE ${where.sql} AND processing_status IN ('error', 'interrupted')) f
-          CROSS JOIN usage_request_daily d ON d.provider=f.provider AND d.session_id=f.session_id) AS stale_summaries
+        CASE WHEN COALESCE(SUM(processing_status = 'error'), 0) + COALESCE(SUM(processing_status = 'interrupted'), 0) = 0 THEN 0
+          ELSE (SELECT COALESCE(SUM(d.turn_count), 0)
+            FROM (SELECT DISTINCT provider, session_id FROM source_file
+              WHERE ${where.sql} AND processing_status IN ('error', 'interrupted')) f
+            CROSS JOIN usage_request_daily d ON d.provider=f.provider AND d.session_id=f.session_id)
+        END AS stale_summaries
       FROM source_file
       WHERE ${where.sql}`,
     values: [...where.values, ...where.values],
