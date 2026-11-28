@@ -2,6 +2,7 @@
 
 [전체 벤치마크](../../README.md)
 
+- [통계 처리와 SQLite 저장 절감 후보 A/B](SummaryReductionBranchesAB-2026-11-27.md) · [원시 표본](SummaryReductionBranchesAB-2026-11-27.json)
 - [누계 검산이 있는 턴만 합산하는 A/B](CheckedTurnTotalsAB-2026-11-27.md) · [원시 표본](CheckedTurnTotalsAB-2026-11-27.json)
 - [최종 요약 문자열 정렬의 임시 버퍼 A/B](SummaryTextOrderAB-2026-11-27.md) · [원시 표본](SummaryTextOrderAB-2026-11-27.json)
 - [작은 JSONL 파일의 일괄 읽기 A/B](SmallJsonlWholeFileAB-2026-11-27.md) · [원시 표본](SmallJsonlWholeFileAB-2026-11-27.json)
