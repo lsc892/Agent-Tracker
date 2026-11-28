@@ -118,15 +118,38 @@ Utilisez **Agent Tracker : Supprimer les données statistiques** pour effacer le
 ## Notes de version
 
 <details open>
+<summary>v0.4.0</summary>
+
+- **Affichage initial des statistiques** — Les 30 derniers jours s’appliquent par défaut et après une réinitialisation des filtres. Le premier tableau est chargé depuis SQLite après l’actualisation. En cas d’échec ou d’annulation, vous pouvez relancer l’actualisation.
+- **Statistiques des conversations terminées** — Les totaux quotidiens et mensuels sont regroupés selon la date de début de la conversation. Le nombre de conversations et la moyenne de tokens se fondent sur les conversations terminées, et la durée moyenne inclut uniquement celles dont la durée est connue.
+- **Actualisation incrémentale des journaux** — La date de modification permet de repérer les journaux nouveaux ou modifiés. Les journaux associés sont lus si nécessaire pour recalculer les sessions concernées. Un journal déplacé est lu à son nouvel emplacement et le réglage de conservation des fichiers supprimés s’applique à l’ancien chemin.
+- **Analyse JSONL et agrégation des tokens** — Seuls les champs nécessaires sont lus, les tampons des lignes longues sont réutilisés et les réponses en double sont fusionnées pendant la collecte. Pour Codex, l’historique recopié est écarté et l’utilisation vérifiée à partir des compteurs cumulés du tour ou du fil est ajoutée.
+- **Stockage quotidien dans SQLite** — Les données existantes sont migrées vers des totaux quotidiens par fournisseur, modèle et outil. L’écriture se limite aux lignes modifiées. L’onglet Skill charge ses quatre catégories en une seule requête, et les requêtes sur les coûts et le nombre de lignes répètent moins de calculs.
+- **Clics sur la carte d’utilisation** — Le comportement d’ouverture, d’épinglage et de fermeture par clic a été corrigé. Sur les installations locales compatibles de Windows et Linux, la mise à jour s’applique automatiquement après la fermeture complète de VS Code.
+
+[Comparaison des performances de la vue des statistiques et de SQLite avec v0.3.1 (en coréen)](docs/benchmarks/success/2026-11-28/MainDevDashboardAB-2026-11-28.md)
+
+</details>
+
+<details>
 <summary>v0.3.1</summary>
 
 - **Sélection rapide des périodes** — Choisissez les 7, 30 ou 90 derniers jours, tout l'historique ou des dates personnalisées. La période par défaut comprend aujourd'hui et les 6 jours précédents. Les dates personnalisées affichent les champs de début et de fin et leurs calendriers.
-- **Actualisation des statistiques plus efficace** — Lit et agrège les journaux JSONL en un seul passage et traite plusieurs fichiers en parallèle pour les ensembles volumineux. Pour les réponses en double, sélectionne l'enregistrement privilégié et ajuste les totaux uniquement de la différence entre leurs contributions.
-- **Écritures et requêtes de base de données** — Met à jour uniquement les requêtes modifiées et regroupe les écritures et agrégations quotidiennes de plusieurs sessions. Réduit les requêtes en double et partage les mêmes résultats entre tableaux, graphiques et nombre total de lignes. Calcule les moyennes d'entrée, de sortie et de cache lorsque le graphique des tokens moyens en a besoin, réduisant le travail d'agrégation pour les autres graphiques.
-- **Utilisation des sous-agents Codex** — Additionne l'utilisation des sous-agents, y compris imbriqués, à la requête parente. Relie ceux sans identifiant de requête grâce à leur historique de création et améliore la gestion des longues chaînes, des cycles et des parents manquants.
-- **Actualisation des journaux déplacés** — Vérifie l'identité et le contenu avant de relier le nouveau chemin et de supprimer l'ancien enregistrement, afin que l'utilisation ajoutée après un déplacement continue d'actualiser les statistiques. La vérification du contenu protège aussi l'utilisation enregistrée lorsque le système d'exploitation réattribue l'identifiant d'un fichier supprimé à un autre fichier.
 - **Commandes par fournisseur** — Les paramètres d'activation de Claude et Codex contrôlent le suivi de leur utilisation et leur affichage dans la barre d'état, la carte d'utilisation et les statistiques.
 - **Jauges d'utilisation et de quota restant** — Les barres et les pourcentages suivent le mode d'affichage sélectionné. Les barres d'utilisation se remplissent depuis la gauche et celles du quota restant diminuent depuis l'extrémité droite.
+- **Vérification des journaux déplacés** — Le journal est associé au nouveau chemin uniquement si son contenu correspond. Les statistiques stockées sont ainsi protégées si le système réutilise l’identifiant d’un fichier supprimé.
+- **Calcul du graphique des tokens moyens** — Les moyennes d’entrée, de sortie et de cache sont calculées uniquement pour le graphique des tokens moyens.
+- **README du paquet npm** — Le paquet d’installation inclut le README principal avec des captures d’écran et des liens vers la documentation accessibles depuis npm.
+
+</details>
+
+<details>
+<summary>v0.3.0</summary>
+
+- **Actualisation des statistiques plus efficace** — Lit et agrège les journaux JSONL en un seul passage et traite plusieurs fichiers en parallèle pour les ensembles volumineux. Pour les réponses en double, sélectionne l'enregistrement privilégié et ajuste les totaux uniquement de la différence entre leurs contributions.
+- **Écritures et requêtes de base de données** — Met à jour uniquement les requêtes modifiées et regroupe les écritures et agrégations quotidiennes de plusieurs sessions. Réduit les requêtes en double et partage les mêmes résultats entre tableaux, graphiques et nombre total de lignes.
+- **Utilisation des sous-agents Codex** — Additionne l'utilisation des sous-agents, y compris imbriqués, à la requête parente. Relie ceux sans identifiant de requête grâce à leur historique de création et améliore la gestion des longues chaînes, des cycles et des parents manquants.
+- **Actualisation des journaux déplacés** — Vérifie l'identité et le contenu avant de relier le nouveau chemin et de supprimer l'ancien enregistrement, afin que l'utilisation ajoutée après un déplacement continue d'actualiser les statistiques.
 - **Carte d'utilisation et accessibilité** — Rétablit la carte complète au survol et, avec le correctif local de workbench, permet de l'épingler ou de la fermer par un clic. Les résumés accessibles annoncent Codex en premier, avec les quotas restants hebdomadaires et sur 5 heures et les délais de réinitialisation, même en mode compact.
 - **Compatibilité des requêtes d'utilisation** — Supprime la limite arbitraire de 100 fenêtres d'utilisation dans les réponses Claude et Codex et utilise la version installée de l'extension dans les métadonnées de communication.
 - **Langue par défaut pour les langues non prises en charge** — Affiche l'anglais lorsque la langue de VS Code n'est pas prise en charge.

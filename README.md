@@ -118,15 +118,38 @@ Use **Agent Tracker: Delete Statistics Data** to clear aggregated statistics. Or
 ## Release notes
 
 <details open>
+<summary>v0.4.0</summary>
+
+- **Statistics first view** — The default and reset range now cover the last 30 days. The first table loads from SQLite after the refresh completes. If the refresh fails or is canceled, you can retry it.
+- **Completed conversation statistics** — Daily and monthly totals use the conversation start date. Counts and average tokens use completed conversations, and average duration uses completed conversations with a known duration.
+- **Incremental log refresh** — Use modification times to identify new or changed logs and read related logs when needed to rebuild affected sessions. A move is handled as a new file and a missing source, with the retention setting applied to the old path.
+- **JSONL parsing and token aggregation** — Read only the fields needed for statistics, reuse buffers for long lines, and merge duplicate responses during collection. Codex aggregation excludes copied history and adds usage verified against turn or thread totals.
+- **SQLite daily storage** — Migrate existing usage to daily provider, model, and tool totals and write only changed rows. The Skills tab loads its four categories in one query, and cost and row-count queries do less repeated work.
+- **Usage card click behavior** — Fix click-to-open, pin, and dismiss behavior. On supported local Windows and Linux installations, Agent Tracker applies the update after VS Code fully exits.
+
+[Usage statistics benchmark against v0.3.1 (Korean)](https://github.com/lsc892/Agent-Tracker/blob/main/docs/benchmarks/success/2026-11-28/MainDevDashboardAB-2026-11-28.md)
+
+</details>
+
+<details>
 <summary>v0.3.1</summary>
 
 - **Quick date ranges** — Choose the last 7, 30, or 90 days, all time, or custom dates. The default is the last 7 days including today, and custom dates provide start/end inputs and calendars.
-- **Faster statistics refresh** — Read and aggregate JSONL logs in a single pass, and process multiple files in parallel for large log sets. Duplicate responses select the preferred record and update totals only by the difference in contributions.
-- **Database writes and queries** — Update only changed requests and batch writes and daily rollups across sessions. Fewer duplicate queries are needed, and tables, charts, and total row counts share the same query results. Token-component averages are calculated when the average-token chart needs them, reducing work for other charts.
-- **Codex subagent usage** — Combine child and nested subagent usage into the parent request. Creation records link children without request identifiers, with improved handling of deep parent chains, cycles, and missing parents.
-- **Moved log updates** — Verify source identity and content before linking a log at its new path and removing the old path record, so usage added after a move continues to update statistics. Content checks also protect stored usage when the operating system reuses a deleted file's identifier for a different file.
 - **Provider controls** — The Claude and Codex enabled settings each control usage tracking and visibility in the status bar, usage card, and statistics.
 - **Usage and remaining gauges** — Bars and percentages follow the selected display mode. Usage bars fill from the left, and remaining bars shrink from the right.
+- **Moved log verification** — Require a content match to reconnect a log at a new path. This protects stored usage when the operating system reuses a deleted file's identifier.
+- **Average-token chart calculation** — Compute input, output, and cache component averages only for the average-token chart.
+- **npm package README** — Include the main README with working screenshots and documentation links in the npm installer package.
+
+</details>
+
+<details>
+<summary>v0.3.0</summary>
+
+- **Faster statistics refresh** — Read and aggregate JSONL logs in a single pass, and process multiple files in parallel for large log sets. Duplicate responses select the preferred record and update totals only by the difference in contributions.
+- **Database writes and queries** — Update only changed requests and batch writes and daily rollups across sessions. Fewer duplicate queries are needed, and tables, charts, and total row counts share the same query results.
+- **Codex subagent usage** — Combine child and nested subagent usage into the parent request. Creation records link children without request identifiers, with improved handling of deep parent chains, cycles, and missing parents.
+- **Moved log updates** — Verify source identity and content before linking a log at its new path and removing the old path record, so usage added after a move continues to update statistics.
 - **Usage card and accessibility** — Restore the full card on hover and, with the local workbench patch, pin or dismiss the same card by clicking. Accessible summaries announce weekly and 5-hour remaining usage and reset times with Codex first, even in compact mode.
 - **Usage query compatibility** — Remove the arbitrary 100-window limit from Claude and Codex responses and use the installed extension version in communication metadata.
 - **Unsupported language fallback** — Display English when the VS Code language is unsupported.

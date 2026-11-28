@@ -118,15 +118,38 @@ Usa **Agent Tracker: Eliminar datos estadísticos** para borrar los resultados a
 ## Notas de la versión
 
 <details open>
+<summary>v0.4.0</summary>
+
+- **Vista inicial de estadísticas** — El período predeterminado y el que se aplica al restablecer los filtros son ahora los últimos 30 días. La primera tabla se carga desde SQLite al terminar la actualización. Si la actualización falla o se cancela, puede volver a intentarse.
+- **Estadísticas de conversaciones completadas** — Los totales diarios y mensuales se agrupan por la fecha de inicio de la conversación. El recuento y el promedio de tokens se basan en las conversaciones completadas, y la duración media solo incluye las que tienen una duración conocida.
+- **Actualización incremental de registros** — Las fechas de modificación permiten detectar los registros nuevos o modificados. También se leen los registros relacionados que hacen falta para recalcular las sesiones afectadas. Si un registro se mueve, se recoge desde la nueva ruta y se aplica a la anterior el ajuste de conservación de archivos eliminados.
+- **Análisis de JSONL y agregación de tokens** — Se leen solo los campos necesarios, se reutilizan los búferes para líneas largas y se combinan las respuestas duplicadas durante la recopilación. En Codex se omite el historial copiado y se añade el uso verificado con los acumulados del turno o del hilo.
+- **Almacenamiento diario en SQLite** — El uso existente se migra a totales diarios por proveedor, modelo y herramienta, y solo se escriben las filas modificadas. La pestaña Skill carga sus cuatro categorías en una sola consulta, y las consultas de costes y número de filas repiten menos trabajo.
+- **Clics en la tarjeta de uso** — Se corrige el comportamiento de abrir, fijar y cerrar la tarjeta con un clic. En las instalaciones locales compatibles de Windows y Linux, la actualización se aplica automáticamente tras cerrar por completo VS Code.
+
+[Comparativa con v0.3.1 de la vista de estadísticas y SQLite (en coreano)](docs/benchmarks/success/2026-11-28/MainDevDashboardAB-2026-11-28.md)
+
+</details>
+
+<details>
 <summary>v0.3.1</summary>
 
 - **Selección rápida de períodos** — Permite elegir los últimos 7, 30 o 90 días, todo el historial o fechas personalizadas. El valor predeterminado incluye hoy y los 6 días anteriores. Las fechas personalizadas muestran los campos de inicio y fin y sus calendarios.
-- **Actualización de estadísticas más eficiente** — Lee y agrega los registros JSONL en una sola pasada y procesa varios archivos en paralelo cuando hay muchos datos. Para respuestas duplicadas, selecciona el registro preferido y ajusta los totales solo por la diferencia de sus contribuciones.
-- **Escrituras y consultas de base de datos** — Actualiza solo las solicitudes modificadas y agrupa las escrituras y agregaciones diarias de varias sesiones. Reduce las consultas duplicadas y comparte los mismos resultados entre tablas, gráficos y recuentos totales de filas. Calcula los promedios de entrada, salida y caché cuando los necesita el gráfico de tokens promedio, reduciendo el trabajo de agregación para otros gráficos.
-- **Uso de subagentes de Codex** — Suma el uso de los subagentes, incluidos los anidados, a la solicitud principal. Vincula los que no tienen identificador de solicitud mediante su historial de creación y mejora la gestión de cadenas largas, ciclos y agentes principales ausentes.
-- **Actualización de registros movidos** — Verifica la identidad y el contenido antes de vincular la nueva ruta y eliminar el registro de la anterior, de modo que el uso añadido después de mover un archivo siga actualizando las estadísticas. La comprobación del contenido también protege el uso guardado cuando el sistema operativo reutiliza el identificador de un archivo eliminado para otro archivo.
 - **Controles por proveedor** — Las opciones de activación de Claude y Codex controlan el seguimiento del uso y su visibilidad en la barra de estado, la tarjeta de uso y las estadísticas.
 - **Indicadores de uso y capacidad restante** — Las barras y los porcentajes siguen el modo de visualización seleccionado. Las barras de uso se llenan desde la izquierda y las de capacidad restante disminuyen desde el extremo derecho.
+- **Verificación de registros movidos** — El registro solo se vincula a la nueva ruta cuando coincide el contenido. Esto protege el uso guardado si el sistema operativo reutiliza el identificador de un archivo eliminado.
+- **Cálculo del gráfico de tokens promedio** — Los promedios de entrada, salida y caché se calculan solo para el gráfico de tokens promedio.
+- **README del paquete npm** — El paquete instalador incluye el README principal con capturas y enlaces a la documentación que se pueden abrir en npm.
+
+</details>
+
+<details>
+<summary>v0.3.0</summary>
+
+- **Actualización de estadísticas más eficiente** — Lee y agrega los registros JSONL en una sola pasada y procesa varios archivos en paralelo cuando hay muchos datos. Para respuestas duplicadas, selecciona el registro preferido y ajusta los totales solo por la diferencia de sus contribuciones.
+- **Escrituras y consultas de base de datos** — Actualiza solo las solicitudes modificadas y agrupa las escrituras y agregaciones diarias de varias sesiones. Reduce las consultas duplicadas y comparte los mismos resultados entre tablas, gráficos y recuentos totales de filas.
+- **Uso de subagentes de Codex** — Suma el uso de los subagentes, incluidos los anidados, a la solicitud principal. Vincula los que no tienen identificador de solicitud mediante su historial de creación y mejora la gestión de cadenas largas, ciclos y agentes principales ausentes.
+- **Actualización de registros movidos** — Verifica la identidad y el contenido antes de vincular la nueva ruta y eliminar el registro de la anterior, de modo que el uso añadido después de mover un archivo siga actualizando las estadísticas.
 - **Tarjeta de uso y accesibilidad** — Restaura la tarjeta completa al pasar el cursor y, con el parche local de workbench, permite fijarla o cerrarla con un clic. Los resúmenes accesibles anuncian primero Codex, con el uso restante semanal y de 5 horas y los tiempos de reinicio, incluso en modo compacto.
 - **Compatibilidad de las consultas de uso** — Elimina el límite arbitrario de 100 ventanas de uso en las respuestas de Claude y Codex y utiliza la versión instalada de la extensión en los metadatos de comunicación.
 - **Idioma predeterminado para idiomas no compatibles** — Muestra inglés cuando el idioma de VS Code no es compatible.
