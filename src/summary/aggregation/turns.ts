@@ -96,11 +96,11 @@ export function accountedCacheWrite(tokens: UsageContribution['tokens']): number
 }
 
 /** 확정한 후보의 토큰, 모델, 결제 정보를 요청에 합친다. */
-export function addUsage(root: Root, event: UsageContribution, collectCapabilities: boolean, direction: 1 | -1 = 1): void {
+export function addUsage(root: Root, event: UsageContribution, collectCapabilities: boolean, direction: 1 | -1 = 1,
+  cacheRead = accountedCacheRead(event.tokens), cacheWrite = accountedCacheWrite(event.tokens)): void {
   // [집계 정책] 캐시 범위를 보정한 토큰을 요청 합계에 더하거나 빼고 결제 유형별 응답 수도 갱신한다.
   const { tokens } = event;
   root.input += direction * tokens.input; root.output += direction * tokens.output;
-  const cacheRead = accountedCacheRead(tokens), cacheWrite = accountedCacheWrite(tokens);
   root.cacheRead += direction * cacheRead; root.cacheWrite += direction * cacheWrite;
   const billing = event.billingMode ?? 'unknown', billingCount = (root.billing.get(billing) ?? 0) + direction;
   if (billingCount === 0) root.billing.delete(billing); else root.billing.set(billing, billingCount);

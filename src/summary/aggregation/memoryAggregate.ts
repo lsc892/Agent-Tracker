@@ -272,10 +272,12 @@ export class StreamingAggregation {
 
   private applyUsage({ source, root, reference, tokens, request }: ResponseCandidate): void {
     const { file } = source, { model, billingMode, threadId, turnId } = reference;
-    // [집계 정책] 확정한 응답의 토큰·모델·결제 정보를 귀속된 요청에 합산한다.
-    addUsage(root, { model, billingMode, tokens }, this.collectCapabilities);
+    // [집계 정책] 확정 응답에 적용한 캐시 보정값을 턴 누계 검산에 재사용한다.
+    let cacheRead = accountedCacheRead(tokens), cacheWrite = accountedCacheWrite(tokens);
+    addUsage(root, { model, billingMode, tokens }, this.collectCapabilities, 1, cacheRead, cacheWrite);
 
     // [DTO 정책] 확정 응답의 키·귀속·토큰을 콜백에 전달한다.
+    const hasCallback = this.onApplied !== undefined;
     this.onApplied?.({ provider: file.provider, sessionId: file.session_id, rootId: root.rootId, tokens,
       responseKey: file.provider === 'claude' ? key(reference.responseId, request ?? MISSING_CLAUDE_REQUEST)
         : key(reference.responseId, threadId, turnId) });
@@ -285,7 +287,12 @@ export class StreamingAggregation {
     if (check) {
       const sum = check.sum ??= { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
       sum.input += tokens.input; sum.output += tokens.output;
-      sum.cacheRead += accountedCacheRead(tokens); sum.cacheWrite += accountedCacheWrite(tokens);
+      // 상세 콜백이 있으면 기존대로 콜백 이후의 토큰을 검산한다.
+      if (hasCallback) {
+        cacheRead = accountedCacheRead(tokens);
+        cacheWrite = accountedCacheWrite(tokens);
+      }
+      sum.cacheRead += cacheRead; sum.cacheWrite += cacheWrite;
     }
     if (file.provider === 'claude' && request === null) addFlag(source.flags, root.rootId, 'missing-request-id');
   }
