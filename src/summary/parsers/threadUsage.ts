@@ -6,7 +6,7 @@ import { SummaryError } from '../jsonl';
 import { hasJsonFields, type FixedJsonShape } from '../jsonl/projection';
 import { StreamingFixedProjection } from '../jsonl/streamProjection';
 import type { TokenVector } from '../types';
-import { claudeTokens, codexTokens, displayName, object, project, sqlText, string, timestamp } from './common';
+import { claudeTokens, codexTokens, displayName, object, optionalCodexTokens, project, sqlText, string, timestamp } from './common';
 import { packLegacySignatures, type LegacySignatures } from './legacySignatures';
 import { scoreThreadTokens, ThreadTokenBuffer, type ThreadTokens } from './threadTokens';
 
@@ -111,11 +111,8 @@ function tokenVector({ input, output, cacheRead, cacheWrite }: TokenVector): Thr
 function optionalCheckpoint(value: unknown): ThreadTokens | undefined {
   // [진단 정책] 보조 누계의 토큰 형식이 지원되지 않으면 해당 누계만 건너뛴다.
   if (value == null) return undefined;
-  try { return tokenVector(codexTokens(object(value))); }
-  catch (error) {
-    if (error instanceof SummaryError && error.code === 'unsupported-token-schema') return undefined;
-    throw error;
-  }
+  const tokens = optionalCodexTokens(object(value));
+  return tokens && tokenVector(tokens);
 }
 
 function checkpointSignature(value: TokenVector | undefined, raw: Record<string, unknown>): unknown {
@@ -183,7 +180,7 @@ export class ThreadLogParser {
     const observed = timestamp(time);
     if (observed === null) return false;
 
-    // Require exactly the four root members above. The payload must be one valid JSON object.
+    // Check only the four root members above. Extra root fields fall through to the general reader.
     while (end > next && (bytes[end - 1] === 32 || bytes[end - 1] === 9 || bytes[end - 1] === 13)) end--;
     const payloadStart = next + responseItemPrefix.length - 1;
     if (bytes[end - 1] !== 125 || bytes[end - 2] !== 125) return false;

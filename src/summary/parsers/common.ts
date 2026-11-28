@@ -80,7 +80,13 @@ export function claudeTokens(raw: Record<string, unknown>): TokenVector {
  * 알고리즘: 입력·출력 총량을 유지하고 캐시는 평면·중첩 필드에서, reasoning은 평면 필드에서 읽는다.
  */
 export function codexTokens(raw: Record<string, unknown>): TokenVector {
-  validateTokens(raw);
+  const tokens = optionalCodexTokens(raw);
+  if (!tokens) throw new SummaryError('unsupported-token-schema');
+  return tokens;
+}
+
+export function optionalCodexTokens(raw: Record<string, unknown>): TokenVector | undefined {
+  if (!hasSupportedTokens(raw)) return undefined;
   const details = object(raw.input_tokens_details);
   return { input: number(raw.input_tokens), output: number(raw.output_tokens),
     cacheRead: number(raw.cached_input_tokens ?? details.cached_tokens), cacheWrite: number(raw.cache_write_input_tokens ?? details.cache_write_tokens),
@@ -91,12 +97,16 @@ export const tokenFields = ['input_tokens', 'output_tokens', 'cache_read_input_t
   'cached_input_tokens', 'cache_write_input_tokens', 'reasoning_output_tokens'] as const;
 
 export function validateTokens(raw: Record<string, unknown>): void {
+  if (!hasSupportedTokens(raw)) throw new SummaryError('unsupported-token-schema');
+}
+
+function hasSupportedTokens(raw: Record<string, unknown>): boolean {
   // [검증 정책] 기재된 토큰은 0 이상의 안전 정수여야 하고 입력 또는 출력 중 하나는 있어야 한다.
   for (const key of tokenFields) {
     const value = raw[key];
-    if (value !== undefined && (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0)) throw new SummaryError('unsupported-token-schema');
+    if (value !== undefined && (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0)) return false;
   }
-  if (raw.input_tokens === undefined && raw.output_tokens === undefined) throw new SummaryError('unsupported-token-schema');
+  return raw.input_tokens !== undefined || raw.output_tokens !== undefined;
 }
 export function tokenFlags(tokens: TokenVector): string[] {
   return tokens.cacheRead + tokens.cacheWrite > tokens.input || tokens.reasoning > tokens.output ? ['component-clamped'] : [];

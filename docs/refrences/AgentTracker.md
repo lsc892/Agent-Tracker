@@ -478,7 +478,7 @@ tokens       = payload.usage
 검산         = turn 마지막 Σ usage == 마지막 turn_token_usage
 ```
 
-`turn_token_usage`와 `thread_token_usage`를 response마다 합산하면 누계를 반복해서 더하게 되므로 금지한다.
+`turn_token_usage`와 `thread_token_usage`를 response마다 합산하면 누계를 반복해서 더하게 되므로 금지한다. 스레드 파서는 공통 토큰 검사를 통과한 보조 누계만 검산에 사용한다.
 
 turn 시간은 현재 `task_complete.duration_ms`를 최우선으로 사용한다. `task_started`와 `task_complete`에는 `turn_id`가 있고, `task_started`에는 `root_turn_id`도 존재한다.
 
@@ -966,7 +966,7 @@ SQLite 자체보다 주의할 부분은 VS Code extension 배포 방식이다.
 
 SQLite 사용 자체가 고정 메모리를 보장하지 않는다. worker의 discovery 목록·중복 검증 작업량·DB page cache도 측정하고, corpus 전체를 host에 반환하지 않도록 batch/page 경계를 지킨다.
 
-JSONL reader는 64 KiB 이하 단위로 파일을 읽는다. 고정 필드의 완성 줄은 `Buffer`에서 바로 문법을 검사한다. 정해진 접두사의 Codex `response_item`은 시각만 디코딩한다. 그 외의 완성 줄과 `JsonlLine`을 거친 경계·이미지 줄은 고정 필드 선택기가 후보 필드명과 LF까지 모은 축소 행을 디코딩한다. 진단 reader는 필터를 통과한 줄을 조립한 뒤 파싱한다. 이미지 제거와 보관 바이트 한도는 `JsonlLine`이 적용하며, 원본 byte offset은 필터링 전 줄의 길이로 계산한다.
+JSONL reader는 64 KiB 이하 단위로 파일을 읽는다. 고정 필드 검증기는 `Buffer`에서 문법을 검사하고 잘못된 줄은 LF에서 원본 바이트 위치와 함께 진단한다. 정해진 네 필드로 끝나는 Codex `response_item`은 시각만 디코딩한다. 그 외의 완성 줄과 `JsonlLine`을 거친 경계·이미지 줄은 일반 고정 필드 선택 경로에서 축소 행을 디코딩한다. 진단 reader는 필터를 통과한 줄을 조립한 뒤 파싱한다. 이미지 제거와 보관 바이트 한도는 `JsonlLine`이 적용하며, 원본 byte offset은 필터링 전 줄의 길이로 계산한다.
 
 일반 JSONL의 원본 바이트 N에 대한 파싱 시간은 O(N)이다. 압축 입력은 원본을 읽고 해제한 JSONL을 같은 파서로 처리한다. 읽기 청크 C, 가장 큰 선택 행 S, 최대 중첩 깊이 D에 대한 고정 필드 reader의 보조 공간은 O(C + S + D)다. 진단 reader는 청크와 보관한 전체 행의 크기에 비례한다. 행 객체·adapter·DB 상태와 Zstd 디코더 공간은 별도다. 파서 버전 25는 원본 토큰 집계 규칙도 변경하므로 기존 정상 파일을 다음 갱신에서 다시 읽는다. [행별 디코딩 제품 A/B](../benchmarks/success/2026-11-21/JsonlLineProductAB-2026-11-21.md) · [스레드 토큰 정합성 A/B](../benchmarks/success/2026-11-24/ResponseThreadAccountingAB-2026-11-24.md)
 
