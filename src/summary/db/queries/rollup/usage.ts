@@ -86,7 +86,7 @@ export function buildRollupUsageQueries(
         FROM (
           SELECT ${dimensions.period} AS period
           FROM (
-            ${source.sql}
+            ${source.countSql}
           ) AS usage
           GROUP BY ${groupColumns}
         )`,

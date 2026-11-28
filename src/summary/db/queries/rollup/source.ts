@@ -10,7 +10,7 @@ const MODEL_KEY = "CASE WHEN model IS NULL THEN 'N' ELSE 'V' || model END";
 
 export function buildDailyUsageSource(
   filter: SummaryFilter, grouping: UsageGrouping, timezone: string, by: UsageBasis,
-): QuerySql {
+): QuerySql & { countSql: string } {
   // [기간 정책] 달력 조회는 별도 지정이 없으면 날짜 미상 행을 포함하도록 필터를 보정한다.
   const calendar = grouping === 'day' || grouping === 'month';
   const usageFilter = calendar && filter.unknownTime === undefined
@@ -19,11 +19,12 @@ export function buildDailyUsageSource(
   const { sql: where, values } = buildDailyUsageFilter(usageFilter, timezone);
 
   // [SQL 조회 정책] 활성 집계 열만 읽고 비용 요청에 한해 비용 상태와 세션별 결제 재분류를 읽는다.
-  const columns = [
+  const dimensions = [
     'provider', 'project_key', 'session_id', 'local_day',
     ...(by === 'model' ? ['model'] : []),
-    ...rollupStates(by).map(state => state.name),
   ];
+  const columns = [...dimensions, ...rollupStates(by).map(state => state.name)];
+  const from = `FROM ${ROLLUP_TABLES[by]} AS usage`;
   let billingJoin = '';
   if (filter.includeCosts) {
     columns.push(...DAILY_COST_STATES.map(state => state.name), 'billing.billing_mode AS billing_override');
@@ -32,8 +33,9 @@ export function buildDailyUsageSource(
   return {
     sql: `SELECT
       ${columns.join(',\n      ')}
-    FROM ${ROLLUP_TABLES[by]} AS usage${billingJoin}
+    ${from}${billingJoin}
     WHERE ${where}`,
+    countSql: `SELECT ${dimensions.join(', ')} ${from} WHERE ${where}`,
     values,
   };
 }
