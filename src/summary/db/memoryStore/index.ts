@@ -224,7 +224,8 @@ export class MemoryStore {
     const project = this.database.statement(`INSERT INTO projects VALUES(?,?) ON CONFLICT(project_key) DO UPDATE SET project_name=excluded.project_name
       WHERE project_name<>excluded.project_name`);
     for (const [key, name] of projects) project.run(key, name);
-    const session = this.database.statement(`INSERT INTO sessions VALUES(?,?,?) ON CONFLICT(provider,session_id) DO UPDATE SET session_name=excluded.session_name
+    const session = this.database.statement(`INSERT INTO sessions (provider,session_id,session_name) VALUES(?,?,?)
+      ON CONFLICT(provider,session_id) DO UPDATE SET session_name=excluded.session_name
       WHERE excluded.session_name IS NOT NULL AND session_name IS NOT excluded.session_name`);
     for (const [key, { provider, session_id, name }] of sessions) {
       session.run(provider, session_id, name);

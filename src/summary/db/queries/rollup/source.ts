@@ -25,7 +25,7 @@ export function buildDailyUsageSource(
     ...rollupStates(by).map(state => state.name),
   ];
   if (filter.includeCosts) columns.push(...DAILY_COST_STATES.map(state => state.name),
-    `(SELECT billing_mode FROM session_billing b
+    `(SELECT billing_mode FROM sessions b
       WHERE b.provider=usage.provider AND b.session_id=usage.session_id) AS billing_override`);
   return {
     sql: `SELECT

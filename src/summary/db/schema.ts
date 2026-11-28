@@ -2,7 +2,8 @@
 import { SCHEMA_DAILY_CAPABILITY_SQL, SCHEMA_ROLLUP_SQL } from './rollup-state';
 
 export { SCHEMA_ROLLUP_SQL } from './rollup-state';
-export const SCHEMA_VERSION = 30;
+export const SCHEMA_VERSION = 31;
+export const SESSION_BILLING_COLUMN_SQL = "billing_mode TEXT CHECK(billing_mode IN ('subscription','api','unknown'))";
 
 // [스키마 정책] 레거시 반영 이력은 턴·응답 키로 중복을 막고 턴 삭제에 맞춰 정리한다.
 export const SCHEMA_APPLIED_RESPONSES_SQL = `
@@ -28,7 +29,7 @@ CREATE TABLE IF NOT EXISTS turn_capability_usage (
 ) WITHOUT ROWID;
 `;
 
-// [스키마 정책] 세션의 결제 지정값을 복합 키로 연결해 세션을 지울 때 함께 제거한다.
+// [스키마 정책] 레거시 결제 지정값은 구형 세션과 같은 복합 키로 이관한다.
 const SESSION_BILLING_SQL = `
 CREATE TABLE IF NOT EXISTS session_billing (
   provider TEXT NOT NULL,
@@ -63,7 +64,8 @@ CREATE TABLE IF NOT EXISTS turn_costs (
 `;
 
 // [스키마 정책] 표시 이름은 프로젝트 키와 제공자·세션 키로 따로 관리한다.
-const NAMES_SQL = `
+function namesSql(legacy = false): string {
+  return `
 CREATE TABLE IF NOT EXISTS projects (
   project_key TEXT PRIMARY KEY,
   project_name TEXT NOT NULL
@@ -71,10 +73,11 @@ CREATE TABLE IF NOT EXISTS projects (
 CREATE TABLE IF NOT EXISTS sessions (
   provider TEXT NOT NULL CHECK(provider IN ('claude', 'codex')),
   session_id TEXT NOT NULL,
-  session_name TEXT,
+  session_name TEXT,${legacy ? '' : `\n  ${SESSION_BILLING_COLUMN_SQL},`}
   PRIMARY KEY(provider, session_id)
 ) WITHOUT ROWID;
 `;
+}
 
 // [스키마 정책] 레거시 상세 행은 세션 내 루트 요청의 유일성과 입력·출력 토큰 합계를 제약한다.
 const TURN_SUMMARY_SQL = `
@@ -140,8 +143,7 @@ CREATE TABLE IF NOT EXISTS source_file (
 // [스키마 정책] 현재 형식은 원본·이름·결제 설정과 일별 집계 테이블로 구성한다.
 export const DAILY_SCHEMA_SQL = `
 ${sourceSql()}
-${NAMES_SQL}
-${SESSION_BILLING_SQL}
+${namesSql()}
 ${SCHEMA_ROLLUP_SQL}
 ${SCHEMA_DAILY_CAPABILITY_SQL}
 `;
@@ -149,7 +151,7 @@ ${SCHEMA_DAILY_CAPABILITY_SQL}
 /** Legacy DDL used to describe the on-disk format before daily-only storage. */
 export const SCHEMA_SQL = `
 ${sourceSql(true)}
-${NAMES_SQL}
+${namesSql(true)}
 ${TURN_SUMMARY_SQL}
 ${TURN_SUMMARY_INDEX_SQL}
 ${SCHEMA_MODEL_SQL}

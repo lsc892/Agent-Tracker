@@ -9,14 +9,14 @@ export class SessionBillingStore {
     // [결제 정책] 지원하는 제공자와 결제 유형을 확인하고 제공자·세션 키마다 지정값을 하나만 저장한다.
     if (!['claude', 'codex'].includes(provider) || !sessionId || !['subscription', 'api', 'unknown'].includes(mode))
       throw new RangeError('Invalid session billing');
-    this.database.statement(`INSERT INTO session_billing VALUES (?, ?, ?)
-      ON CONFLICT(provider, session_id) DO UPDATE SET billing_mode = excluded.billing_mode`)
-      .run(provider, sessionId, mode);
+    const { changes } = this.database.statement('UPDATE sessions SET billing_mode=? WHERE provider=? AND session_id=?')
+      .run(mode, provider, sessionId);
+    if (!changes) throw new Error('FOREIGN KEY constraint failed');
   }
 
   sessionBilling(provider: Provider, sessionId: string): BillingMode {
     // [결제 정책] 세션에 직접 지정한 결제 유형을 가장 먼저 적용한다.
-    const chosen = this.database.statement('SELECT billing_mode FROM session_billing WHERE provider=? AND session_id=?')
+    const chosen = this.database.statement('SELECT billing_mode FROM sessions WHERE provider=? AND session_id=?')
       .get(provider, sessionId)?.billing_mode;
     if (chosen) return chosen as BillingMode;
 

@@ -1,7 +1,7 @@
 // 이전 상세 행을 일별 통계로 이관하고 현재 스키마를 연다.
 import type { DatabaseSync } from 'node:sqlite';
 import { deserialize } from 'node:v8';
-import { DAILY_SCHEMA_SQL, SCHEMA_VERSION, SCHEMA_MODEL_SQL } from './schema';
+import { DAILY_SCHEMA_SQL, SCHEMA_VERSION, SCHEMA_MODEL_SQL, SESSION_BILLING_COLUMN_SQL } from './schema';
 import { ROLLUP_FORMAT_VERSION, ROLLUP_TABLES } from './rollup-state';
 import { aggregateUsageSource } from './queries/rollup/source';
 import { rollupUsageTurns } from './queries/raw/source';
@@ -46,10 +46,25 @@ export function migrateSchema(connection: DatabaseSync, timezone: string, transa
       if (!columns.some(column => column.name === 'thread_usage'))
         connection.exec('ALTER TABLE source_file ADD COLUMN thread_usage INTEGER NOT NULL DEFAULT 0 CHECK(thread_usage IN (0,1))');
       if (columns.some(column => column.name === 'relation_meta')) migrateSourceRelations(connection);
+      migrateSessionBilling(connection);
     }
     // [SQL 트랜잭션 정책] 이관 작업을 모두 마친 트랜잭션 안에서 스키마 버전을 기록한다.
     connection.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
   });
+}
+
+function migrateSessionBilling(connection: DatabaseSync): void {
+  // [스키마 정책] 세션에 지정값을 옮기고 모든 행의 이관을 확인한 뒤 이전 테이블을 제거한다.
+  const columns = connection.prepare('PRAGMA table_info(sessions)').all();
+  if (!columns.some(column => column.name === 'billing_mode'))
+    connection.exec(`ALTER TABLE sessions ADD COLUMN ${SESSION_BILLING_COLUMN_SQL}`);
+  if (!connection.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='session_billing'").get()) return;
+
+  const { changes } = connection.prepare(`UPDATE sessions AS session SET billing_mode=legacy.billing_mode
+    FROM session_billing AS legacy WHERE session.provider=legacy.provider AND session.session_id=legacy.session_id`).run();
+  const count = connection.prepare('SELECT COUNT(*) AS count FROM session_billing').get()!.count;
+  if (changes !== count) throw new Error('Missing session for stored billing');
+  connection.exec('DROP TABLE session_billing');
 }
 
 /** Convert stored relationships in bounded batches before discarding the old payload. */
@@ -81,7 +96,8 @@ function migrateUsage(connection: DatabaseSync, version: number, timezone: strin
     connection.exec(DAILY_SCHEMA_SQL);
     if (version <= 2) connection.exec(`INSERT OR IGNORE INTO projects
       SELECT project_key, MIN(project_name) FROM turn_summary GROUP BY project_key;
-      INSERT OR IGNORE INTO sessions SELECT DISTINCT provider, session_id, NULL FROM turn_summary;`);
+      INSERT OR IGNORE INTO sessions (provider, session_id, session_name)
+        SELECT DISTINCT provider, session_id, NULL FROM turn_summary;`);
     migrateLegacyUsage(connection, timezone);
     saveTimezone(connection, timezone);
   }

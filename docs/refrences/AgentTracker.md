@@ -611,7 +611,7 @@ schema v4는 이전 summary의 cache component를 NULL로 유지해 미확인 �
 
 ## 8. SQLite schema
 
-DB 위치는 `ExtensionContext.globalStorageUri` 아래로 한다. 현재 표는 파일 상태의 `source_file`, 이름의 `projects`·`sessions`, 세션 결제 선택의 `session_billing`, 일별 사용량의 `usage_request_daily`·`usage_model_daily`·`usage_capability_daily`와 집계 설정의 `usage_rollup_meta`다. 아래의 상세 표 정의는 이전 DB의 형식을 설명하며, v26에서는 이관과 상세 테이블 삭제를 같은 트랜잭션에서 진행한다.
+DB 위치는 `ExtensionContext.globalStorageUri` 아래로 한다. 스키마 v31의 표는 파일 상태의 `source_file`, 프로젝트 이름의 `projects`, 세션 이름과 결제 지정값의 `sessions`, 일별 사용량의 `usage_request_daily`·`usage_model_daily`·`usage_capability_daily`, 집계 설정의 `usage_rollup_meta`다. 아래의 상세 표 정의는 이전 DB의 형식을 설명하며, v26에서는 이관과 상세 테이블 삭제를 같은 트랜잭션에서 진행한다.
 
 스키마 v27은 `source_file`의 루트·세션 보조 인덱스 두 개와 일별 사용량 표 두 개의 날짜·프로젝트 보조 인덱스 네 개를 제거한다. 새 DB는 기본 키와 고유 제약에 필요한 구조로 시작한다. 기존 DB는 파일·사용량 행을 보존하고 같은 마이그레이션 트랜잭션에서 보조 인덱스만 삭제한다. 회수한 페이지는 이후 쓰기에 재사용한다.
 
@@ -776,7 +776,7 @@ schema v5는 기존 요청·source_file·이름을 보존하며 다음 table을 
 
 Claude는 `message.model`, Codex는 usage record의 model 또는 해당 turn_context의 model을 사용한다. Claude의 0토큰 오류 안내(`isApiErrorMessage` 또는 `<synthetic>`)는 usage 후보에서 제외하고 요청 상태는 계속 처리한다. `<synthetic>`에 예상 밖의 양수 토큰이 있으면 모델 식별자만 미상으로 두고 토큰은 보존한다. response 중복 제거 후 main/subagent의 모델별 토큰을 합산하므로 모델별 합계는 요청·제공자 총량과 같다. 모델 정보가 없는 0토큰 snapshot은 모델별 행·횟수를 만들지 않으며 실제 모델명이 있는 0토큰 응답은 유지한다. 모델을 확인할 수 없는 양수 토큰은 별도 모델 미상 그룹으로 남기고 과거 모델을 추정하지 않는다. parser version 13은 다음 통계 갱신에서 변경 없는 원본도 한 번 재파싱해 이전 오류 안내 집계를 교체한다.
 
-원본의 명시적 `billing_mode`·`auth_mode`만 결제 방식 근거로 사용하고, 현재 로그인 방식으로 과거 기록을 분류하지 않는다. 명시적 근거가 없거나 한 요청에서 서로 다른 방식이 섞이면 미확인으로 남긴다. 사용자는 통계 창에서 세션을 선택한 뒤 세션 전체의 결제 방식을 지정할 수 있으며, 이 선택은 원본 metadata보다 우선한다. 변경은 기존 창 간 refresh lock을 사용한 worker DB transaction으로 비용만 갱신하며 원본을 다시 읽지 않는다.
+원본의 명시적 `billing_mode`·`auth_mode`만 결제 방식 근거로 사용하고, 현재 로그인 방식으로 과거 기록을 분류하지 않는다. 명시적 근거가 없거나 한 요청에서 서로 다른 방식이 섞이면 미확인으로 남긴다. 사용자는 통계 창에서 세션 전체의 결제 유형을 지정할 수 있다. v31은 이 값을 `sessions.billing_mode`에 보관하며, NULL은 미지정이고 `unknown`을 포함한 명시값은 원본 정보보다 우선한다. 변경은 기존 창 간 refresh lock을 사용한 Worker 트랜잭션에서 세션 행에 반영한다.
 
 요금은 로컬 대화 기록의 모델·토큰을 [Anthropic 표준 단가](https://platform.claude.com/docs/en/about-claude/pricing)와 [OpenAI 표준 단가](https://developers.openai.com/api/docs/pricing)로 계산한 추정 USD 비용이다. 단가 버전은 `2026-10-07-standard-text`다. Input에서 cache write/read를 뺀 뒤 각 component를 한 번씩 계산한다. 미지원 모델·cache 구성·cache write 단가는 NULL로 남기고 확인한 비용과 미확인 건수를 함께 표시한다. 구독은 사용자의 지시에 따라 추가 사용 비용 0원이며 구독 결제액 자체를 합산하지 않는다. 실제 청구액·충전 잔액 조회, 로컬 기록에 없는 다른 API 호출, 도구 요금·할인·빠른 처리·긴 문맥·캐시 보관 기간별 추가 요금은 포함하지 않는다.
 
