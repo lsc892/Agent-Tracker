@@ -1,13 +1,16 @@
-// 제공자별 선택적 제목 metadata를 읽어 표시 이름의 우선순위를 정한다.
+// Codex의 제목 메타데이터에서 세션 표시 이름을 고른다.
 import { lstat, readdir } from 'node:fs/promises';
 import { join, dirname, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { readJsonl } from '../jsonl';
 import { displayName, sqlText, string } from '../parsers/common';
 import type { SourceRoot } from '../types';
+
+/** 제공자와 SQLite 저장 형식으로 정규화한 세션 ID를 하나의 조회 키로 묶는다. */
 const key = (provider: string, session: string): string => JSON.stringify([provider, sqlText(session)]);
 const indexFields = { fields: { id: {}, thread_name: {} } };
-/** 제공자 제목의 우선순위를 메모리에 병합하며 통계 DB는 여기서 쓰지 않는다. */
+
+/** Codex 세션 인덱스와 상태 DB에서 표시 이름을 읽어 우선순위대로 병합한다. */
 export async function readNames(roots: readonly SourceRoot[], cancelled: () => boolean): Promise<Map<string, string>> {
   // [이름 정책] 중복 Codex 데이터 홈을 합치고 session_index 이름을 낮은 우선순위로 수집한다.
   const names = new Map<string, string>(), stateNames = new Set<string>();
@@ -25,7 +28,7 @@ export async function readNames(roots: readonly SourceRoot[], cancelled: () => b
           if (!stateNames.has(session)) names.set(session, name);
         }, { isCancelled: cancelled, fixedShape: indexFields });
     }
-    catch { /* Optional metadata does not invalidate transcript facts. */ }
+    catch { /* 세션 인덱스를 읽지 못해도 상태 DB의 이름을 확인한다. */ }
     // [이름 정책] 가장 높은 버전의 상태 DB를 읽고 name이 있으면 title보다 우선한다.
     let source: DatabaseSync | undefined;
     try {
@@ -61,7 +64,7 @@ export async function readNames(roots: readonly SourceRoot[], cancelled: () => b
         }
       }
     }
-    catch { /* Keep index/log fallback when the optional provider DB is unavailable. */ }
+    catch { /* 상태 DB를 읽지 못하면 세션 인덱스나 로그의 이름을 사용한다. */ }
     finally {
       source?.close();
     }

@@ -19,6 +19,7 @@ interface DiscoveryPaths {
 
 type Observation = Pick<FileState, 'provider' | 'source_root' | 'path' | 'size_bytes' | 'mtime_ms'>;
 
+/** 선택한 루트에서 로그를 찾아 재파싱·재사용·소실 처리에 필요한 원본 상태를 등록한다. */
 export async function discoverSources(context: RefreshContext): Promise<void> {
   // [탐색 정책] 저장된 경로와 실제 로그를 대조하며 이전 기록이 없는 루트의 ENOENT만 허용한다.
   const { database, roots, check } = context;
@@ -40,6 +41,7 @@ export async function discoverSources(context: RefreshContext): Promise<void> {
   registerUnseenSources(context, paths.byPath.values());
 }
 
+/** DB에 저장된 원본 경로와 루트 목록을 불러와 탐색에 사용할 색인을 만든다. */
 function loadStoredPaths(database: SummaryDatabase): DiscoveryPaths {
   // [색인 정책] 제공자·경로로 저장 행을 찾고 최대 ID 다음부터 새 파일에 배정한다.
   const paths: DiscoveryPaths = { byPath: new Map(), storedRoots: new Set(), nextId: 1 };
@@ -53,6 +55,7 @@ function loadStoredPaths(database: SummaryDatabase): DiscoveryPaths {
   return paths;
 }
 
+/** 발견한 파일의 메타데이터를 기록하고 재파싱 여부와 진행 집계를 갱신한다. */
 function recordObservation(context: RefreshContext, paths: DiscoveryPaths, observation: Observation): void {
   // [탐색 정책] 최초 관측에는 기존 파일 ID를 재사용하고 겹치는 루트는 마지막 관측의 메타데이터로 합친다.
   const { state, result, report } = context;
@@ -78,6 +81,7 @@ function recordObservation(context: RefreshContext, paths: DiscoveryPaths, obser
   report();
 }
 
+/** 이번에 보지 못한 저장 원본을 소실 파일이나 선택 범위 밖 파일로 등록한다. */
 function registerUnseenSources(context: RefreshContext, stored: Iterable<SourcePath>): void {
   // [소실 처리 정책] 선택 루트 안의 미관측 파일은 소실로 분류하고 보존 여부에 따라 다시 집계한다.
   const { state, roots, retain } = context;
@@ -97,6 +101,7 @@ function registerUnseenSources(context: RefreshContext, stored: Iterable<SourceP
   }
 }
 
+/** 하위 디렉터리를 재귀 순회하며 지원하는 로그 파일 경로를 전달한다. */
 async function walk(directory: string, check: () => void, compressed: boolean,
   visit: (path: string) => Promise<void>): Promise<void> {
   // [탐색 정책] 디렉터리를 순회하며 취소를 확인하고 Zstd 확장자는 Codex 루트에서만 포함한다.

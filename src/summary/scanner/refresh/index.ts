@@ -21,7 +21,7 @@ export { PARSER_VERSION } from './state';
 const PROGRESS_INTERVAL_MS = 100;
 type PublishProgress = (phase?: SummaryProgress['phase']) => void;
 
-/** 갱신 잠금과 파일 Worker의 수명을 관리한다. */
+/** 사용량 갱신을 실행하고 잠금·Worker를 정리한 뒤 갱신 결과를 반환한다. */
 export async function refreshSummary(
   database: SummaryDatabase, options: SummaryOptions, signal?: AbortSignal,
   progress?: (value: SummaryProgress) => void,
@@ -34,12 +34,15 @@ export async function refreshSummary(
   const result: RefreshResult = { discovered: 0, parsed: 0, reused: 0, failed: 0,
     bodyBytes: 0, interrupted: false, completedAt: '', timings };
   const publish = progressReporter(result, progress);
+  // 원본에서 읽은 바이트를 누적해 진행 보고에 반영한다.
   const onBytes = (bytes: number): void => {
     result.bodyBytes += bytes;
     publish();
   };
   const cancellation = options.cancellation ? new Int32Array(options.cancellation) : undefined;
+  // 중단 신호와 Worker가 공유하는 취소 플래그를 함께 확인한다.
   const cancelled = (): boolean => Boolean(signal?.aborted || cancellation && Atomics.load(cancellation, 0));
+  // 단계 중간에 취소가 확인되면 중단 오류로 갱신 흐름을 빠져나간다.
   const check = (): void => {
     if (cancelled()) throw new SummaryError('interrupted');
   };
@@ -75,6 +78,7 @@ export async function refreshSummary(
   return result;
 }
 
+/** 잠금을 보유하는 동안 탐색, 파싱, 관계 확인, 집계, 저장을 순서대로 실행한다. */
 async function scanUnderLock(context: RefreshContext, publish: PublishProgress, timezone: string): Promise<void> {
   const { database, scan, state, roots, check, cancelled } = context;
 
@@ -85,7 +89,7 @@ async function scanUnderLock(context: RefreshContext, publish: PublishProgress, 
   check();
   const names = await scan.measureAsync('names', () => readNames(roots, cancelled));
 
-  // [파싱 정책] 변경된 원본과 관련 세션의 원본을 읽고 Codex 부모를 찾아 복사 이력을 확인한다.
+  // [파싱 정책] 변경 파일과 관련 원본을 읽고 Claude·Codex 자식 로그를 부모 요청에 연결한다.
   publish('parsing');
   await scan.measureAsync('parseChanged', () => prepareChanged(context));
   await scan.measureAsync('expandRelated', () => expandRelatedSources(context));
@@ -95,6 +99,7 @@ async function scanUnderLock(context: RefreshContext, publish: PublishProgress, 
   });
   check();
 
+  // 사용량을 집계한 뒤 메인 대화 근거가 있는 요약만 저장 대상으로 삼는다.
   const summaries = scan.measure('aggregate', () => collectWinners(context, names).summaries.filter(row => row.hasMain));
 
   // [저장 정책] 연결된 세션을 확정하고 남은 원본 상태와 이름을 저장한다.
@@ -106,6 +111,7 @@ async function scanUnderLock(context: RefreshContext, publish: PublishProgress, 
   scan.measure('optimize', () => database.optimize());
 }
 
+/** 현재 단계와 누적 처리량을 전달하는 진행 보고 함수를 만든다. */
 function progressReporter(result: RefreshResult, progress?: (value: SummaryProgress) => void): PublishProgress {
   // [진행 정책] 단계 전환은 즉시 알리고 같은 단계의 보고는 100ms 간격으로 제한한다.
   if (!progress) return () => {};
@@ -120,6 +126,7 @@ function progressReporter(result: RefreshResult, progress?: (value: SummaryProgr
   };
 }
 
+/** 갱신이 끝까지 진행되지 못한 이유를 결과와 원본 진단에 남긴다. */
 function recordInterruptedScan(context: RefreshContext, error: unknown): void {
   // [진단 정책] 취소와 실패를 구분하고 반영되지 않은 변경·준비 원본만 중단 상태로 기록한다.
   const { cancelled, result, state } = context;

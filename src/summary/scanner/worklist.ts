@@ -1,21 +1,25 @@
 // 관계별 멤버와 처리 후보를 색인하고 기존 순서를 유지하며 중복 방문을 막는다.
+
+/** 키에 멤버를 추가하고 필요한 경우 집합을 만든다. */
 export function addMember<T>(index: Map<string, Set<T>>, key: string, value: T): void {
   let members = index.get(key);
   if (!members) index.set(key, members = new Set());
   members.add(value);
 }
 
+/** 키에서 멤버를 제거하고 집합이 비면 키도 제거한다. */
 export function removeMember<T>(index: Map<string, Set<T>>, key: string, value: T): void {
   const members = index.get(key);
   members?.delete(value);
   if (members?.size === 0) index.delete(key);
 }
 
-/** 파일 ID 우선순위를 유지하는 중복 없는 최소 힙 작업 큐. */
+/** 파일 작업을 중복 없이 담고 가장 작은 ID부터 꺼낼 수 있게 관리한다. */
 export class SourceQueue<T extends { id: number }> {
   private readonly heap: T[] = [];
   private readonly queued = new Set<T>();
 
+  /** 아직 대기열에 없는 작업을 큐에 넣는다. */
   add(value: T): void {
     // [큐 정책] 중복을 Set으로 걸러낸 뒤 부모와 비교하며 올려 최소 힙을 유지한다.
     if (this.queued.has(value)) return;
@@ -31,6 +35,7 @@ export class SourceQueue<T extends { id: number }> {
     this.heap[index] = value;
   }
 
+  /** 가장 작은 파일 ID를 가진 작업을 큐에서 꺼낸다. */
   take(): T | undefined {
     // [큐 정책] 최솟값을 뺀 자리는 마지막 값과 더 작은 자식을 비교하며 내려 채운다.
     const first = this.heap[0];
@@ -74,6 +79,7 @@ export class OrderedGroups<T> {
   private readonly groups = new Map<string, Set<T>>();
   private readonly order = new Map<T, number>();
 
+  /** 입력값을 조회하기 위해 그룹과 순서를 기록한다. */
   constructor(values: Iterable<T>, keys: (value: T) => Iterable<string>) {
     // [색인 정책] 입력 위치를 기록하고 값이 갖는 모든 그룹 키에 멤버를 등록한다.
     let index = 0;
@@ -83,6 +89,7 @@ export class OrderedGroups<T> {
     }
   }
 
+  /** 지정한 그룹들의 멤버를 중복 없이 반환한다. */
   members(keys: Iterable<string>): T[] {
     // [색인 정책] 여러 그룹의 합집합을 만든 뒤 기록한 입력 순서로 되돌린다.
     const members = new Set<T>();

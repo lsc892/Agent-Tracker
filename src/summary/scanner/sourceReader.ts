@@ -11,8 +11,8 @@ export type SourceReadFile = Pick<FileMetadata, 'provider' | 'path' | 'source_ro
 
 export { sqlText } from '../parsers/common';
 
+/** 파싱한 식별 정보의 문자열을 SQLite 저장 형식에 맞춰 반환한다. */
 export function normalizedIdentity(identity: ParsedIdentity): ParsedIdentity {
-  // [DTO 정책] 식별자 객체를 복사한 뒤 문자열 필드를 SQLite와 같은 UTF-8로 맞춘다.
   const result = { ...identity };
   for (const [name, value] of Object.entries(result)) if (typeof value === 'string') Reflect.set(result, name, sqlText(value));
   return result;
@@ -34,6 +34,7 @@ interface ReadOptions {
   onChild?: (reference: string, rootId: string) => void;
 }
 
+/** 탐색 시 관측한 바이트 수까지 JSONL을 읽고 읽는 중 재작성됐는지 검사한다. */
 async function readSourceRows(file: SourceReadFile, onRow: (row: Record<string, unknown>, offset: number) => void,
   fields: { shape: JsonShape } | { fixedShape: FixedJsonShape; onCompleteLine?: (chunk: Buffer, start: number, end: number) => boolean },
   options: Pick<ReadOptions, 'signal' | 'cancelled' | 'maxLineBytes' | 'onBytes'>):
@@ -54,6 +55,7 @@ export interface ThreadSourceRead {
   thread?: ThreadLog;
 }
 
+/** 사용량 조회에 필요한 스레드 정보와 마지막 행의 완성 여부를 읽는다. */
 export async function readThreadSource(file: SourceReadFile, options: Pick<ReadOptions,
   'signal' | 'cancelled' | 'maxLineBytes' | 'onBytes'> & { onFailedSession: (sessionId: string) => void }): Promise<ThreadSourceRead> {
   // [파싱 정책] 제공자별 고정 필드로 관측한 범위만 읽고 완성한 행이 있을 때 스레드를 확정한다.
@@ -92,11 +94,13 @@ export async function readSource(
     child: (reference: string, rootId: string) => options.onChild?.(sqlText(reference), sqlText(rootId)) };
   const parser = file.provider === 'claude' ? new ClaudeParserAdapter(context, sink) : new CodexCurrentParserAdapter(context, sink);
   try {
+    // 완성된 행이 있을 때만 파서를 마무리해 세션 식별 정보를 반환한다.
     const result = await readSourceRows(file, (row, offset) => parser.row(row, offset), { shape: sourceFields(file.provider, options.collectCapabilities) }, options);
     if (!result.rows) return result;
     parser.finish();
     return { ...result, identity: normalizedIdentity(identity) };
   } catch (error) {
+    // 실패하기 전에 확보한 식별 정보를 호출자에게 전달한다.
     const partialIdentity = parser.getIdentity();
     if (partialIdentity) options.onIdentity?.(normalizedIdentity(partialIdentity));
     throw error;

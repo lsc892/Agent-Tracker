@@ -5,12 +5,14 @@ import type { SourcePreparation } from '../sourcePreparation';
 import type { RefreshContext } from './context';
 import { needsSourceRead, PARSER_VERSION, type FileState, type ScanState } from './state';
 
+/** 바뀐 로그를 골라 파일 준비를 시작한다. */
 export async function prepareChanged(context: RefreshContext): Promise<void> {
   // [큐 정책] 변경되었고 소실되지 않은 파일을 ID 순서로 준비한다.
   const changed = [...context.state.files.values()].filter(file => file.changed && !file.removed).sort((a, b) => a.id - b.id);
   await inspectBatch(context, changed);
 }
 
+/** 여러 원본을 미리 읽으면서 준비 결과는 받은 목록 순서대로 적용한다. */
 export async function inspectBatch(context: RefreshContext, batch: readonly FileState[]): Promise<void> {
   // [병렬 처리 정책] 준비는 제한된 구간에서 앞서 진행해도 파일 결과는 입력 순서로 적용한다.
   const { state, sourcePool } = context;
@@ -21,6 +23,7 @@ export async function inspectBatch(context: RefreshContext, batch: readonly File
   }
 }
 
+/** 원본 하나의 파싱 결과나 읽기 오류를 스캔 상태에 반영한다. */
 export async function inspectSource(context: RefreshContext, file: FileState): Promise<void> {
   const { state, result, scan, sourcePool, report, cancelled } = context;
   // [재수집 정책] 이미 시도한 파일을 건너뛰고 선택 범위 밖 파일은 관측값을 다시 얻어 읽는다.
@@ -44,6 +47,7 @@ export async function inspectSource(context: RefreshContext, file: FileState): P
   }
 }
 
+/** 준비 결과에서 파일 버전·세션·관계 근거를 반영하고 재집계 범위를 정한다. */
 function applyPreparation(context: RefreshContext, file: FileState, preparation: SourcePreparation): void {
   const { state, result, check, collect } = context;
   const previousSession = file.previous?.session_id;
@@ -68,12 +72,14 @@ function applyPreparation(context: RefreshContext, file: FileState, preparation:
   state.setSession(file, identity.sessionId);
   file.relations = { identity: { threadId: identity.threadId }, threadUsage: true };
   state.registerPrepared(file, { identity, winners, partialLine: read.partialLine });
+  // 실제로 바뀐 원본이면 현재 세션을 재집계하고 귀속이 이동했을 때 이전 세션도 연결한다.
   file.changed ||= needsSourceRead(file, file.previous, collect);
   if (!file.changed) return;
   state.affect(file.provider, file.session_id);
   state.connect(file.provider, previousSession, file.session_id);
 }
 
+/** 세션 식별 정보를 얻지 못한 파일의 기존 세션과 보류 상태를 반영한다. */
 function applyEmptySource(state: ScanState, file: FileState, partialLine: boolean): void {
   // [저장 정책] 이전 세션이 있고 미완성 행만 남았으면 교체를 보류한다.
   const previousSession = file.previous?.session_id;
@@ -86,6 +92,7 @@ function applyEmptySource(state: ScanState, file: FileState, partialLine: boolea
   state.setSession(file, previousSession ?? null);
 }
 
+/** 선택 범위 밖 원본의 현재 크기와 수정 시각을 확인해 읽을 수 있는지 판단한다. */
 async function refreshOutsideSource(context: RefreshContext, file: FileState): Promise<boolean> {
   const { state, retain } = context;
   try {

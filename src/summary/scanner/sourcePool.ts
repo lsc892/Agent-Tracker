@@ -18,7 +18,7 @@ interface WorkerSlot { worker: Worker; job?: SourceJob }
 interface PoolOptions extends SourcePreparationOptions { workers?: number; externalCancellation?: SharedArrayBuffer }
 interface SourceWorkerMessage { id: number; result?: SourcePreparation; bytes: number }
 
-/** 완료 순서와 무관하게 호출자가 원래 논리 순서로 파일 준비 결과를 소비한다. */
+/** 파일 준비 Worker를 재사용하고 완료된 결과를 파일 ID로 보관한다. */
 export class SourceReaderPool {
   readonly lookahead: number;
   private readonly concurrency: number;
@@ -27,8 +27,11 @@ export class SourceReaderPool {
   private readonly pending: SourceJob[] = [];
   private readonly slots = new Set<WorkerSlot>();
   private closed = false;
+
+  /** 공유 버퍼에 취소를 표시해 모든 Worker에 중단을 알린다. */
   private readonly abort = (): void => { Atomics.store(this.cancellation, 0, 1); };
 
+  /** 동시 실행 수와 선행 작업 한도를 정하고 취소 신호를 연결한다. */
   constructor(private readonly options: PoolOptions) {
     // [병렬 처리 정책] Worker를 최대 4개로 제한하고 선행 파일 수는 동시 Worker 수의 두 배로 정한다.
     const requestedWorkers = Math.trunc(options.workers ?? availableParallelism() - 1) || 1;
@@ -50,6 +53,7 @@ export class SourceReaderPool {
     }
   }
 
+  /** 파일의 선행 준비 결과를 가져오거나 필요한 경우 직접 준비한다. */
   async read(file: SourceReadFile): Promise<SourcePreparation> {
     if (this.closed || this.options.cancelled()) return this.failure('interrupted');
     const job = this.jobs.get(file.id);
@@ -61,6 +65,7 @@ export class SourceReaderPool {
     finally { this.jobs.delete(file.id); }
   }
 
+  /** 남은 파일 작업을 취소하고 풀의 Worker를 모두 종료한다. */
   async dispose(): Promise<void> {
     // [종료 정책] 공유 취소를 알린 뒤 남은 작업을 중단 결과로 풀고 Worker를 모두 종료한다.
     this.closed = true;
@@ -73,10 +78,12 @@ export class SourceReaderPool {
     await Promise.all(workers.map(worker => worker.terminate().catch(() => undefined)));
   }
 
+  /** 풀에서 발생한 오류를 파일 준비 실패 형식으로 반환한다. */
   private failure(code: string): SourcePreparation {
     return { ok: false, error: { code, offset: 0 } };
   }
 
+  /** 요청한 파일의 작업과 결과 Promise를 만들고 대기열에 등록한다. */
   private enqueue(file: SourceReadFile, priority = false): SourceJob {
     let resolve!: SourceJob['resolve'];
     const promise = new Promise<SourcePreparation>(done => { resolve = done; });
@@ -91,6 +98,7 @@ export class SourceReaderPool {
     return job;
   }
 
+  /** 대기 중인 파일 준비 작업을 처리할 Worker를 확보한다. */
   private dispatch(): void {
     // [병렬 처리 정책] 유휴 Worker를 먼저 재사용하고 할 일이 남으면 동시 실행 한도까지 추가한다.
     if (this.closed) return;
@@ -104,6 +112,7 @@ export class SourceReaderPool {
     }
   }
 
+  /** 새 Worker를 시작하고 결과·오류·종료 메시지를 연결한다. */
   private startWorker(): void {
     // [취소 정책] 정리용 취소 버퍼와 갱신 전체의 취소 버퍼를 새 Worker에 공유한다.
     const worker = new Worker(join(__dirname, 'sourceWorker.js'), { workerData: {
@@ -118,6 +127,7 @@ export class SourceReaderPool {
     this.assign(slot);
   }
 
+  /** Worker가 보낸 읽기 진행량과 파일의 최종 결과를 반영한다. */
   private receive(slot: WorkerSlot, message: SourceWorkerMessage): void {
     // [병렬 처리 정책] 현재 파일 메시지만 받아 진행량을 누적하고 최종 결과가 오면 슬롯을 재사용한다.
     if (slot.job?.file.id !== message.id) return;
@@ -128,6 +138,7 @@ export class SourceReaderPool {
     this.dispatch();
   }
 
+  /** 대기열의 첫 작업을 슬롯에 기록하고 Worker에 전달한다. */
   private assign(slot: WorkerSlot): void {
     const job = this.pending.shift();
     if (!job) return;
@@ -136,6 +147,7 @@ export class SourceReaderPool {
     catch { this.workerFailed(slot); }
   }
 
+  /** 종료되거나 실패한 Worker의 작업을 실패 처리하고 남은 작업을 이어간다. */
   private workerFailed(slot: WorkerSlot): void {
     // [오류 정책] 오류와 종료가 연달아 와도 슬롯을 한 번만 폐기하고 대기 작업을 다시 배정한다.
     if (!this.slots.delete(slot)) return;

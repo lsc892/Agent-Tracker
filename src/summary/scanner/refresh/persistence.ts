@@ -16,6 +16,7 @@ interface ComponentCommit {
   summaries: TurnSummaryInput[];
 }
 
+/** 재집계한 세션을 관계로 묶고 연결된 원본 상태와 함께 저장한다. */
 export async function commitComponents(context: RefreshContext, summaries: readonly TurnSummaryInput[]): Promise<void> {
   const { files, affected, links } = context.state;
   if (!affected.size) return;
@@ -27,6 +28,7 @@ export async function commitComponents(context: RefreshContext, summaries: reado
   const remaining = new Set([...affected].sort());
   let batch: ComponentCommit[] = [];
   let batchSummaries = 0;
+  // 대기 중인 묶음을 저장하고 다음 배치의 크기 집계를 초기화한다.
   const flush = async (): Promise<void> => {
     if (!batch.length) return;
     await commitBatch(context, batch);
@@ -53,6 +55,7 @@ export async function commitComponents(context: RefreshContext, summaries: reado
   await flush();
 }
 
+/** 정상 세션 묶음 여러 개를 한 트랜잭션으로 저장한다. */
 async function commitBatch(context: RefreshContext, batch: readonly ComponentCommit[]): Promise<void> {
   if (batch.length === 1) {
     await commitIndividual(context, batch[0]);
@@ -73,6 +76,7 @@ async function commitBatch(context: RefreshContext, batch: readonly ComponentCom
   for (const _ of batch) context.report();
 }
 
+/** 저장 직전에 취소 여부를 확인하고 세션 묶음 하나를 처리한다. */
 async function commitIndividual(context: RefreshContext, entry: ComponentCommit): Promise<void> {
   // [취소 정책] 묶음마다 쓰기 전 취소를 확인하고 반영 후 진행량을 전달한다.
   await yieldToWorker();
@@ -81,6 +85,7 @@ async function commitIndividual(context: RefreshContext, entry: ComponentCommit)
   context.report();
 }
 
+/** 원본 처리를 완료로 표시하고 메모리의 파싱 결과 참조를 해제한다. */
 function settleFiles(files: readonly FileState[]): void {
   for (const file of files) {
     file.settled = true;
@@ -105,7 +110,7 @@ function requiresIndividualCommit(entry: ComponentCommit): boolean {
     || entry.members.some(file => file.deferred || file.error || file.removed);
 }
 
-/** 보류·원본 오류가 있을 때 마지막 정상 반영값을 유지한다. */
+/** 묶음의 요약을 원자적으로 교체하고 보류나 오류가 있으면 마지막 정상 집계를 보존한다. */
 function commitComponent(context: RefreshContext, entry: ComponentCommit): void {
   const { database, storage, state } = context;
   const { members } = entry;
@@ -156,6 +161,7 @@ function componentReplacement(context: RefreshContext, { component, members, sum
   return { sessions, summaries, files, removedFileIds, retainDeletedSourceUsage: retain, preserveCapabilities: !collect };
 }
 
+/** 보류된 원본에만 개행 대기 상태를 써서 연결된 묶음 처리를 끝낸다. */
 function settleDeferredComponent(context: RefreshContext, members: FileState[]): void {
   // [진단 정책] 미완성 행은 기존 집계를 유지한 채 개행을 기다리는 상태만 기록한다.
   const { database } = context;
@@ -168,6 +174,7 @@ function settleDeferredComponent(context: RefreshContext, members: FileState[]):
   settleFiles(members);
 }
 
+/** 세션 교체에 포함되지 않은 원본 상태와 남은 세션 이름을 저장한다. */
 export function finishScan(context: RefreshContext, names: Map<string, string>): void {
   finishSourceRows(context);
   context.check();
@@ -194,6 +201,7 @@ function finishSourceRows(context: RefreshContext): void {
   for (const file of failures) recordFailure(context, file);
 }
 
+/** 수집한 표시 이름과 DB의 세션 이름을 맞춘다. */
 function persistNames(context: RefreshContext, names: ReadonlyMap<string, string>): void {
   // [이름 정책] 이미 저장한 이름과 같은 재시도는 생략하고 DB에서도 값이 다른 세션만 갱신한다.
   const update = context.database.connection.prepare('UPDATE sessions SET session_name=? WHERE provider=? AND session_id=? AND session_name IS NOT ?');
@@ -204,12 +212,14 @@ function persistNames(context: RefreshContext, names: ReadonlyMap<string, string
   }
 }
 
+/** 원본 상태에서 DB에 반영할 경로·세션·버전·관계 정보만 뽑는다. */
 function finalFile(file: FileState): FileMetadata & { id: number } {
   return { id: file.id, provider: file.provider, source_root: file.source_root, path: file.path,
     session_id: file.session_id, mtime_ms: file.mtime_ms, parser_version: file.parser_version,
     capabilities_collected: file.capabilities_collected, relations: file.relations };
 }
 
+/** 원본이 실패하거나 중단된 이유와 위치를 DB에 기록한다. */
 export function recordFailure(context: RefreshContext, file: FileState): void {
   // [진단 정책] 원본 행을 확보해 취소와 실패를 구분하고 파싱 바이트 위치를 기록한다.
   const { database } = context;
@@ -218,6 +228,7 @@ export function recordFailure(context: RefreshContext, file: FileState): void {
   database.setSourceDiagnostic(source.id, code === 'interrupted' ? 'interrupted' : 'error', `parse: byte=${offset}`, code, offset);
 }
 
+/** 보존 설정에 따라 소실된 원본을 DB에 표시한다. */
 function preserveMissingSources(context: RefreshContext, members: FileState[]): void {
   // [보존 정책] 삭제 원본 보존이 켜져 있으면 기존 집계를 두고 아직 표시하지 않은 소실 상태만 기록한다.
   const { database, retain } = context;
