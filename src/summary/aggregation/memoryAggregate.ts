@@ -199,8 +199,14 @@ export class StreamingAggregation {
     // [진단 정책] 제공자·세션·스레드·턴마다 전체 이벤트 순서상 가장 뒤의 누계 검사를 남긴다.
     const { file } = source, ordinal = source.base + check.index;
     const id = key(file.provider, file.session_id, check.threadId, check.turnId), previous = this.checks.get(id);
-    if (!previous || ordinal > previous.ordinal)
-      this.checks.set(id, { source, rootId, check, ordinal, sum: previous?.sum });
+    if (!previous) {
+      this.checks.set(id, { source, rootId, check, ordinal });
+    } else if (ordinal > previous.ordinal) {
+      previous.source = source;
+      previous.rootId = rootId;
+      previous.check = check;
+      previous.ordinal = ordinal;
+    }
   }
 
   private recordOutcome(outcomes: Map<string, Outcome>, root: Root, event: TurnEvent,
@@ -245,16 +251,19 @@ export class StreamingAggregation {
     for (const { source, rootId, check: { input, output, verified }, sum } of this.checks.values()) {
       const missingInput = input - (sum?.input ?? 0), missingOutput = output - (sum?.output ?? 0);
       if (!missingInput && !missingOutput) continue;
-      if (sum && verified && missingInput >= 0 && missingOutput >= 0) {
-        const { file } = source;
-        const root = this.sessionRoots.get(key(file.provider, file.session_id))!.get(rootId)!;
-        const billingMode = root.billing.size === 1 ? root.billing.keys().next().value : undefined;
-        addUsage(root, { model: verified.model, billingMode, tokens: {
-          input: missingInput, output: missingOutput,
-          cacheRead: Math.max(0, verified.cacheRead - sum.cacheRead),
-          cacheWrite: Math.max(0, verified.cacheWrite - sum.cacheWrite),
-        } }, false);
-      } else addFlag(source.flags, rootId, 'token-total-mismatch');
+      const canSupplement = sum && verified && missingInput >= 0 && missingOutput >= 0;
+      if (!canSupplement) {
+        addFlag(source.flags, rootId, 'token-total-mismatch');
+        continue;
+      }
+      const { file } = source;
+      const root = this.sessionRoots.get(key(file.provider, file.session_id))!.get(rootId)!;
+      const billingMode = root.billing.size === 1 ? root.billing.keys().next().value : undefined;
+      addUsage(root, { model: verified.model, billingMode, tokens: {
+        input: missingInput, output: missingOutput,
+        cacheRead: Math.max(0, verified.cacheRead - sum.cacheRead),
+        cacheWrite: Math.max(0, verified.cacheWrite - sum.cacheWrite),
+      } }, false);
     }
 
     // [DTO 정책] 요청·모델·도구 집계와 메인 원본을 찾지 못한 요청의 진단을 반환한다.
@@ -272,13 +281,11 @@ export class StreamingAggregation {
         : key(reference.responseId, threadId, turnId) });
 
     // [진단 정책] 누계 검사용 턴별 합계를 쌓고, 보정 후에도 요청 ID가 없는 Claude 응답을 표시한다.
-    if (this.checks.size) {
-      const check = this.checks.get(key(file.provider, file.session_id, threadId, turnId));
-      if (check) {
-        const sum = check.sum ??= { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
-        sum.input += tokens.input; sum.output += tokens.output;
-        sum.cacheRead += accountedCacheRead(tokens); sum.cacheWrite += accountedCacheWrite(tokens);
-      }
+    const check = this.checks.size ? this.checks.get(key(file.provider, file.session_id, threadId, turnId)) : undefined;
+    if (check) {
+      const sum = check.sum ??= { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
+      sum.input += tokens.input; sum.output += tokens.output;
+      sum.cacheRead += accountedCacheRead(tokens); sum.cacheWrite += accountedCacheWrite(tokens);
     }
     if (file.provider === 'claude' && request === null) addFlag(source.flags, root.rootId, 'missing-request-id');
   }
