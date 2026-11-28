@@ -123,7 +123,7 @@ export class MemoryStore {
       WHERE (provider, session_id) IN (${SESSION_KEYS})`).all(scope).map(row => row.project_key as string);
     const retain = plans.some(({ replacement }) => replacement.retainDeletedSourceUsage === true);
     const preserveCapabilities = plans[0].replacement.preserveCapabilities === true;
-    this.profile.measure('rollups', () => this.database.rollups.replaceDaily(sessions, summaries, retain, this.profile, preserveCapabilities));
+    this.profile.measure('rollups', () => this.database.rollups.replaceDaily(scope, summaries, retain, this.profile, preserveCapabilities));
     this.profile.measure('pruneNames', () => {
       const orphanCandidates = previousProjects.filter(project => !incomingProjects.has(project));
       this.pruneNames(scope, orphanCandidates, savedNames);

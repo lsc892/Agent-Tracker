@@ -1,6 +1,6 @@
 // 메모리 집계에서 날짜별 사용량을 계산해 해당 세션의 일별 행을 교체한다.
 import type { SqliteSession } from './connection';
-import type { Provider, SessionRef, TurnSummaryInput } from './types';
+import type { Provider, TurnSummaryInput } from './types';
 import { aggregateUsageSource, dailyKeySource } from './queries/rollup/source';
 import { DAILY_COST_STATES, dailyKeyColumns, rollupStates, ROLLUP_TABLES } from './rollup-state';
 import type { StageProfiler, StorageStage } from '../profiling';
@@ -87,13 +87,10 @@ export class UsageRollupStore {
     });
   }
 
-  replaceDaily(sessions: readonly SessionRef[], summaries: readonly TurnSummaryInput[], retain: boolean,
+  replaceDaily(scope: string, summaries: readonly TurnSummaryInput[], retain: boolean,
     profile: StageProfiler<StorageStage>, preserveCapabilities = false): void {
-    if (!sessions.length) return;
-
     // [SQL 트랜잭션 정책] 소실 원본을 보존하는 세션은 이번에 집계한 날짜만 교체 범위에 넣는다.
     const timezone = this.dailyTimezone();
-    const scope = JSON.stringify(sessions.map(row => [row.provider, row.session_id]));
     const missing = retain ? this.database.statement(MISSING_SESSIONS).all(scope).map(row => [row.provider, row.session_id]) : [];
     const params = [scope];
     if (missing.length) {
