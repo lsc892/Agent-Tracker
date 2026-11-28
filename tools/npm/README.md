@@ -17,7 +17,7 @@ VS Code, wait a moment, and reopen it. The patch applies on exit on supported
 local Windows and Linux installations.
 
 Run the same command with `@latest` to update. Install a specific version with
-`npx agent-tracker-vscode@0.4.0`.
+`npx agent-tracker-vscode@0.4.1`.
 
 ```sh
 npx agent-tracker-vscode --help
