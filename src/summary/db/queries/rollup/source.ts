@@ -24,13 +24,15 @@ export function buildDailyUsageSource(
     ...(by === 'model' ? ['model'] : []),
     ...rollupStates(by).map(state => state.name),
   ];
-  if (filter.includeCosts) columns.push(...DAILY_COST_STATES.map(state => state.name),
-    `(SELECT billing_mode FROM sessions b
-      WHERE b.provider=usage.provider AND b.session_id=usage.session_id) AS billing_override`);
+  let billingJoin = '';
+  if (filter.includeCosts) {
+    columns.push(...DAILY_COST_STATES.map(state => state.name), 'billing.billing_mode AS billing_override');
+    billingJoin = '\n    LEFT JOIN sessions AS billing USING (provider, session_id)';
+  }
   return {
     sql: `SELECT
       ${columns.join(',\n      ')}
-    FROM ${ROLLUP_TABLES[by]} AS usage
+    FROM ${ROLLUP_TABLES[by]} AS usage${billingJoin}
     WHERE ${where}`,
     values,
   };
