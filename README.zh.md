@@ -127,7 +127,7 @@ npm 包和 VS Code 扩展需要分别卸载。
 - **SQLite 按日存储** — 将现有用量迁移到按提供商、模型和工具划分的日汇总数据，仅写入发生变化的行。Skill 标签页一次查询即可加载四个类别，同时减少费用和行数查询的重复工作。
 - **用量卡片点击行为** — 修复点击打开、固定和关闭卡片的行为。受支持的本地 Windows 和 Linux 安装会在 VS Code 完全退出后自动应用更新。
 
-[与 v0.3.1 的统计界面及 SQLite 性能对比（韩语）](docs/benchmarks/success/2026-11-28/MainDevDashboardAB-2026-11-28.md)
+在空数据库中首次采集 10,000 条合成对话并显示统计表格的耗时从 **879.6 ms 降至 701.6 ms (-20.2%)**。[与 v0.3.1 的统计界面及 SQLite 性能对比（韩语）](docs/benchmarks/success/2026-11-28/MainDevDashboardAB-2026-11-28.md)
 
 </details>
 

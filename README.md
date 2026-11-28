@@ -127,7 +127,7 @@ Use **Agent Tracker: Delete Statistics Data** to clear aggregated statistics. Or
 - **SQLite daily storage** — Migrate existing usage to daily provider, model, and tool totals and write only changed rows. The Skills tab loads its four categories in one query, and cost and row-count queries do less repeated work.
 - **Usage card click behavior** — Fix click-to-open, pin, and dismiss behavior. On supported local Windows and Linux installations, Agent Tracker applies the update after VS Code fully exits.
 
-[Usage statistics benchmark against v0.3.1 (Korean)](https://github.com/lsc892/Agent-Tracker/blob/main/docs/benchmarks/success/2026-11-28/MainDevDashboardAB-2026-11-28.md)
+In a benchmark with 10,000 synthetic conversations and an empty database, the time from initial collection to the first statistics table fell from **879.6 to 701.6 ms (-20.2%)**. [Usage statistics benchmark against v0.3.1 (Korean)](https://github.com/lsc892/Agent-Tracker/blob/main/docs/benchmarks/success/2026-11-28/MainDevDashboardAB-2026-11-28.md)
 
 </details>
 

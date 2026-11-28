@@ -127,7 +127,7 @@ Utilisez **Agent Tracker : Supprimer les données statistiques** pour effacer le
 - **Stockage quotidien dans SQLite** — Les données existantes sont migrées vers des totaux quotidiens par fournisseur, modèle et outil. L’écriture se limite aux lignes modifiées. L’onglet Skill charge ses quatre catégories en une seule requête, et les requêtes sur les coûts et le nombre de lignes répètent moins de calculs.
 - **Clics sur la carte d’utilisation** — Le comportement d’ouverture, d’épinglage et de fermeture par clic a été corrigé. Sur les installations locales compatibles de Windows et Linux, la mise à jour s’applique automatiquement après la fermeture complète de VS Code.
 
-[Comparaison des performances de la vue des statistiques et de SQLite avec v0.3.1 (en coréen)](docs/benchmarks/success/2026-11-28/MainDevDashboardAB-2026-11-28.md)
+Avec une base vide et 10 000 conversations synthétiques, le délai entre le début de la collecte et l’affichage du premier tableau de statistiques est passé de **879.6 à 701.6 ms (-20.2%)**. [Comparaison des performances de la vue des statistiques et de SQLite avec v0.3.1 (en coréen)](docs/benchmarks/success/2026-11-28/MainDevDashboardAB-2026-11-28.md)
 
 </details>
 

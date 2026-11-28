@@ -127,7 +127,7 @@ Usa **Agent Tracker: Eliminar datos estadísticos** para borrar los resultados a
 - **Almacenamiento diario en SQLite** — El uso existente se migra a totales diarios por proveedor, modelo y herramienta, y solo se escriben las filas modificadas. La pestaña Skill carga sus cuatro categorías en una sola consulta, y las consultas de costes y número de filas repiten menos trabajo.
 - **Clics en la tarjeta de uso** — Se corrige el comportamiento de abrir, fijar y cerrar la tarjeta con un clic. En las instalaciones locales compatibles de Windows y Linux, la actualización se aplica automáticamente tras cerrar por completo VS Code.
 
-[Comparativa con v0.3.1 de la vista de estadísticas y SQLite (en coreano)](docs/benchmarks/success/2026-11-28/MainDevDashboardAB-2026-11-28.md)
+Con una base de datos vacía y 10 000 conversaciones sintéticas, el tiempo desde la primera recopilación hasta que se mostró la tabla de estadísticas pasó de **879.6 a 701.6 ms (-20.2%)**. [Comparativa con v0.3.1 de la vista de estadísticas y SQLite (en coreano)](docs/benchmarks/success/2026-11-28/MainDevDashboardAB-2026-11-28.md)
 
 </details>
 
