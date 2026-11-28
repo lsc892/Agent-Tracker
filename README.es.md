@@ -118,6 +118,17 @@ Usa **Agent Tracker: Eliminar datos estadísticos** para borrar los resultados a
 ## Notas de la versión
 
 <details open>
+<summary>v0.4.1</summary>
+
+- **Facturación de la sesión** — El valor predeterminado ahora es **Todos**. Selecciona **Todos** para quitar la configuración manual y calcular el coste estimado con los métodos de facturación registrados en los logs.
+- **Análisis de JSONL** — El analizador general lee las líneas de Codex con campos adicionales en el nivel superior. Se omiten los argumentos de herramientas, los resultados de subagentes y los recuentos acumulados auxiliares de tokens si su formato no es válido.
+- **Credenciales de Claude** — Se simplificaron la validación y la lectura de archivos de credenciales en Windows y macOS. Se mantiene la posibilidad de cancelar la lectura y recurrir al llavero de macOS.
+- **Zona horaria de las estadísticas de uso** — Se simplificó la validación de la zona horaria. Si el valor no es válido, se usa la zona horaria predeterminada y se muestra un aviso.
+- **Documentación de rendimiento** — Se unificó la notación de las variaciones porcentuales en las mediciones de rendimiento de las estadísticas de uso.
+
+</details>
+
+<details>
 <summary>v0.4.0</summary>
 
 - **Vista inicial de estadísticas** — El período predeterminado y el que se aplica al restablecer los filtros son ahora los últimos 30 días. La primera tabla se carga desde SQLite al terminar la actualización. Si la actualización falla o se cancela, puede volver a intentarse.

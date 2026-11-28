@@ -118,6 +118,17 @@ Use **Agent Tracker: Delete Statistics Data** to clear aggregated statistics. Or
 ## Release notes
 
 <details open>
+<summary>v0.4.1</summary>
+
+- **Session billing** — The billing selector now defaults to **All**. Choose **All** to clear a manual override and calculate estimated costs from the billing methods recorded in the logs.
+- **JSONL parsing** — Codex entries with extra top-level fields fall back to the general parser. Tool arguments, subagent results, and optional token checkpoints with invalid formats are skipped.
+- **Claude credentials** — Simplified credential file validation and reading on Windows and macOS, preserving cancellation and the macOS Keychain fallback.
+- **Usage statistics time zone** — Simplified validation of the time zone setting. Invalid values still fall back to the default and display a warning.
+- **Benchmark documentation** — Standardized how percentage changes are reported in the usage statistics benchmarks.
+
+</details>
+
+<details>
 <summary>v0.4.0</summary>
 
 - **Statistics first view** — The default and reset range now cover the last 30 days. The first table loads from SQLite after the refresh completes. If the refresh fails or is canceled, you can retry it.

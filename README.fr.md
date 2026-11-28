@@ -118,6 +118,17 @@ Utilisez **Agent Tracker : Supprimer les données statistiques** pour effacer le
 ## Notes de version
 
 <details open>
+<summary>v0.4.1</summary>
+
+- **Facturation de la session** — L’option **Tous** devient la valeur par défaut. Sélectionnez **Tous** pour effacer le réglage manuel et calculer le coût estimé d’après les modes de facturation consignés dans les journaux.
+- **Analyse JSONL** — L’analyseur général lit les lignes de Codex qui contiennent des champs supplémentaires au premier niveau. Les arguments d’outils, les résultats de sous-agents et les cumuls de jetons auxiliaires sont ignorés si leur format est invalide.
+- **Identifiants Claude** — La validation et la lecture des fichiers d’identifiants sont simplifiées sous Windows et macOS. L’annulation de la lecture et le recours au trousseau macOS restent disponibles.
+- **Fuseau horaire des statistiques d’utilisation** — La validation du fuseau horaire est simplifiée. Les valeurs invalides déclenchent toujours un avertissement et l’utilisation du fuseau horaire par défaut.
+- **Documentation des mesures de performance** — La présentation des variations en pourcentage a été harmonisée dans les mesures de performance des statistiques d’utilisation.
+
+</details>
+
+<details>
 <summary>v0.4.0</summary>
 
 - **Affichage initial des statistiques** — Les 30 derniers jours s’appliquent par défaut et après une réinitialisation des filtres. Le premier tableau est chargé depuis SQLite après l’actualisation. En cas d’échec ou d’annulation, vous pouvez relancer l’actualisation.
