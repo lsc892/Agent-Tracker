@@ -11,6 +11,7 @@
 
 ## 제품 반영
 
+- [2026-11-28 사용량 중복 작업 세 가지 통합 A/B](success/2026-11-28/ThreeUsageReductionsIntegratedAB-2026-11-28.md) — 세 변경을 함께 적용한 코드의 전체 시간·메모리·DB 크기를 비교했다.
 - [2026-11-28 일별 삭제·도구·결제 SQL A/B](success/2026-11-28/SQLiteWorkReductionAB-2026-11-28.md) — 영향 세션 삭제와 분류 일괄·결제 조인의 처리 시간 및 결과 일치를 확인했다. [날짜별 자료](success/2026-11-28/README.md)
 - [2026-11-27 대화·응답 키 직렬화 절감 A/B](success/2026-11-27/AggregationCandidateKeysAB-2026-11-27.md) — 세션별 대화 조회와 ID 필드 직접 비교로 최초 수집의 집계 힙과 시간을 줄였다.
 - [2026-11-27 JSONL 긴 줄 연속 복사와 버퍼 재사용 A/B](success/2026-11-27/JsonlRowBufferReuseAB-2026-11-27.md) — 기존 선택 파서에서 파일별 조립 버퍼를 재사용해 실로그 최초 수집 시간과 RSS를 줄였다.

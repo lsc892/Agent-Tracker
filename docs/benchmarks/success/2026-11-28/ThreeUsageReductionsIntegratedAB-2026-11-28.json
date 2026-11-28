@@ -1,0 +1,2598 @@
+{
+  "environment": {
+    "platform": "win32",
+    "release": "10.0.19045",
+    "arch": "x64",
+    "node": "v24.14.1",
+    "v8": "13.6.233.17-node.44",
+    "sqlite": "3.51.2",
+    "cpu": "AMD Ryzen 5 7500F 6-Core Processor             ",
+    "logicalCpus": 12
+  },
+  "startedAt": "2026-11-28T14:37:02.682Z",
+  "completedAt": "2026-11-28T14:39:56.036Z",
+  "protocol": {
+    "pairs": 20,
+    "warmups": 3,
+    "order": "shared baseline first or last, rotating candidates, sequential",
+    "sourceWorkers": 4,
+    "sampleIntervalMs": 5,
+    "timezone": "Asia/Seoul",
+    "queryIterations": 16,
+    "memory": "Collector V8 heap peak samples at 5ms and phase boundaries; Worker heap at replies; process peak RSS before validation",
+    "workflow": "refresh through COMMIT/return plus one session picker request and nine actual Worker queries, Worker startup excluded",
+    "scripts": {
+      "runner": "452cf0bbb0f31814acee4334ab4f9dba1dbf3d6ddad43c100489892458b2a750",
+      "reads": "02c1ae4dc6f5957ccce469803e28e10de27dd272a9e86afa92c5b086bb5f1dfc"
+    }
+  },
+  "builds": {
+    "before": {
+      "revision": "b26187e1c7a28edd9a4a04404e277a5f1d29c2e5",
+      "source": "6f46df6a2ad5ed2410918f8fa566a4abe7d66d85595556e5e585db95599f9abf",
+      "media": "b4f614c4680f71824ac5178974cf1337d34bcb8cbcba16afb3b28c0be5e5659e",
+      "build": "bf711384db5603771b44d089e12cfa561ecde08fe8d8601fe5b25939b06df216"
+    },
+    "after": {
+      "revision": "b26187e1c7a28edd9a4a04404e277a5f1d29c2e5",
+      "source": "ffa249a67e6e450a1729304c051408cf84a62589aa019d64a347dc32120ffb98",
+      "media": "b4f614c4680f71824ac5178974cf1337d34bcb8cbcba16afb3b28c0be5e5659e",
+      "build": "69846fd18d3c0dd9befaae31055cd5fbe05e338ac4883536cca2929bada5f816"
+    }
+  },
+  "benchmarkCommand": [
+    "node",
+    "--no-warnings",
+    "tests/.cache/sqlite-audit-ab-20261128/runner.cjs",
+    "--variants=three-reduction-baseline",
+    "--pairs=20",
+    "--warmups=3",
+    "--unchanged=true",
+    "--input-workspace=tests/.cache/sqlite-audit-ab-20261128/run-Qqwlvb",
+    "--output=tests/.cache/sqlite-audit-ab-20261128/three-reductions-integrated-results.json"
+  ],
+  "inputs": {
+    "100": {
+      "inputSha256": "776f035313dcd931d408937da1a71359186090430c2978a2b566061a3a79e0d1",
+      "inventory": [
+        {
+          "provider": "claude",
+          "rootOrdinal": 0,
+          "files": 10,
+          "bytes": 22870,
+          "compressed": 0
+        },
+        {
+          "provider": "codex",
+          "rootOrdinal": 1,
+          "files": 10,
+          "bytes": 33275,
+          "compressed": 0,
+          "metadata": {
+            "indexBytes": 0,
+            "threads": 0
+          }
+        }
+      ],
+      "fixture": {
+        "requests": 100,
+        "tokens": 18400,
+        "sessions": 20,
+        "turnsPerSession": 5
+      },
+      "baselineTotals": [
+        {
+          "provider": "claude",
+          "threads": 50,
+          "input": 7350,
+          "output": 1600,
+          "tokens": 8950
+        },
+        {
+          "provider": "codex",
+          "threads": 50,
+          "input": 7600,
+          "output": 1850,
+          "tokens": 9450
+        }
+      ],
+      "expectedAddedTurnAndTokens": [
+        1,
+        123,
+        7
+      ],
+      "mismatches": [],
+      "samples": {
+        "unchanged": [
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 30.09410000000001,
+              "rssBytes": 76939264,
+              "heapBytes": 8375984,
+              "dbBytes": 98304
+            },
+            "after": {
+              "totalMs": 28.408500000000004,
+              "rssBytes": 77209600,
+              "heapBytes": 8374432,
+              "dbBytes": 98304
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 28.802399999999977,
+              "rssBytes": 77090816,
+              "heapBytes": 8385712,
+              "dbBytes": 98304
+            },
+            "after": {
+              "totalMs": 28.18049999999998,
+              "rssBytes": 76636160,
+              "heapBytes": 8374736,
+              "dbBytes": 98304
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 27.402900000000017,
+              "rssBytes": 77549568,
+              "heapBytes": 8384464,
+              "dbBytes": 98304
+            },
+            "after": {
+              "totalMs": 29.984700000000018,
+              "rssBytes": 76853248,
+              "heapBytes": 8373384,
+              "dbBytes": 98304
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 27.592200000000005,
+              "rssBytes": 77279232,
+              "heapBytes": 8383504,
+              "dbBytes": 98304
+            },
+            "after": {
+              "totalMs": 28.403199999999984,
+              "rssBytes": 76967936,
+              "heapBytes": 8370872,
+              "dbBytes": 98304
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 28.858000000000004,
+              "rssBytes": 76996608,
+              "heapBytes": 8383440,
+              "dbBytes": 98304
+            },
+            "after": {
+              "totalMs": 30.07780000000001,
+              "rssBytes": 76787712,
+              "heapBytes": 8374200,
+              "dbBytes": 98304
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 29.278000000000006,
+              "rssBytes": 77389824,
+              "heapBytes": 8384152,
+              "dbBytes": 98304
+            },
+            "after": {
+              "totalMs": 27.812699999999978,
+              "rssBytes": 77459456,
+              "heapBytes": 8370720,
+              "dbBytes": 98304
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 28.779899999999998,
+              "rssBytes": 77021184,
+              "heapBytes": 8383232,
+              "dbBytes": 98304
+            },
+            "after": {
+              "totalMs": 27.886899999999983,
+              "rssBytes": 77074432,
+              "heapBytes": 8373184,
+              "dbBytes": 98304
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 29.036600000000007,
+              "rssBytes": 77451264,
+              "heapBytes": 8383984,
+              "dbBytes": 98304
+            },
+            "after": {
+              "totalMs": 28.3193,
+              "rssBytes": 77262848,
+              "heapBytes": 8374936,
+              "dbBytes": 98304
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 29.296600000000012,
+              "rssBytes": 77021184,
+              "heapBytes": 8378240,
+              "dbBytes": 98304
+            },
+            "after": {
+              "totalMs": 29.355799999999988,
+              "rssBytes": 77242368,
+              "heapBytes": 8374624,
+              "dbBytes": 98304
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 30.357799999999997,
+              "rssBytes": 77164544,
+              "heapBytes": 8383440,
+              "dbBytes": 98304
+            },
+            "after": {
+              "totalMs": 27.90780000000001,
+              "rssBytes": 77025280,
+              "heapBytes": 8699144,
+              "dbBytes": 98304
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 32.330600000000004,
+              "rssBytes": 77393920,
+              "heapBytes": 8378312,
+              "dbBytes": 98304
+            },
+            "after": {
+              "totalMs": 72.66780000000001,
+              "rssBytes": 76877824,
+              "heapBytes": 8380328,
+              "dbBytes": 98304
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 30.792,
+              "rssBytes": 77402112,
+              "heapBytes": 8385856,
+              "dbBytes": 98304
+            },
+            "after": {
+              "totalMs": 29.717100000000002,
+              "rssBytes": 77307904,
+              "heapBytes": 8372568,
+              "dbBytes": 98304
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 28.51909999999998,
+              "rssBytes": 77316096,
+              "heapBytes": 8383528,
+              "dbBytes": 98304
+            },
+            "after": {
+              "totalMs": 28.23390000000002,
+              "rssBytes": 77287424,
+              "heapBytes": 8372352,
+              "dbBytes": 98304
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 29.167600000000007,
+              "rssBytes": 77524992,
+              "heapBytes": 8384160,
+              "dbBytes": 98304
+            },
+            "after": {
+              "totalMs": 29.42489999999998,
+              "rssBytes": 76877824,
+              "heapBytes": 8373168,
+              "dbBytes": 98304
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 29.370400000000004,
+              "rssBytes": 77201408,
+              "heapBytes": 8385480,
+              "dbBytes": 98304
+            },
+            "after": {
+              "totalMs": 31.02380000000001,
+              "rssBytes": 77004800,
+              "heapBytes": 8372976,
+              "dbBytes": 98304
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 27.976600000000005,
+              "rssBytes": 77336576,
+              "heapBytes": 8385712,
+              "dbBytes": 98304
+            },
+            "after": {
+              "totalMs": 27.540499999999994,
+              "rssBytes": 77025280,
+              "heapBytes": 8373736,
+              "dbBytes": 98304
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 35.4696,
+              "rssBytes": 77295616,
+              "heapBytes": 8383648,
+              "dbBytes": 98304
+            },
+            "after": {
+              "totalMs": 31.050700000000006,
+              "rssBytes": 77393920,
+              "heapBytes": 8374208,
+              "dbBytes": 98304
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 28.967899999999986,
+              "rssBytes": 77172736,
+              "heapBytes": 8383504,
+              "dbBytes": 98304
+            },
+            "after": {
+              "totalMs": 27.8681,
+              "rssBytes": 76578816,
+              "heapBytes": 8374880,
+              "dbBytes": 98304
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 28.009699999999995,
+              "rssBytes": 77115392,
+              "heapBytes": 8374088,
+              "dbBytes": 98304
+            },
+            "after": {
+              "totalMs": 28.831299999999985,
+              "rssBytes": 77127680,
+              "heapBytes": 8372904,
+              "dbBytes": 98304
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 29.629599999999968,
+              "rssBytes": 77258752,
+              "heapBytes": 8381536,
+              "dbBytes": 98304
+            },
+            "after": {
+              "totalMs": 32.95050000000002,
+              "rssBytes": 76701696,
+              "heapBytes": 8374680,
+              "dbBytes": 98304
+            }
+          }
+        ],
+        "append": [
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 42.29120000000002,
+              "rssBytes": 78483456,
+              "heapBytes": 8700136,
+              "dbBytes": 98304
+            },
+            "after": {
+              "totalMs": 43.614699999999985,
+              "rssBytes": 77795328,
+              "heapBytes": 8676368,
+              "dbBytes": 98304
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 45.984999999999985,
+              "rssBytes": 78704640,
+              "heapBytes": 8674144,
+              "dbBytes": 98304
+            },
+            "after": {
+              "totalMs": 47.34109999999998,
+              "rssBytes": 78008320,
+              "heapBytes": 9353960,
+              "dbBytes": 98304
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 43.01620000000001,
+              "rssBytes": 78073856,
+              "heapBytes": 8696264,
+              "dbBytes": 98304
+            },
+            "after": {
+              "totalMs": 44.635699999999986,
+              "rssBytes": 77844480,
+              "heapBytes": 8736264,
+              "dbBytes": 98304
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 47.7488,
+              "rssBytes": 78032896,
+              "heapBytes": 8826248,
+              "dbBytes": 98304
+            },
+            "after": {
+              "totalMs": 47.702699999999965,
+              "rssBytes": 77754368,
+              "heapBytes": 8685272,
+              "dbBytes": 98304
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 42.980099999999965,
+              "rssBytes": 77864960,
+              "heapBytes": 8690464,
+              "dbBytes": 98304
+            },
+            "after": {
+              "totalMs": 49.44330000000001,
+              "rssBytes": 77684736,
+              "heapBytes": 8830176,
+              "dbBytes": 98304
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 45.40439999999998,
+              "rssBytes": 78065664,
+              "heapBytes": 8683664,
+              "dbBytes": 98304
+            },
+            "after": {
+              "totalMs": 44.931100000000015,
+              "rssBytes": 78131200,
+              "heapBytes": 8683320,
+              "dbBytes": 98304
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 43.17829999999999,
+              "rssBytes": 77807616,
+              "heapBytes": 8685536,
+              "dbBytes": 98304
+            },
+            "after": {
+              "totalMs": 44.72939999999997,
+              "rssBytes": 77877248,
+              "heapBytes": 8679544,
+              "dbBytes": 98304
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 42.6382,
+              "rssBytes": 78147584,
+              "heapBytes": 8698128,
+              "dbBytes": 98304
+            },
+            "after": {
+              "totalMs": 44.6489,
+              "rssBytes": 78041088,
+              "heapBytes": 8682664,
+              "dbBytes": 98304
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 44.681500000000014,
+              "rssBytes": 78159872,
+              "heapBytes": 8691576,
+              "dbBytes": 98304
+            },
+            "after": {
+              "totalMs": 44.81190000000001,
+              "rssBytes": 77922304,
+              "heapBytes": 8683192,
+              "dbBytes": 98304
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 45.689000000000036,
+              "rssBytes": 77885440,
+              "heapBytes": 8695408,
+              "dbBytes": 98304
+            },
+            "after": {
+              "totalMs": 50.02199999999998,
+              "rssBytes": 78176256,
+              "heapBytes": 8668952,
+              "dbBytes": 98304
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 44.30150000000002,
+              "rssBytes": 77852672,
+              "heapBytes": 8698464,
+              "dbBytes": 98304
+            },
+            "after": {
+              "totalMs": 45.0613,
+              "rssBytes": 78073856,
+              "heapBytes": 8683432,
+              "dbBytes": 98304
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 43.77020000000002,
+              "rssBytes": 78151680,
+              "heapBytes": 8698272,
+              "dbBytes": 98304
+            },
+            "after": {
+              "totalMs": 44.411400000000015,
+              "rssBytes": 77500416,
+              "heapBytes": 8683488,
+              "dbBytes": 98304
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 46.121500000000026,
+              "rssBytes": 78213120,
+              "heapBytes": 8697656,
+              "dbBytes": 98304
+            },
+            "after": {
+              "totalMs": 46.5454,
+              "rssBytes": 78000128,
+              "heapBytes": 8695736,
+              "dbBytes": 98304
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 43.881,
+              "rssBytes": 78147584,
+              "heapBytes": 8683376,
+              "dbBytes": 98304
+            },
+            "after": {
+              "totalMs": 45.608800000000016,
+              "rssBytes": 78036992,
+              "heapBytes": 8943624,
+              "dbBytes": 98304
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 45.62419999999999,
+              "rssBytes": 78237696,
+              "heapBytes": 8702672,
+              "dbBytes": 98304
+            },
+            "after": {
+              "totalMs": 46.25840000000001,
+              "rssBytes": 77602816,
+              "heapBytes": 9013376,
+              "dbBytes": 98304
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 47.15529999999998,
+              "rssBytes": 78479360,
+              "heapBytes": 8683664,
+              "dbBytes": 98304
+            },
+            "after": {
+              "totalMs": 45.92669999999997,
+              "rssBytes": 78094336,
+              "heapBytes": 8825688,
+              "dbBytes": 98304
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 52.60420000000002,
+              "rssBytes": 78454784,
+              "heapBytes": 8687512,
+              "dbBytes": 98304
+            },
+            "after": {
+              "totalMs": 43.04510000000002,
+              "rssBytes": 77967360,
+              "heapBytes": 8685200,
+              "dbBytes": 98304
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 43.83429999999997,
+              "rssBytes": 77938688,
+              "heapBytes": 8697824,
+              "dbBytes": 98304
+            },
+            "after": {
+              "totalMs": 47.09439999999998,
+              "rssBytes": 78053376,
+              "heapBytes": 8666808,
+              "dbBytes": 98304
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 44.5338,
+              "rssBytes": 77758464,
+              "heapBytes": 8705912,
+              "dbBytes": 98304
+            },
+            "after": {
+              "totalMs": 42.30259999999997,
+              "rssBytes": 78102528,
+              "heapBytes": 8685288,
+              "dbBytes": 98304
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 45.35050000000001,
+              "rssBytes": 78012416,
+              "heapBytes": 8696072,
+              "dbBytes": 98304
+            },
+            "after": {
+              "totalMs": 44.465900000000005,
+              "rssBytes": 77709312,
+              "heapBytes": 8683320,
+              "dbBytes": 98304
+            }
+          }
+        ]
+      }
+    },
+    "10000": {
+      "inputSha256": "41c63e61babca594b2c427db7c36fad86664ac2b92b94ec4ccf1cf5a08f6fead",
+      "inventory": [
+        {
+          "provider": "claude",
+          "rootOrdinal": 0,
+          "files": 100,
+          "bytes": 2328260,
+          "compressed": 0
+        },
+        {
+          "provider": "codex",
+          "rootOrdinal": 1,
+          "files": 100,
+          "bytes": 3313450,
+          "compressed": 0,
+          "metadata": {
+            "indexBytes": 0,
+            "threads": 0
+          }
+        }
+      ],
+      "fixture": {
+        "requests": 10000,
+        "tokens": 6340000,
+        "sessions": 200,
+        "turnsPerSession": 50
+      },
+      "baselineTotals": [
+        {
+          "provider": "claude",
+          "threads": 5000,
+          "input": 2872500,
+          "output": 172500,
+          "tokens": 3045000
+        },
+        {
+          "provider": "codex",
+          "threads": 5000,
+          "input": 3122500,
+          "output": 172500,
+          "tokens": 3295000
+        }
+      ],
+      "expectedAddedTurnAndTokens": [
+        1,
+        123,
+        7
+      ],
+      "mismatches": [],
+      "samples": {
+        "unchanged": [
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 103.34959999999998,
+              "rssBytes": 85037056,
+              "heapBytes": 9901520,
+              "dbBytes": 3600384
+            },
+            "after": {
+              "totalMs": 103.32720000000002,
+              "rssBytes": 84639744,
+              "heapBytes": 9865424,
+              "dbBytes": 3600384
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 104.77650000000001,
+              "rssBytes": 84590592,
+              "heapBytes": 9876864,
+              "dbBytes": 3600384
+            },
+            "after": {
+              "totalMs": 105.60309999999998,
+              "rssBytes": 84566016,
+              "heapBytes": 9871536,
+              "dbBytes": 3600384
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 110.4748,
+              "rssBytes": 84774912,
+              "heapBytes": 9901512,
+              "dbBytes": 3600384
+            },
+            "after": {
+              "totalMs": 104.899,
+              "rssBytes": 84807680,
+              "heapBytes": 9861256,
+              "dbBytes": 3600384
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 114.65289999999997,
+              "rssBytes": 85471232,
+              "heapBytes": 9875248,
+              "dbBytes": 3600384
+            },
+            "after": {
+              "totalMs": 102.72139999999999,
+              "rssBytes": 84529152,
+              "heapBytes": 9858232,
+              "dbBytes": 3600384
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 104.96760000000002,
+              "rssBytes": 85188608,
+              "heapBytes": 9881960,
+              "dbBytes": 3600384
+            },
+            "after": {
+              "totalMs": 102.19679999999997,
+              "rssBytes": 85041152,
+              "heapBytes": 9857304,
+              "dbBytes": 3600384
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 109.1484,
+              "rssBytes": 85422080,
+              "heapBytes": 9877080,
+              "dbBytes": 3600384
+            },
+            "after": {
+              "totalMs": 99.9339,
+              "rssBytes": 85065728,
+              "heapBytes": 9883536,
+              "dbBytes": 3600384
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 96.27929999999999,
+              "rssBytes": 84566016,
+              "heapBytes": 9857384,
+              "dbBytes": 3600384
+            },
+            "after": {
+              "totalMs": 103.11299999999999,
+              "rssBytes": 85114880,
+              "heapBytes": 9869224,
+              "dbBytes": 3600384
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 104.18490000000003,
+              "rssBytes": 84320256,
+              "heapBytes": 9887272,
+              "dbBytes": 3600384
+            },
+            "after": {
+              "totalMs": 96.92879999999997,
+              "rssBytes": 84688896,
+              "heapBytes": 9887984,
+              "dbBytes": 3600384
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 96.61469999999998,
+              "rssBytes": 84668416,
+              "heapBytes": 9858192,
+              "dbBytes": 3600384
+            },
+            "after": {
+              "totalMs": 96.84220000000002,
+              "rssBytes": 84639744,
+              "heapBytes": 9890112,
+              "dbBytes": 3600384
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 98.2867,
+              "rssBytes": 85065728,
+              "heapBytes": 9867864,
+              "dbBytes": 3600384
+            },
+            "after": {
+              "totalMs": 95.71900000000001,
+              "rssBytes": 84529152,
+              "heapBytes": 9857680,
+              "dbBytes": 3600384
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 100.58440000000003,
+              "rssBytes": 85274624,
+              "heapBytes": 9867720,
+              "dbBytes": 3600384
+            },
+            "after": {
+              "totalMs": 94.6416,
+              "rssBytes": 84303872,
+              "heapBytes": 9859920,
+              "dbBytes": 3600384
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 96.32459999999996,
+              "rssBytes": 84905984,
+              "heapBytes": 9894168,
+              "dbBytes": 3600384
+            },
+            "after": {
+              "totalMs": 101.89089999999997,
+              "rssBytes": 85143552,
+              "heapBytes": 9854944,
+              "dbBytes": 3600384
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 116.84310000000002,
+              "rssBytes": 84725760,
+              "heapBytes": 9876392,
+              "dbBytes": 3600384
+            },
+            "after": {
+              "totalMs": 97.9539,
+              "rssBytes": 84156416,
+              "heapBytes": 9847008,
+              "dbBytes": 3600384
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 100.84050000000002,
+              "rssBytes": 85229568,
+              "heapBytes": 9887872,
+              "dbBytes": 3600384
+            },
+            "after": {
+              "totalMs": 108.5875,
+              "rssBytes": 85311488,
+              "heapBytes": 9853024,
+              "dbBytes": 3600384
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 105.13990000000003,
+              "rssBytes": 84389888,
+              "heapBytes": 9865192,
+              "dbBytes": 3600384
+            },
+            "after": {
+              "totalMs": 106.967,
+              "rssBytes": 84852736,
+              "heapBytes": 9847128,
+              "dbBytes": 3600384
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 104.30329999999998,
+              "rssBytes": 84963328,
+              "heapBytes": 9862128,
+              "dbBytes": 3600384
+            },
+            "after": {
+              "totalMs": 105.10119999999999,
+              "rssBytes": 84324352,
+              "heapBytes": 9860008,
+              "dbBytes": 3600384
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 97.45100000000002,
+              "rssBytes": 84611072,
+              "heapBytes": 9865360,
+              "dbBytes": 3600384
+            },
+            "after": {
+              "totalMs": 104.31690000000003,
+              "rssBytes": 85147648,
+              "heapBytes": 9872464,
+              "dbBytes": 3600384
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 100.11850000000003,
+              "rssBytes": 84480000,
+              "heapBytes": 9852912,
+              "dbBytes": 3600384
+            },
+            "after": {
+              "totalMs": 110.29950000000001,
+              "rssBytes": 84520960,
+              "heapBytes": 9871104,
+              "dbBytes": 3600384
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 99.59020000000002,
+              "rssBytes": 84918272,
+              "heapBytes": 9901776,
+              "dbBytes": 3600384
+            },
+            "after": {
+              "totalMs": 101.51909999999998,
+              "rssBytes": 84713472,
+              "heapBytes": 9852920,
+              "dbBytes": 3600384
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 100.58090000000001,
+              "rssBytes": 84869120,
+              "heapBytes": 9858728,
+              "dbBytes": 3600384
+            },
+            "after": {
+              "totalMs": 101.54479999999998,
+              "rssBytes": 84422656,
+              "heapBytes": 9862872,
+              "dbBytes": 3600384
+            }
+          }
+        ],
+        "append": [
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 115.19059999999998,
+              "rssBytes": 87044096,
+              "heapBytes": 11140432,
+              "dbBytes": 3600384
+            },
+            "after": {
+              "totalMs": 115.12090000000002,
+              "rssBytes": 87404544,
+              "heapBytes": 11121120,
+              "dbBytes": 3600384
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 116.86980000000001,
+              "rssBytes": 87048192,
+              "heapBytes": 11096120,
+              "dbBytes": 3600384
+            },
+            "after": {
+              "totalMs": 119.35730000000002,
+              "rssBytes": 86966272,
+              "heapBytes": 11173112,
+              "dbBytes": 3600384
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 119.77980000000002,
+              "rssBytes": 87879680,
+              "heapBytes": 11170232,
+              "dbBytes": 3600384
+            },
+            "after": {
+              "totalMs": 122.59050000000003,
+              "rssBytes": 86945792,
+              "heapBytes": 11111656,
+              "dbBytes": 3600384
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 117.00069999999997,
+              "rssBytes": 87146496,
+              "heapBytes": 11155872,
+              "dbBytes": 3600384
+            },
+            "after": {
+              "totalMs": 119.54109999999999,
+              "rssBytes": 87109632,
+              "heapBytes": 11153376,
+              "dbBytes": 3600384
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 126.41279999999999,
+              "rssBytes": 87486464,
+              "heapBytes": 11153704,
+              "dbBytes": 3600384
+            },
+            "after": {
+              "totalMs": 121.28109999999998,
+              "rssBytes": 86962176,
+              "heapBytes": 11102296,
+              "dbBytes": 3600384
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 116.71850000000003,
+              "rssBytes": 87187456,
+              "heapBytes": 11096824,
+              "dbBytes": 3600384
+            },
+            "after": {
+              "totalMs": 117.82899999999998,
+              "rssBytes": 87252992,
+              "heapBytes": 11081440,
+              "dbBytes": 3600384
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 124.85869999999997,
+              "rssBytes": 87355392,
+              "heapBytes": 11118448,
+              "dbBytes": 3600384
+            },
+            "after": {
+              "totalMs": 126.59289999999999,
+              "rssBytes": 87285760,
+              "heapBytes": 11071792,
+              "dbBytes": 3600384
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 118.8191,
+              "rssBytes": 86953984,
+              "heapBytes": 11125304,
+              "dbBytes": 3600384
+            },
+            "after": {
+              "totalMs": 115.51709999999999,
+              "rssBytes": 86929408,
+              "heapBytes": 11125488,
+              "dbBytes": 3600384
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 126.42460000000005,
+              "rssBytes": 87257088,
+              "heapBytes": 11127456,
+              "dbBytes": 3600384
+            },
+            "after": {
+              "totalMs": 125.03349999999998,
+              "rssBytes": 87318528,
+              "heapBytes": 11073256,
+              "dbBytes": 3600384
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 123.50729999999999,
+              "rssBytes": 87646208,
+              "heapBytes": 11108576,
+              "dbBytes": 3600384
+            },
+            "after": {
+              "totalMs": 128.5902,
+              "rssBytes": 87330816,
+              "heapBytes": 11155216,
+              "dbBytes": 3600384
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 119.97309999999999,
+              "rssBytes": 87502848,
+              "heapBytes": 11137472,
+              "dbBytes": 3600384
+            },
+            "after": {
+              "totalMs": 127.02199999999996,
+              "rssBytes": 87228416,
+              "heapBytes": 11117256,
+              "dbBytes": 3600384
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 123.21120000000002,
+              "rssBytes": 87375872,
+              "heapBytes": 11119080,
+              "dbBytes": 3600384
+            },
+            "after": {
+              "totalMs": 117.05239999999999,
+              "rssBytes": 87035904,
+              "heapBytes": 11115680,
+              "dbBytes": 3600384
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 114.97079999999995,
+              "rssBytes": 87306240,
+              "heapBytes": 11128080,
+              "dbBytes": 3600384
+            },
+            "after": {
+              "totalMs": 130.53279999999995,
+              "rssBytes": 87146496,
+              "heapBytes": 11082080,
+              "dbBytes": 3600384
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 116.20230000000002,
+              "rssBytes": 87437312,
+              "heapBytes": 11166336,
+              "dbBytes": 3600384
+            },
+            "after": {
+              "totalMs": 125.48419999999996,
+              "rssBytes": 86970368,
+              "heapBytes": 11121136,
+              "dbBytes": 3600384
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 134.49719999999996,
+              "rssBytes": 87703552,
+              "heapBytes": 11152184,
+              "dbBytes": 3600384
+            },
+            "after": {
+              "totalMs": 128.3449,
+              "rssBytes": 87396352,
+              "heapBytes": 11110144,
+              "dbBytes": 3600384
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 128.48109999999997,
+              "rssBytes": 86876160,
+              "heapBytes": 11167952,
+              "dbBytes": 3600384
+            },
+            "after": {
+              "totalMs": 137.9354,
+              "rssBytes": 87355392,
+              "heapBytes": 11115120,
+              "dbBytes": 3600384
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 119.53969999999997,
+              "rssBytes": 87293952,
+              "heapBytes": 11159144,
+              "dbBytes": 3600384
+            },
+            "after": {
+              "totalMs": 126.63040000000007,
+              "rssBytes": 87027712,
+              "heapBytes": 11162800,
+              "dbBytes": 3600384
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 158.45980000000003,
+              "rssBytes": 87298048,
+              "heapBytes": 11123808,
+              "dbBytes": 3600384
+            },
+            "after": {
+              "totalMs": 118.91449999999998,
+              "rssBytes": 86929408,
+              "heapBytes": 11124544,
+              "dbBytes": 3600384
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 122.39620000000001,
+              "rssBytes": 86904832,
+              "heapBytes": 11185176,
+              "dbBytes": 3600384
+            },
+            "after": {
+              "totalMs": 117.97210000000001,
+              "rssBytes": 87523328,
+              "heapBytes": 11144864,
+              "dbBytes": 3600384
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 119.28749999999997,
+              "rssBytes": 87506944,
+              "heapBytes": 11109528,
+              "dbBytes": 3600384
+            },
+            "after": {
+              "totalMs": 116.91280000000002,
+              "rssBytes": 87306240,
+              "heapBytes": 11091856,
+              "dbBytes": 3600384
+            }
+          }
+        ]
+      }
+    },
+    "real": {
+      "inputSha256": "f54e6bbd7921ed5ea5a1bd76ef85fba3ee8c29772679587f709448496501c62d",
+      "inventory": [
+        {
+          "provider": "claude",
+          "rootOrdinal": 0,
+          "files": 12,
+          "bytes": 11486533,
+          "compressed": 0
+        },
+        {
+          "provider": "codex",
+          "rootOrdinal": 1,
+          "files": 775,
+          "bytes": 538977191,
+          "compressed": 667,
+          "metadata": {
+            "indexBytes": 60598,
+            "threads": 776
+          }
+        },
+        {
+          "provider": "codex",
+          "rootOrdinal": 2,
+          "files": 2,
+          "bytes": 3075020,
+          "compressed": 2,
+          "metadata": {
+            "indexBytes": 60598,
+            "threads": 776
+          }
+        }
+      ],
+      "baselineTotals": [
+        {
+          "provider": "claude",
+          "threads": 15,
+          "input": 9994511,
+          "output": 247006,
+          "tokens": 10241517
+        },
+        {
+          "provider": "codex",
+          "threads": 1859,
+          "input": 3874562265,
+          "output": 17297605,
+          "tokens": 3891859870
+        }
+      ],
+      "expectedAddedTurnAndTokens": [
+        1,
+        123,
+        7
+      ],
+      "mismatches": [],
+      "samples": {
+        "unchanged": [
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 162.9626,
+              "rssBytes": 86679552,
+              "heapBytes": 12801568,
+              "dbBytes": 1077248
+            },
+            "after": {
+              "totalMs": 154.6558,
+              "rssBytes": 87334912,
+              "heapBytes": 12786352,
+              "dbBytes": 1077248
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 163.6867,
+              "rssBytes": 86552576,
+              "heapBytes": 12798176,
+              "dbBytes": 1077248
+            },
+            "after": {
+              "totalMs": 159.1356,
+              "rssBytes": 86495232,
+              "heapBytes": 12832520,
+              "dbBytes": 1077248
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 157.99809999999997,
+              "rssBytes": 86773760,
+              "heapBytes": 12840512,
+              "dbBytes": 1077248
+            },
+            "after": {
+              "totalMs": 169.9775,
+              "rssBytes": 87162880,
+              "heapBytes": 12831776,
+              "dbBytes": 1077248
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 160.28900000000002,
+              "rssBytes": 87359488,
+              "heapBytes": 12722216,
+              "dbBytes": 1077248
+            },
+            "after": {
+              "totalMs": 157.26210000000003,
+              "rssBytes": 86925312,
+              "heapBytes": 12768664,
+              "dbBytes": 1077248
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 158.2841,
+              "rssBytes": 86601728,
+              "heapBytes": 12843176,
+              "dbBytes": 1077248
+            },
+            "after": {
+              "totalMs": 154.5609,
+              "rssBytes": 86994944,
+              "heapBytes": 12802296,
+              "dbBytes": 1077248
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 165.04179999999997,
+              "rssBytes": 87605248,
+              "heapBytes": 13078704,
+              "dbBytes": 1077248
+            },
+            "after": {
+              "totalMs": 175.67500000000004,
+              "rssBytes": 87191552,
+              "heapBytes": 12754040,
+              "dbBytes": 1077248
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 167.23839999999998,
+              "rssBytes": 86437888,
+              "heapBytes": 13258840,
+              "dbBytes": 1077248
+            },
+            "after": {
+              "totalMs": 166.38830000000002,
+              "rssBytes": 87166976,
+              "heapBytes": 12733408,
+              "dbBytes": 1077248
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 169.66510000000005,
+              "rssBytes": 86437888,
+              "heapBytes": 12841288,
+              "dbBytes": 1077248
+            },
+            "after": {
+              "totalMs": 168.40380000000005,
+              "rssBytes": 86564864,
+              "heapBytes": 12763040,
+              "dbBytes": 1077248
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 179.42480000000003,
+              "rssBytes": 86528000,
+              "heapBytes": 12812968,
+              "dbBytes": 1077248
+            },
+            "after": {
+              "totalMs": 166.91199999999998,
+              "rssBytes": 87203840,
+              "heapBytes": 12702512,
+              "dbBytes": 1077248
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 166.95519999999996,
+              "rssBytes": 86921216,
+              "heapBytes": 12744272,
+              "dbBytes": 1077248
+            },
+            "after": {
+              "totalMs": 160.9935,
+              "rssBytes": 87617536,
+              "heapBytes": 12763344,
+              "dbBytes": 1077248
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 181.55070000000003,
+              "rssBytes": 86642688,
+              "heapBytes": 12810376,
+              "dbBytes": 1077248
+            },
+            "after": {
+              "totalMs": 163.0373,
+              "rssBytes": 86568960,
+              "heapBytes": 12785192,
+              "dbBytes": 1077248
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 155.8775,
+              "rssBytes": 87306240,
+              "heapBytes": 12800296,
+              "dbBytes": 1077248
+            },
+            "after": {
+              "totalMs": 159.7329,
+              "rssBytes": 86736896,
+              "heapBytes": 12798472,
+              "dbBytes": 1077248
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 165.45710000000003,
+              "rssBytes": 87142400,
+              "heapBytes": 12771888,
+              "dbBytes": 1077248
+            },
+            "after": {
+              "totalMs": 192.9001,
+              "rssBytes": 86765568,
+              "heapBytes": 12786024,
+              "dbBytes": 1077248
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 159.21009999999998,
+              "rssBytes": 86626304,
+              "heapBytes": 12858552,
+              "dbBytes": 1077248
+            },
+            "after": {
+              "totalMs": 163.9688,
+              "rssBytes": 87556096,
+              "heapBytes": 12781792,
+              "dbBytes": 1077248
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 164.37390000000005,
+              "rssBytes": 86761472,
+              "heapBytes": 12777776,
+              "dbBytes": 1077248
+            },
+            "after": {
+              "totalMs": 173.28240000000002,
+              "rssBytes": 86200320,
+              "heapBytes": 12797216,
+              "dbBytes": 1077248
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 174.7203,
+              "rssBytes": 86753280,
+              "heapBytes": 12799456,
+              "dbBytes": 1077248
+            },
+            "after": {
+              "totalMs": 163.35340000000002,
+              "rssBytes": 87318528,
+              "heapBytes": 12730096,
+              "dbBytes": 1077248
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 157.40849999999995,
+              "rssBytes": 87347200,
+              "heapBytes": 12970968,
+              "dbBytes": 1077248
+            },
+            "after": {
+              "totalMs": 164.75830000000002,
+              "rssBytes": 86913024,
+              "heapBytes": 12761280,
+              "dbBytes": 1077248
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 170.93270000000004,
+              "rssBytes": 86450176,
+              "heapBytes": 12834984,
+              "dbBytes": 1077248
+            },
+            "after": {
+              "totalMs": 156.16790000000003,
+              "rssBytes": 87306240,
+              "heapBytes": 12742832,
+              "dbBytes": 1077248
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 159.2049,
+              "rssBytes": 87003136,
+              "heapBytes": 12738640,
+              "dbBytes": 1077248
+            },
+            "after": {
+              "totalMs": 155.55199999999996,
+              "rssBytes": 87355392,
+              "heapBytes": 12709832,
+              "dbBytes": 1077248
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 159.73410000000004,
+              "rssBytes": 86851584,
+              "heapBytes": 12824280,
+              "dbBytes": 1077248
+            },
+            "after": {
+              "totalMs": 173.56390000000002,
+              "rssBytes": 86892544,
+              "heapBytes": 12830088,
+              "dbBytes": 1077248
+            }
+          }
+        ],
+        "append": [
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 292.8657,
+              "rssBytes": 104505344,
+              "heapBytes": 16583888,
+              "dbBytes": 1077248
+            },
+            "after": {
+              "totalMs": 318.6211999999999,
+              "rssBytes": 90361856,
+              "heapBytes": 15680688,
+              "dbBytes": 1077248
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 306.0409,
+              "rssBytes": 93818880,
+              "heapBytes": 16530248,
+              "dbBytes": 1077248
+            },
+            "after": {
+              "totalMs": 298.5456000000001,
+              "rssBytes": 92737536,
+              "heapBytes": 16520504,
+              "dbBytes": 1077248
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 262.98199999999997,
+              "rssBytes": 90451968,
+              "heapBytes": 15690152,
+              "dbBytes": 1077248
+            },
+            "after": {
+              "totalMs": 309.6482,
+              "rssBytes": 94068736,
+              "heapBytes": 16520832,
+              "dbBytes": 1077248
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 280.20480000000003,
+              "rssBytes": 93917184,
+              "heapBytes": 16525744,
+              "dbBytes": 1077248
+            },
+            "after": {
+              "totalMs": 290.66009999999994,
+              "rssBytes": 93704192,
+              "heapBytes": 16516624,
+              "dbBytes": 1077248
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 289.66120000000006,
+              "rssBytes": 93802496,
+              "heapBytes": 16526128,
+              "dbBytes": 1077248
+            },
+            "after": {
+              "totalMs": 286.4216,
+              "rssBytes": 92700672,
+              "heapBytes": 16386128,
+              "dbBytes": 1077248
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 298.11830000000003,
+              "rssBytes": 94339072,
+              "heapBytes": 16401128,
+              "dbBytes": 1077248
+            },
+            "after": {
+              "totalMs": 291.3892000000001,
+              "rssBytes": 91652096,
+              "heapBytes": 17028648,
+              "dbBytes": 1077248
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 312.61779999999993,
+              "rssBytes": 94363648,
+              "heapBytes": 16632640,
+              "dbBytes": 1077248
+            },
+            "after": {
+              "totalMs": 292.30719999999997,
+              "rssBytes": 93106176,
+              "heapBytes": 16375208,
+              "dbBytes": 1077248
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 302.535,
+              "rssBytes": 92938240,
+              "heapBytes": 16526144,
+              "dbBytes": 1077248
+            },
+            "after": {
+              "totalMs": 303.3153,
+              "rssBytes": 100093952,
+              "heapBytes": 16436920,
+              "dbBytes": 1077248
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 285.60540000000003,
+              "rssBytes": 102285312,
+              "heapBytes": 18323744,
+              "dbBytes": 1077248
+            },
+            "after": {
+              "totalMs": 273.57269999999994,
+              "rssBytes": 94089216,
+              "heapBytes": 16389608,
+              "dbBytes": 1077248
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 289.2923,
+              "rssBytes": 93118464,
+              "heapBytes": 16528376,
+              "dbBytes": 1077248
+            },
+            "after": {
+              "totalMs": 273.0997,
+              "rssBytes": 102014976,
+              "heapBytes": 18290048,
+              "dbBytes": 1077248
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 297.56399999999996,
+              "rssBytes": 93700096,
+              "heapBytes": 16430680,
+              "dbBytes": 1077248
+            },
+            "after": {
+              "totalMs": 285.0712,
+              "rssBytes": 93503488,
+              "heapBytes": 16621448,
+              "dbBytes": 1077248
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 278.00590000000005,
+              "rssBytes": 93151232,
+              "heapBytes": 16400472,
+              "dbBytes": 1077248
+            },
+            "after": {
+              "totalMs": 295.3714,
+              "rssBytes": 94396416,
+              "heapBytes": 16404568,
+              "dbBytes": 1077248
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 288.6064,
+              "rssBytes": 94027776,
+              "heapBytes": 16532272,
+              "dbBytes": 1077248
+            },
+            "after": {
+              "totalMs": 290.0345,
+              "rssBytes": 102133760,
+              "heapBytes": 18352128,
+              "dbBytes": 1077248
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 302.3045,
+              "rssBytes": 93925376,
+              "heapBytes": 16534128,
+              "dbBytes": 1077248
+            },
+            "after": {
+              "totalMs": 284.0892,
+              "rssBytes": 92999680,
+              "heapBytes": 16386184,
+              "dbBytes": 1077248
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 294.6943,
+              "rssBytes": 93745152,
+              "heapBytes": 16526456,
+              "dbBytes": 1077248
+            },
+            "after": {
+              "totalMs": 281.2127,
+              "rssBytes": 93949952,
+              "heapBytes": 16511528,
+              "dbBytes": 1077248
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 275.7864,
+              "rssBytes": 90824704,
+              "heapBytes": 15691464,
+              "dbBytes": 1077248
+            },
+            "after": {
+              "totalMs": 300.6405000000001,
+              "rssBytes": 92958720,
+              "heapBytes": 16412320,
+              "dbBytes": 1077248
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 283.27110000000005,
+              "rssBytes": 102731776,
+              "heapBytes": 18366952,
+              "dbBytes": 1077248
+            },
+            "after": {
+              "totalMs": 271.0589,
+              "rssBytes": 103010304,
+              "heapBytes": 18436176,
+              "dbBytes": 1077248
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 287.27799999999996,
+              "rssBytes": 94015488,
+              "heapBytes": 16528160,
+              "dbBytes": 1077248
+            },
+            "after": {
+              "totalMs": 283.88110000000006,
+              "rssBytes": 93048832,
+              "heapBytes": 16510928,
+              "dbBytes": 1077248
+            }
+          },
+          {
+            "order": [
+              "after",
+              "before"
+            ],
+            "before": {
+              "totalMs": 288.1117000000001,
+              "rssBytes": 93777920,
+              "heapBytes": 16527680,
+              "dbBytes": 1077248
+            },
+            "after": {
+              "totalMs": 366.9063999999999,
+              "rssBytes": 93036544,
+              "heapBytes": 16624072,
+              "dbBytes": 1077248
+            }
+          },
+          {
+            "order": [
+              "before",
+              "after"
+            ],
+            "before": {
+              "totalMs": 320.0116,
+              "rssBytes": 93872128,
+              "heapBytes": 16525496,
+              "dbBytes": 1077248
+            },
+            "after": {
+              "totalMs": 270.6313,
+              "rssBytes": 93503488,
+              "heapBytes": 16436968,
+              "dbBytes": 1077248
+            }
+          }
+        ]
+      }
+    }
+  },
+  "summary": {
+    "100": {
+      "unchanged": {
+        "pairs": 20,
+        "metrics": {
+          "totalMs": {
+            "before": 29.102100000000007,
+            "after": 28.619899999999994,
+            "pairedDelta": -0.3606499999999855,
+            "pairedDeltaQ1": -1.0811249999999966,
+            "pairedDeltaQ3": 0.9211499999999937
+          },
+          "rssMiB": {
+            "before": 73.689453125,
+            "after": 73.45703125,
+            "pairedDelta": -0.18359375,
+            "pairedDeltaQ1": -0.4482421875,
+            "pairedDeltaQ3": 0.021484375
+          },
+          "heapMiB": {
+            "before": 7.995143890380859,
+            "after": 7.9860382080078125,
+            "pairedDelta": -0.0092926025390625,
+            "pairedDeltaQ1": -0.0108489990234375,
+            "pairedDeltaQ3": -0.0057659149169921875
+          },
+          "dbKiB": {
+            "before": 96,
+            "after": 96,
+            "pairedDelta": 0,
+            "pairedDeltaQ1": 0,
+            "pairedDeltaQ3": 0
+          }
+        }
+      },
+      "append": {
+        "pairs": 20,
+        "metrics": {
+          "totalMs": {
+            "before": 44.60765000000001,
+            "after": 44.99620000000001,
+            "pairedDelta": 0.700499999999991,
+            "pairedDeltaQ1": -0.15290000000002024,
+            "pairedDeltaQ3": 1.6465749999999844
+          },
+          "rssMiB": {
+            "before": 74.4921875,
+            "after": 74.37109375,
+            "pairedDelta": -0.2109375,
+            "pairedDeltaQ1": -0.3916015625,
+            "pairedDeltaQ3": 0.0634765625
+          },
+          "heapMiB": {
+            "before": 8.293312072753906,
+            "after": 8.282035827636719,
+            "pairedDelta": -0.006855010986328125,
+            "pairedDeltaQ1": -0.015977859497070312,
+            "pairedDeltaQ3": 0.061920166015625
+          },
+          "dbKiB": {
+            "before": 96,
+            "after": 96,
+            "pairedDelta": 0,
+            "pairedDeltaQ1": 0,
+            "pairedDeltaQ3": 0
+          }
+        }
+      }
+    },
+    "10000": {
+      "unchanged": {
+        "pairs": 20,
+        "metrics": {
+          "totalMs": {
+            "before": 102.09505,
+            "after": 102.45909999999998,
+            "pairedDelta": 0.5127000000000237,
+            "pairedDeltaQ1": -5.667550000000009,
+            "pairedDeltaQ3": 2.83824999999997
+          },
+          "rssMiB": {
+            "before": 80.955078125,
+            "after": 80.7421875,
+            "pairedDelta": -0.083984375,
+            "pairedDeltaQ1": -0.447265625,
+            "pairedDeltaQ3": 0.115234375
+          },
+          "heapMiB": {
+            "before": 9.418315887451172,
+            "after": 9.403831481933594,
+            "pairedDelta": -0.008575439453125,
+            "pairedDeltaQ1": -0.029325485229492188,
+            "pairedDeltaQ3": 0.0045032501220703125
+          },
+          "dbKiB": {
+            "before": 3516,
+            "after": 3516,
+            "pairedDelta": 0,
+            "pairedDeltaQ1": 0,
+            "pairedDeltaQ3": 0
+          }
+        }
+      },
+      "append": {
+        "pairs": 20,
+        "metrics": {
+          "totalMs": {
+            "before": 119.87645,
+            "after": 121.9358,
+            "pairedDelta": 1.4223499999999802,
+            "pairedDeltaQ1": -3.5825250000000146,
+            "pairedDeltaQ3": 5.574400000000011
+          },
+          "rssMiB": {
+            "before": 83.2578125,
+            "after": 83.1484375,
+            "pairedDelta": -0.171875,
+            "pairedDeltaQ1": -0.306640625,
+            "pairedDeltaQ3": -0.0029296875
+          },
+          "heapMiB": {
+            "before": 10.617042541503906,
+            "after": 10.601490020751953,
+            "pairedDelta": -0.018848419189453125,
+            "pairedDeltaQ1": -0.044025421142578125,
+            "pairedDeltaQ3": -0.0017414093017578125
+          },
+          "dbKiB": {
+            "before": 3516,
+            "after": 3516,
+            "pairedDelta": 0,
+            "pairedDeltaQ1": 0,
+            "pairedDeltaQ3": 0
+          }
+        }
+      }
+    },
+    "real": {
+      "unchanged": {
+        "pairs": 20,
+        "metrics": {
+          "totalMs": {
+            "before": 164.0303,
+            "after": 163.6611,
+            "pairedDelta": -2.1440999999999946,
+            "pairedDeltaQ1": -6.5479749999999655,
+            "pairedDeltaQ3": 7.7394750000000485
+          },
+          "rssMiB": {
+            "before": 82.73828125,
+            "after": 83.044921875,
+            "pairedDelta": 0.228515625,
+            "pairedDeltaQ1": -0.3681640625,
+            "pairedDeltaQ3": 0.6298828125
+          },
+          "heapMiB": {
+            "before": 12.218162536621094,
+            "after": 12.183406829833984,
+            "pairedDelta": -0.025745391845703125,
+            "pairedDeltaQ1": -0.07793807983398438,
+            "pairedDeltaQ3": 0.0075244903564453125
+          },
+          "dbKiB": {
+            "before": 1052,
+            "after": 1052,
+            "pairedDelta": 0,
+            "pairedDeltaQ1": 0,
+            "pairedDeltaQ3": 0
+          }
+        }
+      },
+      "append": {
+        "pairs": 20,
+        "metrics": {
+          "totalMs": {
+            "before": 289.47675000000004,
+            "after": 290.34729999999996,
+            "pairedDelta": -5.062999999999931,
+            "pairedDeltaQ1": -12.739999999999995,
+            "pairedDeltaQ3": 12.182849999999917
+          },
+          "rssMiB": {
+            "before": 89.498046875,
+            "after": 89.171875,
+            "pairedDelta": -0.27734375,
+            "pairedDeltaQ1": -1.0361328125,
+            "pairedDeltaQ3": 1.3994140625
+          },
+          "heapMiB": {
+            "before": 15.76144027709961,
+            "after": 15.746334075927734,
+            "pairedDelta": -0.00899505615234375,
+            "pairedDeltaQ1": -0.09719657897949219,
+            "pairedDeltaQ3": 0.2860603332519531
+          },
+          "dbKiB": {
+            "before": 1052,
+            "after": 1052,
+            "pairedDelta": 0,
+            "pairedDeltaQ1": 0,
+            "pairedDeltaQ3": 0
+          }
+        }
+      }
+    }
+  }
+}
