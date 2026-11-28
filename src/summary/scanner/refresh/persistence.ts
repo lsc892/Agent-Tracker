@@ -178,7 +178,7 @@ function settleDeferredComponent(context: RefreshContext, members: FileState[]):
 export function finishScan(context: RefreshContext, names: Map<string, string>): void {
   finishSourceRows(context);
   context.check();
-  context.database.transaction(() => persistNames(context, names));
+  if (names.size) context.database.transaction(() => persistNames(context, names));
 }
 
 /** 세션이 담당하지 않는 원본 행과 실패를 반영한다. */
