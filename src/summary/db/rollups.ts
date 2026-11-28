@@ -17,6 +17,16 @@ const MISSING_DAY_FILTER = `(NOT (${SESSION_SET_FILTER}) OR (provider, session_i
   SELECT json_extract(value, '$[0]'), json_extract(value, '$[1]'), json_extract(value, '$[2]') FROM json_each(?)
 ))`;
 
+// [저장 정책] 바깥 삭제와 키 대조가 같은 영향 세션 범위를 사용한다.
+function deleteAbsent(table: string, keys: string, incomingKeys: string, extraFilter = ''): string {
+  return `WITH affected_sessions(provider, session_id) AS MATERIALIZED (${SESSION_KEYS})
+    DELETE FROM ${table} WHERE ${AFFECTED_SESSION_FILTER} AND (${keys}) IN (
+      SELECT ${keys} FROM ${table} WHERE ${AFFECTED_SESSION_FILTER}${extraFilter}
+      EXCEPT
+      ${incomingKeys}
+    )`;
+}
+
 function dailyStatements(by: keyof typeof ROLLUP_TABLES, insertStage: StorageStage, deleteStage: StorageStage) {
   // [저장 정책] 집계 기준별 키로 일별 행을 UPSERT하고 NULL까지 포함해 실제로 값이 달라진 행만 갱신한다.
   const table = ROLLUP_TABLES[by];
@@ -29,22 +39,31 @@ function dailyStatements(by: keyof typeof ROLLUP_TABLES, insertStage: StorageSta
       (${fields.join(', ')}) = (${incoming.join(', ')})
     WHERE (${fields.map(field => `${table}.${field}`).join(', ')}) IS NOT (${incoming.join(', ')})`;
 
-  // [저장 정책] 바깥 삭제와 키 대조가 같은 세션 목록을 사용해 영향 세션의 PK 범위만 탐색한다.
   const incomingKeys = dailyKeySource(by);
-  const deleteAbsent = (extraFilter = '') => `WITH affected_sessions(provider, session_id) AS MATERIALIZED (${SESSION_KEYS})
-    DELETE FROM ${table} WHERE ${AFFECTED_SESSION_FILTER} AND (${keys}) IN (
-      SELECT ${keys} FROM ${table} WHERE ${AFFECTED_SESSION_FILTER}${extraFilter}
-      EXCEPT
-      ${incomingKeys}
-    )`;
-  return { upsert, insertStage, deleteStage, remove: deleteAbsent(),
-    removeWithMissing: deleteAbsent(` AND ${MISSING_DAY_FILTER}`) };
+  return { upsert, insertStage, deleteStage, remove: deleteAbsent(table, keys, incomingKeys),
+    removeWithMissing: deleteAbsent(table, keys, incomingKeys, ` AND ${MISSING_DAY_FILTER}`) };
 }
 
 const DAILY_STATEMENTS = {
   provider: dailyStatements('provider', 'rollupRequestInsert', 'rollupRequestDelete'),
   model: dailyStatements('model', 'rollupModelInsert', 'rollupModelDelete'),
 };
+
+const CAPABILITY_TABLE = 'usage_capability_daily';
+const CAPABILITY_KEY_COLUMNS = ['provider', 'session_id', 'project_key', 'local_day', 'category', 'name'];
+const CAPABILITY_KEYS = CAPABILITY_KEY_COLUMNS.join(', ');
+const capabilitySource = (columns: readonly string[]) =>
+  `SELECT ${columns.map((field, index) => `json_extract(value, '$[${index}]') AS ${field}`).join(', ')} FROM json_each(?)`;
+const CAPABILITY_UPSERT = `INSERT INTO ${CAPABILITY_TABLE}
+  SELECT ${CAPABILITY_KEYS}, SUM(usage_count)
+  FROM (${capabilitySource([...CAPABILITY_KEY_COLUMNS, 'usage_count'])})
+  WHERE true GROUP BY ${CAPABILITY_KEYS}
+  ON CONFLICT(${CAPABILITY_KEYS}) DO UPDATE SET usage_count=excluded.usage_count
+  WHERE ${CAPABILITY_TABLE}.usage_count IS NOT excluded.usage_count`;
+const CAPABILITY_KEY_SOURCE = capabilitySource(CAPABILITY_KEY_COLUMNS);
+const CAPABILITY_DELETE = deleteAbsent(CAPABILITY_TABLE, CAPABILITY_KEYS, CAPABILITY_KEY_SOURCE);
+const CAPABILITY_DELETE_WITH_MISSING = deleteAbsent(CAPABILITY_TABLE, CAPABILITY_KEYS,
+  CAPABILITY_KEY_SOURCE, ` AND ${MISSING_DAY_FILTER}`);
 
 export class UsageRollupStore {
   constructor(private readonly database: SqliteSession) {}
@@ -108,18 +127,18 @@ export class UsageRollupStore {
     } else {
       const capabilities = [];
       for (const row of summaries) {
-        for (const use of row.capability_usage ?? []) {
-          capabilities.push([row.provider, row.session_id, row.project_key, row.started_at_ms ?? null,
-            use.category, use.name, use.usage_count]);
+        if (!row.capability_usage) continue;
+        const started = row.started_at_ms;
+        let day: string | undefined;
+        for (const use of row.capability_usage) {
+          day ??= started != null && Number.isFinite(started) ? calendarPeriod(started, timezone, 'day') : '';
+          capabilities.push([row.provider, row.session_id, row.project_key, day, use.category, use.name, use.usage_count]);
         }
       }
-      const filter = missing.length ? `${SESSION_SET_FILTER} AND ${MISSING_DAY_FILTER}` : SESSION_SET_FILTER;
-      this.database.statement(`DELETE FROM usage_capability_daily WHERE ${filter}`).run(...params);
-      if (capabilities.length) this.database.statement(`INSERT INTO usage_capability_daily
-        SELECT json_extract(value,'$[0]'), json_extract(value,'$[1]'), json_extract(value,'$[2]'),
-          coalesce(agent_tracker_period(json_extract(value,'$[3]'), ?, 'day'),''),
-          json_extract(value,'$[4]'), json_extract(value,'$[5]'), sum(json_extract(value,'$[6]'))
-        FROM json_each(?) GROUP BY 1,2,3,4,5,6`).run(timezone, JSON.stringify(capabilities));
+      // [저장 정책] 새 합계와 키 대조에 같은 입력을 사용해 횟수가 바뀐 행만 쓰고 사라진 키만 지운다.
+      const payload = JSON.stringify(capabilities);
+      if (capabilities.length) this.database.statement(CAPABILITY_UPSERT).run(payload);
+      this.database.statement(missing.length ? CAPABILITY_DELETE_WITH_MISSING : CAPABILITY_DELETE).run(...params, payload);
     }
   }
 

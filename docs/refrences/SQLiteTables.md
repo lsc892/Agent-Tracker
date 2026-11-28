@@ -12,7 +12,7 @@
 | `usage_rollup_meta` | `singleton = 1` | 일별 집계 기준 시간대와 형식 버전. |
 | `usage_request_daily` | `(provider, session_id, project_key, local_day)` | 대화 사용량을 날짜별로 합친 결과. 토큰·비용, 전체·완료 표본 수, 시간 합계·표본 수와 세션 시작을 구하는 최소 시각을 보관한다. |
 | `usage_model_daily` | 위 일별 키 + `model_key` | 같은 범위의 모델별 사용량·표본·비용. 조회 시 `model_key`에서 모델명을 복원한다. `N`은 NULL, `V`는 빈 이름이고, 이름이 있으면 `V` 뒤에 붙는다. |
-| `usage_capability_daily` | 위 일별 키 + `category`, `name` | 스킬·서브에이전트·플러그인·모델 횟수. Skill 집계는 토큰 행과 같은 범위의 일별 값을 교체한다. |
+| `usage_capability_daily` | 위 일별 키 + `category`, `name` | 스킬·서브에이전트·플러그인·모델 횟수. 새 키와 횟수가 달라진 행을 쓰고 토큰 행과 같은 교체 범위에서 사라진 키를 삭제한다. |
 
 `local_day`는 통계 시간대의 날짜다. 대화 시작 시각을 날짜로 바꾸며, 시각 미상은 빈 문자열로 저장한다. 제공자·모델 일별 테이블에 평균을 위한 합계와 표본 수를 저장한다. [일별 입력](../../src/summary/db/dailyFacts.ts) · [일별 그룹 키와 날짜](../../src/summary/db/queries/rollup/source.ts)
 
