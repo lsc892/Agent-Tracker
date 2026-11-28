@@ -1,5 +1,7 @@
 # 2026-11-28 벤치마크
 
+- [중복 작업 제거 후보 4개 A/B](RedundantWorkCandidatesAB-2026-11-28.md) · [원시 표본](RedundantWorkCandidatesAB-2026-11-28.json)
+- [마지막 세션 이름 저장 일괄 처리 A/B](SessionNameBatchAB-2026-11-28.md) · [원시 표본](SessionNameBatchAB-2026-11-28.json)
 - [일별 저장 작업 절감 A/B](DailyRollupWriteAB-2026-11-28.md) · [원시 표본](DailyRollupWriteAB-2026-11-28.json)
 - [SQLite 조회·저장 중복 제거 A/B](SQLiteAuditAB-2026-11-28.md) · [원시 표본](SQLiteAuditAB-2026-11-28.json)
 - [JSONL 추가분 읽기와 SQLite 체크포인트 A/B](AppendTailRefreshAB-2026-11-28.md) · [원시 표본](AppendTailRefreshAB-2026-11-28.json)

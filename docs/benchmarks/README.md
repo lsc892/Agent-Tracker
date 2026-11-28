@@ -73,6 +73,8 @@
 
 ## 미채택·철회 및 검증 한계
 
+- [2026-11-28 중복 작업 제거 후보 4개 A/B](failure/2026-11-28/RedundantWorkCandidatesAB-2026-11-28.md) — 사용량 후보 세 개와 Codex quota 후보의 시간·메모리·DB 크기를 비교했다.
+- [2026-11-28 마지막 세션 이름 저장 일괄 처리 A/B](failure/2026-11-28/SessionNameBatchAB-2026-11-28.md) — 무변경과 1건 추가에서 이름 저장 및 전체 시간을 비교했다.
 - [2026-11-28 일별 저장 작업 절감 A/B](failure/2026-11-28/DailyRollupWriteAB-2026-11-28.md) — 현지 날짜 재사용, 도구 변경분 저장, 프로젝트 정리 생략의 시간·heap·RSS·DB·WAL을 비교했다.
 - [2026-11-28 SQLite 조회·저장 중복 제거 A/B](failure/2026-11-28/SQLiteAuditAB-2026-11-28.md) — 여섯 후보와 전체 조합의 정합성, 구간·전체 시간, heap·RSS·DB 크기를 비교했다.
 - [2026-11-28 JSONL 추가분 읽기와 SQLite 체크포인트 A/B](failure/2026-11-28/AppendTailRefreshAB-2026-11-28.md) — 실로그 1건 추가의 읽기량·갱신 시간·정합성과 체크포인트의 공간 비용을 비교했다.
