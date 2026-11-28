@@ -1,0 +1,2279 @@
+{
+  "startedAt": "2026-11-28T09:46:48.209Z",
+  "completedAt": "2026-11-28T09:50:20.757Z",
+  "builds": {
+    "A": {
+      "revision": "4d3093dd7caf525afeb3fa649d7b462e941ae948",
+      "source": "c8326bf405b911a1012db8fd6ac81a15c981583bbe1be23c551de0ece6489b9d",
+      "build": "0d91911acc483f305dabf49d911a95242d0cdc111a8379899cd1ff7cf8411bdb"
+    },
+    "B": {
+      "revision": "4d3093dd7caf525afeb3fa649d7b462e941ae948",
+      "source": "4d09dd1592e0752ef644bc1bbdc00ab5656a1886a6cdcc2ff991e1481ae4d0a6",
+      "build": "1058ac2ce3c00ae22e6db1f09e3ac690e44d2531a038d3301e2a2b7aeaec50b3"
+    }
+  },
+  "environment": {
+    "platform": "win32",
+    "release": "10.0.19045",
+    "arch": "x64",
+    "node": "v24.14.1",
+    "v8": "13.6.233.17-node.44",
+    "sqlite": "3.51.2",
+    "cpu": "AMD Ryzen 5 7500F 6-Core Processor             ",
+    "logicalCpus": 12
+  },
+  "protocol": {
+    "pairs": 20,
+    "warmups": 3,
+    "order": "shared baseline first or last, rotating candidates, sequential",
+    "sourceWorkers": 4,
+    "sampleIntervalMs": 5,
+    "timezone": "Asia/Seoul",
+    "queryIterations": 64,
+    "recentFromDay": "2026-10-30",
+    "recentToDayExclusive": "2026-11-29"
+  },
+  "verification": {
+    "normalAndRetainedDeletion": "passed",
+    "independentBillingCasesPerBasis": 7,
+    "capabilityRankingAndPagination": "independent group/sort/count and page checks in every database",
+    "targetedWorkerTestsPerBuild": 2,
+    "sqliteIntegrityAndForeignKeys": "passed",
+    "independentTotals": {
+      "synthetic": "generated full input and output totals and append delta",
+      "real": "append delta and unchanged Claude totals"
+    }
+  },
+  "inputs": {
+    "100": {
+      "initialRequests": 100,
+      "fixture": {
+        "requests": 100,
+        "tokens": 18400,
+        "sessions": 20,
+        "turnsPerSession": 5
+      },
+      "inputSha256": "776f035313dcd931d408937da1a71359186090430c2978a2b566061a3a79e0d1",
+      "append": {
+        "beforeBytes": 3331,
+        "appendedBytes": 712,
+        "parsedFiles": 1,
+        "readBytes": 4043,
+        "inputTokens": 123,
+        "outputTokens": 7,
+        "requests": 1
+      },
+      "totals": {
+        "baseline": [
+          {
+            "requests": 50,
+            "provider": "claude",
+            "input": 7350,
+            "output": 1600,
+            "tokens": 8950
+          },
+          {
+            "requests": 50,
+            "provider": "codex",
+            "input": 7600,
+            "output": 1850,
+            "tokens": 9450
+          }
+        ],
+        "afterAppend": [
+          {
+            "requests": 50,
+            "provider": "claude",
+            "input": 7350,
+            "output": 1600,
+            "tokens": 8950
+          },
+          {
+            "requests": 51,
+            "provider": "codex",
+            "input": 7723,
+            "output": 1857,
+            "tokens": 9580
+          }
+        ]
+      },
+      "toolGroups": {
+        "skill": 0,
+        "subagent": 0,
+        "plugin": 0,
+        "model": 4
+      },
+      "checks": {
+        "matchedPairs": 20,
+        "warmupPairs": 3,
+        "averageGroups": {
+          "day": 6,
+          "month": 2,
+          "session": 20,
+          "project": 10
+        },
+        "tableSha256": {
+          "usage_request_daily": "54c89ebac4bb004155e51eb3b147ebc5524d54616fed49bbb419521349e1a3ba",
+          "usage_model_daily": "ecac405384d475e1b287fab08cc96e3e0241388935442528579e3eeef100b381",
+          "usage_capability_daily": "74df6e45d65d4ad7348bea3bc67543fcd9b7419759c6068b0976b9422f8a6dc5",
+          "usage_rollup_meta": "b032255c5ddb50cfc10cc540113803190edebbdbeb88efc36f5abec60f105dae",
+          "projects": "b47e3317c065d27c2bad0853550e050062814b6969b4885a53d5eebea862bc1f",
+          "sessions": "a7eca6930b75326584d2441b5a4a2c1d295a4b6ba55666f82df7d23e5488adf8",
+          "session_billing": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "source_file": "ba96bf10f1b1b4b1dc9b7b9028c0ce78c45ac21e7d739a035f74d4d2e04bd220"
+        },
+        "sourceIdentitySha256": "e46dda8cb71852eef8aa9acaeb44cda055078371fe0f86cc8e6604e8959468fd",
+        "averageSha256": {
+          "day": "27a8b1bcb2d9624dd9b5f2e6f93ae39a84f63799ff0e3d19c62a60be6f783b28",
+          "month": "0f8dfbb8800ad12de3c3e091ef11170dbdfdbb1023e6e782be954258c4e5a6d5",
+          "session": "d3c57c48d784766b063a139c90a4c74ac1340755f63a37f13c1c47a2ded4a8a0",
+          "project": "7cca1055cd8450874f7af6813b7bfdcd2e35fdbcbe402074d0ca07e255bcff05"
+        },
+        "recentQuerySha256": {
+          "capabilities": "935473b13958c77eb01c51ce666be2391b7b929dd5c40ca1a45c607c2689a584",
+          "providerCosts": "091d0ea9b7ef51db8ddf2478e1f8757880c21b655a71f541810ad5935c4f41cd",
+          "modelCosts": "cf69a04099996d87f610e9864634a5d288318ca43baa877b01ae2a2606959a70"
+        }
+      },
+      "durations": [
+        {
+          "order": [
+            "A",
+            "B"
+          ],
+          "A": {
+            "append": 29.425200000000004,
+            "dailyDeletes": 0.2803000000000111,
+            "capability": 1.3020671875,
+            "providerCosts": 0.6713890624999999,
+            "modelCosts": 0.8269953124999994,
+            "dayAverage": 0.9222000000000037,
+            "monthAverage": 0.38750000000000284,
+            "sessionAverage": 0.46460000000000434,
+            "projectAverage": 0.397199999999998
+          },
+          "B": {
+            "append": 30.473700000000008,
+            "dailyDeletes": 0.48100000000000875,
+            "capability": 0.5783624999999999,
+            "providerCosts": 0.6383171875000002,
+            "modelCosts": 0.7586578125000001,
+            "dayAverage": 1.0369000000000028,
+            "monthAverage": 0.3937999999999988,
+            "sessionAverage": 0.50030000000001,
+            "projectAverage": 0.422300000000007
+          }
+        },
+        {
+          "order": [
+            "B",
+            "A"
+          ],
+          "A": {
+            "append": 31.535200000000003,
+            "dailyDeletes": 0.26900000000000546,
+            "capability": 1.3065531250000002,
+            "providerCosts": 0.6959312499999997,
+            "modelCosts": 0.8221953124999999,
+            "dayAverage": 0.9665000000000106,
+            "monthAverage": 0.5252000000000123,
+            "sessionAverage": 0.4677000000000078,
+            "projectAverage": 0.43139999999999645
+          },
+          "B": {
+            "append": 32.180400000000006,
+            "dailyDeletes": 0.5995000000000061,
+            "capability": 0.5475625000000002,
+            "providerCosts": 0.6831187500000002,
+            "modelCosts": 0.752915625,
+            "dayAverage": 0.9286000000000172,
+            "monthAverage": 0.40100000000001046,
+            "sessionAverage": 0.4965000000000259,
+            "projectAverage": 0.43909999999999627
+          }
+        },
+        {
+          "order": [
+            "A",
+            "B"
+          ],
+          "A": {
+            "append": 30.3699,
+            "dailyDeletes": 0.3212999999999937,
+            "capability": 1.3099796874999998,
+            "providerCosts": 0.7256812499999996,
+            "modelCosts": 0.8464546874999996,
+            "dayAverage": 0.9226999999999919,
+            "monthAverage": 0.39289999999999736,
+            "sessionAverage": 0.4671999999999912,
+            "projectAverage": 0.41729999999998313
+          },
+          "B": {
+            "append": 31.535600000000002,
+            "dailyDeletes": 0.4714999999999918,
+            "capability": 0.7791984375000003,
+            "providerCosts": 0.6806937500000001,
+            "modelCosts": 0.7549984375000003,
+            "dayAverage": 0.9625000000000057,
+            "monthAverage": 0.42099999999999227,
+            "sessionAverage": 0.46879999999998745,
+            "projectAverage": 0.4146000000000072
+          }
+        },
+        {
+          "order": [
+            "B",
+            "A"
+          ],
+          "A": {
+            "append": 30.73360000000001,
+            "dailyDeletes": 0.2751999999999981,
+            "capability": 1.2560656250000002,
+            "providerCosts": 0.6932390624999996,
+            "modelCosts": 0.9864968750000003,
+            "dayAverage": 1.1512000000000029,
+            "monthAverage": 0.4154000000000053,
+            "sessionAverage": 0.47119999999999607,
+            "projectAverage": 0.4055000000000035
+          },
+          "B": {
+            "append": 31.712400000000002,
+            "dailyDeletes": 0.4754999999999967,
+            "capability": 0.5582812500000003,
+            "providerCosts": 0.6338109375000003,
+            "modelCosts": 0.9567343749999995,
+            "dayAverage": 0.9429000000000087,
+            "monthAverage": 0.3990000000000009,
+            "sessionAverage": 0.4562999999999988,
+            "projectAverage": 0.41610000000000014
+          }
+        },
+        {
+          "order": [
+            "A",
+            "B"
+          ],
+          "A": {
+            "append": 33.363699999999994,
+            "dailyDeletes": 0.29489999999996996,
+            "capability": 1.3526656250000002,
+            "providerCosts": 0.7371062500000001,
+            "modelCosts": 0.8424078125000003,
+            "dayAverage": 0.9802999999999997,
+            "monthAverage": 0.4802999999999997,
+            "sessionAverage": 0.5200999999999851,
+            "projectAverage": 0.5261000000000138
+          },
+          "B": {
+            "append": 32.134100000000004,
+            "dailyDeletes": 0.4381000000000057,
+            "capability": 0.6047796875000002,
+            "providerCosts": 0.695325,
+            "modelCosts": 0.7810296874999998,
+            "dayAverage": 0.9795000000000016,
+            "monthAverage": 0.38819999999998345,
+            "sessionAverage": 0.46800000000001774,
+            "projectAverage": 0.4088999999999885
+          }
+        },
+        {
+          "order": [
+            "B",
+            "A"
+          ],
+          "A": {
+            "append": 30.50070000000001,
+            "dailyDeletes": 0.2507999999999839,
+            "capability": 1.2900984375000002,
+            "providerCosts": 0.6991531249999996,
+            "modelCosts": 0.8430437500000005,
+            "dayAverage": 0.9337000000000018,
+            "monthAverage": 0.3984999999999985,
+            "sessionAverage": 0.49840000000000373,
+            "projectAverage": 0.43309999999999604
+          },
+          "B": {
+            "append": 32.51809999999999,
+            "dailyDeletes": 0.4853000000000094,
+            "capability": 0.558246875,
+            "providerCosts": 0.6702062500000001,
+            "modelCosts": 0.7159781249999999,
+            "dayAverage": 0.9663000000000181,
+            "monthAverage": 0.3896000000000015,
+            "sessionAverage": 0.46869999999998413,
+            "projectAverage": 0.4095000000000084
+          }
+        },
+        {
+          "order": [
+            "A",
+            "B"
+          ],
+          "A": {
+            "append": 31.080399999999983,
+            "dailyDeletes": 0.29070000000000107,
+            "capability": 1.2682499999999997,
+            "providerCosts": 0.6974765624999999,
+            "modelCosts": 0.8231000000000002,
+            "dayAverage": 0.9273000000000025,
+            "monthAverage": 0.3808999999999969,
+            "sessionAverage": 0.45340000000001623,
+            "projectAverage": 0.41030000000000655
+          },
+          "B": {
+            "append": 30.927800000000005,
+            "dailyDeletes": 0.3913000000000011,
+            "capability": 0.5722765624999999,
+            "providerCosts": 0.685853125,
+            "modelCosts": 0.7220453125000001,
+            "dayAverage": 0.9230999999999909,
+            "monthAverage": 0.4007000000000005,
+            "sessionAverage": 0.4613000000000085,
+            "projectAverage": 0.4186000000000121
+          }
+        },
+        {
+          "order": [
+            "B",
+            "A"
+          ],
+          "A": {
+            "append": 33.12140000000001,
+            "dailyDeletes": 0.3538000000000068,
+            "capability": 1.3094765625,
+            "providerCosts": 0.7123812500000004,
+            "modelCosts": 0.8354375000000003,
+            "dayAverage": 1.0378999999999934,
+            "monthAverage": 0.4823999999999842,
+            "sessionAverage": 0.4719000000000051,
+            "projectAverage": 0.4994000000000085
+          },
+          "B": {
+            "append": 31.196399999999997,
+            "dailyDeletes": 0.44769999999998333,
+            "capability": 0.5707499999999999,
+            "providerCosts": 0.6488328125000002,
+            "modelCosts": 0.7797093749999995,
+            "dayAverage": 0.9267999999999859,
+            "monthAverage": 0.41319999999998913,
+            "sessionAverage": 0.4603999999999928,
+            "projectAverage": 0.4869000000000199
+          }
+        },
+        {
+          "order": [
+            "A",
+            "B"
+          ],
+          "A": {
+            "append": 30.9456,
+            "dailyDeletes": 0.2977999999999952,
+            "capability": 1.3456296875000002,
+            "providerCosts": 0.7250609374999999,
+            "modelCosts": 0.8299421875000004,
+            "dayAverage": 0.9662000000000006,
+            "monthAverage": 0.40389999999999304,
+            "sessionAverage": 0.5209000000000117,
+            "projectAverage": 3.792400000000015
+          },
+          "B": {
+            "append": 30.661600000000007,
+            "dailyDeletes": 0.4743000000000137,
+            "capability": 0.5704515624999997,
+            "providerCosts": 0.6781328124999999,
+            "modelCosts": 0.7727968749999996,
+            "dayAverage": 0.9353000000000122,
+            "monthAverage": 0.3954999999999984,
+            "sessionAverage": 0.4749999999999943,
+            "projectAverage": 0.4060000000000059
+          }
+        },
+        {
+          "order": [
+            "B",
+            "A"
+          ],
+          "A": {
+            "append": 31.144599999999997,
+            "dailyDeletes": 0.2638000000000176,
+            "capability": 1.2400921874999997,
+            "providerCosts": 0.6767890625000001,
+            "modelCosts": 0.8611859374999993,
+            "dayAverage": 0.9061000000000092,
+            "monthAverage": 0.39509999999999934,
+            "sessionAverage": 0.47390000000000043,
+            "projectAverage": 0.4083000000000112
+          },
+          "B": {
+            "append": 31.4045,
+            "dailyDeletes": 0.443799999999996,
+            "capability": 0.5681046875,
+            "providerCosts": 0.6495406249999998,
+            "modelCosts": 0.7536750000000003,
+            "dayAverage": 0.9377000000000066,
+            "monthAverage": 0.3989000000000118,
+            "sessionAverage": 0.4630999999999972,
+            "projectAverage": 0.42660000000000764
+          }
+        },
+        {
+          "order": [
+            "A",
+            "B"
+          ],
+          "A": {
+            "append": 29.591799999999992,
+            "dailyDeletes": 0.2563999999999851,
+            "capability": 1.4693312499999998,
+            "providerCosts": 0.7110765624999997,
+            "modelCosts": 0.8791968749999999,
+            "dayAverage": 0.9417000000000115,
+            "monthAverage": 0.3819999999999908,
+            "sessionAverage": 0.46649999999999636,
+            "projectAverage": 0.40989999999999327
+          },
+          "B": {
+            "append": 33.94269999999999,
+            "dailyDeletes": 0.47400000000001796,
+            "capability": 0.5894046874999996,
+            "providerCosts": 0.6728296874999997,
+            "modelCosts": 0.7518203125,
+            "dayAverage": 0.9946999999999946,
+            "monthAverage": 0.41669999999999163,
+            "sessionAverage": 0.47620000000000573,
+            "projectAverage": 0.4335000000000093
+          }
+        },
+        {
+          "order": [
+            "B",
+            "A"
+          ],
+          "A": {
+            "append": 30.16210000000001,
+            "dailyDeletes": 0.2954999999999899,
+            "capability": 1.2863390624999997,
+            "providerCosts": 0.686040625,
+            "modelCosts": 0.8484953124999999,
+            "dayAverage": 0.9316999999999922,
+            "monthAverage": 0.4017000000000053,
+            "sessionAverage": 0.4609999999999985,
+            "projectAverage": 0.41729999999999734
+          },
+          "B": {
+            "append": 32.804500000000004,
+            "dailyDeletes": 0.4159999999999968,
+            "capability": 0.5952156249999998,
+            "providerCosts": 0.6490343749999998,
+            "modelCosts": 0.7712515624999998,
+            "dayAverage": 0.9385000000000048,
+            "monthAverage": 0.38920000000001664,
+            "sessionAverage": 0.4671000000000163,
+            "projectAverage": 0.4159999999999968
+          }
+        },
+        {
+          "order": [
+            "A",
+            "B"
+          ],
+          "A": {
+            "append": 32.00590000000001,
+            "dailyDeletes": 0.28990000000000293,
+            "capability": 1.3124406250000002,
+            "providerCosts": 0.7242171875000003,
+            "modelCosts": 0.7939296874999995,
+            "dayAverage": 0.9084000000000003,
+            "monthAverage": 0.3966000000000065,
+            "sessionAverage": 0.47280000000000655,
+            "projectAverage": 0.41320000000000334
+          },
+          "B": {
+            "append": 29.96350000000001,
+            "dailyDeletes": 0.44089999999998497,
+            "capability": 0.5573000000000001,
+            "providerCosts": 0.6312796875000002,
+            "modelCosts": 0.7582718750000002,
+            "dayAverage": 0.997399999999999,
+            "monthAverage": 0.4969999999999999,
+            "sessionAverage": 0.477099999999993,
+            "projectAverage": 0.4129999999999967
+          }
+        },
+        {
+          "order": [
+            "B",
+            "A"
+          ],
+          "A": {
+            "append": 31.015500000000003,
+            "dailyDeletes": 0.2948999999999842,
+            "capability": 1.3286578125,
+            "providerCosts": 0.7431234374999995,
+            "modelCosts": 0.8311312500000003,
+            "dayAverage": 0.9185999999999979,
+            "monthAverage": 0.38760000000000616,
+            "sessionAverage": 0.4706999999999937,
+            "projectAverage": 0.42249999999999943
+          },
+          "B": {
+            "append": 30.804100000000005,
+            "dailyDeletes": 0.4735999999999905,
+            "capability": 0.5600359374999999,
+            "providerCosts": 0.6810437500000002,
+            "modelCosts": 0.7644375000000001,
+            "dayAverage": 1.1702999999999975,
+            "monthAverage": 0.5049000000000063,
+            "sessionAverage": 0.47690000000000055,
+            "projectAverage": 0.4046999999999912
+          }
+        },
+        {
+          "order": [
+            "A",
+            "B"
+          ],
+          "A": {
+            "append": 29.943600000000004,
+            "dailyDeletes": 0.26789999999999736,
+            "capability": 1.3168171875000003,
+            "providerCosts": 0.7064828125,
+            "modelCosts": 0.8207265625,
+            "dayAverage": 8.352100000000007,
+            "monthAverage": 0.40459999999998786,
+            "sessionAverage": 0.5063999999999851,
+            "projectAverage": 0.434599999999989
+          },
+          "B": {
+            "append": 30.3784,
+            "dailyDeletes": 0.40279999999998495,
+            "capability": 0.7013781249999997,
+            "providerCosts": 0.6663890625,
+            "modelCosts": 0.7371234375000002,
+            "dayAverage": 0.9162999999999926,
+            "monthAverage": 0.4643000000000086,
+            "sessionAverage": 0.48519999999999186,
+            "projectAverage": 0.4017000000000053
+          }
+        },
+        {
+          "order": [
+            "B",
+            "A"
+          ],
+          "A": {
+            "append": 32.9169,
+            "dailyDeletes": 0.27899999999999636,
+            "capability": 1.3058421875000001,
+            "providerCosts": 0.7106093749999998,
+            "modelCosts": 0.793878125,
+            "dayAverage": 0.9317999999999955,
+            "monthAverage": 0.39330000000001064,
+            "sessionAverage": 0.5380000000000109,
+            "projectAverage": 1.6687000000000012
+          },
+          "B": {
+            "append": 30.97439999999999,
+            "dailyDeletes": 0.4747999999999877,
+            "capability": 0.5724265625,
+            "providerCosts": 0.6430531249999998,
+            "modelCosts": 0.7383421874999998,
+            "dayAverage": 1.1544000000000096,
+            "monthAverage": 0.4790000000000134,
+            "sessionAverage": 0.4824000000000126,
+            "projectAverage": 0.42310000000000514
+          }
+        },
+        {
+          "order": [
+            "A",
+            "B"
+          ],
+          "A": {
+            "append": 30.87830000000001,
+            "dailyDeletes": 0.3573000000000093,
+            "capability": 1.2922796875000002,
+            "providerCosts": 0.7288562500000002,
+            "modelCosts": 0.8948749999999999,
+            "dayAverage": 0.9685000000000059,
+            "monthAverage": 0.3948000000000036,
+            "sessionAverage": 0.4843999999999937,
+            "projectAverage": 0.45120000000000005
+          },
+          "B": {
+            "append": 31.47269999999999,
+            "dailyDeletes": 0.4403999999999968,
+            "capability": 0.6033124999999999,
+            "providerCosts": 0.6941734374999999,
+            "modelCosts": 0.7720656249999998,
+            "dayAverage": 0.9486000000000132,
+            "monthAverage": 0.42560000000000286,
+            "sessionAverage": 0.49459999999999127,
+            "projectAverage": 0.4239999999999924
+          }
+        },
+        {
+          "order": [
+            "B",
+            "A"
+          ],
+          "A": {
+            "append": 30.899,
+            "dailyDeletes": 0.3301999999999907,
+            "capability": 1.2354875,
+            "providerCosts": 0.6757171874999996,
+            "modelCosts": 0.8198140624999999,
+            "dayAverage": 0.9031999999999982,
+            "monthAverage": 0.4456000000000131,
+            "sessionAverage": 0.45800000000002683,
+            "projectAverage": 0.40229999999999677
+          },
+          "B": {
+            "append": 32.5933,
+            "dailyDeletes": 0.5111999999999881,
+            "capability": 0.6564140625000001,
+            "providerCosts": 0.6726359375,
+            "modelCosts": 0.7838718749999996,
+            "dayAverage": 0.9382999999999981,
+            "monthAverage": 0.38649999999998386,
+            "sessionAverage": 0.519299999999987,
+            "projectAverage": 0.42130000000000223
+          }
+        },
+        {
+          "order": [
+            "A",
+            "B"
+          ],
+          "A": {
+            "append": 29.900400000000005,
+            "dailyDeletes": 0.2916000000000025,
+            "capability": 1.28860625,
+            "providerCosts": 0.7158796874999998,
+            "modelCosts": 0.8245343749999998,
+            "dayAverage": 0.8990000000000009,
+            "monthAverage": 0.3942000000000121,
+            "sessionAverage": 0.47050000000000125,
+            "projectAverage": 0.41030000000000655
+          },
+          "B": {
+            "append": 32.3969,
+            "dailyDeletes": 0.5281999999999982,
+            "capability": 0.7079421875,
+            "providerCosts": 0.6709390624999996,
+            "modelCosts": 0.7125796874999999,
+            "dayAverage": 1.1632000000000176,
+            "monthAverage": 0.5124000000000137,
+            "sessionAverage": 0.5792999999999893,
+            "projectAverage": 0.40749999999999886
+          }
+        },
+        {
+          "order": [
+            "B",
+            "A"
+          ],
+          "A": {
+            "append": 35.03309999999999,
+            "dailyDeletes": 0.41389999999999816,
+            "capability": 1.3343124999999998,
+            "providerCosts": 0.70151875,
+            "modelCosts": 0.8591859374999995,
+            "dayAverage": 0.9202999999999975,
+            "monthAverage": 0.3889000000000067,
+            "sessionAverage": 0.578899999999976,
+            "projectAverage": 0.4462000000000046
+          },
+          "B": {
+            "append": 31.3395,
+            "dailyDeletes": 0.46189999999998577,
+            "capability": 0.5641562499999999,
+            "providerCosts": 0.648478125,
+            "modelCosts": 0.7507265624999997,
+            "dayAverage": 1.0756999999999977,
+            "monthAverage": 0.43070000000000164,
+            "sessionAverage": 0.49339999999999407,
+            "projectAverage": 0.5041000000000082
+          }
+        }
+      ],
+      "timings": {
+        "append": {
+          "a": 30.9223,
+          "b": 31.438599999999994,
+          "reductionPercent": -1.6696688150622494,
+          "fasterPairs": 8,
+          "pairedDeltaIqr": [
+            -0.5203999999999915,
+            1.2978500000000004
+          ]
+        },
+        "dailyDeletes": {
+          "a": 0.2911500000000018,
+          "b": 0.47254999999999114,
+          "reductionPercent": -62.30465395843662,
+          "fasterPairs": 0,
+          "pairedDeltaIqr": [
+            0.13129999999999242,
+            0.20039999999999836
+          ]
+        },
+        "capability": {
+          "a": 1.3061976562500002,
+          "b": 0.5723515625,
+          "reductionPercent": 56.181856569611355,
+          "fasterPairs": 20,
+          "pairedDeltaIqr": [
+            -0.7561031250000001,
+            -0.6847222656250002
+          ]
+        },
+        "providerCosts": {
+          "a": 0.7085460937499999,
+          "b": 0.6705726562499998,
+          "reductionPercent": 5.359346108172662,
+          "fasterPairs": 20,
+          "pairedDeltaIqr": [
+            -0.05463749999999978,
+            -0.0320406249999996
+          ]
+        },
+        "modelCosts": {
+          "a": 0.8332843750000003,
+          "b": 0.7566351562500002,
+          "reductionPercent": 9.198446658741208,
+          "fasterPairs": 20,
+          "pairedDeltaIqr": [
+            -0.10774804687499917,
+            -0.056791015625000774
+          ]
+        },
+        "dayAverage": {
+          "a": 0.9317499999999939,
+          "b": 0.9555500000000094,
+          "reductionPercent": -2.5543332438975845,
+          "fasterPairs": 8,
+          "pairedDeltaIqr": [
+            -0.02264999999999162,
+            0.09542499999999876
+          ]
+        },
+        "monthAverage": {
+          "a": 0.3958500000000029,
+          "b": 0.4070999999999998,
+          "reductionPercent": -2.84198560060548,
+          "fasterPairs": 8,
+          "pairedDeltaIqr": [
+            -0.013474999999992576,
+            0.0462750000000014
+          ]
+        },
+        "sessionAverage": {
+          "a": 0.4715500000000006,
+          "b": 0.47655000000000314,
+          "reductionPercent": -1.0603329445451282,
+          "fasterPairs": 9,
+          "pairedDeltaIqr": [
+            -0.023324999999999818,
+            0.009825000000006412
+          ]
+        },
+        "projectAverage": {
+          "a": 0.4198999999999984,
+          "b": 0.4173500000000061,
+          "reductionPercent": 0.6072874493908765,
+          "fasterPairs": 12,
+          "pairedDeltaIqr": [
+            -0.02449999999999264,
+            0.012524999999996567
+          ]
+        }
+      }
+    },
+    "10000": {
+      "initialRequests": 10000,
+      "fixture": {
+        "requests": 10000,
+        "tokens": 6340000,
+        "sessions": 200,
+        "turnsPerSession": 50
+      },
+      "inputSha256": "41c63e61babca594b2c427db7c36fad86664ac2b92b94ec4ccf1cf5a08f6fead",
+      "append": {
+        "beforeBytes": 33218,
+        "appendedBytes": 712,
+        "parsedFiles": 1,
+        "readBytes": 33930,
+        "inputTokens": 123,
+        "outputTokens": 7,
+        "requests": 1
+      },
+      "totals": {
+        "baseline": [
+          {
+            "requests": 5000,
+            "provider": "claude",
+            "input": 2872500,
+            "output": 172500,
+            "tokens": 3045000
+          },
+          {
+            "requests": 5000,
+            "provider": "codex",
+            "input": 3122500,
+            "output": 172500,
+            "tokens": 3295000
+          }
+        ],
+        "afterAppend": [
+          {
+            "requests": 5000,
+            "provider": "claude",
+            "input": 2872500,
+            "output": 172500,
+            "tokens": 3045000
+          },
+          {
+            "requests": 5001,
+            "provider": "codex",
+            "input": 3122623,
+            "output": 172507,
+            "tokens": 3295130
+          }
+        ]
+      },
+      "toolGroups": {
+        "skill": 0,
+        "subagent": 0,
+        "plugin": 0,
+        "model": 4
+      },
+      "checks": {
+        "matchedPairs": 20,
+        "warmupPairs": 3,
+        "averageGroups": {
+          "day": 50,
+          "month": 2,
+          "session": 200,
+          "project": 10
+        },
+        "tableSha256": {
+          "usage_request_daily": "2cee17c7e5f51f83da49a3bbbee5d72c99ef6d4f59a07e1d1bad7887ee5402d3",
+          "usage_model_daily": "da0e09d9c6539c6ca2641394e62d59f443e5d223274d2f28f08206f6d28c3a23",
+          "usage_capability_daily": "ff11a9720f63cb9e79c22312a600c7991d921a72eac0471716f1236b71199d78",
+          "usage_rollup_meta": "b032255c5ddb50cfc10cc540113803190edebbdbeb88efc36f5abec60f105dae",
+          "projects": "b47e3317c065d27c2bad0853550e050062814b6969b4885a53d5eebea862bc1f",
+          "sessions": "329f6e06095fbb1414c92d9015088601aaf0bb8a1bc92b6a3968b39dd4b0026c",
+          "session_billing": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "source_file": "62d58276be4cadefe58ddce022c11d8b93552aa6a2f7115b11b4a129a9bacce6"
+        },
+        "sourceIdentitySha256": "3f03ba303edc6154e3bd21a1d3858cb207483ff3b6b63ece393cf1b22c272584",
+        "averageSha256": {
+          "day": "f24819c8417034979d4df497df3412b3e874697ba760e65c1f7b04f7bdd433bd",
+          "month": "b481877f8f8731f0f77a923a38f3f540feef8de16d2fd6e37de2f03dbadd4b18",
+          "session": "c6d3040011703684f08c950dac9060d33a987ec22d251c6f46222b7adb4e8774",
+          "project": "213666c31a4f21882c8f44cff0f104e1ddd6964e175e208f47d2ff4bb1160c32"
+        },
+        "recentQuerySha256": {
+          "capabilities": "5853abb72812472fc0777d8c182526f10595d43e2d1b4d24086421549df2a6fb",
+          "providerCosts": "97bb64e79c32a23f4383dd5bdad7f28830bf9ab1c898206214818d12e228fd1b",
+          "modelCosts": "05d1b2825db6b28dd31f58f2196fd7a52d64ba5c5078963ea9226e0cbec163ba"
+        }
+      },
+      "durations": [
+        {
+          "order": [
+            "A",
+            "B"
+          ],
+          "A": {
+            "append": 61.70450000000001,
+            "dailyDeletes": 3.531499999999994,
+            "capability": 8.2697828125,
+            "providerCosts": 12.122882812499999,
+            "modelCosts": 23.7580625,
+            "dayAverage": 5.366300000000024,
+            "monthAverage": 4.18059999999997,
+            "sessionAverage": 3.519200000000012,
+            "projectAverage": 4.630300000000034
+          },
+          "B": {
+            "append": 56.86749999999999,
+            "dailyDeletes": 0.494199999999978,
+            "capability": 4.8183015625,
+            "providerCosts": 6.65671875,
+            "modelCosts": 15.9893140625,
+            "dayAverage": 5.908200000000022,
+            "monthAverage": 4.858299999999986,
+            "sessionAverage": 3.6924999999999955,
+            "projectAverage": 4.234700000000032
+          }
+        },
+        {
+          "order": [
+            "B",
+            "A"
+          ],
+          "A": {
+            "append": 64.83909999999999,
+            "dailyDeletes": 3.691500000000019,
+            "capability": 8.1744234375,
+            "providerCosts": 12.052499999999998,
+            "modelCosts": 24.143484374999996,
+            "dayAverage": 5.241399999999999,
+            "monthAverage": 4.188699999999983,
+            "sessionAverage": 3.651299999999992,
+            "projectAverage": 4.006899999999973
+          },
+          "B": {
+            "append": 57.58200000000001,
+            "dailyDeletes": 0.5185000000000173,
+            "capability": 4.723267187499999,
+            "providerCosts": 6.819840624999999,
+            "modelCosts": 15.538809375,
+            "dayAverage": 5.38130000000001,
+            "monthAverage": 4.3156999999999925,
+            "sessionAverage": 3.6311000000000035,
+            "projectAverage": 4.189000000000021
+          }
+        },
+        {
+          "order": [
+            "A",
+            "B"
+          ],
+          "A": {
+            "append": 59.67030000000001,
+            "dailyDeletes": 3.4080000000000155,
+            "capability": 7.933945312500001,
+            "providerCosts": 12.2064625,
+            "modelCosts": 23.8499203125,
+            "dayAverage": 5.7777000000000385,
+            "monthAverage": 4.573800000000006,
+            "sessionAverage": 3.866100000000017,
+            "projectAverage": 4.2812999999999874
+          },
+          "B": {
+            "append": 57.81890000000001,
+            "dailyDeletes": 0.5078000000000031,
+            "capability": 4.954895312500001,
+            "providerCosts": 6.852770312500001,
+            "modelCosts": 15.745235937499999,
+            "dayAverage": 5.537199999999984,
+            "monthAverage": 4.32710000000003,
+            "sessionAverage": 4.142300000000034,
+            "projectAverage": 3.9762000000000057
+          }
+        },
+        {
+          "order": [
+            "B",
+            "A"
+          ],
+          "A": {
+            "append": 60.11500000000001,
+            "dailyDeletes": 3.5046000000000106,
+            "capability": 7.973221875,
+            "providerCosts": 12.643504687499998,
+            "modelCosts": 23.431823437500004,
+            "dayAverage": 5.2584999999999695,
+            "monthAverage": 4.2309999999999945,
+            "sessionAverage": 3.54910000000001,
+            "projectAverage": 4.251800000000003
+          },
+          "B": {
+            "append": 58.2825,
+            "dailyDeletes": 0.5465999999999838,
+            "capability": 4.7772468749999994,
+            "providerCosts": 6.6421171874999985,
+            "modelCosts": 15.603470312499997,
+            "dayAverage": 5.800000000000011,
+            "monthAverage": 4.443499999999972,
+            "sessionAverage": 4.067000000000007,
+            "projectAverage": 4.925199999999961
+          }
+        },
+        {
+          "order": [
+            "A",
+            "B"
+          ],
+          "A": {
+            "append": 64.3499,
+            "dailyDeletes": 3.8555999999999813,
+            "capability": 7.954762499999999,
+            "providerCosts": 12.1942109375,
+            "modelCosts": 24.173790625,
+            "dayAverage": 5.371000000000038,
+            "monthAverage": 4.222700000000032,
+            "sessionAverage": 3.654299999999978,
+            "projectAverage": 4.072799999999972
+          },
+          "B": {
+            "append": 58.63390000000001,
+            "dailyDeletes": 0.5045999999999822,
+            "capability": 4.944559375000001,
+            "providerCosts": 6.971298437499998,
+            "modelCosts": 15.494621875,
+            "dayAverage": 5.168700000000001,
+            "monthAverage": 4.228499999999997,
+            "sessionAverage": 3.553100000000029,
+            "projectAverage": 4.898199999999974
+          }
+        },
+        {
+          "order": [
+            "B",
+            "A"
+          ],
+          "A": {
+            "append": 58.9799,
+            "dailyDeletes": 3.5193000000000154,
+            "capability": 7.9032124999999995,
+            "providerCosts": 11.792762499999998,
+            "modelCosts": 23.927587499999998,
+            "dayAverage": 6.06189999999998,
+            "monthAverage": 5.584300000000042,
+            "sessionAverage": 4.060799999999972,
+            "projectAverage": 4.272899999999993
+          },
+          "B": {
+            "append": 58.42359999999999,
+            "dailyDeletes": 0.728100000000012,
+            "capability": 5.333984375,
+            "providerCosts": 6.662415625000001,
+            "modelCosts": 16.5318171875,
+            "dayAverage": 5.335299999999961,
+            "monthAverage": 4.995400000000018,
+            "sessionAverage": 3.7502999999999815,
+            "projectAverage": 5.031499999999994
+          }
+        },
+        {
+          "order": [
+            "A",
+            "B"
+          ],
+          "A": {
+            "append": 61.36519999999999,
+            "dailyDeletes": 3.5896000000000186,
+            "capability": 7.986896875,
+            "providerCosts": 12.150365625000003,
+            "modelCosts": 24.2670265625,
+            "dayAverage": 5.18689999999998,
+            "monthAverage": 4.371300000000019,
+            "sessionAverage": 3.5351,
+            "projectAverage": 4.391300000000001
+          },
+          "B": {
+            "append": 58.69850000000001,
+            "dailyDeletes": 0.5366999999999962,
+            "capability": 4.7166250000000005,
+            "providerCosts": 6.770371875,
+            "modelCosts": 15.9106953125,
+            "dayAverage": 5.4406999999999925,
+            "monthAverage": 4.2047999999999774,
+            "sessionAverage": 3.5183000000000106,
+            "projectAverage": 4.536200000000008
+          }
+        },
+        {
+          "order": [
+            "B",
+            "A"
+          ],
+          "A": {
+            "append": 59.4487,
+            "dailyDeletes": 3.4617000000000075,
+            "capability": 8.0020359375,
+            "providerCosts": 11.986125000000001,
+            "modelCosts": 23.84676875,
+            "dayAverage": 5.519600000000025,
+            "monthAverage": 4.578700000000026,
+            "sessionAverage": 3.521699999999953,
+            "projectAverage": 4.460899999999981
+          },
+          "B": {
+            "append": 57.16059999999999,
+            "dailyDeletes": 0.5305999999999926,
+            "capability": 4.945514062500001,
+            "providerCosts": 7.111478125,
+            "modelCosts": 15.895129687499999,
+            "dayAverage": 5.314999999999998,
+            "monthAverage": 4.810200000000009,
+            "sessionAverage": 3.82529999999997,
+            "projectAverage": 4.971499999999992
+          }
+        },
+        {
+          "order": [
+            "A",
+            "B"
+          ],
+          "A": {
+            "append": 60.78819999999999,
+            "dailyDeletes": 3.8004999999999995,
+            "capability": 8.138948437500002,
+            "providerCosts": 11.631065625000002,
+            "modelCosts": 23.8744046875,
+            "dayAverage": 5.2613999999999805,
+            "monthAverage": 4.2076999999999884,
+            "sessionAverage": 3.539299999999969,
+            "projectAverage": 4.0306000000000495
+          },
+          "B": {
+            "append": 56.119299999999996,
+            "dailyDeletes": 0.48400000000000887,
+            "capability": 4.9763874999999995,
+            "providerCosts": 6.632948437499998,
+            "modelCosts": 15.752321875,
+            "dayAverage": 5.315600000000018,
+            "monthAverage": 4.337599999999952,
+            "sessionAverage": 3.5977000000000317,
+            "projectAverage": 4.109200000000044
+          }
+        },
+        {
+          "order": [
+            "B",
+            "A"
+          ],
+          "A": {
+            "append": 61.01110000000001,
+            "dailyDeletes": 3.8950000000000102,
+            "capability": 8.125915625000001,
+            "providerCosts": 12.538975,
+            "modelCosts": 24.1999328125,
+            "dayAverage": 5.456200000000024,
+            "monthAverage": 4.240000000000009,
+            "sessionAverage": 4.402600000000007,
+            "projectAverage": 4.079400000000021
+          },
+          "B": {
+            "append": 58.6917,
+            "dailyDeletes": 0.6310000000000002,
+            "capability": 4.96435,
+            "providerCosts": 6.926976562500002,
+            "modelCosts": 15.341184374999997,
+            "dayAverage": 8.730999999999995,
+            "monthAverage": 10.067700000000002,
+            "sessionAverage": 7.740599999999972,
+            "projectAverage": 5.3670999999999935
+          }
+        },
+        {
+          "order": [
+            "A",
+            "B"
+          ],
+          "A": {
+            "append": 59.13450000000002,
+            "dailyDeletes": 3.470499999999987,
+            "capability": 8.255884375,
+            "providerCosts": 12.011357812499998,
+            "modelCosts": 24.0105859375,
+            "dayAverage": 5.196100000000001,
+            "monthAverage": 4.3940000000000055,
+            "sessionAverage": 3.5336999999999534,
+            "projectAverage": 4.1089000000000055
+          },
+          "B": {
+            "append": 61.22030000000001,
+            "dailyDeletes": 0.5020999999999844,
+            "capability": 4.796896875,
+            "providerCosts": 6.717495312499999,
+            "modelCosts": 15.3074296875,
+            "dayAverage": 6.112700000000018,
+            "monthAverage": 4.524900000000002,
+            "sessionAverage": 3.75060000000002,
+            "projectAverage": 4.2374000000000365
+          }
+        },
+        {
+          "order": [
+            "B",
+            "A"
+          ],
+          "A": {
+            "append": 62.632700000000014,
+            "dailyDeletes": 3.587900000000019,
+            "capability": 8.184459375000001,
+            "providerCosts": 11.755603125,
+            "modelCosts": 23.736673437500002,
+            "dayAverage": 5.621100000000013,
+            "monthAverage": 4.477100000000007,
+            "sessionAverage": 3.844100000000026,
+            "projectAverage": 4.491800000000012
+          },
+          "B": {
+            "append": 55.7252,
+            "dailyDeletes": 0.5407999999999902,
+            "capability": 4.793896875,
+            "providerCosts": 6.718428125000001,
+            "modelCosts": 15.742420312500002,
+            "dayAverage": 5.8933999999999855,
+            "monthAverage": 4.7423,
+            "sessionAverage": 3.8559999999999945,
+            "projectAverage": 5.8759000000000015
+          }
+        },
+        {
+          "order": [
+            "A",
+            "B"
+          ],
+          "A": {
+            "append": 70.0254,
+            "dailyDeletes": 4.287399999999991,
+            "capability": 8.31418125,
+            "providerCosts": 12.180181249999997,
+            "modelCosts": 24.1722375,
+            "dayAverage": 7.055700000000002,
+            "monthAverage": 14.898000000000025,
+            "sessionAverage": 7.312099999999987,
+            "projectAverage": 5.7625000000000455
+          },
+          "B": {
+            "append": 56.6811,
+            "dailyDeletes": 0.5340999999999951,
+            "capability": 4.8138015625,
+            "providerCosts": 6.7464031250000005,
+            "modelCosts": 15.9001953125,
+            "dayAverage": 5.32650000000001,
+            "monthAverage": 4.2577,
+            "sessionAverage": 3.898300000000006,
+            "projectAverage": 4.2765999999999735
+          }
+        },
+        {
+          "order": [
+            "B",
+            "A"
+          ],
+          "A": {
+            "append": 63.18560000000001,
+            "dailyDeletes": 4.629300000000001,
+            "capability": 8.2944484375,
+            "providerCosts": 12.036071875000001,
+            "modelCosts": 23.8828875,
+            "dayAverage": 5.1906999999999925,
+            "monthAverage": 4.213400000000036,
+            "sessionAverage": 3.8558000000000447,
+            "projectAverage": 4.119399999999985
+          },
+          "B": {
+            "append": 65.60690000000001,
+            "dailyDeletes": 0.5382999999999925,
+            "capability": 5.03938125,
+            "providerCosts": 7.283385937500002,
+            "modelCosts": 15.515959375000001,
+            "dayAverage": 5.870499999999993,
+            "monthAverage": 4.378499999999974,
+            "sessionAverage": 3.5996999999999844,
+            "projectAverage": 4.407799999999952
+          }
+        },
+        {
+          "order": [
+            "A",
+            "B"
+          ],
+          "A": {
+            "append": 69.3056,
+            "dailyDeletes": 4.1053,
+            "capability": 8.2292578125,
+            "providerCosts": 12.201620312499998,
+            "modelCosts": 23.731710937499997,
+            "dayAverage": 5.468299999999999,
+            "monthAverage": 4.422799999999995,
+            "sessionAverage": 3.73580000000004,
+            "projectAverage": 4.168200000000013
+          },
+          "B": {
+            "append": 64.50800000000001,
+            "dailyDeletes": 0.5386000000000024,
+            "capability": 4.7399734375,
+            "providerCosts": 6.8100921875000004,
+            "modelCosts": 16.10090625,
+            "dayAverage": 5.177700000000016,
+            "monthAverage": 4.836099999999988,
+            "sessionAverage": 3.608699999999999,
+            "projectAverage": 4.036200000000008
+          }
+        },
+        {
+          "order": [
+            "B",
+            "A"
+          ],
+          "A": {
+            "append": 58.55080000000001,
+            "dailyDeletes": 3.670899999999989,
+            "capability": 8.245496875,
+            "providerCosts": 11.7691046875,
+            "modelCosts": 24.260370312499997,
+            "dayAverage": 5.397099999999966,
+            "monthAverage": 4.422500000000014,
+            "sessionAverage": 3.8712999999999624,
+            "projectAverage": 4.186900000000037
+          },
+          "B": {
+            "append": 56.09599999999999,
+            "dailyDeletes": 0.5938000000000159,
+            "capability": 4.897535937500001,
+            "providerCosts": 6.745753125,
+            "modelCosts": 15.675520312499998,
+            "dayAverage": 5.435799999999972,
+            "monthAverage": 4.38130000000001,
+            "sessionAverage": 3.570100000000025,
+            "projectAverage": 4.163699999999949
+          }
+        },
+        {
+          "order": [
+            "A",
+            "B"
+          ],
+          "A": {
+            "append": 60.0265,
+            "dailyDeletes": 3.490399999999994,
+            "capability": 8.474245312499999,
+            "providerCosts": 12.107790625,
+            "modelCosts": 23.7930765625,
+            "dayAverage": 5.39689999999996,
+            "monthAverage": 4.531100000000038,
+            "sessionAverage": 3.7035999999999945,
+            "projectAverage": 4.0663000000000125
+          },
+          "B": {
+            "append": 71.81490000000001,
+            "dailyDeletes": 0.9609000000000094,
+            "capability": 4.76935,
+            "providerCosts": 6.9128687499999995,
+            "modelCosts": 15.6776484375,
+            "dayAverage": 5.2690000000000055,
+            "monthAverage": 4.6684999999999945,
+            "sessionAverage": 3.7959999999999923,
+            "projectAverage": 4.153099999999995
+          }
+        },
+        {
+          "order": [
+            "B",
+            "A"
+          ],
+          "A": {
+            "append": 60.07800000000002,
+            "dailyDeletes": 3.518499999999989,
+            "capability": 8.353603125,
+            "providerCosts": 12.051059374999998,
+            "modelCosts": 23.754240625,
+            "dayAverage": 5.232499999999959,
+            "monthAverage": 4.319299999999998,
+            "sessionAverage": 3.624400000000037,
+            "projectAverage": 3.879599999999982
+          },
+          "B": {
+            "append": 57.776300000000006,
+            "dailyDeletes": 0.5586000000000126,
+            "capability": 4.959664062500001,
+            "providerCosts": 6.867045312500002,
+            "modelCosts": 15.3889125,
+            "dayAverage": 5.261699999999962,
+            "monthAverage": 4.212700000000041,
+            "sessionAverage": 3.615000000000009,
+            "projectAverage": 4.203600000000051
+          }
+        },
+        {
+          "order": [
+            "A",
+            "B"
+          ],
+          "A": {
+            "append": 59.61789999999999,
+            "dailyDeletes": 3.4436000000000035,
+            "capability": 8.032689062500001,
+            "providerCosts": 12.29641875,
+            "modelCosts": 24.282884375000002,
+            "dayAverage": 5.547699999999963,
+            "monthAverage": 4.749000000000024,
+            "sessionAverage": 3.56940000000003,
+            "projectAverage": 4.111499999999978
+          },
+          "B": {
+            "append": 58.15499999999999,
+            "dailyDeletes": 0.5127999999999986,
+            "capability": 4.861073437500001,
+            "providerCosts": 7.09974375,
+            "modelCosts": 15.802801562500004,
+            "dayAverage": 5.289100000000019,
+            "monthAverage": 4.286200000000008,
+            "sessionAverage": 3.55619999999999,
+            "projectAverage": 4.1644000000000005
+          }
+        },
+        {
+          "order": [
+            "B",
+            "A"
+          ],
+          "A": {
+            "append": 60.2047,
+            "dailyDeletes": 3.518999999999977,
+            "capability": 8.0974296875,
+            "providerCosts": 12.096631250000002,
+            "modelCosts": 23.6993734375,
+            "dayAverage": 5.194299999999998,
+            "monthAverage": 4.2346,
+            "sessionAverage": 3.5819000000000187,
+            "projectAverage": 3.9775999999999954
+          },
+          "B": {
+            "append": 60.26350000000001,
+            "dailyDeletes": 0.5186999999999671,
+            "capability": 4.836278124999999,
+            "providerCosts": 6.697837500000002,
+            "modelCosts": 16.3816359375,
+            "dayAverage": 5.168000000000006,
+            "monthAverage": 4.412199999999984,
+            "sessionAverage": 3.5720999999999776,
+            "projectAverage": 3.9811000000000263
+          }
+        }
+      ],
+      "timings": {
+        "append": {
+          "a": 60.496449999999996,
+          "b": 58.21874999999999,
+          "reductionPercent": 3.7650143107570826,
+          "fasterPairs": 16,
+          "pairedDeltaIqr": [
+            -4.807449999999996,
+            -1.2362500000000054
+          ]
+        },
+        "dailyDeletes": {
+          "a": 3.5597000000000065,
+          "b": 0.5353999999999957,
+          "reductionPercent": 84.95940669157528,
+          "fasterPairs": 20,
+          "pairedDeltaIqr": [
+            -3.277125000000005,
+            -2.951275000000024
+          ]
+        },
+        "capability": {
+          "a": 8.1566859375,
+          "b": 4.84867578125,
+          "reductionPercent": 40.55581128901349,
+          "fasterPairs": 20,
+          "pairedDeltaIqr": [
+            -3.4512375000000004,
+            -3.162312109375002
+          ]
+        },
+        "providerCosts": {
+          "a": 12.1022109375,
+          "b": 6.79023203125,
+          "reductionPercent": 43.89263196355521,
+          "fasterPairs": 20,
+          "pairedDeltaIqr": [
+            -5.393344531249998,
+            -5.107053906249998
+          ]
+        },
+        "modelCosts": {
+          "a": 23.87864609375,
+          "b": 15.743828125,
+          "reductionPercent": 34.0673333689518,
+          "fasterPairs": 20,
+          "pairedDeltaIqr": [
+            -8.506274609374998,
+            -7.920817578125002
+          ]
+        },
+        "dayAverage": {
+          "a": 5.383949999999999,
+          "b": 5.358299999999986,
+          "reductionPercent": 0.47641601426486235,
+          "fasterPairs": 9,
+          "pairedDeltaIqr": [
+            -0.21357500000003427,
+            0.33959999999999013
+          ]
+        },
+        "monthAverage": {
+          "a": 4.382650000000012,
+          "b": 4.396749999999997,
+          "reductionPercent": -0.3217231583627454,
+          "fasterPairs": 7,
+          "pairedDeltaIqr": [
+            -0.12157499999997867,
+            0.21724999999997863
+          ]
+        },
+        "sessionAverage": {
+          "a": 3.652799999999985,
+          "b": 3.6617999999999995,
+          "reductionPercent": -0.24638633377175287,
+          "fasterPairs": 11,
+          "pairedDeltaIqr": [
+            -0.10767499999997199,
+            0.18420000000000414
+          ]
+        },
+        "projectAverage": {
+          "a": 4.143799999999999,
+          "b": 4.236050000000034,
+          "reductionPercent": -2.226217481539541,
+          "fasterPairs": 5,
+          "pairedDeltaIqr": [
+            -0.0031749999999988177,
+            0.5512999999999977
+          ]
+        }
+      }
+    },
+    "real": {
+      "initialRequests": 1825,
+      "inputSha256": "2eb1f06224f554eff22f4e35a80963aec0645c42d79ba7794de8d6477f2ab49b",
+      "append": {
+        "beforeBytes": 11752906,
+        "appendedBytes": 245,
+        "parsedFiles": 1,
+        "readBytes": 11753151,
+        "inputTokens": 123,
+        "outputTokens": 7,
+        "requests": 1
+      },
+      "totals": {
+        "baseline": [
+          {
+            "requests": 15,
+            "provider": "claude",
+            "input": 9994511,
+            "output": 247006,
+            "tokens": 10241517
+          },
+          {
+            "requests": 1810,
+            "provider": "codex",
+            "input": 3798831556,
+            "output": 17063363,
+            "tokens": 3815894919
+          }
+        ],
+        "afterAppend": [
+          {
+            "requests": 15,
+            "provider": "claude",
+            "input": 9994511,
+            "output": 247006,
+            "tokens": 10241517
+          },
+          {
+            "requests": 1811,
+            "provider": "codex",
+            "input": 3798831679,
+            "output": 17063370,
+            "tokens": 3815895049
+          }
+        ]
+      },
+      "toolGroups": {
+        "skill": 15,
+        "subagent": 1,
+        "plugin": 6,
+        "model": 5
+      },
+      "checks": {
+        "matchedPairs": 20,
+        "warmupPairs": 3,
+        "averageGroups": {
+          "day": 100,
+          "month": 7,
+          "session": 444,
+          "project": 33
+        },
+        "tableSha256": {
+          "usage_request_daily": "ce56ec22329d09ad6723580ea7dde8a1f641c02854f001c648c89738bbf09868",
+          "usage_model_daily": "7f8304f78b5ba5e2c6a63b128718f70b6a4cb94e12c78745d75d75bee186ce3a",
+          "usage_capability_daily": "915d80700118dc7b6574d7a50fa9d9eca1ad33a0a70366155b27692a5e3f1e95",
+          "usage_rollup_meta": "b032255c5ddb50cfc10cc540113803190edebbdbeb88efc36f5abec60f105dae",
+          "projects": "ec1bb75302897713b3c55852279229ccb0c365d270d7070d78d20dd7aa07b40c",
+          "sessions": "9d6e9306c047c087e57acc5b335e988b2369d037bbc551ab6a9c08f2382480f0",
+          "session_billing": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "source_file": "13404414787cb751af4032414027d28d35a5e45e21b323a92ba93ef7b15b6573"
+        },
+        "sourceIdentitySha256": "29f0e02b101e8ebf0c49e3ed8f830cc2a4794e92f2a2d8c8c2bb73b133e65e38",
+        "averageSha256": {
+          "day": "6866c394b970726053ee068bc8c09081ad09f485128f4b1aa936f99cef4ed149",
+          "month": "98bccb6e5a4f8643a3d7ba882d07a958bcaab0b81c8a383e1f6a3c3e16a8b3f7",
+          "session": "67cc3e0c74b592ec958f866b825ec97eb4c234d95cc67b0d3108fed53cbde7a8",
+          "project": "05354c836c216297c5598dacebcecbff583847583a2266b48292fd5c107e3f28"
+        },
+        "recentQuerySha256": {
+          "capabilities": "1dc57680a03f38bea2007dfaae8be06156fd1ae7a6a464be84dc21e83fa563c5",
+          "providerCosts": "7e28ade77f6fa0ebdb9be708afe5a4e9e53582d5eb2d77266a37d5a48923fee8",
+          "modelCosts": "ce2e647674f61d390ed3e29f75ec40c172885d83a3006eab80fd39298a548e69"
+        }
+      },
+      "durations": [
+        {
+          "order": [
+            "A",
+            "B"
+          ],
+          "A": {
+            "append": 264.7775,
+            "dailyDeletes": 0.46479999999996835,
+            "capability": 1.8288343750000005,
+            "providerCosts": 1.3194984375,
+            "modelCosts": 1.4420796874999997,
+            "dayAverage": 1.7364000000000033,
+            "monthAverage": 0.7977999999999952,
+            "sessionAverage": 3.956899999999962,
+            "projectAverage": 1.2724000000000046
+          },
+          "B": {
+            "append": 289.2597,
+            "dailyDeletes": 0.3153999999998973,
+            "capability": 0.757090625,
+            "providerCosts": 0.9756968750000006,
+            "modelCosts": 1.1405843749999995,
+            "dayAverage": 1.761700000000019,
+            "monthAverage": 1.0516999999999825,
+            "sessionAverage": 3.9003000000000156,
+            "projectAverage": 0.9680000000000177
+          }
+        },
+        {
+          "order": [
+            "B",
+            "A"
+          ],
+          "A": {
+            "append": 266.68359999999996,
+            "dailyDeletes": 0.5960000000000036,
+            "capability": 1.7273437500000002,
+            "providerCosts": 1.174129687499999,
+            "modelCosts": 1.2972921875,
+            "dayAverage": 1.767499999999984,
+            "monthAverage": 0.891900000000021,
+            "sessionAverage": 3.747599999999977,
+            "projectAverage": 0.8863999999999805
+          },
+          "B": {
+            "append": 285.4723,
+            "dailyDeletes": 0.4743000000000279,
+            "capability": 1.0689375000000005,
+            "providerCosts": 1.2596546874999994,
+            "modelCosts": 1.0936296875,
+            "dayAverage": 2.078900000000033,
+            "monthAverage": 1.158900000000017,
+            "sessionAverage": 3.5582999999999743,
+            "projectAverage": 1.176499999999976
+          }
+        },
+        {
+          "order": [
+            "A",
+            "B"
+          ],
+          "A": {
+            "append": 259.2574,
+            "dailyDeletes": 0.4947999999999979,
+            "capability": 1.7182515625000008,
+            "providerCosts": 1.1615765625000005,
+            "modelCosts": 1.2832781250000007,
+            "dayAverage": 1.8297000000000025,
+            "monthAverage": 1.0365999999999644,
+            "sessionAverage": 3.61160000000001,
+            "projectAverage": 0.8976000000000113
+          },
+          "B": {
+            "append": 250.91180000000003,
+            "dailyDeletes": 0.28759999999999764,
+            "capability": 0.7945031249999994,
+            "providerCosts": 0.9622906249999996,
+            "modelCosts": 1.0399046875,
+            "dayAverage": 1.8155999999999608,
+            "monthAverage": 0.9739000000000146,
+            "sessionAverage": 3.450999999999965,
+            "projectAverage": 0.9053000000000111
+          }
+        },
+        {
+          "order": [
+            "B",
+            "A"
+          ],
+          "A": {
+            "append": 248.5197,
+            "dailyDeletes": 0.43559999999996535,
+            "capability": 1.6823375,
+            "providerCosts": 1.1456234375000012,
+            "modelCosts": 1.2774593749999994,
+            "dayAverage": 1.829400000000021,
+            "monthAverage": 1.015100000000018,
+            "sessionAverage": 3.488400000000013,
+            "projectAverage": 1.0067999999999984
+          },
+          "B": {
+            "append": 250.6866,
+            "dailyDeletes": 0.34609999999997854,
+            "capability": 0.7808937499999997,
+            "providerCosts": 1.0675500000000007,
+            "modelCosts": 1.1273359374999998,
+            "dayAverage": 1.7631999999999834,
+            "monthAverage": 0.7964999999999804,
+            "sessionAverage": 3.653599999999983,
+            "projectAverage": 0.9121000000000095
+          }
+        },
+        {
+          "order": [
+            "A",
+            "B"
+          ],
+          "A": {
+            "append": 246.4333,
+            "dailyDeletes": 0.5502999999999929,
+            "capability": 1.6656781249999995,
+            "providerCosts": 1.1636140624999989,
+            "modelCosts": 1.4012624999999996,
+            "dayAverage": 1.9212999999999738,
+            "monthAverage": 0.841700000000003,
+            "sessionAverage": 3.450400000000002,
+            "projectAverage": 0.8849999999999909
+          },
+          "B": {
+            "append": 251.22449999999998,
+            "dailyDeletes": 0.3166999999999689,
+            "capability": 0.7711218750000004,
+            "providerCosts": 0.9996656249999996,
+            "modelCosts": 1.0479875000000014,
+            "dayAverage": 2.0731999999999857,
+            "monthAverage": 0.8252999999999702,
+            "sessionAverage": 3.3302999999999656,
+            "projectAverage": 0.9740999999999644
+          }
+        },
+        {
+          "order": [
+            "B",
+            "A"
+          ],
+          "A": {
+            "append": 245.4293,
+            "dailyDeletes": 0.4352999999999838,
+            "capability": 1.6835812499999996,
+            "providerCosts": 1.2311468750000003,
+            "modelCosts": 1.3022578124999988,
+            "dayAverage": 1.7076000000000136,
+            "monthAverage": 0.8063999999999965,
+            "sessionAverage": 3.7980999999999767,
+            "projectAverage": 0.8718000000000075
+          },
+          "B": {
+            "append": 248.49339999999998,
+            "dailyDeletes": 0.40270000000003847,
+            "capability": 0.7835937500000005,
+            "providerCosts": 0.9939703125000001,
+            "modelCosts": 1.053548437499999,
+            "dayAverage": 1.8068999999999846,
+            "monthAverage": 0.8015000000000327,
+            "sessionAverage": 3.3740999999999985,
+            "projectAverage": 1.0810000000000173
+          }
+        },
+        {
+          "order": [
+            "A",
+            "B"
+          ],
+          "A": {
+            "append": 252.1379,
+            "dailyDeletes": 0.42809999999997217,
+            "capability": 1.7517453124999998,
+            "providerCosts": 1.1710421875000012,
+            "modelCosts": 1.2663171875000003,
+            "dayAverage": 1.95840000000004,
+            "monthAverage": 0.8254000000000019,
+            "sessionAverage": 3.3467999999999734,
+            "projectAverage": 0.944500000000005
+          },
+          "B": {
+            "append": 248.9371,
+            "dailyDeletes": 0.27190000000001646,
+            "capability": 0.7484031249999994,
+            "providerCosts": 0.9325359375,
+            "modelCosts": 1.0277218750000001,
+            "dayAverage": 2.1748999999999796,
+            "monthAverage": 0.8749000000000251,
+            "sessionAverage": 3.4805000000000064,
+            "projectAverage": 1.0831999999999766
+          }
+        },
+        {
+          "order": [
+            "B",
+            "A"
+          ],
+          "A": {
+            "append": 247.1875,
+            "dailyDeletes": 0.4549999999999841,
+            "capability": 1.9372718750000004,
+            "providerCosts": 1.1678296874999994,
+            "modelCosts": 1.3081406249999983,
+            "dayAverage": 1.9658000000000015,
+            "monthAverage": 0.8360000000000127,
+            "sessionAverage": 3.803100000000029,
+            "projectAverage": 0.9092999999999734
+          },
+          "B": {
+            "append": 253.03590000000003,
+            "dailyDeletes": 0.4622999999999706,
+            "capability": 0.7554953124999999,
+            "providerCosts": 0.9619140625,
+            "modelCosts": 1.0423234374999995,
+            "dayAverage": 1.713799999999992,
+            "monthAverage": 0.8159999999999741,
+            "sessionAverage": 3.459099999999978,
+            "projectAverage": 0.8829999999999814
+          }
+        },
+        {
+          "order": [
+            "A",
+            "B"
+          ],
+          "A": {
+            "append": 255.0795,
+            "dailyDeletes": 0.6514000000000237,
+            "capability": 1.9818406249999994,
+            "providerCosts": 1.1637578124999983,
+            "modelCosts": 1.2584250000000008,
+            "dayAverage": 2.055000000000007,
+            "monthAverage": 0.8590000000000373,
+            "sessionAverage": 3.499500000000012,
+            "projectAverage": 0.9318999999999846
+          },
+          "B": {
+            "append": 250.59880000000004,
+            "dailyDeletes": 0.289100000000019,
+            "capability": 0.7271343749999994,
+            "providerCosts": 0.9809906250000004,
+            "modelCosts": 1.0187625000000011,
+            "dayAverage": 1.8269999999999982,
+            "monthAverage": 0.7812000000000126,
+            "sessionAverage": 4.028999999999996,
+            "projectAverage": 0.9001999999999839
+          }
+        },
+        {
+          "order": [
+            "B",
+            "A"
+          ],
+          "A": {
+            "append": 245.63410000000002,
+            "dailyDeletes": 0.5235000000000127,
+            "capability": 1.6929812499999999,
+            "providerCosts": 1.1690500000000004,
+            "modelCosts": 1.3244500000000006,
+            "dayAverage": 1.8997999999999706,
+            "monthAverage": 0.7991999999999848,
+            "sessionAverage": 3.497099999999989,
+            "projectAverage": 0.9501000000000204
+          },
+          "B": {
+            "append": 247.84069999999997,
+            "dailyDeletes": 0.280399999999986,
+            "capability": 0.7517671875000005,
+            "providerCosts": 0.9999625000000005,
+            "modelCosts": 1.1133531250000006,
+            "dayAverage": 1.7887000000000057,
+            "monthAverage": 0.7882999999999925,
+            "sessionAverage": 3.7117999999999824,
+            "projectAverage": 0.9884999999999877
+          }
+        },
+        {
+          "order": [
+            "A",
+            "B"
+          ],
+          "A": {
+            "append": 248.2647,
+            "dailyDeletes": 0.40989999999999327,
+            "capability": 1.6435343749999998,
+            "providerCosts": 1.1689656250000002,
+            "modelCosts": 1.2972906249999987,
+            "dayAverage": 1.8473000000000184,
+            "monthAverage": 0.8051000000000386,
+            "sessionAverage": 3.9880999999999744,
+            "projectAverage": 0.9422999999999888
+          },
+          "B": {
+            "append": 250.56829999999997,
+            "dailyDeletes": 0.2968000000000188,
+            "capability": 0.7881296874999997,
+            "providerCosts": 0.9900703125000003,
+            "modelCosts": 1.0545406249999996,
+            "dayAverage": 1.778599999999983,
+            "monthAverage": 0.7740999999999758,
+            "sessionAverage": 3.726599999999962,
+            "projectAverage": 0.8944999999999936
+          }
+        },
+        {
+          "order": [
+            "B",
+            "A"
+          ],
+          "A": {
+            "append": 244.98520000000002,
+            "dailyDeletes": 0.4450999999999681,
+            "capability": 1.6882140625000002,
+            "providerCosts": 1.1579234375,
+            "modelCosts": 1.2789953124999993,
+            "dayAverage": 2.134299999999996,
+            "monthAverage": 0.876700000000028,
+            "sessionAverage": 3.413000000000011,
+            "projectAverage": 0.9322999999999979
+          },
+          "B": {
+            "append": 252.91430000000003,
+            "dailyDeletes": 0.44050000000004275,
+            "capability": 0.7364156249999994,
+            "providerCosts": 1.0191390624999999,
+            "modelCosts": 1.0502921875000002,
+            "dayAverage": 1.7590999999999894,
+            "monthAverage": 0.8002999999999929,
+            "sessionAverage": 3.303100000000029,
+            "projectAverage": 0.948099999999954
+          }
+        },
+        {
+          "order": [
+            "A",
+            "B"
+          ],
+          "A": {
+            "append": 244.59750000000003,
+            "dailyDeletes": 0.45570000000003574,
+            "capability": 1.6786390625000003,
+            "providerCosts": 1.1438546874999993,
+            "modelCosts": 1.3161718750000002,
+            "dayAverage": 1.7078000000000202,
+            "monthAverage": 0.8004999999999995,
+            "sessionAverage": 3.637800000000027,
+            "projectAverage": 1.1725999999999885
+          },
+          "B": {
+            "append": 250.5994,
+            "dailyDeletes": 0.28309999999999036,
+            "capability": 0.7511687500000006,
+            "providerCosts": 0.9866656249999997,
+            "modelCosts": 1.0569484374999991,
+            "dayAverage": 1.7985000000000468,
+            "monthAverage": 0.7823999999999955,
+            "sessionAverage": 3.364499999999964,
+            "projectAverage": 0.9761000000000308
+          }
+        },
+        {
+          "order": [
+            "B",
+            "A"
+          ],
+          "A": {
+            "append": 246.53629999999998,
+            "dailyDeletes": 0.4560999999999922,
+            "capability": 1.6538374999999998,
+            "providerCosts": 1.167165625,
+            "modelCosts": 1.2769703124999996,
+            "dayAverage": 1.8512000000000057,
+            "monthAverage": 0.7889999999999873,
+            "sessionAverage": 4.279600000000016,
+            "projectAverage": 0.9646999999999935
+          },
+          "B": {
+            "append": 262.8203,
+            "dailyDeletes": 0.23619999999999663,
+            "capability": 0.7412000000000001,
+            "providerCosts": 0.9740703125000003,
+            "modelCosts": 1.0661859375000002,
+            "dayAverage": 1.779200000000003,
+            "monthAverage": 0.7886000000000308,
+            "sessionAverage": 3.5603000000000407,
+            "projectAverage": 1.1465000000000032
+          }
+        },
+        {
+          "order": [
+            "A",
+            "B"
+          ],
+          "A": {
+            "append": 257.4665,
+            "dailyDeletes": 0.43369999999998754,
+            "capability": 1.6593234374999994,
+            "providerCosts": 1.2077187499999997,
+            "modelCosts": 1.313098437499999,
+            "dayAverage": 1.8412000000000148,
+            "monthAverage": 0.813699999999983,
+            "sessionAverage": 3.3017000000000394,
+            "projectAverage": 0.9618999999999573
+          },
+          "B": {
+            "append": 253.17739999999998,
+            "dailyDeletes": 0.3201000000000249,
+            "capability": 0.7381937500000006,
+            "providerCosts": 0.9838843749999997,
+            "modelCosts": 1.0263656250000004,
+            "dayAverage": 1.732500000000016,
+            "monthAverage": 0.8235000000000241,
+            "sessionAverage": 3.349899999999991,
+            "projectAverage": 0.9309000000000083
+          }
+        },
+        {
+          "order": [
+            "B",
+            "A"
+          ],
+          "A": {
+            "append": 268.4361,
+            "dailyDeletes": 0.4669999999999277,
+            "capability": 1.7250421875000006,
+            "providerCosts": 1.1943984375000003,
+            "modelCosts": 1.3363062499999998,
+            "dayAverage": 1.765799999999956,
+            "monthAverage": 0.7932999999999879,
+            "sessionAverage": 4.060299999999984,
+            "projectAverage": 1.0787000000000262
+          },
+          "B": {
+            "append": 258.5786,
+            "dailyDeletes": 0.33260000000001355,
+            "capability": 0.7798281249999999,
+            "providerCosts": 1.0137906249999995,
+            "modelCosts": 1.0461734374999985,
+            "dayAverage": 2.2607000000000426,
+            "monthAverage": 1.1958999999999946,
+            "sessionAverage": 3.8681000000000267,
+            "projectAverage": 0.8926999999999907
+          }
+        },
+        {
+          "order": [
+            "A",
+            "B"
+          ],
+          "A": {
+            "append": 259.1314,
+            "dailyDeletes": 0.47800000000000864,
+            "capability": 1.6547546875000005,
+            "providerCosts": 1.1364484375000004,
+            "modelCosts": 1.304128125,
+            "dayAverage": 1.8385999999999854,
+            "monthAverage": 1.0597000000000207,
+            "sessionAverage": 3.4139999999999873,
+            "projectAverage": 1.030900000000031
+          },
+          "B": {
+            "append": 256.6303,
+            "dailyDeletes": 0.3003999999999678,
+            "capability": 0.7296734375000007,
+            "providerCosts": 0.997314062500001,
+            "modelCosts": 1.0614421875000009,
+            "dayAverage": 1.9460000000000264,
+            "monthAverage": 0.7995000000000232,
+            "sessionAverage": 3.722500000000025,
+            "projectAverage": 0.9257000000000062
+          }
+        },
+        {
+          "order": [
+            "B",
+            "A"
+          ],
+          "A": {
+            "append": 255.837,
+            "dailyDeletes": 0.42349999999993315,
+            "capability": 1.7389203124999995,
+            "providerCosts": 1.1931437500000008,
+            "modelCosts": 1.3275593749999999,
+            "dayAverage": 1.7235000000000014,
+            "monthAverage": 0.7922000000000367,
+            "sessionAverage": 3.795099999999991,
+            "projectAverage": 0.9293999999999869
+          },
+          "B": {
+            "append": 273.45750000000004,
+            "dailyDeletes": 0.45150000000001,
+            "capability": 0.7423171875000003,
+            "providerCosts": 0.9683156249999998,
+            "modelCosts": 1.0707312499999997,
+            "dayAverage": 1.7306999999999562,
+            "monthAverage": 0.7883999999999673,
+            "sessionAverage": 3.3034999999999854,
+            "projectAverage": 1.4019999999999868
+          }
+        },
+        {
+          "order": [
+            "A",
+            "B"
+          ],
+          "A": {
+            "append": 245.81649999999996,
+            "dailyDeletes": 0.5117000000000189,
+            "capability": 1.6997093750000003,
+            "providerCosts": 1.1558875000000004,
+            "modelCosts": 1.3301968750000004,
+            "dayAverage": 1.8362000000000194,
+            "monthAverage": 0.797300000000007,
+            "sessionAverage": 3.386199999999974,
+            "projectAverage": 0.9338999999999942
+          },
+          "B": {
+            "append": 256.7508,
+            "dailyDeletes": 0.4020999999999617,
+            "capability": 0.7354109374999993,
+            "providerCosts": 0.9487328124999994,
+            "modelCosts": 1.0758593749999994,
+            "dayAverage": 1.773900000000026,
+            "monthAverage": 0.9796000000000049,
+            "sessionAverage": 3.602800000000002,
+            "projectAverage": 0.875
+          }
+        },
+        {
+          "order": [
+            "B",
+            "A"
+          ],
+          "A": {
+            "append": 244.0513,
+            "dailyDeletes": 0.40859999999997854,
+            "capability": 1.7019203124999995,
+            "providerCosts": 1.1723218749999997,
+            "modelCosts": 1.2501484375,
+            "dayAverage": 1.7169999999999845,
+            "monthAverage": 0.8301999999999907,
+            "sessionAverage": 3.708499999999958,
+            "projectAverage": 1.0293000000000347
+          },
+          "B": {
+            "append": 247.5752,
+            "dailyDeletes": 0.32229999999998427,
+            "capability": 0.7648515625000005,
+            "providerCosts": 1.0191093750000002,
+            "modelCosts": 1.031409374999999,
+            "dayAverage": 1.7468999999999824,
+            "monthAverage": 0.7980999999999767,
+            "sessionAverage": 3.294300000000021,
+            "projectAverage": 0.8909999999999627
+          }
+        }
+      ],
+      "timings": {
+        "append": {
+          "a": 248.3922,
+          "b": 252.0694,
+          "reductionPercent": -1.480400753324782,
+          "fasterPairs": 6,
+          "pairedDeltaIqr": [
+            -2.67602500000001,
+            8.68040000000002
+          ]
+        },
+        "dailyDeletes": {
+          "a": 0.45590000000001396,
+          "b": 0.3183999999999969,
+          "reductionPercent": 30.16012283395763,
+          "fasterPairs": 18,
+          "pairedDeltaIqr": [
+            -0.1850000000000307,
+            -0.08869999999998868
+          ]
+        },
+        "capability": {
+          "a": 1.6963453125,
+          "b": 0.7536312500000002,
+          "reductionPercent": 55.5732406340469,
+          "fasterPairs": 20,
+          "pairedDeltaIqr": [
+            -0.9723746093750005,
+            -0.9098390624999999
+          ]
+        },
+        "providerCosts": {
+          "a": 1.1683976562499998,
+          "b": 0.98836796875,
+          "reductionPercent": 15.408254761295003,
+          "fasterPairs": 19,
+          "pairedDeltaIqr": [
+            -0.21132460937500075,
+            -0.15619492187499961
+          ]
+        },
+        "modelCosts": {
+          "a": 1.3031929687499995,
+          "b": 1.0540445312499993,
+          "reductionPercent": 19.118307378452105,
+          "fasterPairs": 20,
+          "pairedDeltaIqr": [
+            -0.26087187500000053,
+            -0.22621210937499958
+          ]
+        },
+        "dayAverage": {
+          "a": 1.8374000000000024,
+          "b": 1.7839500000000044,
+          "reductionPercent": 2.9090018504407276,
+          "fasterPairs": 10,
+          "pairedDeltaIqr": [
+            -0.08117500000000177,
+            0.10132499999998856
+          ]
+        },
+        "monthAverage": {
+          "a": 0.8195499999999925,
+          "b": 0.8009000000000128,
+          "reductionPercent": 2.275639070218998,
+          "fasterPairs": 14,
+          "pairedDeltaIqr": [
+            -0.039749999999997954,
+            0.01972500000003663
+          ]
+        },
+        "sessionAverage": {
+          "a": 3.6247000000000185,
+          "b": 3.5193999999999903,
+          "reductionPercent": 2.905068005628814,
+          "fasterPairs": 13,
+          "pairedDeltaIqr": [
+            -0.29097500000005994,
+            0.14157500000001733
+          ]
+        },
+        "projectAverage": {
+          "a": 0.9433999999999969,
+          "b": 0.9394999999999811,
+          "reductionPercent": 0.41339834640828843,
+          "fasterPairs": 11,
+          "pairedDeltaIqr": [
+            -0.09732499999999789,
+            0.10149999999997306
+          ]
+        }
+      }
+    }
+  }
+}
