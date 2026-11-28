@@ -110,7 +110,7 @@ export class MemoryStore {
     const sessions = plans.flatMap(plan => [...plan.sessions.values()]);
 
     // [SQL 트랜잭션 정책] 이름과 원본 상태를 먼저 저장해 소실 여부가 일별 집계에 반영되게 한다.
-    this.profile.measure('metadata', () => this.saveNames(summaries, savedNames));
+    const incomingProjects = this.profile.measure('metadata', () => this.saveNames(summaries, savedNames));
     for (const plan of plans) {
       this.profile.measure('source_file', () => this.saveFiles(plan, now));
       this.profile.measure('removeSources', () => this.removeSources(plan, now));
@@ -119,12 +119,15 @@ export class MemoryStore {
 
     // [SQL 트랜잭션 정책] 같은 트랜잭션에서 대상 세션의 일별 집계를 교체하고 참조가 끊긴 이름을 정리한다.
     const scope = JSON.stringify(sessions.map(row => [row.provider, row.session_id]));
-    const projects = this.database.statement(`SELECT DISTINCT project_key FROM usage_request_daily
-      WHERE (provider, session_id) IN (${SESSION_KEYS})`).all(scope).map(row => row.project_key);
+    const previousProjects = this.database.statement(`SELECT DISTINCT project_key FROM usage_request_daily
+      WHERE (provider, session_id) IN (${SESSION_KEYS})`).all(scope).map(row => row.project_key as string);
     const retain = plans.some(({ replacement }) => replacement.retainDeletedSourceUsage === true);
     const preserveCapabilities = plans[0].replacement.preserveCapabilities === true;
     this.profile.measure('rollups', () => this.database.rollups.replaceDaily(sessions, summaries, retain, this.profile, preserveCapabilities));
-    this.profile.measure('pruneNames', () => this.pruneNames(scope, projects, savedNames));
+    this.profile.measure('pruneNames', () => {
+      const orphanCandidates = previousProjects.filter(project => !incomingProjects.has(project));
+      this.pruneNames(scope, orphanCandidates, savedNames);
+    });
   }
 
   private requireSession(provider: unknown, session: unknown, sessions: ReplacementSessions): void {
@@ -209,7 +212,7 @@ export class MemoryStore {
     return retained;
   }
 
-  private saveNames(summaries: readonly TurnSummaryInput[], savedNames: Map<string, string>): void {
+  private saveNames(summaries: readonly TurnSummaryInput[], savedNames: Map<string, string>): ReadonlyMap<string, string> {
     // [저장 정책] 프로젝트와 세션을 키별로 모으고 세션 이름은 비어 있지 않은 마지막 입력을 선택한다.
     const projects = new Map<string, string>(), sessions = new Map<string, SessionName>();
     for (const summary of summaries) {
@@ -218,7 +221,7 @@ export class MemoryStore {
       const key = sessionKey(provider, session_id), name = summary.session_name?.trim() || null;
       if (!sessions.has(key) || name !== null) sessions.set(key, { provider, session_id, name });
     }
-    if (!sessions.size) return;
+    if (!sessions.size) return projects;
 
     // [저장 정책] 프로젝트 이름은 바뀐 경우만 갱신하고 빈 세션 이름은 이미 저장한 이름을 덮어쓰지 않는다.
     const project = this.database.statement(`INSERT INTO projects VALUES(?,?) ON CONFLICT(project_key) DO UPDATE SET project_name=excluded.project_name
@@ -231,9 +234,10 @@ export class MemoryStore {
       session.run(provider, session_id, name);
       if (name !== null) savedNames.set(key, name);
     }
+    return projects;
   }
 
-  private pruneNames(scope: string, projects: readonly unknown[], savedNames: Map<string, string>): void {
+  private pruneNames(scope: string, projects: readonly string[], savedNames: Map<string, string>): void {
     // [저장 정책] 교체 범위에서 일별 행이 모두 사라진 세션을 지우고 확정 이름 목록에서도 제외한다.
     const deleted = this.database.statement(`DELETE FROM sessions
       WHERE (provider, session_id) IN (${SESSION_KEYS}) AND NOT EXISTS(
